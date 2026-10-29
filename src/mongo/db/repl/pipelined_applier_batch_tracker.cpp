@@ -51,13 +51,15 @@ std::shared_ptr<std::atomic<uint32_t>> PipelinedApplierBatchTracker::addBatch(
                 newBatchThreshold = static_cast<uint64_t>(maxBatches * hysteresisFactor);
                 newBytesThreshold = static_cast<uint64_t>(maxBytes * hysteresisFactor);
             };
+            boost::optional<BackpressureReason> reason;
             const auto underThresholdOrShuttingDown = [&] {
                 updateThresholds();
-                return _shutdown ||
-                    !backpressureNecessary(_inflightBatches.size(),
-                                           _inflightBytes,
-                                           newBatchThreshold,
-                                           newBytesThreshold);
+                if (_shutdown) {
+                    return true;
+                }
+                reason = backpressureNecessary(
+                    _inflightBatches.size(), _inflightBytes, newBatchThreshold, newBytesThreshold);
+                return !reason;
             };
             // Emit a log message after having waited for 1sec, 30sec, 1hr, and 24hrs.
             const std::array logFrequencies{
@@ -71,13 +73,12 @@ std::shared_ptr<std::atomic<uint32_t>> PipelinedApplierBatchTracker::addBatch(
                 if (_capacityCv.wait_for(lk, duration, underThresholdOrShuttingDown)) {
                     break;
                 }
+                invariant(reason);
                 LOGV2(13478000,
                       "Pipelined oplog applier backpressure triggered, waiting for the inflight "
                       "batch queue count/bytes to drop under threshold before enqueuing further",
-                      "batchesOverThreshold"_attr = _inflightBatches.size() -
-                          std::min(_inflightBatches.size(), newBatchThreshold),
-                      "bytesOverThreshold"_attr =
-                          _inflightBytes - std::min(_inflightBytes, newBytesThreshold),
+                      "batchesOverThreshold"_attr = reason->batchesOverThreshold,
+                      "bytesOverThreshold"_attr = reason->bytesOverThreshold,
                       "batchThreshold"_attr = newBatchThreshold,
                       "byteThreshold"_attr = newBytesThreshold,
                       "timeBlocked"_attr = Date_t::now() - start);
