@@ -23,6 +23,8 @@ class BazelCompileTest(unittest.TestCase):
         *,
         distro: str | None,
         expected_capture: bool = True,
+        expected_release_log: str | None = None,
+        expected_reuse: bool = False,
         windows: bool = WINDOWS,
         **expansions: str,
     ) -> tuple[subprocess.CompletedProcess, str]:
@@ -35,7 +37,19 @@ class BazelCompileTest(unittest.TestCase):
             shutil.copy(REPO_ROOT / "evergreen/bazel_evergreen_shutils.sh", evergreen)
             (src / ".bazelrc").write_text("common:publish --config=public-release-local\n")
             # Keep the real option composition and policy; replace host/server operations.
-            (evergreen / "prelude.sh").write_text("activate_venv() { :; }\n")
+            (evergreen / "prelude.sh").write_text(
+                "activate_venv() { :; }\n"
+                "setup_db_contrib_tool() { :; }\n"
+                "db-contrib-tool() {\n"
+                "  local arg directory\n"
+                '  for arg in "$@"; do\n'
+                '    case "$arg" in --installDir=*) directory=${arg#--installDir=} ;; esac\n'
+                "  done\n"
+                '  mkdir -p "$directory"\n'
+                '  echo reused > "$directory/dist-test-stripped.tgz"\n'
+                "  echo reuse >> build.log\n"
+                "}\n"
+            )
             with (evergreen / "bazel_evergreen_shutils.sh").open("a") as helpers:
                 helpers.write(
                     "\n"
@@ -83,8 +97,16 @@ class BazelCompileTest(unittest.TestCase):
                 timeout=20,
             )
             log = src / "build.log"
-            if result.returncode == 0:
-                captured_distro = src / ".bazel_provenance_build_invocation.distro_id"
+            if result.returncode == 0 and expected_reuse:
+                self.assertFalse((src / ".bazel_provenance_build_invocation").exists())
+                self.assertEqual("reused\n", (src / "bazel-bin/dist-test-stripped.tgz").read_text())
+            elif result.returncode == 0:
+                invocation_name = (
+                    ".bazel_crypt_build_invocation"
+                    if env["task_name"] == "crypt_create_lib"
+                    else ".bazel_provenance_build_invocation"
+                )
+                captured_distro = src / f"{invocation_name}.distro_id"
                 self.assertEqual(f"{distro}\n", captured_distro.read_text())
                 capture_path = src / ".bazel_toolchain_provenance.json"
                 self.assertEqual(expected_capture, capture_path.exists())
@@ -92,7 +114,82 @@ class BazelCompileTest(unittest.TestCase):
                     self.assertEqual(
                         {"compiler_version": "19.1.7"}, json.loads(capture_path.read_text())
                     )
+                if expected_release_log is not None:
+                    invocation = (src / invocation_name).read_text()
+                    if expected_release_log:
+                        self.assertIn(
+                            f"--execution_log_compact_file={expected_release_log}", invocation
+                        )
+                        self.assertIn("--remote_executor= --noremote_accept_cached", invocation)
+                    else:
+                        self.assertNotIn("--execution_log_compact_file=", invocation)
             return result, log.read_text() if log.exists() else ""
+
+    def test_provenance_builds_do_not_reuse_another_tasks_binaries(self) -> None:
+        for patch, release in (("false", "false"), ("true", "true")):
+            for reuse_option in ("build_patch_id", "reuse_compile_from"):
+                with self.subTest(patch=patch, release=release, reuse_option=reuse_option):
+                    result, log = self.run_compile(
+                        distro="release-build-host",
+                        expected_release_log=".bazel_release_execution_log.binpb.zst",
+                        is_patch=patch,
+                        is_release=release,
+                        bazel_compile_flags="--config=public-release-local",
+                        **{reuse_option: "prior-version"},
+                    )
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertEqual(self.successful_build_log, log)
+
+    def test_ordinary_patch_can_still_reuse_a_compile(self) -> None:
+        result, log = self.run_compile(
+            distro="regular-build-host",
+            expected_capture=False,
+            expected_reuse=True,
+            is_patch="true",
+            is_release="false",
+            build_patch_id="prior-version",
+            compile_variant="producer-variant",
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("reuse\n", log)
+
+    def test_release_producers_record_execution_logs_across_projects(self) -> None:
+        for project in ("mongodb-mongo-master-nightly", "mongodb-mongo-v9.0", "mongo-release"):
+            for task, execution_log in (
+                ("package", "release_execution_log.binpb.zst"),
+                ("crypt_create_lib", "release_execution_log.binpb.zst"),
+                ("archive_dist_test", ".bazel_release_execution_log.binpb.zst"),
+                (
+                    "archive_dist_test_future_git_tag_multiversion",
+                    ".bazel_release_execution_log.binpb.zst",
+                ),
+            ):
+                for is_patch in ("true", "false"):
+                    with self.subTest(project=project, task=task, patch=is_patch):
+                        result, log = self.run_compile(
+                            distro="release-build-host",
+                            expected_release_log=execution_log,
+                            project=project,
+                            task_name=task,
+                            is_patch=is_patch,
+                            is_release="true" if is_patch == "true" else "false",
+                            patch_compile_flags="--config=public-release-local",
+                        )
+                        self.assertEqual(0, result.returncode, result.stderr)
+                        self.assertEqual(self.successful_build_log, log)
+
+    def test_ordinary_nightly_patch_does_not_require_release_execution_log(self) -> None:
+        result, log = self.run_compile(
+            distro="regular",
+            expected_release_log="",
+            project="mongodb-mongo-master-nightly",
+            task_name="package",
+            is_patch="true",
+            is_release="false",
+            push_bucket="downloads",
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(self.successful_build_log, log)
 
     def test_release_profiles_fail_before_build_on_regular_or_missing_distro(self) -> None:
         for profile in ("public-release", "public-release-local", "public-release-rbe", "publish"):

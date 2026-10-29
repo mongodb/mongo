@@ -38,6 +38,16 @@ rm -f .bazel_provenance_build_invocation .bazel_crypt_build_invocation \
 # if build_patch_id is passed, try to download binaries from specified
 # evergreen patch.
 build_patch_id="${build_patch_id:-${reuse_compile_from}}"
+if [[ -n "${build_patch_id}" && ("${is_patch:-}" != "true" || "${is_release:-false}" != "false") ]]; then
+    case "${task_name:-}" in
+    archive_dist_test | archive_dist_test_debug | archive_dist_test_future_git_tag_multiversion)
+        # These producers need their own build invocation and provenance on the waterfall and
+        # explicit release patches. Downloading another version's binaries bypasses that build.
+        echo "Building ${task_name} instead of reusing ${build_patch_id} to preserve producer provenance"
+        build_patch_id=""
+        ;;
+    esac
+fi
 if [[ -n "${build_patch_id}" ]]; then
     echo "build_patch_id detected, trying to skip task"
 
@@ -153,21 +163,14 @@ if [[ "${is_patch:-}" != "true" || "${is_release:-false}" != "false" ]]; then
     SHOULD_ENFORCE_RELEASE_LOCAL_BUILD=true
 fi
 echo "Release-local build enforcement: ${SHOULD_ENFORCE_RELEASE_LOCAL_BUILD} (is_patch=${is_patch:-}, is_release=${is_release:-false})"
-IS_SERVER_RELEASE_PROJECT=false
-if [[ "${project:-}" == mongo-release* ]]; then
-    IS_SERVER_RELEASE_PROJECT=true
-fi
-
 if [[ "${SHOULD_ENFORCE_RELEASE_LOCAL_BUILD}" == "true" ]]; then
     if [[ " ${BASE_FLAGS} " == *" --config=public-release "* ||
         " ${BASE_FLAGS} " == *" --config public-release "* ||
         " ${BASE_FLAGS} " == *" --config=public-release-local "* ||
         " ${BASE_FLAGS} " == *" --config public-release-local "* ]]; then
-        if [[ "${IS_SERVER_RELEASE_PROJECT}" == "true" && "${task_name:-}" == "package" ]]; then
+        if [[ "${task_name:-}" == "package" || "${task_name:-}" == "crypt_create_lib" ]]; then
             RELEASE_EXECUTION_LOG_FLAGS="--execution_log_compact_file=release_execution_log.binpb.zst"
-        elif [[ "${task_name:-}" == "crypt_create_lib" ]]; then
-            RELEASE_EXECUTION_LOG_FLAGS="--execution_log_compact_file=release_execution_log.binpb.zst"
-        elif [[ "${IS_SERVER_RELEASE_PROJECT}" == "false" && "${task_name:-}" == "archive_dist_test" ]]; then
+        elif [[ "${task_name:-}" == "archive_dist_test" || "${task_name:-}" == "archive_dist_test_future_git_tag_multiversion" ]]; then
             RELEASE_EXECUTION_LOG_FLAGS="--execution_log_compact_file=.bazel_release_execution_log.binpb.zst"
         fi
         RELEASE_LOCAL_SAFETY_FLAGS="--remote_executor= --noremote_accept_cached"

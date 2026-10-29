@@ -37,7 +37,6 @@ from buildscripts.package_test.package_test_provenance import (
     CRYPT_RELEASE_BINARY_NAMES,
     RELEASE_BINARY_NAMES,
     combine_execution_log_validation_summaries,
-    create_release_binary_provenance_from_archive_dist_test,
     extract_file_from_tar_by_basename,
     fetch_release_binary_provenance_from_tasks,
     fetch_release_execution_log_from_tasks,
@@ -46,10 +45,11 @@ from buildscripts.package_test.package_test_provenance import (
     find_task_artifact_url_with_retry,
     is_release_branch_project,
     is_server_release_project,
+    package_test_task_chain,
     release_binary_name_from_path,
     validate_compact_execution_log_file,
     validate_release_binary_provenance_against_archive,
-    validate_release_binary_provenance_distro,
+    validate_release_binary_provenance_identity,
     validate_release_toolchain_provenance,
     validate_task_toolchain_provenance,
 )
@@ -68,6 +68,14 @@ root.addHandler(handler)
 
 ARCHIVE_DIST_TEST_EXECUTION_LOG_PATH = ".bazel_release_execution_log.binpb.zst"
 DEFAULT_RELEASE_BINARY_ARCHIVE_PATH = Path("mongo-binaries.tgz")
+
+
+def _package_test_tasks(api: Any, build_id: str) -> list[Any]:
+    """Use the test's dependency chain in CI; allow build selection for local reproduction."""
+    task_id = os.environ.get("task_id")
+    if task_id:
+        return package_test_task_chain(api, task_id, build_id)
+    return api.tasks_by_build(build_id)
 
 
 def download_packages_from_build(
@@ -95,7 +103,7 @@ def download_packages_from_build(
     )
 
     evg_api = evergreen_conn.get_evergreen_api()
-    tasks = evg_api.tasks_by_build(build_id)
+    tasks = _package_test_tasks(evg_api, build_id)
 
     package_task = find_build_task(tasks, package_task_display_name)
     logging.info("Found package task: %s", package_task.task_id)
@@ -139,9 +147,9 @@ def get_release_binary_provenance_for_validation(
         logging.info("Reading release binary provenance from: %s", binary_provenance_path)
         provenance_text = binary_provenance_path.read_text()
         if evg_build_id:
-            tasks = evergreen_conn.get_evergreen_api().tasks_by_build(evg_build_id)
+            tasks = _package_test_tasks(evergreen_conn.get_evergreen_api(), evg_build_id)
             build_task = find_build_task(tasks, binary_provenance_task_name)
-            validate_release_binary_provenance_distro(json.loads(provenance_text), build_task)
+            validate_release_binary_provenance_identity(json.loads(provenance_text), build_task)
         return provenance_text
 
     if not evg_build_id:
@@ -158,7 +166,7 @@ def get_release_binary_provenance_for_validation(
         )
 
     evg_api = evergreen_conn.get_evergreen_api()
-    tasks = evg_api.tasks_by_build(evg_build_id)
+    tasks = _package_test_tasks(evg_api, evg_build_id)
 
     if is_server_release_project(evg_project) or binary_provenance_task_name != "package":
         logging.info(
@@ -168,13 +176,10 @@ def get_release_binary_provenance_for_validation(
         return fetch_release_binary_provenance_from_tasks(tasks, binary_provenance_task_name)
 
     logging.info(
-        "Creating release binary provenance from archive_dist_test artifacts for Evergreen "
-        "project: %s",
+        "Fetching release binary provenance from archive_dist_test for Evergreen " "project: %s",
         evg_project,
     )
-    return create_release_binary_provenance_from_archive_dist_test(
-        tasks, evg_build_id, download_dir
-    )
+    return fetch_release_binary_provenance_from_tasks(tasks, "archive_dist_test")
 
 
 def get_release_execution_logs_for_validation(
@@ -202,7 +207,7 @@ def get_release_execution_logs_for_validation(
         )
 
     evg_api = evergreen_conn.get_evergreen_api()
-    tasks = evg_api.tasks_by_build(evg_build_id)
+    tasks = _package_test_tasks(evg_api, evg_build_id)
 
     if is_server_release_project(evg_project) or (
         execution_log_task_name and execution_log_task_name != "package"
@@ -255,7 +260,7 @@ def get_release_binary_archive_for_validation(
             )
 
         evg_api = evergreen_conn.get_evergreen_api()
-        tasks = evg_api.tasks_by_build(evg_build_id)
+        tasks = _package_test_tasks(evg_api, evg_build_id)
         logging.info(
             "Fetching release binary archive artifact '%s' from Evergreen task: %s",
             binary_archive_artifact_name,
@@ -1165,7 +1170,9 @@ if args.command == "branch":
             and build_task_name == "package"
         ):
             build_task_name = "archive_dist_test"
-        build_task = find_build_task(evg_api.tasks_by_build(args.evg_build_id), build_task_name)
+        build_task = find_build_task(
+            _package_test_tasks(evg_api, args.evg_build_id), build_task_name
+        )
     if should_validate_provenance:
         release_binary_provenance = get_release_binary_provenance_for_validation(
             args.binary_provenance_file,

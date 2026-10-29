@@ -510,6 +510,10 @@ py_test(
     deps = [
         "//buildscripts:generate_bazel_spawn_pb2",
         "//buildscripts/package_test:package_test_provenance",
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
     ],
 )
 

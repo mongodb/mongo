@@ -411,6 +411,221 @@ class PackageTestProvenanceTest(unittest.TestCase):
                         command, Path("unused"), toolchain_provenance_file=toolchain_file
                     )
 
+    def test_preserved_provenance_validates_its_original_execution_distro(self):
+        from evergreen.task import Task
+
+        api = mock.Mock()
+        original = Task(
+            {
+                "task_id": "producer",
+                "display_name": "package",
+                "build_id": "build",
+                "build_variant": "variant",
+                "version_id": "version",
+                "execution": 0,
+                "distro_id": "release-original",
+            },
+            api,
+        )
+        latest = Task({**original.json, "execution": 1, "distro_id": "release-retry"}, api)
+        api.task_by_id.return_value = original
+        provenance = {
+            "task_id": "producer",
+            "task_name": "package",
+            "build_id": "build",
+            "build_variant": "variant",
+            "version_id": "version",
+            "execution": "0",
+            "distro_id": "release-original",
+        }
+        under_test.validate_release_binary_provenance_identity(provenance, latest)
+        api.task_by_id.assert_called_once_with("producer", execution=0)
+        for distro_id in (None, "", "regular-build-host"):
+            retry = Task({**latest.json, "distro_id": distro_id}, api)
+            with self.subTest(distro_id=distro_id), self.assertRaisesRegex(ValueError, "distro"):
+                under_test.validate_release_binary_provenance_identity(provenance, retry)
+        for execution in (None, "", "invalid", "2", "-1", True):
+            with self.subTest(execution=execution), self.assertRaisesRegex(ValueError, "execution"):
+                under_test.validate_release_binary_provenance_identity(
+                    {**provenance, "execution": execution}, latest
+                )
+
+    def test_provenance_identity_must_match_the_chain_producer(self):
+        task = types.SimpleNamespace(
+            task_id="producer",
+            display_name="package",
+            build_id="build",
+            build_variant="variant",
+            version_id="version",
+            distro_id="release-host",
+            execution=0,
+        )
+        provenance = {
+            "task_id": task.task_id,
+            "task_name": task.display_name,
+            "build_id": task.build_id,
+            "build_variant": task.build_variant,
+            "version_id": task.version_id,
+            "distro_id": task.distro_id,
+            "execution": "0",
+        }
+        under_test.validate_release_binary_provenance_identity(provenance, task)
+        for field in ("task_id", "task_name", "build_id", "build_variant", "version_id"):
+            for value in (None, "", "wrong"):
+                with (
+                    self.subTest(field=field, value=value),
+                    self.assertRaisesRegex(ValueError, field),
+                ):
+                    under_test.validate_release_binary_provenance_identity(
+                        {**provenance, field: value}, task
+                    )
+
+    def test_task_chain_uses_dependency_ids_and_rejects_unrelated_same_name(self):
+        producer = types.SimpleNamespace(
+            task_id="producer",
+            display_name="archive_dist_test",
+            depends_on=[],
+            build_id="build",
+            build_variant="variant",
+            version_id="version",
+        )
+        package = types.SimpleNamespace(
+            task_id="package",
+            display_name="package",
+            depends_on=[{"id": "producer"}],
+            build_id="build",
+            build_variant="variant",
+            version_id="version",
+        )
+        test_task = types.SimpleNamespace(
+            task_id="test",
+            display_name="test_packages",
+            depends_on=[{"id": "package"}],
+            build_id="build",
+            build_variant="variant",
+            version_id="version",
+        )
+        tasks = {task.task_id: task for task in (producer, package, test_task)}
+        api = mock.Mock()
+        api.task_by_id.side_effect = tasks.__getitem__
+        chain = under_test.package_test_task_chain(api, "test", "build")
+        self.assertIs(producer, under_test.find_build_task(chain, "archive_dist_test"))
+        package.depends_on = []
+        chain = under_test.package_test_task_chain(api, "test", "build")
+        with self.assertRaisesRegex(RuntimeError, "Could not find"):
+            under_test.find_build_task(chain, "archive_dist_test")
+        for field in ("build_id", "build_variant", "version_id"):
+            with self.subTest(field=field):
+                original = getattr(package, field)
+                setattr(package, field, "wrong")
+                with self.assertRaisesRegex(ValueError, field):
+                    under_test.package_test_task_chain(api, "test", "build")
+                setattr(package, field, original)
+
+    def test_toolchain_checks_select_the_actual_package_dependency(self):
+        source = ast.parse(
+            workspace_file_path("buildscripts/package_test/package_test.py").read_text()
+        )
+        helper = next(
+            node
+            for node in source.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_package_test_tasks"
+        )
+        selection = next(
+            node
+            for node in ast.walk(source)
+            if isinstance(node, ast.If)
+            and any(
+                isinstance(statement, ast.Assign)
+                and any(
+                    isinstance(target, ast.Name) and target.id == "build_task_name"
+                    for target in statement.targets
+                )
+                for statement in node.body
+            )
+        )
+        identity = {"build_id": "build", "build_variant": "variant", "version_id": "version"}
+        archive = types.SimpleNamespace(
+            **identity, task_id="archive", display_name="archive_dist_test", depends_on=[]
+        )
+        package = types.SimpleNamespace(
+            **identity, task_id="package", display_name="package", depends_on=[{"id": "archive"}]
+        )
+        test_task = types.SimpleNamespace(
+            **identity, task_id="test", display_name="test_packages", depends_on=[{"id": "package"}]
+        )
+        api = mock.Mock()
+        api.task_by_id.side_effect = {
+            t.task_id: t for t in (test_task, package, archive)
+        }.__getitem__
+        api.tasks_by_build.return_value = [
+            package,
+            archive,
+            types.SimpleNamespace(**vars(package) | {"task_id": "unrelated-package"}),
+            types.SimpleNamespace(**vars(archive) | {"task_id": "unrelated-archive"}),
+        ]
+        for validate_release, expected in ((False, package), (True, archive)):
+            with (
+                self.subTest(validate_release=validate_release),
+                mock.patch.dict(
+                    os.environ, {"task_id": "test", "project": "mongodb-mongo-master-nightly"}
+                ),
+            ):
+                namespace = {
+                    "Any": under_test.Any,
+                    "os": os,
+                    "args": types.SimpleNamespace(
+                        evg_build_id="build",
+                        skip_release_binary_provenance_check=False,
+                        evg_binary_provenance_task_name="package",
+                        binary_provenance_file=None,
+                    ),
+                    "should_validate_provenance": validate_release,
+                    "evergreen_conn": types.SimpleNamespace(get_evergreen_api=lambda: api),
+                    "is_server_release_project": under_test.is_server_release_project,
+                    "find_build_task": under_test.find_build_task,
+                    "package_test_task_chain": under_test.package_test_task_chain,
+                }
+                exec(
+                    compile(ast.Module([helper, selection], []), "package_test.py", "exec"),
+                    namespace,
+                )
+                self.assertIs(expected, namespace["build_task"])
+        api.tasks_by_build.assert_not_called()
+
+    def test_task_chain_skips_shared_version_generation_and_handles_cycles(self):
+        root = types.SimpleNamespace(
+            task_id="test",
+            display_name="test_packages",
+            build_id="build",
+            build_variant="variant",
+            version_id="version",
+            depends_on=[{"id": "package"}, {"id": "generator"}],
+        )
+        package = types.SimpleNamespace(
+            task_id="package",
+            display_name="package",
+            build_id="build",
+            build_variant="variant",
+            version_id="version",
+            depends_on=[{"id": "test"}],
+        )
+        generator = types.SimpleNamespace(
+            task_id="generator", display_name="version_expansions_gen"
+        )
+        api = mock.Mock()
+        api.task_by_id.side_effect = {t.task_id: t for t in (root, package, generator)}.__getitem__
+        self.assertEqual([root, package], under_test.package_test_task_chain(api, "test", "build"))
+        with self.assertRaisesRegex(ValueError, "build_id"):
+            under_test.package_test_task_chain(api, "test", "wrong")
+
+    def test_missing_provenance_build_id_is_rejected_when_expected(self):
+        for value in (None, ""):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "build_id"):
+                under_test.validate_release_binary_provenance_hashes(
+                    json.dumps({"build_id": value}), {}, expected_build_id="build"
+                )
+
     def test_archive_fallback_checks_captured_distro_against_task(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -476,11 +691,14 @@ class PackageTestProvenanceTest(unittest.TestCase):
             command.write_text(f"bazel build archive-dist-stripped {release_local_suffix()}")
             Path(f"{command}.distro_id").write_text("release-build-host\n")
             with (
-                mock.patch.dict(os.environ, {"distro_id": "release-later-host"}),
+                mock.patch.dict(
+                    os.environ, {"distro_id": "release-later-host", "version_id": "version"}
+                ),
                 mock.patch.object(under_test, "hash_release_binaries_in_archive", return_value={}),
             ):
                 provenance = under_test.make_release_binary_provenance(command, Path("unused"))
             self.assertEqual("release-build-host", provenance["distro_id"])
+            self.assertEqual("version", provenance["version_id"])
 
     def test_provenance_creation_rejects_missing_or_regular_captured_distro(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -585,6 +803,9 @@ class PackageTestProvenanceTest(unittest.TestCase):
         task = types.SimpleNamespace(
             display_name="package",
             task_id="task_id",
+            build_id="build",
+            build_variant="variant",
+            version_id="version",
             artifacts=[
                 types.SimpleNamespace(name="Binaries", url="https://example.invalid/binaries.tgz"),
                 types.SimpleNamespace(
@@ -595,7 +816,18 @@ class PackageTestProvenanceTest(unittest.TestCase):
         )
         response = mock.Mock()
         task.distro_id = "release-build-host"
-        response.text = json.dumps({"task_id": task.task_id, "distro_id": task.distro_id})
+        task.execution = 0
+        response.text = json.dumps(
+            {
+                "task_id": task.task_id,
+                "task_name": task.display_name,
+                "build_id": task.build_id,
+                "build_variant": task.build_variant,
+                "version_id": task.version_id,
+                "distro_id": task.distro_id,
+                "execution": "0",
+            }
+        )
         response.raise_for_status = mock.Mock()
 
         with mock.patch.object(under_test.requests, "get", return_value=response) as get_mock:
@@ -1060,7 +1292,14 @@ class PackageTestProvenanceTest(unittest.TestCase):
             output_file.write_text("stale provenance")
 
             with mock.patch.dict(
-                "os.environ", {"is_patch": "true", "is_release": "false"}, clear=False
+                "os.environ",
+                {
+                    "is_patch": "true",
+                    "is_release": "false",
+                    "task_name": "package",
+                    "project": "mongodb-mongo-master-nightly",
+                },
+                clear=False,
             ):
                 under_test.create_provenance_file(
                     build_command_file, temp_path / "missing-dist.tgz", output_file
@@ -1087,16 +1326,24 @@ class PackageTestProvenanceTest(unittest.TestCase):
 
             self.assertFalse(output_file.exists())
 
-    def test_create_provenance_file_skips_package_task_outside_server_release_project(self):
+    def test_nightly_package_creates_provenance_for_its_own_binaries(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             build_command_file = temp_path / "build_command.txt"
             Path(f"{build_command_file}.distro_id").write_text("release-build-host\n")
             build_command_file.write_text(
-                "bazel build --config=public-release archive-dist-stripped"
+                f"bazel build archive-dist-stripped {release_local_suffix()}"
             )
             output_file = temp_path / "release_binary_provenance.json"
             output_file.write_text("stale provenance")
+            archive_path = temp_path / "dist.tgz"
+            with tarfile.open(archive_path, "w:gz") as archive:
+                for name in under_test.RELEASE_BINARY_NAMES:
+                    binary = temp_path / name
+                    binary.write_bytes(f"nightly {name}".encode())
+                    archive.add(binary, arcname=f"mongodb/bin/{name}")
+            execution_log = temp_path / "release_execution_log.binpb"
+            execution_log.write_bytes(compact_log_with_spawns(("local", False)))
 
             with mock.patch.dict(
                 "os.environ",
@@ -1109,10 +1356,16 @@ class PackageTestProvenanceTest(unittest.TestCase):
                 clear=False,
             ):
                 under_test.create_provenance_file(
-                    build_command_file, temp_path / "missing-dist.tgz", output_file
+                    build_command_file, archive_path, output_file, execution_log
                 )
 
-            self.assertFalse(output_file.exists())
+            provenance = json.loads(output_file.read_text())
+            self.assertEqual("package", provenance["task_name"])
+            self.assertEqual("release-build-host", provenance["distro_id"])
+            for name in under_test.RELEASE_BINARY_NAMES:
+                self.assertEqual(
+                    under_test.hash_file(temp_path / name), provenance["binaries"][name]["sha256"]
+                )
 
     def test_archive_dist_test_can_create_provenance_outside_server_release_project(self):
         with mock.patch.dict(

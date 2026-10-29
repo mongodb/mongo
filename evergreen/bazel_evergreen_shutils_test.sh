@@ -393,6 +393,10 @@ test_query_resmoke_configs_filters_target_universe() {
 test_provenance_build_invocation_file_selection() {
     assert_eq \
         ".bazel_provenance_build_invocation" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file archive_dist_test_future_git_tag_multiversion mongodb-mongo-v8.3-staging)" \
+        "future-tag archive task should capture its own provenance invocation"
+    assert_eq \
+        ".bazel_provenance_build_invocation" \
         "$(bazel_evergreen_shutils::get_provenance_build_invocation_file archive_dist_test mongodb-mongo-v8.3-staging)" \
         "archive_dist_test should create the provenance invocation file"
     assert_eq \
@@ -400,9 +404,13 @@ test_provenance_build_invocation_file_selection() {
         "$(bazel_evergreen_shutils::get_provenance_build_invocation_file package mongo-release)" \
         "release package should create the provenance invocation file"
     assert_eq \
-        "" \
+        ".bazel_provenance_build_invocation" \
         "$(bazel_evergreen_shutils::get_provenance_build_invocation_file package mongodb-mongo-v8.3-staging)" \
-        "non-server-release package should not create the provenance invocation file"
+        "release branch package should create the provenance invocation file"
+    assert_eq \
+        ".bazel_provenance_build_invocation" \
+        "$(bazel_evergreen_shutils::get_provenance_build_invocation_file package mongodb-mongo-master-nightly)" \
+        "nightly package should create the provenance invocation file"
     assert_eq \
         ".bazel_crypt_build_invocation" \
         "$(bazel_evergreen_shutils::get_provenance_build_invocation_file crypt_create_lib mongo-release)" \

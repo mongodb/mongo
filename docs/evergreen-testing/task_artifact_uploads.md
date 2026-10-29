@@ -77,6 +77,27 @@ ETags guard against concurrent changes to object content, not metadata-only chan
 lock across task executions or an atomic publication of all files: avoid running producer executions
 concurrently, and restart dependent tasks if they need the rebuilt artifacts.
 
+## Package provenance
+
+`test_packages` resolves dependencies by Evergreen task IDs starting from its executing task, then
+selects package, archive, and crypt producers from that chain. Producer tasks must belong to the
+test's build, variant, and version. Shared version generation is an infrastructure dependency and
+does not supply binary artifacts.
+
+The producer creates and uploads its own provenance JSON. Package tests require its `task_id`,
+`task_name`, `build_id`, `build_variant`, and `version_id` to match independently fetched Evergreen
+metadata, in addition to checking the build command, distro, and binary hashes. Missing origin
+fields fail validation. Earlier executions of the correct task remain valid after release restarts.
+Distro validation uses the execution recorded in the JSON, fetched independently from Evergreen;
+future or malformed execution values fail. Both the current and recorded executions must use release
+distros. Archive producers build their own binaries on waterfall versions and explicit release
+patches so their provenance retains the primary build command; ordinary development patches can
+still reuse an earlier compile. Byte-for-byte reproducibility of rebuilt tarballs is not required.
+
+The new archive-provenance JSON uses a task-specific filename under the existing artifacts
+namespace. Existing binary destinations and native `s3.put` uploads are unchanged. Uploader adoption
+and S3 path migration are tracked separately in SERVER-137930.
+
 Producers can enable release recovery with `artifact_release_provenance_file`,
 `artifact_release_execution_log_file`, and `artifact_release_related_files`. All input paths are
 relative to the Evergreen workdir, just like `artifact_local_file`. Related files are a JSON array

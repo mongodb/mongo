@@ -104,16 +104,9 @@ bazel_evergreen_shutils::should_disable_gdb_index() {
 # from the task's primary build instead of whichever compile ran last.
 bazel_evergreen_shutils::get_provenance_build_invocation_file() {
     local task_name_to_check="${1:-}"
-    local project_to_check="${2:-}"
-
     case "${task_name_to_check}" in
-    archive_dist_test)
+    archive_dist_test | archive_dist_test_future_git_tag_multiversion | package)
         echo ".bazel_provenance_build_invocation"
-        ;;
-    package)
-        if [[ "${project_to_check}" == mongo-release* ]]; then
-            echo ".bazel_provenance_build_invocation"
-        fi
         ;;
     crypt_create_lib)
         echo ".bazel_crypt_build_invocation"

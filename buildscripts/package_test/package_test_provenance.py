@@ -84,6 +84,76 @@ def find_build_task(tasks: list[Any], task_display_name: str) -> Any:
     return matching_tasks[0]
 
 
+def package_test_task_chain(api: Any, task_id: str, expected_build_id: str) -> list[Any]:
+    """Resolve producer tasks from the executing test's actual dependency IDs."""
+    root = api.task_by_id(task_id)
+    if root.build_id != expected_build_id:
+        raise ValueError("Package test build_id does not match the executing Evergreen task")
+    pending = [root]
+    seen = set()
+    tasks = []
+    while pending:
+        task = pending.pop()
+        if task.task_id in seen:
+            continue
+        seen.add(task.task_id)
+        tasks.append(task)
+        for dependency in task.depends_on or []:
+            if dependency["id"] in seen:
+                continue
+            producer = api.task_by_id(dependency["id"])
+            # Shared version generation is an infrastructure dependency, not an artifact producer.
+            if producer.display_name == "version_expansions_gen":
+                continue
+            for field in ("build_id", "build_variant", "version_id"):
+                if not getattr(producer, field) or getattr(producer, field) != getattr(root, field):
+                    raise ValueError(
+                        f"Package test dependency {producer.task_id} {field} does not match "
+                        f"the executing Evergreen task: {getattr(producer, field)} != "
+                        f"{getattr(root, field)}"
+                    )
+            pending.append(producer)
+    return tasks
+
+
+def validate_release_binary_provenance_identity(
+    provenance: dict[str, Any], build_task: Any
+) -> None:
+    """Compare JSON origin with independently resolved Evergreen producer metadata."""
+    for field, expected in (
+        ("task_id", build_task.task_id),
+        ("task_name", build_task.display_name),
+        ("build_id", build_task.build_id),
+        ("build_variant", build_task.build_variant),
+        ("version_id", build_task.version_id),
+    ):
+        if not expected or provenance.get(field) != expected:
+            raise ValueError(
+                f"Release binary provenance {field} does not match Evergreen build task: "
+                f"{provenance.get(field)} != {expected}"
+            )
+    execution = provenance.get("execution")
+    if (
+        isinstance(execution, bool)
+        or not isinstance(execution, (str, int))
+        or not re.fullmatch(r"[0-9]+", str(execution))
+        or int(execution) > build_task.execution
+    ):
+        raise ValueError("Release binary provenance has an invalid or future execution")
+    # A preserved artifact may refer to an older execution, but that must not hide an unsafe
+    # current producer host. Validate both executions when a restart preserves the original bytes.
+    validate_release_distro_id(build_task.distro_id)
+    if int(execution) != build_task.execution:
+        original = build_task.get_execution(int(execution))
+        if original is None:
+            # The default task response omits historical executions; request the recorded one.
+            original = build_task._api.task_by_id(build_task.task_id, execution=int(execution))
+        if original.execution != int(execution) or original.task_id != build_task.task_id:
+            raise ValueError("Could not resolve release binary provenance execution")
+        build_task = original
+    validate_release_binary_provenance_distro(provenance, build_task)
+
+
 def find_task_artifact_url(task: Any, artifact_name: str) -> str:
     """Find a unique artifact URL on a task."""
 
@@ -216,7 +286,7 @@ def fetch_release_binary_provenance_from_tasks(tasks: list[Any], task_display_na
 
     build_task = find_build_task(tasks, task_display_name)
     provenance_text = fetch_task_artifact_text(build_task, RELEASE_BINARY_PROVENANCE_ARTIFACT_NAME)
-    validate_release_binary_provenance_distro(json.loads(provenance_text), build_task)
+    validate_release_binary_provenance_identity(json.loads(provenance_text), build_task)
     return provenance_text
 
 
@@ -519,6 +589,7 @@ def make_release_binary_provenance(
         "distro_id": distro_id,
         "build_id": os.environ.get("build_id", ""),
         "build_variant": os.environ.get("build_variant", ""),
+        "version_id": os.environ.get("version_id", ""),
         "execution": os.environ.get("execution", ""),
         "revision": os.environ.get("revision", ""),
         "task_id": os.environ.get("task_id", ""),
@@ -540,14 +611,6 @@ def should_create_release_binary_provenance() -> bool:
 
 def release_binary_provenance_skip_reason() -> str | None:
     """Return the reason to skip release binary provenance, if any."""
-
-    if os.environ.get("task_name") == "package" and not is_server_release_project(
-        os.environ.get("project")
-    ):
-        return (
-            "package task in non-server-release project "
-            f"(project={os.environ.get('project', '')})"
-        )
 
     if os.environ.get("is_patch") == "true" and os.environ.get("is_release", "false") == "false":
         return (
@@ -602,7 +665,7 @@ def validate_release_binary_provenance_hashes(
     except json.JSONDecodeError as exc:
         raise ValueError(f"Could not parse release binary provenance JSON: {exc}") from exc
 
-    if expected_build_id and provenance.get("build_id") not in {None, "", expected_build_id}:
+    if expected_build_id and provenance.get("build_id") != expected_build_id:
         raise ValueError(
             "Release binary provenance build_id does not match package test build_id: "
             f"{provenance.get('build_id')} != {expected_build_id}"
