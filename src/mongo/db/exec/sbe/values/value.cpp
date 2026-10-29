@@ -22,6 +22,7 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/duration.h"
 
+#include <chrono>
 #include <cmath>
 #include <string_view>
 
@@ -135,6 +136,171 @@ std::pair<TypeTags, Value> makeNewBsonCodeWScope(std::string_view code, const ch
     memcpy(ptr, scope, scopeLen);
 
     return {TypeTags::bsonCodeWScope, bitcastFrom<char*>(buffer.release())};
+}
+
+namespace {
+template <typename KeyStringBuilder>
+void appendToKeyStringImpl(KeyStringBuilder& kb,
+                           TagValueView tagValView,
+                           const CollatorInterface* collator) {
+    const auto stringTransformFn = [&](std::string_view stringData) {
+        return collator->getComparisonString(stringData);
+    };
+
+    switch (tagValView.tag) {
+        case sbe::value::TypeTags::Boolean:
+            kb.appendBool(sbe::value::bitcastTo<bool>(tagValView.value));
+            break;
+        case sbe::value::TypeTags::NumberInt32:
+            kb.appendNumberInt(sbe::value::bitcastTo<int32_t>(tagValView.value));
+            break;
+        case sbe::value::TypeTags::NumberInt64:
+            kb.appendNumberLong(sbe::value::bitcastTo<int64_t>(tagValView.value));
+            break;
+        case sbe::value::TypeTags::NumberDouble:
+            kb.appendNumberDouble(sbe::value::bitcastTo<double>(tagValView.value));
+            break;
+        case sbe::value::TypeTags::NumberDecimal:
+            kb.appendNumberDecimal(sbe::value::bitcastTo<Decimal128>(tagValView.value));
+            break;
+        case sbe::value::TypeTags::StringSmall:
+        case sbe::value::TypeTags::StringBig:
+        case sbe::value::TypeTags::bsonString:
+            if (collator) {
+                kb.appendString(sbe::value::getStringView(tagValView.tag, tagValView.value),
+                                stringTransformFn);
+            } else {
+                kb.appendString(sbe::value::getStringView(tagValView.tag, tagValView.value));
+            }
+            break;
+        case sbe::value::TypeTags::Null:
+            kb.appendNull();
+            break;
+        case sbe::value::TypeTags::Nothing:
+        case sbe::value::TypeTags::bsonUndefined:
+            kb.appendUndefined();
+            break;
+        case sbe::value::TypeTags::bsonJavascript:
+            kb.appendCode(sbe::value::getBsonJavascriptView(tagValView.value));
+            break;
+        case sbe::value::TypeTags::Date: {
+            auto milliseconds = sbe::value::bitcastTo<int64_t>(tagValView.value);
+            auto duration = std::chrono::duration<int64_t, std::milli>(milliseconds);
+            auto date = Date_t::fromDurationSinceEpoch(duration);
+            kb.appendDate(date);
+            break;
+        }
+        case sbe::value::TypeTags::Timestamp: {
+            Timestamp ts{sbe::value::bitcastTo<uint64_t>(tagValView.value)};
+            kb.appendTimestamp(ts);
+            break;
+        }
+        case sbe::value::TypeTags::MinKey:
+            kb.appendBSONElement(kMinBSONKey.firstElement());
+            break;
+        case sbe::value::TypeTags::MaxKey:
+            kb.appendBSONElement(kMaxBSONKey.firstElement());
+            break;
+        case sbe::value::TypeTags::bsonArray: {
+            BSONObj bson{sbe::value::getRawPointerView(tagValView.value)};
+            if (collator) {
+                kb.appendArray(BSONArray(BSONObj(bson)), stringTransformFn);
+            } else {
+                kb.appendArray(BSONArray(BSONObj(bson)));
+            }
+            break;
+        }
+        case sbe::value::TypeTags::Array:
+        case sbe::value::TypeTags::ArraySet:
+        case sbe::value::TypeTags::ArrayMultiSet: {
+            sbe::value::ArrayEnumerator enumerator{tagValView.tag, tagValView.value};
+            BSONArrayBuilder arrayBuilder;
+            sbe::bson::convertToBsonArr(arrayBuilder, enumerator);
+            if (collator) {
+                kb.appendArray(arrayBuilder.arr(), stringTransformFn);
+            } else {
+                kb.appendArray(arrayBuilder.arr());
+            }
+            break;
+        }
+        case sbe::value::TypeTags::bsonObject: {
+            BSONObj bson{sbe::value::getRawPointerView(tagValView.value)};
+            if (collator) {
+                kb.appendObject(bson, stringTransformFn);
+            } else {
+                kb.appendObject(bson);
+            }
+            break;
+        }
+        case sbe::value::TypeTags::Object: {
+            BSONObjBuilder objBuilder;
+            sbe::bson::convertToBsonObj(objBuilder, sbe::value::getObjectView(tagValView.value));
+            if (collator) {
+                kb.appendObject(objBuilder.obj(), stringTransformFn);
+            } else {
+                kb.appendObject(objBuilder.obj());
+            }
+            break;
+        }
+        case sbe::value::TypeTags::ObjectId: {
+            auto oid = OID::from(sbe::value::getObjectIdView(tagValView.value)->data());
+            kb.appendOID(oid);
+            break;
+        }
+        case sbe::value::TypeTags::bsonObjectId: {
+            auto oid = OID::from(sbe::value::getRawPointerView(tagValView.value));
+            kb.appendOID(oid);
+            break;
+        }
+        case sbe::value::TypeTags::bsonSymbol: {
+            auto symbolView = sbe::value::getStringOrSymbolView(tagValView.tag, tagValView.value);
+            kb.appendSymbol(symbolView);
+            break;
+        }
+        case sbe::value::TypeTags::bsonBinData: {
+            auto data = sbe::value::getBSONBinData(tagValView.tag, tagValView.value);
+            auto length =
+                static_cast<int>(sbe::value::getBSONBinDataSize(tagValView.tag, tagValView.value));
+            auto type = sbe::value::getBSONBinDataSubtype(tagValView.tag, tagValView.value);
+            BSONBinData binData{data, length, type};
+            kb.appendBinData(binData);
+            break;
+        }
+        case sbe::value::TypeTags::bsonRegex: {
+            auto sbeRegex = sbe::value::getBsonRegexView(tagValView.value);
+            BSONRegEx regex{sbeRegex.pattern, sbeRegex.flags};
+            kb.appendRegex(regex);
+            break;
+        }
+        case sbe::value::TypeTags::bsonCodeWScope: {
+            auto sbeCodeWScope = sbe::value::getBsonCodeWScopeView(tagValView.value);
+            BSONCodeWScope codeWScope{sbeCodeWScope.code, BSONObj(sbeCodeWScope.scope)};
+            kb.appendCodeWString(codeWScope);
+            break;
+        }
+        case sbe::value::TypeTags::bsonDBPointer: {
+            auto dbPointer = sbe::value::getBsonDBPointerView(tagValView.value);
+            BSONDBRef dbRef{dbPointer.ns, OID::from(dbPointer.id)};
+            kb.appendDBRef(dbRef);
+            break;
+        }
+        default:
+            tasserted(4822802, str::stream() << "Unsupported key string type: " << tagValView.tag);
+            break;
+    }
+}
+}  // namespace
+
+void appendToKeyString(key_string::Builder& builder,
+                       TagValueView value,
+                       const CollatorInterface* collator) {
+    appendToKeyStringImpl(builder, value, collator);
+}
+
+void appendToKeyString(key_string::HeapBuilder& builder,
+                       TagValueView value,
+                       const CollatorInterface* collator) {
+    appendToKeyStringImpl(builder, value, collator);
 }
 
 std::pair<TypeTags, Value> makeKeyString(key_string::Value inKey) {

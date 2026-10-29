@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/ordering.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 #include <cstddef>
 #include <cstdint>
-#include <string_view>
 
 #include <absl/container/inlined_vector.h>
 
@@ -46,160 +44,8 @@ value::TagValueMaybeOwned ByteCode::genericNewKeyString(ArityType arity,
 
     key_string::HeapBuilder kb{ksVersion, Ordering::make(orders)};
 
-    const auto stringTransformFn = [&](std::string_view stringData) {
-        return collator->getComparisonString(stringData);
-    };
-
     for (size_t idx = 2; idx < arity - 1u; ++idx) {
-        auto tagValView = viewFromStack(idx);
-
-        switch (tagValView.tag) {
-            case value::TypeTags::Boolean:
-                kb.appendBool(value::bitcastTo<bool>(tagValView.value));
-                break;
-            case value::TypeTags::NumberInt32:
-                kb.appendNumberInt(value::bitcastTo<int32_t>(tagValView.value));
-                break;
-            case value::TypeTags::NumberInt64:
-                kb.appendNumberLong(value::bitcastTo<int64_t>(tagValView.value));
-                break;
-            case value::TypeTags::NumberDouble:
-                kb.appendNumberDouble(value::bitcastTo<double>(tagValView.value));
-                break;
-            case value::TypeTags::NumberDecimal:
-                kb.appendNumberDecimal(value::bitcastTo<Decimal128>(tagValView.value));
-                break;
-            case value::TypeTags::StringSmall:
-            case value::TypeTags::StringBig:
-            case value::TypeTags::bsonString:
-                if (collator) {
-                    kb.appendString(value::getStringView(tagValView.tag, tagValView.value),
-                                    stringTransformFn);
-                } else {
-                    kb.appendString(value::getStringView(tagValView.tag, tagValView.value));
-                }
-                break;
-            case value::TypeTags::Null:
-                kb.appendNull();
-                break;
-            case value::TypeTags::bsonUndefined:
-                kb.appendUndefined();
-                break;
-            case value::TypeTags::bsonJavascript:
-                kb.appendCode(value::getBsonJavascriptView(tagValView.value));
-                break;
-            case value::TypeTags::Date: {
-                auto milliseconds = value::bitcastTo<int64_t>(tagValView.value);
-                auto duration = std::chrono::duration<int64_t, std::milli>(milliseconds);
-                auto date = Date_t::fromDurationSinceEpoch(duration);
-                kb.appendDate(date);
-                break;
-            }
-            case value::TypeTags::Timestamp: {
-                Timestamp ts{value::bitcastTo<uint64_t>(tagValView.value)};
-                kb.appendTimestamp(ts);
-                break;
-            }
-            case value::TypeTags::MinKey: {
-                BSONObjBuilder bob;
-                bob.appendMinKey("");
-                kb.appendBSONElement(bob.obj().firstElement());
-                break;
-            }
-            case value::TypeTags::MaxKey: {
-                BSONObjBuilder bob;
-                bob.appendMaxKey("");
-                kb.appendBSONElement(bob.obj().firstElement());
-                break;
-            }
-            case value::TypeTags::bsonArray: {
-                BSONObj bson{value::getRawPointerView(tagValView.value)};
-                if (collator) {
-                    kb.appendArray(BSONArray(BSONObj(bson)), stringTransformFn);
-                } else {
-                    kb.appendArray(BSONArray(BSONObj(bson)));
-                }
-                break;
-            }
-            case value::TypeTags::Array:
-            case value::TypeTags::ArraySet:
-            case value::TypeTags::ArrayMultiSet: {
-                value::ArrayEnumerator enumerator{tagValView.tag, tagValView.value};
-                BSONArrayBuilder arrayBuilder;
-                bson::convertToBsonArr(arrayBuilder, enumerator);
-                if (collator) {
-                    kb.appendArray(arrayBuilder.arr(), stringTransformFn);
-                } else {
-                    kb.appendArray(arrayBuilder.arr());
-                }
-                break;
-            }
-            case value::TypeTags::bsonObject: {
-                BSONObj bson{value::getRawPointerView(tagValView.value)};
-                if (collator) {
-                    kb.appendObject(bson, stringTransformFn);
-                } else {
-                    kb.appendObject(bson);
-                }
-                break;
-            }
-            case value::TypeTags::Object: {
-                BSONObjBuilder objBuilder;
-                bson::convertToBsonObj(objBuilder, value::getObjectView(tagValView.value));
-                if (collator) {
-                    kb.appendObject(objBuilder.obj(), stringTransformFn);
-                } else {
-                    kb.appendObject(objBuilder.obj());
-                }
-                break;
-            }
-            case value::TypeTags::ObjectId: {
-                auto oid = OID::from(value::getObjectIdView(tagValView.value)->data());
-                kb.appendOID(oid);
-                break;
-            }
-            case value::TypeTags::bsonObjectId: {
-                auto oid = OID::from(value::getRawPointerView(tagValView.value));
-                kb.appendOID(oid);
-                break;
-            }
-            case value::TypeTags::bsonSymbol: {
-                auto symbolView = value::getStringOrSymbolView(tagValView.tag, tagValView.value);
-                kb.appendSymbol(symbolView);
-                break;
-            }
-            case value::TypeTags::bsonBinData: {
-                auto data = value::getBSONBinData(tagValView.tag, tagValView.value);
-                auto length =
-                    static_cast<int>(value::getBSONBinDataSize(tagValView.tag, tagValView.value));
-                auto type = value::getBSONBinDataSubtype(tagValView.tag, tagValView.value);
-                BSONBinData binData{data, length, type};
-                kb.appendBinData(binData);
-                break;
-            }
-            case value::TypeTags::bsonRegex: {
-                auto sbeRegex = value::getBsonRegexView(tagValView.value);
-                BSONRegEx regex{sbeRegex.pattern, sbeRegex.flags};
-                kb.appendRegex(regex);
-                break;
-            }
-            case value::TypeTags::bsonCodeWScope: {
-                auto sbeCodeWScope = value::getBsonCodeWScopeView(tagValView.value);
-                BSONCodeWScope codeWScope{sbeCodeWScope.code, BSONObj(sbeCodeWScope.scope)};
-                kb.appendCodeWString(codeWScope);
-                break;
-            }
-            case value::TypeTags::bsonDBPointer: {
-                auto dbPointer = value::getBsonDBPointerView(tagValView.value);
-                BSONDBRef dbRef{dbPointer.ns, OID::from(dbPointer.id)};
-                kb.appendDBRef(dbRef);
-                break;
-            }
-            default:
-                uasserted(4822802,
-                          str::stream() << "Unsupported key string type: " << tagValView.tag);
-                break;
-        }
+        sbe::value::appendToKeyString(kb, viewFromStack(idx), collator);
     }
 
     kb.appendDiscriminator(ksDiscriminator);

@@ -6,6 +6,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
@@ -24,7 +25,8 @@ protected:
     void runAndAssertExpression(value::TypeTags argTag,
                                 value::Value argVal,
                                 value::TypeTags expectedTag,
-                                value::Value expectedVal) {
+                                value::Value expectedVal,
+                                const CollatorInterface* collator = nullptr) {
         auto version = static_cast<int64_t>(key_string::Version::V1);
         auto ordering = uint32_t{0};
         auto discriminator = static_cast<int64_t>(key_string::Discriminator::kInclusive);
@@ -38,11 +40,15 @@ protected:
 
         auto [copyTag, copyVal] = value::copyValue(argTag, argVal);
 
-        auto ksExpr = makeE<EFunction>(EFn::kKs,
-                                       makeEs(std::move(versionExpr),
-                                              std::move(orderingExpr),
-                                              makeE<EConstant>(copyTag, copyVal),
-                                              std::move(discriminatorExpr)));
+        auto args = makeEs(std::move(versionExpr),
+                           std::move(orderingExpr),
+                           makeE<EConstant>(copyTag, copyVal),
+                           std::move(discriminatorExpr));
+        if (collator) {
+            const auto [collatorTag, collatorVal] = value::makeCopyCollator(*collator);
+            args.push_back(makeE<EConstant>(collatorTag, collatorVal));
+        }
+        auto ksExpr = makeE<EFunction>(collator ? EFn::kCollKs : EFn::kKs, std::move(args));
 
         auto compiledExpr = compileExpression(*ksExpr);
         value::TagValueOwned actual =
@@ -148,6 +154,18 @@ TEST_F(SBEBuiltinKsTest, NullTests) {
         value::TagValueOwned::fromRaw(value::makeKeyString(kb.getValueCopy()));
 
     runAndAssertExpression(argTag, argVal, expected.tag(), expected.value());
+}
+
+TEST_F(SBEBuiltinKsTest, CollatedStringEncoding) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    const auto input = value::TagValueOwned::fromRaw(value::makeNewString("ABC"));
+
+    key_string::Builder builder(key_string::Version::V1, key_string::ALL_ASCENDING);
+    builder.appendString("abc");
+    const auto expected =
+        value::TagValueOwned::fromRaw(value::makeKeyString(builder.getValueCopy()));
+
+    runAndAssertExpression(input.tag(), input.value(), expected.tag(), expected.value(), &collator);
 }
 
 }  // namespace mongo::sbe

@@ -4,6 +4,8 @@
 #include "mongo/db/query/compiler/ce/ndv/ndv_hashing.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 
@@ -15,6 +17,20 @@
 
 namespace mongo::ce {
 namespace {
+
+// Adapt BSON test inputs to the SBE hashing API.
+uint64_t hashValueForNdv(const BSONElement& value) {
+    return ce::hashValueForNdv(sbe::bson::convertToView(value));
+}
+
+uint64_t hashValuesForNdv(std::span<const BSONElement> values) {
+    std::vector<sbe::value::TagValueView> views;
+    views.reserve(values.size());
+    for (const auto& value : values) {
+        views.push_back(sbe::bson::convertToView(value));
+    }
+    return ce::hashValuesForNdv(views);
+}
 
 /**
  * Single-value documents covering every relevant BSON type, with groups that woCompare treats as
@@ -116,7 +132,7 @@ std::vector<BSONObj> corpus() {
         docs.push_back(bob.obj());
     }
 
-    // Objects as values: field order and nesting matter. (Arrays are outside the hash domain.)
+    // Objects as values: field order and nesting matter.
     docs.push_back(BSON("ae" << BSONObj()));
     docs.push_back(BSON("af" << BSON("a" << 1)));
     docs.push_back(BSON("ag" << BSON("a" << 1 << "b" << 2)));
@@ -170,6 +186,32 @@ std::vector<BSONObj> corpus() {
     return docs;
 }
 
+TEST(NdvHashingTest, HashesNativeArrays) {
+    const auto array = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
+    const auto set = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArraySet());
+    const auto multiset = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArrayMultiSet());
+
+    const BSONObj doc = BSON("a" << BSONArray());
+    const auto expectedHash = hashValueForNdv(doc.firstElement());
+
+    ASSERT_EQ(ce::hashValueForNdv(array.view()), expectedHash);
+    ASSERT_EQ(ce::hashValueForNdv(set.view()), expectedHash);
+    ASSERT_EQ(ce::hashValueForNdv(multiset.view()), expectedHash);
+}
+
+TEST(NdvHashingTest, HashesBsonArrays) {
+    const BSONObj doc = BSON("a" << BSON_ARRAY(1 << 2));
+    const BSONObj equal = BSON("b" << BSON_ARRAY(1.0 << 2.0));
+    const BSONObj reversed = BSON("a" << BSON_ARRAY(2 << 1));
+
+    const auto nativeArray = sbe::bson::convertToOwned(doc.firstElement());
+    const auto hash = hashValueForNdv(doc.firstElement());
+
+    ASSERT_EQ(hash, hashValueForNdv(equal.firstElement()));
+    ASSERT_EQ(hash, ce::hashValueForNdv(nativeArray.view()));
+    ASSERT_NE(hash, hashValueForNdv(reversed.firstElement()));
+}
+
 TEST(NdvHashingTest, HashEqualityMatchesWoCompareOverCorpus) {
     // The central correctness property: for every pair of corpus values, the hashes are equal iff
     // the values compare equal under woCompare with no collator and field names ignored. That is
@@ -194,10 +236,24 @@ TEST(NdvHashingTest, FieldNamesDoNotParticipate) {
     ASSERT_EQ(hashValueForNdv(shortName.firstElement()), hashValueForNdv(longName.firstElement()));
 }
 
-TEST(NdvHashingTest, MissingHashMatchesWoCompareSemantics) {
-    const uint64_t missingHash = hashValueForNdv(BSONElement{});
+TEST(NdvHashingTest, MissingAndUndefinedHaveIdenticalKeyStringsAndHashes) {
+    const auto missing = sbe::value::TagValueView::nothing();
+    key_string::Builder missingBuilder(key_string::Version::V1, key_string::ALL_ASCENDING);
+    sbe::value::appendToKeyString(missingBuilder, missing);
 
-    // Missing is woCompare-equal to Undefined, so the hashes must match.
+    const sbe::value::TagValueView undefined{sbe::value::TypeTags::bsonUndefined, 0};
+    key_string::Builder undefinedBuilder(key_string::Version::V1, key_string::ALL_ASCENDING);
+    sbe::value::appendToKeyString(undefinedBuilder, undefined);
+
+    ASSERT_EQ(missingBuilder.getValueCopy(), undefinedBuilder.getValueCopy());
+    ASSERT_EQ(ce::hashValueForNdv(missing), ce::hashValueForNdv(undefined));
+}
+
+TEST(NdvHashingTest, MissingHashMatchesWoCompareSemantics) {
+    const uint64_t missingHash = ce::hashValueForNdv(sbe::value::TagValueView::nothing());
+    ASSERT_EQ(missingHash, hashValueForNdv(BSONElement{}));
+
+    // BSON Undefined has the same encoding as missing, so the hashes must match.
     BSONObjBuilder undefinedBob;
     undefinedBob.appendUndefined("u");
     ASSERT_EQ(missingHash, hashValueForNdv(undefinedBob.obj().firstElement()));
@@ -282,7 +338,7 @@ TEST(NdvHashingTest, TupleValuesDoNotBleedAcrossPositions) {
 }
 
 TEST(NdvHashingTest, TupleMissingStaysDistinctFromNull) {
-    // Strict ($expr) semantics per position: missing (EOO) folds into Undefined, never null.
+    // Strict ($expr) semantics per position: missing stays distinct from null.
     const BSONObj one = BSON("" << 1);
     BSONObjBuilder nullBob;
     nullBob.appendNull("");

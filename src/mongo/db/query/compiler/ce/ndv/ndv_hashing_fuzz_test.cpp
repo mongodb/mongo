@@ -5,6 +5,7 @@
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/compiler/ce/ndv/ndv_hashing.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/shared_buffer.h"
@@ -35,12 +36,13 @@ void assertHashEqualityMatchesWoCompare(const BSONObj& obj) {
         if (elements.size() == kMaxElements) {
             break;
         }
-        // Arrays are outside the hash domain; see the header.
+        // KeyString ignores BSON array element field names, which woCompare can distinguish
+        // in noncanonical arrays.
         if (element.type() == BSONType::array) {
             continue;
         }
         elements.push_back(element);
-        hashes.push_back(hashValueForNdv(element));
+        hashes.push_back(hashValueForNdv(sbe::bson::convertToView(element)));
     }
 
     for (size_t i = 0; i < elements.size(); ++i) {
@@ -61,10 +63,11 @@ void assertHashEqualityMatchesWoCompare(const BSONObj& obj) {
     const size_t numTupleElements = std::min(elements.size(), kMaxTupleElements);
     std::vector<uint64_t> tupleHashes(numTupleElements * numTupleElements);
     for (size_t i = 0; i < numTupleElements; ++i) {
-        const BSONElement single[] = {elements[i]};
+        const sbe::value::TagValueView single[] = {sbe::bson::convertToView(elements[i])};
         ASSERT_EQ(hashValuesForNdv(single), hashes[i]) << "element=" << elements[i];
         for (size_t j = 0; j < numTupleElements; ++j) {
-            const BSONElement pair[] = {elements[i], elements[j]};
+            const sbe::value::TagValueView pair[] = {sbe::bson::convertToView(elements[i]),
+                                                     sbe::bson::convertToView(elements[j])};
             tupleHashes[i * numTupleElements + j] = hashValuesForNdv(pair);
         }
     }

@@ -2345,6 +2345,14 @@ inline std::pair<TypeTags, Value> makeCopyBsonCodeWScope(const BsonCodeWScope& c
 
 std::pair<TypeTags, Value> makeKeyString(key_string::Value inKey);
 
+/** Appends a BSON-representable SBE value or Nothing using the ordinary KeyString encoding. */
+void appendToKeyString(key_string::Builder& builder,
+                       TagValueView value,
+                       const CollatorInterface* collator = nullptr);
+void appendToKeyString(key_string::HeapBuilder& builder,
+                       TagValueView value,
+                       const CollatorInterface* collator = nullptr);
+
 std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator);
 
 struct ExtendedTypeOps {

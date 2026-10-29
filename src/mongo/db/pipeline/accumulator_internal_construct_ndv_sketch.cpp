@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -130,9 +131,8 @@ void AccumulatorInternalConstructNdvSketch::processInternal(const Value& input, 
 
     // 'input' is the evaluated argument {val: <document>, fields: [...]}. The helper yields
     // boost::none for arrays anywhere along the path and missing for absent fields; a
-    // non-document 'val' also degrades to missing. The hasher takes BSONElements, so each value
-    // is materialized into a single-element object; a missing value becomes an empty object
-    // whose firstElement() is EOO, which the hasher handles.
+    // non-document 'val' also degrades to missing. Keep extracted values in BSON storage while
+    // the hasher reads their SBE views, avoiding owned SBE conversion and object reserialization.
     //
     // Note: the Value round trip normalizes some deprecated representations, e.g. it truncates
     // a DBRef namespace at an embedded NUL byte (Value::Value uses dbrefNS()), so two such
@@ -159,34 +159,34 @@ void AccumulatorInternalConstructNdvSketch::processInternal(const Value& input, 
         // Single-field fast path: no per-document containers, and the one-value hash is an
         // on-disk contract (golden values in ndv_hashing_test.cpp).
         const BSONObj valueObj = extractField(_fieldPaths.front());
-        _sketches.front().addHash(ce::hashValueForNdv(valueObj.firstElement()));
+        _sketches.front().addHash(
+            ce::hashValueForNdv(sbe::bson::convertToView(valueObj.firstElement())));
         return;
     }
 
     // This runs for every document of a full collection scan; the inlined capacity (bounded by
     // kNdvMaxFields) keeps it allocation-free.
     absl::InlinedVector<BSONObj, ce::kNdvMaxFields> valueObjs;
-    absl::InlinedVector<BSONElement, ce::kNdvMaxFields> elements;
+    absl::InlinedVector<sbe::value::TagValueView, ce::kNdvMaxFields> elements;
     for (const auto& fieldPath : _fieldPaths) {
         valueObjs.push_back(extractField(fieldPath));
-        elements.push_back(valueObjs.back().firstElement());
+        elements.push_back(sbe::bson::convertToView(valueObjs.back().firstElement()));
     }
 
     // sketches[0]: the strict tuple, all fields under $expr semantics (missing distinct from
-    // null, encoded as Undefined by the hasher).
+    // null, represented as Nothing).
     const uint64_t strictHash = ce::hashValuesForNdv(elements);
     _sketches[0].addHash(strictHash);
 
     // sketches[i + 1]: field i folded, missing counted as null. Folding only changes the
     // encoding when the value actually is missing; otherwise the strict hash is the same bytes.
-    static const BSONObj kNullValueObj = BSON("" << BSONNULL);
     size_t numMissing = 0;
     uint64_t allMatchHash = strictHash;
     for (size_t i = 0; i < elements.size(); ++i) {
         uint64_t hash = strictHash;
-        if (elements[i].eoo()) {
+        if (elements[i].tag == sbe::value::TypeTags::Nothing) {
             ++numMissing;
-            const BSONElement original = std::exchange(elements[i], kNullValueObj.firstElement());
+            const auto original = std::exchange(elements[i], sbe::value::TagValueView::null());
             hash = allMatchHash = ce::hashValuesForNdv(elements);
             elements[i] = original;
         }
@@ -195,8 +195,8 @@ void AccumulatorInternalConstructNdvSketch::processInternal(const Value& input, 
     // With at most one missing field, all-match reuses a hash computed above.
     if (numMissing > 1) {
         for (auto& element : elements) {
-            if (element.eoo()) {
-                element = kNullValueObj.firstElement();
+            if (element.tag == sbe::value::TypeTags::Nothing) {
+                element = sbe::value::TagValueView::null();
             }
         }
         allMatchHash = ce::hashValuesForNdv(elements);

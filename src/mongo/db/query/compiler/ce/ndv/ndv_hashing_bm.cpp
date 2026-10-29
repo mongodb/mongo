@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/ce/ndv/ndv_hashing.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 
 #include <string>
 
@@ -17,7 +18,7 @@ namespace {
 
 void BM_ndvHashInt(benchmark::State& state) {
     const BSONObj doc = BSON("a" << 12345);
-    const BSONElement element = doc.firstElement();
+    const auto element = sbe::bson::convertToView(doc.firstElement());
     for (auto _ : state) {
         benchmark::DoNotOptimize(hashValueForNdv(element));
     }
@@ -26,7 +27,7 @@ BENCHMARK(BM_ndvHashInt);
 
 void BM_ndvHashString(benchmark::State& state) {
     const BSONObj doc = BSON("a" << std::string(32, 'x'));
-    const BSONElement element = doc.firstElement();
+    const auto element = sbe::bson::convertToView(doc.firstElement());
     for (auto _ : state) {
         benchmark::DoNotOptimize(hashValueForNdv(element));
     }
@@ -35,7 +36,7 @@ BENCHMARK(BM_ndvHashString);
 
 void BM_ndvHashNestedObject(benchmark::State& state) {
     const BSONObj doc = BSON("a" << BSON("b" << BSON("c" << 1 << "d" << "xyz")));
-    const BSONElement element = doc.firstElement();
+    const auto element = sbe::bson::convertToView(doc.firstElement());
     for (auto _ : state) {
         benchmark::DoNotOptimize(hashValueForNdv(element));
     }
@@ -48,7 +49,7 @@ void BM_ndvHashWideObject(benchmark::State& state) {
         wide.append("field" + std::to_string(i), i);
     }
     const BSONObj doc = BSON("a" << wide.obj());
-    const BSONElement element = doc.firstElement();
+    const auto element = sbe::bson::convertToView(doc.firstElement());
     for (auto _ : state) {
         benchmark::DoNotOptimize(hashValueForNdv(element));
     }
@@ -61,7 +62,7 @@ void BM_ndvHashDeeplyNestedObject(benchmark::State& state) {
         nested = BSON("v" << nested);
     }
     const BSONObj doc = BSON("a" << nested);
-    const BSONElement element = doc.firstElement();
+    const auto element = sbe::bson::convertToView(doc.firstElement());
     for (auto _ : state) {
         benchmark::DoNotOptimize(hashValueForNdv(element));
     }
