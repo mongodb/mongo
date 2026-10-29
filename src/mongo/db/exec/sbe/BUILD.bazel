@@ -225,11 +225,13 @@ mongo_cc_library(
 mongo_cc_library(
     name = "query_sbe_storage",
     srcs = [
+        "//src/mongo/db/exec/sbe/stages:batched_simple_ix_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:generic_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:ix_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:multi_range_clustered_scan_stage.cpp",
         "//src/mongo/db/exec/sbe/stages:random_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:scan.cpp",
+        "//src/mongo/db/exec/sbe/stages:unordered_fetch.cpp",
     ],
     deps = [
         ":query_sbe",
@@ -331,6 +333,7 @@ mongo_cc_unit_test(
     srcs = [
         "sbe_agg_project_test.cpp",
         "sbe_and_hash_test.cpp",
+        "sbe_batched_simple_ix_scan_test.cpp",
         "sbe_block_hashagg_test.cpp",
         "sbe_block_stages_test.cpp",
         "sbe_code_fragment_test.cpp",
@@ -362,6 +365,7 @@ mongo_cc_unit_test(
         "sbe_test.cpp",
         "sbe_trial_run_tracker_test.cpp",
         "sbe_unique_test.cpp",
+        "sbe_unordered_fetch_test.cpp",
         "write_value_to_stream_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_array_set_conversion_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_block_expr_test.cpp",

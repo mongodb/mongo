@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/stages/batched_simple_ix_scan.h"
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/util/modules.h"
 
@@ -45,7 +46,7 @@ public:
 protected:
     void visit(const sbe::PlanStage* root) override {
         auto stats = root->getCommonStats();
-        if (stats->stageType == "fetch"sv) {
+        if (stats->stageType == "fetch"sv || stats->stageType == "unordered_fetch"sv) {
             collectionSeeks += stats->advances;
         } else if (stats->stageType == "scan"sv) {
             collectionScans += stats->opens;
@@ -55,6 +56,15 @@ protected:
             if (stats->stageType == "ixseek"sv) {
                 indexSeeks += stats->opens;
             } else if (stats->stageType == "ixscan"sv) {
+                indexScans += stats->opens;
+            }
+        } else if (stats->stageType == "batched_ixseek"sv ||
+                   stats->stageType == "batched_ixscan"sv) {
+            auto indexScanStage = checked_cast<const BatchedSimpleIndexScanStage*>(root);
+            indexesUsed.push_back(indexScanStage->getIndexName());
+            if (stats->stageType == "batched_ixseek"sv) {
+                indexSeeks += stats->opens;
+            } else {
                 indexScans += stats->opens;
             }
         } else if (stats->stageType == "ixscan_generic"sv) {
