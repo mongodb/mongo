@@ -65,10 +65,18 @@ class test_verify_disagg(wttest.WiredTigerTestCase):
             # Writes to disaggregated tables require a commit timestamp.
             self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(self.timestamp))
         cursor.close()
+        # The leader must set a stable timestamp. A checkpoint records the stable timestamp as its
+        # checkpoint timestamp, and a follower, which sets no stable timestamp of its own, verifies
+        # against that value. A leaf rebuilt from a base image and deltas can keep its values' time
+        # windows while its aggregate in the parent is empty; verify then requires that no value is
+        # newer than the checkpoint timestamp, which is zero without a stable timestamp.
+        ts_config = 'stable_timestamp=' + self.timestamp_str(self.timestamp)
         # With the commits timestamped, overwritten versions would otherwise be retained in the
         # history store at checkpoint; advance the oldest timestamp to keep it empty when requested.
+        # Set it together with stable: oldest may never be later than stable.
         if not self.fill_hs:
-            self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(self.timestamp))
+            ts_config += ',oldest_timestamp=' + self.timestamp_str(self.timestamp)
+        self.conn.set_timestamp(ts_config)
 
     def verify(self, sessions, expected_error = None):
         for session in sessions:

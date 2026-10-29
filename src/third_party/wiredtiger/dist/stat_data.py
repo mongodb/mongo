@@ -468,6 +468,7 @@ conn_stats = [
     EvictStat('eviction_server_skip_trees_walk_complete', 'eviction server skips resuming trees whose walk already traversed the whole tree'),
     EvictStat('eviction_server_skip_unwanted_pages', 'eviction server skips pages that we do not want to evict'),
     EvictStat('eviction_server_skip_unwanted_tree', 'eviction server skips tree that we do not want to evict'),
+    EvictStat('eviction_server_skip_unwanted_tree_early', 'eviction server skips tree that we do not want to evict before releasing the handle list lock'),
     EvictStat('eviction_server_slept', 'eviction server slept, because we did not make progress with eviction'),
     EvictStat('eviction_server_walk_dominating_cache', 'eviction server walks trees within their walk period because they dominate the cache'),
     EvictStat('eviction_server_walk_dominating_cache_unproductive', 'eviction server walks trees within their walk period because they dominate the cache but queues no pages'),
