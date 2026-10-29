@@ -232,25 +232,25 @@ void InitialSyncBaseCloner::pauseForFuzzer(BaseClonerStage* stage) {
     static const auto initialSyncPauseStages =
         std::vector<std::string>{"listCollections", "listIndexes", "listDatabases"};
 
-    // Check the stage before evaluating the fail point: the InitialSyncTest fixture detects pauses
-    // by waiting for timesEntered to increase, so non-pausing stages must not count as entries.
-    if (std::find(initialSyncPauseStages.begin(), initialSyncPauseStages.end(), stage->getName()) ==
-        initialSyncPauseStages.end()) {
-        return;
-    }
-
     if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint1.shouldFail())) {
-        // These failpoints are set and unset by the InitialSyncTest fixture to cause initial
-        // sync to pause so that the Initial Sync Fuzzer can run commands on the sync source.
-        LOGV2(21066,
-              "Collection Cloner scheduled a remote command",
-              "stage"_attr = describeForFuzzer(stage));
-        LOGV2(21067, "initialSyncFuzzerSynchronizationPoint1 fail point enabled");
-        initialSyncFuzzerSynchronizationPoint1.pauseWhileSet();
+        if (std::find(initialSyncPauseStages.begin(),
+                      initialSyncPauseStages.end(),
+                      stage->getName()) != initialSyncPauseStages.end()) {
+            // These failpoints are set and unset by the InitialSyncTest fixture to cause initial
+            // sync to pause so that the Initial Sync Fuzzer can run commands on the sync source.
+            // nb: This log message is specifically checked for in
+            // initial_sync_test_fixture_test.js, so if you change it here you will need to change
+            // it there.
+            LOGV2(21066,
+                  "Collection Cloner scheduled a remote command",
+                  "stage"_attr = describeForFuzzer(stage));
+            LOGV2(21067, "initialSyncFuzzerSynchronizationPoint1 fail point enabled");
+            initialSyncFuzzerSynchronizationPoint1.pauseWhileSet();
 
-        if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint2.shouldFail())) {
-            LOGV2(21068, "initialSyncFuzzerSynchronizationPoint2 fail point enabled");
-            initialSyncFuzzerSynchronizationPoint2.pauseWhileSet();
+            if (MONGO_unlikely(initialSyncFuzzerSynchronizationPoint2.shouldFail())) {
+                LOGV2(21068, "initialSyncFuzzerSynchronizationPoint2 fail point enabled");
+                initialSyncFuzzerSynchronizationPoint2.pauseWhileSet();
+            }
         }
     }
 }
