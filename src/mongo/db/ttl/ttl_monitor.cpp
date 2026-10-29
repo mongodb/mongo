@@ -74,10 +74,12 @@
 
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <string_view>
 #include <utility>
 
 #include <boost/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
@@ -355,6 +357,23 @@ const IndexCatalogEntry* getValidTTLIndex(OperationContext* opCtx,
     return entry;
 }
 
+/**
+ * Debug info for a fatal error while deleting through a TTL index.
+ */
+struct TTLIndexDeleteDebugInfo {
+    std::string nss;
+    std::string indexName;
+    std::string indexIdent;
+    BSONObj spec;
+};
+
+std::string format_as(const TTLIndexDeleteDebugInfo& info) {
+    return fmt::format("{{nss: {}, indexName: {}, indexIdent: {}, spec: {}}}",
+                       info.nss,
+                       info.indexName,
+                       info.indexIdent,
+                       redact(info.spec).toString());
+}
 }  // namespace
 
 TTLMonitor::TTLMonitor()
@@ -695,6 +714,14 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
     if (!entry) {
         return false;
     }
+
+    ScopedDebugInfo ttlIndexDeleteDbg("ttlIndexDelete",
+                                      TTLIndexDeleteDebugInfo{
+                                          .nss = toStringForLogging(collection.nss()),
+                                          .indexName = indexName,
+                                          .indexIdent = entry->getIdent(),
+                                          .spec = spec.getOwned(),
+                                      });
 
     const auto desc = entry->descriptor();
 
