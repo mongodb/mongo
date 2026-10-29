@@ -15,6 +15,7 @@
  *   featureFlagRequireTenantID_incompatible,
  * ]
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -69,6 +70,16 @@ describe("Pre-image writes on a tenant-scoped collection write to the shared col
 
         adminDB = rst.getPrimary().getDB("admin");
 
+        // Under disaggregated storage collections use replicated record ids. An oplog entry for
+        // such a collection applied outside of applyOps command mode must carry the document's
+        // 'rid', but the applyOps command strips the 'rid' field from its operations. Disable
+        // replicated record ids so that the secondary-mode operation below can be applied without
+        // a 'rid'.
+        const overrideRecordIdsReplicatedFalse = configureFailPoint(
+            rst.getPrimary(),
+            "overrideRecordIdsReplicatedFalse",
+        );
+
         // Arm the tenant-scoped collection with change stream pre-images.
         assert.commandWorked(
             adminDB.runCommand({
@@ -82,6 +93,8 @@ describe("Pre-image writes on a tenant-scoped collection write to the shared col
                 ],
             }),
         );
+
+        overrideRecordIdsReplicatedFalse.off();
     });
 
     after(function () {
