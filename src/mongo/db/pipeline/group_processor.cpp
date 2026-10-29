@@ -211,12 +211,19 @@ void GroupProcessor::spill() {
 
     int64_t spilledRecords = 0;
     for (auto end = _groups.end(); groupsIt != end; ++groupsIt) {
+        _expCtx->checkForInterrupt();
         ptrs.push_back(&*groupsIt);
         ++spilledRecords;
     }
+    constexpr size_t kComparisonsPerInterrupt = 4096;
+    size_t comparisonsUntilInterrupt = kComparisonsPerInterrupt;
     auto STLSorterComparator =
-        [valueComp = _expCtx->getValueComparator()](const GroupsMap::value_type* lhs,
-                                                    const GroupsMap::value_type* rhs) -> int {
+        [&, valueComp = _expCtx->getValueComparator()](const GroupsMap::value_type* lhs,
+                                                       const GroupsMap::value_type* rhs) -> int {
+        if (MONGO_unlikely(--comparisonsUntilInterrupt == 0)) {
+            comparisonsUntilInterrupt = kComparisonsPerInterrupt;
+            _expCtx->getOperationContext()->checkForInterrupt();
+        }
         return valueComp.evaluate(lhs->first < rhs->first);
     };
 

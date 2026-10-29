@@ -1056,6 +1056,90 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
     ASSERT_BSONOBJ_EQ(BSON_ARRAY(1 << 2 << "3" << 4 << BSON_ARRAY(5) << 6 << "7"), resultArr);
 }
 
+TEST_F(HashAggAccumulatorTest, PushMergeTransfersRecoveredElements) {
+    PushHashAggAccumulator accumulator(
+        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, kDefaultCap);
+    vm::ByteCode bytecode;
+    accumulator.prepare(compileContext(), &accumulatorState());
+    accumulator.prepareForMerge(compileContext(), &accumulatorState());
+    accumulator.initialize(bytecode, accumulatorState());
+    auto string = value::TagValueOwned::fromRaw(
+        value::makeNewString("A string long enough to require a heap allocation"));
+    inAccessor().reset(std::move(string));
+    accumulator.accumulate(bytecode, accumulatorState());
+    spillAccessor().reset(accumulatorState().copyOrMoveValue());
+    const auto spillValue = spillAccessor().getViewOfValue().value;
+    auto values =
+        value::getArrayView(spillValue)->getAt(static_cast<size_t>(vm::AggArrayWithSize::kValues));
+    const auto stringValue = value::getArrayView(values.value)->getAt(0).value;
+    value::MaterializedRow merged(1);
+    value::MaterializedSingleRowAccessor mergedAccessor(merged, 0);
+    accumulator.merge(bytecode, mergedAccessor);
+    // Release the spill row before inspecting the merged value: the destination must own it.
+    spillAccessor().reset(value::TagValueView::nothing());
+    accumulatorState().reset(merged.copyOrMoveValue(0));
+    accumulator.finalize(bytecode, accumulatorState());
+    auto [tag, val] = accumulatorState().getViewOfValue();
+    ASSERT_EQ(tag, value::TypeTags::Array);
+    ASSERT_EQ(value::getArrayView(val)->getAt(0).value, stringValue);
+}
+
+TEST_F(HashAggAccumulatorTest, PushMergeTransfersMultipleNestedPartialsIntoNonemptyArray) {
+    PushHashAggAccumulator accumulator(
+        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, kDefaultCap);
+    vm::ByteCode bytecode;
+    accumulator.prepare(compileContext(), &accumulatorState());
+    accumulator.prepareForMerge(compileContext(), &accumulatorState());
+
+    value::MaterializedRow merged(1);
+    value::MaterializedSingleRowAccessor mergedAccessor(merged, 0);
+    BSONArrayBuilder expected;
+    std::vector<value::TagValueView> transferred;
+    for (int partial = 0; partial < 3; ++partial) {
+        accumulator.initialize(bytecode, accumulatorState());
+        for (int i = 0; i < 32; ++i) {
+            const auto text = std::string(64, 'a' + partial) + std::to_string(i);
+            auto nested = value::TagValueOwned::fromRaw(value::makeNewArray());
+            auto* array = value::getArrayView(nested.value());
+            array->push_back_raw(value::makeNewString(text));
+            auto object = value::TagValueOwned::fromRaw(value::makeNewObject());
+            value::getObjectView(object.value())
+                ->push_back_raw("value", value::makeNewString(text));
+            array->push_back(std::move(object));
+            inAccessor().reset(std::move(nested));
+            accumulator.accumulate(bytecode, accumulatorState());
+            expected << BSON_ARRAY(text << BSON("value" << text));
+        }
+
+        if (partial == 0) {
+            mergedAccessor.reset(accumulatorState().copyOrMoveValue());
+            continue;
+        }
+        spillAccessor().reset(accumulatorState().copyOrMoveValue());
+        const auto source = spillAccessor().getViewOfValue();
+        const auto values = value::getArrayView(source.value)
+                                ->getAt(static_cast<size_t>(vm::AggArrayWithSize::kValues));
+        auto* array = value::getArrayView(values.value);
+        for (size_t i = 0; i < array->size(); ++i) {
+            transferred.push_back(array->getAt(i));
+        }
+        accumulator.merge(bytecode, mergedAccessor);
+        spillAccessor().reset(value::TagValueView::nothing());
+    }
+
+    accumulatorState().reset(merged.copyOrMoveValue(0));
+    accumulator.finalize(bytecode, accumulatorState());
+    const auto result = accumulatorState().getViewOfValue();
+    auto* array = value::getArrayView(result.value);
+    ASSERT_EQ(array->size(), 96);
+    for (size_t i = 0; i < transferred.size(); ++i) {
+        ASSERT_EQ(array->getAt(32 + i).value, transferred[i].value);
+    }
+    BSONArrayBuilder actual;
+    bson::convertToBsonArr(actual, value::ArrayEnumerator(result.tag, result.value));
+    ASSERT_BSONOBJ_EQ(actual.arr(), expected.arr());
+}
+
 TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEnforcesCap) {
     int64_t sizeCap = 192;
     PushHashAggAccumulator accumulator(

@@ -44,10 +44,11 @@ void AccumulatorPush::processInternal(const Value& input, bool merging) {
 
         const vector<Value>& vec = input.getArray();
         for (auto&& val : vec) {
+            getExpressionContext()->checkForInterrupt();
             _memUsageTracker.add(val.getApproximateSize());
             checkMemUsage();
+            _array.push_back(val);
         }
-        _array.insert(_array.end(), vec.begin(), vec.end());
     }
 }
 

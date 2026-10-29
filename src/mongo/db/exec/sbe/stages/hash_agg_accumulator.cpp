@@ -481,14 +481,10 @@ void PushHashAggAccumulator::mergeRecoveredState(
             "Expected recovered array size to be 64-bit integer",
             newArrayElementsSizeTagVal.tag == value::TypeTags::NumberInt64);
 
-    // Note that ownership of both 'valNewArrayElements' and 'valAccumulatorState' passes to the
-    // 'setUnionAccumImpl()' function.
-    auto newArrayElements = [&]() {
-        auto newArrayElementsTagVal =
-            recoveredStateArr->getAt(static_cast<size_t>(vm::AggArrayWithSize::kValues));
-        return value::TagValueOwned::fromRaw(
-            value::copyValue(newArrayElementsTagVal.tag, newArrayElementsTagVal.value));
-    }();
+    // The recovered spill row is consumed by this merge. Detach the values so the spill row
+    // can be released without copying the partial's elements.
+    auto newArrayElements = recoveredStateArr->swapAt(
+        static_cast<size_t>(vm::AggArrayWithSize::kValues), value::TypeTags::Null, 0);
 
     value::TagValueOwned ownedAccumulatorState = accumulatorState.copyOrMoveValue();
 

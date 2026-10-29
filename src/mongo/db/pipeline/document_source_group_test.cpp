@@ -25,6 +25,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context.h"
@@ -1094,6 +1095,124 @@ TEST_F(DocumentSourceGroupTest, SpillWriteLoopChecksForInterrupt) {
     ASSERT_TRUE(processor.usedDisk());
     // Allow slack for kInterruptCheckPeriod amortization and memory-accounting granularity.
     ASSERT_GTE(checksDelta, kDocs / ExpressionContext::kInterruptCheckPeriod / 2);
+}
+
+TEST_F(DocumentSourceGroupTest, PushMergeChecksForInterruptWithinPartial) {
+    auto expCtx = getExpCtx();
+    AccumulatorPush accumulator(expCtx.get());
+    std::vector<Value> values(4096, Value(1));
+    auto* opCtx = expCtx->getOperationContext();
+    const auto before = opCtx->numInterruptChecks();
+    accumulator.process(Value(values), true);
+    ASSERT_GT(opCtx->numInterruptChecks() - before, 1);
+    ASSERT_VALUE_EQ(accumulator.getValue(false), Value(values));
+}
+
+TEST_F(DocumentSourceGroupTest, PushMergePropagatesInterruptWithinPartial) {
+    auto expCtx = getExpCtx();
+    AccumulatorPush accumulator(expCtx.get());
+    Value partial(std::vector<Value>(4096, Value(1)));
+    expCtx->getOperationContext()->markKilled();
+    ASSERT_THROWS_CODE(accumulator.process(partial, true), DBException, ErrorCodes::Interrupted);
+}
+
+TEST_F(DocumentSourceGroupTest, SpillSortChecksForInterruptDuringComparisons) {
+    auto expCtx = getExpCtx();
+    unittest::TempDir tempDir("GroupSpillSortInterrupt");
+    expCtx->setTempDir(tempDir.path());
+    expCtx->setAllowDiskUse(true);
+    GroupProcessor processor(expCtx, MemoryUsageLimit{100 * 1024 * 1024});
+    processor.setIdExpression(
+        ExpressionFieldPath::parse(expCtx.get(), "$k", expCtx->variablesParseState));
+    processor.setExecutionStarted();
+    constexpr int kDocs = 20'000;
+    for (int i = 0; i < kDocs; ++i) {
+        Document doc{{"k", Value(i)}};
+        processor.add(processor.computeGroupKey(doc), doc);
+    }
+    auto* opCtx = expCtx->getOperationContext();
+    const auto before = opCtx->numInterruptChecks();
+    processor.spill();
+    // Record writes account for one check per period. Sorting must contribute more.
+    ASSERT_GT(opCtx->numInterruptChecks() - before,
+              2 * kDocs / ExpressionContext::kInterruptCheckPeriod + 10);
+    ASSERT_TRUE(processor.usedDisk());
+}
+
+class KillDuringComparisonCollator final : public CollatorInterface {
+public:
+    explicit KillDuringComparisonCollator(OperationContext* opCtx)
+        : CollatorInterface(Collation("kill_during_comparison")), _opCtx(opCtx) {}
+
+    std::unique_ptr<CollatorInterface> clone() const override {
+        return std::make_unique<KillDuringComparisonCollator>(_opCtx);
+    }
+
+    std::shared_ptr<CollatorInterface> cloneShared() const override {
+        return std::make_shared<KillDuringComparisonCollator>(_opCtx);
+    }
+
+    int compare(std::string_view lhs, std::string_view rhs) const override {
+        if (armed) {
+            ++comparisons;
+            _opCtx->markKilled();
+        }
+        return lhs.compare(rhs);
+    }
+
+    ComparisonKey getComparisonKey(std::string_view value) const override {
+        return makeComparisonKey(std::string(value));
+    }
+
+    bool armed = false;
+    mutable size_t comparisons = 0;
+
+private:
+    OperationContext* _opCtx;
+};
+
+TEST_F(DocumentSourceGroupTest, SpillSortPropagatesInterruptBeforeWriting) {
+    auto expCtx = getExpCtx();
+    auto collator = std::make_unique<KillDuringComparisonCollator>(expCtx->getOperationContext());
+    auto* comparisonCollator = collator.get();
+    expCtx->setCollator(std::move(collator));
+    unittest::TempDir tempDir("GroupSpillSortCancellation");
+    expCtx->setTempDir(tempDir.path());
+    expCtx->setAllowDiskUse(true);
+    GroupProcessor processor(expCtx, MemoryUsageLimit{100 * 1024 * 1024});
+    processor.setIdExpression(
+        ExpressionFieldPath::parse(expCtx.get(), "$k", expCtx->variablesParseState));
+    processor.setExecutionStarted();
+    for (int i = 0; i < 20'000; ++i) {
+        Document doc{{"k", Value(fmt::format("key{}", i))}};
+        processor.add(processor.computeGroupKey(doc), doc);
+    }
+    comparisonCollator->armed = true;
+    ASSERT_THROWS_CODE(processor.spill(), DBException, ErrorCodes::Interrupted);
+    ASSERT_GT(comparisonCollator->comparisons, 0);
+    ASSERT_LTE(comparisonCollator->comparisons, 4096);
+    ASSERT_FALSE(processor.usedDisk());
+    ASSERT_GT(processor.getMemoryTracker().inUseTrackedMemoryBytes(), 0);
+    processor.reset();
+    ASSERT_EQ(processor.getMemoryTracker().inUseTrackedMemoryBytes(), 0);
+}
+
+TEST_F(DocumentSourceGroupTest, PushMergePreservesOrderAcrossPartials) {
+    auto expCtx = getExpCtx();
+    AccumulatorPush accumulator(expCtx.get());
+    accumulator.process(Value(0), false);
+    accumulator.process(Value(std::vector<Value>{Value(1), Value(2)}), true);
+    accumulator.process(Value(std::vector<Value>{Value(3), Value(4)}), true);
+    ASSERT_VALUE_EQ(accumulator.getValue(false),
+                    Value(std::vector<Value>{Value(0), Value(1), Value(2), Value(3), Value(4)}));
+}
+
+TEST_F(DocumentSourceGroupTest, PushMergeEnforcesMemoryLimit) {
+    auto expCtx = getExpCtx();
+    AccumulatorPush accumulator(expCtx.get(), MemoryUsageLimit{1024});
+    Value partial(std::vector<Value>(4096, Value(1)));
+    ASSERT_THROWS_CODE(
+        accumulator.process(partial, true), DBException, ErrorCodes::ExceededMemoryLimit);
 }
 
 class KillOnDestructionAccumulator : public AccumulatorState {
