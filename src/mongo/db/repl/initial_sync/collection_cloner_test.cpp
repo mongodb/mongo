@@ -18,6 +18,7 @@
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -166,6 +167,45 @@ TEST_F(CollectionClonerTestResumable, CountStage) {
     _mockServer->setCommandReply("count", createCountResponse(100));
     ASSERT_OK(cloner->run());
     ASSERT_EQ(100, getProgressMeter(cloner.get()).total());
+}
+
+// The InitialSyncTest fixture detects that initial sync has paused by waiting for
+// initialSyncFuzzerSynchronizationPoint1's timesEntered to increase, so stages that don't pause
+// must not count as entries.
+TEST_F(CollectionClonerTestResumable, NonPausingStagesDoNotEnterFuzzerSynchronizationPoint) {
+    FailPointEnableBlock fpb("initialSyncFuzzerSynchronizationPoint1");
+    auto cloner = makeCollectionCloner();
+    cloner->setStopAfterStage_forTest("count");
+    _mockServer->setCommandReply("collStats", BSON("size" << 10000));
+    _mockServer->setCommandReply("count", createCountResponse(100));
+    ASSERT_OK(cloner->run());
+    ASSERT_EQ(0, fpb.waitForNNewEntries(0));
+}
+
+// A pause enters initialSyncFuzzerSynchronizationPoint1 twice: once in shouldFail() before the
+// stage is logged, and once in pauseWhileSet() after. The InitialSyncTest fixture waits for the
+// second entry so that the stage's log messages are guaranteed to exist when step() returns.
+TEST_F(CollectionClonerTestResumable, FuzzerSynchronizationPointLogsBeforeSecondEntry) {
+    auto cloner = makeCollectionCloner();
+    cloner->setStopAfterStage_forTest("listIndexes");
+    setMockServerReplies(BSON("size" << 10),
+                         createCountResponse(1),
+                         createCursorResponse(_nss.ns_forTest(), BSONArray()));
+
+    unittest::LogCaptureGuard logs;
+    boost::optional<FailPointEnableBlock> fpb;
+    fpb.emplace("initialSyncFuzzerSynchronizationPoint1");
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
+        ASSERT_OK(cloner->run());
+    });
+
+    fpb->waitForNNewEntries(2);
+    ASSERT_EQ(1, logs.countTextContaining("Collection Cloner scheduled a remote command"));
+    ASSERT_EQ(1, logs.countTextContaining("initialSyncFuzzerSynchronizationPoint1 fail point"));
+
+    fpb.reset();
+    clonerThread.join();
 }
 
 // On a negative count, the CollectionCloner should use a zero count.
