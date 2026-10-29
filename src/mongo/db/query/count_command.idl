@@ -28,7 +28,7 @@ types:
 structs:
     CountCommandReply:
         description: "Reply from the {count: ...} command"
-        strict: false
+        strict: true
         is_command_reply: true
         fields:
             n:

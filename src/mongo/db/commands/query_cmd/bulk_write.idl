@@ -174,7 +174,7 @@ structs:
     # TODO (SERVER-77798): Get rid of this struct that duplicates the definition of a WriteConcernError.
     BulkWriteWriteConcernError:
         description: "WriteConcernError structure shared by all commands."
-        strict: false
+        strict: true
         fields:
             code:
                 type: int
@@ -233,7 +233,6 @@ structs:
 
     BulkWriteCommandResponseCursor:
         description: "Cursor holding results for a successful 'bulkWrite' command."
-        strict: false
         fields:
             id:
                 type: long

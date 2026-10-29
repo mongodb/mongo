@@ -13,7 +13,6 @@ imports:
 structs:
     ErrorReplyElement:
         description: "Error reply element of validateDBMetadata command's reply."
-        strict: false
         fields:
             shard:
                 type: string
@@ -25,7 +24,6 @@ structs:
 
     ValidateDBMetadataCommandReply:
         description: "The validateDBMetadata command's reply."
-        strict: false
         is_command_reply: true
         fields:
             apiVersionErrors:

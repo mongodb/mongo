@@ -627,13 +627,6 @@ The generated C++ parsers for structs are strict by default. This means that the
 fields that do not know about. Use `strict: false` to change this behavior. Mark persisted structs
 with `strict: false` for future backwards compatibility needs.
 
-Structs used as command replies (including every struct reachable from a reply struct through
-struct-valued fields, arrays of structs, variants, and chained structs) must set `strict: false`.
-Replies are parsed by potentially older binaries, and a strict reply parser makes an older binary
-fail with `IDLUnknownField` when a newer binary adds a reply field. This cannot be gated behind a
-feature flag or FCV since FCV only tracks major.minor versions, not patch versions. The IDL compiler
-rejects a strict reply struct at compile time.
-
 A struct consists of one or more fields. All fields are required by default. The generated parser
 errors if field is missing from the BSON document. On serialization, if a field has not been set,
 the serializer calls `invariant`.
@@ -761,9 +754,7 @@ multi level chained structs.
 - `fields` - sequence - see [fields attributes reference below](#struct-fields-attribute-reference)
 - `strict` - bool - defaults to true, a strict parser errors if a unknown field is encountered by
   the generated parser. Persisted structs should set this to `false` to allow them to encounter
-  documents from future versions of MongoDB without throwing an error. Reply structs (and any struct
-  reachable from one) must set this to `false`; the compiler errors otherwise. See
-  [Structs](#structs) above.
+  documents from future versions of MongoDB without throwing an error.
 - `chained_structs` - mapping - a list of structs to include this struct. IDL adds the chained
   structs as member variables in the generated C++ class. IDL also adds a getter for each chained
   struct.
@@ -778,8 +769,7 @@ multi level chained structs.
   expected to thrown a C++ exception (i.e. `uassert`) if validation fails.
 - `is_command_reply` - bool - if true, marks the struct as a command reply. A struct marked a
   `is_command_reply` generates a parser that ignores known generic or common fields across all
-  replies when parsing replies (i.e. `ok`, `errmsg`, etc). A struct marked `is_command_reply` must
-  set `strict: false`; see [Structs](#structs) above.
+  replies when parsing replies (i.e. `ok`, `errmsg`, etc)
 - `is_generic_cmd_list` - string - choice [`arg`, `reply`], if set, generates functions
   `bool hasField(StringData)` and `bool shouldForwardToShards(StringData)` for each field in the
   struct. If set to `arg`, the struct will automatically be chained to every `command`.

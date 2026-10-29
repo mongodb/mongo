@@ -12,7 +12,6 @@ imports:
 structs:
     ListDatabasesForAllTenantsReplyItem:
         description: "Individual result"
-        strict: false
         fields:
             name:
                 type: string
@@ -36,7 +35,6 @@ structs:
 
     ListDatabasesForAllTenantsReply:
         description: "The listDatabasesForAllTenants command's reply."
-        strict: false
         fields:
             databases:
                 type: array<ListDatabasesForAllTenantsReplyItem>

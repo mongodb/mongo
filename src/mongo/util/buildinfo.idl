@@ -11,7 +11,6 @@ imports:
 structs:
     BuildInfoOpenSSL:
         description: "Information about the SSL implementation used (OpenSSL, SChannel, or SecureTransport)"
-        strict: false
         fields:
             running:
                 description: "The version of OpenSSL actually loaded as a shared object"
@@ -23,7 +22,6 @@ structs:
 
     BuildInfoMacOS:
         description: "Reply fields specific to macOS"
-        strict: false
         fields:
             osProductVersion:
                 description: "Value of kern.osproductversion"
@@ -38,7 +36,6 @@ structs:
     BuildInfo:
         description: "Response from the buildInfo command"
         inline_chained_structs: true
-        strict: false
         fields:
             version:
                 description: "The current MongoDB server version, e.g. '1.2.3-rc0'"

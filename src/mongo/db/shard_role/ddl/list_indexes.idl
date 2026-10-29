@@ -14,7 +14,6 @@ imports:
 structs:
     ListIndexesReplyItem:
         description: "An item in the listIndexes command's reply"
-        strict: false
         # If adding new fields, the set 'kAllowedListIndexesFieldNames' in
         # 'src/mongo/db/commands/list_indexes_allowed_fields.h' should also be updated.
         fields:
@@ -163,7 +162,6 @@ structs:
 
     ListIndexesReplyCursor:
         description: "Cursor object"
-        strict: false
         fields:
             id:
                 type: long
@@ -177,7 +175,6 @@ structs:
 
     ListIndexesReply:
         description: "The listIndexes command's reply."
-        strict: false
         is_command_reply: true
         fields:
             cursor:

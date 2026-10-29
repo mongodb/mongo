@@ -1919,75 +1919,6 @@ def is_incremental_feature_rollout_flag(feature_flag):
     return phase is not None and phase != ast.FeatureFlagRolloutPhase.NOT_FOR_INCREMENTAL_ROLLOUT
 
 
-def _validate_reply_structs_not_strict(ctxt, parsed_spec):
-    # type: (errors.ParserContext, syntax.IDLSpec) -> None
-    """Validate that no struct reachable from a reply position is strict. See SERVER-130246."""
-    symbols = parsed_spec.symbols
-
-    # The bind pass has already resolved (and reported) any unresolvable field types; resolution
-    # failures here are silently skipped so this validation cannot add duplicate errors.
-    silent_ctxt = errors.ParserContext("unknown", errors.ParserErrorCollection())
-    visited = set()  # type: Set[str]
-
-    def visit_resolved_type(resolved, reply_root_name):
-        # type: (Union[syntax.Enum, syntax.Struct, syntax.Type], str) -> None
-        """Visit a resolved type, recursing into nested struct types."""
-        if isinstance(resolved, syntax.ArrayType):
-            # Arrays of structs parse each element with the struct's own parser.
-            visit_resolved_type(resolved.element_type, reply_root_name)
-        elif isinstance(resolved, syntax.VariantType):
-            # A variant alternative may be a struct or an array of structs; the latter
-            # resolves into variant_types as an ArrayType wrapping the struct.
-            for alternative in resolved.variant_struct_types:
-                visit_resolved_type(alternative, reply_root_name)
-            for alternative in resolved.variant_types:
-                visit_resolved_type(alternative, reply_root_name)
-        elif isinstance(resolved, syntax.Struct):
-            visit_struct(resolved, reply_root_name)
-
-    def visit_struct(struct, reply_root_name):
-        # type: (syntax.Struct, str) -> None
-        """Visit a struct reachable from a reply position, and recurse into its fields."""
-        if struct.name in visited:
-            return
-        visited.add(struct.name)
-
-        if struct.strict:
-            ctxt.add_strict_reply_not_allowed(struct, struct.name, reply_root_name)
-
-        for field in struct.fields or []:
-            # Ignored fields are not deserialized, so their types are unreachable from the reply.
-            if field.ignore:
-                continue
-            resolved = symbols.resolve_field_type(silent_ctxt, struct, field.name, field.type)
-            if resolved is not None:
-                visit_resolved_type(resolved, reply_root_name)
-
-        for chained_struct in struct.chained_structs or []:
-            resolved = symbols.resolve_type_from_name(
-                silent_ctxt, chained_struct, chained_struct.name, chained_struct.name
-            )
-            if isinstance(resolved, syntax.Struct):
-                visit_struct(resolved, reply_root_name)
-
-    # Imported definitions are validated when their own file is compiled; only seed from this
-    # file's commands and structs. The traversal itself still follows imported structs since a
-    # reply defined here really does embed them.
-    for command in symbols.commands:
-        if not command.imported and command.reply_type:
-            resolved = symbols.resolve_type_from_name(
-                silent_ctxt, command, command.name, command.reply_type
-            )
-            if isinstance(resolved, syntax.Struct):
-                visit_struct(resolved, command.name)
-
-    for struct in symbols.structs:
-        if not struct.imported and (
-            struct.is_command_reply or struct.is_generic_cmd_list == "reply"
-        ):
-            visit_struct(struct, struct.name)
-
-
 def bind(parsed_spec):
     # type: (syntax.IDLSpec) -> ast.IDLBoundSpec
     """Read an idl.syntax, create an idl.ast tree, and validate the final IDL Specification."""
@@ -2012,12 +1943,6 @@ def bind(parsed_spec):
     for struct in parsed_spec.symbols.structs:
         if not struct.imported:
             bound_spec.structs.append(_bind_struct(ctxt, parsed_spec, struct))
-
-    # Reply-struct validation runs after all commands and structs are bound because a struct's
-    # reachability from a reply position can span struct declaration order (a struct declared
-    # earlier may be reachable only through one declared later), and the error must point at the
-    # offending strict struct rather than the reply root.
-    _validate_reply_structs_not_strict(ctxt, parsed_spec)
 
     for feature_flag in parsed_spec.feature_flags:
         bound_spec.server_parameters.append(_bind_feature_flags(ctxt, feature_flag))

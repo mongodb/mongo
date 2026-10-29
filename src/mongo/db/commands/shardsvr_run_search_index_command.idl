@@ -12,7 +12,6 @@ imports:
 structs:
     MongotCursorResponse:
         description: "This response from the cursor opened on mongot for a given search index command"
-        strict: false
         fields:
             id:
                 type: int
@@ -28,7 +27,6 @@ structs:
         description: >-
             The SearchIndexManager's response from running the search index command specified 
             in shardsvrRunSearchIndexCommand.userCmd.
-        strict: false
         fields:
             ok:
                 description: "Result of the command execution."
@@ -46,7 +44,6 @@ structs:
                 optional: true
     ShardsvrRunSearchIndexCommandReply:
         description: "The response that the shard returns to mongos upon receiving a response from the search index manager"
-        strict: false
         is_command_reply: true
         fields:
             searchIndexManagerResponse:

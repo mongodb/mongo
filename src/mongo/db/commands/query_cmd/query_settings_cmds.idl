@@ -15,7 +15,6 @@ imports:
 structs:
     SetQuerySettingsCommandReply:
         description: "Reply to setQuerySettings command."
-        strict: false
         is_command_reply: true
         inline_chained_structs: true
         chained_structs:

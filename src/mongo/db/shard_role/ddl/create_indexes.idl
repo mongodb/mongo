@@ -13,7 +13,7 @@ imports:
 structs:
     CreateIndexesReply:
         description: "Reply to 'createIndexes' command"
-        strict: false
+        strict: true
         is_command_reply: true
         fields:
             numIndexesBefore:
@@ -48,7 +48,7 @@ structs:
     # fields in list_indexes.idl.
     NewIndexSpec:
         description: "A type representing a spec for a new index"
-        strict: false
+        strict: true
         fields:
             v:
                 description: "Index spec version"

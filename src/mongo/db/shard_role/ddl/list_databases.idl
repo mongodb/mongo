@@ -12,7 +12,6 @@ imports:
 structs:
     ListDatabasesReplyItem:
         description: "Individual result"
-        strict: false
         fields:
             name:
                 type: string
@@ -32,7 +31,6 @@ structs:
 
     ListDatabasesReply:
         description: "The listDatabases command's reply."
-        strict: false
         is_command_reply: true
         fields:
             databases:

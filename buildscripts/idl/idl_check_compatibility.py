@@ -1813,9 +1813,6 @@ def check_compatibility(
                     if not old_cmd.strict and new_cmd.strict:
                         ctxt.add_command_strict_true_error(new_cmd.command_name, new_idl_file_path)
 
-                    old_reply = old_idl_file.spec.symbols.get_struct(old_cmd.reply_type)
-                    new_reply = new_idl_file.spec.symbols.get_struct(new_cmd.reply_type)
-
                     # Check compatibility of command's parameters.
                     check_command_params_or_type_struct_fields(
                         ctxt,
@@ -1839,6 +1836,8 @@ def check_compatibility(
                         new_idl_file_path,
                     )
 
+                    old_reply = old_idl_file.spec.symbols.get_struct(old_cmd.reply_type)
+                    new_reply = new_idl_file.spec.symbols.get_struct(new_cmd.reply_type)
                     check_reply_fields(
                         ctxt,
                         old_reply,

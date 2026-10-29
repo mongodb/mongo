@@ -4305,12 +4305,9 @@ TEST(IDLTypeCommand, ReplyTypeCanParseWithGenericFields) {
     ASSERT(parsed.getIsCommandReply());
     ASSERT_EQ(parsed.getReply_field(), 42);
 
-    // This contains a field not part of Reply_type_struct. Reply structs are not strict
-    // (SERVER-130246), so unknown fields are ignored rather than failing to parse.
+    // This contains a field not part of Reply_type struct, so shouldn't parse
     auto bsonInvalidReply = BSON("reply_field" << 42 << nonGenericField << 1);
-    auto parsedInvalid = CommandWithReplyType::Reply::parse(bsonInvalidReply);
-    ASSERT(parsedInvalid.getIsCommandReply());
-    ASSERT_EQ(parsedInvalid.getReply_field(), 42);
+    ASSERT_THROWS(CommandWithReplyType::Reply::parse(bsonInvalidReply), DBException);
 }
 
 TEST(IDLCommand,

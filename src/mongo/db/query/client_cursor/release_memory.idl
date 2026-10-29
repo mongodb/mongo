@@ -26,7 +26,6 @@ structs:
         description: >-
             A structure that holds a cursor id and an error that happened during
             releasing memory for this cursor.
-        strict: false
         fields:
             cursorId:
                 type: cursorId

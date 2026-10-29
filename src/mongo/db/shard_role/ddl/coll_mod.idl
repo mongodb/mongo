@@ -50,7 +50,7 @@ structs:
 
     CollModReply:
         description: "The collMod command's reply."
-        strict: false
+        strict: true
         is_command_reply: true
         fields:
             expireAfterSeconds_old:

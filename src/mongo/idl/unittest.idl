@@ -171,7 +171,6 @@ structs:
 
     reply_type_struct:
         description: Used for testing the IDL command reply_type field
-        strict: false
         is_command_reply: true
         fields:
             reply_field: int
@@ -580,7 +579,7 @@ structs:
     ##################################################################################################
     NamespaceInfoStruct:
         description: "Test struct with namespace string field."
-        strict: false
+        strict: true
         fields:
             ns:
                 type: namespacestring
@@ -596,7 +595,7 @@ structs:
 
     BypassReplyStruct:
         description: "Reply struct that contains a nested struct with namespace string field"
-        strict: false
+        strict: true
         is_command_reply: true
         fields:
             field1:

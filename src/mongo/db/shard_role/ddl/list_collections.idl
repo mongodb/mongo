@@ -15,7 +15,6 @@ structs:
         description: >-
             Persisted replicated fast count metadata, surfaced via listCollections so initial
             sync clients can seed local stores before applying oplog entries.
-        strict: false
         fields:
             size:
                 type: safeInt64
@@ -49,7 +48,6 @@ structs:
 
     ListCollectionsReplyInfo:
         description: "Information about the collection."
-        strict: false
         fields:
             readOnly:
                 type: bool
@@ -84,7 +82,6 @@ structs:
 
     ListCollectionsReplyItem:
         description: "Individual result"
-        strict: false
         fields:
             name:
                 type: string
@@ -112,7 +109,6 @@ structs:
 
     ListCollectionsReplyCursor:
         description: "Cursor object"
-        strict: false
         fields:
             id:
                 type: long
@@ -126,7 +122,6 @@ structs:
 
     ListCollectionsReply:
         description: "The listCollection command's reply."
-        strict: false
         is_command_reply: true
         fields:
             cursor:

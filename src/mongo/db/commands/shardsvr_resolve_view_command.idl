@@ -24,7 +24,6 @@ types:
 structs:
     ShardsvrResolveViewReply:
         description: "The response that the primary shard returns to mongos upon receiving a shardsvrResolveView command"
-        strict: false
         fields:
             collectionUUID:
                 type: uuid
