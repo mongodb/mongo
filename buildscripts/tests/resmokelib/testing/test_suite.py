@@ -1,9 +1,15 @@
 """Unit tests for the resmokelib.testing.suite module."""
 
+import json
 import logging
 import os
+import pathlib
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import yaml
 from mock import MagicMock
@@ -12,6 +18,206 @@ from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing import suite as under_test
 from buildscripts.resmokelib.testing.suite import EqualRuntime
 from buildscripts.resmokelib.testing.testcases.interface import TestCase
+
+
+class TestBypassEnvironmentTransport(unittest.TestCase):
+    def test_patch_bypass_reaches_resmoke_as_environment_not_arguments(self):
+        root = pathlib.Path(__file__).resolve().parents[4]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workdir = pathlib.Path(tmpdir)
+            (workdir / "src").mkdir()
+            evergreen_dir = workdir / "src/evergreen"
+            evergreen_dir.mkdir()
+            script = evergreen_dir / "resmoke_tests_execute.sh"
+            shutil.copyfile(root / "evergreen/resmoke_tests_execute.sh", script)
+            shutil.copyfile(root / "evergreen/prelude.sh", evergreen_dir / "prelude.sh")
+            for helper in (
+                "prelude_workdir.sh",
+                "prelude_python.sh",
+                "prelude_db_contrib_tool.sh",
+                "prelude_mongo_task_generator.sh",
+                "prelude_system_env_variables.sh",
+            ):
+                (evergreen_dir / helper).write_text("")
+            (evergreen_dir / "prelude_venv.sh").write_text(
+                "activate_venv() { :; }\nsetup_db_contrib_tool() { :; }\n"
+            )
+            (workdir / "src/buildscripts").mkdir()
+            shutil.copyfile(
+                root / "buildscripts/evergreen_expansions2bash.py",
+                workdir / "src/buildscripts/evergreen_expansions2bash.py",
+            )
+            # A failing stub skips the wrapper's successful-run core-file cleanup.
+            (workdir / "src/buildscripts/resmoke.py").write_text(
+                "import json, os, pathlib, sys\n"
+                "pathlib.Path('captured.json').write_text(json.dumps({\n"
+                "    'bypass': os.environ.get('TEST_SELECTION_BYPASS_QUARANTINE'),\n"
+                "    'args': sys.argv[1:],\n"
+                "}))\n"
+                "sys.exit(1)\n"
+            )
+            (workdir / "src/etc").mkdir()
+            (workdir / "src/etc/expansions.default.yml").write_text(
+                yaml.safe_dump(
+                    {
+                        "disable_unit_tests": "false",
+                        "should_shuffle": "false",
+                        "continue_on_failure": "false",
+                        "resmoke_jobs": "1",
+                        "workdir": str(workdir),
+                    }
+                )
+            )
+            marker = workdir / "injected"
+            names = [
+                "a,b.js",
+                " a.js ",
+                "a  b.js",
+                "a\t\tb.js",
+                'a"b.js',
+                r"a\b.js",
+                "a=b.js",
+                f"$(touch {marker})",
+                f"`touch {marker}`",
+                f"';touch {marker};'",
+            ]
+            raw = json.dumps(names, indent=2)
+            for is_patch, value, inherited, expected in (
+                ("true", raw, None, raw),
+                ("false", raw, "stale", ""),
+                ("true", None, "stale", ""),
+            ):
+                with self.subTest(is_patch=is_patch, value=value):
+                    expansions = {"is_patch": is_patch}
+                    if value is not None:
+                        expansions["test_selection_bypass_quarantine"] = value
+                    expansion_file = workdir / "expansions.yml"
+                    expansion_file.write_text(yaml.safe_dump(expansions))
+                    env = {**os.environ, "python": sys.executable, "OS": "Darwin"}
+                    env.pop("TEST_SELECTION_BYPASS_QUARANTINE", None)
+                    if inherited is not None:
+                        env["TEST_SELECTION_BYPASS_QUARANTINE"] = inherited
+                    captured_file = workdir / "src/captured.json"
+                    captured_file.unlink(missing_ok=True)
+                    subprocess.run(
+                        ["bash", str(script)],
+                        cwd=workdir,
+                        text=True,
+                        capture_output=True,
+                        check=True,
+                        env=env,
+                    )
+                    captured = json.loads(captured_file.read_text())
+                    self.assertEqual(expected, captured["bypass"])
+                    self.assertEqual("run", captured["args"][0])
+                    self.assertNotIn("a,b.js", " ".join(captured["args"]))
+                    self.assertFalse(marker.exists())
+
+
+class TestPatchTestSelectionBypass(unittest.TestCase):
+    def setUp(self):
+        for name, value in (
+            ("EVERGREEN_TASK_ID", "task"),
+            ("ENABLE_EVERGREEN_API_TEST_SELECTION", True),
+            ("EVERGREEN_PATCH_BUILD", True),
+            ("TSS_TEST_LIST", None),
+            ("SHARD_COUNT", None),
+            ("SHARD_INDEX", None),
+        ):
+            self.enterContext(patch.object(under_test._config, name, value))
+        self.enterContext(
+            patch.object(loggers, "ROOT_EXECUTOR_LOGGER", logging.getLogger("bypass-test"))
+        )
+        self.enterContext(patch.dict(os.environ, {}, clear=True))
+        self.suite = under_test.Suite("suite_name", {"test_kind": "js_test", "selector": {}})
+        self.api = MagicMock()
+        self.api.select_tests.return_value = {"tests": ["a.js", "outside.js"]}
+        self.client = self.enterContext(
+            patch.object(under_test.evergreen_conn, "get_evergreen_api", return_value=self.api)
+        )
+
+    def test_restores_only_bypassed_candidates_in_candidate_order(self):
+        os.environ["TEST_SELECTION_BYPASS_QUARANTINE"] = '["b  b.js","b  b.js","outside.js"]'
+        self.assertEqual(
+            (["b  b.js", "a.js"], ["b b.js", "c.js"]),
+            self.suite._apply_test_selection(["b  b.js", "a.js", "b b.js", "c.js"]),
+        )
+        self.assertEqual(
+            ["b  b.js", "a.js", "b b.js", "c.js"],
+            self.api.select_tests.call_args.kwargs["tests"],
+        )
+        self.assertNotIn("test_selection_bypass_quarantine", self.api.select_tests.call_args.kwargs)
+
+    def test_invalid_active_bypass_fails_before_client_creation(self):
+        os.environ["TEST_SELECTION_BYPASS_QUARANTINE"] = "broken"
+        with self.assertRaisesRegex(ValueError, "test_selection_bypass_quarantine"):
+            self.suite._apply_test_selection(["a.js"])
+        self.client.assert_not_called()
+
+    def test_absent_and_empty_bypass_preserve_selection(self):
+        for env in (
+            {},
+            {"TEST_SELECTION_BYPASS_QUARANTINE": ""},
+            {"TEST_SELECTION_BYPASS_QUARANTINE": "[]"},
+        ):
+            with self.subTest(env=env), patch.dict(os.environ, env, clear=True):
+                self.assertEqual(
+                    (["a.js"], ["b.js"]), self.suite._apply_test_selection(["b.js", "a.js"])
+                )
+
+    def test_disabled_missing_task_and_mainline_ignore_invalid_bypass(self):
+        os.environ["TEST_SELECTION_BYPASS_QUARANTINE"] = "broken"
+        for name, value in (
+            ("ENABLE_EVERGREEN_API_TEST_SELECTION", False),
+            ("EVERGREEN_TASK_ID", None),
+            ("EVERGREEN_PATCH_BUILD", False),
+        ):
+            with self.subTest(gate=name), patch.object(under_test._config, name, value):
+                self.assertEqual((["a.js"], []), self.suite._apply_test_selection(["a.js"]))
+        self.client.assert_not_called()
+
+    def test_api_failures_do_not_select_only_bypassed_tests(self):
+        os.environ["TEST_SELECTION_BYPASS_QUARANTINE"] = '["b.js"]'
+        for error in (RuntimeError("API unavailable"), under_test.TimeoutError()):
+            with self.subTest(error=error):
+                self.api.select_tests.side_effect = error
+                self.assertEqual(
+                    (["a.js", "b.js", "c.js"], []),
+                    self.suite._apply_test_selection(["a.js", "b.js", "c.js"]),
+                )
+        self.client.side_effect = RuntimeError("client unavailable")
+        self.assertEqual((["a.js", "b.js"], []), self.suite._apply_test_selection(["a.js", "b.js"]))
+
+    def test_restored_tests_are_partitioned_once_across_real_shards(self):
+        os.environ["TEST_SELECTION_BYPASS_QUARANTINE"] = '["b.js","excluded_by_tags.js"]'
+        shards = []
+        with (
+            patch.object(self.suite, "_get_suite_root", return_value=os.getcwd()),
+            patch.object(
+                under_test._selector,
+                "filter_tests",
+                side_effect=lambda *args, **kwargs: (
+                    ["b.js", "a.js", "c.js"],
+                    ["excluded_by_tags.js"],
+                ),
+            ),
+            patch.object(
+                under_test._selector, "group_tests", side_effect=lambda kind, cfg, tests: tests
+            ),
+            patch.object(under_test._config, "SHARD_COUNT", 2),
+            patch.object(under_test._config, "HISTORIC_TEST_RUNTIMES", None),
+        ):
+            for index in range(2):
+                with patch.object(under_test._config, "SHARD_INDEX", index):
+                    tests, excluded = self.suite._get_tests_for_kind("js_test")
+                    shards.append(tests)
+                    self.assertEqual(["excluded_by_tags.js", "c.js"], excluded)
+        self.assertEqual([["b.js"], ["a.js"]], shards)
+
+    def test_empty_candidates_do_not_parse_or_query(self):
+        os.environ["TEST_SELECTION_BYPASS_QUARANTINE"] = "broken"
+        self.assertEqual(([], []), self.suite._apply_test_selection([]))
+        self.client.assert_not_called()
 
 
 class TestNumTimesToRepeatTests(unittest.TestCase):

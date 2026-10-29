@@ -54,7 +54,7 @@ if [ "Windows_NT" = "$OS" ]; then
     script=$(cygpath -w "$script")
 fi
 
-eval $(activate_venv >/dev/null && $python "$script" "$expansions_yaml" "$expansions_default_yaml")
+eval "$(activate_venv >/dev/null && $python "$script" "$expansions_yaml" "$expansions_default_yaml")"
 if [ -n "$___expansions_error" ]; then
     echo $___expansions_error
     exit 1
