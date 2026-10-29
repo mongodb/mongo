@@ -283,6 +283,35 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "resharding_state_transition_validation",
+    srcs = [
+        "resharding_state_transition_validation.cpp",
+    ],
+    hdrs = [
+        "resharding_state_transition_validation.h",
+        "resharding_transition_check.h",
+    ],
+    deps = [
+        ":resharding_state_documents",
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+        "//src/mongo/s:common_s",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "resharding_state_transition_validation_test",
+    srcs = [
+        "resharding_state_transition_validation_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":resharding_state_transition_validation",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "resharding_destined_recipient_util",
     srcs = [
         "resharding_destined_recipient_util.cpp",

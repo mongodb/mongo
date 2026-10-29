@@ -1410,5 +1410,14 @@ error_codes:
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
 
+  # A resharding participant or coordinator found its pre-transition state inconsistent.
+  - {code: 535, name: ReshardingPreconditionFailure, categories: [InternalOnly]}
+
+  # A resharding participant or coordinator found its post-transition state inconsistent.
+  - {
+      code: 536,
+      name: ReshardingPostconditionFailure,
+      categories: [InternalOnly],
+    }
   # ^^^^
   # Add new codes, sequentially numbered, above.

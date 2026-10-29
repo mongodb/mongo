@@ -33,6 +33,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/synchronized_value.h"
 
 #include <cstdint>
 #include <memory>
@@ -314,6 +315,14 @@ private:
     // Transitions the on-disk and in-memory state to DonorStateEnum::kDone.
     void _transitionToDone(std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
+    // Reads the donor document's mutable state back from storage, or boost::none if the document
+    // is missing.
+    boost::optional<DonorShardContext> _readDurableDonorContext(OperationContext* opCtx) const;
+
+    // Checks that the proposed context got installed in memory and durably. Reports violations as
+    // tripwire assertions without throwing.
+    void _validatePostTransition(OperationContext* opCtx, const DonorShardContext& proposed);
+
     BSONObj _makeQueryForCoordinatorUpdate(const ShardId& shardId, DonorStateEnum newState);
 
     ExecutorFuture<void> _updateCoordinator(
@@ -356,8 +365,9 @@ private:
     const std::vector<ShardId> _recipientShardIds;
 
     // The in-memory representation of the mutable portion of the document in
-    // config.localReshardingOperations.donor.
-    DonorShardContext _donorCtx;
+    // config.localReshardingOperations.donor. Self-synchronized: safe to access directly.
+    synchronized_value<DonorShardContext> _donorCtx;
+
     boost::optional<ChangeStreamsMonitorContext> _changeStreamsMonitorCtx;
 
     // This is only used to restore metrics on a stepup.
@@ -373,7 +383,7 @@ private:
     boost::optional<resharding::RetryingCancelableOperationContextFactory>
         _retryingCancelableOpCtxFactory;
 
-    // Protects the state below
+    // Protects the state below.
     mutable std::mutex _mutex;
 
     // Manages abort state and provides cancellation tokens for async operations.

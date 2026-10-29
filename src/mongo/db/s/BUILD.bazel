@@ -346,6 +346,7 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:resharding_donor_promises",
         "//src/mongo/db/s/resharding:resharding_promise_util",
         "//src/mongo/db/s/resharding:resharding_recipient_promises",
+        "//src/mongo/db/s/resharding:resharding_state_transition_validation",
         "//src/mongo/db/session:kill_sessions_local",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/shard_role",

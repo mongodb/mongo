@@ -36,6 +36,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -570,6 +571,48 @@ TEST_F(ReshardingDonorServiceTest, CanTransitionThroughEachStateToCompletion) {
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
         checkStateDocumentRemoved(opCtx.get());
     }
+}
+
+TEST_F(ReshardingDonorServiceTest, FailedDoneValidationStillReleasesCriticalSection) {
+    unittest::ServerParameterGuard validations{"featureFlagReshardingPrePostConditionsValidations",
+                                               true};
+    TestOptions testOptions{.isAlsoRecipient = false, .performVerification = false};
+
+    auto doc = makeStateDocument(testOptions);
+    auto opCtx = makeOperationContext();
+
+    createSourceCollection(opCtx.get(), doc);
+
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    awaitChangeStreamsMonitorCompleted(opCtx.get(), *donor, doc);
+
+    FailPointEnableBlock failpoint("reshardingDonorCorruptContextBeforeValidation",
+                                   FailPoint::ModeOptions{.mode = FailPoint::nTimes, .val = 1});
+    unittest::TassertGuard tassertGuard(1);
+
+    notifyReshardingCommitting(opCtx.get(), *donor, doc);
+
+    ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+    checkStateDocumentRemoved(opCtx.get());
+}
+
+TEST_F(ReshardingDonorServiceTest, FailedErrorValidationStillRecordsAbortReason) {
+    unittest::ServerParameterGuard validations{"featureFlagReshardingPrePostConditionsValidations",
+                                               true};
+    externalState()->throwUnrecoverableErrorIn(DonorStateEnum::kDonatingInitialData,
+                                               kUpdateCoordinatorDocument);
+
+    FailPointEnableBlock failpoint("reshardingDonorCorruptContextBeforeValidation",
+                                   FailPoint::ModeOptions{.mode = FailPoint::nTimes, .val = 1});
+    unittest::TassertGuard tassertGuard(1);
+
+    runUnrecoverableErrorTest(TestOptions{.isAlsoRecipient = false, .performVerification = false},
+                              DonorStateEnum::kDonatingInitialData);
 }
 
 TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
@@ -1633,6 +1676,32 @@ TEST_F(ReshardingDonorServiceTestWithWCE,
 
     // Assert the critical section elapsed time is unchanged even after the retry.
     ASSERT_EQ(elapsedCritSecTime, elapsedCritSecTimeAfterFinish);
+}
+
+TEST_F(ReshardingDonorServiceTest, PostValidationReadsMajorityCommittedState) {
+    unittest::ServerParameterGuard validations{"featureFlagReshardingPrePostConditionsValidations",
+                                               true};
+    TestOptions testOptions{.isAlsoRecipient = false, .performVerification = false};
+
+    auto doc = makeStateDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    createSourceCollection(opCtx.get(), doc);
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+
+    // Fires when a read opens a transaction on the majority committed snapshot.
+    FailPointEnableBlock majorityRead("hangBeforeMajorityReadTransactionStarted",
+                                      FailPoint::ModeOptions{.mode = FailPoint::nTimes, .val = 1});
+
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    notifyReshardingCommitting(opCtx.get(), *donor, doc);
+
+    ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+    checkStateDocumentRemoved(opCtx.get());
+
+    opCtx->setDeadlineByDate(Date_t::now() + Seconds(5), ErrorCodes::ExceededTimeLimit);
+    ASSERT_EQ(majorityRead.waitForOneNewEntry(opCtx.get()), 1);
 }
 
 }  // namespace
