@@ -14,7 +14,10 @@
 #include "mongo/db/s/resharding/local_resharding_operations_registry.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -67,9 +70,11 @@ BSONObj makeDonorDocBson(const CommonReshardingMetadata& metadata,
     return doc.toBSON();
 }
 
-BSONObj makeRecipientDocBson(const CommonReshardingMetadata& metadata) {
+BSONObj makeRecipientDocBson(
+    const CommonReshardingMetadata& metadata,
+    RecipientStateEnum state = RecipientStateEnum::kAwaitingFetchTimestamp) {
     RecipientShardContext recipientCtx;
-    recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
+    recipientCtx.setState(state);
     ReshardingRecipientDocument doc(std::move(recipientCtx));
     doc.setDonorShards({DonorShardFetchTimestamp(ShardId{"donor1"})});
     doc.setMinimumOperationDurationMillis(5);
@@ -89,8 +94,12 @@ protected:
         ServiceContextMongoDTest::setUp();
         auto service = getServiceContext();
 
+        // Use standalone ReplSettings to short-circuit onUpdate before reaching
+        // getReshardingCoordinatorObserver, which fails when no registered
+        // ReshardingCoordinatorService exists.
         repl::ReplicationCoordinator::set(
-            service, std::make_unique<repl::ReplicationCoordinatorMock>(service));
+            service,
+            std::make_unique<repl::ReplicationCoordinatorMock>(service, repl::ReplSettings()));
     }
 
     LocalReshardingOperationsRegistry& registry() {
@@ -100,6 +109,8 @@ protected:
     void doInsert(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
         auto [_, collPtr] = makeCollPtr(nss);
         std::vector<InsertStatement> stmts{InsertStatement(doc)};
+        // Registry mutations are deferred to WriteUnitOfWork commit.
+        WriteUnitOfWork wuow(opCtx);
         _opObserver.onInserts(opCtx,
                               collPtr,
                               stmts.cbegin(),
@@ -107,6 +118,7 @@ protected:
                               /*recordIds=*/{},
                               /*fromMigrate=*/{false},
                               /*defaultFromMigrate=*/false);
+        wuow.commit();
     }
 
     void doUpdate(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& updatedDoc) {
@@ -114,17 +126,32 @@ protected:
         CollectionUpdateArgs updateArgs(/*preImageDoc=*/BSONObj{});
         updateArgs.updatedDoc = updatedDoc;
         OplogUpdateEntryArgs update(&updateArgs, collPtr);
-        // We add a WUOW here to transition recovery unit state from Inactive to InUnitOfWork. The
-        // registry changes we test are synchronous and unaffected by the WUOW abort.
+        // Registry mutations are deferred to WriteUnitOfWork commit.
         WriteUnitOfWork wuow(opCtx);
         _opObserver.onUpdate(opCtx, update);
+        wuow.commit();
     }
 
     void doDelete(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
         auto [_, collPtr] = makeCollPtr(nss);
         DocumentKey docKey(doc["_id"].wrap(), boost::none);
         OplogDeleteEntryArgs deleteArgs;
+        // Registry mutations are deferred to WriteUnitOfWork commit.
+        WriteUnitOfWork wuow(opCtx);
         _opObserver.onDelete(opCtx, collPtr, /*stmtId=*/0, doc, docKey, deleteArgs);
+        wuow.commit();
+    }
+
+    void doDropCollection(OperationContext* opCtx, const NamespaceString& nss) {
+        // Registry mutations are deferred to WriteUnitOfWork commit.
+        WriteUnitOfWork wuow(opCtx);
+        _opObserver.onDropCollection(opCtx,
+                                     nss,
+                                     UUID::gen(),
+                                     /*numRecords=*/0,
+                                     /*markFromMigrate=*/false,
+                                     /*isTimeseries=*/false);
+        wuow.commit();
     }
 
     ReshardingOpObserver _opObserver;
@@ -319,6 +346,23 @@ TEST_F(ReshardingOpObserverRegistryTest, DeleteUnrelatedCollectionDoesNotUnregis
     ASSERT_TRUE(op->roles.count(Role::kCoordinator));
 }
 
+TEST_F(ReshardingOpObserverRegistryTest, DropCollectionClearsOperationsForRole) {
+    auto opCtx = makeOperationContext();
+    auto metadata = makeMetadata();
+
+    registry().registerOperation(Role::kCoordinator, metadata);
+    registry().registerOperation(Role::kDonor, metadata);
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+
+    doDropCollection(opCtx.get(), NamespaceString::kDonorReshardingOperationsNamespace);
+
+    // Only the specified role's operations are cleared, other existing roles are unaffected.
+    auto op = registry().getOperation(kSourceNss);
+    ASSERT_TRUE(op);
+    ASSERT_EQ(op->roles.size(), 1u);
+    ASSERT_TRUE(op->roles.count(Role::kCoordinator));
+}
+
 TEST_F(ReshardingOpObserverRegistryTest, InsertThenDeleteLifecycle) {
     auto opCtx = makeOperationContext();
     auto metadata = makeMetadata();
@@ -338,6 +382,98 @@ TEST_F(ReshardingOpObserverRegistryTest, DeleteNonExistentOperationIsNoOp) {
 
     doDelete(opCtx.get(), NamespaceString::kConfigReshardingOperationsNamespace, doc);
     ASSERT_FALSE(registry().getOperation(kSourceNss));
+}
+
+TEST_F(ReshardingOpObserverRegistryTest, AbortedInsertDoesNotRegisterRecipientRole) {
+    auto opCtx = makeOperationContext();
+    auto metadata = makeMetadata();
+    auto doc = makeRecipientDocBson(metadata);
+
+    auto [_, collPtr] = makeCollPtr(NamespaceString::kRecipientReshardingOperationsNamespace);
+    std::vector<InsertStatement> stmts{InsertStatement(doc)};
+
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        _opObserver.onInserts(opCtx.get(),
+                              collPtr,
+                              stmts.cbegin(),
+                              stmts.cend(),
+                              /*recordIds=*/{},
+                              /*fromMigrate=*/{false},
+                              /*defaultFromMigrate=*/false);
+        // Operation remains un-registered inside the WUOW
+        ASSERT_FALSE(registry().getOperation(kSourceNss));
+    }
+    // Aborted, the operation remains un-registered.
+    ASSERT_FALSE(registry().getOperation(kSourceNss));
+}
+
+TEST_F(ReshardingOpObserverRegistryTest, AbortedUpdateDoesNotUnregisterCoordinator) {
+    auto opCtx = makeOperationContext();
+    auto metadata = makeMetadata();
+
+    doInsert(opCtx.get(),
+             NamespaceString::kConfigReshardingOperationsNamespace,
+             makeCoordinatorDocBson(metadata));
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+
+    auto [_, collPtr] = makeCollPtr(NamespaceString::kConfigReshardingOperationsNamespace);
+    CollectionUpdateArgs updateArgs(/*preImageDoc=*/BSONObj{});
+    updateArgs.updatedDoc = makeCoordinatorDocBson(metadata, CoordinatorStateEnum::kQuiesced);
+    OplogUpdateEntryArgs update(&updateArgs, collPtr);
+
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        _opObserver.onUpdate(opCtx.get(), update);
+        // Operation remains registered inside the WUOW
+        ASSERT_TRUE(registry().getOperation(kSourceNss));
+    }
+    // Aborted, the operation remains registered.
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+}
+
+TEST_F(ReshardingOpObserverRegistryTest, AbortedDeleteDoesNotUnregisterRecipientRole) {
+    auto opCtx = makeOperationContext();
+    auto metadata = makeMetadata();
+    auto doc = makeRecipientDocBson(metadata);
+
+    doInsert(opCtx.get(), NamespaceString::kRecipientReshardingOperationsNamespace, doc);
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+
+    auto [_, collPtr] = makeCollPtr(NamespaceString::kRecipientReshardingOperationsNamespace);
+    DocumentKey docKey(doc["_id"].wrap(), boost::none);
+    OplogDeleteEntryArgs deleteArgs;
+
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        _opObserver.onDelete(opCtx.get(), collPtr, /*stmtId=*/0, doc, docKey, deleteArgs);
+        // Operation remains registered inside the WUOW
+        ASSERT_TRUE(registry().getOperation(kSourceNss));
+    }
+    // Aborted, the operation remains registered.
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+}
+
+TEST_F(ReshardingOpObserverRegistryTest, AbortedDropCollectionDoesNotClearDonorRole) {
+    auto opCtx = makeOperationContext();
+    auto metadata = makeMetadata();
+
+    registry().registerOperation(Role::kDonor, metadata);
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        _opObserver.onDropCollection(opCtx.get(),
+                                     NamespaceString::kDonorReshardingOperationsNamespace,
+                                     UUID::gen(),
+                                     /*numRecords=*/0,
+                                     /*markFromMigrate=*/false,
+                                     /*isTimeseries=*/false);
+        // Operation remains registered inside the WUOW
+        ASSERT_TRUE(registry().getOperation(kSourceNss));
+    }
+    // Aborted, the operation remains registered.
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, UpdateCoordinatorDocToQuiescedUnregistersCoordinator) {
@@ -372,6 +508,47 @@ TEST_F(ReshardingOpObserverRegistryTest, UpdateCoordinatorDocToNonQuiescedDoesNo
     ASSERT_TRUE(op);
     ASSERT_EQ(op->roles.size(), 1u);
     ASSERT_TRUE(op->roles.count(Role::kCoordinator));
+}
+
+TEST_F(ReshardingOpObserverRegistryTest, UpdateRecipientDocToDoneUnregistersRecipient) {
+    auto opCtx = makeOperationContext();
+    auto metadata = makeMetadata();
+
+    doInsert(opCtx.get(),
+             NamespaceString::kRecipientReshardingOperationsNamespace,
+             makeRecipientDocBson(metadata));
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+
+    doUpdate(opCtx.get(),
+             NamespaceString::kRecipientReshardingOperationsNamespace,
+             makeRecipientDocBson(metadata, RecipientStateEnum::kDone));
+
+    ASSERT_FALSE(registry().getOperation(kSourceNss));
+}
+
+TEST_F(ReshardingOpObserverRegistryTest, UpdateDonorDocToDoneUnregistersDonor) {
+    auto opCtx = makeOperationContext();
+    auto metadata = makeMetadata();
+
+    doInsert(opCtx.get(),
+             NamespaceString::kDonorReshardingOperationsNamespace,
+             makeDonorDocBson(metadata));
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+
+    // Acquire an exclusive lock on the donor namespace and open a snapshot to mimic expected
+    // production preconditions for _doPin.
+    Lock::DBLock dbLock(opCtx.get(),
+                        NamespaceString::kDonorReshardingOperationsNamespace.dbName(),
+                        LockMode::MODE_X);
+    Lock::CollectionLock collLock(
+        opCtx.get(), NamespaceString::kDonorReshardingOperationsNamespace, LockMode::MODE_X);
+    shard_role_details::getRecoveryUnit(opCtx.get())->preallocateSnapshot();
+
+    doUpdate(opCtx.get(),
+             NamespaceString::kDonorReshardingOperationsNamespace,
+             makeDonorDocBson(metadata, DonorStateEnum::kDone));
+
+    ASSERT_FALSE(registry().getOperation(kSourceNss));
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, QuiescedCoordinatorThenNewOperationLifecycle) {

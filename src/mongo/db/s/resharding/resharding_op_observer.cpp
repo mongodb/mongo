@@ -211,13 +211,20 @@ void ReshardingOpObserver::onInserts(OperationContext* opCtx,
     const auto& nss = coll->ns();
 
     if (shouldUseRegistry() && _nssToRoleMap.contains(nss)) {
+        const auto role = _nssToRoleMap.at(nss);
         // We should only get a single document here as each resharding participant writes a single
         // state document per operation but we loop to be defensive.
         for (auto it = begin; it != end; ++it) {
             auto commonMetadata = CommonReshardingMetadata::parse(
                 it->doc, IDLParserContext("ReshardingOpObserver::onInserts"));
-            LocalReshardingOperationsRegistry::get().registerOperation(_nssToRoleMap.at(nss),
-                                                                       commonMetadata);
+            // Defer to commit: the registry is in-memory and should only be updated when
+            // an operation is committed.
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                [role, commonMetadata = std::move(commonMetadata)](OperationContext*,
+                                                                   boost::optional<Timestamp>) {
+                    LocalReshardingOperationsRegistry::get().registerOperation(role,
+                                                                               commonMetadata);
+                });
         }
     }
 
@@ -255,9 +262,13 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx,
         auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
             args.updateArgs->updatedDoc, IDLParserContext("ReshardingOpObserver::onUpdate"));
         if (resharding::excludeFromRegistry(coordinatorDoc)) {
-            const auto& commonMetadata = coordinatorDoc.getCommonReshardingMetadata();
-            LocalReshardingOperationsRegistry::get().unregisterOperation(Role::kCoordinator,
-                                                                         commonMetadata);
+            auto commonMetadata = coordinatorDoc.getCommonReshardingMetadata();
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                [commonMetadata = std::move(commonMetadata)](OperationContext*,
+                                                             boost::optional<Timestamp>) {
+                    LocalReshardingOperationsRegistry::get().unregisterOperation(Role::kCoordinator,
+                                                                                 commonMetadata);
+                });
         }
     }
 
@@ -265,9 +276,13 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx,
         auto donorDoc = ReshardingDonorDocument::parse(
             args.updateArgs->updatedDoc, IDLParserContext("ReshardingOpObserver::onUpdate"));
         if (resharding::excludeFromRegistry(donorDoc)) {
-            const auto& commonMetadata = donorDoc.getCommonReshardingMetadata();
-            LocalReshardingOperationsRegistry::get().unregisterOperation(Role::kDonor,
-                                                                         commonMetadata);
+            auto commonMetadata = donorDoc.getCommonReshardingMetadata();
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                [commonMetadata = std::move(commonMetadata)](OperationContext*,
+                                                             boost::optional<Timestamp>) {
+                    LocalReshardingOperationsRegistry::get().unregisterOperation(Role::kDonor,
+                                                                                 commonMetadata);
+                });
         }
     }
 
@@ -275,9 +290,13 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx,
         auto recipientDoc = ReshardingRecipientDocument::parse(
             args.updateArgs->updatedDoc, IDLParserContext("ReshardingOpObserver::onUpdate"));
         if (resharding::excludeFromRegistry(recipientDoc)) {
-            const auto& commonMetadata = recipientDoc.getCommonReshardingMetadata();
-            LocalReshardingOperationsRegistry::get().unregisterOperation(Role::kRecipient,
-                                                                         commonMetadata);
+            auto commonMetadata = recipientDoc.getCommonReshardingMetadata();
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                [commonMetadata = std::move(commonMetadata)](OperationContext*,
+                                                             boost::optional<Timestamp>) {
+                    LocalReshardingOperationsRegistry::get().unregisterOperation(Role::kRecipient,
+                                                                                 commonMetadata);
+                });
         }
     }
 
@@ -326,18 +345,18 @@ void ReshardingOpObserver::onDelete(OperationContext* opCtx,
                                     const OplogDeleteEntryArgs& args,
                                     OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
-    // Run pinning before unregistering from the LocalReshardingOperationsRegistry: the registry
-    // mutation is in-memory and immediate, whereas the pin's tassert can still abort this write
-    // before it commits. Doing the registry mutation second would leave it out of sync with the
-    // (rolled-back) on-disk state if the pin logic threw.
     if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {
         _doPin(opCtx);
     }
     if (shouldUseRegistry() && _nssToRoleMap.contains(nss)) {
+        const auto role = _nssToRoleMap.at(nss);
         auto commonMetadata = CommonReshardingMetadata::parse(
             doc, IDLParserContext("ReshardingOpObserver::onDelete"));
-        LocalReshardingOperationsRegistry::get().unregisterOperation(_nssToRoleMap.at(nss),
-                                                                     commonMetadata);
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [role, commonMetadata = std::move(commonMetadata)](OperationContext*,
+                                                               boost::optional<Timestamp>) {
+                LocalReshardingOperationsRegistry::get().unregisterOperation(role, commonMetadata);
+            });
     }
 }
 
@@ -348,8 +367,11 @@ repl::OpTime ReshardingOpObserver::onDropCollection(OperationContext* opCtx,
                                                     bool markFromMigrate,
                                                     bool isTimeseries) {
     if (shouldUseRegistry() && _nssToRoleMap.contains(collectionName)) {
-        LocalReshardingOperationsRegistry::get().clearOperationsForRole(
-            _nssToRoleMap.at(collectionName));
+        const auto role = _nssToRoleMap.at(collectionName);
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [role](OperationContext*, boost::optional<Timestamp>) {
+                LocalReshardingOperationsRegistry::get().clearOperationsForRole(role);
+            });
     }
     return {};
 }
