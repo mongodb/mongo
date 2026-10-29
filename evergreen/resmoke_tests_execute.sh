@@ -1,12 +1,6 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
-# Keep the raw JSON patch parameter out of shell-interpreted extra_args.
-export TEST_SELECTION_BYPASS_QUARANTINE=""
-if [ "${is_patch}" = "true" ]; then
-    export TEST_SELECTION_BYPASS_QUARANTINE="${test_selection_bypass_quarantine:-}"
-fi
-
 cd src
 
 # Export these before verbose is set to avoid sharing sensitive info.

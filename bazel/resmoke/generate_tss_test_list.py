@@ -29,8 +29,7 @@ _SELECT_TESTS_TIMEOUT = 60
 
 from buildscripts.resmokelib import cli
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib.utils import evergreen_conn, test_selection
-from buildscripts.util.read_config import read_config_file
+from buildscripts.resmokelib.utils import evergreen_conn
 
 # Test kinds whose "tests" are not file names, so there is nothing for selection to work with.
 UNSELECTABLE_TEST_KINDS = ("mongos_test",)
@@ -175,15 +174,6 @@ def find_evergreen_config() -> str | None:
     return None
 
 
-def read_expansions() -> dict:
-    """Read task parameters next to the checkout, not the Bazel action's working directory."""
-    workspace_root = pathlib.Path(os.path.realpath("MODULE.bazel")).parent
-    try:
-        return read_config_file(str(workspace_root.parent / "expansions.yml")) or {}
-    except FileNotFoundError:
-        return {}
-
-
 def select_tests(tests: list[str], label: str, volatile: dict, strategies: list[str]) -> list[str]:
     """Narrow the test list by asking Evergreen's select-tests REST endpoint.
 
@@ -191,16 +181,6 @@ def select_tests(tests: list[str], label: str, volatile: dict, strategies: list[
     full list -- test selection must only ever be able to make the list smaller, never to drop
     tests because it broke.
     """
-    bypass = set()
-    if volatile.get("requester") in (
-        "patch_request",
-        "github_pull_request",
-        "github_merge_request",
-    ):
-        bypass = test_selection.parse_bypass_tests(
-            read_expansions().get(test_selection.BYPASS_PARAMETER, "")
-        )
-
     task_id = construct_task_id(volatile, label)
     if not task_id:
         raise RuntimeError(
@@ -241,8 +221,10 @@ def select_tests(tests: list[str], label: str, volatile: dict, strategies: list[
     if not isinstance(result, dict) or not isinstance(result.get("tests"), list):
         raise RuntimeError(f"test selection returned an unexpected response: {result!r}")
 
-    keep, _ = test_selection.merge_selected_tests(tests, result["tests"], bypass)
-    return keep
+    # Intersect rather than take the response as-is, so selection can only narrow the list. The
+    # same guard exists in buildscripts/resmokelib/testing/suite.py.
+    selected = set(result["tests"])
+    return [test for test in tests if test in selected]
 
 
 def main():
