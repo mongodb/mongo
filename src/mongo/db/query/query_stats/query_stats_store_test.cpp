@@ -3,11 +3,13 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/basic_types_gen.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -32,6 +34,7 @@
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -793,6 +796,52 @@ TEST_F(QueryStatsStoreTest, RegisterRequestSkipsKeyExceedingMaxUserSize) {
         });
     })());
     ASSERT_EQ(CurOp::get(*opCtx)->debug().getQueryStatsInfo().keyHash, boost::none);
+}
+
+long long getNumQueryStatsStoreWriteErrors() {
+    BSONObjBuilder builder;
+    globalMetricTreeSet()[ClusterRole::None].appendTo(builder);
+    return builder.obj()
+        .getObjectField("metrics")
+        .getObjectField("queryStats")["numQueryStatsStoreWriteErrors"]
+        .safeNumberLong();
+}
+
+TEST_F(QueryStatsStoreTest, WriteQueryStatsSkipsKeyTooDeeplyNestedToBeReturned) {
+    // A dotted projection path shapifies into one nested object per component, and the key adds 4
+    // levels above it, so this path makes the serialized key exceed the hard BSON depth limit. Such
+    // a key cannot be wrapped in a $queryStats reply, so writeQueryStats() must not store it.
+    std::string path = "a0";
+    for (int i = 1; i < 198; ++i) {
+        path += ".a" + std::to_string(i);
+    }
+
+    auto opCtx = makeOperationContext();
+    AggregateCommandRequest acr(kDefaultTestNss.nss());
+    auto rawPipeline = {BSON("$project" << BSON(path << 1))};
+    acr.setPipeline(rawPipeline);
+    auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+    auto aggShape = std::make_unique<query_shape::AggCmdShape>(
+        acr, acr.getNamespace(), pipeline->getInvolvedCollections(), *pipeline, expCtx);
+    auto key = std::make_unique<AggKey>(
+        expCtx, acr, std::move(aggShape), pipeline->getInvolvedCollections(), collectionType);
+    const auto keyHash = absl::HashOf(*key);
+
+    // Sanity check: the key exceeds the hard depth limit, not just the user-storage one.
+    const auto keyBson =
+        key->toBson(opCtx.get(),
+                    query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                    SerializationContext::stateDefault());
+    ASSERT_EQ(validateBSON(keyBson).code(), ErrorCodes::Overflow);
+    ASSERT_EQ(validateQueryStatsKeyBson(keyBson).code(), ErrorCodes::Overflow);
+
+    const auto errorsBefore = getNumQueryStatsStoreWriteErrors();
+    query_stats::writeQueryStats(opCtx.get(), keyHash, std::move(key), QueryStatsSnapshot{});
+
+    ASSERT_EQ(countAllEntries(getQueryStatsStore(opCtx.get())), 0);
+    ASSERT_EQ(getNumQueryStatsStoreWriteErrors(), errorsBefore + 1);
 }
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {

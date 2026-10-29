@@ -19,10 +19,10 @@ describe("$queryStats and query shapes near the BSON limits", function () {
     const kMaxBSONDepth = 200;
 
     // A dotted projection path shapifies into one nested object per component. The stored key adds
-    // 4 levels above it ('queryShape.pipeline.<n>.$project') and the reply adds 4 more
-    // ('cursor.firstBatch.<n>.key'). This length keeps the key valid on its own (199 <=
-    // kMaxBSONDepth) while making it unreturnable (203 > kMaxBSONDepth).
-    const kTooDeepPath = kMaxBSONDepth - 5;
+    // 4 levels above it ('queryShape.pipeline.<n>.$project'), which pushes it past the hard BSON
+    // depth limit. Such a key cannot be wrapped in a $queryStats reply, so it is skipped at write
+    // time and never stored.
+    const kTooDeepPath = kMaxBSONDepth - 2;
 
     const kShallowPath = 5;
 
@@ -135,24 +135,23 @@ describe("$queryStats and query shapes near the BSON limits", function () {
         assert.eq(entries.length, 1, entries);
     });
 
-    it("does not fail $queryStats but omits an entry too deeply nested for the reply", function () {
-        const errorsBefore = testDB.serverStatus().metrics.queryStats.numHmacApplicationErrors;
+    it("does not write an entry whose key is too deeply nested to be returned", function () {
+        const errorsBefore = testDB.serverStatus().metrics.queryStats.numQueryStatsStoreWriteErrors;
 
         aggregateWithProjectDepth(kTooDeepPath);
 
-        // Reading query stats must succeed rather than returning a reply no client can parse.
+        // The entry is skipped at write time, so $queryStats returns nothing for it.
         const entries = getQueryStats(conn, {collName});
         assert.eq(entries, [], entries);
 
-        // Proves entry was skipped as numHmacApplicationErrors is incremented on the query stats
-        // read path.
+        // Proves the entry was skipped on the write path.
         assert.eq(
-            testDB.serverStatus().metrics.queryStats.numHmacApplicationErrors,
+            testDB.serverStatus().metrics.queryStats.numQueryStatsStoreWriteErrors,
             errorsBefore + 1,
         );
     });
 
-    it("returns the remaining entries alongside one that is too deeply nested", function () {
+    it("collects other entries while skipping one whose key is too deeply nested", function () {
         aggregateWithProjectDepth(kTooDeepPath);
         assert.commandWorked(testDB.runCommand({find: collName, filter: {x: 1}}));
 

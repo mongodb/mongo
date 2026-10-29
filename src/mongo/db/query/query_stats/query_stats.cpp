@@ -473,9 +473,12 @@ void registerRequestImpl(OperationContext* opCtx,
 }  // namespace
 
 Status validateQueryStatsKeyBson(const BSONObj& keyBson) {
-    // The 'keyBson' is expected to have structurally well-formed BSON by this point. Only its size
-    // and nesting depth remain to be checked.
-    dassert(validateBSON(keyBson));
+    if constexpr (kDebugBuild) {
+        // Only terminate the process when the serializer produced a malformed key. Ignore depth
+        // overflows due to deeply nested user queries as those will be rejected below.
+        auto status = validateBSON(keyBson);
+        invariant(status.isOK() || status.code() == ErrorCodes::Overflow, status.toString());
+    }
 
     if (auto status = keyBson.validateBSONObjSize(BSONObjMaxUserSize)
                           .addContext("Query stats key exceeds maximum BSON size");
@@ -666,14 +669,27 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
 namespace {
 
 /**
- * Serializes 'key's representative shape, or returns boost::none when it cannot be serialized. Such
- * a key can be neither indexed nor emitted by $queryStats, so the caller should not store it.
+ * Serializes 'key's representative shape, or returns boost::none when it cannot be serialized or
+ * fails BSON validation. Such a key can be neither indexed nor emitted by $queryStats, so the
+ * caller should not store it.
  */
-boost::optional<BSONObj> tryComputeRepresentativeShapeKey(OperationContext* opCtx,
-                                                          const Key& key,
-                                                          boost::optional<size_t> storeKey) {
+boost::optional<BSONObj> tryToComputeRepresentativeShapeKey(OperationContext* opCtx,
+                                                            const Key& key,
+                                                            boost::optional<size_t> storeKey) {
     try {
-        return computeRepresentativeShapeKey(opCtx, key);
+        auto representativeShapeKey = computeRepresentativeShapeKey(opCtx, key);
+        // A key that fails validation (too large or too deeply nested) cannot be wrapped in a
+        // $queryStats reply, so skip storing it rather than dropping it on every read.
+        if (auto status = validateQueryStatsKeyBson(representativeShapeKey); !status.isOK()) {
+            queryStatsStoreWriteErrorsMetric.increment();
+            LOGV2_DEBUG(13691700,
+                        2,
+                        "Query stats key failed BSON validation. Skipping it.",
+                        "status"_attr = status,
+                        "storeKeyHash"_attr = storeKey);
+            return boost::none;
+        }
+        return representativeShapeKey;
     } catch (const DBException& ex) {
         queryStatsStoreWriteErrorsMetric.increment();
         LOGV2_DEBUG(13519100,
@@ -739,7 +755,7 @@ void writeQueryStats(OperationContext* opCtx,
     }
 
     // Serialize the key's representative shape.
-    auto representativeShapeKey = tryComputeRepresentativeShapeKey(opCtx, *key, storeKey);
+    auto representativeShapeKey = tryToComputeRepresentativeShapeKey(opCtx, *key, storeKey);
     if (!representativeShapeKey) {
         return;
     }
