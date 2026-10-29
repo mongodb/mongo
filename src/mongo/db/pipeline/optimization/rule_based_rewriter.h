@@ -121,6 +121,9 @@ public:
         // Rules that will be applied for testing.
         // Protected by 'enablePipelineOptimizationAdditionalTestingRules' query knob.
         Testing = 1 << 2,
+        // Rules that record facts about stages without changing the pipeline. Only
+        // optimizePipeline() runs them, after all other rules.
+        Annotation = 1 << 3,
     };
 
     PipelineRewriteContext(Pipeline& pipeline);

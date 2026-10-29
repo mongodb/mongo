@@ -1709,6 +1709,23 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "pipeline_d_test",
+    srcs = [
+        "pipeline_d_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":expression_context_for_test",
+        ":pipeline",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/pipeline/optimization:pipeline_optimization",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
 mongo_cc_library(
     name = "aggregation_context_fixture",
     deps = [

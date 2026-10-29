@@ -55,6 +55,7 @@ void optimizePipeline(Pipeline& pipeline) {
     }
     applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline), Tags::Reordering);
     applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline), Tags::InPlace);
+    applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline), Tags::Annotation);
 
     // Insert validation stages if the dependency graph validation knob is enabled.
     // TODO SERVER-127305: Move insertion of validation stages into a separate optimization rule.

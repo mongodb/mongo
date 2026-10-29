@@ -1789,13 +1789,15 @@ struct GroupNode : public QuerySolutionNode {
               std::vector<AccumulationStatement> accs,
               bool merging,
               bool willBeMerged,
-              bool shouldProduceBson)
+              bool shouldProduceBson,
+              OrderedPathSet nonArrayIdFields = {})
         : QuerySolutionNode(std::move(child)),
           groupByExpression(groupByExpression),
           accumulators(std::move(accs)),
           doingMerge(merging),
           willBeMerged(willBeMerged),
-          shouldProduceBson(shouldProduceBson) {
+          shouldProduceBson(shouldProduceBson),
+          nonArrayIdFields(std::move(nonArrayIdFields)) {
         // Use the DepsTracker to extract the fields that the 'groupByExpression' and accumulator
         // expressions depend on.
         DepsTracker deps;
@@ -1852,6 +1854,8 @@ struct GroupNode : public QuerySolutionNode {
     // If set to true, generated SBE plan will produce result as BSON object. If false,
     // 'sbe::Object' is produced instead.
     bool shouldProduceBson;
+
+    OrderedPathSet nonArrayIdFields;
 
 protected:
     virtual void appendSpecificToString(str::stream* ss, int indent) const {}

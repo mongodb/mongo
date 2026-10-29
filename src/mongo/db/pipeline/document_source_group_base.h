@@ -200,6 +200,14 @@ public:
         _sbeCompatibility = sbeCompatibility;
     }
 
+    const OrderedPathSet& getNonArrayIdFields() const {
+        return _nonArrayIdFields;
+    }
+
+    void setNonArrayIdFields(OrderedPathSet nonArrayIdFields) {
+        _nonArrayIdFields = std::move(nonArrayIdFields);
+    }
+
     bool willBeMerged() const {
         return _groupProcessor->willBeMerged();
     }
@@ -245,6 +253,16 @@ private:
     boost::optional<DocumentSource::DistributedPlanLogic> distributedPlanLogicWithoutContext();
 
     SbeCompatibility _sbeCompatibility = SbeCompatibility::notCompatible;
+
+    /**
+     * Output paths of group keys, as named by getIdFields(), that are plain field paths whose input
+     * cannot be an array. Assuming that 'a' and 'c' cannot be arrays:
+     *   {_id: "$a"}                       -> {"_id"}
+     *   {_id: {b: "$a"}}                  -> {"_id.b"}
+     *   {_id: {b: "$a", d: "$c"}}         -> {"_id.b", "_id.d"}
+     * The input paths, such as "a", are recorded in the ExpressionContext for the yield check.
+     */
+    OrderedPathSet _nonArrayIdFields;
 };
 
 }  // namespace mongo

@@ -3,6 +3,7 @@
 
 #include "mongo/db/pipeline/sbe_pushdown_util.h"
 
+#include "mongo/db/pipeline/document_source_group_base.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
@@ -17,5 +18,10 @@ SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum curren
         return SbeCompatibility::requiresTrySbe;
     }
     return SbeCompatibility::noRequirements;
+}
+
+bool isGroupSbeCompatible(const DocumentSourceGroupBase& group,
+                          SbeCompatibility minRequiredCompatibility) {
+    return !group.doingMerge() && group.sbeCompatibility() >= minRequiredCompatibility;
 }
 }  // namespace mongo

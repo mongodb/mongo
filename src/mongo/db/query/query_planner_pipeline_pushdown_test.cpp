@@ -1,6 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
@@ -8,6 +9,7 @@
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -101,6 +103,23 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleGroup) {
         "}}",
         solution->root()))
         << solution->root()->toString();
+}
+
+TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfGroupCarriesNonArrayIdFields) {
+    const std::vector<BSONObj> rawPipeline = {
+        fromjson("{$group: {_id: {x: '$a', y: '$b'}, count: {$sum: '$c'}}}"),
+    };
+    auto pipeline = buildTestPipeline(rawPipeline);
+    checked_cast<DocumentSourceGroup&>(*pipeline->getSources().front())
+        .setNonArrayIdFields({"_id.x"});
+
+    runQueryWithPipeline(fromjson("{x: 1}"), makeInnerPipelineStages(*pipeline.get()));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), /*secondaryCollInfos=*/{});
+    ASSERT_EQ(checked_cast<const GroupNode&>(*solution->root()).nonArrayIdFields,
+              OrderedPathSet({"_id.x"}));
 }
 
 TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoGroups) {

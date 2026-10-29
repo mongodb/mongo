@@ -13,6 +13,7 @@ mongo_cc_library(
     name = "pipeline_optimization",
     srcs = [
         "cr_rules_to_move.cpp",
+        "group_rules.cpp",
         "lookup_rules.cpp",
         "match_rules.cpp",
         "projection_rules.cpp",
@@ -25,10 +26,28 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline/optimization/qi_rules",
+        "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query/compiler/dependency_analysis:document_transformation",
         "//src/mongo/db/query/compiler/dependency_analysis:pipeline_dependency_graph",
         "//src/mongo/db/query/compiler/metadata:path_arrayness",
         "//src/mongo/db/query/compiler/metadata:schema_type_info",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "group_rules_test",
+    srcs = [
+        "group_rules_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":pipeline_optimization",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query/compiler/metadata:path_arrayness",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 

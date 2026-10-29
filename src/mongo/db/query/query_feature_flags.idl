@@ -39,10 +39,15 @@ feature_flags:
         fcv_gated: false
         incremental_rollout_phase: in_development
 
+    featureFlagSbeStreamingGroup:
+        description: "Feature flag to enable streaming $group in SBE."
+        cpp_varname: gFeatureFlagSbeStreamingGroup
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development
+
     featureFlagSbeCompactHashAgg:
-        description:
-            "Feature flag to run eligible SBE $group stages with CompactHashAggStage when disk use
-            is not allowed."
+        description: "Feature flag to enable compact hash $group in SBE."
         cpp_varname: gFeatureFlagSbeCompactHashAgg
         default: false
         fcv_gated: false

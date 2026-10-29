@@ -3,6 +3,7 @@
 
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/classic/subplanning_utils.h"
@@ -12,6 +13,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
+#include "mongo/db/pipeline/document_source_group_base.h"
 #include "mongo/db/pipeline/document_source_internal_join_hint.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_project.h"
@@ -588,11 +590,18 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
         }
     }
 
-    // Find out how many $lookups remain in the suffix.
+    // Count how many $lookups remain in the suffix.
+    // Also copy $group key arrayness for SBE lowering, which isn't cloned by default.
+    auto originalIt = std::prev(pipeline.getSources().end(), suffix->getSources().size());
     for (const auto& stage : suffix->getSources()) {
         if (dynamic_cast<const DocumentSourceLookUp*>(stage.get())) {
             metrics.numLookupsInSuffix++;
         }
+        if (auto* group = dynamic_cast<DocumentSourceGroupBase*>(stage.get())) {
+            group->setNonArrayIdFields(
+                checked_cast<const DocumentSourceGroupBase&>(**originalIt).getNonArrayIdFields());
+        }
+        ++originalIt;
     }
 
     // Update remaining syntactic statistics.

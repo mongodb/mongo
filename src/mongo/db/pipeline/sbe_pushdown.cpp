@@ -167,12 +167,9 @@ bool pipelineStageIsCompatible(const boost::intrusive_ptr<ExpressionContext>& ex
         return true;
     } else if (stageId == DocumentSourceGroup::id) {
         auto groupStage = static_cast<DocumentSourceGroup*>(stage.get());
-        if (!allowedStages.group || groupStage->doingMerge() ||
-            groupStage->getAccumulationStatements().size() > maxGroupAccumulators ||
-            groupStage->sbeCompatibility() < minRequiredCompatibility) {
-            return false;
-        }
-        return true;
+        return allowedStages.group &&
+            groupStage->getAccumulationStatements().size() <= maxGroupAccumulators &&
+            isGroupSbeCompatible(*groupStage, minRequiredCompatibility);
     } else if (stageId == DocumentSourceLookUp::id) {
         DocumentSourceLookUp* lookupStage = static_cast<DocumentSourceLookUp*>(stage.get());
         if (!allowedStages.lookup ||

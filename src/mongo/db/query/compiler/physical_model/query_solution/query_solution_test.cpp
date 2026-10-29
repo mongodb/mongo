@@ -3,6 +3,7 @@
 
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -1962,6 +1963,43 @@ TEST(QuerySolutionTest, GroupNodeToStringWithArrayKey) {
 )gold");
 }
 
+TEST(QuerySolutionTest, GroupNodeToStringWithNonArrayIdFields) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto groupByExpression = Expression::parseObject(
+        expCtx.get(), BSON("a" << "$a" << "b" << "$b"), expCtx->variablesParseState);
+    auto node = makeGroupNodeForToStringTest(expCtx.get(), groupByExpression);
+    node->nonArrayIdFields = {"_id.a", "_id.b"};
+
+    ASSERT_EQ(node->toString(),
+              R"gold(GROUP
+---key = {a: "$a", b: "$b"}
+---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
+---nonArrayIdFields = [_id.a, _id.b]
+---nodeId = 0
+---fetched = 1
+---sortedByDiskLoc = 0
+---providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Child:
+------IXSCAN
+---------ns = test.dummy
+---------indexName = test_foo
+---------keyPattern = { a: 1, b: 1 }
+---------direction = 1
+---------bounds = [{ a: 1, b: 1 }, { a: 1, b: 1 })
+---------nodeId = 0
+---------fetched = 0
+---------sortedByDiskLoc = 1
+---------providedSorts = {baseSortPattern: {}, ignoredFields: [a, b]}
+)gold");
+    ASSERT_EQ(checked_cast<const GroupNode&>(*node->clone()).nonArrayIdFields,
+              node->nonArrayIdFields);
+}
+
 TEST(QuerySolutionTest, StreamingGroupNodeWithIndexScan) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
@@ -1992,11 +2030,13 @@ TEST(QuerySolutionTest, StreamingGroupNodeWithIndexScan) {
     ASSERT_STRING_CONTAINS(asString, "STREAMING_GROUP");
     ASSERT_STRING_CONTAINS(asString, "streamingKey = [b]");
 
+    node.nonArrayIdFields = {"_id"};
     auto clone = node.clone();
     ASSERT_EQ(clone->getType(), StageType::STAGE_STREAMING_GROUP);
     auto* clonedStreamingGroup = static_cast<StreamingGroupNode*>(clone.get());
     ASSERT_EQ(clonedStreamingGroup->streamingKey.size(), 1u);
     ASSERT_EQ(clonedStreamingGroup->streamingKey[0].fullPath(), "b");
+    ASSERT_EQ(clonedStreamingGroup->nonArrayIdFields, node.nonArrayIdFields);
 
     verifyClone(node);
 }

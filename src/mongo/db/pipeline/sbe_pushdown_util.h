@@ -6,6 +6,8 @@
 #include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
+class DocumentSourceGroupBase;
+
 /**
  * Set the minimum required compatibility based on the 'featureFlagSbeFull' and the
  * query framework control knob. If 'featureFlagSbeFull' is true, set the compatibility to
@@ -14,4 +16,7 @@ namespace mongo {
  */
 SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
                                                 bool sbeFullEnabled);
+
+bool isGroupSbeCompatible(const DocumentSourceGroupBase& group,
+                          SbeCompatibility minRequiredCompatibility);
 }  // namespace mongo

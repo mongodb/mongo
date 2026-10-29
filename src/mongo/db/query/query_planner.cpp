@@ -2106,7 +2106,8 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                      groupStage->getAccumulationStatements(),
                                                      groupStage->doingMerge(),
                                                      groupStage->willBeMerged(),
-                                                     /*shouldProduceBson=*/isLastSource);
+                                                     /*shouldProduceBson=*/isLastSource,
+                                                     groupStage->getNonArrayIdFields());
             continue;
         }
 

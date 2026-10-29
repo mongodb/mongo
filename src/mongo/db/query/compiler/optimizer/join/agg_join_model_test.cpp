@@ -3,9 +3,11 @@
 
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_text_noop.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
@@ -2594,6 +2596,25 @@ TEST_F(PipelineAnalyzerTest, GroupInMiddleIneligible) {
     ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(PipelineAnalyzerTest, SuffixGroupKeepsNonArrayIdFields) {
+    auto pipeline = makePipeline(R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$group: {_id: "$key"}}
+        ])",
+                                 {"A"});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
+    checked_cast<DocumentSourceGroup&>(*pipeline->getSources().back()).setNonArrayIdFields({"_id"});
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    const auto& suffix = *swJoinModel.getValue().getSuffix();
+    ASSERT_EQ(
+        checked_cast<DocumentSourceGroup&>(*suffix.getSources().front()).getNonArrayIdFields(),
+        OrderedPathSet({"_id"}));
 }
 
 TEST_F(PipelineAnalyzerTest, GroupInSubPipeline) {
