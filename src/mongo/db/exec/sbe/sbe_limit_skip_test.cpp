@@ -86,6 +86,19 @@ protected:
     }
 };
 
+TEST_F(LimitSkipStageTest, BoundedCoScanProducesExactRowsPerOpen) {
+    auto ctx = makeCompileCtx();
+
+    auto coScan = makeS<CoScanStage>(kEmptyPlanNodeId, nullptr, true, 1);
+    prepareTree(ctx.get(), coScan.get());
+
+    for (int pass = 0; pass < 2; ++pass) {
+        ASSERT_TRUE(coScan->getNext() == PlanState::ADVANCED);
+        ASSERT_TRUE(coScan->getNext() == PlanState::IS_EOF);
+        coScan->open(true);
+    }
+}
+
 TEST_F(LimitSkipStageTest, LimitSimpleTest) {
     auto ctx = makeCompileCtx();
 

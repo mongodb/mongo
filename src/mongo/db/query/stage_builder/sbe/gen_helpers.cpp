@@ -323,17 +323,14 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
     //   branch {!exists(prefetchedResultSlot)} [resultSlot, recordIdSlot]
     //     [thenResultSlot, thenRecordIdSlot]
     //       fetch seekRecordId thenResultSlot thenRecordIdSlot ...
-    //       limit 1
-    //       coscan
+    //       coscan 1
     //     [elseResultSlot, elseRecordIdSlot]
     //       project [elseResultSlot = prefetchedResultSlot, elseRecordIdSlot = seekRecordId]
-    //       limit 1
-    //       coscan
+    //       coscan 1
 
     // Move 'resultSlot', 'recordIdSlot', and 'fieldSlots' to new variables
     // 'thenResultSlot', 'thenRecordIdSlot', and 'thenFieldSlots', respectively.
-    auto [fetchStage, resultSlot, ridSlot, thenFieldSlots] =
-        makeFetchHelper(b.makeLimitOneCoScanTree());
+    auto [fetchStage, resultSlot, ridSlot, thenFieldSlots] = makeFetchHelper(b.makeCoScan(1));
     auto thenStage = std::move(fetchStage);
 
     SbSlot thenResultSlot = resultSlot;
@@ -343,8 +340,8 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
     auto elseResultSlot = SbSlot{state.slotId()};
     auto elseRecordIdSlot = SbSlot{state.slotId()};
 
-    // Create a project/limit-1/coscan subtree for the else branch.
-    auto [elseStage, _] = b.makeProject(b.makeLimitOneCoScanTree(),
+    // Create a project/coscan-1 subtree for the else branch.
+    auto [elseStage, _] = b.makeProject(b.makeCoScan(1),
                                         std::pair(SbExpr{*prefetchedResultSlot}, elseResultSlot),
                                         std::pair(SbExpr{seekRecordIdSlot}, elseRecordIdSlot));
 

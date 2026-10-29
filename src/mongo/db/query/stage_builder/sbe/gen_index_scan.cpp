@@ -348,7 +348,7 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
     // and add an unwind stage on top to flatten the interval bounds array.
     constexpr bool preserveNullAndEmptyArrays = false;
     auto [unwind, unwindSlot, _] =
-        b.makeUnwind(b.makeLimitOneCoScanTree(), boundsSlot, preserveNullAndEmptyArrays);
+        b.makeUnwind(b.makeCoScan(1), boundsSlot, preserveNullAndEmptyArrays);
 
     // Add another project stage to extract low and high keys from each value produced by unwind and
     // bind the keys to the 'lowKeySlot' and 'highKeySlot'.

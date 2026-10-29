@@ -12,12 +12,16 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
+
+#include <boost/optional.hpp>
 
 namespace mongo::sbe {
 /**
- * Delivers an infinite stream of getNext() calls, always returning 'ADVANCED'. Also, it does not
- * define any slots; i.e. it does not produce any results.
+ * Delivers an infinite stream of getNext() calls, always returning 'ADVANCED', unless a row limit
+ * is given, in which case it returns 'ADVANCED' that many times per open() and then 'IS_EOF'. Also,
+ * it does not define any slots; i.e. it does not produce any results.
  *
  * On its face value this does not seem to be very useful but it is handy when we have to construct
  * a data stream when there is not any physical source (i.e. no collection to read from).  Typical
@@ -27,7 +31,8 @@ class CoScanStage final : public PlanStage {
 public:
     explicit CoScanStage(PlanNodeId,
                          PlanYieldPolicySBE* yieldPolicy = nullptr,
-                         bool participateInTrialRunTracking = true);
+                         bool participateInTrialRunTracking = true,
+                         boost::optional<int64_t> numRows = boost::none);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -41,8 +46,10 @@ public:
     const SpecificStats* getSpecificStats() const final;
     size_t estimateCompileTimeSize() const final;
     void doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                      DebugPrintInfo& debugPrintInfo) const final {}
+                      DebugPrintInfo& debugPrintInfo) const final;
 
 protected:
+    boost::optional<int64_t> _numRows;
+    int64_t _remaining{0};
 };
 }  // namespace mongo::sbe

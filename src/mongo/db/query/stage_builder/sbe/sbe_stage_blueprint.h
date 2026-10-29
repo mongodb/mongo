@@ -136,6 +136,7 @@ inline void addIndexInfoUses(const SbIndexInfoSlots& slots, SbSlotCollector& out
  */
 struct SbBlueprintCoScan {
     PlanNodeId nodeId{kEmptyPlanNodeId};
+    boost::optional<int64_t> numRows;
 
     void def(SbSlotCollector&) const {}
 

@@ -97,7 +97,7 @@ struct Lowerer {
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintCoScan node) {
-        return sbe::makeS<sbe::CoScanStage>(node.nodeId);
+        return sbe::makeS<sbe::CoScanStage>(node.nodeId, nullptr, true, node.numRows);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintVirtualScan node) {

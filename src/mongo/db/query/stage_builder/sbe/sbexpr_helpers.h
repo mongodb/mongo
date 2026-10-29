@@ -410,7 +410,7 @@ public:
     std::pair<SbStage, SbSlot> makeVirtualScan(sbe::value::TypeTags inputTag,
                                                sbe::value::Value inputVal);
 
-    SbStage makeCoScan();
+    SbStage makeCoScan(boost::optional<int64_t> numRows = boost::none);
 
     SbStage makeLimit(SbStage stage, SbExpr limit) {
         return makeLimit(VariableTypes{}, std::move(stage), std::move(limit));
@@ -423,8 +423,6 @@ public:
     }
 
     SbStage makeLimitSkip(const VariableTypes& varTypes, SbStage stage, SbExpr limit, SbExpr skip);
-
-    SbStage makeLimitOneCoScanTree();
 
     inline SbStage makeFilter(SbStage stage, SbExpr condition) {
         return makeFilter(VariableTypes{}, std::move(stage), std::move(condition));

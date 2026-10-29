@@ -146,8 +146,7 @@
                     }, 1))) 
                     else s19 
                ] 
-                [4] limit 1ll 
-                [4] coscan 
+                [4] coscan 1 
             right 
                 [3] fetch s9 = seek, s14 = result, s15 = recordId, s12 = inSnapshotId, s10 = inIndexIdent, s11 = inIndexKey, s13 = inIndexKeyPattern [s16 = a, s17 = fkey, s18 = n] @"UUID" 
                 [2] ixseek seekKeyLow = s7 seekKeyHigh = s8 [s11 = indexKey, s9 = recordId, s12 = snapshotId, s10 = indexIdent] [] @"UUID" @"fkey_1" forward 
@@ -206,8 +205,7 @@
                     }, 1))) 
                     else s24 
                ] 
-                [5] limit 1ll 
-                [5] coscan 
+                [5] coscan 1 
             right 
                 [3] fetch s9 = seek, s14 = result, s15 = recordId, s12 = inSnapshotId, s10 = inIndexIdent, s11 = inIndexKey, s13 = inIndexKeyPattern [s16 = a, s17 = fkey, s18 = n] @"UUID" 
                 [2] ixseek seekKeyLow = s7 seekKeyHigh = s8 [s11 = indexKey, s9 = recordId, s12 = snapshotId, s10 = indexIdent] [] @"UUID" @"fkey_1" forward 

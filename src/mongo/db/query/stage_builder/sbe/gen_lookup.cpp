@@ -533,7 +533,7 @@ std::pair<SbSlot /* resultSlot */, SbStage> buildForeignMatchedArray(SbStage inn
     SbExpr emptyArrayConst = b.makeConstant(emptyArrayTag, emptyArrayVal);
 
     auto [emptyArrayStage, emptyArrayOutSlots] =
-        b.makeProject(b.makeLimitOneCoScanTree(), std::move(emptyArrayConst));
+        b.makeProject(b.makeCoScan(1), std::move(emptyArrayConst));
     SbSlot emptyArraySlot = emptyArrayOutSlots[0];
 
     auto unionInputs =
@@ -1038,7 +1038,7 @@ SbStage buildIndexJoinLookupForeignSideStage(
 
     // Modify the set of values to lookup to include the first item of any array.
     auto [localKeysIndexSetSlot, localKeysSetStage] =
-        buildKeySetForIndexScan(state, b.makeLimitOneCoScanTree(), localKeysSetSlot, nodeId);
+        buildKeySetForIndexScan(state, b.makeCoScan(1), localKeysSetSlot, nodeId);
 
     // Unwind local keys one by one into 'valueForIndexBound'.
     auto [valueGeneratorStage, valueForIndexBound, _] = b.makeUnwind(
@@ -2560,8 +2560,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinEmbedd
     }
 
     // Project the computed predicates from the left side.
-    auto [leftPrjStage, leftPrjOutputs] =
-        b.makeProject(b.makeLimitOneCoScanTree(), std::move(leftPrj));
+    auto [leftPrjStage, leftPrjOutputs] = b.makeProject(b.makeCoScan(1), std::move(leftPrj));
 
     auto outStage = buildIndexSeek(_state,
                                    std::move(leftPrjStage),

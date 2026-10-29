@@ -599,8 +599,8 @@ std::pair<SbStage, SbSlot> SbBuilder::makeVirtualScan(sbe::value::TypeTags input
     return {std::move(stage), outSlot};
 }
 
-SbStage SbBuilder::makeCoScan() {
-    return addBlueprint(_state, SbBlueprintCoScan{.nodeId = _nodeId});
+SbStage SbBuilder::makeCoScan(boost::optional<int64_t> numRows) {
+    return addBlueprint(_state, SbBlueprintCoScan{.nodeId = _nodeId, .numRows = numRows});
 }
 
 SbStage SbBuilder::makeLimit(const VariableTypes& varTypes, SbStage stage, SbExpr limitConstant) {
@@ -621,14 +621,6 @@ SbStage SbBuilder::makeLimitSkip(const VariableTypes& varTypes,
                                              .limitExpr = std::move(limitConstant),
                                              .skipExpr = std::move(skipConstant)},
                         &varTypes);
-}
-
-SbStage SbBuilder::makeLimitOneCoScanTree() {
-    auto coScan = makeCoScan();
-    return addBlueprint(_state,
-                        SbBlueprintLimitSkip{.child = coScan.release(),
-                                             .nodeId = _nodeId,
-                                             .limitExpr = makeInt64Constant(1)});
 }
 
 SbStage SbBuilder::makeFilter(const VariableTypes& varTypes, SbStage stage, SbExpr condition) {

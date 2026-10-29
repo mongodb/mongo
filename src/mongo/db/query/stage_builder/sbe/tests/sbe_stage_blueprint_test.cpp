@@ -181,13 +181,12 @@ TEST_F(SbBlueprintLoweringTest, SbBuilderRetainsBlueprintUntilLowered) {
     auto [unwound, outSlot, idxSlot] =
         b.makeUnwind(b.makeCoScan(), SbSlot{_state->slotId()}, false);
     auto unique = b.makeUnique(std::move(unwound), outSlot);
-    auto [joined, _] =
-        b.makeUnion(SbStage::makeVector(std::move(unique), b.makeLimitOneCoScanTree()),
-                    {SbExpr::makeSV(outSlot), SbExpr::makeSV(idxSlot)});
+    auto [joined, _] = b.makeUnion(SbStage::makeVector(std::move(unique), b.makeCoScan(1)),
+                                   {SbExpr::makeSV(outSlot), SbExpr::makeSV(idxSlot)});
 
     // Nothing has been lowered yet: every stage built above is a node of the blueprint, and the
     // root handle refers to the union node.
-    ASSERT_EQ(blueprint.size(), 6u);
+    ASSERT_EQ(blueprint.size(), 5u);
     ASSERT_TRUE(std::holds_alternative<SbBlueprintUnion>(blueprint[joined.idx()]));
     for (uint32_t i = 0; i < blueprint.size(); ++i) {
         ASSERT_EQ(getNodeId(blueprint[SbBlueprintNodeIdx{i}]), 5);
@@ -196,20 +195,19 @@ TEST_F(SbBlueprintLoweringTest, SbBuilderRetainsBlueprintUntilLowered) {
     ASSERT_TRUE(std::holds_alternative<SbBlueprintUnwind>(blueprint[SbBlueprintNodeIdx{1}]));
     ASSERT_TRUE(std::holds_alternative<SbBlueprintUnique>(blueprint[SbBlueprintNodeIdx{2}]));
     ASSERT_TRUE(std::holds_alternative<SbBlueprintCoScan>(blueprint[SbBlueprintNodeIdx{3}]));
-    ASSERT_TRUE(std::holds_alternative<SbBlueprintLimitSkip>(blueprint[SbBlueprintNodeIdx{4}]));
 
     auto str = lowerAndPrint(std::move(joined));
     ASSERT_STRING_CONTAINS(str, "[5] union");
     ASSERT_STRING_CONTAINS(str, "[5] unique");
     ASSERT_STRING_CONTAINS(str, "[5] unwind");
-    ASSERT_STRING_CONTAINS(str, "[5] limit 1");
+    ASSERT_STRING_CONTAINS(str, "[5] coscan 1");
 }
 
 TEST_F(SbBlueprintLoweringTest, DisableTrialRunTrackingAppliesToLoweredStage) {
     // The join's inner side reports TrackResults unless the join excludes it from trial runs.
     auto build = [&](bool disableInner) {
         SbBuilder innerBuilder{*_state, 1};
-        auto inner = innerBuilder.makeLimitOneCoScanTree();
+        auto inner = innerBuilder.makeCoScan(1);
         SbBuilder rootBuilder{*_state, 2};
         auto root = rootBuilder.makeLoopJoin(rootBuilder.makeCoScan(),
                                              std::move(inner),
