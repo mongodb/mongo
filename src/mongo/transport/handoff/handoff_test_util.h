@@ -3,28 +3,41 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/rpc/message.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/handoff/handoff_posix_interface.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/unittest/unittest.h"
 
 #include <chrono>
+#include <concepts>
 #include <condition_variable>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <functional>
+#include <initializer_list>
 #include <iterator>
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <span>
+#include <string>
 #include <system_error>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #include <fcntl.h>
 #include <poll.h>
+#include <s2n.h>
 #include <unistd.h>
 
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 #include <sys/un.h>
 
 namespace mongo::transport {
@@ -182,7 +195,7 @@ private:
     bool _shutdownResult;
     int _numSessionsStarted = 0;
     std::mutex _mu;
-    std::condition_variable _cv;
+    stdx::condition_variable _cv;
     std::queue<std::shared_ptr<Session>> _sessions;
 };
 
@@ -231,5 +244,112 @@ inline std::shared_ptr<Session> connectAndGetSession(const std::filesystem::path
     ::close(clientFd);
     return session;
 }
+
+/**
+ * Builds a wire protocol message with the given opcode wrapping a BSON body.
+ */
+Message makeMessage(NetworkOp op, const BSONObj& body);
+
+/**
+ * Writes an entire buffer to an fd, retrying short writes.
+ */
+void writeAll(int fd, const char* buf, size_t len);
+
+/**
+ * Returns an iovec pointing at the message's bytes, for scatter/gather I/O.
+ */
+iovec fromMessage(const Message& msg);
+
+/**
+ * Sends a wire message over a UDS with the given fds packed into a single SCM_RIGHTS cmsghdr.
+ */
+void sendMessageWithFds(int udsFd, const Message& msg, std::initializer_list<int> fds);
+
+struct SessionHandoffMessageOptions {
+    bool omitEmptyExtraCleartext = true;
+};
+
+/**
+ * Builds an OP_HANDOFF wire message containing the serialized s2n session state and extra
+ * cleartext.
+ * The state is encoded as a BSON BinData field named "s2nState".
+ * The extra cleartext is encoded as a BSON BinData field named "extraCleartext" if either of the
+ * following are true:
+ * - extraCleartext is nonempty
+ * - the optionally specified options has `.omitEmptyExtraCleartext = false`. It defaults to `true`.
+ */
+Message buildSessionHandoffMessage(const std::vector<uint8_t>& serializedState,
+                                   const std::vector<uint8_t>& extraCleartext,
+                                   SessionHandoffMessageOptions options = {});
+
+// Values used by buildProxyHeader and by tests that assert on the parsed source endpoint.
+inline constexpr uint16_t kTestClientPort = 12345;
+inline constexpr char kTestClientAddr[] = "127.0.0.1";
+inline constexpr char kTestSniName[] = "test.example.com";
+
+/**
+ * Builds a PROXY v2 binary header. sniName, subjectDN, and rolesBytes/rolesLen are optional
+ * — pass nullptr/0 to omit each. Always includes at least a NOOP TLV since the parser requires
+ * a non-empty TLV block on the proxy unix socket (enforced by the parser).
+ */
+std::vector<uint8_t> buildProxyHeader(const char* sniName,
+                                      const char* subjectDN,
+                                      const uint8_t* rolesBytes,
+                                      size_t rolesLen);
+
+/**
+ * Runs a single TLS handshake and exposes the artifacts needed to drive an OP_HANDOFF.
+ *
+ * Not a gtest fixture: the handshake is expensive and produces immutable outputs, so construct it
+ * once and reuse across iterations. Derived classes (the gtest fixture, the fuzz test) add the
+ * per-test/per-iteration pieces (the UDS socketpair and the HandoffSession).
+ */
+class HandoffTlsState {
+public:
+    HandoffTlsState();
+    ~HandoffTlsState();
+
+    HandoffTlsState(const HandoffTlsState&) = delete;
+    HandoffTlsState& operator=(const HandoffTlsState&) = delete;
+
+    template <typename... Messages>
+    requires(std::same_as<Messages, Message> && ...)
+    void clientSend(const Message& first, const Messages&... rest) {
+        const iovec iovs[] = {fromMessage(first), fromMessage(rest)...};
+        clientSend(iovs);
+    }
+
+    void clientSend(const char* data, size_t len);
+    void clientSend(std::span<const iovec> buffers);
+
+    Message clientReceive(int expectedSize);
+    Message serverReceive(int expectedSize);
+
+    /** Serializes the server-side TLS state and remaining decrypted data. */
+    void serializeConnection();
+
+protected:
+    const s2n_config* deserConfig() const {
+        return _deserConfig;
+    }
+
+    int proxyTlsFd = -1;
+    int clientTlsFd = -1;
+    struct s2n_connection* clientConn = nullptr;
+    struct s2n_connection* serverConn = nullptr;
+    std::vector<uint8_t> serializedState;
+    std::vector<uint8_t> extraCleartext;
+
+private:
+    static std::string readFile(const std::string& path);
+    static std::pair<std::string, std::string> splitCertAndKey(const std::string& combined);
+    static int negotiateBlocking(struct s2n_connection* conn);
+    Message _receive(s2n_connection* conn, int expectedSize);
+
+    struct s2n_config* _serverConfig = nullptr;
+    struct s2n_config* _clientConfig = nullptr;
+    struct s2n_config* _deserConfig = nullptr;
+    struct s2n_cert_chain_and_key* _certChainAndKey = nullptr;
+};
 
 }  // namespace mongo::transport

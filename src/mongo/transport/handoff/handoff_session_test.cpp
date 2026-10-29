@@ -55,38 +55,6 @@ namespace mongo::transport {
 namespace {
 
 /**
- * Builds a wire protocol message with the given opcode wrapping a BSON body.
- */
-Message makeMessage(NetworkOp op, const BSONObj& body) {
-    int totalLen = sizeof(MSGHEADER::Value) + body.objsize();
-    auto buf = SharedBuffer::allocate(totalLen);
-
-    MsgData::View view(buf.get());
-    view.setLen(totalLen);
-    view.setId(nextMessageId());
-    view.setResponseToMsgId(0);
-    view.setOperation(op);
-    memcpy(view.data(), body.objdata(), body.objsize());
-
-    return Message(std::move(buf));
-}
-
-/**
- * Writes an entire buffer to an fd, retrying short writes.
- */
-void writeAll(int fd, const char* buf, size_t len) {
-    size_t written = 0;
-    while (written < len) {
-        ssize_t n;
-        do {
-            n = ::send(fd, buf + written, len - written, 0);
-        } while (n == -1 && errno == EINTR);
-        ASSERT_GT(n, 0) << "send failed: " << errorMessage(lastSocketError());
-        written += n;
-    }
-}
-
-/**
  * Reads an entire buffer from an fd, retrying short reads.
  */
 void readAll(int fd, char* buf, size_t len) {
@@ -96,42 +64,6 @@ void readAll(int fd, char* buf, size_t len) {
         ASSERT_GT(n, 0) << "recv failed or closed: " << errorMessage(lastSocketError());
         totalRead += n;
     }
-}
-
-iovec fromMessage(const Message& msg) {
-    iovec result;
-    result.iov_base = const_cast<char*>(msg.buf());
-    result.iov_len = msg.size();
-    return result;
-}
-
-/**
- * Sends a wire message over a UDS with the given fds packed into a single SCM_RIGHTS cmsghdr.
- */
-void sendMessageWithFds(int udsFd, const Message& msg, std::initializer_list<int> fds) {
-    iovec iov = fromMessage(msg);
-
-    size_t fdBytes = fds.size() * sizeof(int);
-    std::vector<char> controlBuf(CMSG_SPACE(fdBytes), 0);
-
-    struct msghdr hdr;
-    memset(&hdr, 0, sizeof(hdr));
-    hdr.msg_iov = &iov;
-    hdr.msg_iovlen = 1;
-    hdr.msg_control = controlBuf.data();
-    hdr.msg_controllen = controlBuf.size();
-
-    struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr);
-    cmsg->cmsg_level = SOL_SOCKET;
-    cmsg->cmsg_type = SCM_RIGHTS;
-    cmsg->cmsg_len = CMSG_LEN(fdBytes);
-    memcpy(CMSG_DATA(cmsg), fds.begin(), fdBytes);
-
-    ssize_t n;
-    do {
-        n = ::sendmsg(udsFd, &hdr, 0);
-    } while (n < 0 && errno == EINTR);
-    ASSERT_GT(n, 0) << "sendmsg failed: " << errorMessage(lastSocketError());
 }
 
 /**
@@ -257,42 +189,6 @@ void ThreadSleepOneTimeNotification::notifyAboutToSleep() {
 void ThreadSleepOneTimeNotification::waitForEnterSleep(std::chrono::milliseconds timeout,
                                                        std::chrono::milliseconds checkInterval) {
     waitUntilTaskIsAsleep(std::move(taskStat.future).get(), timeout, checkInterval);
-}
-
-struct SessionHandoffMessageOptions {
-    bool omitEmptyExtraCleartext = true;
-};
-
-/**
- * Builds an OP_HANDOFF wire message containing the serialized s2n session state and extra
- * cleartext.
- * The state is encoded as a BSON BinData field named "s2nState".
- * The extra cleartext is encoded as a BSON BinData field named "extraCleartext" if either of the
- * following are true:
- * - extraCleartext is nonempty
- * - the optionally specified options has `.omitEmptyExtraCleartext = false`. It defaults to `true`.
- */
-Message buildSessionHandoffMessage(const std::vector<uint8_t>& serializedState,
-                                   const std::vector<uint8_t>& extraCleartext,
-                                   SessionHandoffMessageOptions options = {}) {
-    SessionHandoffMessage handoffMsg;
-    handoffMsg.setS2nState(ConstDataRange(serializedState.data(), serializedState.size()));
-    if (!extraCleartext.empty() || !options.omitEmptyExtraCleartext) {
-        handoffMsg.setExtraCleartext(ConstDataRange(extraCleartext.data(), extraCleartext.size()));
-    }
-    BSONObj body = handoffMsg.toBSON();
-
-    int totalLen = sizeof(MSGHEADER::Value) + body.objsize();
-    auto buf = SharedBuffer::allocate(totalLen);
-
-    MsgData::View view(buf.get());
-    view.setLen(totalLen);
-    view.setId(nextMessageId());
-    view.setResponseToMsgId(0);
-    view.setOperation(dbSessionHandoff);
-    memcpy(view.data(), body.objdata(), body.objsize());
-
-    return Message(std::move(buf));
 }
 
 /**
@@ -1041,52 +937,13 @@ TEST_F(HandoffSessionHandoffMessageValidationTest, SourceMessageRejectsHandoffWi
 }
 
 /**
- * Base fixture for tests that require a real TLS handshake. setUp runs a full TLS handshake,
- * serializes the server-side TLS state, and constructs a HandoffSession on a UDS socketpair.
- * The handoff is not driven. Derived fixtures drive it in their own setUp.
+ * Base fixture for tests that require a real TLS handshake. HandoffTlsState runs the handshake and
+ * owns the TLS socketpair and connections. This fixture adds the UDS socketpair and the
+ * HandoffSession that the tests drive.
  */
-class HandoffSessionTLSFixture : public unittest::Test {
+class HandoffSessionTLSFixture : public unittest::Test, public HandoffTlsState {
 public:
     void setUp() override {
-        ASSERT_OK(s2nInitOnce());
-
-        // Build the server config with TLS 1.2, serialization enabled, and a server cert.
-        _serverConfig = s2n_config_new_minimal();
-        ASSERT_TRUE(_serverConfig);
-        ASSERT_EQ(s2n_config_set_serialization_version(_serverConfig, S2N_SERIALIZED_CONN_V1),
-                  S2N_SUCCESS);
-        ASSERT_EQ(
-            s2n_config_set_cipher_preferences(_serverConfig, "ELBSecurityPolicy-TLS-1-2-2017-01"),
-            S2N_SUCCESS);
-        auto certPem = readFile(kServerCertKeyFile);
-        auto [certChainPem, keyPem] = splitCertAndKey(certPem);
-        _certChainAndKey = s2n_cert_chain_and_key_new();
-        ASSERT_TRUE(_certChainAndKey);
-        ASSERT_EQ(
-            s2n_cert_chain_and_key_load_pem(_certChainAndKey, certChainPem.c_str(), keyPem.c_str()),
-            S2N_SUCCESS);
-        ASSERT_EQ(s2n_config_add_cert_chain_and_key_to_store(_serverConfig, _certChainAndKey),
-                  S2N_SUCCESS);
-        ASSERT_EQ(s2n_config_disable_x509_verification(_serverConfig), S2N_SUCCESS);
-
-        // Build the client config with TLS 1.2, serialization enabled, and no cert verification.
-        _clientConfig = s2n_config_new_minimal();
-        ASSERT_TRUE(_clientConfig);
-        ASSERT_EQ(s2n_config_set_serialization_version(_clientConfig, S2N_SERIALIZED_CONN_V1),
-                  S2N_SUCCESS);
-        ASSERT_EQ(
-            s2n_config_set_cipher_preferences(_clientConfig, "ELBSecurityPolicy-TLS-1-2-2017-01"),
-            S2N_SUCCESS);
-        ASSERT_EQ(s2n_config_disable_x509_verification(_clientConfig), S2N_SUCCESS);
-
-        // Build the deserialization config for the HandoffSession.
-        _deserConfig = s2n_config_new_minimal();
-        ASSERT_TRUE(_deserConfig);
-        ASSERT_EQ(s2n_config_set_serialization_version(_deserConfig, S2N_SERIALIZED_CONN_V1),
-                  S2N_SUCCESS);
-
-        // Two socketpairs model the handoff protocol.
-        //
         // UDS socketpair (proxy <-> mongod):
         //   proxyUdsFd  is the proxy end. The test sends OP_HANDOFF through it. After the
         //               handoff (success or failure), proxyUdsFd reaches EOF when the session
@@ -1094,40 +951,6 @@ public:
         //   mongodUdsFd is the mongod end. It is passed to HandoffSession as its initial fd.
         //               The session reads OP_HANDOFF here and closes it whether the handoff
         //               succeeds or fails.
-        //
-        // TLS socketpair (proxy <-> client):
-        //   proxyTlsFd  is the proxy end. It is sent inside OP_HANDOFF via SCM_RIGHTS. On a
-        //               successful handoff, the session uses it as its new active fd for TLS I/O.
-        //   clientTlsFd is the client end. clientConn uses this fd to send and receive data.
-        //
-        // When the session calls recvmsg on mongodUdsFd, the kernel gives it a duplicate of
-        // proxyTlsFd. On a successful handoff, the session holds and uses that dup. On failure,
-        // the session closes it.
-
-        // Create a socketpair for the TLS channel between proxy and client.
-        int tlsFds[2];
-        ASSERT_EQ(::socketpair(AF_UNIX, SOCK_STREAM, 0, tlsFds), 0);
-        proxyTlsFd = tlsFds[0];   // proxy's end.
-        clientTlsFd = tlsFds[1];  // client's end.
-
-        // Create and connect s2n server and client connections.
-        serverConn = s2n_connection_new(S2N_SERVER);
-        ASSERT_TRUE(serverConn);
-        ASSERT_EQ(s2n_connection_set_config(serverConn, _serverConfig), S2N_SUCCESS);
-        ASSERT_EQ(s2n_connection_set_fd(serverConn, proxyTlsFd), S2N_SUCCESS);
-
-        clientConn = s2n_connection_new(S2N_CLIENT);
-        ASSERT_TRUE(clientConn);
-        ASSERT_EQ(s2n_connection_set_config(clientConn, _clientConfig), S2N_SUCCESS);
-        ASSERT_EQ(s2n_connection_set_fd(clientConn, clientTlsFd), S2N_SUCCESS);
-
-        std::thread serverThread([&] {
-            ASSERT_EQ(negotiateBlocking(serverConn), S2N_SUCCESS) << s2n_strerror(s2n_errno, "EN");
-        });
-        ASSERT_EQ(negotiateBlocking(clientConn), S2N_SUCCESS) << s2n_strerror(s2n_errno, "EN");
-        serverThread.join();
-
-        // Create a UDS socketpair for the HandoffSession.
         int udsFds[2];
         ASSERT_EQ(::socketpair(AF_UNIX, SOCK_STREAM, 0, udsFds), 0);
         mongodUdsFd = udsFds[0];  // mongod's HandoffSession end.
@@ -1139,7 +962,7 @@ public:
                                    .transportLayer = nullptr,
                                    .acceptedOnLoadBalancedSocket = false,
                                    .acceptedOnPrioritySocket = false,
-                                   .s2nConfig = _deserConfig,
+                                   .s2nConfig = deserConfig(),
                                    .posix = _posix});
     }
 
@@ -1148,39 +971,9 @@ public:
             session->end();
             session.reset();
         }
-        if (proxyTlsFd >= 0) {
-            ::close(proxyTlsFd);
-            proxyTlsFd = -1;
-        }
         if (proxyUdsFd >= 0) {
             ::close(proxyUdsFd);
             proxyUdsFd = -1;
-        }
-        // Close the client fd before freeing the s2n connection; session->end() has
-        // already shut down the server side.
-        if (clientTlsFd >= 0) {
-            ::close(clientTlsFd);
-            clientTlsFd = -1;
-        }
-        if (clientConn) {
-            s2n_connection_free(clientConn);
-            clientConn = nullptr;
-        }
-        if (serverConn) {
-            s2n_connection_free(serverConn);
-            serverConn = nullptr;
-        }
-        if (_serverConfig) {
-            s2n_config_free(_serverConfig);
-        }
-        if (_clientConfig) {
-            s2n_config_free(_clientConfig);
-        }
-        if (_deserConfig) {
-            s2n_config_free(_deserConfig);
-        }
-        if (_certChainAndKey) {
-            s2n_cert_chain_and_key_free(_certChainAndKey);
         }
     }
 
@@ -1196,158 +989,16 @@ public:
         proxyUdsFd = -1;
     }
 
-    template <typename... Messages>
-    requires(std::same_as<Messages, Message> && ...)
-    void clientSend(const Message& first, const Messages&... rest) {
-        const iovec iovs[] = {fromMessage(first), fromMessage(rest)...};
-        clientSend(iovs);
-    }
-
-    void clientSend(const char* data, size_t len) {
-        iovec bufs[1];
-        bufs[0].iov_base = const_cast<char*>(data);
-        bufs[0].iov_len = len;
-        clientSend(bufs);
-    }
-
-    void clientSend(std::span<const iovec> buffers) {
-        size_t len = 0;
-        for (const iovec& buf : buffers) {
-            len += buf.iov_len;
-        }
-
-        size_t written = 0;
-        while (written < len) {
-            s2n_blocked_status blocked;
-            ssize_t n = s2n_sendv_with_offset(
-                clientConn, buffers.data(), buffers.size(), written, &blocked);
-            uassert(ErrorCodes::InternalError, s2n_strerror(s2n_errno, "EN"), n > 0);
-            written += n;
-        }
-    }
-
-    Message clientReceive(int expectedSize) {
-        return _receive(clientConn, expectedSize);
-    }
-
-    Message serverReceive(int expectedSize) {
-        return _receive(serverConn, expectedSize);
-    }
-
-    void serializeConnection() {
-        // Serialize the server-side TLS state and remaining decrypted data.
-        const uint32_t extraCount = s2n_peek(serverConn);
-        extraCleartext.resize(extraCount);
-        s2n_blocked_status blocked;
-        ASSERT_EQ(s2n_recv(serverConn, extraCleartext.data(), extraCount, &blocked), extraCount);
-
-        uint32_t serializedLen = 0;
-        ASSERT_EQ(s2n_connection_serialization_length(serverConn, &serializedLen), S2N_SUCCESS);
-        ASSERT_GT(serializedLen, 0u);
-        serializedState.resize(serializedLen);
-        ASSERT_EQ(s2n_connection_serialize(serverConn, serializedState.data(), serializedLen),
-                  S2N_SUCCESS);
-    }
-
 protected:
     std::shared_ptr<HandoffSession> session;
-    int proxyTlsFd = -1;
     int proxyUdsFd = -1;
     int mongodUdsFd = -1;  // HandoffSession is responsible for closing this file.
-    int clientTlsFd = -1;
-    struct s2n_connection* clientConn = nullptr;
-    struct s2n_connection* serverConn = nullptr;
-    std::vector<uint8_t> serializedState;
-    std::vector<uint8_t> extraCleartext;
 
     MockPOSIXInterface& posix() {
         return _posix;
     }
 
 private:
-    static constexpr auto kServerCertKeyFile = "jstests/libs/server.pem";
-
-    static std::string readFile(const std::string& path) {
-        std::ifstream file(path);
-        ASSERT_TRUE(file.good()) << "Failed to open file: " << path;
-        std::stringstream ss;
-        ss << file.rdbuf();
-        return ss.str();
-    }
-
-    static std::pair<std::string, std::string> splitCertAndKey(const std::string& combined) {
-        const std::string certBegin = "-----BEGIN CERTIFICATE-----";
-        const std::string certEnd = "-----END CERTIFICATE-----";
-        const std::string keyBegin = "-----BEGIN";
-
-        std::string certChain;
-        std::string privateKey;
-
-        size_t pos = 0;
-        while ((pos = combined.find(certBegin, pos)) != std::string::npos) {
-            size_t endPos = combined.find(certEnd, pos);
-            ASSERT_NE(endPos, std::string::npos) << "Unterminated certificate block in PEM";
-            endPos += certEnd.size();
-            if (endPos < combined.size() && combined[endPos] == '\n') {
-                endPos++;
-            }
-            certChain += combined.substr(pos, endPos - pos);
-            pos = endPos;
-        }
-
-        pos = 0;
-        while ((pos = combined.find(keyBegin, pos)) != std::string::npos) {
-            if (combined.substr(pos).starts_with("-----BEGIN CERTIFICATE-----")) {
-                pos += certBegin.size();
-                continue;
-            }
-            size_t endPos = combined.find("-----END ", pos + 1);
-            ASSERT_NE(endPos, std::string::npos) << "Unterminated key block in PEM";
-            endPos = combined.find('\n', endPos);
-            if (endPos == std::string::npos) {
-                endPos = combined.size();
-            } else {
-                endPos++;
-            }
-            privateKey = combined.substr(pos, endPos - pos);
-            break;
-        }
-
-        ASSERT_FALSE(certChain.empty()) << "No certificate found in PEM file";
-        ASSERT_FALSE(privateKey.empty()) << "No private key found in PEM file";
-        return {certChain, privateKey};
-    }
-
-    static int negotiateBlocking(struct s2n_connection* conn) {
-        s2n_blocked_status blocked;
-        while (true) {
-            int rc = s2n_negotiate(conn, &blocked);
-            if (rc == S2N_SUCCESS) {
-                return S2N_SUCCESS;
-            }
-            if (s2n_error_get_type(s2n_errno) != S2N_ERR_T_BLOCKED) {
-                return S2N_FAILURE;
-            }
-        }
-    }
-
-    Message _receive(s2n_connection* conn, int expectedSize) {
-        auto buf = SharedBuffer::allocate(expectedSize);
-        int totalRead = 0;
-        while (totalRead < expectedSize) {
-            s2n_blocked_status blocked;
-            ssize_t n = s2n_recv(conn, buf.get() + totalRead, expectedSize - totalRead, &blocked);
-            uassert(ErrorCodes::InternalError, s2n_strerror(s2n_errno, "EN"), n != S2N_FAILURE);
-            uassert(ErrorCodes::InternalError, "client connection closed unexpectedly", n > 0);
-            totalRead += n;
-        }
-        return Message(std::move(buf));
-    }
-
-    struct s2n_config* _serverConfig = nullptr;
-    struct s2n_config* _clientConfig = nullptr;
-    struct s2n_config* _deserConfig = nullptr;
-    struct s2n_cert_chain_and_key* _certChainAndKey = nullptr;
     MockPOSIXInterface _posix;
 };
 
@@ -2203,98 +1854,6 @@ protected:
         t.join();
         ASSERT_OK(result.getStatus());
         ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
-    }
-
-protected:
-    static constexpr uint16_t kTestClientPort = 12345;
-    static constexpr char kTestClientAddr[] = "127.0.0.1";
-    static constexpr char kTestSniName[] = "test.example.com";
-
-    static void appendU16BE(std::vector<uint8_t>& buf, uint16_t v) {
-        buf.push_back(static_cast<uint8_t>(v >> 8));
-        buf.push_back(static_cast<uint8_t>(v & 0xFF));
-    }
-
-    static void appendTLV(std::vector<uint8_t>& buf,
-                          uint8_t type,
-                          const uint8_t* val,
-                          uint16_t len) {
-        buf.push_back(type);
-        appendU16BE(buf, len);
-        buf.insert(buf.end(), val, val + len);
-    }
-
-    static struct sockaddr_storage makeTestIpv4Addr() {
-        struct sockaddr_storage addr{};
-        auto* sin = reinterpret_cast<struct sockaddr_in*>(&addr);
-        sin->sin_family = AF_INET;
-        const int rc = inet_pton(AF_INET, kTestClientAddr, &sin->sin_addr);
-        invariant(rc == 1);
-        sin->sin_port = htons(kTestClientPort);
-        return addr;
-    }
-
-    /**
-     * Builds a PROXY v2 binary header. sniName, subjectDN, and rolesBytes/rolesLen are optional
-     * — pass nullptr/0 to omit each. Always includes at least a NOOP TLV since the parser requires
-     * a non-empty TLV block on the proxy unix socket (enforced by the parser).
-     */
-    static std::vector<uint8_t> buildProxyHeader(const char* sniName,
-                                                 const char* subjectDN,
-                                                 const uint8_t* rolesBytes,
-                                                 size_t rolesLen) {
-        static constexpr uint8_t kSignature[12] = {
-            0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A};
-
-        auto src = makeTestIpv4Addr();
-        const auto* s = reinterpret_cast<const struct sockaddr_in*>(&src);
-        const uint8_t* ip = reinterpret_cast<const uint8_t*>(&s->sin_addr.s_addr);
-
-        std::vector<uint8_t> addrBlock;
-        addrBlock.insert(addrBlock.end(), ip, ip + 4);
-        addrBlock.insert(addrBlock.end(), 4, 0);  // dst addr (zeros)
-        appendU16BE(addrBlock, ntohs(s->sin_port));
-        appendU16BE(addrBlock, 0);  // dst port (zero)
-
-        std::vector<uint8_t> tlvs;
-        if (sniName && *sniName) {
-            appendTLV(tlvs,
-                      0x02,
-                      reinterpret_cast<const uint8_t*>(sniName),
-                      static_cast<uint16_t>(strlen(sniName)));
-        }
-        if ((subjectDN && *subjectDN) || (rolesBytes && rolesLen > 0)) {
-            std::vector<uint8_t> subTlvs;
-            if (subjectDN && *subjectDN) {
-                appendTLV(subTlvs,
-                          0xE0,
-                          reinterpret_cast<const uint8_t*>(subjectDN),
-                          static_cast<uint16_t>(strlen(subjectDN)));
-            }
-            if (rolesBytes && rolesLen > 0) {
-                appendTLV(subTlvs, 0xE1, rolesBytes, static_cast<uint16_t>(rolesLen));
-            }
-            // SSL TLV value: client_flags(1) + verify(4 big-endian, 0=success) + sub-TLVs.
-            std::vector<uint8_t> sslVal = {0x07, 0x00, 0x00, 0x00, 0x00};
-            sslVal.insert(sslVal.end(), subTlvs.begin(), subTlvs.end());
-            appendTLV(tlvs, 0x20, sslVal.data(), static_cast<uint16_t>(sslVal.size()));
-        }
-
-        // The parser requires a non-empty TLV block on the proxy unix socket.
-        if (tlvs.empty()) {
-            static constexpr uint8_t kNoop[] = {0x04, 0x00, 0x01, 0x00};
-            tlvs.insert(tlvs.end(), kNoop, kNoop + sizeof(kNoop));
-        }
-
-        uint16_t addrLen = static_cast<uint16_t>(addrBlock.size() + tlvs.size());
-        std::vector<uint8_t> header;
-        header.insert(header.end(), kSignature, kSignature + 12);
-        header.push_back(0x21);  // ver=2, cmd=PROXY
-        header.push_back(0x11);  // TCP over IPv4
-        appendU16BE(header, addrLen);
-        header.insert(header.end(), addrBlock.begin(), addrBlock.end());
-        header.insert(header.end(), tlvs.begin(), tlvs.end());
-        return header;
     }
 };
 
