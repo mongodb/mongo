@@ -11,6 +11,7 @@ structs:
     ECOCStats:
         mod_visibility: public
         description: "Stats about records in ECOC compact touched"
+        strict: false
         fields:
             read:
                 type: exactInt64
@@ -22,6 +23,7 @@ structs:
     ECStats:
         mod_visibility: public
         description: "Stats about records in ESC compact touched"
+        strict: false
         fields:
             read:
                 type: exactInt64
@@ -39,6 +41,7 @@ structs:
     CompactStats:
         mod_visibility: public
         description: "Stats about records in ECOC, and ESC compact touched"
+        strict: false
         fields:
             ecoc: ECOCStats
             esc: ECStats
@@ -46,6 +49,7 @@ structs:
     CleanupStats:
         mod_visibility: public
         description: "Stats about records in ECOC, and ESC cleanup touched"
+        strict: false
         fields:
             ecoc: ECOCStats
             esc: ECStats

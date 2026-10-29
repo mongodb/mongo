@@ -11,6 +11,7 @@ imports:
 structs:
     GetClusterParameterReply:
         description: "Reply to getClusterParameter command"
+        strict: false
         is_command_reply: true
         fields:
             clusterParameters: array<object>

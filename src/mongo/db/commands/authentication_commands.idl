@@ -11,7 +11,7 @@ imports:
 structs:
     AuthenticateReply:
         description: "Response for MONGODB-X509 authenticate command"
-        strict: true
+        strict: false
         is_command_reply: true
         fields:
             dbname:

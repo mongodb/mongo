@@ -10,6 +10,7 @@ imports:
 structs:
     replSetTestEgressReply:
         description: "Result of attempting to connect to cluster member"
+        strict: false
         is_command_reply: true
         fields:
             target:

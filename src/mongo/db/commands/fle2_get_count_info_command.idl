@@ -12,7 +12,7 @@ imports:
 structs:
     ESCPositionsPair:
         description: "A pair of non-anchor and anchor positions"
-        strict: true
+        strict: false
         fields:
             cpos:
                 description: "non-anchor position"
@@ -23,7 +23,7 @@ structs:
 
     ESCOptionalPositionsPair:
         description: "A pair of optional non-anchor and anchor positions"
-        strict: true
+        strict: false
         fields:
             cpos:
                 description: "non-anchor position"
@@ -36,7 +36,7 @@ structs:
 
     QECountInfoReplyTokens:
         description: "A tokens of ESC information"
-        strict: true
+        strict: false
         fields:
             t:
                 description: "ESCTwiceDerivedTagToken"
@@ -68,7 +68,7 @@ structs:
 
     QECountInfoReplyTokenSet:
         description: "Array of tokens sets"
-        strict: true
+        strict: false
         fields:
             tokens: array<QECountInfoReplyTokens>
 

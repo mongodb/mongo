@@ -12,6 +12,7 @@ imports:
 structs:
     ConnectionStatusReplyAuthInfo:
         description: "Currently authenticated users and roles, and optional privileges"
+        strict: false
         fields:
             authenticatedUsers:
                 description: "Currently authenticated users"
@@ -26,6 +27,7 @@ structs:
 
     ConnectionStatusReply:
         description: "Reply to connectionStatus command"
+        strict: false
         is_command_reply: true
         fields:
             authInfo:

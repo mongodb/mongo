@@ -29,7 +29,7 @@ structs:
 
     HelloLastWrite:
         description: "Most recent op/write times for this node"
-        strict: true
+        strict: false
         fields:
             opTime:
                 type: optime
@@ -50,7 +50,7 @@ structs:
 
     HelloCommandReply:
         description: "Reply to 'hello' command"
-        strict: true
+        strict: false
         is_command_reply: true
         fields:
             helloOk:

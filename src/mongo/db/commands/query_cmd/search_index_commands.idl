@@ -13,6 +13,7 @@ imports:
 structs:
     IndexCreated:
         description: "Information about the just created search index"
+        strict: false
         fields:
             id:
                 description: "The ID of the just created search index"
@@ -25,6 +26,7 @@ structs:
 
     CreateSearchIndexesReply:
         description: "Reply to 'createSearchIndexes' command"
+        strict: false
         is_command_reply: true
         fields:
             indexesCreated:
@@ -34,14 +36,17 @@ structs:
 
     DropSearchIndexReply:
         description: "Reply to 'dropSearchIndex' command"
+        strict: false
         is_command_reply: true
 
     UpdateSearchIndexReply:
         description: "Reply to 'updateSearchIndex' command"
+        strict: false
         is_command_reply: true
 
     ListSearchIndexesReply:
         description: "Reply to 'listSearchIndexes' command"
+        strict: false
         is_command_reply: true
         fields:
             cursor:

@@ -12,6 +12,7 @@ imports:
 structs:
     QueryStatsMetrics:
         description: "Query stats metrics relevant to a single write."
+        strict: false
         fields:
             originalOpIndex:
                 type: int

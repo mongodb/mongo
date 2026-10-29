@@ -12,6 +12,7 @@ imports:
 structs:
     UpdateMetricsFilteringAllowlistReply:
         description: "Reply for updateMetricsFilteringAllowlist command"
+        strict: false
         is_command_reply: true
         fields: {}
 

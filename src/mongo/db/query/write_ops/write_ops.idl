@@ -64,6 +64,7 @@ structs:
     # via write_ops.cpp helpers. See SERVER-103148 for more information.
     WriteCommandReplyBase:
         description: "Contains fields that is common in all the write commands reply."
+        strict: false
         fields:
             n:
                 description: "For insert: number of documents inserted.
@@ -123,6 +124,7 @@ structs:
 
     Upserted:
         description: "Contains documents that have been upserted."
+        strict: false
         fields:
             index:
                 description: "Index of the document."
@@ -388,6 +390,7 @@ structs:
 
     FindAndModifyLastError:
         description: "Contains execution details for the findAndModify command"
+        strict: false
         fields:
             n:
                 type: int

@@ -9,6 +9,7 @@ imports:
 structs:
     httpClientReply:
         description: "Result of an HTTP(S) GET request"
+        strict: false
         is_command_reply: true
         fields:
             code:

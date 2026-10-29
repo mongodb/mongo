@@ -892,6 +892,7 @@ class TestGenerator(testcase.IDLTestcase):
                 ReplyStruct:
                     description: Test struct that is a command reply.
                     is_command_reply: true
+                    strict: false
                     fields:
                         reply_field: int
             """
@@ -1443,6 +1444,7 @@ class TestGenerator(testcase.IDLTestcase):
                 ReplyStruct:
                     description: Test struct that is a reply type.
                     is_command_reply: true
+                    strict: false
             commands:
                 CommandWithReplyType:
                     description: A command with its reply type specified by an IDL struct.
@@ -1466,6 +1468,7 @@ class TestGenerator(testcase.IDLTestcase):
             structs:
                 EmptyStruct:
                     description: Empty struct.
+                    strict: false
             commands:
                 APIv1Command:
                     description: A Stable API command.
