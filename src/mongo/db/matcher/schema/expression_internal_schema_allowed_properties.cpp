@@ -21,7 +21,7 @@ namespace mongo {
 constexpr std::string_view InternalSchemaAllowedPropertiesMatchExpression::kName;
 
 InternalSchemaAllowedPropertiesMatchExpression::InternalSchemaAllowedPropertiesMatchExpression(
-    StringDataSet properties,
+    std::set<std::string_view> properties,
     std::string_view namePlaceholder,
     std::vector<PatternSchema> patternProperties,
     std::unique_ptr<ExpressionWithPlaceholder> otherwise,
@@ -76,7 +76,6 @@ void InternalSchemaAllowedPropertiesMatchExpression::serialize(
         builder->subobjStart(InternalSchemaAllowedPropertiesMatchExpression::kName));
 
     std::vector<std::string_view> sortedProperties(_properties.begin(), _properties.end());
-    std::sort(sortedProperties.begin(), sortedProperties.end());
     opts.appendLiteral(&expressionBuilder, "properties", sortedProperties);
     // This will be serialized to "i", which is the parser chosen namePlaceholder. Using this
     // unmodified will have a similar effect to serializing to "?", however it preserves round trip

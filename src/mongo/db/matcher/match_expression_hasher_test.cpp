@@ -482,6 +482,43 @@ TEST_F(MatchExpressionHasherTest, InternalSchemaAllowedPropertiesMatchExpression
     assertEquivalent(fromjson(json), fromjson(json));
 }
 
+TEST_F(MatchExpressionHasherTest, InternalSchemaAllowedPropertiesReordered) {
+    constexpr std::string_view json = R"(
+        {
+            "$_internalSchemaAllowedProperties": {
+                "properties": ["c", "a", "b"],
+                "namePlaceholder": "i",
+                "patternProperties": [
+                { "regex": /a/, "expression": { "i": { "$type": "string" } } }
+                ],
+                "otherwise": { "i": { "$type": "number" } }
+            }
+        }
+        )";
+    constexpr std::string_view jsonWithReorderedProperties = R"(
+        {
+            "$_internalSchemaAllowedProperties": {
+                "properties": ["b", "c", "a"],
+                "namePlaceholder": "i",
+                "patternProperties": [
+                { "regex": /a/, "expression": { "i": { "$type": "string" } } }
+                ],
+                "otherwise": { "i": { "$type": "number" } }
+            }
+        }
+        )";
+
+    assertEquivalent(fromjson(json), fromjson(jsonWithReorderedProperties));
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto expCtx = makeContext(nullptr, opCtx.get());
+    BSONObj filter = fromjson(json);
+    auto expr = makeMatchExpression(expCtx, filter);
+    auto clone = expr->clone();
+    ASSERT_EQ(hash(expr.get()), hash(clone.get()));
+    ASSERT_TRUE(expr->equivalent(clone.get()));
+}
+
 TEST_F(MatchExpressionHasherTest, InternalSchemaMatchArrayIndexMatchExpression) {
     constexpr std::string_view json =
         "{foo: {$_internalSchemaMatchArrayIndex:"

@@ -720,13 +720,11 @@ StatusWithMatchExpression parseAllowedProperties(
     bool ignoreUnknownKeywords,
     bool requiredMissingID) {
     // Collect the set of properties named by the 'properties' keyword.
-    StringDataSet propertyNames;
+    std::set<std::string_view> propertyNames;
     if (propertiesElt) {
-        std::vector<std::string_view> propertyNamesVec;
         for (auto&& elem : propertiesElt.embeddedObject()) {
-            propertyNamesVec.push_back(elem.fieldNameStringData());
+            propertyNames.insert(elem.fieldNameStringData());
         }
-        propertyNames.insert(propertyNamesVec.begin(), propertyNamesVec.end());
     }
 
     auto patternProperties = parsePatternProperties(

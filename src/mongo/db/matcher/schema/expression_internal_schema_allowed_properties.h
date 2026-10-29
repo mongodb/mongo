@@ -15,10 +15,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/pcre.h"
-#include "mongo/util/string_map.h"
 
 #include <cstddef>
 #include <memory>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -99,7 +99,7 @@ public:
     static constexpr std::string_view kName = "$_internalSchemaAllowedProperties"sv;
 
     explicit InternalSchemaAllowedPropertiesMatchExpression(
-        StringDataSet properties,
+        std::set<std::string_view> properties,
         std::string_view namePlaceholder,
         std::vector<PatternSchema> patternProperties,
         std::unique_ptr<ExpressionWithPlaceholder> otherwise,
@@ -165,7 +165,7 @@ public:
         visitor->visit(this);
     }
 
-    const StringDataSet& getProperties() const {
+    const std::set<std::string_view>& getProperties() const {
         return _properties;
     }
 
@@ -183,8 +183,9 @@ public:
 
 private:
     // The names of the properties are owned by the BSONObj used to create this match expression.
-    // Since that BSONObj must outlive this object, we can safely store std::string_view.
-    StringDataSet _properties;
+    // Since that BSONObj must outlive this object, we can safely store std::string_view. The set
+    // is ordered so that iteration order is stable  across equivalent expressions.
+    std::set<std::string_view> _properties;
 
     // The placeholder used in both '_patternProperties' and '_otherwise'.
     std::string_view _namePlaceholder;

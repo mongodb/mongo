@@ -1095,7 +1095,7 @@ parsePatternProperties(BSONElement patternPropertiesElem,
     return std::move(patternProperties);
 }
 
-StatusWith<StringDataSet> parseProperties(BSONElement propertiesElem) {
+StatusWith<std::set<std::string_view>> parseProperties(BSONElement propertiesElem) {
     if (!propertiesElem) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
@@ -1107,7 +1107,7 @@ StatusWith<StringDataSet> parseProperties(BSONElement propertiesElem) {
                               << propertiesElem.type()};
     }
 
-    StringDataSet properties;
+    std::set<std::string_view> properties;
     for (auto property : propertiesElem.embeddedObject()) {
         if (property.type() != BSONType::string) {
             return {
