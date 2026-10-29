@@ -215,6 +215,7 @@ def get_pr_commits(
         message = gh_commit["messageHeadline"]
         if gh_commit["messageBody"]:
             message = "\n".join([message, gh_commit["messageBody"]])
+        LOGGER.info("Commit message", message=message)
         commits.append(
             Commit(
                 message=message,
