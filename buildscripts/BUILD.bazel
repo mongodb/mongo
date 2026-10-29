@@ -1100,6 +1100,35 @@ py_library(
 )
 
 py_library(
+    name = "validate_rebase_merge",
+    srcs = ["validate_rebase_merge.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:validate_commit_message",
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "gitpython",
+            group = "evergreen",
+        ),
+        dependency(
+            "typing-extensions",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
     name = "create_todo_tickets",
     srcs = ["create_todo_tickets.py"],
     visibility = ["//visibility:public"],

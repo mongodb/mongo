@@ -55,6 +55,20 @@ ALLOWED_JIRA_PROJECTS = {
 RETRY_INSTRUCTIONS = "If you are seeing this on a PR, after changing the required field, you will need to restart the failed validate_commit_message task in Evergreen before being able to submit your PR."
 
 
+def find_banned_string(text: str) -> str | None:
+    """Return the first banned string appearing in text, or None if there is none.
+
+    Whitespace is stripped from both sides of the comparison: GitHub line-wraps commit
+    messages, which adds newline characters that otherwise would not match verbatim
+    such banned strings.
+    """
+    stripped_text = "".join(text.split())
+    for banned_string in BANNED_STRINGS:
+        if "".join(banned_string.split()) in stripped_text:
+            return banned_string
+    return None
+
+
 def is_valid_commit(commit: Commit, changed_files: list[str] = [], requester: str = "") -> bool:
     # Valid values look like:
     # 1. SERVER-\d+
@@ -113,20 +127,17 @@ The decision to add this check was made in SERVER-101443, please feel free to le
                 )
                 return False
 
-    # Remove all whitespace from comparisons. GitHub line-wraps commit messages, which adds
-    # newline characters that otherwise would not match verbatim such banned strings.
-    stripped_message = "".join(commit.message.split())
-    for banned_string in BANNED_STRINGS:
-        if "".join(banned_string.split()) in stripped_message:
-            LOGGER.error(
-                f"""PR title/description contains a banned string (ignoring whitespace).
+    banned_string = find_banned_string(commit.message)
+    if banned_string:
+        LOGGER.error(
+            f"""PR title/description contains a banned string (ignoring whitespace).
 Please update the PR title and description to not contain the following banned string:
 banned string: "{banned_string}"
 commit message: "{commit.message}"
 {RETRY_INSTRUCTIONS}
 The decision to add this check was made in SERVER-101443, please feel free to leave comments/feedback on that ticket."""
-            )
-            return False
+        )
+        return False
 
     return True
 
