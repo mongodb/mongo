@@ -68,12 +68,33 @@ UUID uuidFromContainerInnerOp(const repl::DurableReplOperation& inner) {
     return UUID::fromCDR(ConstDataRange(keyBytes.data(), keyBytes.data() + keyBytes.size()));
 }
 
-void foldRecord(ReplicatedMetadataDeltas& deltas, const ValidatorDeltaRecord& rec) {
-    // TODO(SERVER-136545): Remove.
-    invariant(rec.delta.state == DDLState::kNone,
-              "Checkpoint validation does not support DDL deltas yet");
-    auto& entry = deltas[rec.uuid];
-    entry.metadata = entry.metadata + rec.delta.metadata;
+/**
+ * Adds the provided `delta` to the provided `entry`, accounting for DDL state.
+ */
+void addDelta(ReplicatedMetadataDelta& entry, const ReplicatedMetadataDelta& delta) {
+    entry.metadata = entry.metadata + delta.metadata;
+    switch (delta.state) {
+        case DDLState::kNone:
+            // `computeExpectedCheckpoint()` uses DDL state to know if an entry should exist in
+            // `_baseline`. If a collection is created and written to in the same checkpoint
+            // interval, its DDL state should stay `DDLState::kCreated` so that
+            // `computeExpectedCheckpoint()` does not expect an entry in `_baseline`. Thus, we do
+            // not overwrite pre-existing DDL state with `DDLState::kNone`.
+            break;
+        case DDLState::kCreated:
+            invariant(entry.state != DDLState::kDropped,
+                      "Checkpoint validation does not support collection re-creation with the "
+                      "same UUID");
+            entry.state = DDLState::kCreated;
+            break;
+        case DDLState::kDropped:
+            entry.state = DDLState::kDropped;
+            break;
+        case DDLState::kDroppedAndRecreated:
+            // TODO(SERVER-137910): After shard migration is enabled, a delta can have DDL state
+            // `kDroppedAndRecreated`.
+            MONGO_UNREACHABLE;
+    }
 }
 }  // namespace
 
@@ -338,10 +359,8 @@ void SizeCountCheckpointValidator::mergeAndValidate(const ValidatorBuffers& thre
         // After validating the checkpoint, we consider all intervals with cutoff <= validAsOf
         // validated. This includes intervals/watermarks that do not have an associated checkpoint.
         // TODO(SERVER-135085): This loop would go away if there existed one watermark per
-        // checkpoint. We would simply advance the baseline and erase the interval once.
+        // checkpoint. We would simply erase the interval once.
         while (!_intervals.empty() && _intervals.front().cutoff <= validAsOf) {
-            advanceBaseline(_intervals.front().deltas);
-            // Evict the interval from our queue, even if we didn't see an exact checkpoint.
             _intervals.pop_front();
         }
 
@@ -369,11 +388,11 @@ void SizeCountCheckpointValidator::merge(const ValidatorBuffers& threadRecords) 
                     it->cutoff != rec.ts,
                     "Timestamp of a replicated metadata delta should never equal the timestamp "
                     "of a watermark");
-                foldRecord(it->deltas, rec);
+                addDelta(it->deltas[rec.uuid], rec.delta);
             } else {
                 // The watermark will arrive in another batch, so we fold this record into the
                 // _ongoing map.
-                foldRecord(_ongoing, rec);
+                addDelta(_ongoing[rec.uuid], rec.delta);
             }
         }
     }
@@ -385,8 +404,7 @@ CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Times
     auto it = _intervals.begin();
     while (it != _intervals.end() && it->cutoff <= validAsOf) {
         for (const auto& [uuid, delta] : it->deltas) {
-            auto& merged = observed[uuid];
-            merged.metadata = merged.metadata + delta.metadata;
+            addDelta(observed[uuid], delta);
         }
         ++it;
     }
@@ -394,16 +412,40 @@ CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Times
               "Expected checkpoint must end on the interval whose cutoff equals the checkpoint's "
               "validAsOf timestamp");
 
-    // Combine the observed deltas with the baseline. The baseline may contain entries that have not
-    // changed since the last checkpoint, so we only want to return UUIDs in `observed`.
+    // Combine the observed deltas with the baseline, advancing the baseline to reflect the
+    // validated window. The baseline may contain entries that have not changed since the last
+    // checkpoint, so `expected` only contains UUIDs in `observed`.
     CheckpointContents expected;
     for (const auto& [uuid, delta] : observed) {
-        auto baseIt = _baseline.find(uuid);
-        if (baseIt != _baseline.end()) {
-            expected[uuid] = baseIt->second + delta.metadata;
-        } else {
-            expected[uuid] = delta.metadata;
+        if (delta.state == DDLState::kDropped) {
+            // If `_baseline` contains an entry for this UUID, it must have been created in another
+            // checkpoint, so we expect a `boost::none` entry in the checkpoint.
+            if (_baseline.contains(uuid)) {
+                expected.emplace(uuid, boost::none);
+            }
+            // Otherwise, it might have been created and dropped within the same checkpoint, in
+            // which case the entry would be absent from the primary's checkpoint. We do not add it
+            // to `expected`.
+            _baseline.erase(uuid);
+            continue;
         }
+        const CollectionReplicatedMetadata base = [&]() -> CollectionReplicatedMetadata {
+            if (delta.state == DDLState::kCreated) {
+                return CollectionReplicatedMetadata{.sizeCount =
+                                                        CollectionSizeCount{.size = 0, .count = 0},
+                                                    .hash = kEmptyCollectionValidationHash};
+            }
+            auto baseIt = _baseline.find(uuid);
+            // TODO(SERVER-136295): Invariant that the UUID exists in the baseline once the
+            // baseline is seeded with the primary's first checkpoint.
+            return baseIt == _baseline.end()
+                ? CollectionReplicatedMetadata{.sizeCount =
+                                                   CollectionSizeCount{.size = 0, .count = 0}}
+                : baseIt->second;
+        }();
+        const CollectionReplicatedMetadata absolute = base + delta.metadata;
+        expected[uuid] = absolute;
+        _baseline[uuid] = absolute;
     }
 
     if (MONGO_unlikely(skewStandbyCheckpointSize.shouldFail())) {
@@ -415,19 +457,6 @@ CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Times
     }
 
     return expected;
-}
-
-void SizeCountCheckpointValidator::advanceBaseline(const ReplicatedMetadataDeltas& deltas) {
-    // TODO(SERVER-136545): Combine this functionality with computeExpectedCheckpoint() or explain
-    // why it is not possible.
-    for (const auto& [uuid, delta] : deltas) {
-        auto base = _baseline.find(uuid);
-        if (base != _baseline.end()) {
-            base->second = base->second + delta.metadata;
-        } else {
-            _baseline[uuid] = delta.metadata;
-        }
-    }
 }
 
 }  // namespace mongo::replicated_fast_count

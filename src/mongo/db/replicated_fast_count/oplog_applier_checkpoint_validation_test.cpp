@@ -20,7 +20,10 @@ namespace {
 
 using replicated_fast_count::test_helpers::CheckpointWriteSpec;
 using replicated_fast_count::test_helpers::makeCheckpointEntry;
+using replicated_fast_count::test_helpers::makeCreateOplogEntry;
+using replicated_fast_count::test_helpers::makeDropOplogEntry;
 using replicated_fast_count::test_helpers::makeWatermarkEntry;
+using replicated_fast_count::test_helpers::NsAndUUID;
 
 const Timestamp kT0{Seconds(100), 0};
 
@@ -39,20 +42,24 @@ protected:
                                                     /*writeToOplog=*/false));
     }
 
-    Status runThroughApplyOplogBatch(std::vector<OplogEntry> oploog,
+    Status runThroughApplyOplogBatch(std::vector<OplogEntry> oplog,
                                      boost::optional<size_t> numWorkers = boost::none) {
-        NoopOplogApplierObserver observer;
-        auto workerPool = numWorkers ? makeReplWorkerPool(*numWorkers) : makeReplWorkerPool();
-        OplogApplierImpl oplogApplier(/*executor=*/nullptr,
-                                      /*oplogBuffer=*/nullptr,
-                                      &observer,
-                                      ReplicationCoordinator::get(_opCtx.get()),
-                                      getConsistencyMarkers(),
-                                      getStorageInterface(),
-                                      OplogApplier::Options(OplogApplication::Mode::kSecondary),
-                                      workerPool.get());
+        invariant(!numWorkers || !_oplogApplier,
+                  "Cannot change the worker count across batches of the same applier");
+        if (!_oplogApplier) {
+            _workerPool = numWorkers ? makeReplWorkerPool(*numWorkers) : makeReplWorkerPool();
+            _oplogApplier = std::make_unique<OplogApplierImpl>(
+                /*executor=*/nullptr,
+                /*oplogBuffer=*/nullptr,
+                &noopOplogApplierObserver,
+                ReplicationCoordinator::get(_opCtx.get()),
+                getConsistencyMarkers(),
+                getStorageInterface(),
+                OplogApplier::Options(OplogApplication::Mode::kSecondary),
+                _workerPool.get());
+        }
         const StatusWith<OpTime> applyResult =
-            oplogApplier.applyOplogBatch(_opCtx.get(), std::move(oploog));
+            _oplogApplier->applyOplogBatch(_opCtx.get(), std::move(oplog));
         if (!applyResult.isOK()) {
             return applyResult.getStatus();
         }
@@ -62,6 +69,8 @@ protected:
     }
 
 private:
+    std::unique_ptr<ThreadPool> _workerPool;
+    std::unique_ptr<OplogApplierImpl> _oplogApplier;
     unittest::ServerParameterGuard _recordIdsFlag{"featureFlagRecordIdsReplicated", true};
     unittest::ServerParameterGuard _fastCountFlag{"featureFlagReplicatedFastCount", true};
     unittest::ServerParameterGuard _containerWritesFlag{"featureFlagContainerWrites", true};
@@ -262,6 +271,39 @@ TEST_F(CheckpointValidationTest, TwoWatermarksNoCheckpointsPasses) {
     ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
 }
 
+TEST_F(CheckpointValidationTest, CheckpointValidatesDroppedCollection) {
+    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
+        "enableContinuousInternodePerCollectionValidation", true);
+
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.checkpointDropped");
+    const NsAndUUID coll{.nss = nss, .uuid = UUID::gen()};
+
+    {
+        std::vector<OplogEntry> createOplog;
+        createOplog.push_back(makeCreateOplogEntry(nextOpTime().getTimestamp(), coll));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(createOplog)));
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        createOplog.push_back(makeWatermarkEntry(watermarkTs));
+        createOplog.push_back(makeCheckpointEntry(
+            watermarkTs,
+            {{.uuid = coll.uuid,
+              .metadata = CollectionReplicatedMetadata{
+                  .sizeCount = CollectionSizeCount{.size = 0, .count = 0}, .hash = boost::none}}}));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(createOplog)));
+    }
+
+    {
+        std::vector<OplogEntry> dropOplog;
+        dropOplog.push_back(makeDropOplogEntry(nextOpTime().getTimestamp(), coll));
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        dropOplog.push_back(makeWatermarkEntry(watermarkTs));
+        dropOplog.push_back(
+            makeCheckpointEntry(watermarkTs, {{.uuid = coll.uuid, .metadata = boost::none}}));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(dropOplog)));
+    }
+}
+
 using CheckpointValidationDeathTest = CheckpointValidationTest;
 
 DEATH_TEST_F(CheckpointValidationDeathTest,
@@ -408,6 +450,155 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
     // oplog application path is exercised.
     const size_t numWorkers = 1;
     ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog), numWorkers));
+}
+
+DEATH_TEST_F(CheckpointValidationDeathTest,
+             CheckpointValidationFailsWhenPrimaryWritesCreatedAndDroppedCollection,
+             "13626001") {
+    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
+        "enableContinuousInternodePerCollectionValidation", true);
+
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.checkpointCreatedDroppedWrites");
+    const NsAndUUID coll{.nss = nss, .uuid = UUID::gen()};
+
+    std::vector<OplogEntry> createOplog;
+    createOplog.push_back(makeCreateOplogEntry(nextOpTime().getTimestamp(), coll));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(createOplog)));
+
+    std::vector<OplogEntry> dropOplog;
+    dropOplog.push_back(makeDropOplogEntry(nextOpTime().getTimestamp(), coll));
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    dropOplog.push_back(makeWatermarkEntry(watermarkTs));
+    // There should be no entry for `uuid` because the collection was created and dropped in the
+    // same checkpoint interval.
+    dropOplog.push_back(makeCheckpointEntry(
+        watermarkTs,
+        {{.uuid = coll.uuid,
+          .metadata = CollectionReplicatedMetadata{
+              .sizeCount = CollectionSizeCount{.size = 0, .count = 0}, .hash = boost::none}}}));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(dropOplog)));
+}
+
+DEATH_TEST_F(CheckpointValidationDeathTest,
+             CheckpointValidationFailsWhenPrimaryDeletesCreatedAndDroppedCollection,
+             "13626002") {
+    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
+        "enableContinuousInternodePerCollectionValidation", true);
+
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.checkpointCreatedDroppedDeletes");
+    const NsAndUUID coll{.nss = nss, .uuid = UUID::gen()};
+
+    std::vector<OplogEntry> createOplog;
+    createOplog.push_back(makeCreateOplogEntry(nextOpTime().getTimestamp(), coll));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(createOplog)));
+
+    std::vector<OplogEntry> dropOplog;
+    dropOplog.push_back(makeDropOplogEntry(nextOpTime().getTimestamp(), coll));
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    dropOplog.push_back(makeWatermarkEntry(watermarkTs));
+    // There should be no entry for `uuid` because the collection was created and dropped in the
+    // same checkpoint interval.
+    dropOplog.push_back(
+        makeCheckpointEntry(watermarkTs, {{.uuid = coll.uuid, .metadata = boost::none}}));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(dropOplog)));
+}
+
+DEATH_TEST_F(CheckpointValidationDeathTest,
+             CheckpointValidationFailsWhenPrimaryWritesDroppedCollection,
+             "13626004") {
+    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
+        "enableContinuousInternodePerCollectionValidation", true);
+
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.checkpointDroppedWrites");
+    const NsAndUUID coll{.nss = nss, .uuid = UUID::gen()};
+
+    std::vector<OplogEntry> createOplog;
+    createOplog.push_back(makeCreateOplogEntry(nextOpTime().getTimestamp(), coll));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(createOplog)));
+
+    {
+        std::vector<OplogEntry> checkpointOplog;
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        checkpointOplog.push_back(makeWatermarkEntry(watermarkTs));
+        checkpointOplog.push_back(makeCheckpointEntry(
+            watermarkTs,
+            {{.uuid = coll.uuid,
+              .metadata = CollectionReplicatedMetadata{
+                  .sizeCount = CollectionSizeCount{.size = 0, .count = 0}, .hash = boost::none}}}));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(checkpointOplog)));
+    }
+
+    {
+        std::vector<OplogEntry> dropOplog;
+        dropOplog.push_back(makeDropOplogEntry(nextOpTime().getTimestamp(), coll));
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        dropOplog.push_back(makeWatermarkEntry(watermarkTs));
+        // The `.metadata` entry should be boost::none because the collection was dropped across two
+        // checkpoints.
+        dropOplog.push_back(makeCheckpointEntry(
+            watermarkTs,
+            {{.uuid = coll.uuid,
+              .metadata = CollectionReplicatedMetadata{
+                  .sizeCount = CollectionSizeCount{.size = 0, .count = 0}, .hash = boost::none}}}));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(dropOplog)));
+    }
+}
+
+DEATH_TEST_F(CheckpointValidationDeathTest,
+             CheckpointValidationFailsWhenPrimaryOmitsDroppedCollection,
+             "13626006") {
+    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
+        "enableContinuousInternodePerCollectionValidation", true);
+
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.checkpointDroppedOmitted");
+    const NsAndUUID coll{.nss = nss, .uuid = UUID::gen()};
+    // We need two collections so the second checkpoint includes one or more container writes while
+    // `coll` is omitted.
+    const NamespaceString otherNss =
+        NamespaceString::createNamespaceString_forTest("test.checkpointDroppedOmittedOther");
+    const NsAndUUID otherColl{.nss = otherNss, .uuid = UUID::gen()};
+
+    std::vector<OplogEntry> createOplog;
+    createOplog.push_back(makeCreateOplogEntry(nextOpTime().getTimestamp(), coll));
+    createOplog.push_back(makeCreateOplogEntry(nextOpTime().getTimestamp(), otherColl));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(createOplog)));
+
+    {
+        std::vector<OplogEntry> checkpointOplog;
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        checkpointOplog.push_back(makeWatermarkEntry(watermarkTs));
+        checkpointOplog.push_back(makeCheckpointEntry(
+            watermarkTs,
+            {{.uuid = coll.uuid,
+              .metadata = CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 0,
+                                                                                        .count = 0},
+                                                       .hash = boost::none}},
+             {.uuid = otherColl.uuid,
+              .metadata = CollectionReplicatedMetadata{
+                  .sizeCount = CollectionSizeCount{.size = 0, .count = 0}, .hash = boost::none}}}));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(checkpointOplog)));
+    }
+
+    {
+        const BSONObj docB = BSON("_id" << 2);
+        std::vector<OplogEntry> dropOplog;
+        dropOplog.push_back(makeDropOplogEntry(nextOpTime().getTimestamp(), coll));
+        dropOplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
+            nextOpTime(), otherNss, otherColl.uuid, docB, RecordId(1)));
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        dropOplog.push_back(makeWatermarkEntry(watermarkTs));
+        dropOplog.push_back(makeCheckpointEntry(
+            watermarkTs,
+            {{.uuid = otherColl.uuid,
+              .metadata = CollectionReplicatedMetadata{
+                  .sizeCount = CollectionSizeCount{.size = docB.objsize(), .count = 1},
+                  .hash = boost::none}}}));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(dropOplog)));
+    }
 }
 
 }  // namespace

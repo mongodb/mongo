@@ -16,7 +16,7 @@
 
 namespace mongo {
 
-inline constexpr int64_t kEmptyCollectionValidationHash = 0;
+[[MONGO_MOD_PUBLIC]] inline constexpr int64_t kEmptyCollectionValidationHash = 0;
 
 /**
  * The `o.msg` value identifying a no-op oplog entry as a replicated collection metadata

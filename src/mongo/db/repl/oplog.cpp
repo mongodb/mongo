@@ -274,6 +274,39 @@ void recordGroupedInsertDelta(UUID uuid,
         recordSingleInsertDelta(uuid, *insertOps[i], insertObjs[i].doc);
     }
 }
+
+void recordDdlDelta(const ApplierOperation& op) {
+    switch (op->getCommandType()) {
+        case OplogEntry::CommandType::kCreate:
+            invariant(op->getUuid(), "Collection create oplog entries carry a UUID");
+            replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
+                *op->getUuid(),
+                op->getOpTime().getTimestamp(),
+                ReplicatedMetadataDelta{
+                    .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                 .hash = kEmptyCollectionValidationHash},
+                    .state = DDLState::kCreated});
+            break;
+        case OplogEntry::CommandType::kDrop:
+            invariant(op->getUuid(), "Collection drop oplog entries carry a UUID");
+            replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
+                *op->getUuid(),
+                op->getOpTime().getTimestamp(),
+                ReplicatedMetadataDelta{
+                    .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                 .hash = boost::none},
+                    .state = DDLState::kDropped});
+            break;
+        default:
+            // We deliberately do not record other commands (truncateRange, dropDatabase,
+            // renameCollection, etc.). truncateRange is ineligible for replicated metadata
+            // tracking except for the oplog, and the SizeCountCheckpointValidator excludes the
+            // oplog from validation. The primary does not use the other commands to compute its
+            // replicated metadata checkpoint, so the standby does not need to record them for
+            // validation later.
+            break;
+    }
+}
 }  // namespace
 
 namespace internal {
@@ -4012,6 +4045,15 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 done = true;
                 break;
         }
+    }
+
+    if (mode == OplogApplication::Mode::kSecondary) {
+        // We call this function even if there was an acceptable error above (e.g., reapplying a
+        // drop for an already-dropped collection). The expected replicated metadata checkpoint
+        // should contain this DDL operation because the operation was applied at some point in the
+        // past. If there was an unacceptable error, applyCommand_inlock() returns before we reach
+        // this line and oplog application fails.
+        recordDdlDelta(op);
     }
 
     AuthorizationManager::get(opCtx->getService())->notifyDDLOperation(opCtx, "c", nss, o, nullptr);

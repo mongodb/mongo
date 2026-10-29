@@ -635,6 +635,175 @@ TEST_F(SizeCountCheckpointValidatorTest, TwoWatermarksCheckpointForSecondOnly) {
                  .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}}});
 }
 
+TEST_F(SizeCountCheckpointValidatorTest, CreatedAndDroppedInBatchExcluded) {
+    const UUID uuid = UUID::gen();
+    const UUID otherUuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{otherUuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}})};
+    applyBatch(
+        validator,
+        ops,
+        {{.ts = kT0,
+          .uuid = uuid,
+          .delta =
+              ReplicatedMetadataDelta{
+                  .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                               .hash = kEmptyCollectionValidationHash},
+                  .state = DDLState::kCreated}},
+         {.ts = kT0, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}},
+         {.ts = kT0,
+          .uuid = otherUuid,
+          .delta = ReplicatedMetadataDelta{
+              .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, DropOfKnownCollectionCheckedByMembership) {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 100, .count = 10}}}}),
+        makeWatermarkEntry(kT3),
+        makeCheckpointEntry(kT3, {{uuid, boost::none}})};
+    applyBatch(
+        validator,
+        ops,
+        {{.ts = kT0,
+          .uuid = uuid,
+          .delta =
+              ReplicatedMetadataDelta{
+                  .metadata = {.sizeCount = CollectionSizeCount{.size = 100, .count = 10},
+                               .hash = kEmptyCollectionValidationHash},
+                  .state = DDLState::kCreated}},
+         {.ts = kT2, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}}});
+}
+
+// TODO(SERVER-136295): Convert this to a DEATH_TEST.
+TEST_F(SizeCountCheckpointValidatorTest, DropOfUnknownCollectionExcluded) {
+    const UUID uuid = UUID::gen();
+    const UUID otherUuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{otherUuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}})};
+    applyBatch(
+        validator,
+        ops,
+        {{.ts = kT0, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}},
+         {.ts = kT0,
+          .uuid = otherUuid,
+          .delta = ReplicatedMetadataDelta{
+              .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, CreatedCollectionStartsAtZero) {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 0, .count = 0}}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                  .hash = kEmptyCollectionValidationHash},
+                     .state = DDLState::kCreated}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, CreatedCollectionThenCrudOperationValidates) {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 15, .count = 2}}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta =
+                     ReplicatedMetadataDelta{
+                         .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                      .hash = kEmptyCollectionValidationHash},
+                         .state = DDLState::kCreated}},
+                {.ts = kT0,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 15, .count = 2}}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, CreatedThenCrudThenDroppedExcluded) {
+    const UUID uuid = UUID::gen();
+    const UUID otherUuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{otherUuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}})};
+    applyBatch(
+        validator,
+        ops,
+        {{.ts = kT0,
+          .uuid = uuid,
+          .delta =
+              ReplicatedMetadataDelta{
+                  .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                               .hash = kEmptyCollectionValidationHash},
+                  .state = DDLState::kCreated}},
+         {.ts = kT0,
+          .uuid = uuid,
+          .delta =
+              ReplicatedMetadataDelta{
+                  .metadata = {.sizeCount = CollectionSizeCount{.size = 15, .count = 2}}}},
+         {.ts = kT0, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}},
+         {.ts = kT0,
+          .uuid = otherUuid,
+          .delta = ReplicatedMetadataDelta{
+              .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest,
+       CreatedThenDroppedAcrossIntervalsWithoutCheckpointExcluded) {
+    const UUID uuid = UUID::gen();
+    const UUID otherUuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeWatermarkEntry(kT3),
+        makeCheckpointEntry(kT3,
+                            {{otherUuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}})};
+    applyBatch(
+        validator,
+        ops,
+        {{.ts = kT0,
+          .uuid = uuid,
+          .delta =
+              ReplicatedMetadataDelta{
+                  .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                               .hash = kEmptyCollectionValidationHash},
+                  .state = DDLState::kCreated}},
+         {.ts = kT2, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}},
+         {.ts = kT2,
+          .uuid = otherUuid,
+          .delta = ReplicatedMetadataDelta{
+              .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}}});
+}
+
 TEST_F(SizeCountCheckpointValidatorTest, DeltasPastNewestWatermarkStayOutOfCheckpoint) {
     const UUID uuid = UUID::gen();
     const UUID tailUuid = UUID::gen();
@@ -791,6 +960,121 @@ DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
              "Watermark timestamps should be monotonically increasing") {
     const std::vector<repl::OplogEntry> ops{makeWatermarkEntry(kT1), makeWatermarkEntry(kT1)};
     applyBatch(validator, ops, {});
+}
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
+             CollectionRecreateNotSupported,
+             "Checkpoint validation does not support collection re-creation") {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{makeWatermarkEntry(kT1)};
+    applyBatch(
+        validator,
+        ops,
+        {{.ts = kT0, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}},
+         {.ts = kT0, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kCreated}}});
+}
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
+             PrimaryWritesCollectionCreatedAndDroppedInIntervalFasserts,
+             "13626001") {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}})};
+    applyBatch(
+        validator,
+        ops,
+        {{.ts = kT0,
+          .uuid = uuid,
+          .delta =
+              ReplicatedMetadataDelta{
+                  .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                               .hash = kEmptyCollectionValidationHash},
+                  .state = DDLState::kCreated}},
+         {.ts = kT0, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}}});
+}
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
+             PrimaryDropsCollectionCreatedAndDroppedInIntervalFasserts,
+             "13626002") {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{makeWatermarkEntry(kT1),
+                                            makeCheckpointEntry(kT1, {{uuid, boost::none}})};
+    applyBatch(
+        validator,
+        ops,
+        {{.ts = kT0,
+          .uuid = uuid,
+          .delta =
+              ReplicatedMetadataDelta{
+                  .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                               .hash = kEmptyCollectionValidationHash},
+                  .state = DDLState::kCreated}},
+         {.ts = kT0, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}}});
+}
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
+             PrimaryWritesCollectionDroppedAcrossIntervalsFasserts,
+             "13626004") {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 100, .count = 10}}}}),
+        makeWatermarkEntry(kT3),
+        makeCheckpointEntry(kT3,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 110, .count = 11}}}})};
+    applyBatch(
+        validator,
+        ops,
+        {{.ts = kT0,
+          .uuid = uuid,
+          .delta =
+              ReplicatedMetadataDelta{
+                  .metadata = {.sizeCount = CollectionSizeCount{.size = 100, .count = 10},
+                               .hash = kEmptyCollectionValidationHash},
+                  .state = DDLState::kCreated}},
+         {.ts = kT2, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}}});
+}
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
+             PrimaryOmitsCollectionDroppedAcrossIntervalsFasserts,
+             "13626006") {
+    const UUID uuid = UUID::gen();
+    const UUID otherUuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 100, .count = 10}}}}),
+        makeWatermarkEntry(kT3),
+        makeCheckpointEntry(kT3,
+                            {{otherUuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}})};
+    applyBatch(
+        validator,
+        ops,
+        {{.ts = kT0,
+          .uuid = uuid,
+          .delta =
+              ReplicatedMetadataDelta{
+                  .metadata = {.sizeCount = CollectionSizeCount{.size = 100, .count = 10},
+                               .hash = kEmptyCollectionValidationHash},
+                  .state = DDLState::kCreated}},
+         {.ts = kT2, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}},
+         {.ts = kT2,
+          .uuid = otherUuid,
+          .delta = ReplicatedMetadataDelta{
+              .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}}});
 }
 
 DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,

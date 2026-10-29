@@ -997,8 +997,10 @@ protected:
         return makeOplogEntry(nextOpTime(), OpTypeEnum::kNoop, nss, boost::none /* uuid */, object);
     }
 
-    OplogEntry commandOp(const NamespaceString& nss, const BSONObj& command) {
-        return makeCommandOplogEntry(nextOpTime(), nss, command);
+    OplogEntry commandOp(const NamespaceString& nss,
+                         const BSONObj& command,
+                         boost::optional<UUID> uuid = boost::none) {
+        return makeCommandOplogEntry(nextOpTime(), nss, command, boost::none, std::move(uuid));
     }
 
     // A non-transactional applyOps entry.
@@ -1078,7 +1080,7 @@ TEST_F(PipelinedBatchSerializationTest, SerializesOpsOnOwnBatchNamespaces) {
 }
 
 TEST_F(PipelinedBatchSerializationTest, SerializesCommands) {
-    ASSERT_TRUE(serialized({commandOp(kNss, BSON("create" << kNss.coll()))}));
+    ASSERT_TRUE(serialized({commandOp(kNss, BSON("create" << kNss.coll()), kUuid)}));
     ASSERT_TRUE(serialized({commandOp(kNss, BSON("dropDatabase" << 1))}));
     ASSERT_TRUE(
         serialized({makeCreateIndexOplogEntry(nextOpTime(), kNss, "a_1", BSON("a" << 1), kUuid)}));
@@ -2587,8 +2589,11 @@ TEST_F(PipelinedMultikeyPublishTest, SerializedBatchFlushesBeforeFollowingDDL) {
     createCollectionWithIndex(_opCtx.get(), nss, BSON("a" << 1));
     const auto insert = insertOp(nss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
     ASSERT_TRUE(batchMustBeAppliedSerialized(OplogApplication::Mode::kSecondary, {insert}));
-    const auto drop =
-        makeCommandOplogEntry(nextOpTime(), nss.getCommandNS(), BSON("drop" << nss.coll()));
+    const auto drop = makeCommandOplogEntry(nextOpTime(),
+                                            nss.getCommandNS(),
+                                            BSON("drop" << nss.coll()),
+                                            boost::none,
+                                            getCollectionUUID(_opCtx.get(), nss));
     applyThroughBuffer({insert, drop}, &_storage);
 
     // The real catalog write must succeed before the serialized drop removes its collection.

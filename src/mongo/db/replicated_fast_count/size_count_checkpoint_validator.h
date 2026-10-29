@@ -145,13 +145,10 @@ private:
      *
      * The returned `CheckpointContents` is the sum of deltas in [Timestamp(0,0), validAsOf]
      * because the checkpoint in the oplog contains absolute size, count, and hash.
+     *
+     * Advances `_baseline` by the sum of deltas in [Timestamp(0,0), validAsOf].
      */
     CheckpointContents computeExpectedCheckpoint(Timestamp validAsOf);
-
-    /**
-     * Increments the baseline absolute replicated metadata values by the provided `deltas`.
-     */
-    void advanceBaseline(const ReplicatedMetadataDeltas& deltas);
 
     /**
      * Records the provided `watermarkTs` in `_intervals` with any `_ongoing` deltas and resets
