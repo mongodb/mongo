@@ -1011,6 +1011,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/express:express_executor",
         "//src/mongo/db/exec/sbe:query_sbe_stages",
         "//src/mongo/db/exec/sbe:query_sbe_storage",
+        "//src/mongo/db/exec/sbe:result_materializer",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/matcher:expressions_mongod_only",
         "//src/mongo/db/memory_tracking",

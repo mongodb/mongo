@@ -5,10 +5,9 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/bsontypes_util.h"
-#include "mongo/bson/oid.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/result_materializer.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/plan_explainer_factory.h"
@@ -21,7 +20,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/decimal128.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
@@ -366,124 +364,6 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
     return {};
 }
 
-namespace {
-
-Document convertToDocument(const sbe::value::Object& obj);
-
-Value convertToValue(sbe::value::TypeTags tag, sbe::value::Value val) {
-    switch (tag) {
-        case sbe::value::TypeTags::Nothing:
-            return Value();
-
-        case sbe::value::TypeTags::NumberInt32:
-            return Value(sbe::value::bitcastTo<int32_t>(val));
-
-        case sbe::value::TypeTags::NumberInt64:
-            return Value(sbe::value::bitcastTo<long long>(val));
-
-        case sbe::value::TypeTags::NumberDouble:
-            return Value(sbe::value::bitcastTo<double>(val));
-
-        case sbe::value::TypeTags::NumberDecimal:
-            return Value(sbe::value::bitcastTo<Decimal128>(val));
-
-        case sbe::value::TypeTags::Date:
-            return Value(Date_t::fromMillisSinceEpoch(sbe::value::bitcastTo<int64_t>(val)));
-
-        case sbe::value::TypeTags::Timestamp:
-            return Value(Timestamp(sbe::value::bitcastTo<uint64_t>(val)));
-
-        case sbe::value::TypeTags::Boolean:
-            return Value(sbe::value::bitcastTo<bool>(val));
-
-        case sbe::value::TypeTags::Null:
-            return Value(BSONNULL);
-
-        case sbe::value::TypeTags::StringSmall:
-        case sbe::value::TypeTags::StringBig:
-        case sbe::value::TypeTags::bsonString:
-            return Value(sbe::value::getStringOrSymbolView(tag, val));
-
-        case sbe::value::TypeTags::bsonSymbol:
-            return Value(BSONSymbol(sbe::value::getStringOrSymbolView(tag, val)));
-
-        case sbe::value::TypeTags::Array:
-        case sbe::value::TypeTags::ArraySet:
-        case sbe::value::TypeTags::ArrayMultiSet: {
-            std::vector<Value> vals;
-            auto enumerator = sbe::value::ArrayEnumerator{tag, val};
-            while (!enumerator.atEnd()) {
-                auto [arrTag, arrVal] = enumerator.getViewOfValue();
-                enumerator.advance();
-                vals.push_back(convertToValue(arrTag, arrVal));
-            }
-            return Value(std::move(vals));
-        }
-
-        case sbe::value::TypeTags::Object:
-            return Value(convertToDocument(*sbe::value::getObjectView(val)));
-
-        case sbe::value::TypeTags::ObjectId:
-            return Value(OID::from(sbe::value::getObjectIdView(val)->data()));
-
-        case sbe::value::TypeTags::MinKey:
-            return Value(kMinBSONKey);
-
-        case sbe::value::TypeTags::MaxKey:
-            return Value(kMaxBSONKey);
-
-        case sbe::value::TypeTags::bsonObject:
-            return Value(BSONObj{sbe::value::bitcastTo<const char*>(val)});
-
-        case sbe::value::TypeTags::bsonArray:
-            return Value(BSONArray{BSONObj{sbe::value::bitcastTo<const char*>(val)}});
-
-        case sbe::value::TypeTags::bsonObjectId:
-            return Value(OID::from(sbe::value::bitcastTo<const char*>(val)));
-
-        case sbe::value::TypeTags::bsonBinData:
-            return Value(BSONBinData(sbe::value::getBSONBinData(tag, val),
-                                     sbe::value::getBSONBinDataSize(tag, val),
-                                     sbe::value::getBSONBinDataSubtype(tag, val)));
-
-        case sbe::value::TypeTags::bsonUndefined:
-            return Value(BSONUndefined);
-
-        case sbe::value::TypeTags::bsonRegex: {
-            auto regex = sbe::value::getBsonRegexView(val);
-            return Value(BSONRegEx(regex.pattern, regex.flags));
-        }
-
-        case sbe::value::TypeTags::bsonJavascript:
-            return Value(BSONCode(sbe::value::getBsonJavascriptView(val)));
-
-        case sbe::value::TypeTags::bsonDBPointer: {
-            auto dbptr = sbe::value::getBsonDBPointerView(val);
-            return Value(BSONDBRef(dbptr.ns, OID::from(dbptr.id)));
-        }
-
-        case sbe::value::TypeTags::bsonCodeWScope: {
-            auto bcws = sbe::value::getBsonCodeWScopeView(val);
-            return Value(BSONCodeWScope(bcws.code, BSONObj(bcws.scope)));
-        }
-
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-Document convertToDocument(const sbe::value::Object& obj) {
-    MutableDocument doc;
-    for (size_t idx = 0; idx < obj.size(); ++idx) {
-        auto tagVal = obj.getAt(idx);
-        const auto& name = obj.field(idx);
-        doc.addField(name, convertToValue(tagVal.tag, tagVal.value));
-    }
-    return doc.freeze();
-}
-
-}  // namespace
-
 template <typename ObjectType, typename BSONTraits>
 sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
                              sbe::value::SlotAccessor* resultSlot,
@@ -519,7 +399,7 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
                 *out = bb.obj<BSONTraits>();
                 uassertStatusOK(out->validateBSONObjSize(BSONTraits::MaxSize));
             } else {
-                *out = convertToDocument(*sbe::value::getObjectView(val));
+                *out = sbe::convertToValue({tag, val}).getDocument();
             }
         } else if (tag == sbe::value::TypeTags::bsonObject) {
             BSONObj result;

@@ -28,6 +28,19 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "result_materializer",
+    srcs = [
+        "//src/mongo/db/exec/sbe/values:result_materializer.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/util:string_listset",
+    ],
+)
+
+mongo_cc_library(
     name = "sbe_fn_names",
     srcs = [
         "//src/mongo/db/exec/sbe/expressions:sbe_fn_names.cpp",
@@ -411,6 +424,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/values:block_test.cpp",
         "//src/mongo/db/exec/sbe/values:bsoncolumn_materializer_test.cpp",
         "//src/mongo/db/exec/sbe/values:object_walk_node_scalar_test.cpp",
+        "//src/mongo/db/exec/sbe/values:result_materializer_test.cpp",
         "//src/mongo/db/exec/sbe/values:row_test.cpp",
         "//src/mongo/db/exec/sbe/values:slot_printer_test.cpp",
         "//src/mongo/db/exec/sbe/values:slot_test.cpp",
@@ -430,10 +444,12 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":clustered_scan_stage_test_fixtures",
+        ":result_materializer",
         ":sbe_plan_stage_test",
         ":sbe_unittest_base",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
