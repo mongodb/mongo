@@ -68,6 +68,9 @@ MONGO_RUSTC_COMMON_FLAGS = [
     "-Cforce-frame-pointers=yes",
     # -fstack-protector-strong
     "-Zstack-protector=strong",
+    # LLVM emits a .debug_names index for DWARF 5, which clang/gcc don't do by default.
+    # We currently use gdb as our main debugger which does not end up using these
+    "-Cllvm-args=-accel-tables=Disable",
 ] + select({
     # Same settings as DWARF_VERSION in
     # //bazel/toolchains/cc/mongo_linux:mongo_toolchain.BUILD.tmpl.
