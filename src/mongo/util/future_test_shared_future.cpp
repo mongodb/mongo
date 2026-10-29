@@ -32,6 +32,26 @@ namespace {
 
 // Tests of SharedFuture based on "core" tests.
 
+TEST(SharedFuture, CountChildren) {
+    SharedPromise<void> promise;
+    ASSERT_EQ(promise.getNumChildren_forTest(), 0);
+
+    auto first = promise.getFuture().semi();
+    ASSERT_EQ(promise.getNumChildren_forTest(), 1);
+
+    auto second = promise.getFuture().semi();
+    ASSERT_EQ(promise.getNumChildren_forTest(), 2);
+
+    promise.emplaceValue();
+    ASSERT_EQ(promise.getNumChildren_forTest(), 0);
+    first.get();
+    second.get();
+
+    auto ready = promise.getFuture().semi();
+    ASSERT_EQ(promise.getNumChildren_forTest(), 0);
+    ready.get();
+}
+
 TEST(SharedFuture, Success_shared_get) {
     FUTURE_SUCCESS_TEST(
         [] { return 1; },

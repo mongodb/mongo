@@ -13,6 +13,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 
+#include <mutex>
+
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/move/utility_core.hpp>
@@ -25,6 +27,64 @@
 
 namespace mongo {
 namespace executor {
+
+ExhaustResponseReaderTL::InFlightReadCanceller::Read
+ExhaustResponseReaderTL::InFlightReadCanceller::startRead() {
+    auto source = std::make_shared<CancellationSource>();
+    bool done;
+    uint64_t id;
+    {
+        std::lock_guard lk(_mutex);
+        invariant(!_inFlight);
+        _inFlight = source;
+        id = _inFlightId = ++_lastId;
+        done = _canceled || _finished;
+    }
+    if (done) {
+        source->cancel();
+    }
+    return {source->token(), id};
+}
+
+void ExhaustResponseReaderTL::InFlightReadCanceller::finishRead(uint64_t id) {
+    _consumeInFlight(id);
+}
+
+void ExhaustResponseReaderTL::InFlightReadCanceller::cancelRead(uint64_t id) {
+    if (auto source = _consumeInFlight(id)) {
+        source->cancel();
+    }
+}
+
+void ExhaustResponseReaderTL::InFlightReadCanceller::cancel() {
+    std::shared_ptr<CancellationSource> source;
+    {
+        std::lock_guard lk(_mutex);
+        if (_finished) {
+            return;
+        }
+        _canceled = true;
+        source = _inFlight;
+    }
+    if (source) {
+        source->cancel();
+    }
+}
+
+void ExhaustResponseReaderTL::InFlightReadCanceller::finish() {
+    std::shared_ptr<CancellationSource> source;
+    {
+        std::lock_guard lk(_mutex);
+        _finished = true;
+        source = std::move(_inFlight);
+    }
+}
+
+std::shared_ptr<CancellationSource>
+ExhaustResponseReaderTL::InFlightReadCanceller::_consumeInFlight(uint64_t id) {
+    std::lock_guard lk(_mutex);
+    return id == _inFlightId ? std::move(_inFlight) : nullptr;
+}
 
 ExhaustResponseReaderTL::ExhaustResponseReaderTL(
     RemoteCommandRequest originatingRequest,
@@ -39,11 +99,15 @@ ExhaustResponseReaderTL::ExhaustResponseReaderTL(
       _baton(std::move(baton)),
       _reactor(std::move(reactor)),
       _cancelSource(token),
+      _inFlightReadCanceller(std::make_shared<InFlightReadCanceller>()),
       _timer(_reactor->makeTimer()) {
 
-    // Safe to run the callback inline here since all it does is log.
+    // Runs inline on whichever thread cancels the stream. That is acceptable because the callback
+    // only logs and calls `InFlightReadCanceller::cancel()`, which takes a short-lived mutex and
+    // then cancels the in-flight read's source outside the lock. Cancelling that source may in
+    // turn run the read's cancellation callbacks inline, so they must not block.
     _cancelSource.token().onCancel().unsafeToInlineFuture().getAsync(
-        [request = _originatingRequest](Status s) {
+        [request = _originatingRequest, canceller = _inFlightReadCanceller](Status s) {
             if (!s.isOK()) {
                 return;
             }
@@ -53,6 +117,7 @@ ExhaustResponseReaderTL::ExhaustResponseReaderTL(
                         "Cancelling exhaust command",
                         "requestId"_attr = request.id,
                         "request"_attr = redact(request.toString()));
+            canceller->cancel();
         });
 }
 
@@ -68,6 +133,9 @@ void ExhaustResponseReaderTL::_recordConnectionOutcome(Status outcome) {
     if (_finished.swap(true)) {
         return;
     }
+    // The stream is over: stop forwarding stream-level cancellation and release any in-flight
+    // read's source.
+    _inFlightReadCanceller->finish();
 
     LOGV2_DEBUG(9311300,
                 2,
@@ -83,33 +151,32 @@ void ExhaustResponseReaderTL::_recordConnectionOutcome(Status outcome) {
     }
 }
 
-Future<RemoteCommandResponse> ExhaustResponseReaderTL::_read() {
+Future<RemoteCommandResponse> ExhaustResponseReaderTL::_read(const CancellationToken& token) {
     if (_initialResponse) {
         return std::exchange(_initialResponse, {}).value();
     } else if (_finished.load()) {
         return Status(ErrorCodes::ExhaustCommandFinished,
                       "No further exhaust responses available to read");
     }
-    return _client->getClient().awaitExhaustCommand(_baton, _cancelSource.token());
+    return _client->getClient().awaitExhaustCommand(_baton, token);
 }
 
 SemiFuture<RemoteCommandResponse> ExhaustResponseReaderTL::next() {
-    auto token = _cancelSource.token();
+    // Each read gets its own short-lived token from `_inFlightReadCanceller` (SERVER-135020)
+    // rather than a child of `_cancelSource`, which would register with the stream token and
+    // accumulate there. The local timeout below cancels only this read, so a timer firing after
+    // the response was read cannot cancel the stream.
+    auto read = _inFlightReadCanceller->startRead();
 
     if (_originatingRequest.timeout != RemoteCommandRequest::kNoTimeout &&
         _originatingRequest.enforceLocalTimeout) {
-        // Make a new CancellationSource so that if this timer happens to fire after the response
-        // has been successfully read, _cancelSource isn't cancelled.
-        CancellationSource source(_cancelSource);
-        token = source.token();
-
         auto deadline = _reactor->now() + _originatingRequest.timeout;
 
         _timer->waitUntil(deadline, _baton)
             .getAsync([deadline,
                        requestId = _originatingRequest.id,
-                       weak_self = weak_from_this(),
-                       source = std::move(source)](Status s) mutable {
+                       canceller = _inFlightReadCanceller,
+                       readId = read.id](Status s) {
                 if (!s.isOK()) {
                     return;
                 }
@@ -119,21 +186,21 @@ SemiFuture<RemoteCommandResponse> ExhaustResponseReaderTL::next() {
                             "Reading exhaust response timed out, cancelling",
                             "requestId"_attr = requestId,
                             "deadline"_attr = deadline);
-                source.cancel();
+                canceller->cancelRead(readId);
             });
     }
 
-    return _read()
-        .onCompletion(
-            [this](StatusWith<RemoteCommandResponse> swResp) -> StatusWith<RemoteCommandResponse> {
-                _timer->cancel(_baton);
+    return _read(read.token)
+        .onCompletion([this, readId = read.id](StatusWith<RemoteCommandResponse> swResp)
+                          -> StatusWith<RemoteCommandResponse> {
+            _timer->cancel(_baton);
+            _inFlightReadCanceller->finishRead(readId);
 
-                if (swResp.isOK()) {
-                    return swResp;
-                }
-                return RemoteCommandResponse(_originatingRequest.target,
-                                             std::move(swResp.getStatus()));
-            })
+            if (swResp.isOK()) {
+                return swResp;
+            }
+            return RemoteCommandResponse(_originatingRequest.target, std::move(swResp.getStatus()));
+        })
         .tapAll(
             [this, anchor = shared_from_this()](const StatusWith<RemoteCommandResponse>& swResp) {
                 invariant(swResp);

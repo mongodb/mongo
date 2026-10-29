@@ -69,6 +69,9 @@ public:
         /**
          * Reads the next response from the exhaust command.
          *
+         * Callers must not call next() again until the previously returned future is ready;
+         * reads on one exhaust command are strictly sequential.
+         *
          * The returned future is always successful, though the status contained in the
          * RemoteCommandResponse may not be OK.
          *

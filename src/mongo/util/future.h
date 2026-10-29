@@ -16,6 +16,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
+#include <cstddef>
 #include <type_traits>
 
 #include <boost/intrusive_ptr.hpp>
@@ -1097,6 +1098,10 @@ public:
      */
     SharedSemiFuture<T> getFuture() const {
         return SharedSemiFuture<T>(_sharedState);
+    }
+
+    [[MONGO_MOD_PUBLIC]] size_t getNumChildren_forTest() const {
+        return _sharedState->getNumChildren_forTest();
     }
 
     template <typename Func>

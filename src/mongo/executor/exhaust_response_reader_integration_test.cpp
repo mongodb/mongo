@@ -41,6 +41,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::executor {
+namespace {
 
 class ExhaustResponseReaderIntegrationFixture : public unittest::Test {
 public:
@@ -146,6 +147,31 @@ private:
     std::shared_ptr<transport::Reactor> _reactor;
 };
 
+TEST_F(ExhaustResponseReaderIntegrationFixture, CompletedReadsDoNotAccumulateCancellationState) {
+    CancellationSource cancelSource;
+    auto conn = getConnection();
+    auto& client = conn->getClient();
+    auto request = makeExhaustHello(Milliseconds(25));
+    auto rdr = std::make_shared<ExhaustResponseReaderTL>(
+        request,
+        assertOK(client.beginExhaustCommandRequest(request).getNoThrow()),
+        std::move(conn),
+        nullptr,
+        getReactor(),
+        cancelSource.token());
+
+    const auto initialCallbacks = rdr->getNumCancellationCallbacks_forTest();
+    for (int i = 0; i < 4; ++i) {
+        ASSERT_TRUE(assertReadOK(*rdr).moreToCome);
+        // Reading responses does not add callbacks to the cancellation source.
+        ASSERT_EQ(rdr->getNumCancellationCallbacks_forTest(), initialCallbacks)
+            << "Cancellation state accumulated after exhaust read " << i;
+    }
+
+    cancelSource.cancel();
+    ASSERT_EQ(rdr->next().get().status, ErrorCodes::CallbackCanceled);
+}
+
 TEST_F(ExhaustResponseReaderIntegrationFixture, ReceiveMultipleResponses) {
     CancellationSource cancelSource;
 
@@ -182,6 +208,27 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, ReceiveMultipleResponses) {
             return stats.getTotalInUseStreams() + stats.getTotalLeasedStreams() == 0;
         },
         "ReceiveMultipleResponses test timed out while waiting for connection count to drop to 0.");
+}
+
+TEST_F(ExhaustResponseReaderIntegrationFixture, CancelBeforeReaderConstruction) {
+    CancellationSource cancelSource;
+    auto conn = getConnection();
+    auto& client = conn->getClient();
+    auto request = makeExhaustHello(Milliseconds(100));
+    auto initialResponse = assertOK(client.beginExhaustCommandRequest(request).getNoThrow());
+
+    cancelSource.cancel();
+    auto rdr = std::make_shared<ExhaustResponseReaderTL>(request,
+                                                         std::move(initialResponse),
+                                                         std::move(conn),
+                                                         nullptr,
+                                                         getReactor(),
+                                                         cancelSource.token());
+
+    // Cancellation does not discard the response that has already been received.
+    ASSERT_TRUE(assertReadOK(*rdr).moreToCome);
+    ASSERT_EQ(rdr->next().get().status, ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(rdr->next().get().status, ErrorCodes::ExhaustCommandFinished);
 }
 
 TEST_F(ExhaustResponseReaderIntegrationFixture, CancelRead) {
@@ -399,4 +446,5 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, LocalTimeout) {
         "of available/open connections.");
 }
 
+}  // namespace
 }  // namespace mongo::executor

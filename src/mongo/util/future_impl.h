@@ -20,7 +20,9 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/scopeguard.h"
 
+#include <cstddef>
 #include <forward_list>
+#include <iterator>
 #include <mutex>
 #include <type_traits>
 
@@ -508,6 +510,11 @@ struct SharedStateImpl final : SharedStateBase {
     static_assert(!std::is_void<T>::value);
 
     // Initial methods only called from future side.
+
+    [[MONGO_MOD_PUBLIC]] size_t getNumChildren_forTest() {
+        std::lock_guard lk(mx);
+        return static_cast<size_t>(std::distance(children.begin(), children.end()));
+    }
 
     boost::intrusive_ptr<SharedState<T>> addChild() {
         static_assert(is_really_copy_constructible_v<T>);  // T has been through VoidToFakeVoid.

@@ -12,6 +12,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
 
+#include <cstddef>
 #include <new>
 #include <utility>
 
@@ -88,6 +89,10 @@ public:
      */
     bool isCancelable() const {
         return _state.load() == State::kInit;
+    }
+
+    [[MONGO_MOD_PUBLIC]] size_t getNumCancellationCallbacks_forTest() const {
+        return _cancellationPromise.getNumChildren_forTest();
     }
 
 private:
@@ -220,8 +225,12 @@ public:
         // Note that because this captures the CancellationState object directly, and not the
         // CancellationStateHolder, this will still allow callback state attached to this
         // source's tokens to be cleaned up as soon as the last source is destroyed, even if the
-        // parent token still exists.. This means that long-lived tokens can have many sub-sources
-        // for tasks which start and complete without worrying about too much memory build-up.
+        // parent token still exists.
+        //
+        // However, the continuation below stays registered on the parent's shared state, pinning
+        // this CancellationState, until the parent is canceled or dismissed. A long-lived token
+        // that spawns one sub-source per task accumulates one continuation per task for its whole
+        // lifetime. If the tasks don't need independent cancellation, reuse a single sub-source.
         token.onCancel()
             .unsafeToInlineFuture()
             .then([state = this->_stateHolder->get()] { state->cancel(); })
@@ -254,6 +263,10 @@ public:
      */
     CancellationToken token() const {
         return CancellationToken{_stateHolder->get()};
+    }
+
+    [[MONGO_MOD_PUBLIC]] size_t getNumCancellationCallbacks_forTest() const {
+        return _stateHolder->get()->getNumCancellationCallbacks_forTest();
     }
 
 private:

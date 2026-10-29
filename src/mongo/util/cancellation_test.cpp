@@ -202,5 +202,32 @@ TEST(CancelTest, TokenIsCancelableReturnsTrueIfSourceExistsAndIsNotYetCanceled) 
     ASSERT_TRUE(token.isCancelable());
 }
 
+TEST(CancelTest, DestroyedSubSourceReleasesItsOwnTokenCallbacksWhileParentIsAlive) {
+    CancellationSource parent;
+    bool ran = false;
+    CancellationSource(parent.token())
+        .token()
+        .onCancel()
+        .unsafeToInlineFuture()
+        .getAsync([&](Status) { ran = true; });
+    ASSERT_TRUE(ran);
+}
+
+// Documents a known limitation: a sub-source's continuation stays registered on the parent's
+// shared state until the parent resolves, even after the sub-source has been destroyed.
+TEST(CancelTest, DestroyedSubSourcesStayRegisteredOnParentUntilParentResolves) {
+    CancellationSource parent;
+    const auto parentToken = parent.token();
+    const auto initial = parent.getNumCancellationCallbacks_forTest();
+
+    for (size_t i = 1; i <= 5; ++i) {
+        (void)CancellationSource(parentToken);
+        ASSERT_EQ(parent.getNumCancellationCallbacks_forTest(), initial + i);
+    }
+
+    parent.cancel();
+    ASSERT_EQ(parent.getNumCancellationCallbacks_forTest(), 0u);
+}
+
 }  // namespace
 }  // namespace mongo
