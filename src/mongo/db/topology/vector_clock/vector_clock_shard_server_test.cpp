@@ -8,6 +8,15 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authorization_session_impl.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/auth/validated_tenancy_scope_factory.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_manager.h"
@@ -20,20 +29,47 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/signed_logical_time.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_document_gen.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/sockaddr.h"
 
+#include <array>
 #include <memory>
 #include <string>
 #include <utility>
 
 namespace mongo {
+
+/**
+ * Test helper for AuthorizationSessionImpl: synthesize authenticated users without real user
+ * documents or config-server-backed user acquisition.
+ */
+class AuthorizationSessionImplTestHelper {
+public:
+    /**
+     * Marks 'client' as authenticated as a user with the given privileges (none by default).
+     */
+    static void logInAsRegularUser(Client* client, PrivilegeVector privileges = {}) {
+        User user(std::make_unique<UserRequestGeneral>(UserName("regularUser", "test"),
+                                                       boost::none /* roles */));
+        user.setPrivileges(privileges);
+        auto* as = dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(client));
+        as->_authenticatedUser = std::move(user);
+        as->_authenticationMode = AuthorizationSession::AuthenticationMode::kConnection;
+        as->_updateInternalAuthorizationState();
+    }
+};
+
 namespace {
 
 class VectorClockShardServerTest : public ShardServerTestFixture {
@@ -199,7 +235,7 @@ TEST_F(VectorClockShardServerTest, GossipInInternal) {
                        << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2));
     auto timepoints = GossipedVectorClockComponents::parse(
         timepointsObj, IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(operationContext(), timepoints, false, true);
+    vc->gossipIn(operationContext(), timepoints, VectorClock::GossipSource::kClientCommand, true);
 
     // On shard servers, gossip in from internal clients should update $clusterTime, $configTime,
     // and $topologyTime.
@@ -213,7 +249,7 @@ TEST_F(VectorClockShardServerTest, GossipInInternal) {
                          << "$configTime" << Timestamp(1, 1) << "$topologyTime" << Timestamp(1, 1));
     timepoints = GossipedVectorClockComponents::parse(timepointsObj,
                                                       IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(operationContext(), timepoints, false, true);
+    vc->gossipIn(operationContext(), timepoints, VectorClock::GossipSource::kClientCommand, true);
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2.clusterTime().asTimestamp(), Timestamp(2, 2));
@@ -225,7 +261,7 @@ TEST_F(VectorClockShardServerTest, GossipInInternal) {
                                         << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3));
     timepoints = GossipedVectorClockComponents::parse(timepointsObj,
                                                       IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(operationContext(), timepoints, false, true);
+    vc->gossipIn(operationContext(), timepoints, VectorClock::GossipSource::kClientCommand, true);
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
@@ -247,7 +283,7 @@ TEST_F(VectorClockShardServerTest, GossipInExternal) {
                        << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2));
     auto timepoints = GossipedVectorClockComponents::parse(
         timepointsObj, IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(operationContext(), timepoints, false);
+    vc->gossipIn(operationContext(), timepoints, VectorClock::GossipSource::kClientCommand);
 
     // On shard servers, gossip in from external clients should update $clusterTime, but not
     // $configTime or $topologyTime.
@@ -261,7 +297,7 @@ TEST_F(VectorClockShardServerTest, GossipInExternal) {
                          << "$configTime" << Timestamp(1, 1) << "$topologyTime" << Timestamp(1, 1));
     timepoints = GossipedVectorClockComponents::parse(timepointsObj,
                                                       IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(operationContext(), timepoints, false);
+    vc->gossipIn(operationContext(), timepoints, VectorClock::GossipSource::kClientCommand);
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2.clusterTime().asTimestamp(), Timestamp(2, 2));
@@ -274,13 +310,276 @@ TEST_F(VectorClockShardServerTest, GossipInExternal) {
                                         << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3));
     timepoints = GossipedVectorClockComponents::parse(timepointsObj,
                                                       IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(operationContext(), timepoints, false);
+    vc->gossipIn(operationContext(), timepoints, VectorClock::GossipSource::kClientCommand);
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
     ASSERT_EQ(afterTime3.configTime(), VectorClock::kInitialComponentTime);
     ASSERT_EQ(afterTime3.topologyTime(), VectorClock::kInitialComponentTime);
 }
+
+/**
+ * Authentication state of the gossiping client: one axis of the policy matrix below.
+ */
+enum class GossipAuthState {
+    kAuthDisabled,     // Authentication is disabled on the server entirely.
+    kUnauthenticated,  // Never authenticated, non-localhost: no localhost bypass either.
+    kLocalhostBypass,  // Never authenticated, but connected from localhost.
+    kInternal,         // Authenticated as internal (__system).
+    kRegularUser,      // Authenticated as a regular user with no privileges.
+    kSecurityToken,    // Validated security token; user not yet in the AuthorizationSession.
+};
+
+/**
+ * One cell of the gossipIn() policy matrix below: client auth state x gossip source x payload
+ * signature, plus the expected outcome for the clock and for TimeProofMismatch.
+ */
+struct GossipTestCase {
+    // Unique gtest case name, used by INSTANTIATE_TEST_SUITE_P below.
+    const char* name;
+    GossipAuthState authState;
+    VectorClock::GossipSource source;
+    bool mismatchedSignature = false;  // Payload time differs from the signed time.
+    bool expectAdvance = false;
+    bool expectTimeProofMismatch = false;
+};
+
+// Secret for the ValidatedTenancyScope tokens in runGossipTestCase().
+constexpr auto kSecurityTokenSecret = "secret";
+
+/**
+ * Auth-enabled variant of VectorClockShardServerTest: runs the policy-matrix cells below via
+ * runGossipTestCase() on behalf of VectorClockShardServerGossipPolicyMatrixTest.
+ */
+class VectorClockShardServerAuthTest : public VectorClockShardServerTest {
+protected:
+    void setUp() override {
+        VectorClockShardServerTest::setUp();
+        populateKeyCache();
+        _authzManager = AuthorizationManager::get(getServiceContext()->getService());
+        _authzManager->setAuthEnabled(true);
+    }
+
+    void tearDown() override {
+        _authzManager->setAuthEnabled(false);
+        VectorClockShardServerTest::tearDown();
+    }
+
+    /**
+     * Creates a new client from a non-localhost address that has never authenticated, so it is
+     * not eligible for the localhost bypass either.
+     */
+    ServiceContext::UniqueClient makeUnauthenticatedClient() {
+        auto session = std::make_shared<transport::MockSession>(
+            HostAndPort("192.168.1.100", 20000),
+            SockAddr::create("192.168.1.100", 20000, AF_UNSPEC),
+            SockAddr::create("192.168.1.1", 27017, AF_UNSPEC),
+            nullptr);
+        return getServiceContext()->getService()->makeClient("unauthenticatedClient", session);
+    }
+
+    ServiceContext::UniqueClient makeLocalhostBypassClient() {
+        auto session = std::make_shared<transport::MockSession>(
+            HostAndPort("127.0.0.1", 20000),
+            SockAddr::create("127.0.0.1", 20000, AF_UNSPEC),
+            SockAddr::create("127.0.0.1", 27017, AF_UNSPEC),
+            nullptr);
+        return getServiceContext()->getService()->makeClient("localhostBypassClient", session);
+    }
+
+    /**
+     * Builds the $clusterTime gossip payload for the given, genuinely signed, logical time.
+     */
+    static BSONObj makeSignedClusterTimeBSON(const SignedLogicalTime& signedTime) {
+        BSONObjBuilder signatureBuilder;
+        signedTime.getProof()->appendAsBinData(signatureBuilder, "hash");
+        signatureBuilder.append("keyId", signedTime.getKeyId());
+        return BSON("$clusterTime" << BSON("clusterTime" << signedTime.getTime().asTimestamp()
+                                                         << "signature" << signatureBuilder.obj()));
+    }
+
+    /**
+     * Runs one GossipTestCase: builds its $clusterTime payload, gossips it from a new client in
+     * the given auth state, and checks the declared expectations.
+     */
+    void runGossipTestCase(const GossipTestCase& testCase) {
+        auto vc = VectorClockMutable::get(getServiceContext());
+        auto validator = LogicalTimeValidator::get(getServiceContext());
+
+        const auto initialVectorTime = vc->getTime();
+        const auto initialTime = initialVectorTime.clusterTime();
+        const LogicalTime signedTimeValue(Timestamp(100, 0));
+
+        // A real, valid signature from this server. When called for, the payload's time and the
+        // signature mismatch (auth_reject_mismatching_logical_times.js).
+        auto signedTime = validator->trySignLogicalTime(signedTimeValue);
+        ASSERT_TRUE(signedTime.getProof());
+        const LogicalTime gossipTime = testCase.mismatchedSignature
+            ? LogicalTime(Timestamp(signedTimeValue.asTimestamp().getSecs() + 100, 0))
+            : signedTimeValue;
+        const SignedLogicalTime gossipPayload = testCase.mismatchedSignature
+            ? SignedLogicalTime(gossipTime, signedTime.getProof().value(), signedTime.getKeyId())
+            : signedTime;
+
+        auto timepoints = GossipedVectorClockComponents::parse(
+            makeSignedClusterTimeBSON(gossipPayload), IDLParserContext("VectorClockComponents"));
+
+        if (testCase.authState == GossipAuthState::kAuthDisabled) {
+            _authzManager->setAuthEnabled(false);
+        }
+
+        auto client = testCase.authState == GossipAuthState::kLocalhostBypass
+            ? makeLocalhostBypassClient()
+            : makeUnauthenticatedClient();
+        auto opCtx = client->makeOperationContext();
+        auto* authSession = AuthorizationSession::get(opCtx->getClient());
+
+        switch (testCase.authState) {
+            case GossipAuthState::kAuthDisabled:
+            case GossipAuthState::kUnauthenticated:
+                ASSERT_FALSE(authSession->isAuthenticated());
+                break;
+            case GossipAuthState::kLocalhostBypass:
+                ASSERT_FALSE(authSession->isAuthenticated());
+                // isUsingLocalhostBypass() is asserted inside the AlternativeClientRegion below:
+                // the bypass check inspects the current client's remote address.
+                break;
+            case GossipAuthState::kInternal:
+                authSession->grantInternalAuthorization();
+                ASSERT_TRUE(authSession->isAuthenticated());
+                break;
+            case GossipAuthState::kRegularUser:
+                AuthorizationSessionImplTestHelper::logInAsRegularUser(opCtx->getClient());
+                ASSERT_TRUE(authSession->isAuthenticated());
+                break;
+            case GossipAuthState::kSecurityToken: {
+                // Validated security token present, but the user is not yet installed into the
+                // AuthorizationSession.
+                //
+                // TODO SERVER-129535: Delete this ValidatedTenancyScope setup along with
+                // ValidatedTenancyScope.
+                unittest::ServerParameterGuard secretGuard{"testOnlyValidatedTenancyScopeKey",
+                                                           kSecurityTokenSecret};
+                auto vts = auth::ValidatedTenancyScopeFactory::create(
+                    UserName("tokenUser", "admin"),
+                    kSecurityTokenSecret,
+                    auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                    auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
+                ASSERT_TRUE(vts.hasAuthenticatedUser());
+                auth::ValidatedTenancyScope::set(opCtx.get(), vts);
+                ASSERT_FALSE(authSession->isAuthenticated());
+                break;
+            }
+        }
+
+        {
+            AlternativeClientRegion clientRegion(client);
+            if (testCase.authState == GossipAuthState::kLocalhostBypass) {
+                ASSERT_TRUE(authSession->isUsingLocalhostBypass());
+            }
+            if (testCase.expectTimeProofMismatch) {
+                ASSERT_THROWS_CODE(vc->gossipIn(opCtx.get(), timepoints, testCase.source),
+                                   DBException,
+                                   ErrorCodes::TimeProofMismatch);
+            } else {
+                vc->gossipIn(opCtx.get(), timepoints, testCase.source);
+            }
+        }
+
+        const auto afterVectorTime = vc->getTime();
+        const auto afterTime = afterVectorTime.clusterTime();
+        ASSERT_EQ(afterTime, testCase.expectAdvance ? gossipTime : initialTime);
+    }
+
+private:
+    AuthorizationManager* _authzManager = nullptr;
+};
+
+/**
+ * The gossipIn() policy matrix: {GossipAuthState} x {GossipSource} x {payload signature} cells
+ * with their expected outcome, in three classes:
+ *
+ *   - Trusted (advance, never TimeProofMismatch): kInternalReply gossip, and kClientCommand
+ *     clients authorized to advance the clock; the signature is never validated.
+ *   - Validated (advance on a valid signature, TimeProofMismatch on a mismatched one): clients
+ *     that pass the unauthenticated-client gate but are not authorized to advance the clock.
+ *   - Dropped (never advances, never throws): unauthenticated, non-localhost kClientCommand
+ *     clients; dropped outright, since validating the signature would expose the signing key
+ *     as an oracle.
+ */
+constexpr std::array<GossipTestCase, 9> kGossipPolicyMatrix{{
+    // Auth disabled: trusted outright, since isAuthorizedToAdvanceClock() is implicitly true.
+    {.name = "AuthDisabled_ClientCommand_ValidSignature",
+     .authState = GossipAuthState::kAuthDisabled,
+     .source = VectorClock::GossipSource::kClientCommand,
+     .expectAdvance = true},
+
+    // Internal client: authorized to advance the clock, so trusted without validation.
+    {.name = "Internal_ClientCommand_ValidSignature",
+     .authState = GossipAuthState::kInternal,
+     .source = VectorClock::GossipSource::kClientCommand,
+     .expectAdvance = true},
+
+    // Localhost bypass: passes the gate, so a valid signature advances the clock.
+    {.name = "LocalhostBypass_ClientCommand_ValidSignature",
+     .authState = GossipAuthState::kLocalhostBypass,
+     .source = VectorClock::GossipSource::kClientCommand,
+     .expectAdvance = true},
+
+    // Regular user: passes the gate but is not authorized to advance the clock; validated.
+    {.name = "RegularUser_ClientCommand_MismatchedSignature",
+     .authState = GossipAuthState::kRegularUser,
+     .source = VectorClock::GossipSource::kClientCommand,
+     .mismatchedSignature = true,
+     .expectTimeProofMismatch = true},
+
+    // Security token, user not yet in the AuthorizationSession: passes the gate via
+    // ValidatedTenancyScope; validated.
+    //
+    // TODO SERVER-129535: Delete with ValidatedTenancyScope.
+    {.name = "SecurityToken_ClientCommand_ValidSignature",
+     .authState = GossipAuthState::kSecurityToken,
+     .source = VectorClock::GossipSource::kClientCommand,
+     .expectAdvance = true},
+    {.name = "SecurityToken_ClientCommand_MismatchedSignature",
+     .authState = GossipAuthState::kSecurityToken,
+     .source = VectorClock::GossipSource::kClientCommand,
+     .mismatchedSignature = true,
+     .expectTimeProofMismatch = true},
+
+    // Unauthenticated, non-localhost: kClientCommand gossip is dropped outright, never
+    // validated; kInternalReply is trusted via internal RPC auth.
+    {.name = "Unauthenticated_ClientCommand_ValidSignature",
+     .authState = GossipAuthState::kUnauthenticated,
+     .source = VectorClock::GossipSource::kClientCommand},
+    {.name = "Unauthenticated_ClientCommand_MismatchedSignature",
+     .authState = GossipAuthState::kUnauthenticated,
+     .source = VectorClock::GossipSource::kClientCommand,
+     .mismatchedSignature = true},
+    {.name = "Unauthenticated_InternalReply_ValidSignature",
+     .authState = GossipAuthState::kUnauthenticated,
+     .source = VectorClock::GossipSource::kInternalReply,
+     .expectAdvance = true},
+}};
+
+/**
+ * One parameterized case per kGossipPolicyMatrix cell, e.g.
+ * GossipPolicyMatrix.Unauthenticated_ClientCommand_MismatchedSignature.
+ */
+class VectorClockShardServerGossipPolicyMatrixTest
+    : public VectorClockShardServerAuthTest,
+      public testing::WithParamInterface<GossipTestCase> {};
+
+TEST_P(VectorClockShardServerGossipPolicyMatrixTest, GossipInPolicy) {
+    runGossipTestCase(GetParam());
+}
+
+INSTANTIATE_TEST_SUITE_P(GossipPolicyMatrix,
+                         VectorClockShardServerGossipPolicyMatrixTest,
+                         testing::ValuesIn(kGossipPolicyMatrix),
+                         [](const testing::TestParamInfo<GossipTestCase>& info) {
+                             return info.param.name;
+                         });
 
 class VectorClockPersistenceTest : public ShardServerTestFixture {
 protected:

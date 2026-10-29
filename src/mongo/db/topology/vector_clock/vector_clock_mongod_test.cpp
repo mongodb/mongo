@@ -198,7 +198,7 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
                        << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2));
     auto timepoints = GossipedVectorClockComponents::parse(
         timepointsObj, IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(nullptr, timepoints, false, true);
+    vc->gossipIn(nullptr, timepoints, VectorClock::GossipSource::kInternalReply, true);
 
     // On plain replset servers, gossip in from internal clients should update $clusterTime, but not
     // $configTime or $topologyTime.
@@ -212,7 +212,7 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
                          << "$configTime" << Timestamp(1, 1) << "$topologyTime" << Timestamp(1, 1));
     timepoints = GossipedVectorClockComponents::parse(timepointsObj,
                                                       IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(nullptr, timepoints, false, true);
+    vc->gossipIn(nullptr, timepoints, VectorClock::GossipSource::kInternalReply, true);
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2.clusterTime().asTimestamp(), Timestamp(2, 2));
@@ -224,7 +224,7 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
                          << "$configTime" << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3));
     timepoints = GossipedVectorClockComponents::parse(timepointsObj,
                                                       IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(nullptr, timepoints, false, true);
+    vc->gossipIn(nullptr, timepoints, VectorClock::GossipSource::kInternalReply, true);
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
@@ -246,7 +246,7 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
                        << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2));
     auto timepoints = GossipedVectorClockComponents::parse(
         timepointsObj, IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(nullptr, timepoints, false);
+    vc->gossipIn(nullptr, timepoints, VectorClock::GossipSource::kInternalReply);
 
     // On plain replset servers, gossip in from external clients should update $clusterTime, but not
     // $configTime or $topologyTime.
@@ -260,7 +260,7 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
                          << "$configTime" << Timestamp(1, 1) << "$topologyTime" << Timestamp(1, 1));
     timepoints = GossipedVectorClockComponents::parse(timepointsObj,
                                                       IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(nullptr, timepoints, false);
+    vc->gossipIn(nullptr, timepoints, VectorClock::GossipSource::kInternalReply);
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2.clusterTime().asTimestamp(), Timestamp(2, 2));
@@ -272,7 +272,7 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
                          << "$configTime" << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3));
     timepoints = GossipedVectorClockComponents::parse(timepointsObj,
                                                       IDLParserContext("VectorClockComponents"));
-    vc->gossipIn(nullptr, timepoints, false);
+    vc->gossipIn(nullptr, timepoints, VectorClock::GossipSource::kInternalReply);
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));

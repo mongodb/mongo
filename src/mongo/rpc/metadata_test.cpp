@@ -281,7 +281,7 @@ public:
 
     void readMetadata(const GenericArguments& args) {
         boost::optional<ImpersonatedClientSessionGuard> clientSessionGuard;
-        readRequestMetadata(_opCtx.get(), args, false /* cmdRequiresAuth */, clientSessionGuard);
+        readRequestMetadata(_opCtx.get(), args, clientSessionGuard);
     }
 
     ServiceContext::UniqueOperationContext _opCtx;

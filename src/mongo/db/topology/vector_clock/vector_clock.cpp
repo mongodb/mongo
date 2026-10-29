@@ -13,6 +13,7 @@
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
@@ -171,8 +172,8 @@ public:
     LogicalTime in(ServiceContext* service,
                    OperationContext* opCtx,
                    const GossipedVectorClockComponents& timepoints,
-                   bool couldBeUnauthenticated,
-                   Component component) const override {
+                   Component component,
+                   GossipSource source) const override {
         return fromOptionalTimestamp(timepoints.getDollarConfigTime());
     }
 };
@@ -185,8 +186,8 @@ public:
     LogicalTime in(ServiceContext* service,
                    OperationContext* opCtx,
                    const GossipedVectorClockComponents& timepoints,
-                   bool couldBeUnauthenticated,
-                   Component component) const override {
+                   Component component,
+                   GossipSource source) const override {
         return fromOptionalTimestamp(timepoints.getDollarTopologyTime());
     }
 };
@@ -265,8 +266,8 @@ public:
     LogicalTime in(ServiceContext* service,
                    OperationContext* opCtx,
                    const GossipedVectorClockComponents& timepoints,
-                   bool couldBeUnauthenticated,
-                   Component component) const override {
+                   Component component,
+                   GossipSource source) const override {
         if (!timepoints.getDollarClusterTime()) {
             // Nothing to gossip in.
             return LogicalTime();
@@ -290,22 +291,36 @@ public:
 
         auto signedTime = SignedLogicalTime(LogicalTime(ts), std::move(proof), keyId);
 
-        if (!opCtx) {
-            // If there's no opCtx then this must be coming from a reply, which must be internal,
-            // and so doesn't require validation.
+        if (source == GossipSource::kInternalReply) {
+            // Gossip from another node's reply, trusted via internal RPC auth; no signature
+            // validation is required.
             return signedTime.getTime();
         }
 
-        // Validate the signature.
-        if (couldBeUnauthenticated &&
-            AuthorizationManager::get(opCtx->getService())->isAuthEnabled() &&
-            (!signedTime.getProof() || *signedTime.getProof() == TimeProofService::TimeProof())) {
+        if (!opCtx) {
+            // Client command gossip always originates from rpc::readRequestMetadata, which has an
+            // OperationContext. Reaching here without one is a bug; drop the gossip rather than
+            // trusting or validating it, since the client's authentication cannot be verified.
+            tassertedNoThrow(11975100, "Client command gossip requires an OperationContext");
+            return {};
+        }
 
+        // A valid signature proves cluster origin, not client auth; unauthenticated non-localhost
+        // clients must not advance the clock. Validation would also expose the signing key as an
+        // oracle, so the gossip is dropped rather than validated.
+        if (AuthorizationManager::get(opCtx->getService())->isAuthEnabled()) {
             AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-            // The client is not authenticated and is not using localhost auth bypass. Do not
-            // gossip.
-            if (authSession && !authSession->isAuthenticated() &&
-                !authSession->isUsingLocalhostBypass()) {
+
+            // TODO SERVER-129535: Remove once ValidatedTenancyScope is deleted. Security-token
+            // requests may already carry an authenticated user in ValidatedTenancyScope before it
+            // is installed into AuthorizationSession; without this check, valid $clusterTime is
+            // silently ignored.
+            auto vts = auth::ValidatedTenancyScope::get(opCtx);
+            bool hasAuthenticatedSecurityToken = vts && vts->hasAuthenticatedUser();
+
+            // Unauthenticated, non-localhost client: drop the gossip entirely (see above).
+            if (!authSession->isAuthenticated() && !authSession->isUsingLocalhostBypass() &&
+                !hasAuthenticatedSecurityToken) {
                 return {};
             }
         }
@@ -372,7 +387,7 @@ bool VectorClock::gossipOut(OperationContext* opCtx,
 
 void VectorClock::gossipIn(OperationContext* opCtx,
                            const GossipedVectorClockComponents& timepoints,
-                           bool couldBeUnauthenticated,
+                           GossipSource source,
                            bool defaultIsInternalClient) {
     if (!isEnabled()) {
         return;
@@ -392,7 +407,7 @@ void VectorClock::gossipIn(OperationContext* opCtx,
 
     LogicalTimeArray newTime;
     for (auto component : toGossip) {
-        _gossipInComponent(opCtx, timepoints, couldBeUnauthenticated, &newTime, component);
+        _gossipInComponent(opCtx, timepoints, &newTime, component, source);
     }
     // Since the times in LogicalTimeArray are default constructed (ie. to Timestamp(0, 0)), any
     // component not present in the input BSONObj won't be advanced.
@@ -411,11 +426,11 @@ bool VectorClock::_gossipOutComponent(OperationContext* opCtx,
 
 void VectorClock::_gossipInComponent(OperationContext* opCtx,
                                      const GossipedVectorClockComponents& timepoints,
-                                     bool couldBeUnauthenticated,
                                      LogicalTimeArray* newTime,
-                                     Component component) {
-    (*newTime)[component] = _gossipFormatters[component]->in(
-        _service, opCtx, timepoints, couldBeUnauthenticated, component);
+                                     Component component,
+                                     GossipSource source) {
+    (*newTime)[component] =
+        _gossipFormatters[component]->in(_service, opCtx, timepoints, component, source);
 }
 
 std::string VectorClock::_componentName(Component component) {

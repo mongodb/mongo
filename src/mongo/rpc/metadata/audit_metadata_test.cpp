@@ -126,7 +126,7 @@ TEST_F(AuditMetadataTest, ReadAuditMetadata) {
     {
         boost::optional<rpc::ImpersonatedClientSessionGuard> clientSessionGuard;
         ASSERT_FALSE(clientSessionGuard);
-        rpc::readRequestMetadata(opCtx(), requestArgs, false, clientSessionGuard);
+        rpc::readRequestMetadata(opCtx(), requestArgs, clientSessionGuard);
         ASSERT_TRUE(clientSessionGuard.has_value());
 
         // Now, AuditClientAttrs and AuditUserAttrs should be updated to store the users and client
@@ -172,7 +172,7 @@ TEST_F(AuditMetadataTest, ReadAuditMetadataUserOnly) {
     {
         boost::optional<rpc::ImpersonatedClientSessionGuard> clientSessionGuard;
         ASSERT_FALSE(clientSessionGuard);
-        rpc::readRequestMetadata(opCtx(), requestArgs, false, clientSessionGuard);
+        rpc::readRequestMetadata(opCtx(), requestArgs, clientSessionGuard);
         ASSERT_FALSE(clientSessionGuard.has_value());
 
         // Now, AuditClientAttrs and AuditUserAttrs should be updated to store the user
@@ -215,7 +215,7 @@ TEST_F(AuditMetadataTest, ReadAuditMetadataClientOnly) {
     {
         boost::optional<rpc::ImpersonatedClientSessionGuard> clientSessionGuard;
         ASSERT_FALSE(clientSessionGuard);
-        rpc::readRequestMetadata(opCtx(), requestArgs, false, clientSessionGuard);
+        rpc::readRequestMetadata(opCtx(), requestArgs, clientSessionGuard);
         ASSERT_TRUE(clientSessionGuard.has_value());
 
         // Now, AuditClientAttrs should be updated to store the client

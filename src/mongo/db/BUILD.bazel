@@ -1328,6 +1328,7 @@ mongo_cc_library(
         "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/auth:security_token",
         "//src/mongo/db/repl:repl_coordinator_interface",
     ],
 )

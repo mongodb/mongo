@@ -521,8 +521,7 @@ void ParseAndRunCommand::_parseCommand() {
         APIParameters::get(opCtx) = APIParameters::fromClient(std::move(apiParams));
     }
 
-    rpc::readRequestMetadata(
-        opCtx, _invocation->getGenericArguments(), command->requiresAuth(), _clientSessionGuard);
+    rpc::readRequestMetadata(opCtx, _invocation->getGenericArguments(), _clientSessionGuard);
 
     CommandInvocation::set(opCtx, _invocation);
 

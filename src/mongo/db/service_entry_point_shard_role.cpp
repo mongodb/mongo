@@ -633,10 +633,7 @@ private:
             APIParameters::get(opCtx) = APIParameters::fromClient(apiParameters);
         }
 
-        rpc::readRequestMetadata(opCtx,
-                                 _invocation->getGenericArguments(),
-                                 command->requiresAuth(),
-                                 _clientSessionGuard);
+        rpc::readRequestMetadata(opCtx, _invocation->getGenericArguments(), _clientSessionGuard);
 
         const auto session = _execContext.getOpCtx()->getClient()->session();
         if (session) {

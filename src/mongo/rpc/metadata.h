@@ -37,7 +37,6 @@ BSONObj makeEmptyMetadata();
  */
 void readRequestMetadata(OperationContext* opCtx,
                          const GenericArguments& requestArgs,
-                         bool cmdRequiresAuth,
                          boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard);
 
 /**

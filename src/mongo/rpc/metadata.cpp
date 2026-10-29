@@ -200,7 +200,6 @@ void installIfrContextFromWire(OperationContext* opCtx, const GenericArguments& 
 
 void readRequestMetadata(OperationContext* opCtx,
                          const GenericArguments& requestArgs,
-                         bool cmdRequiresAuth,
                          boost::optional<ImpersonatedClientSessionGuard>& clientSessionGuard) {
     readPrivilegedRequestMetadata(opCtx, requestArgs);
 
@@ -223,7 +222,7 @@ void readRequestMetadata(OperationContext* opCtx,
     components.setDollarConfigTime(requestArgs.getDollarConfigTime());
     components.setDollarTopologyTime(requestArgs.getDollarTopologyTime());
     components.setDollarClusterTime(requestArgs.getDollarClusterTime());
-    VectorClock::get(opCtx)->gossipIn(opCtx, components, !cmdRequiresAuth);
+    VectorClock::get(opCtx)->gossipIn(opCtx, components, VectorClock::GossipSource::kClientCommand);
 
     if (requestArgs.getRawData()) {
         isRawDataOperation(opCtx) = true;

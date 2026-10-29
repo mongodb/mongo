@@ -217,13 +217,29 @@ public:
                    bool forceInternal = false) const;
 
     /**
+     * Source of a gossipIn() payload, which determines auth handling:
+     *
+     *   - kClientCommand: a client-initiated command (via rpc::readRequestMetadata, which always
+     *     has an OperationContext; gossip without one is dropped). Unauthenticated non-localhost
+     *     callers (possible for pre-auth commands like hello) must not advance the clock or
+     *     validate signatures; see SignedComponentFormat::in().
+     *   - kInternalReply: gossip from an outbound RPC reply (VectorClockMetadataHook, which is only
+     *     installed on internal inter-node channels). Trusted via internal RPC auth; no signature
+     *     validation is performed.
+     */
+    enum class GossipSource {
+        kClientCommand,
+        kInternalReply,
+    };
+
+    /**
      * Read the necessary fields from inMessage in order to update the current time, based on this
      * message received from another node, taking into account if the gossiping is from an internal
      * or external client.
      */
     void gossipIn(OperationContext* opCtx,
                   const GossipedVectorClockComponents& timepoints,
-                  bool couldBeUnauthenticated,
+                  GossipSource source,
                   bool defaultIsInternalClient = false);
 
     /**
@@ -265,8 +281,8 @@ protected:
         virtual LogicalTime in(ServiceContext* service,
                                OperationContext* opCtx,
                                const GossipedVectorClockComponents& timepoints,
-                               bool couldBeUnauthenticated,
-                               Component component) const = 0;
+                               Component component,
+                               GossipSource source) const = 0;
 
         const std::string _fieldName;
     };
@@ -390,9 +406,9 @@ private:
      */
     void _gossipInComponent(OperationContext* opCtx,
                             const GossipedVectorClockComponents& timepoints,
-                            bool couldBeUnauthenticated,
                             LogicalTimeArray* newTime,
-                            Component component);
+                            Component component,
+                            GossipSource source);
 
     static const ComponentArray<std::unique_ptr<ComponentFormat>> _gossipFormatters;
 };
