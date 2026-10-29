@@ -15,6 +15,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 #include <algorithm>
 #include <string>
@@ -22,6 +23,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::replicated_fast_count {
+
+// Adds one byte to the size of each live collection in the standby's expected checkpoint.
+MONGO_FAIL_POINT_DEFINE(skewStandbyCheckpointSize);
 
 namespace {
 
@@ -399,6 +403,14 @@ CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Times
             expected[uuid] = baseIt->second + delta.metadata;
         } else {
             expected[uuid] = delta.metadata;
+        }
+    }
+
+    if (MONGO_unlikely(skewStandbyCheckpointSize.shouldFail())) {
+        for (auto&& [uuid, metadata] : expected) {
+            if (metadata) {
+                metadata->sizeCount.size += 1;
+            }
         }
     }
 

@@ -23,6 +23,7 @@
 #include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -756,6 +757,26 @@ DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest, WrongCountInCheckpointFasser
                             {{uuid,
                               CollectionReplicatedMetadata{
                                   .sizeCount = CollectionSizeCount{.size = 50, .count = 999}}}})};
+    applyBatch(validator,
+               ops,
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT0,
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 50, .count = 5}}}}});
+}
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
+             SkewStandbyCheckpointSizeFailPointFasserts,
+             "13626005") {
+    FailPointEnableBlock skewFp("skewStandbyCheckpointSize");
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 50, .count = 5}}}})};
     applyBatch(validator,
                ops,
                std::vector<ValidatorDeltaRecord>{
