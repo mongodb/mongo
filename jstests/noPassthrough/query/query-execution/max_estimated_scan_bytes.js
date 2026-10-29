@@ -696,6 +696,24 @@ describe("maxEstimatedScanBytes with PQS $natural hint override", function () {
         );
     });
 
+    it("PQS queryKnobs maxEstimatedScanBytes: -1 exempts a specific query shape", function () {
+        setParam(belowHeavy);
+        const targetShape = qsutils.makeFindQueryInstance({filter: {a: 1}});
+        qsutils.withQuerySettings(targetShape, {queryKnobs: {maxEstimatedScanBytes: -1}}, () => {
+            assert.commandWorked(
+                db.runCommand({find: "heavy_pqs", filter: {a: 1}}),
+                "the targeted query shape should be exempted by the per-shape maxEstimatedScanBytes: -1 override",
+            );
+            // A different query shape is untouched by the per-shape override and still uses the
+            // globally-set (low) threshold.
+            assert.commandFailedWithCode(
+                db.runCommand({find: "heavy_pqs", filter: {b: 1}}),
+                ErrorCodes.NoQueryExecutionPlans,
+                "a differently-shaped query should still be rejected by the global threshold",
+            );
+        });
+    });
+
     it("PQS $natural hint override also suppresses dry-run: dryRunWouldReject does not increment", function () {
         setParam(belowHeavy);
         setDryRun(true);
