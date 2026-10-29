@@ -4,11 +4,15 @@ FROM $BASE_IMAGE
 ARG BASE_IMAGE
 
 ARG USERNAME=mongo-dev
-ARG USER_UID=1000
-ARG USER_GID=$USER_UID
 
-# Create the user
-RUN groupadd $USERNAME && useradd -s /bin/bash --gid $USER_GID -m $USERNAME
+# Create the user and group only if the base image does not already provide them.
+# On Linux, Dev Containers adjusts the user's UID/GID to match the host at startup.
+RUN if ! getent group "$USERNAME" > /dev/null; then \
+      groupadd "$USERNAME"; \
+    fi && \
+    if ! id -u "$USERNAME" > /dev/null 2>&1; then \
+      useradd -s /bin/bash --gid "$USERNAME" -m "$USERNAME"; \
+    fi
 
 RUN apt-get update \
     && apt-get install -y \
