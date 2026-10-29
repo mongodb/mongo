@@ -727,6 +727,50 @@ TEST_F(ExtractReplicatedMetadataTest, ExtractSizeCountDeltaOnNonEligibleNssWitho
     EXPECT_FALSE(extractReplicatedMetadataForOp(insertOpLocalNs).has_value());
 }
 
+TEST_F(ExtractReplicatedMetadataTest, RenameWithDropTarget) {
+    const auto sourceUuid = UUID::gen();
+    const auto droppedTargetUuid = UUID::gen();
+    const auto targetNss = NamespaceString::createNamespaceString_forTest(
+        "replicated_fast_count_delta_utils_test", "renamed_with_drop_target_coll");
+    repl::OplogEntry renameEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = _nss1.getCommandNS(),
+        .uuid = sourceUuid,
+        .oField = BSON("renameCollection" << _nss1.ns_forTest() << "to" << targetNss.ns_forTest()
+                                          << "dropTarget" << droppedTargetUuid),
+        .wallClockTime = Date_t::now(),
+    }}};
+
+    ReplicatedMetadataDeltas deltas;
+    EXPECT_EQ(1, processOplogEntry(renameEntry, deltas));
+
+    EXPECT_EQ(1u, deltas.size());
+    ASSERT_TRUE(deltas.contains(droppedTargetUuid));
+    EXPECT_EQ(deltas.at(droppedTargetUuid).state, DDLState::kDropped);
+    EXPECT_EQ((CollectionSizeCount{.size = 0, .count = 0}),
+              deltas.at(droppedTargetUuid).metadata.sizeCount);
+    EXPECT_FALSE(deltas.at(droppedTargetUuid).metadata.hash);
+}
+
+TEST_F(ExtractReplicatedMetadataTest, RenameWithoutDropTargetRecordsNoDelta) {
+    const auto sourceUuid = UUID::gen();
+    const auto targetNss = NamespaceString::createNamespaceString_forTest(
+        "replicated_fast_count_delta_utils_test", "renamed_coll");
+    repl::OplogEntry renameEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = _nss1.getCommandNS(),
+        .uuid = sourceUuid,
+        .oField = BSON("renameCollection" << _nss1.ns_forTest() << "to" << targetNss.ns_forTest()),
+        .wallClockTime = Date_t::now(),
+    }}};
+
+    ReplicatedMetadataDeltas deltas;
+    EXPECT_EQ(1, processOplogEntry(renameEntry, deltas));
+    EXPECT_TRUE(deltas.empty());
+}
+
 // ===========================================================================
 // Test fixture for extractReplicatedMetadataDeltasForApplyOps() -- needs full infrastructure for
 // real writes.

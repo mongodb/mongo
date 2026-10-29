@@ -367,6 +367,15 @@ int processOplogEntry(const repl::OplogEntry& entry,
         case repl::OplogEntry::CommandType::kDrop:
             recordCollectionDrop(*entryUuid, replicatedMetadataDeltasOut);
             return 1;
+        case repl::OplogEntry::CommandType::kRenameCollection: {
+            // The rename preserves the source UUID, so only a dropped target needs a delta to mark
+            // it dropped like a kDrop entry.
+            if (auto swDropTargetUUID = UUID::parse(entry.getObject().getField("dropTarget"));
+                swDropTargetUUID.isOK()) {
+                recordCollectionDrop(swDropTargetUUID.getValue(), replicatedMetadataDeltasOut);
+            }
+            return 1;
+        }
         default:
             break;
     }
