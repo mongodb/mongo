@@ -346,6 +346,17 @@ static void assertSameFields(const BSONObj& docA, const BSONObj& docB) {
     }
 }
 
+TEST_F(CreateFromQuery, PaddingLargeArrayThrowsWhenOperationIsKilled) {
+    BSONObj query = fromjson("{'a.5000': 1}");
+    FieldRefSet immutablePaths;
+    ASSERT_OK(doc().root().pushBack(doc().makeElementArray("a")));
+    opCtx()->markKilled();
+    ASSERT_THROWS_CODE(
+        driverOps().populateDocumentWithQueryFields(opCtx(), query, immutablePaths, doc()),
+        DBException,
+        ErrorCodes::Interrupted);
+}
+
 TEST_F(CreateFromQuery, BasicOp) {
     BSONObj query = fromjson("{a:1,b:2}");
     FieldRef idFieldRef("_id");

@@ -8,6 +8,7 @@
 #include "mongo/db/exec/mutable_bson/algorithm.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -22,7 +23,7 @@ using namespace std::literals::string_view_literals;
 
 namespace {
 
-Status maybePadTo(mutablebson::Element* elemArray, size_t sizeRequired) {
+Status maybePadTo(OperationContext* opCtx, mutablebson::Element* elemArray, size_t sizeRequired) {
     dassert(elemArray->getType() == BSONType::array);
 
     size_t currSize = mutablebson::countChildren(*elemArray);
@@ -36,6 +37,9 @@ Status maybePadTo(mutablebson::Element* elemArray, size_t sizeRequired) {
         }
 
         for (size_t i = 0; i < toPad; i++) {
+            if (opCtx && i % 2048 == 0) {
+                opCtx->checkForInterrupt();
+            }
             Status status = elemArray->appendNull("");
             if (!status.isOK()) {
                 return status;
@@ -119,7 +123,8 @@ StatusWith<bool> findLongestPrefix(const FieldRef& prefix,
     }
 }
 
-StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
+StatusWith<mutablebson::Element> createPathAt(OperationContext* opCtx,
+                                              const FieldRef& prefix,
                                               FieldIndex idxFound,
                                               mutablebson::Element elemFound,
                                               mutablebson::Element newElem) {
@@ -152,7 +157,7 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
                                         << "' in element {" << elemFound.toString() << "}");
         }
 
-        status = maybePadTo(&elemFound, *newIdx);
+        status = maybePadTo(opCtx, &elemFound, *newIdx);
         if (!status.isOK()) {
             return status;
         }
@@ -240,7 +245,8 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
     return firstNewElem;
 }
 
-Status setElementAtPath(const FieldRef& path,
+Status setElementAtPath(OperationContext* opCtx,
+                        const FieldRef& path,
                         const BSONElement& value,
                         mutablebson::Document* doc) {
     FieldIndex deepestElemPathPart;
@@ -272,7 +278,7 @@ Status setElementAtPath(const FieldRef& path,
         std::string_view leafFieldName = path.getPart(path.numParts() - 1);
         mutablebson::Element leafElem = doc->makeElementWithNewFieldName(leafFieldName, value);
         dassert(leafElem.ok());
-        return createPathAt(path, deepestElemPathPart, deepestElem, leafElem).getStatus();
+        return createPathAt(opCtx, path, deepestElemPathPart, deepestElem, leafElem).getStatus();
     }
 }
 
@@ -377,12 +383,14 @@ Status extractEqualityMatches(const MatchExpression& root, EqualityMatches* equa
     return _extractFullEqualityMatches(root, nullptr, equalities);
 }
 
-Status addEqualitiesToDoc(const EqualityMatches& equalities, mutablebson::Document* doc) {
+Status addEqualitiesToDoc(OperationContext* opCtx,
+                          const EqualityMatches& equalities,
+                          mutablebson::Document* doc) {
     for (EqualityMatches::const_iterator it = equalities.begin(); it != equalities.end(); ++it) {
         FieldRef path(it->first);
         const BSONElement& data = it->second->getData();
 
-        Status status = setElementAtPath(path, data, doc);
+        Status status = setElementAtPath(opCtx, path, data, doc);
         if (!status.isOK())
             return status;
     }

@@ -87,7 +87,8 @@ public:
                                            const FieldRefSet& immutablePaths,
                                            mutablebson::Document& doc) const;
 
-    Status populateDocumentWithQueryFields(const MatchExpression& query,
+    Status populateDocumentWithQueryFields(OperationContext* opCtx,
+                                           const MatchExpression& query,
                                            const FieldRefSet& immutablePaths,
                                            mutablebson::Document& doc) const;
 

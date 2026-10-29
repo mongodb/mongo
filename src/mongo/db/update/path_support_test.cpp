@@ -19,6 +19,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
@@ -85,7 +86,7 @@ TEST_F(EmptyDoc, NewField) {
 
     Element newElem = doc().makeElementInt("a", 1);
     ASSERT_TRUE(newElem.ok());
-    auto firstNewElem = createPathAt(field(), 0, root(), newElem);
+    auto firstNewElem = createPathAt(nullptr, field(), 0, root(), newElem);
     ASSERT_OK(firstNewElem);
     ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["a"], nullptr), 0);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc());
@@ -102,7 +103,7 @@ TEST_F(EmptyDoc, NewPath) {
 
     Element newElem = doc().makeElementInt("c", 1);
     ASSERT_TRUE(newElem.ok());
-    auto firstNewElem = createPathAt(field(), 0, root(), newElem);
+    auto firstNewElem = createPathAt(nullptr, field(), 0, root(), newElem);
     ASSERT_OK(firstNewElem);
     ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["a"], nullptr), 0);
     ASSERT_EQUALS(fromjson("{a: {b: {c: 1}}}"), doc());
@@ -186,7 +187,7 @@ TEST_F(SimpleDoc, NotCommonPrefix) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(root()), 1u);
 
-    auto firstNewElem = createPathAt(field(), 0, root(), newElem);
+    auto firstNewElem = createPathAt(nullptr, field(), 0, root(), newElem);
     ASSERT_OK(firstNewElem);
     ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["b"], nullptr), 0);
     ASSERT_EQUALS(newElem.getFieldName(), "b");
@@ -208,7 +209,7 @@ TEST_F(SimpleDoc, CreatePathAtFailsIfElemFoundIsNonObjectNonArray) {
     auto elemFound = root()["a"];
     auto newElem = doc().makeElementInt("b", 1);
     ASSERT_TRUE(newElem.ok());
-    auto result = createPathAt(field(), 0, elemFound, newElem);
+    auto result = createPathAt(nullptr, field(), 0, elemFound, newElem);
     ASSERT_NOT_OK(result);
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::PathNotViable);
     ASSERT_EQ(result.getStatus().reason(), "Cannot create field 'b' in element {a: 1}");
@@ -319,7 +320,7 @@ TEST_F(NestedDoc, NewFieldNested) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // 'c' is a child of 'b'
 
-    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    auto firstNewElem = createPathAt(nullptr, field(), idxFound + 1, elemFound, newElem);
     ASSERT_OK(firstNewElem);
     ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["a"]["b"]["d"], nullptr), 0);
     ASSERT_EQUALS(fromjson("{a: {b: {c: 1, d: 1}}}"), doc());
@@ -434,7 +435,7 @@ TEST_F(ArrayDoc, ExtendingExistingObject) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // '{c:1}' is a child of b.0
 
-    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    auto firstNewElem = createPathAt(nullptr, field(), idxFound + 1, elemFound, newElem);
     ASSERT_OK(firstNewElem);
     ASSERT_EQUALS(
         firstNewElem.getValue().compareWithElement(root()["b"].findNthChild(0)["d"], nullptr), 0);
@@ -458,7 +459,7 @@ TEST_F(ArrayDoc, NewObjectInsideArray) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // '{c:1}' is a child of 'b'
 
-    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    auto firstNewElem = createPathAt(nullptr, field(), idxFound + 1, elemFound, newElem);
     ASSERT_OK(firstNewElem);
     ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["b"].findNthChild(1), nullptr),
                   0);
@@ -482,7 +483,7 @@ TEST_F(ArrayDoc, NewNestedObjectInsideArray) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // '{c:1}' is a child of 'b'
 
-    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    auto firstNewElem = createPathAt(nullptr, field(), idxFound + 1, elemFound, newElem);
     ASSERT_OK(firstNewElem);
     ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["b"].findNthChild(1), nullptr),
                   0);
@@ -506,7 +507,7 @@ TEST_F(ArrayDoc, ArrayPaddingNecessary) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // '{c:1}' is a child of 'b'
 
-    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    auto firstNewElem = createPathAt(nullptr, field(), idxFound + 1, elemFound, newElem);
     ASSERT_OK(firstNewElem);
     ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["b"].findNthChild(5), nullptr),
                   0);
@@ -530,7 +531,7 @@ TEST_F(ArrayDoc, ExcessivePaddingRequested) {
     ASSERT_TRUE(newElem.ok());
     ASSERT_EQUALS(countChildren(elemFound), 1u);  // '{c:1}' is a child of 'b'
 
-    Status status = createPathAt(field(), idxFound + 1, elemFound, newElem).getStatus();
+    Status status = createPathAt(nullptr, field(), idxFound + 1, elemFound, newElem).getStatus();
     ASSERT_EQUALS(status.code(), ErrorCodes::CannotBackfillArray);
 }
 
@@ -558,7 +559,7 @@ TEST_F(ArrayDoc, ExcessivePaddingNotRequestedIfArrayAlreadyPadded) {
     Element newElem = doc().makeElementInt("", 99);
     ASSERT_TRUE(newElem.ok());
 
-    auto firstNewElem = createPathAt(field(), idxFound + 1, elemFound, newElem);
+    auto firstNewElem = createPathAt(nullptr, field(), idxFound + 1, elemFound, newElem);
     ASSERT_OK(firstNewElem);
     ASSERT_EQUALS(
         firstNewElem.getValue().compareWithElement(
@@ -589,10 +590,45 @@ TEST_F(ArrayDoc, CreatePathAtFailsIfElemFoundIsArrayAndIdxFoundFieldIsNonNumeric
     auto elemFound = root()["a"];
     auto newElem = doc().makeElementInt("b", 1);
     ASSERT_TRUE(newElem.ok());
-    auto result = createPathAt(field(), 0, elemFound, newElem);
+    auto result = createPathAt(nullptr, field(), 0, elemFound, newElem);
     ASSERT_NOT_OK(result);
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::PathNotViable);
     ASSERT_EQ(result.getStatus().reason(), "Cannot create field 'b' in element {a: []}");
+}
+
+class ArrayPaddingInterrupt : public ServiceContextTest {};
+
+TEST_F(ArrayPaddingInterrupt, CreatePathAtThrowsWhenOperationIsKilled) {
+    mutablebson::Document doc;
+    Element arr = doc.makeElementArray("a");
+    ASSERT_OK(doc.root().pushBack(arr));
+
+    FieldRef field("a.5000");
+    Element newElem = doc.makeElementInt("", 1);
+
+    auto opCtx = makeOperationContext();
+    opCtx->markKilled();
+
+    ASSERT_THROWS_CODE(
+        createPathAt(opCtx.get(), field, 1, arr, newElem), DBException, ErrorCodes::Interrupted);
+}
+
+TEST_F(ArrayPaddingInterrupt, AddEqualitiesToDocThrowsWhenOperationIsKilled) {
+    mutablebson::Document doc;
+    Element arr = doc.makeElementArray("a");
+    ASSERT_OK(doc.root().pushBack(arr));
+
+    BSONObj query = BSON("a.5000" << 1);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expr = std::move(MatchExpressionParser::parse(query, std::move(expCtx)).getValue());
+    EqualityMatches equalities;
+    ASSERT_OK(extractEqualityMatches(*expr, &equalities));
+
+    auto opCtx = makeOperationContext();
+    opCtx->markKilled();
+
+    ASSERT_THROWS_CODE(
+        addEqualitiesToDoc(opCtx.get(), equalities, &doc), DBException, ErrorCodes::Interrupted);
 }
 
 //

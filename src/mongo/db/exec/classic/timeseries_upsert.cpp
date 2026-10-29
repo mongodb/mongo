@@ -185,7 +185,7 @@ BSONObj TimeseriesUpsertStage::_produceNewDocumentForInsert() {
         // include it in 'immutablePaths' for this step.
         _immutablePaths.emplace_back(std::make_unique<FieldRef>(idFieldName));
         uassertStatusOK(_params.updateDriver->populateDocumentWithQueryFields(
-            *_originalPredicate, _immutablePaths, doc));
+            opCtx(), *_originalPredicate, _immutablePaths, doc));
         _immutablePaths.pop_back();
 
         update::generateNewDocumentFromUpdateOp(

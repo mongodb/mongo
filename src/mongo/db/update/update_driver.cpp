@@ -219,10 +219,12 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
         return statusWithCQ.getStatus();
     }
     auto cq = std::move(statusWithCQ.getValue());
-    return populateDocumentWithQueryFields(*cq->getPrimaryMatchExpression(), immutablePaths, doc);
+    return populateDocumentWithQueryFields(
+        opCtx, *cq->getPrimaryMatchExpression(), immutablePaths, doc);
 }
 
-Status UpdateDriver::populateDocumentWithQueryFields(const MatchExpression& query,
+Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
+                                                     const MatchExpression& query,
                                                      const FieldRefSet& immutablePaths,
                                                      mutablebson::Document& doc) const {
     EqualityMatches equalities;
@@ -239,7 +241,7 @@ Status UpdateDriver::populateDocumentWithQueryFields(const MatchExpression& quer
     if (!status.isOK())
         return status;
 
-    status = pathsupport::addEqualitiesToDoc(equalities, &doc);
+    status = pathsupport::addEqualitiesToDoc(opCtx, equalities, &doc);
     return status;
 }
 
@@ -257,6 +259,7 @@ Status UpdateDriver::update(OperationContext* opCtx,
     _logDoc.reset();
 
     UpdateExecutor::ApplyParams applyParams(doc->root(), immutablePaths);
+    applyParams.opCtx = opCtx;
     applyParams.matchedField = matchedField;
     applyParams.insert = isInsert;
     applyParams.fromOplogApplication = _fromOplogApplication;

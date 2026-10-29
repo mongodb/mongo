@@ -213,8 +213,12 @@ UpdateExecutor::ApplyResult ModifierNode::applyToNonexistentElement(
         setValueForNewElement(&newElement);
 
         invariant(newElement.ok());
-        auto statusWithFirstCreatedElem = pathsupport::createPathAt(
-            *(updateNodeApplyParams.pathToCreate), 0, applyParams.element, newElement);
+        auto statusWithFirstCreatedElem =
+            pathsupport::createPathAt(applyParams.opCtx,
+                                      *(updateNodeApplyParams.pathToCreate),
+                                      0,
+                                      applyParams.element,
+                                      newElement);
         if (!statusWithFirstCreatedElem.isOK()) {
             // $set operations on non-viable paths are ignored when the update came from
             // replication. We do not error because idempotency requires that any other update

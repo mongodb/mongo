@@ -123,7 +123,7 @@ void produceDocumentForUpsert(OperationContext* opCtx,
     // if available. This generates the pre-image document that we will run the update against.
     if (auto* cq = canonicalQuery) {
         uassertStatusOK(driver->populateDocumentWithQueryFields(
-            *cq->getPrimaryMatchExpression(), immutablePaths, doc));
+            opCtx, *cq->getPrimaryMatchExpression(), immutablePaths, doc));
     } else {
         fassert(17354, isSimpleIdQuery(request->getQuery()));
         // IDHACK path allows for queries of the shape {_id: 123} and {_id: {$eq: 123}}. Neither

@@ -19,6 +19,7 @@ namespace mongo {
 
 class CollatorInterface;
 class FieldRef;
+class OperationContext;
 
 /**
  * Provides an interface for applying an update to a document.
@@ -54,6 +55,8 @@ public:
         // If there was a positional ($) element in the update expression, 'matchedField' is the
         // index of the array element that caused the query to match the document.
         std::string_view matchedField;
+
+        OperationContext* opCtx = nullptr;
 
         // True if the update is being applied to a document to be inserted.
         bool insert = false;

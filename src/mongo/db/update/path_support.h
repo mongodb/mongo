@@ -20,6 +20,8 @@
 
 namespace mongo {
 
+class OperationContext;
+
 namespace pathsupport {
 
 // Cap on the number of nulls we'll add to an array if we're inserting to an index that
@@ -114,7 +116,8 @@ StatusWith<bool> findLongestPrefix(const FieldRef& prefix,
  * field parts in 'prefix' that are missing from a given document. 'elemFound' points
  * to the element in the doc that is the parent of prefix[idxRoot].
  */
-StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
+StatusWith<mutablebson::Element> createPathAt(OperationContext* opCtx,
+                                              const FieldRef& prefix,
                                               FieldIndex idxRoot,
                                               mutablebson::Element elemFound,
                                               mutablebson::Element newElem);
@@ -126,7 +129,10 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
  * Returns PathNotViable if the path cannot be created without modifying the type of another
  * element, see above.
  */
-Status setElementAtPath(const FieldRef& path, const BSONElement& value, mutablebson::Document* doc);
+Status setElementAtPath(OperationContext* opCtx,
+                        const FieldRef& path,
+                        const BSONElement& value,
+                        mutablebson::Document* doc);
 
 /**
  * Finds and returns-by-path all the equality matches in a particular MatchExpression.
@@ -201,7 +207,9 @@ BSONElement findParentEqualityElement(const EqualityMatches& equalities,
  * Returns PathNotViable similar to setElementAtPath above.  If equality paths do not
  * conflict, as is enforced by extractEqualityMatches, this function should return OK.
  */
-Status addEqualitiesToDoc(const EqualityMatches& equalities, mutablebson::Document* doc);
+Status addEqualitiesToDoc(OperationContext* opCtx,
+                          const EqualityMatches& equalities,
+                          mutablebson::Document* doc);
 
 }  // namespace pathsupport
 
