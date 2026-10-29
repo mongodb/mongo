@@ -2793,7 +2793,6 @@ TEST(QuerySolutionTest, ParallelEligibleNodes) {
 
     ASSERT_TRUE(scan()->isParallelEligible());
     ASSERT_TRUE(LimitNode(scan(), 1, LimitSkipParameterization::Disabled).isParallelEligible());
-    ASSERT_TRUE(SkipNode(scan(), 1, LimitSkipParameterization::Disabled).isParallelEligible());
     ASSERT_TRUE(ShardingFilterNode().isParallelEligible());
 
     auto [filter, projection] = createMatchExprAndProjection(BSONObj(), BSON("a" << 1));
@@ -2808,6 +2807,7 @@ TEST(QuerySolutionTest, ParallelEligibleNodes) {
         std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
     ASSERT_FALSE(indexScan->isParallelEligible());
     ASSERT_FALSE(FetchNode(std::move(indexScan), mainNss).isParallelEligible());
+    ASSERT_FALSE(SkipNode(scan(), 1, LimitSkipParameterization::Disabled).isParallelEligible());
 }
 
 TEST(QuerySolutionTest, GroupNodeCloneKeepsPhysicalProps) {

@@ -1416,7 +1416,9 @@ struct SkipNode : public QuerySolutionNode {
     }
 
     bool isParallelEligible() const override {
-        return true;
+        // The skip stage itself cannot run solely on a worker thread and requires a more complex
+        // approach especially when combined with limit.
+        return false;
     }
     void appendToString(str::stream* ss, int indent) const override;
 
