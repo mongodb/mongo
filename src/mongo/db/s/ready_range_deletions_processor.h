@@ -6,12 +6,19 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/modules.h"
 
 #include <queue>
 #include <string_view>
 
 namespace mongo {
+
+struct InFlightEntry {
+    RangeDeletionTask task;
+    OperationContext* opCtx = nullptr;
+};
 /*
  * Class enclosing a thread continuously processing "ready" range deletions, meaning tasks
  * that are allowed to be processed (already drained ongoing queries and already waited for
@@ -51,18 +58,22 @@ private:
      * Remove a range deletion from the head of the queue. Supposed to be called only once a
      * range deletion successfully finishes.
      */
-    void _completedRangeDeletion();
+    void _completedRangeDeletion(mongo::UUID taskId);
 
     /*
-     * Code executed by the internal thread
+     * Code executed by the dispatcher thread
      */
-    void _runRangeDeletions();
+    void _dispatchRangeDeletions();
 
-    /**
-     * Returns a copy of the task at the front of the queue.
+    /*
+     * Takes the top element of the ready queue and creates its in-flight entry.
      */
-    RangeDeletionTask _peekFront() const;
+    InFlightEntry _peekFrontAndAddToInFlight();
 
+    /*
+     * Code executed by the worker threads.
+     */
+    void _processRangeDeletion(InFlightEntry taskEntry);
 
     bool _shouldDeferRangeDeletionForResharding(NamespaceString nss, OperationContext* opCtx);
 
@@ -92,19 +103,21 @@ private:
     /* Queue containing scheduled range deletions */
     std::queue<RangeDeletionTask> _queue;
 
+    stdx::unordered_map<mongo::UUID, InFlightEntry, UUID::Hash> _inflightMap;
+
     /* Pointer to the (one and only) operation context used by the thread */
     ServiceContext::UniqueOperationContext _threadOpCtxHolder;
 
-    /*
-     * Raw pointer to the operation context of the alternate client ("range-deleter-batch")
-     * currently executing a batch deletion, or nullptr when no batch is in flight. Owned by the
-     * range-deleter thread; only ever set/cleared by it under `_mutex`. Tracked so that shutdown()
-     * can interrupt the in-flight batch directly rather than relying on cancellation delivered via
-     * the executor, which may already be shutting down on stepdown.
-     */
-    OperationContext* _batchOpCtx{nullptr};
-
     SharedPromise<void> _beginProcessingSignal;
+
+    /*
+     * Maximum number of worker threads. Fixed at 1 until a server parameter can change it.
+     * TODO SERVER-137792: Replace _maxThreads with the server parameter rangeDeleterThreadsCount.
+     */
+    size_t _maxThreads{1};
+
+    /* Thread pool with the worker threads that will perform the range deletions */
+    std::unique_ptr<ThreadPool> _workerPool;
 
     /* Thread consuming the range deletions queue */
     stdx::thread _thread;

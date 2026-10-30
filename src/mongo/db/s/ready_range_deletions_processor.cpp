@@ -4,7 +4,6 @@
 #include "mongo/db/s/ready_range_deletions_processor.h"
 
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
-#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_util.h"
@@ -78,13 +77,27 @@ makeRangeDeleterTicketStatsUpdater(ShardingStatistics& shardingStats) {
 ReadyRangeDeletionsProcessor::ReadyRangeDeletionsProcessor(
     OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor)
     : _service(opCtx->getServiceContext()),
+      _workerPool(std::make_unique<ThreadPool>([this, service = opCtx->getService()] {
+          ThreadPool::Options options;
+          options.poolName = "RangeDeleterWorkerPool";
+          options.minThreads = _maxThreads;
+          options.maxThreads = _maxThreads;
+          options.threadNamePrefix = "RangeDeleterWorker-";
+          options.onCreateThread = [service](const std::string& threadName) {
+              Client::initThread(threadName, service);
+          };
+          return options;
+      }())),
       _thread([this] {
           if (!_beginProcessingSignal.getFuture().getNoThrow().isOK()) {
               return;
           }
-          _runRangeDeletions();
+          _dispatchRangeDeletions();
       }),
-      _executor(executor) {}
+
+      _executor(executor) {
+    _workerPool->startup();
+}
 
 ReadyRangeDeletionsProcessor::~ReadyRangeDeletionsProcessor() {
     shutdown();
@@ -92,6 +105,7 @@ ReadyRangeDeletionsProcessor::~ReadyRangeDeletionsProcessor() {
     _thread.join();
     invariant(!_threadOpCtxHolder,
               "Thread operation context is still alive after joining main thread");
+    _workerPool->join();
 }
 
 void ReadyRangeDeletionsProcessor::beginProcessing() {
@@ -117,10 +131,14 @@ void ReadyRangeDeletionsProcessor::shutdown() {
         _threadOpCtxHolder->markKilled(ErrorCodes::Interrupted);
     }
 
-    if (_batchOpCtx) {
-        std::lock_guard<Client> scopedClientLock(*_batchOpCtx->getClient());
-        _batchOpCtx->markKilled(ErrorCodes::Interrupted);
+    for (auto& [taskId, entry] : _inflightMap) {
+        if (entry.opCtx) {
+            std::lock_guard<Client> scopedClientLock(*entry.opCtx->getClient());
+            entry.opCtx->markKilled(ErrorCodes::Interrupted);
+        }
     }
+
+    _workerPool->shutdown();
 }
 
 bool ReadyRangeDeletionsProcessor::_stopRequested() const {
@@ -174,20 +192,30 @@ void ReadyRangeDeletionsProcessor::emplaceRangeDeletion(const RangeDeletionTask&
     _condVar.notify_all();
 }
 
-void ReadyRangeDeletionsProcessor::_completedRangeDeletion() {
+void ReadyRangeDeletionsProcessor::_completedRangeDeletion(mongo::UUID taskId) {
     std::unique_lock<std::mutex> lock(_mutex);
     tassert(ErrorCodes::InternalError,
-            "Queue cannot be empty while popping queue element",
-            !_queue.empty());
-    _queue.pop();
+            "Map cannot lack a task entry",
+            _inflightMap.find(taskId) != _inflightMap.end());
+    _inflightMap.erase(taskId);
+    _condVar.notify_all();
 }
 
-RangeDeletionTask ReadyRangeDeletionsProcessor::_peekFront() const {
+InFlightEntry ReadyRangeDeletionsProcessor::_peekFrontAndAddToInFlight() {
     std::unique_lock<std::mutex> lock(_mutex);
     tassert(ErrorCodes::InternalError,
             "Queue cannot be empty while peeking at front element",
             !_queue.empty());
-    return _queue.front();
+    // Pop the task from the ready queue
+    RangeDeletionTask task = std::move(_queue.front());
+    _queue.pop();
+    // Create the InFlight entry
+    InFlightEntry taskEntry = InFlightEntry{task, nullptr};
+    auto emplaceResult = _inflightMap.emplace(task.getId(), taskEntry);
+    tassert(ErrorCodes::InternalError,
+            "Range deletion task is already in flight",
+            emplaceResult.second);
+    return taskEntry;
 }
 
 // TODO: SERVER-123812 refactor connection between range deleter and resharding
@@ -202,7 +230,7 @@ bool ReadyRangeDeletionsProcessor::_shouldDeferRangeDeletionForResharding(Namesp
 void ReadyRangeDeletionsProcessor::_rescheduleRangeDeletion(const RangeDeletionTask& task,
                                                             Seconds delay,
                                                             std::string_view reason) {
-    _completedRangeDeletion();
+    _completedRangeDeletion(task.getId());
 
     sleepFor(_executor, delay).getAsync([this, task, reason](Status status) {
         if (!status.isOK()) {
@@ -221,7 +249,7 @@ void ReadyRangeDeletionsProcessor::_rescheduleRangeDeletion(const RangeDeletionT
     });
 }
 
-void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
+void ReadyRangeDeletionsProcessor::_dispatchRangeDeletions() {
     ThreadClient threadClient(kRangeDeletionThreadName, _service->getService());
 
     {
@@ -240,9 +268,6 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
         _threadOpCtxHolder.reset();
     });
 
-    HierarchicalCancelableOperationContextFactory opCtxFactory(opCtx->getCancellationToken(),
-                                                               _executor);
-
     // The MaxKey orphan guard's blocked set must be populated before any task is deleted (see
     // RangeDeleterService::classifyBlockedMaxKeyTasks). Classify lazily below, after the disabled
     // gate and before processing the first task, retrying on transient failure.
@@ -252,7 +277,9 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
         {
             std::unique_lock<std::mutex> lock(_mutex);
             try {
-                opCtx->waitForConditionOrInterrupt(_condVar, lock, [&] { return !_queue.empty(); });
+                opCtx->waitForConditionOrInterrupt(_condVar, lock, [&] {
+                    return !_queue.empty() && _maxThreads > _inflightMap.size();
+                });
             } catch (const DBException& ex) {
                 dassert(!opCtx->checkForInterruptNoAssert().isOK(),
                         str::stream() << "Range deleter thread failed with unexpected exception "
@@ -287,242 +314,241 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
             }
         }
 
-        const RangeDeletionTask task = _peekFront();
-        const auto dbName = task.getNss().dbName();
-        const auto collectionUuid = task.getCollectionUuid();
-        const auto range = task.getRange();
-        const auto optKeyPattern = task.getKeyPattern();
+        const InFlightEntry taskEntry = _peekFrontAndAddToInFlight();
 
+        _workerPool->schedule([this, taskEntry = taskEntry](Status status) {
+            if (!status.isOK()) {
+                return;
+            }
+            _processRangeDeletion(taskEntry);
+        });
+    }
+}
 
-        // A task is considered completed when all the following conditions are met:
-        // - All orphans have been deleted
-        // - The deletions have been majority committed
-        // - The range deletion task document has been deleted
-        bool taskCompleted = false;
-        while (!taskCompleted) {
+void ReadyRangeDeletionsProcessor::_processRangeDeletion(InFlightEntry taskEntry) {
+    const RangeDeletionTask task = taskEntry.task;
+
+    const auto dbName = task.getNss().dbName();
+    const auto collectionUuid = task.getCollectionUuid();
+    const auto range = task.getRange();
+    const auto optKeyPattern = task.getKeyPattern();
+    const auto taskId = task.getId();
+
+    // A task is considered completed when all the following conditions are met:
+    // - All orphans have been deleted
+    // - The deletions have been majority committed
+    // - The range deletion task document has been deleted
+    bool taskCompleted = false;
+    while (!taskCompleted) {
+        auto opCtxHolder = cc().makeOperationContext();
+        auto opCtx = opCtxHolder.get();
+        {
+            std::unique_lock<std::mutex> lock(_mutex);
+            auto it = _inflightMap.find(taskId);
+            invariant(it != _inflightMap.end());
+
+            if (_state == kStopped) {
+                opCtx->markKilled(ErrorCodes::Interrupted);
+            } else {
+                it->second.opCtx = opCtx;
+            }
+        }
+        ON_BLOCK_EXIT([this, taskId, opCtx] {
+            std::unique_lock<std::mutex> lock(_mutex);
+            auto it = _inflightMap.find(taskId);
+            if (it != _inflightMap.end() && it->second.opCtx == opCtx) {
+                it->second.opCtx = nullptr;
+            }
+        });
+        try {
+            bool orphansRemovalCompleted = false;
+            NamespaceString possiblyStaleNss;
             try {
-                bool orphansRemovalCompleted = false;
-                NamespaceString possiblyStaleNss;
-                try {
-                    // Should only use possiblyStaleNss for logging and the initial resharding check
-                    // collectionUUID is the source of truth for range deletions
-                    possiblyStaleNss =
-                        AutoGetCollection(
-                            opCtx, NamespaceStringOrUUID{dbName, collectionUuid}, MODE_IS)
-                            .getNss();
-                    if (_shouldDeferRangeDeletionForResharding(possiblyStaleNss, opCtx)) {
-                        LOGV2_INFO(11485100,
-                                   "Range deletion task paused for namespace while "
-                                   "resharding takes place",
-                                   "namespace"_attr = possiblyStaleNss,
-                                   "collectionUUID"_attr = collectionUuid.toString(),
-                                   "task"_attr = task.toBSON());
+                // Should only use possiblyStaleNss for logging and the initial resharding check
+                // collectionUUID is the source of truth for range deletions
+                possiblyStaleNss =
+                    AutoGetCollection(opCtx, NamespaceStringOrUUID{dbName, collectionUuid}, MODE_IS)
+                        .getNss();
+                if (_shouldDeferRangeDeletionForResharding(possiblyStaleNss, opCtx)) {
+                    LOGV2_INFO(11485100,
+                               "Range deletion task paused for namespace while "
+                               "resharding takes place",
+                               "namespace"_attr = possiblyStaleNss,
+                               "collectionUUID"_attr = collectionUuid.toString(),
+                               "task"_attr = task.toBSON());
 
-                        _rescheduleRangeDeletion(
-                            task, kCheckForEnabledServiceInterval, "active resharding"sv);
-                        break;
-                    }
-                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                    // no range deletions will occur if the collection doesn't exist,
-                    // but we still need to delete the persistent range deletion task
-                    orphansRemovalCompleted = true;
-                }
-
-                // MaxKey orphan guard: for a task classified at step-up as blocked, delete the
-                // ordinary docs in the global-max chunk but preserve those whose leading shard-key
-                // field is MaxKey (potentially never cloned). The task then completes normally.
-                bool preserveMaxKeyPrefixedDocs = false;
-                if (!orphansRemovalCompleted && feature_flags::gMaxKeyOrphanGuard.isEnabled() &&
-                    skipRangeDeletionForMaxKeyChunks.load() &&
-                    RangeDeleterService::get(opCtx)->isMaxKeyBlocked(task.getId())) {
-                    LOGV2(
-                        13018000,
-                        "Preserving MaxKey-prefixed documents while deleting the rest of the range",
-                        "namespace"_attr = possiblyStaleNss,
-                        "collectionUUID"_attr = collectionUuid.toString(),
-                        "range"_attr = redact(range.toString()));
-                    preserveMaxKeyPrefixedDocs = true;
-                }
-
-                // Perform the actual range deletion
-                while (!orphansRemovalCompleted) {
-                    try {
-                        LOGV2_INFO(6872501,
-                                   "Beginning deletion of documents in orphan range",
-                                   "namespace"_attr = possiblyStaleNss,
-                                   "collectionUUID"_attr = collectionUuid.toString(),
-                                   "range"_attr = redact(range.toString()));
-
-                        auto shardKeyPattern =
-                            (optKeyPattern ? (*optKeyPattern).toBSON()
-                                           : getShardKeyPattern(opCtx, dbName, collectionUuid));
-
-                        {
-                            // There can only be one operation context per client, and because we
-                            // don't want to miss the shutdown signal, let's create an alternate
-                            // client for the batch.
-                            auto newClient =
-                                _service->getService()->makeClient("range-deleter-batch");
-                            AlternativeClientRegion acr(newClient);
-                            auto batchOpCtxHolder = opCtxFactory.makeOperationContext(&cc());
-                            auto* batchOpCtx = batchOpCtxHolder.get();
-
-                            // Publish the batch opCtx so shutdown()/stepdown can interrupt it
-                            // directly, and clear it when the batch scope exits.
-                            {
-                                std::lock_guard<std::mutex> lock(_mutex);
-                                if (_state == kStopped) {
-                                    // A stepdown raced us between the last check and here; the
-                                    // registration would never be observed by shutdown(). Kill this
-                                    // opCtx now so the batch does not block indefinitely.
-                                    std::lock_guard<Client> clientLock(*batchOpCtx->getClient());
-                                    batchOpCtx->markKilled(ErrorCodes::Interrupted);
-                                } else {
-                                    _batchOpCtx = batchOpCtx;
-                                }
-                            }
-                            ON_BLOCK_EXIT([this] {
-                                std::lock_guard<std::mutex> lock(_mutex);
-                                _batchOpCtx = nullptr;
-                            });
-
-                            // Keep the serverStatus ticket metrics up to date as the deletion
-                            // acquires and releases execution tickets, so a range deletion
-                            // stalled on ticket admission is visible in serverStatus/FTDC while
-                            // it is stalled. The local stats are attached to the completion log
-                            // line below.
-                            auto& shardingStats = ShardingStatistics::get(batchOpCtx);
-                            admission::execution_control::ScopedTicketAdmissionStatsRecorder
-                                ticketStatsRecorder(
-                                    batchOpCtx, makeRangeDeleterTicketStatsUpdater(shardingStats));
-
-                            auto numDocsAndBytesDeleted =
-                                uassertStatusOK(rangedeletionutil::deleteRangeInBatches(
-                                    batchOpCtx,
-                                    dbName,
-                                    collectionUuid,
-                                    shardKeyPattern,
-                                    range,
-                                    preserveMaxKeyPrefixedDocs));
-                            const auto& ticketStats = ticketStatsRecorder.stats();
-                            LOGV2_INFO(9239400,
-                                       "Finished deletion of documents in orphan range",
-                                       "namespace"_attr = possiblyStaleNss,
-                                       "collectionUUID"_attr = collectionUuid.toString(),
-                                       "range"_attr = redact(range.toString()),
-                                       "docsDeleted"_attr = numDocsAndBytesDeleted.first,
-                                       "bytesDeleted"_attr = numDocsAndBytesDeleted.second,
-                                       "timeQueuedForTicketsMicros"_attr =
-                                           ticketStats.timeQueuedMicros,
-                                       "timeProcessingWithTicketsMicros"_attr =
-                                           ticketStats.timeProcessingMicros,
-                                       "ticketAdmissions"_attr = ticketStats.admissions,
-                                       "lowPriorityTicketAdmissions"_attr =
-                                           ticketStats.lowPriorityAdmissions,
-                                       "ticketQueueEntries"_attr = ticketStats.startedQueueing);
-                        }
-                        orphansRemovalCompleted = true;
-                    } catch (ExceptionFor<
-                             ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist>&) {
-                        // No orphaned documents to remove from a dropped collection
-                        orphansRemovalCompleted = true;
-                    } catch (ExceptionFor<
-                             ErrorCodes::
-                                 RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist>&) {
-                        // The task can be considered completed because the range
-                        // deletion document doesn't exist
-                        orphansRemovalCompleted = true;
-                    } catch (const DBException& e) {
-                        if (e.code() != ErrorCodes::IndexNotFound) {
-                            // It is expected that we reschedule the range deletion task to the
-                            // bottom of the queue if the index is missing and do not need to log
-                            // this message.
-                            LOGV2_ERROR(6872502,
-                                        "Failed to delete documents in orphan range",
-                                        "dbName"_attr = dbName,
-                                        "collectionUUID"_attr = collectionUuid.toString(),
-                                        "range"_attr = redact(range.toString()),
-                                        "error"_attr = e);
-                        }
-                        throw;
-                    }
-                }
-
-                {
-                    repl::ReplClientInfo::forClient(opCtx->getClient())
-                        .setLastOpToSystemLastOpTime(opCtx);
-                    auto clientOpTime =
-                        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-
-                    LOGV2_DEBUG(6872503,
-                                2,
-                                "Waiting for majority replication of local deletions",
-                                "dbName"_attr = dbName,
-                                "collectionUUID"_attr = collectionUuid,
-                                "range"_attr = redact(range.toString()),
-                                "clientOpTime"_attr = clientOpTime);
-
-                    // Synchronously wait for majority before removing the range
-                    // deletion task document: oplog gets applied in parallel for
-                    // different collections, so it's important not to apply
-                    // out of order the deletions of orphans and the removal of the
-                    // entry persisted in `config.rangeDeletions`
-                    WaitForMajorityService::get(opCtx->getServiceContext())
-                        .waitUntilMajorityForWrite(clientOpTime, CancellationToken::uncancelable())
-                        .get(opCtx);
-                }
-
-                // Remove persistent range deletion task
-                try {
-                    auto* self = RangeDeleterService::get(opCtx);
-                    auto task = self->completeTask(collectionUuid, range);
-                    if (task) {
-                        rangedeletionutil::removePersistentTask(opCtx, task->getTaskId());
-                    }
-
-                    LOGV2_DEBUG(6872504,
-                                2,
-                                "Completed removal of persistent range deletion task",
-                                "dbName"_attr = dbName,
-                                "collectionUUID"_attr = collectionUuid.toString(),
-                                "range"_attr = redact(range.toString()));
-
-                } catch (const DBException& e) {
-                    LOGV2_ERROR(6872505,
-                                "Failed to remove persistent range deletion task",
-                                "dbName"_attr = dbName,
-                                "collectionUUID"_attr = collectionUuid.toString(),
-                                "range"_attr = redact(range.toString()),
-                                "error"_attr = e);
-                    throw;
-                }
-
-                if (preserveMaxKeyPrefixedDocs) {
-                    ShardingStatistics::get(opCtx)
-                        .countRangeDeletionTasksPreservingMaxKeyOrphans.fetchAndAdd(1);
-                }
-            } catch (const ExceptionFor<ErrorCodes::IndexNotFound>&) {
-                // We cannot complete this range deletion right now because we do not have an index
-                // built on the shard key. This situation is expected for a hashed shard key and
-                // recoverable for a range shard key. This index may be rebuilt in the future, so
-                // reschedule the task at the end of the queue.
-                _rescheduleRangeDeletion(task, kMissingIndexRetryInterval, "missing index"sv);
-                break;
-            } catch (const DBException&) {
-                // Release the thread only in case the operation context has been interrupted, as
-                // interruption only happens on shutdown/stepdown (this is fine because range
-                // deletions will be resumed on the next step up)
-                if (_stopRequested()) {
+                    _rescheduleRangeDeletion(
+                        task, kCheckForEnabledServiceInterval, "active resharding"sv);
                     break;
                 }
-
-                // Iterate again in case of any other error
-                continue;
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // no range deletions will occur if the collection doesn't exist,
+                // but we still need to delete the persistent range deletion task
+                orphansRemovalCompleted = true;
             }
 
-            taskCompleted = true;
-            _completedRangeDeletion();
+            // MaxKey orphan guard: for a task classified at step-up as blocked, delete the
+            // ordinary docs in the global-max chunk but preserve those whose leading shard-key
+            // field is MaxKey (potentially never cloned). The task then completes normally.
+            bool preserveMaxKeyPrefixedDocs = false;
+            if (!orphansRemovalCompleted && feature_flags::gMaxKeyOrphanGuard.isEnabled() &&
+                skipRangeDeletionForMaxKeyChunks.load() &&
+                RangeDeleterService::get(opCtx)->isMaxKeyBlocked(task.getId())) {
+                LOGV2(13018000,
+                      "Preserving MaxKey-prefixed documents while deleting the rest of the range",
+                      "namespace"_attr = possiblyStaleNss,
+                      "collectionUUID"_attr = collectionUuid.toString(),
+                      "range"_attr = redact(range.toString()));
+                preserveMaxKeyPrefixedDocs = true;
+            }
+
+            // Perform the actual range deletion
+            while (!orphansRemovalCompleted) {
+                try {
+                    LOGV2_INFO(6872501,
+                               "Beginning deletion of documents in orphan range",
+                               "namespace"_attr = possiblyStaleNss,
+                               "collectionUUID"_attr = collectionUuid.toString(),
+                               "range"_attr = redact(range.toString()));
+
+                    auto shardKeyPattern =
+                        (optKeyPattern ? (*optKeyPattern).toBSON()
+                                       : getShardKeyPattern(opCtx, dbName, collectionUuid));
+
+                    {
+                        // Keep the serverStatus ticket metrics up to date as the deletion
+                        // acquires and releases execution tickets, so a range deletion
+                        // stalled on ticket admission is visible in serverStatus/FTDC while
+                        // it is stalled. The local stats are attached to the completion log
+                        // line below.
+                        auto& shardingStats = ShardingStatistics::get(opCtx);
+                        admission::execution_control::ScopedTicketAdmissionStatsRecorder
+                            ticketStatsRecorder(opCtx,
+                                                makeRangeDeleterTicketStatsUpdater(shardingStats));
+
+                        auto numDocsAndBytesDeleted = uassertStatusOK(
+                            rangedeletionutil::deleteRangeInBatches(opCtx,
+                                                                    dbName,
+                                                                    collectionUuid,
+                                                                    shardKeyPattern,
+                                                                    range,
+                                                                    preserveMaxKeyPrefixedDocs));
+                        const auto& ticketStats = ticketStatsRecorder.stats();
+                        LOGV2_INFO(9239400,
+                                   "Finished deletion of documents in orphan range",
+                                   "namespace"_attr = possiblyStaleNss,
+                                   "collectionUUID"_attr = collectionUuid.toString(),
+                                   "range"_attr = redact(range.toString()),
+                                   "docsDeleted"_attr = numDocsAndBytesDeleted.first,
+                                   "bytesDeleted"_attr = numDocsAndBytesDeleted.second,
+                                   "timeQueuedForTicketsMicros"_attr = ticketStats.timeQueuedMicros,
+                                   "timeProcessingWithTicketsMicros"_attr =
+                                       ticketStats.timeProcessingMicros,
+                                   "ticketAdmissions"_attr = ticketStats.admissions,
+                                   "lowPriorityTicketAdmissions"_attr =
+                                       ticketStats.lowPriorityAdmissions,
+                                   "ticketQueueEntries"_attr = ticketStats.startedQueueing);
+                    }
+                    orphansRemovalCompleted = true;
+                } catch (ExceptionFor<
+                         ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist>&) {
+                    // No orphaned documents to remove from a dropped collection
+                    orphansRemovalCompleted = true;
+                } catch (
+                    ExceptionFor<
+                        ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist>&) {
+                    // The task can be considered completed because the range
+                    // deletion document doesn't exist
+                    orphansRemovalCompleted = true;
+                } catch (const DBException& e) {
+                    if (e.code() != ErrorCodes::IndexNotFound) {
+                        // It is expected that we reschedule the range deletion task to the
+                        // bottom of the queue if the index is missing and do not need to log
+                        // this message.
+                        LOGV2_ERROR(6872502,
+                                    "Failed to delete documents in orphan range",
+                                    "dbName"_attr = dbName,
+                                    "collectionUUID"_attr = collectionUuid.toString(),
+                                    "range"_attr = redact(range.toString()),
+                                    "error"_attr = e);
+                    }
+                    throw;
+                }
+            }
+
+            {
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+                auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+
+                LOGV2_DEBUG(6872503,
+                            2,
+                            "Waiting for majority replication of local deletions",
+                            "dbName"_attr = dbName,
+                            "collectionUUID"_attr = collectionUuid,
+                            "range"_attr = redact(range.toString()),
+                            "clientOpTime"_attr = clientOpTime);
+
+                // Synchronously wait for majority before removing the range
+                // deletion task document: oplog gets applied in parallel for
+                // different collections, so it's important not to apply
+                // out of order the deletions of orphans and the removal of the
+                // entry persisted in `config.rangeDeletions`
+                WaitForMajorityService::get(opCtx->getServiceContext())
+                    .waitUntilMajorityForWrite(clientOpTime, CancellationToken::uncancelable())
+                    .get(opCtx);
+            }
+
+            // Remove persistent range deletion task
+            try {
+                auto* self = RangeDeleterService::get(opCtx);
+                auto task = self->completeTask(collectionUuid, range);
+                if (task) {
+                    rangedeletionutil::removePersistentTask(opCtx, task->getTaskId());
+                }
+
+                LOGV2_DEBUG(6872504,
+                            2,
+                            "Completed removal of persistent range deletion task",
+                            "dbName"_attr = dbName,
+                            "collectionUUID"_attr = collectionUuid.toString(),
+                            "range"_attr = redact(range.toString()));
+
+            } catch (const DBException& e) {
+                LOGV2_ERROR(6872505,
+                            "Failed to remove persistent range deletion task",
+                            "dbName"_attr = dbName,
+                            "collectionUUID"_attr = collectionUuid.toString(),
+                            "range"_attr = redact(range.toString()),
+                            "error"_attr = e);
+                throw;
+            }
+
+            if (preserveMaxKeyPrefixedDocs) {
+                ShardingStatistics::get(opCtx)
+                    .countRangeDeletionTasksPreservingMaxKeyOrphans.fetchAndAdd(1);
+            }
+        } catch (const ExceptionFor<ErrorCodes::IndexNotFound>&) {
+            // We cannot complete this range deletion right now because we do not have an index
+            // built on the shard key. This situation is expected for a hashed shard key and
+            // recoverable for a range shard key. This index may be rebuilt in the future, so
+            // reschedule the task at the end of the queue.
+            _rescheduleRangeDeletion(task, kMissingIndexRetryInterval, "missing index"sv);
+            break;
+        } catch (const DBException&) {
+            // Release the thread only in case the operation context has been interrupted, as
+            // interruption only happens on shutdown/stepdown (this is fine because range
+            // deletions will be resumed on the next step up)
+            if (_stopRequested()) {
+                break;
+            }
+
+            // Iterate again in case of any other error
+            continue;
         }
+
+        taskCompleted = true;
+        _completedRangeDeletion(task.getId());
     }
 }
 
