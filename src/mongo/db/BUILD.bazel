@@ -2549,6 +2549,7 @@ mongo_cc_library(
         "//src/mongo/db/query:cursor_response_idl",
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/stats:resource_consumption_metrics",
+        "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
         "//src/mongo/db/stats:timer_stats",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/rpc",
