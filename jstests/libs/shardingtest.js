@@ -1917,9 +1917,15 @@ export class ShardingTest {
                                 addShardCmd.name = `${testName}-${idx}`;
                             }
 
-                            let result = assert.commandWorked(
-                                admin.runCommand(addShardCmd),
-                                "Failed to add shard " + n,
+                            // TODO (SERVER-138180): Remove retry on write conflicts.
+                            let result = retryOnRetryableError(
+                                () => assert.commandWorked(
+                                    admin.runCommand(addShardCmd),
+                                    "Failed to add shard " + n,
+                                ),
+                                10,
+                                1000,
+                                [ErrorCodes.WriteConflict],
                             );
                             z.shardName = result.shardAdded;
                         }
