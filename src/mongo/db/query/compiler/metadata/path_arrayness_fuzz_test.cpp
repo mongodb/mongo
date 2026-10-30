@@ -7,6 +7,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
+#include "mongo/db/query/query_test_service_context.h"
 
 #include <array>
 #include <string>
@@ -83,8 +84,18 @@ auto QueryCompsDomain() {
         .WithMaxSize(10);
 }
 
+// Share a QueryTestServiceContext across runs. Tests still create fresh ExpressionContexts.
+QueryTestServiceContext& fuzzServiceContext() {
+    static QueryTestServiceContext ctx;
+    return ctx;
+}
+
+const NamespaceString kTestNss =
+    NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv);
+
 void EmptyOldTrieNeverInvalidates(std::vector<PathOp> ops) {
-    ExpressionContextForTest expCtx;
+    auto opCtx = fuzzServiceContext().makeOperationContext();
+    ExpressionContextForTest expCtx(opCtx.get(), kTestNss);
     PathArrayness current = buildPathArrayness(ops);
     EXPECT_FALSE(PathArrayness::getFirstInvalidatedPath(
                      expCtx.nonArrayPathsForNss(expCtx.getNamespaceString()),
@@ -93,14 +104,13 @@ void EmptyOldTrieNeverInvalidates(std::vector<PathOp> ops) {
                      .has_value());
 }
 
-FUZZ_TEST(PathArraynessFuzz, EmptyOldTrieNeverInvalidates).WithDomains(PathOpsDomain());
-
 void HasInvalidatedPathsMatchesManualCheck(std::vector<PathOp> oldOps,
                                            std::vector<std::vector<int>> queryComps,
                                            std::vector<PathOp> currentOps) {
     auto old = std::make_shared<PathArrayness>(buildPathArrayness(oldOps));
 
-    ExpressionContextForTest expCtx;
+    auto opCtx = fuzzServiceContext().makeOperationContext();
+    ExpressionContextForTest expCtx(opCtx.get(), kTestNss);
     expCtx.setPathArraynessForNss(expCtx.getNamespaceString(), old);
     const auto& nss = expCtx.getNamespaceString();
     for (const auto& comps : queryComps)
@@ -108,7 +118,7 @@ void HasInvalidatedPathsMatchesManualCheck(std::vector<PathOp> oldOps,
 
     PathArrayness current = buildPathArrayness(currentOps);
 
-    ExpressionContextForTest checkExpCtx;
+    ExpressionContextForTest checkExpCtx(opCtx.get(), kTestNss);
     checkExpCtx.setPathArraynessForNss(checkExpCtx.getNamespaceString(),
                                        std::make_shared<PathArrayness>(current));
     const auto& checkNss = checkExpCtx.getNamespaceString();
@@ -122,12 +132,10 @@ void HasInvalidatedPathsMatchesManualCheck(std::vector<PathOp> oldOps,
               expected);
 }
 
-FUZZ_TEST(PathArraynessFuzz, HasInvalidatedPathsMatchesManualCheck)
-    .WithDomains(PathOpsDomain(), QueryCompsDomain(), PathOpsDomain());
-
 void SelfDoesNotInvalidate(std::vector<PathOp> ops, std::vector<std::vector<int>> queryComps) {
     auto old = std::make_shared<PathArrayness>(buildPathArrayness(ops));
-    ExpressionContextForTest expCtx;
+    auto opCtx = fuzzServiceContext().makeOperationContext();
+    ExpressionContextForTest expCtx(opCtx.get(), kTestNss);
     expCtx.setPathArraynessForNss(expCtx.getNamespaceString(), old);
     const auto& nss = expCtx.getNamespaceString();
     for (const auto& comps : queryComps)
@@ -136,8 +144,16 @@ void SelfDoesNotInvalidate(std::vector<PathOp> ops, std::vector<std::vector<int>
                      .has_value());
 }
 
-FUZZ_TEST(PathArraynessFuzz, SelfDoesNotInvalidate)
-    .WithDomains(PathOpsDomain(), QueryCompsDomain());
+void PathArraynessTests(std::vector<PathOp> oldOps,
+                        std::vector<std::vector<int>> queryComps,
+                        std::vector<PathOp> currentOps) {
+    EmptyOldTrieNeverInvalidates(oldOps);
+    HasInvalidatedPathsMatchesManualCheck(oldOps, queryComps, currentOps);
+    SelfDoesNotInvalidate(oldOps, queryComps);
+}
+
+FUZZ_TEST(PathArraynessFuzz, PathArraynessTests)
+    .WithDomains(PathOpsDomain(), QueryCompsDomain(), PathOpsDomain());
 
 }  // namespace
 }  // namespace mongo
