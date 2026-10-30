@@ -836,8 +836,10 @@ env.Library(
         'prepare_conflict_tracker',
         'query/common_query_enums_and_helpers',
         'repl/read_concern_args',
+        'repl/repl_server_parameters',
         'server_base',
         'stats/resource_consumption_metrics',
+        'stats/server_read_concern_write_concern_metrics',
         'stats/timer_stats',
         # TODO (SERVER-66896): Remove this dependency.
         'storage/storage_engine_feature_flags',
