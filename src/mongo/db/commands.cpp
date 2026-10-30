@@ -45,6 +45,7 @@
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/version_context.h"
@@ -940,6 +941,35 @@ std::shared_ptr<CommandInvocation>& CommandInvocation::get(OperationContext* opC
 
 CommandInvocation::~CommandInvocation() = default;
 
+/**
+ * Rejects a client-supplied readConcern.afterOpTime unless the client holds ActionType::internal.
+ * Both outcomes are counted in the 'readConcernCounters' server status section, so that operators
+ * can see how much the deprecated argument is still relied upon before it is removed.
+ */
+void checkAuthForAfterOpTime(OperationContext* opCtx, const GenericArguments& genArg) {
+    const auto& readConcern = genArg.getReadConcern();
+    if (MONGO_likely(!readConcern || !readConcern->getArgsOpTime()))
+        return;
+
+    auto* metrics = ServerReadConcernMetrics::get(opCtx);
+
+    if (MONGO_unlikely(repl::gAllowDeprecatedAfterOpTimeReadConcern.load())) {
+        metrics->recordAcceptedAfterOpTime();
+        return;
+    }
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    const bool isInternal = authSession->isAuthorizedForActionsOnResource(
+        ResourcePattern::forClusterResource(boost::none), ActionType::internal);
+    if (isInternal) {
+        metrics->recordAcceptedAfterOpTime();
+    } else {
+        metrics->recordRejectedAfterOpTime();
+        uasserted(ErrorCodes::Unauthorized,
+                  "Not authorized to run command with readConcern.afterOpTime");
+    }
+}
+
 void CommandInvocation::checkAuthorization(OperationContext* opCtx,
                                            const OpMsgRequest& request) const {
     // Always send an authorization event to audit log, even if OK.
@@ -955,6 +985,7 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
             // Blanket authorization: don't need to check anything else.
         } else {
             try {
+                checkAuthForAfterOpTime(opCtx, getGenericArguments());
                 checkAuthForRawData(opCtx, getGenericArguments(), request);
                 doCheckAuthorization(opCtx);
             } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {

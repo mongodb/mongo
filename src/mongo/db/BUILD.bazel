@@ -748,6 +748,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/ddl:coll_mod_command_idl",
         "//src/mongo/db/shard_role/ddl:index_commands_idl",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
+        "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
         "//src/mongo/db/stats:timer_stats",
         "//src/mongo/db/storage:execution_context",
         "//src/mongo/db/storage:prepare_conflict_tracker",

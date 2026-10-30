@@ -97,6 +97,15 @@ void ServerReadConcernMetrics::ReadConcernLevelCounters::recordReadConcern(
     }
 }
 
+void ServerReadConcernMetrics::recordAcceptedAfterOpTime() {
+    _afterOpTime.accepted.fetchAndAdd(1);
+}
+
+void ServerReadConcernMetrics::recordRejectedAfterOpTime() {
+    _afterOpTime.rejected.fetchAndAdd(1);
+}
+
+
 void ServerReadConcernMetrics::ReadConcernCounters::recordReadConcern(
     const repl::ReadConcernArgs& readConcernArgs, bool isTransaction) {
     if (!readConcernArgs.getProvenance().isClientSupplied() || !readConcernArgs.hasLevel()) {
@@ -171,6 +180,11 @@ void ServerReadConcernMetrics::ReadConcernCounters::updateStats(ReadConcernOps* 
 }
 
 void ServerReadConcernMetrics::updateStats(ReadConcernStats* stats, OperationContext* opCtx) {
+    AfterOpTimeOps afterOpTime;
+    afterOpTime.setAccepted(_afterOpTime.accepted.load());
+    afterOpTime.setRejected(_afterOpTime.rejected.load());
+    stats->setAfterOpTime(afterOpTime);
+
     ReadConcernOps nonTransactionOps;
     _nonTransactionOps.updateStats(&nonTransactionOps, false /* isTransaction */);
     stats->setNonTransactionOps(nonTransactionOps);
@@ -203,3 +217,4 @@ auto readConcernCountersSSS =
 }  // namespace
 
 }  // namespace mongo
+
