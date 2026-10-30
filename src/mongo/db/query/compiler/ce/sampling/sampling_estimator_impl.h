@@ -329,12 +329,15 @@ public:
             BSONElementComparator(BSONElementComparator::FieldNamesMode::kIgnore, nullptr);
         const auto hasher = BSONComparatorInterfaceBase<BSONElement>::Hasher(&bsonElmComparator);
         const auto equalTo = BSONComparatorInterfaceBase<BSONElement>::EqualTo(&bsonElmComparator);
-        std::vector<MultiKeyDottedPathIterator> iterators;
+        std::vector<std::pair<MultiKeyDottedPathIterator, Interval::Direction>> fieldStates;
         // TODO(SERVER-114759) Optimize non-multikey indices
         std::transform(bounds.fields.begin(),
                        bounds.fields.end(),
-                       std::back_inserter(iterators),
-                       [&](auto&& oil) { return MultiKeyDottedPathIterator(oil.name); });
+                       std::back_inserter(fieldStates),
+                       [&](auto&& oil) {
+                           return std::make_pair(MultiKeyDottedPathIterator(oil.name),
+                                                 oil.computeDirection());
+                       });
         BSONElementSet elemSet(0, hasher, equalTo);
 
         // TODO(SERVER-114756): We can be more clever with retrieving the fields
@@ -343,8 +346,8 @@ public:
         for (size_t sampleIdx = 0; sampleIdx < sample.size(); sampleIdx++) {
             size_t count = 1;
 
-            for (size_t fieldIdx = 0; fieldIdx < iterators.size() && count > 0; fieldIdx++) {
-                auto&& it = iterators[fieldIdx];
+            for (size_t fieldIdx = 0; fieldIdx < fieldStates.size() && count > 0; fieldIdx++) {
+                auto&& [it, direction] = fieldStates[fieldIdx];
                 const auto& oil = bounds.fields[fieldIdx];
                 elemSet.clear();
 
@@ -354,7 +357,7 @@ public:
                 while (true) {
                     hasNext = it.hasNext();
                     if (elemSet.insert(element).second) {
-                        elementCount += matchesInterval(oil, element);
+                        elementCount += matchesInterval(oil, direction, element);
                         if (elementCount > 0 && skipDuplicateMatches) {
                             break;
                         }

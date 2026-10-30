@@ -69,7 +69,7 @@ static size_t countUniqueKeysBtree(
         bool matches = true;
         size_t i = 0;
         for (auto it = keyBson.begin(); it != keyBson.end(); ++it, ++i) {
-            if (!matchesInterval((*bounds)[i], *it)) {
+            if (!matchesInterval((*bounds)[i], (*bounds)[i].computeDirection(), *it)) {
                 matches = false;
                 break;
             }
@@ -939,7 +939,7 @@ static BSONElement intElt(int v, BSONObj& storage) {
 TEST(MatchesIntervalOIL, EmptyOILReturnsFalse) {
     OrderedIntervalList oil;
     BSONObj storage;
-    ASSERT_FALSE(matchesInterval(oil, intElt(5, storage)));
+    ASSERT_FALSE(matchesInterval(oil, oil.computeDirection(), intElt(5, storage)));
 }
 
 TEST(MatchesIntervalOIL, SingleInclusiveInterval) {
@@ -947,12 +947,13 @@ TEST(MatchesIntervalOIL, SingleInclusiveInterval) {
     OrderedIntervalList oil;
     oil.intervals.push_back(Interval(BSON("" << 3 << "" << 7), true, true));
 
+    Interval::Direction direction = oil.computeDirection();
     BSONObj s;
-    ASSERT_FALSE(matchesInterval(oil, intElt(2, s)));  // before start
-    ASSERT_TRUE(matchesInterval(oil, intElt(3, s)));   // == start, inclusive
-    ASSERT_TRUE(matchesInterval(oil, intElt(5, s)));   // strictly inside
-    ASSERT_TRUE(matchesInterval(oil, intElt(7, s)));   // == end, inclusive
-    ASSERT_FALSE(matchesInterval(oil, intElt(8, s)));  // after end
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(2, s)));  // before start
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(3, s)));   // == start, inclusive
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(5, s)));   // strictly inside
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(7, s)));   // == end, inclusive
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(8, s)));  // after end
 }
 
 TEST(MatchesIntervalOIL, SingleExclusiveBounds) {
@@ -960,10 +961,11 @@ TEST(MatchesIntervalOIL, SingleExclusiveBounds) {
     OrderedIntervalList oil;
     oil.intervals.push_back(Interval(BSON("" << 3 << "" << 7), false, false));
 
+    Interval::Direction direction = oil.computeDirection();
     BSONObj s;
-    ASSERT_FALSE(matchesInterval(oil, intElt(3, s)));  // == start, exclusive
-    ASSERT_TRUE(matchesInterval(oil, intElt(4, s)));   // inside
-    ASSERT_FALSE(matchesInterval(oil, intElt(7, s)));  // == end, exclusive
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(3, s)));  // == start, exclusive
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(4, s)));   // inside
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(7, s)));  // == end, exclusive
 }
 
 TEST(MatchesIntervalOIL, MultipleAscendingIntervals) {
@@ -973,20 +975,21 @@ TEST(MatchesIntervalOIL, MultipleAscendingIntervals) {
     oil.intervals.push_back(Interval(BSON("" << 5 << "" << 7), true, true));
     oil.intervals.push_back(Interval(BSON("" << 9 << "" << 11), true, true));
 
+    Interval::Direction direction = oil.computeDirection();
     BSONObj s;
-    ASSERT_FALSE(matchesInterval(oil, intElt(0, s)));   // before all
-    ASSERT_TRUE(matchesInterval(oil, intElt(1, s)));    // start of first
-    ASSERT_TRUE(matchesInterval(oil, intElt(2, s)));    // inside first
-    ASSERT_TRUE(matchesInterval(oil, intElt(3, s)));    // end of first
-    ASSERT_FALSE(matchesInterval(oil, intElt(4, s)));   // gap [3,5)
-    ASSERT_TRUE(matchesInterval(oil, intElt(5, s)));    // start of second
-    ASSERT_TRUE(matchesInterval(oil, intElt(6, s)));    // inside second
-    ASSERT_TRUE(matchesInterval(oil, intElt(7, s)));    // end of second
-    ASSERT_FALSE(matchesInterval(oil, intElt(8, s)));   // gap [7,9)
-    ASSERT_TRUE(matchesInterval(oil, intElt(9, s)));    // start of third
-    ASSERT_TRUE(matchesInterval(oil, intElt(10, s)));   // inside third
-    ASSERT_TRUE(matchesInterval(oil, intElt(11, s)));   // end of third
-    ASSERT_FALSE(matchesInterval(oil, intElt(12, s)));  // after all
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(0, s)));   // before all
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(1, s)));    // start of first
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(2, s)));    // inside first
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(3, s)));    // end of first
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(4, s)));   // gap [3,5)
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(5, s)));    // start of second
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(6, s)));    // inside second
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(7, s)));    // end of second
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(8, s)));   // gap [7,9)
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(9, s)));    // start of third
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(10, s)));   // inside third
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(11, s)));   // end of third
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(12, s)));  // after all
 }
 
 TEST(MatchesIntervalOIL, MultipleIntervalsWithExclusiveBounds) {
@@ -995,13 +998,14 @@ TEST(MatchesIntervalOIL, MultipleIntervalsWithExclusiveBounds) {
     oil.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
     oil.intervals.push_back(Interval(BSON("" << 5 << "" << 7), false, true));
 
+    Interval::Direction direction = oil.computeDirection();
     BSONObj s;
-    ASSERT_TRUE(matchesInterval(oil, intElt(1, s)));   // inclusive start
-    ASSERT_FALSE(matchesInterval(oil, intElt(3, s)));  // exclusive end of first
-    ASSERT_FALSE(matchesInterval(oil, intElt(4, s)));  // gap
-    ASSERT_FALSE(matchesInterval(oil, intElt(5, s)));  // exclusive start of second
-    ASSERT_TRUE(matchesInterval(oil, intElt(6, s)));   // inside second
-    ASSERT_TRUE(matchesInterval(oil, intElt(7, s)));   // inclusive end
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(1, s)));   // inclusive start
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(3, s)));  // exclusive end of first
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(4, s)));  // gap
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(5, s)));  // exclusive start of second
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(6, s)));   // inside second
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(7, s)));   // inclusive end
 }
 
 TEST(MatchesIntervalOIL, MixedRangesAndPointIntervals) {
@@ -1011,18 +1015,19 @@ TEST(MatchesIntervalOIL, MixedRangesAndPointIntervals) {
     oil.intervals.push_back(Interval(BSON("" << 5 << "" << 5), true, true));
     oil.intervals.push_back(Interval(BSON("" << 7 << "" << 9), true, true));
 
+    Interval::Direction direction = oil.computeDirection();
     BSONObj s;
-    ASSERT_FALSE(matchesInterval(oil, intElt(0, s)));   // before all
-    ASSERT_TRUE(matchesInterval(oil, intElt(1, s)));    // start of range [1,3]
-    ASSERT_TRUE(matchesInterval(oil, intElt(2, s)));    // inside [1,3]
-    ASSERT_TRUE(matchesInterval(oil, intElt(3, s)));    // end of range [1,3]
-    ASSERT_FALSE(matchesInterval(oil, intElt(4, s)));   // gap between [1,3] and [5,5]
-    ASSERT_TRUE(matchesInterval(oil, intElt(5, s)));    // point interval [5,5]
-    ASSERT_FALSE(matchesInterval(oil, intElt(6, s)));   // gap between [5,5] and [7,9]
-    ASSERT_TRUE(matchesInterval(oil, intElt(7, s)));    // start of range [7,9]
-    ASSERT_TRUE(matchesInterval(oil, intElt(8, s)));    // inside [7,9]
-    ASSERT_TRUE(matchesInterval(oil, intElt(9, s)));    // end of range [7,9]
-    ASSERT_FALSE(matchesInterval(oil, intElt(10, s)));  // after all
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(0, s)));   // before all
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(1, s)));    // start of range [1,3]
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(2, s)));    // inside [1,3]
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(3, s)));    // end of range [1,3]
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(4, s)));   // gap between [1,3] and [5,5]
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(5, s)));    // point interval [5,5]
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(6, s)));   // gap between [5,5] and [7,9]
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(7, s)));    // start of range [7,9]
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(8, s)));    // inside [7,9]
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(9, s)));    // end of range [7,9]
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(10, s)));  // after all
 }
 
 TEST(MatchesIntervalOIL, DescendingIntervals) {
@@ -1032,26 +1037,28 @@ TEST(MatchesIntervalOIL, DescendingIntervals) {
     oil.intervals.push_back(Interval(BSON("" << 7 << "" << 3), true, true));
     oil.intervals.push_back(Interval(BSON("" << 1 << "" << -1), true, true));
 
+    Interval::Direction direction = oil.computeDirection();
     BSONObj s;
-    ASSERT_FALSE(matchesInterval(oil, intElt(8, s)));   // above first interval's start
-    ASSERT_TRUE(matchesInterval(oil, intElt(7, s)));    // == start of first
-    ASSERT_TRUE(matchesInterval(oil, intElt(5, s)));    // inside first
-    ASSERT_TRUE(matchesInterval(oil, intElt(3, s)));    // == end of first
-    ASSERT_FALSE(matchesInterval(oil, intElt(2, s)));   // gap [1,3)
-    ASSERT_TRUE(matchesInterval(oil, intElt(1, s)));    // start of second
-    ASSERT_TRUE(matchesInterval(oil, intElt(0, s)));    // inside second
-    ASSERT_TRUE(matchesInterval(oil, intElt(-1, s)));   // end of second
-    ASSERT_FALSE(matchesInterval(oil, intElt(-2, s)));  // below last interval's end
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(8, s)));   // above first interval's start
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(7, s)));    // == start of first
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(5, s)));    // inside first
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(3, s)));    // == end of first
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(2, s)));   // gap [1,3)
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(1, s)));    // start of second
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(0, s)));    // inside second
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(-1, s)));   // end of second
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(-2, s)));  // below last interval's end
 }
 TEST(MatchesIntervalOIL, PointIntervalInclusive) {
     // OIL: [5, 5] — computeDirection() returns kDirectionNone; direction defaults to ascending.
     OrderedIntervalList oil;
     oil.intervals.push_back(Interval(BSON("" << 5 << "" << 5), true, true));
 
+    Interval::Direction direction = oil.computeDirection();
     BSONObj s;
-    ASSERT_FALSE(matchesInterval(oil, intElt(4, s)));  // before the point
-    ASSERT_TRUE(matchesInterval(oil, intElt(5, s)));   // exactly the point
-    ASSERT_FALSE(matchesInterval(oil, intElt(6, s)));  // after the point
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(4, s)));  // before the point
+    ASSERT_TRUE(matchesInterval(oil, direction, intElt(5, s)));   // exactly the point
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(6, s)));  // after the point
 }
 
 TEST(MatchesIntervalOIL, PointIntervalExclusive) {
@@ -1060,10 +1067,11 @@ TEST(MatchesIntervalOIL, PointIntervalExclusive) {
     OrderedIntervalList oil;
     oil.intervals.push_back(Interval(BSON("" << 5 << "" << 5), false, false));
 
+    Interval::Direction direction = oil.computeDirection();
     BSONObj s;
-    ASSERT_FALSE(matchesInterval(oil, intElt(4, s)));
-    ASSERT_FALSE(matchesInterval(oil, intElt(5, s)));
-    ASSERT_FALSE(matchesInterval(oil, intElt(6, s)));
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(4, s)));
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(5, s)));
+    ASSERT_FALSE(matchesInterval(oil, direction, intElt(6, s)));
 }
 
 TEST(CountNDVMultiKey, DottedPathSharingArrayPrefix) {

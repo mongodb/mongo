@@ -69,7 +69,7 @@ public:
     }
 
     static bool matches(const OrderedIntervalList& oil, BSONElement val) {
-        return matchesInterval(oil, val);
+        return matchesInterval(oil, oil.computeDirection(), val);
     }
 
     // Help function to compute the margin of error for the given sample size. The z parameter

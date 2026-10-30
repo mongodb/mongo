@@ -127,6 +127,8 @@ size_t countUniqueDocuments(const std::vector<BSONObj>& docs);
 /**
  * This helper checks if an element is within any of the list of Interval.
  */
-bool matchesInterval(const OrderedIntervalList& oil, BSONElement val);
+bool matchesInterval(const OrderedIntervalList& oil,
+                     Interval::Direction direction,
+                     BSONElement val);
 
 }  // namespace mongo::ce

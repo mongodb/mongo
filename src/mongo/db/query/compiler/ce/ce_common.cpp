@@ -263,9 +263,14 @@ namespace filter {
  *  }
  */
 auto forBounds(std::span<const OrderedIntervalList> bounds) {
-    return [bounds](const std::vector<BSONElement>& fields) {
+    std::vector<Interval::Direction> directions;
+    directions.reserve(bounds.size());
+    for (const auto& oil : bounds)
+        directions.push_back(oil.computeDirection());
+
+    return [bounds, directions = std::move(directions)](const std::vector<BSONElement>& fields) {
         for (size_t i = 0; i < fields.size(); ++i) {
-            if (!matchesInterval(bounds[i], fields[i])) {
+            if (!matchesInterval(bounds[i], directions[i], fields[i])) {
                 return false;
             }
         }
@@ -347,12 +352,12 @@ size_t countUniqueDocuments(const std::vector<BSONObj>& docs) {
     return uniqueIds.size();
 }
 
-bool matchesInterval(const OrderedIntervalList& oil, BSONElement val) {
+bool matchesInterval(const OrderedIntervalList& oil,
+                     Interval::Direction direction,
+                     BSONElement val) {
     if (oil.intervals.empty()) {
         return false;
     }
-
-    const Interval::Direction direction = oil.computeDirection();
 
     // Binary search for the first interval val is not strictly AHEAD of.
     auto it =
