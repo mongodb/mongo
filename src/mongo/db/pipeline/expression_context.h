@@ -26,6 +26,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/compiler/metadata/schema_type_info.h"
+#include "mongo/db/query/compiler/type_system/type.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -1097,6 +1098,25 @@ public:
     }
 
     /**
+     * Returns the type of the field path, as inferred from the collection validator.
+     * This is only available when all documents are guaranteed to conform. Otherwise, type 'any' is
+     * returned. The use of this method establishes a dependency between this query and the current
+     * validator, when the type of the path is not 'any'. If the validator is changed, the dependent
+     * query might be killed to ensure it is not running with stale assumptions. Note the returned
+     * type is what is inferred from the validator only and does not encode information from other
+     * sources, such as index multikey metadata (PathArrayness).
+     */
+    pipeline::type_system::Type getTypeFromSchemaForNss(const FieldRef& path,
+                                                        const NamespaceString& nss) {
+        using namespace pipeline::type_system;
+        auto type = getPathType(getSchemaTypeForNss(nss), path);
+        if (type != Type::any()) {
+            markSchemaTypeInfoUsed();
+        }
+        return type;
+    }
+
+    /**
      * Returns whether a field path can be an array for the given namespace. Returns true
      * (conservative) when neither PathArrayness nor SchemaTypeInfo information for 'nss' is
      * available (e.g. on mongos). Either source independently guaranteeing the path cannot be an
@@ -1111,16 +1131,13 @@ public:
                 return false;
             }
         }
-        if (auto it = _params.schemaTypeInfoForNss.find(nss);
-            it != _params.schemaTypeInfoForNss.end()) {
-            tassert(13516202, "SchemaTypeInfo entry must not be null", it->second);
-            if (!it->second->canPathBeArray(FieldRef(path.fullPath()))) {
-                // Only a proven "cannot be an array" result enables a rewrite, so mark the schema
-                // used (making the query schema-dependent) only in that case. A conservative "can
-                // be an array" answer drives no rewrite, so it creates no dependency to invalidate.
-                markSchemaTypeInfoUsed();
-                return false;
-            }
+        auto rootType = getSchemaTypeForNss(nss);
+        if (!rootType.canPathBeArray(FieldRef(path.fullPath()))) {
+            // Only a proven "cannot be an array" result enables a rewrite, so mark the schema
+            // used (making the query schema-dependent) only in that case. A conservative "can
+            // be an array" answer drives no rewrite, so it creates no dependency to invalidate.
+            markSchemaTypeInfoUsed();
+            return false;
         }
         return true;
     }
@@ -1476,6 +1493,19 @@ protected:
     ValueComparator _valueComparator;
 
 private:
+    /**
+     * Returns the type inferred from the document validator for the given namespace.
+     * Does not mark the type as used, that is left to the caller.
+     */
+    pipeline::type_system::Type getSchemaTypeForNss(const NamespaceString& nss) const {
+        auto it = _params.schemaTypeInfoForNss.find(nss);
+        if (it == _params.schemaTypeInfoForNss.end()) {
+            return pipeline::type_system::Type::any();
+        }
+        tassert(13516202, "SchemaTypeInfo entry must not be null", it->second);
+        return it->second->getRootType();
+    }
+
     std::unique_ptr<ExpressionCounters> _expressionCounters;
     uint32_t _memoryIntensiveExprCount = 0;
 

@@ -56,14 +56,12 @@ protected:
 
     void setPipeline(std::unique_ptr<Pipeline> p) {
         pipeline = std::move(p);
-        pipeline->getContext()->setPathArraynessForNss(pipeline->getContext()->getNamespaceString(),
-                                                       pathArrayness);
+        auto& expCtx = *pipeline->getContext();
+        const auto& nss = expCtx.getNamespaceString();
+        expCtx.setPathArraynessForNss(nss, pathArrayness);
         stages.assign(pipeline->getSources().begin(), pipeline->getSources().end());
-        canPathBeArray = [this](std::string_view path) -> bool {
-            return pipeline->getContext()->canPathBeArrayForNss(
-                FieldRef(path), pipeline->getContext()->getNamespaceString());
-        };
-        graph = std::make_unique<DependencyGraph>(pipeline->getSources(), canPathBeArray);
+        graph = std::make_unique<DependencyGraph>(
+            pipeline->getSources(), nss, CollectionMetadataAccessor{expCtx});
     }
 
     void setPipeline(const std::string& array) {
@@ -105,7 +103,6 @@ protected:
 
     std::unique_ptr<Pipeline> pipeline;
     std::shared_ptr<PathArrayness> pathArrayness;
-    CanPathBeArray canPathBeArray;
     std::vector<boost::intrusive_ptr<DocumentSource>> stages;
     std::unique_ptr<DependencyGraph> graph;
 
@@ -139,11 +136,11 @@ private:
         }
 
         AggregateCommandRequest request(kTestNss, rawPipeline);
-        boost::intrusive_ptr<ExpressionContextForTest> ctx = new ExpressionContextForTest();
-        ctx->setResolvedNamespaces(resolvedNs);
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx = new ExpressionContextForTest();
+        expCtx->setResolvedNamespaces(resolvedNs);
 
         return pipeline_factory::makePipeline(
-            request.getPipeline(), ctx, pipeline_factory::kOptionsMinimal);
+            request.getPipeline(), expCtx, pipeline_factory::kOptionsMinimal);
     }
 };
 
@@ -2215,7 +2212,8 @@ DEATH_TEST_REGEX_F(PipelineDependencyGraphDeathTest,
         "[{$set: {a: 1}},"
         " {$set: {a: 2}}]");
     auto& container = pipeline->getSources();
-    graph = std::make_unique<DependencyGraph>(container, std::next(container.begin()));
+    graph = std::make_unique<DependencyGraph>(
+        container, std::next(container.begin()), pipeline->getContext()->getNamespaceString());
 
     ASSERT_THROWS_CODE(graph->getPrevModifyingStage(nullptr, "a"), AssertionException, 13118101);
 }
@@ -2238,7 +2236,8 @@ DEATH_TEST_REGEX_F(PipelineDependencyGraphDeathTest,
                    "Tripwire assertion.*13118101") {
     setPipeline("[{$set: {a: 1}}]");
     auto& container = pipeline->getSources();
-    graph = std::make_unique<DependencyGraph>(container, container.begin());
+    graph = std::make_unique<DependencyGraph>(
+        container, container.begin(), pipeline->getContext()->getNamespaceString());
 
     ASSERT_THROWS_CODE(graph->getPrevModifyingStage(nullptr, "a"), AssertionException, 13118101);
 }

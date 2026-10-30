@@ -31,12 +31,9 @@ public:
         }
         pipeline->getContext()->setPathArraynessForNss(pipeline->getContext()->getNamespaceString(),
                                                        pathArrayness);
-        auto canPathBeArray = [this, &pipeline](std::string_view path) -> bool {
-            return pipeline->getContext()->canPathBeArrayForNss(
-                FieldRef(path), pipeline->getContext()->getNamespaceString());
-        };
-
-        DependencyGraph graph(pipeline->getSources(), canPathBeArray);
+        DependencyGraph graph(pipeline->getSources(),
+                              pipeline->getContext()->getNamespaceString(),
+                              CollectionMetadataAccessor{*pipeline->getContext()});
 
         // Run the golden test portion.
         {

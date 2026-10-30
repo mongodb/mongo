@@ -595,20 +595,54 @@ struct PathMatch {
 
 }  // namespace
 
-bool defaultCanPathBeArray(std::string_view path) {
+bool defaultCanPathBeArray(std::string_view path, const NamespaceString& nss) {
     return true;
+}
+
+ts::Type defaultGetTypeFromSchema(std::string_view, const NamespaceString& nss) {
+    return ts::Type::any();
 }
 
 namespace {
 /// Wrapper for the PathArrayness API passed into the graph as CanPathBeArray.
 struct CanPathBeArrayForNss {
-    bool operator()(std::string_view path) const {
+    bool operator()(std::string_view path, const NamespaceString& nss) const {
         return expCtx.canPathBeArrayForNss(FieldRef(path), nss);
     }
     ExpressionContext& expCtx;
-    const NamespaceString& nss;
+};
+
+struct GetTypeFromSchemaForNss {
+    ts::Type operator()(std::string_view path, const NamespaceString& nss) const {
+        return expCtx.getTypeFromSchemaForNss(FieldRef(path), nss);
+    }
+    ExpressionContext& expCtx;
 };
 }  // namespace
+
+CollectionMetadataAccessor::CollectionMetadataAccessor()
+    : CollectionMetadataAccessor(defaultCanPathBeArray, defaultGetTypeFromSchema) {}
+
+CollectionMetadataAccessor::CollectionMetadataAccessor(CanPathBeArray canPathBeArray)
+    : CollectionMetadataAccessor(std::move(canPathBeArray), defaultGetTypeFromSchema) {}
+
+CollectionMetadataAccessor::CollectionMetadataAccessor(CanPathBeArray canPathBeArray,
+                                                       GetTypeFromSchema getTypeFromSchema)
+    : _canPathBeArray(std::move(canPathBeArray)),
+      _getTypeFromSchema(std::move(getTypeFromSchema)) {}
+
+CollectionMetadataAccessor::CollectionMetadataAccessor(ExpressionContext& expCtx)
+    : CollectionMetadataAccessor(CanPathBeArrayForNss{expCtx}, GetTypeFromSchemaForNss{expCtx}) {}
+
+bool CollectionMetadataAccessor::canPathBeArray(std::string_view path,
+                                                const NamespaceString& nss) const {
+    return _canPathBeArray(path, nss);
+}
+
+ts::Type CollectionMetadataAccessor::getTypeFromSchema(std::string_view path,
+                                                       const NamespaceString& nss) const {
+    return _getTypeFromSchema(path, nss);
+}
 
 namespace {
 /// RAII helper that appends a dotted path component to 'buf' on construction and restores
@@ -649,8 +683,9 @@ class DependencyGraph::Impl {
 public:
     explicit Impl(const DocumentSourceContainer& container,
                   DocumentSourceContainer::const_iterator endIt,
-                  CanPathBeArray canPathBeArray = defaultCanPathBeArray)
-        : _container(container), _canPathBeArray(std::move(canPathBeArray)) {
+                  const NamespaceString& nss,
+                  CollectionMetadataAccessor collectionMetadata)
+        : _container(container), _mainNss(nss), _collectionMetadata(std::move(collectionMetadata)) {
         grow(endIt);
     }
 
@@ -719,6 +754,10 @@ public:
         }
 
         MONGO_UNREACHABLE_TASSERT(11939201);
+    }
+
+    Type getTypeFromSchema(std::string_view path) const {
+        return _collectionMetadata.getTypeFromSchema(path, _mainNss);
     }
 
     Type getType(const DocumentSource* ds, PathRef path) const {
@@ -1058,7 +1097,7 @@ private:
                 // Check if the shadowing field has an alias to a collection path. If so, resolve
                 // the full path and query the PathArrayness API with it.
                 if (auto* alias = getCollectionAlias(fieldId)) {
-                    return _canPathBeArray(buildDottedPath(*alias, match.suffix()));
+                    return canCollectionFieldBeArray(buildDottedPath(*alias, match.suffix()));
                 }
                 // Walk the shadowing field's constant if it's array-free.
                 if (!canPrefixContainArrays(prefix)) {
@@ -1079,7 +1118,7 @@ private:
                     // array even if the leaf is missing.
                     canPrefixContainArrays(prefix);
             case FieldMatchType::kBaseDocument:
-                return _canPathBeArray(match.path);
+                return canCollectionFieldBeArray(match.path);
         }
 
         MONGO_UNREACHABLE_TASSERT(12266805);
@@ -1697,6 +1736,10 @@ private:
         return value;
     }
 
+    bool canCollectionFieldBeArray(PathRef path) const {
+        return _collectionMetadata.canPathBeArray(path, _mainNss);
+    }
+
     /**
      * Returns true if the prefix of the given collection path can be an array.
      */
@@ -1706,7 +1749,7 @@ private:
         }
         auto prefix =
             buildDottedPath(ParsedPath(collectionPath.begin(), std::prev(collectionPath.end())));
-        return _canPathBeArray(prefix);
+        return canCollectionFieldBeArray(prefix);
     }
 
     /**
@@ -2062,11 +2105,10 @@ private:
         }
         auto subExpCtx = ds->getSubpipelineExpCtx();
         tassert(12414601, "Expected to have subpipeline expression context", subExpCtx);
-        auto& mainExpCtx = *ds->getExpCtx();
+        const auto& subNss = subExpCtx->getNamespaceString();
         auto info = std::make_unique<SubpipelineInfo>();
         setSubpipelineMetadata(ds, *info);
-        info->graph = std::make_unique<DependencyGraph>(
-            *subPipeline, CanPathBeArrayForNss{mainExpCtx, subExpCtx->getNamespaceString()});
+        info->graph = std::make_unique<DependencyGraph>(*subPipeline, subNss, _collectionMetadata);
         _subpipelineGraphs.push_back(std::move(info));
         _stages[stageId].subpipeline = _subpipelineGraphs.back().get();
     }
@@ -2396,18 +2438,22 @@ private:
 
     // Reference to the complete pipeline.
     const DocumentSourceContainer& _container;
-    // Callback to query the Path Arrayness API for the ExpressionContext's resident namespace.
-    const CanPathBeArray _canPathBeArray;
+    // The namespace of the pipeline.
+    NamespaceString _mainNss;
+    // Provides access to the PathArrayness and SchemaType APIs.
+    const CollectionMetadataAccessor _collectionMetadata;
 };
 
 DependencyGraph::DependencyGraph(const DocumentSourceContainer& container,
-                                 CanPathBeArray canPathBeArray)
-    : DependencyGraph(container, container.end(), std::move(canPathBeArray)) {}
+                                 const NamespaceString& nss,
+                                 CollectionMetadataAccessor collectionMetadata)
+    : DependencyGraph(container, container.end(), nss, std::move(collectionMetadata)) {}
 
 DependencyGraph::DependencyGraph(const DocumentSourceContainer& container,
                                  DocumentSourceContainer::const_iterator endIt,
-                                 CanPathBeArray canPathBeArray)
-    : _impl(std::make_unique<Impl>(container, endIt, std::move(canPathBeArray))) {}
+                                 const NamespaceString& nss,
+                                 CollectionMetadataAccessor collectionMetadata)
+    : _impl(std::make_unique<Impl>(container, endIt, nss, std::move(collectionMetadata))) {}
 
 DependencyGraph::~DependencyGraph() = default;
 DependencyGraph::DependencyGraph(DependencyGraph&&) noexcept = default;
@@ -2700,7 +2746,7 @@ DependencyGraphContext::DependencyGraphContext(ExpressionContext& expCtx,
 std::unique_ptr<DependencyGraph> DependencyGraphContext::createGraph(
     DocumentSourceContainer::const_iterator endIt) const {
     return std::make_unique<DependencyGraph>(
-        _container, endIt, CanPathBeArrayForNss{_expCtx, _expCtx.getNamespaceString()});
+        _container, endIt, _expCtx.getNamespaceString(), CollectionMetadataAccessor{_expCtx});
 }
 
 const DependencyGraph& DependencyGraphContext::getGraph(

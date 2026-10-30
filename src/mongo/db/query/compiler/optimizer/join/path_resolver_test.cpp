@@ -10,10 +10,6 @@
 
 namespace mongo::join_ordering {
 
-bool mainCollPathAlwaysScalar(std::string_view path) {
-    return false;
-}
-
 void validatePath(boost::optional<PathId> id,
                   PathResolver& pr,
                   const FieldPath& expectedPath,
@@ -63,6 +59,23 @@ void testResolveRename(PathResolver& pr,
 
 class PathResolverTest : public AggJoinModelFixture {
 public:
+    pipeline::dependency_graph::DependencyGraph makeGraph(Pipeline& pipeline) {
+        const auto expCtx = pipeline.getContext();
+        const auto mainNss = expCtx->getNamespaceString();
+        const auto mainCollPathAlwaysScalar = [expCtx, mainNss](std::string_view path,
+                                                                const NamespaceString& nss) {
+            if (nss == mainNss) {
+                return false;
+            }
+            return expCtx->canPathBeArrayForNss(FieldRef(path), nss);
+        };
+
+        return pipeline::dependency_graph::DependencyGraph(
+            pipeline.getSources(),
+            mainNss,
+            pipeline::dependency_graph::CollectionMetadataAccessor{mainCollPathAlwaysScalar});
+    }
+
     std::unique_ptr<Pipeline> makeBasicTestPipeline(std::string_view lf1,
                                                     std::string_view ff1,
                                                     std::string_view as1,
@@ -132,8 +145,7 @@ TEST_F(PathResolverTest, Basic) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "embed", "lf2", "ff2", "embed2");
     markFieldsAsScalar(
         *pipeline, {}, {{"foreign", {"ff", "a", "embed.a"}}, {"foreign2", {"ff2", "embed.a"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
 
     const NodeId kBaseNode = 0;
     const NodeId kForeignNode = 1;
@@ -186,8 +198,7 @@ TEST_F(PathResolverTest, Basic) {
 
 TEST_F(PathResolverTest, EmbedPathCollisionExact) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "as", "lf2", "ff2", "as");
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     // No issues embedding our first path.
@@ -206,8 +217,7 @@ TEST_F(PathResolverTest, EmbedPathCollisionExact) {
 
 TEST_F(PathResolverTest, EmbedPathCollision2ndPrefixed) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "as", "lf2", "ff2", "as.bar");
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     // No issues embedding our first path.
@@ -226,8 +236,7 @@ TEST_F(PathResolverTest, EmbedPathCollision2ndPrefixed) {
 
 TEST_F(PathResolverTest, EmbedPathCollisions1stPrefixed) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "as.foo", "lf2", "ff2", "as");
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     // No issues embedding our first path.
@@ -247,8 +256,7 @@ TEST_F(PathResolverTest, EmbedPathCollisions1stPrefixed) {
 TEST_F(PathResolverTest, EmbedPathShadowsExact) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "as", "lf2", "ff2", "lf");
     markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     // No issues embedding our first path.
@@ -272,8 +280,7 @@ TEST_F(PathResolverTest, EmbedPathShadowsExact) {
 TEST_F(PathResolverTest, EmbedPathShadowsPrefix) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "as", "lf2", "ff2", "lf.as");
     markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     // No issues embedding our first path.
@@ -297,8 +304,7 @@ TEST_F(PathResolverTest, EmbedPathShadowsPrefix) {
 TEST_F(PathResolverTest, EmbedPathShadowsSuffix) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "as.x", "lf2", "ff2", "as");
     markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     // No issues embedding our first path.
@@ -322,8 +328,7 @@ TEST_F(PathResolverTest, EmbedPathShadowsSuffix) {
 TEST_F(PathResolverTest, EmbedPathParallelOk) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "as.x", "lf2", "ff2", "as.y");
     markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     // No issues embedding our first path.
@@ -356,8 +361,7 @@ TEST_F(PathResolverTest, HandleSubpipelineProject) {
                        {},
                        {{"foreign", {"someField", "someOtherField", "someOtherField.bar"}},
                         {"foreign2", {"ff", "someOtherField", "someOtherField2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     // No issues embedding our first path.
@@ -402,8 +406,7 @@ TEST_F(PathResolverTest, HandleSubpipelineProject) {
 TEST_F(PathResolverTest, PathValidation_NumericComponentOnBaseCollection) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "embed", "lf2", "ff2", "embed2");
     markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
 
     const NodeId kBaseNode = 0;
     const NodeId kForeignNode = 1;
@@ -433,8 +436,7 @@ TEST_F(PathResolverTest, PathValidation_NumericComponentOnBaseCollection) {
 TEST_F(PathResolverTest, PathValidation_NumericComponentOnEmbeddedPath) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "embed", "lf2", "ff2", "embed2");
     markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
 
     const NodeId kBaseNode = 0;
     const NodeId kForeignNode = 1;
@@ -464,8 +466,7 @@ TEST_F(PathResolverTest, PathValidation_ArrayPathOnForeignCollection) {
     auto pipeline = makeBasicTestPipeline("lf", "ff", "embed", "lf2", "ff2", "embed2");
     // Only "scalarField" is marked as non-array in the foreign collection; "ff" is not.
     markFieldsAsScalar(*pipeline, {}, {{"foreign", {"scalarField"}}, {"foreign2", {"ff2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
 
     const NodeId kBaseNode = 0;
     const NodeId kForeignNode = 1;
@@ -494,7 +495,12 @@ TEST_F(PathResolverTest, PathValidation_ArrayPathOnBaseCollection) {
 
     // Use a canPathBeArray callback that marks "arrayField" as potentially an array.
     pipeline::dependency_graph::DependencyGraph dg(
-        pipeline->getSources(), [](std::string_view path) { return path == "arrayField"; });
+        pipeline->getSources(),
+        pipeline->getContext()->getNamespaceString(),
+        pipeline::dependency_graph::CollectionMetadataAccessor{
+            [](std::string_view path, const NamespaceString&) {
+                return path == "arrayField";
+            }});
 
     const NodeId kBaseNode = 0;
     const NodeId kForeignNode = 1;
@@ -527,8 +533,7 @@ TEST_F(PathResolverTest, HandleMainPipelineProject) {
                               "embed2",
                               /* prefix */ R"({$project: {lf: 1, embed: 1, lf2: "computed"}},)");
     markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff", "bar"}}, {"foreign2", {"ff2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     // No issues embedding our first path.
@@ -579,8 +584,7 @@ TEST_F(PathResolverTest, HandleMainPipelineConsecutiveProjectsSameField) {
                               "embed2",
                               /* prefix */ R"({$project: {r1: "$a"}}, {$project: {r2: "$r1"}},)");
     markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     // The first $lookup is the third stage, after the two $project stages.
@@ -624,8 +628,7 @@ TEST_F(PathResolverTest, HandleMainPipelineConsecutiveProjectsDottedPath) {
         "embed2",
         /* prefix */ R"({$project: {r1: "$a.b"}}, {$project: {"r2.c": "$r1"}},)");
     markFieldsAsScalar(*pipeline, {"r2"}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     // The first $lookup is the third stage, after the two $project stages.
@@ -654,8 +657,7 @@ TEST_F(PathResolverTest, HandleSubpipelineConsecutiveRenamesSameField) {
         "ff2",
         "embed2");
     markFieldsAsScalar(*pipeline, {}, {{"foreign", {"ff"}}, {"foreign2", {"ff2"}}});
-    pipeline::dependency_graph::DependencyGraph dg(pipeline->getSources(),
-                                                   mainCollPathAlwaysScalar);
+    auto dg = makeGraph(*pipeline);
     PathResolver pr(0, dg);
 
     auto it = pipeline->getSources().begin();

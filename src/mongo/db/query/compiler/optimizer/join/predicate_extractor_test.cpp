@@ -490,11 +490,10 @@ public:
             {"a", "b", "c", "d"},
             {{"first", {"a", "b", "e"}}, {"second", {"a", "b", "c", "d", "e"}}});
 
-        auto canMainCollPathBeArray = [expCtx](std::string_view path) {
-            return expCtx->canPathBeArrayForNss(FieldRef(path), expCtx->getNamespaceString());
-        };
-        auto graph = pipeline::dependency_graph::DependencyGraph(pipeline->getSources(),
-                                                                 canMainCollPathBeArray);
+        auto graph = pipeline::dependency_graph::DependencyGraph(
+            pipeline->getSources(),
+            pipeline->getContext()->getNamespaceString(),
+            pipeline::dependency_graph::CollectionMetadataAccessor{*expCtx});
         PathResolver pathResolver(_baseNodeId, graph);
 
         ASSERT_TRUE(pathResolver.trackEmbedPath(*lookup1, _firstNodeId));

@@ -460,11 +460,10 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
     // Initialize deps after popping the $hint stage, but BEFORE we try to push a pipeline prefix
     // into our base collection CQ. This is important so we don't miss (for instance) $projects at
     // the start of the pipeline that might rename fields.
-    auto canMainCollPathBeArray = [clonedExpCtx, &nss](std::string_view path) {
-        return clonedExpCtx->canPathBeArrayForNss(FieldRef(path), nss);
-    };
-    pipeline::dependency_graph::DependencyGraph mainCollDeps(suffix->getSources(),
-                                                             canMainCollPathBeArray);
+    pipeline::dependency_graph::DependencyGraph mainCollDeps(
+        suffix->getSources(),
+        nss,
+        pipeline::dependency_graph::CollectionMetadataAccessor{*clonedExpCtx});
 
     auto swCQ = createCQForJoinPipeline(expCtx, *suffix, metrics.fallbackReason);
     if (!swCQ.isOK()) {

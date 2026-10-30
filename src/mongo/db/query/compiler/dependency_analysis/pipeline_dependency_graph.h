@@ -18,6 +18,11 @@
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+namespace mongo {
+class ExpressionContext;
+class NamespaceString;
+}  // namespace mongo
+
 namespace mongo::pipeline::dependency_graph {
 
 /**
@@ -30,12 +35,54 @@ using PathRef = std::string_view;
  * Callback used to query whether a path from the input of the pipeline (i.e. the base collection)
  * may resolve to an array.
  */
-using CanPathBeArray = std::function<bool(std::string_view)>;
+using CanPathBeArray = std::function<bool(std::string_view, const NamespaceString&)>;
+
+/**
+ * Callback used to query the type of the path inferred from the collection validator.
+ */
+using GetTypeFromSchema =
+    std::function<type_system::Type(std::string_view, const NamespaceString&)>;
 
 /**
  * Always returns true (any path may be an array).
  */
-bool defaultCanPathBeArray(std::string_view path);
+bool defaultCanPathBeArray(std::string_view path, const NamespaceString& nss);
+
+/**
+ * Always returns Type::any().
+ */
+type_system::Type defaultGetTypeFromSchema(std::string_view path, const NamespaceString& nss);
+
+/**
+ * Collection metadata accessors used by the dependency graph.
+ *
+ * 'getTypeFromSchema' returns the validator-derived type for a path. It should be valid for every
+ * document in the collection.
+ *
+ * 'canPathBeArray' returns true when any component of a path may be an array, based on multikey
+ * index metadata and the validator-derived type. It must return false whenever
+ * 'getTypeFromSchema' returns a type that excludes arrays for the path.
+ *
+ * This requirement lets the graph call 'canPathBeArray' without also calling 'getTypeFromSchema'
+ * when it only needs arrayness information.
+ */
+
+struct CollectionMetadataAccessor {
+    CollectionMetadataAccessor();
+    explicit CollectionMetadataAccessor(CanPathBeArray canPathBeArray);
+    CollectionMetadataAccessor(CanPathBeArray canPathBeArray, GetTypeFromSchema getTypeFromSchema);
+    /**
+     * Constructs an instance which queries metadata from the 'expCtx'.
+     */
+    explicit CollectionMetadataAccessor(ExpressionContext& expCtx);
+
+    bool canPathBeArray(std::string_view path, const NamespaceString& nss) const;
+    type_system::Type getTypeFromSchema(std::string_view path, const NamespaceString& nss) const;
+
+private:
+    CanPathBeArray _canPathBeArray;
+    GetTypeFromSchema _getTypeFromSchema;
+};
 
 /**
  * Result of looking up which stage last declared or modified a field path.
@@ -129,13 +176,15 @@ public:
      * Construct a dependency graph covering the entire container.
      */
     explicit DependencyGraph(const DocumentSourceContainer& container,
-                             CanPathBeArray canPathBeArray = defaultCanPathBeArray);
+                             const NamespaceString& nss,
+                             CollectionMetadataAccessor collectionMetadata = {});
     /**
      * Construct a dependency graph covering the range [container.begin(), endIt).
      */
     DependencyGraph(const DocumentSourceContainer& container,
                     DocumentSourceContainer::const_iterator endIt,
-                    CanPathBeArray canPathBeArray = defaultCanPathBeArray);
+                    const NamespaceString& nss,
+                    CollectionMetadataAccessor collectionMetadata = {});
     ~DependencyGraph();
     DependencyGraph(DependencyGraph&&) noexcept;
     DependencyGraph& operator=(DependencyGraph&&) noexcept;

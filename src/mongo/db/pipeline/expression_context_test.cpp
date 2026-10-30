@@ -763,6 +763,31 @@ TEST_F(ExpressionContextTest, SchemaTypeInfoUsageIsFalseByDefaultAndSharedWithCo
     ASSERT_TRUE(expCtx->hasUsedSchemaTypeInfo());
 }
 
+TEST_F(ExpressionContextTest, GetTypeFromSchemaForNssMarksOnlyUsefulSchemaTypeInfo) {
+    using namespace pipeline::type_system;
+    auto opCtx = makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv);
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    auto fieldType = Type(BSONType::array, Extent::kAll);
+    auto schemaTypeInfo = std::make_shared<SchemaTypeInfo>(
+        Type::object({{"x", fieldType}, {"y", Type::any()}}, Open::kYes));
+    expCtx->setSchemaTypeInfoForNss(nss, schemaTypeInfo);
+
+    // The schema does not tell us anything about the type of "y", "z" or "x.a", so we shouldn't
+    // mark the type info as used.
+    for (auto untypedPath : {"y", "z", "x.a"}) {
+        ASSERT_EQ(expCtx->getTypeFromSchemaForNss(FieldRef(untypedPath), nss), Type::any());
+        ASSERT_FALSE(expCtx->hasUsedSchemaTypeInfo());
+        ASSERT_TRUE(expCtx->getNonArrayPathsForNss().empty());
+    }
+
+    // But 'x' is known and we should mark the info as used.
+    ASSERT_EQ(expCtx->getTypeFromSchemaForNss(FieldRef("x"), nss), fieldType);
+    ASSERT_TRUE(expCtx->hasUsedSchemaTypeInfo());
+    ASSERT_TRUE(expCtx->getNonArrayPathsForNss().empty());
+}
+
 // An internal-only expression must still be rejected when an external client sends it, but must
 // parse when the server re-parses a stored query shape that contains it. Otherwise reading
 // $queryStats as an external client fails on any entry recorded for an internal client. See

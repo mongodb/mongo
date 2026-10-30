@@ -28,7 +28,7 @@ public:
 
     void runVariation(TestCase testCase) {
         auto pipeline = parsePipeline(testCase.pipeline);
-        DependencyGraph graph(pipeline->getSources());
+        DependencyGraph graph(pipeline->getSources(), pipeline->getContext()->getNamespaceString());
 
         // Run the golden test portion.
         {

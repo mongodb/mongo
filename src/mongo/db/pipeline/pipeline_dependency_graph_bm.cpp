@@ -32,7 +32,8 @@ BENCHMARK_DEFINE_F(PipelineDependencyGraphBMFixture, BM_BuildDependencyGraph)
 (benchmark::State& state) {
     auto pipeline = makePipeline(state);
     for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(DependencyGraph(pipeline->getSources()));
+        benchmark::DoNotOptimize(
+            DependencyGraph(pipeline->getSources(), pipeline->getContext()->getNamespaceString()));
     }
 }
 BENCHMARK_REGISTER_F(PipelineDependencyGraphBMFixture, BM_BuildDependencyGraph)
@@ -49,7 +50,7 @@ BENCHMARK_DEFINE_F(PipelineDependencyGraphBMFixture, BM_RebuildDependencyGraphFr
     size_t middle = state.range(0) / 2;
     auto middleIt = std::next(pipeline->getSources().cbegin(), middle);
 
-    DependencyGraph graph(pipeline->getSources());
+    DependencyGraph graph(pipeline->getSources(), pipeline->getContext()->getNamespaceString());
     for (auto keepRunning : state) {
         graph.recompute_forTest(middleIt);
     }
@@ -99,7 +100,7 @@ BENCHMARK_DEFINE_F(PipelineDependencyGraphBMFixture, BM_RebuildDependencyGraphWi
         pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
     auto middleIt = std::next(pipeline->getSources().cbegin(), kNumStages / 2);
 
-    DependencyGraph graph(pipeline->getSources());
+    DependencyGraph graph(pipeline->getSources(), pipeline->getContext()->getNamespaceString());
     for (auto keepRunning : state) {
         graph.recompute_forTest(middleIt);
     }
@@ -135,7 +136,7 @@ BENCHMARK_DEFINE_F(PipelineDependencyGraphBMFixture, BM_RebuildDependencyGraphFi
         pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
     auto middleIt = std::next(pipeline->getSources().cbegin(), 1 + kNumStages / 2);
 
-    DependencyGraph graph(pipeline->getSources());
+    DependencyGraph graph(pipeline->getSources(), pipeline->getContext()->getNamespaceString());
     for (auto keepRunning : state) {
         graph.recompute_forTest(middleIt);
     }
@@ -179,7 +180,7 @@ private:
 BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_CanPathBeArray)
 (benchmark::State& state) {
     auto pipeline = makeRenamePipeline(state.range(0));
-    DependencyGraph graph(pipeline->getSources());
+    DependencyGraph graph(pipeline->getSources(), pipeline->getContext()->getNamespaceString());
     for (auto keepRunning : state) {
         benchmark::DoNotOptimize(graph.canPathBeArray(nullptr, "x"));
     }
@@ -195,7 +196,8 @@ BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_BuildDepend
 (benchmark::State& state) {
     auto pipeline = makeRenamePipeline(state.range(0));
     for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(DependencyGraph(pipeline->getSources()));
+        benchmark::DoNotOptimize(
+            DependencyGraph(pipeline->getSources(), pipeline->getContext()->getNamespaceString()));
     }
 }
 BENCHMARK_REGISTER_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_BuildDependencyGraphRenames)
@@ -231,7 +233,7 @@ BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_CanPathBeAr
     }
     auto pipeline = pipeline_factory::makePipeline(
         {BSON("$match" << predicates.obj())}, expCtx, pipeline_factory::kOptionsMinimal);
-    DependencyGraph graph(pipeline->getSources());
+    DependencyGraph graph(pipeline->getSources(), pipeline->getContext()->getNamespaceString());
     for (auto keepRunning : state) {
         benchmark::DoNotOptimize(graph.canPathBeArray(nullptr, path));
     }
@@ -260,7 +262,7 @@ BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture,
     }
     auto pipeline = pipeline_factory::makePipeline(
         {BSON("$match" << predicates.obj())}, expCtx, pipeline_factory::kOptionsMinimal);
-    DependencyGraph graph(pipeline->getSources());
+    DependencyGraph graph(pipeline->getSources(), pipeline->getContext()->getNamespaceString());
     for (auto keepRunning : state) {
         benchmark::DoNotOptimize(graph.canPathBeArray(nullptr, "x"));
     }
@@ -290,7 +292,7 @@ BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture,
     }
     auto pipeline = pipeline_factory::makePipeline(
         {BSON("$match" << predicates.obj())}, expCtx, pipeline_factory::kOptionsMinimal);
-    DependencyGraph graph(pipeline->getSources());
+    DependencyGraph graph(pipeline->getSources(), pipeline->getContext()->getNamespaceString());
     for (auto keepRunning : state) {
         benchmark::DoNotOptimize(graph.canPathBeArray(nullptr, "x"));
     }
@@ -319,7 +321,7 @@ BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_CanPathBeAr
     }
     auto pipeline =
         pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
-    DependencyGraph graph(pipeline->getSources());
+    DependencyGraph graph(pipeline->getSources(), pipeline->getContext()->getNamespaceString());
     for (auto keepRunning : state) {
         benchmark::DoNotOptimize(graph.canPathBeArray(nullptr, "x"));
     }
