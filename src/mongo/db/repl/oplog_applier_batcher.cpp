@@ -166,8 +166,11 @@ StatusWith<OplogApplierBatch> OplogApplierBatcher::getNextApplierBatch(
             }
         }
 
-        BatchAction action = getBatchActionForEntry(
-            _oplogApplier->getOptions().mode, ops.empty() ? entry : ops.front(), entry, batchStats);
+        BatchAction action =
+            getBatchActionForEntry(_oplogApplier->getOptions().mode,
+                                   ops.empty() ? entry.getTimestamp() : ops.front().getTimestamp(),
+                                   entry,
+                                   batchStats);
         switch (action) {
             case BatchAction::kContinueBatch:
                 break;
@@ -261,7 +264,7 @@ StatusWith<OplogApplierBatch> OplogApplierBatcher::getNextApplierBatch(
  *       individually.
  */
 BatchAction getBatchActionForEntry(OplogApplication::Mode mode,
-                                   const OplogEntry& firstEntryInBatch,
+                                   Timestamp earliestTsAppliedConcurrently,
                                    const OplogEntry& entry,
                                    const BatchStats& batchStats) {
     // Used by non-commit and non-abort entries to cut the batch if it already contains any
@@ -316,7 +319,7 @@ BatchAction getBatchActionForEntry(OplogApplication::Mode mode,
                 change_stream_pre_image_id_util::getPreImageTimestamp(maxRecordId);
             // Entries in the current batch can be applied concurrently as the truncate. Make sure
             // applying the current batch does not insert preimages into the truncate range.
-            return maxTruncateTimestamp >= firstEntryInBatch.getTimestamp()
+            return maxTruncateTimestamp >= earliestTsAppliedConcurrently
                 ? BatchAction::kStartNewBatch
                 : continueOrStartNewBatch();
         } else if (ns.isOplog()) {

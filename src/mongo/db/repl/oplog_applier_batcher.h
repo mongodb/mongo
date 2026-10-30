@@ -53,11 +53,13 @@ struct BatchStats {
 
 /**
  * Returns how we should batch an oplog entry: grouping with the current batch, starting a new
- * batch, or processing it individually in its own batch. `firstEntryInBatch` is the first entry
- * of the batch being accumulated; it is `entry` itself when deciding on the first entry.
+ * batch, or processing it individually in its own batch.
+ *
+ * `earliestTsAppliedConcurrently` is the earliest timestamp of the entries that may potentially
+ * be applied concurrently with `entry`.
  */
 BatchAction getBatchActionForEntry(OplogApplication::Mode mode,
-                                   const OplogEntry& firstEntryInBatch,
+                                   Timestamp earliestTsAppliedConcurrently,
                                    const OplogEntry& entry,
                                    const BatchStats& batchStats);
 

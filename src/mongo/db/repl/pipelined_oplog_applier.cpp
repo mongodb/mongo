@@ -53,12 +53,15 @@ void setWorkerOpCtxStates(OperationContext* opCtx) {
  * Returns if a batch containing the given ops must be applied serialized, i.e. with
  * no other batches in flight.
  */
-bool batchMustBeAppliedSerialized(OplogApplication::Mode mode, const std::vector<OplogEntry>& ops) {
+bool batchMustBeAppliedSerialized(OplogApplication::Mode mode,
+                                  Timestamp lastApplied,
+                                  const std::vector<OplogEntry>& ops) {
     invariant(!ops.empty());
     const BatchStats batchStats;
-    const auto& firstEntryInBatch = ops.front();
     return std::any_of(ops.begin(), ops.end(), [&](const OplogEntry& entry) {
-        const auto action = getBatchActionForEntry(mode, firstEntryInBatch, entry, batchStats);
+        // Entries above lastApplied may belong to batches still in flight, so they may be applied
+        // concurrently with this batch; entries below it have already been published.
+        const auto action = getBatchActionForEntry(mode, lastApplied, entry, batchStats);
         return action == BatchAction::kProcessIndividually || action == BatchAction::kStartNewBatch;
     });
 }
@@ -170,7 +173,11 @@ void PipelinedOplogApplier::_dispatchBatch(OperationContext* opCtx, std::vector<
     // and published before resuming.
     // If the batch doesn't require serialization, the batch is dispatched to the worker pool and
     // pipelined with other batches.
-    if (batchMustBeAppliedSerialized(getOptions().mode, ops)) {
+    // We pass in the current lastApplied opTime as a bound on the smallest opTime that can be run
+    // by a worker while this batch is executing. Since this is the LOWER bound, it's alright and
+    // expected if the lastApplied moves forward and the value passed in is stale.
+    if (batchMustBeAppliedSerialized(
+            getOptions().mode, _replCoord->getMyLastAppliedOpTime().getTimestamp(), ops)) {
         if (!_drainWorkers()) {
             // TODO(SERVER-136053): Propagate shutdown failure to `_run`
             return;

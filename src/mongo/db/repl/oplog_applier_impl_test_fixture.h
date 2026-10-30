@@ -170,6 +170,17 @@ public:
                    boost::optional<IndexCollModInfo> indexInfo,
                    bool isViewlessTimeseries) override;
 
+    /**
+     * Called when OplogApplierImpl truncates a range of RecordIds.
+     */
+    void onTruncateRange(OperationContext* opCtx,
+                         const CollectionPtr& coll,
+                         const RecordId& minRecordId,
+                         const RecordId& maxRecordId,
+                         int64_t bytesDeleted,
+                         int64_t docsDeleted,
+                         repl::OpTime& opTime) override;
+
     // Hooks for OpObserver functions. Defaults to a no-op function but may be overridden to
     // check actual documents mutated.
     std::function<void(OperationContext*, const NamespaceString&, const std::vector<BSONObj>&)>
@@ -221,6 +232,15 @@ public:
                        const CollectionOptions&,
                        boost::optional<IndexCollModInfo>)>
         onCollModFn;
+
+    std::function<void(OperationContext*,
+                       const CollectionPtr&,
+                       const RecordId&,
+                       const RecordId&,
+                       int64_t,
+                       int64_t,
+                       repl::OpTime&)>
+        onTruncateRangeFn;
 };
 
 class [[MONGO_MOD_OPEN]] OplogApplierImplTest : public ServiceContextMongoDTest {

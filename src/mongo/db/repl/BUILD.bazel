@@ -2278,6 +2278,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index:multikey_paths",
         "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog",
         "//src/mongo/db/shard_role/shard_catalog:set_multikey_metadata_oplog_helpers",
         "//src/mongo/db/storage/kv:kv_engine",

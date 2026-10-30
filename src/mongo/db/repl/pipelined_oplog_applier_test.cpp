@@ -29,6 +29,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/set_multikey_metadata_oplog_helpers.h"
@@ -1048,9 +1049,9 @@ protected:
         return sessionInfo;
     }
 
-    // Whether a batch of 'ops' must be applied serialized.
-    bool serialized(std::vector<OplogEntry> ops) {
-        return batchMustBeAppliedSerialized(OplogApplication::Mode::kSecondary, ops);
+    // Whether a batch of 'ops' must be applied serialized at the given lastApplied timestamp.
+    bool serialized(std::vector<OplogEntry> ops, Timestamp lastApplied = Timestamp()) {
+        return batchMustBeAppliedSerialized(OplogApplication::Mode::kSecondary, lastApplied, ops);
     }
 };
 
@@ -1084,6 +1085,34 @@ TEST_F(PipelinedBatchSerializationTest, SerializesCommands) {
     ASSERT_TRUE(serialized({commandOp(kNss, BSON("dropDatabase" << 1))}));
     ASSERT_TRUE(
         serialized({makeCreateIndexOplogEntry(nextOpTime(), kNss, "a_1", BSON("a" << 1), kUuid)}));
+}
+
+// A pre-images ranged truncate validates its range against lastApplied and the storage engine's
+// all-durable timestamp, which do not cover batches still in flight. When the truncate range
+// reaches entries above lastApplied, the batch applies serialized so that every batch writing
+// into the range is published first.
+TEST_F(PipelinedBatchSerializationTest, SerializesPreImagesTruncateReachingUnappliedEntries) {
+    const auto truncate =
+        makeTruncateRangeOnPreImagesEntry(10 /* t */, 5 /* maxTruncateTimestamp */);
+    // The truncate leading a batch is the shape the batcher produces when it cuts the previous
+    // batch at the truncate; that previous batch, containing the pre-images inside the range,
+    // may still be in flight.
+    ASSERT_TRUE(serialized({truncate, insertOp(kNss, BSON("_id" << 0))}, Timestamp(5, 0)));
+    ASSERT_TRUE(serialized({truncate}, Timestamp(5, 0)));
+    // lastApplied below the top of the truncate range by any amount forces serialization.
+    ASSERT_TRUE(serialized({truncate}, Timestamp(4, 0)));
+}
+
+TEST_F(PipelinedBatchSerializationTest, PipelinesPreImagesTruncateWhenRangeIsFullyApplied) {
+    // lastApplied is above the truncate range, so every pre-image in the range belongs to a
+    // published batch: the truncate may be pipelined with batches applying later entries.
+    const auto truncate =
+        makeTruncateRangeOnPreImagesEntry(10 /* t */, 5 /* maxTruncateTimestamp */);
+    ASSERT_FALSE(serialized({truncate}, Timestamp(6, 0)));
+    ASSERT_FALSE(serialized({truncate, insertOp(kNss, BSON("_id" << 0))}, Timestamp(6, 0)));
+    // Truncating the oplog is not gated on lastApplied: the range cannot receive more writes,
+    // because the applier buffer has already consumed the entries within it.
+    ASSERT_FALSE(serialized({makeTruncateRangeOnOplogEntry(10, 5)}, Timestamp(4, 0)));
 }
 
 // A single-entry transaction whose applyOps embeds a DDL command applies serialized
@@ -1954,6 +1983,70 @@ TEST_F(PipelinedOplogApplierRunTest,
     finishApplier();
 }
 
+// A pre-images ranged truncate may not be applied while a batch whose entries write inside its
+// range is still in flight.
+// In this test:
+// 1. One worker is held applying inserts from an earlier batch while
+// 2. A second worker will receive a truncateRange to truncate the entries being written
+//    to in the earlier batch.
+// The dispatcher must wait for worker (1) to drain before dispatching the truncateRange.
+TEST_F(PipelinedOplogApplierRunTest, PreImagesTruncateWaitsForInFlightBatchCoveringItsRange) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    // The truncate's validation requires the pre-images collection: clustered, no indexes.
+    {
+        CollectionOptions preImagesOptions;
+        preImagesOptions.clusteredIndex.emplace(
+            clustered_util::makeCanonicalClusteredInfoForLegacyFormat());
+        createCollection(
+            _opCtx.get(), NamespaceString::kChangeStreamPreImagesNamespace, preImagesOptions);
+    }
+
+    // Records when the truncate's range validation passed and the truncate was applied.
+    Notification<void> truncateApplied;
+    _opObserver->onTruncateRangeFn = [&](OperationContext*,
+                                         const CollectionPtr&,
+                                         const RecordId&,
+                                         const RecordId&,
+                                         int64_t,
+                                         int64_t,
+                                         repl::OpTime&) {
+        truncateApplied.set();
+    };
+
+    // Command ops route by namespace alone, so the truncate lands on a fixed worker. Hold a
+    // batch of inserts routed to a different worker.
+    const size_t truncateWorker = expectedWorker(makeTruncateRangeOnPreImagesEntry(0, 0));
+    const size_t heldWorker = (truncateWorker + 1) % kNumWorkers;
+    const int heldId = idRoutedTo(heldWorker);
+    const int heldId2 = idRoutedTo(heldWorker, heldId + 1);
+    auto& held = watchWriteOf(heldId, /*hold=*/true);
+
+    auto insert1 = insertOp(kNss, BSON("_id" << heldId));
+    auto insert2 = insertOp(kNss, BSON("_id" << heldId2));
+    // The truncate's optime follows the inserts', and its range top covers the first insert's
+    // timestamp while staying at or below the inserts batch's last op: the range becomes
+    // eligible exactly once the inserts batch is published.
+    const auto firstInsertSecs = static_cast<int>(insert1.getOpTime().getTimestamp().getSecs());
+    auto truncateOp = makeTruncateRangeOnPreImagesEntry(firstInsertSecs + 2, firstInsertSecs);
+
+    pushToBuffer({insert1, insert2});
+    startApplier();
+    // The batch of inserts is now in flight, held on its worker after the first write.
+    waitForGate(held);
+
+    pushToBuffer({truncateOp});
+
+    // While the inserts batch is in flight, lastApplied and the all-durable timestamp are below
+    // the truncate's range top, so the truncate must not apply.
+    ASSERT_FALSE(truncateApplied.waitFor(_opCtx.get(), Milliseconds(500)));
+
+    held.release.set();
+    ASSERT_TRUE(truncateApplied.waitFor(_opCtx.get(), Seconds(60)));
+    finishApplier();
+    assertPublished(truncateOp);
+    assertCollectionContainsExactly(kNss, {BSON("_id" << heldId), BSON("_id" << heldId2)});
+}
+
 // The step-up drain waits for the advancer's publication, not just worker idleness: the final
 // batch's publication side effects must finish before the signal fires.
 TEST_F(PipelinedOplogApplierRunTest, StepUpDrainWaitsForAdvancerPublication) {
@@ -2588,7 +2681,8 @@ TEST_F(PipelinedMultikeyPublishTest, SerializedBatchFlushesBeforeFollowingDDL) {
     const auto nss = NamespaceString::kServerConfigurationNamespace;
     createCollectionWithIndex(_opCtx.get(), nss, BSON("a" << 1));
     const auto insert = insertOp(nss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
-    ASSERT_TRUE(batchMustBeAppliedSerialized(OplogApplication::Mode::kSecondary, {insert}));
+    ASSERT_TRUE(batchMustBeAppliedSerialized(
+        OplogApplication::Mode::kSecondary, Timestamp() /* lastApplied */, {insert}));
     const auto drop = makeCommandOplogEntry(nextOpTime(),
                                             nss.getCommandNS(),
                                             BSON("drop" << nss.coll()),

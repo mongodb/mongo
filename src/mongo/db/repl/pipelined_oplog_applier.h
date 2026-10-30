@@ -110,8 +110,12 @@ void consumeWorkItem(size_t workerIdx,
 
 /**
  * Returns whether a batch must be applied serialized ("drain, dispatch, drain") because it
- * contains an entry that must not be applied concurrently with its neighbors.
+ * contains an entry that must not be applied concurrently with its neighbors. `lastApplied` is
+ * this applier's lastApplied timestamp: entries with later timestamps may belong to batches
+ * still in flight, so a batch whose entries depend on those batches must be applied serialized.
  */
-bool batchMustBeAppliedSerialized(OplogApplication::Mode mode, const std::vector<OplogEntry>& ops);
+bool batchMustBeAppliedSerialized(OplogApplication::Mode mode,
+                                  Timestamp lastApplied,
+                                  const std::vector<OplogEntry>& ops);
 
 }  // namespace mongo::repl

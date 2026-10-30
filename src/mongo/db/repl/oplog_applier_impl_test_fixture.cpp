@@ -184,6 +184,19 @@ void OplogApplierImplOpObserver::onCollMod(OperationContext* opCtx,
     onCollModFn(opCtx, nss, uuid, collModCmd, oldCollOptions, indexInfo);
 }
 
+void OplogApplierImplOpObserver::onTruncateRange(OperationContext* opCtx,
+                                                 const CollectionPtr& coll,
+                                                 const RecordId& minRecordId,
+                                                 const RecordId& maxRecordId,
+                                                 int64_t bytesDeleted,
+                                                 int64_t docsDeleted,
+                                                 repl::OpTime& opTime) {
+    if (!onTruncateRangeFn) {
+        return;
+    }
+    onTruncateRangeFn(opCtx, coll, minRecordId, maxRecordId, bytesDeleted, docsDeleted, opTime);
+}
+
 std::unique_ptr<ReplicationCoordinator> OplogApplierImplTest::makeReplCoord(
     ServiceContext* serviceContext) {
     return std::make_unique<ReplicationCoordinatorMock>(serviceContext);
