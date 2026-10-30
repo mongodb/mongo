@@ -161,20 +161,33 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate(WithLock lk
               "latestKnownOpTime"_attr = (pair.second ? (*pair.second).toString() : "unknown"));
     }
 
-    auto targetOpTimeCB = [this](Status status) {
-        // Double check the target time since stepdown may signal us too.
-        const auto myLastApplied = _repl->_getMyLastAppliedOpTime(
+    auto targetOpTimeCB = [weakSelf = weak_from_this()](Status status) {
+        // A non-OK status means the waiter was destroyed or failed: by abort(), by a change of
+        // target, or by stepdown or shutdown. That caller concludes catch-up itself and may be in
+        // the middle of destroying this state, so concluding it here as well would run abort()
+        // twice and use the state after it is freed.
+        if (!status.isOK()) {
+            return;
+        }
+        // The waiter can outlive this state, for example if remove() did not find it, so only the
+        // current catch-up may be concluded.
+        auto self = weakSelf.lock();
+        if (!self || self->_repl->_catchupState != self) {
+            return;
+        }
+        const auto myLastApplied = self->_repl->_getMyLastAppliedOpTime(
             WithLock::withoutLock() /* We hold _mutex when we execute this. */);
-        if (_targetOpTime <= myLastApplied) {
+        if (self->_targetOpTime <= myLastApplied) {
             LOGV2(21368,
                   "Caught up to the latest known optime successfully after becoming primary",
-                  "targetOpTime"_attr = _targetOpTime,
+                  "targetOpTime"_attr = self->_targetOpTime,
                   "myLastApplied"_attr = myLastApplied);
             // Report the number of ops applied during catchup in replSetGetStatus once the primary
             // is caught up.
-            ReplicationMetrics::get(getGlobalServiceContext()).setNumCatchUpOps(_numCatchUpOps);
-            abort(WithLock::withoutLock() /* We hold _mutex when we execute this. */,
-                  PrimaryCatchUpConclusionReason::kSucceeded);
+            ReplicationMetrics::get(getGlobalServiceContext())
+                .setNumCatchUpOps(self->_numCatchUpOps);
+            self->abort(WithLock::withoutLock() /* We hold _mutex when we execute this. */,
+                        PrimaryCatchUpConclusionReason::kSucceeded);
         }
     };
     auto pf = makePromiseFuture<void>();
@@ -374,7 +387,7 @@ void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) 
     _startHeartbeats(lk);
 
     invariant(!_catchupState);
-    _catchupState = std::make_unique<CatchupState>(this);
+    _catchupState = std::make_shared<CatchupState>(this);
     _catchupState->start(lk);
 }
 
