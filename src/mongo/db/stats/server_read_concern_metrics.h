@@ -55,6 +55,16 @@ public:
     void recordReadConcern(const repl::ReadConcernArgs& readConcernArgs, bool isTransaction);
 
     /**
+     * Records that a client-supplied readConcern.afterOpTime argument was accepted.
+     */
+    void recordAcceptedAfterOpTime();
+
+    /**
+     * Records that a client-supplied readConcern.afterOpTime argument was rejected.
+     */
+    void recordRejectedAfterOpTime();
+
+    /**
      * Appends the accumulated stats to a readConcern stats object.
      */
     void updateStats(ReadConcernStats* stats, OperationContext* opCtx);
@@ -98,6 +108,18 @@ private:
     };
     ReadConcernCounters _nonTransactionOps;
     ReadConcernCounters _transactionOps;
+
+    /**
+     * Counters for operations that supplied the deprecated readConcern.afterOpTime argument, split
+     * by whether the argument was accepted or rejected. Unlike the level counters above, these are
+     * not broken down by readConcern level: 'afterOpTime' is orthogonal to the level, and may only
+     * not be combined with 'snapshot'.
+     */
+    struct AfterOpTimeCounters {
+        AtomicWord<unsigned long long> accepted{0};
+        AtomicWord<unsigned long long> rejected{0};
+    };
+    AfterOpTimeCounters _afterOpTime;
 };
 
 }  // namespace mongo

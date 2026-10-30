@@ -598,6 +598,8 @@ env.Library(
         'commands/test_commands_enabled',
         'create_indexes_idl',
         'namespace_string',
+        'repl/repl_server_parameters',
+        'stats/server_read_concern_write_concern_metrics',
     ],
 )
 

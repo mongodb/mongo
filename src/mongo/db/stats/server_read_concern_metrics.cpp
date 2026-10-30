@@ -108,6 +108,14 @@ void ServerReadConcernMetrics::recordReadConcern(const repl::ReadConcernArgs& re
     ops.recordReadConcern(readConcernArgs, isTransaction);
 }
 
+void ServerReadConcernMetrics::recordAcceptedAfterOpTime() {
+    _afterOpTime.accepted.fetchAndAdd(1);
+}
+
+void ServerReadConcernMetrics::recordRejectedAfterOpTime() {
+    _afterOpTime.rejected.fetchAndAdd(1);
+}
+
 void ServerReadConcernMetrics::ReadConcernLevelCounters::updateStats(ReadConcernOps* stats,
                                                                      bool isTransaction) {
     SnapshotOps snapshotOps;
@@ -160,6 +168,11 @@ void ServerReadConcernMetrics::ReadConcernCounters::updateStats(ReadConcernOps* 
 }
 
 void ServerReadConcernMetrics::updateStats(ReadConcernStats* stats, OperationContext* opCtx) {
+    AfterOpTimeOps afterOpTime;
+    afterOpTime.setAccepted(_afterOpTime.accepted.load());
+    afterOpTime.setRejected(_afterOpTime.rejected.load());
+    stats->setAfterOpTime(afterOpTime);
+
     ReadConcernOps nonTransactionOps;
     _nonTransactionOps.updateStats(&nonTransactionOps, false /* isTransaction */);
     stats->setNonTransactionOps(nonTransactionOps);
