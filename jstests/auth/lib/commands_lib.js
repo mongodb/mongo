@@ -2975,7 +2975,8 @@ export const authCommandsLib = {
                 },
             ],
         },
-        // showSystemEvents re-admits system.js into db/cluster-scoped streams, requiring an extra privilege.
+        // 'showSystemEvents' requires no privileges beyond those of the stream's scope. Events on
+        // system.js are filtered out of the stream if the user cannot read system.js.
         {
             testname: "aggregate_changeStream_whole_db_showSystemEvents",
             command: {
@@ -3001,16 +3002,10 @@ export const authCommandsLib = {
                             resource: {db: firstDbName, collection: ""},
                             actions: ["changeStream", "find"],
                         },
-                        {
-                            resource: {db: firstDbName, collection: "system.js"},
-                            actions: ["changeStream", "find"],
-                        },
                     ],
                     expectFail: true, // because no replication enabled
                 },
                 {
-                    // A role scoped to firstDbName's system.js (e.g. 'read') must not satisfy this
-                    // check against a different database.
                     runOnDb: secondDbName,
                     roles: {
                         readAnyDatabase: 1,
@@ -3024,22 +3019,8 @@ export const authCommandsLib = {
                             resource: {db: secondDbName, collection: ""},
                             actions: ["changeStream", "find"],
                         },
-                        {
-                            resource: {db: secondDbName, collection: "system.js"},
-                            actions: ["changeStream", "find"],
-                        },
                     ],
                     expectFail: true, // because no replication enabled
-                },
-                {
-                    expectAuthzFailure: true,
-                    runOnDb: firstDbName,
-                    privileges: [
-                        {
-                            resource: {db: firstDbName, collection: ""},
-                            actions: ["changeStream", "find"],
-                        },
-                    ],
                 },
             ],
         },
@@ -3062,19 +3043,8 @@ export const authCommandsLib = {
                     },
                     privileges: [
                         {resource: {db: "", collection: ""}, actions: ["changeStream", "find"]},
-                        {
-                            resource: {db: "", collection: "system.js"},
-                            actions: ["changeStream", "find"],
-                        },
                     ],
                     expectFail: true, // because no replication enabled
-                },
-                {
-                    expectAuthzFailure: true,
-                    runOnDb: adminDbName,
-                    privileges: [
-                        {resource: {db: "", collection: ""}, actions: ["changeStream", "find"]},
-                    ],
                 },
             ],
         },

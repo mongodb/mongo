@@ -76,25 +76,22 @@ public:
         }
 
         ActionSet actions{ActionType::changeStream, ActionType::find};
+        // Note: 'showSystemEvents' does not require additional privileges. Events on system
+        // collections that the scope privileges below do not cover are filtered out of the stream
+        // instead, see 'DocumentSourceChangeStream::resolveAllCollectionsRegex()'.
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            PrivilegeVector privileges;
             if (_nss.isAdminDB() && _nss.isCollectionlessAggregateNS()) {
                 // Watching a whole cluster.
-                privileges.push_back(
-                    Privilege(ResourcePattern::forAnyNormalResource(_nss.tenantId()), actions));
+                return {Privilege(ResourcePattern::forAnyNormalResource(_nss.tenantId()), actions)};
             } else if (_nss.isCollectionlessAggregateNS()) {
                 // Watching a whole database.
-                privileges.push_back(
-                    Privilege(ResourcePattern::forDatabaseName(_nss.dbName()), actions));
+                return {Privilege(ResourcePattern::forDatabaseName(_nss.dbName()), actions)};
             } else {
                 // Watching a single collection. Note if this is in the admin database it will fail
                 // at parse time.
-                privileges.push_back(Privilege(ResourcePattern::forExactNamespace(_nss), actions));
+                return {Privilege(ResourcePattern::forExactNamespace(_nss), actions)};
             }
-
-            _addShowSystemEventsPrivilegesIfNeeded(&privileges);
-            return privileges;
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
@@ -144,10 +141,6 @@ public:
 
     protected:
         const NamespaceString _nss;
-
-    private:
-        // Require a system.js privilege for showSystemEvents on db/cluster-scoped streams.
-        void _addShowSystemEventsPrivilegesIfNeeded(PrivilegeVector* privileges) const;
     };
 
     // The name of the field where the document key (_id and shard key, if present) will be found
@@ -292,18 +285,35 @@ public:
     // Does not match a collection named $ or a collection with 'system.' in the name.
     // However, it will still match collection names starting with system.buckets or
     // system.resharding, or a collection exactly named system.js or system.views.
-    // Keep in sync with LiteParsed::_addShowSystemEventsPrivilegesIfNeeded.
     static constexpr std::string_view kRegexAllCollectionsShowSystemEvents{
         R"((?!(\$|system\.(?!(js$|resharding\.|buckets\.|views$)))))"};
+
+    // Same as 'kRegexAllCollectionsShowSystemEvents', but without system.js. Used when the user is
+    // not authorized to read the system.js collections covered by the stream.
+    static constexpr std::string_view kRegexAllCollectionsShowSystemEventsExceptSystemJs{
+        R"((?!(\$|system\.(?!(resharding\.|buckets\.|views$)))))"};
 
     static constexpr std::string_view kRegexAllDBs{R"(^(?!(admin|config|local)\.)[^.]+)"};
     static constexpr std::string_view kRegexCmdColl{R"(\$cmd$)"};
 
     /**
      * Helpers for determining which regex to match a change stream against.
+     *
+     * When 'showSystemEvents' is set, 'resolveAllCollectionsRegex()' only includes system.js if
+     * the user is authorized for 'find' and 'changeStream' on every system.js collection covered by
+     * the stream. The scope privileges of whole-db and whole-cluster streams do not cover system
+     * collections, so without such a grant system.js events are filtered out.
      */
     static std::string_view resolveAllCollectionsRegex(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Returns whether the client of 'opCtx' may read the events on every system.js collection
+     * covered by a change stream on 'nss'. 'showSystemEvents' exposes system.js, but the privileges
+     * required to open a whole-db or whole-cluster stream do not cover system collections, so
+     * system.js events are filtered out when this returns false.
+     */
+    static bool isAuthorizedForSystemJsEvents(OperationContext* opCtx, const NamespaceString& nss);
 
     static std::string getNsRegexForChangeStream(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
