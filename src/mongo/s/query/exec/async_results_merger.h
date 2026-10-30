@@ -880,6 +880,16 @@ private:
     bool _shouldProcessAdditionalParticipantsFor(OperationContext* opCtx, WithLock lk) const;
 
     /**
+     * Buffers the parts of a successful getMore response pertaining to additional transaction
+     * participants. They cannot be processed in the async callback because the transaction router
+     * is not thread-safe; the owner thread drains '_remoteResponses' later.
+     */
+    void _keepRecordOfAdditionalTxnParticipants(WithLock,
+                                                const CbData& cbData,
+                                                const StatusWith<CursorResponse>& parsedResponse,
+                                                const RemoteCursorPtr& remote);
+
+    /**
      * Removes a remote from the _promisedMinSortKeys set, if already present in there.
      */
     void _removeRemoteFromPromisedMinSortKeys(WithLock lk, const RemoteCursorPtr& remote);

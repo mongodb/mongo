@@ -1629,6 +1629,38 @@ void AsyncResultsMerger::_scheduleRetryCallback(std::function<void(Status)> call
     }
 }
 
+void AsyncResultsMerger::_keepRecordOfAdditionalTxnParticipants(
+    WithLock,
+    const CbData& cbData,
+    const StatusWith<CursorResponse>& parsedResponse,
+    const RemoteCursorPtr& remote) {
+    if (!parsedResponse.isOK()) {
+        return;
+    }
+    if (const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        !gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
+        return;
+    }
+    // Here we buffer the parsed parts of the response pertaining to additional transaction
+    // participants. Additional transaction participants processing cannot occur here
+    // directly since access to the underlying transaction router is not thread-safe.
+    _remoteResponses.push(
+        {.shardId = remote->shardId,
+         .parsedMetadata =
+             TransactionRouter::Router::parseParticipantResponseMetadata(cbData.response.data)});
+    // To avoid data race issues we delay processing until the actual owner thread of the
+    // ARM drains the queue.
+    // Only log when additional participants were actually added.
+    if (const auto& additionalParticipants =
+            _remoteResponses.back().parsedMetadata.txnResponseMetadata.getAdditionalParticipants();
+        additionalParticipants && !additionalParticipants->empty()) {
+        LOGV2_DEBUG(13412904,
+                    2,
+                    "Buffered response for additional transaction participant processing",
+                    "shardId"_attr = remote->shardId);
+    }
+}
+
 void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                                               CbData const& cbData,
                                               StatusWith<CursorResponse>& parsedResponse,
@@ -1637,30 +1669,7 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
     remote->cbHandle = executor::TaskExecutor::CallbackHandle();
     remote->outstandingRequest = false;
 
-    if (parsedResponse.isOK()) {
-        if (const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-            gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
-            // Here we buffer the parsed parts of the response pertaining to additional transaction
-            // participants. Additional transaction participants processing cannot occur here
-            // directly since access to the underlying transaction router is not thread-safe.
-            _remoteResponses.push(
-                {.shardId = remote->shardId,
-                 .parsedMetadata = TransactionRouter::Router::parseParticipantResponseMetadata(
-                     cbData.response.data)});
-            // To avoid data race issues we delay processing until the actual owner thread of the
-            // ARM drains the queue.
-            // Only log when additional participants were actually added.
-            if (const auto& additionalParticipants =
-                    _remoteResponses.back()
-                        .parsedMetadata.txnResponseMetadata.getAdditionalParticipants();
-                additionalParticipants && !additionalParticipants->empty()) {
-                LOGV2_DEBUG(13412904,
-                            2,
-                            "Buffered response for additional transaction participant processing",
-                            "shardId"_attr = remote->shardId);
-            }
-        }
-    }
+    _keepRecordOfAdditionalTxnParticipants(lk, cbData, parsedResponse, remote);
 
     //  On shutdown, there is no need to process the response.
     if (_lifecycleState != kAlive) {
