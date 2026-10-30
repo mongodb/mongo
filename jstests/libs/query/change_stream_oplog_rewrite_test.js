@@ -78,11 +78,12 @@ function traverseEvent(event, outputMap, prefixPath = "") {
 export function generateEventsAndFieldsToBeTestedForOplogRewrites(db, dbName, collName) {
     const testDB = db.getSiblingDB(dbName);
 
-    // Start strictly after the current cluster time so that leftover oplog entries from previously
-    // run tests (in suites that reuse the fixture) cannot leak into the harvested event window.
-    // 'startAtOperationTime' is inclusive, so using the current time directly would pick up the
-    // last entry written before this test began.
-    const startPoint = getNextClusterTime(getClusterTime(db));
+    // Start strictly after the highest cluster time known to any router so that leftover oplog
+    // entries from previously run tests (in suites that reuse the fixture) cannot leak into the
+    // harvested event window. With multiple routers, the cluster time known to 'db' alone may lag
+    // behind entries written through another router. 'startAtOperationTime' is inclusive, so using
+    // that time directly would pick up the last entry written before this test began.
+    const startPoint = getNextClusterTime(advanceClusterTime(db).clusterTime);
     const numDocs = 8;
 
     // Generate a write workload for the change stream to consume.

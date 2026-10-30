@@ -18,7 +18,7 @@ import {
 } from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
-    advanceClusterTimeIncludingConfigServer,
+    advanceClusterTime,
     CursorList,
     getClusterTime,
 } from "jstests/libs/query/change_stream_util.js";
@@ -29,12 +29,6 @@ describe("change stream cursor metrics in currentOp", function () {
     const testDB = db.getSiblingDB(jsTestName());
     const adminDB = db.getSiblingDB("admin");
     const testColl = testDB.getCollection("test");
-
-    const getClusterTimeFromInsert = (db) => {
-        return assert.commandWorked(
-            db.runCommand({insert: "unrelated_collection", documents: [{}]}),
-        ).$clusterTime.clusterTime;
-    };
 
     function idleCursorFilter(comment, cursor = null) {
         const filter = {"cursor.originatingCommand.comment": comment};
@@ -320,23 +314,17 @@ describe("change stream cursor metrics in currentOp", function () {
 
     it("optime initialized to cluster time with no start option", function () {
         const comment = "optime initialized to cluster time with no start option";
+        const currentClusterTime = getClusterTime(testDB);
 
-        const currentClusterTime = getClusterTimeFromInsert(testDB);
-        // The cluster time gossiped above can outpace the oplog's visible timestamp (e.g. when the
-        // periodic no-op writer hasn't caught up yet), which is what a fresh change stream's
-        // initial optime is derived from. Force the oplog to catch up to currentClusterTime before
-        // opening the cursor so the assertion below isn't racy. See SERVER-128391/SERVER-131399.
-        advanceClusterTimeIncludingConfigServer(testDB);
+        // A fresh change stream's initial optime is derived from the oplog's visible timestamp,
+        // which can lag the gossiped cluster time (e.g. when the periodic no-op writer hasn't
+        // caught up yet). Advance every oplog, including the config server's, past the routers'
+        // cluster time and use that time as the lower bound so the assertion below isn't racy.
+        // See SERVER-128391/SERVER-131399.
+        advanceClusterTime(testDB, true);
         let cursor = this.cursorList.push(testColl.watch([], {comment, cursor: {batchSize: 0}}));
 
         const idleCursor = getIdleCursor(comment, cursor);
-
-        jsTest.log.info("Important timestamps", {
-            clusterTimeFromHello: getClusterTime(testDB),
-            clusterTimeFromInsert: currentClusterTime,
-            clusterTimeFromAdminDB: getClusterTime(testDB.getSiblingDB("admin")),
-            changeStreamOptime: idleCursor.cursor.changeStreams.optime,
-        });
 
         const optime = idleCursor.cursor.changeStreams.optime;
         assert(optime instanceof Timestamp, "Expected changeStreams.optime to be a timestamp", {
@@ -352,7 +340,7 @@ describe("change stream cursor metrics in currentOp", function () {
 
     it("optime advances monotonically across successive getMores", function () {
         const comment = "optime advances monotonically across successive getMores";
-        let prevOptime = getClusterTimeFromInsert(testDB);
+        let prevOptime = advanceClusterTime(testDB, true).clusterTime;
         const cursor = this.cursorList.push(testColl.watch([], {comment, cursor: {batchSize: 0}}));
 
         for (let i = 0; i < 3; i++) {

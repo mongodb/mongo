@@ -1394,62 +1394,96 @@ export function assertValidChangeStreamPreImageDocument(preImage, db) {
 }
 
 /**
- * Advance the cluster time on all primary nodes of the test fixture, even if the no-op oplog writer is disabled.
+ * Returns the highest $clusterTime (including its signature) known to 'db's connection or to any
+ * router behind it, or undefined if none is known. With a multi-router fixture every individual
+ * router is queried, since a mongos that served none of the test's traffic may hold a cluster
+ * time different from the one known to 'db'. Otherwise only 'db's own connection is queried.
+ *
+ * Before querying, each router is gossiped 'oldMaxClusterTime', or 'db's cluster time if it is
+ * not given, so the routers' clocks are advanced as a side effect and none of them is left behind
+ * that time. 'oldMaxClusterTime' must be a $clusterTime previously returned by this cluster, e.g.
+ * by an earlier call to this function: a forged or far-future time is rejected or permanently
+ * advances the cluster clock.
+ *
+ * In transaction passthroughs, callers must first commit any transaction the override left open
+ * on the test's session; see advanceClusterTime().
  */
-export function advanceClusterTime(db) {
-    const msg =
-        "Advancing oplog time before waiting for changestream. See SERVER-131399 for motivation";
-    for (const primary of FixtureHelpers.getPrimaries(db)) {
-        assert.commandWorked(primary.getDB("admin").runCommand({appendOplogNote: 1, data: {msg}}));
+export function maxRouterClusterTime(db, oldMaxClusterTime) {
+    // Temporarily disable mongos pinning so the individual router connections behind the
+    // multi-router proxy are reachable; with pinning active the proxy only exposes the pinned
+    // router. The returned connections are plain Mongo objects, unaffected by pinning.
+    const dbConnection = db.getMongo();
+    let newMaxClusterTime = dbConnection.getClusterTime();
+    let gossipClusterTime = oldMaxClusterTime ?? newMaxClusterTime;
+    const pinnedBefore = TestData.pinToSingleMongos;
+    TestData.pinToSingleMongos = false;
+    let otherConns;
+    try {
+        otherConns = dbConnection.isMultiRouter ? dbConnection._mongoConnections : [dbConnection];
+        for (const otherConn of otherConns) {
+            if (gossipClusterTime) {
+                otherConn.advanceClusterTime(gossipClusterTime);
+            }
+            const {$clusterTime} = assert.commandWorked(otherConn.adminCommand({ping: 1}));
+            if (
+                $clusterTime &&
+                (!newMaxClusterTime ||
+                    timestampCmp($clusterTime.clusterTime, newMaxClusterTime.clusterTime) > 0)
+            ) {
+                newMaxClusterTime = $clusterTime;
+            }
+        }
+    } finally {
+        TestData.pinToSingleMongos = pinnedBefore;
     }
+    return newMaxClusterTime;
 }
 
 /**
- * Advance the cluster time on every primary of the test fixture, including the config server
- * primary, then ensure every router has observed the advanced cluster time. This covers a
- * dedicated (non-config-shard) config server as well as multi-router fixtures, where a mongos
- * that served none of the preceding traffic may still hold an older cluster time.
+ * Advance the cluster time on all primary nodes of the test fixture, even if the periodic no-op
+ * writer is disabled, so that a change stream opened afterwards on any router does not wait for a
+ * shard whose oplog lags behind the router's cluster time.
+ *
+ * Writes a no-op directly to every shard primary, timestamped strictly after the highest cluster
+ * time known to 'db' or to any router, then gossips that time to every router without writing
+ * through them. This covers multi-router fixtures, where a mongos that served none of the
+ * preceding traffic may hold a cluster time different from the one known to 'db'.
+ *
+ * If 'includeConfigShard' is true, the config server replica set is written to as well, which is
+ * needed when it is a dedicated (non-config-shard) config server. In config-shard mode the config
+ * server is already one of the shards, so it then receives a second, harmless no-op.
+ *
+ * Returns the highest $clusterTime held by any router after the gossip, or undefined if no cluster
+ * time is known.
  */
-export function advanceClusterTimeIncludingConfigServer(db) {
+export function advanceClusterTime(db, includeConfigShard = false) {
     const msg =
         "Advancing oplog time before waiting for changestream. See SERVER-131399 for motivation";
+
     // In transaction passthroughs the override may have left a transaction open on the test's
     // session. Commit it now via a non-transactional command on that session: the commands below
     // run on other sessions, and the override would otherwise try to commit the open transaction
     // with the wrong lsid and fail with "transaction that was not started".
     assert.commandWorked(db.adminCommand({ping: 1}));
+    const replSets = FixtureHelpers.getAllReplicas(db, includeConfigShard);
+    const maxClusterTime = maxRouterClusterTime(db);
 
-    // The cluster appendOplogNote below only targets shards; write directly to every replica set
-    // first so a dedicated config server is covered too. In config-shard mode the config server
-    // is also listed in config.shards, so it may receive a second (harmless) no-op write.
-    // getAllReplicas() constructs fresh connections that have not observed the cluster time
-    // gossiped to 'db', so propagate it explicitly: otherwise the no-op below could be
-    // timestamped below that time, which would defeat the purpose of this helper.
-    const signedClusterTime = db.getMongo().getClusterTime();
-    for (const replSet of FixtureHelpers.getAllReplicas(db, true /* includeConfigServers */)) {
+    // Write a no-op directly to every replica set. 'getAllReplicas()' constructs fresh connections
+    // that have not observed any cluster time, so gossip 'maxClusterTime' explicitly: the receiving
+    // node advances its clock before writing, which places the no-op strictly above
+    // 'maxClusterTime'.
+    for (const replSet of replSets) {
         const primary = replSet.getPrimary();
-        if (signedClusterTime) {
-            primary.advanceClusterTime(signedClusterTime);
+        if (maxClusterTime) {
+            primary.advanceClusterTime(maxClusterTime);
         }
-        assert.commandWorked(primary.getDB("admin").runCommand({appendOplogNote: 1, data: {msg}}));
+        assert.commandWorked(primary.adminCommand({appendOplogNote: 1, data: {msg}}));
     }
 
-    // Run appendOplogNote through every router: it writes a no-op on all shards, and the shard
-    // responses advance the issuing router's cluster time before the command returns.
-    // Temporarily disable mongos pinning so the individual router connections behind the
-    // multi-router proxy are reachable; with pinning active the proxy only exposes the pinned
-    // router.
-    const conn = db.getMongo();
-    const pinnedBefore = TestData.pinToSingleMongos;
-    TestData.pinToSingleMongos = false;
-    try {
-        const routers = conn.isMultiRouter ? conn._mongoConnections : [conn];
-        for (const router of routers) {
-            assert.commandWorked(router.adminCommand({appendOplogNote: 1, data: {msg}}));
-        }
-    } finally {
-        TestData.pinToSingleMongos = pinnedBefore;
-    }
+    // Gossip 'maxClusterTime' to every router without writing: any command carrying a newer
+    // $clusterTime advances the router's clock. Every oplog is now beyond that time, so a change
+    // stream opened on any router starts at a point all shards have reached.
+    return maxRouterClusterTime(db, maxClusterTime);
 }
 
 /**
