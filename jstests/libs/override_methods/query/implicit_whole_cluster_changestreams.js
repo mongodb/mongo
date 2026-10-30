@@ -1,9 +1,9 @@
 /**
- * Loading this file overrides DB.prototype._runCommandImpl with a function that converts any
- * attempt to run $changeStream on a single collection or single database into a cluster-wide
- * $changeStream filtered by that database or namespace. Single-collection/db rules regarding
- * internal collections and views are respected. Non-$changeStream commands and commands which
- * explicitly request to be exempted from modification by setting the 'noPassthrough' flag, are
+ * Loading this file overrides runCommand with a function that converts any attempt to run
+ * $changeStream on a single collection or single database into a cluster-wide $changeStream
+ * filtered by that database or namespace. Single-collection/db rules regarding internal
+ * collections and views are respected. Non-$changeStream commands and commands which explicitly
+ * request to be exempted from modification via 'changeStreamPassthroughAwareRunCommand', are
  * passed through as-is.
  */
 
