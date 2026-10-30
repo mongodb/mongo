@@ -60,3 +60,15 @@ structs:
                 type: bool
                 cpp_name: waitLastStableRecoveryTimestamp
                 optional: true
+
+server_parameters:
+    allowDeprecatedAfterOpTimeReadConcern:
+        description: >-
+            Permit clients to send the deprecated readConcern.afterOpTime argument. When false,
+            the server rejects that argument on requests received from clients. Intended only as a
+            temporary escape hatch for deployments that still depend on it.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gAllowDeprecatedAfterOpTimeReadConcern
+        default: false
+        redact: false
