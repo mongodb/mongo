@@ -1976,9 +1976,16 @@ void logOplogConstraintViolation(OperationContext* opCtx,
                                  OplogConstraintViolationEnum type,
                                  const std::string& operation,
                                  const BSONObj& opObj,
-                                 boost::optional<Status> status) {
+                                 boost::optional<Status> status,
+                                 bool isCappedCollection,
+                                 bool cappedViolationIsTolerated) {
     // Log the violation to initialized OplogConstraintViolationLogger
-    oplogConstraintViolationLogger->logViolationIfReady(type, opObj, status);
+    oplogConstraintViolationLogger->logViolationIfReady(
+        type, opObj, status, isCappedCollection, cappedViolationIsTolerated);
+}
+
+void resetOplogConstraintViolationLoggerForTest() {
+    oplogConstraintViolationLogger->resetForTest();
 }
 
 UpdateResult updateObjectByRid(OperationContext* opCtx,
@@ -2034,7 +2041,8 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                         OplogConstraintViolationEnum::kUpdateOnMissingDoc,
                                         "update",
                                         opObj,
-                                        /*status=*/boost::none);
+                                        /*status=*/boost::none,
+                                        /*isCappedCollection=*/collPtr->isCapped());
             // This error is always fatal regardless of steady state constraints. We throw an error
             // here instead of deferring to the typical numMatched = 0 handling since this should
             // be a fatal error for capped collections.
@@ -2093,7 +2101,8 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                 OplogConstraintViolationEnum::kRecordIdsReplicatedDocIdMismatch,
                 "update",
                 opObj,
-                /*status=*/boost::none);
+                /*status=*/boost::none,
+                /*isCappedCollection=*/collPtr->isCapped());
             // This error is always fatal regardless of steady state constraints. We throw an error
             // here instead of deferring to the typical numMatched = 0 handling since this should
             // also be a fatal error for capped collections.
@@ -2158,7 +2167,8 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                         OplogConstraintViolationEnum::kReplicatedSizeDeltaMismatch,
                         "update",
                         redact(op.toBSONForLogging()),
-                        /*status=*/boost::none);
+                        /*status=*/boost::none,
+                        /*isCappedCollection=*/collPtr->isCapped());
                 }
                 uassert(
                     12380201,
@@ -2262,7 +2272,8 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                                         OplogConstraintViolationEnum::kDeleteWasEmpty,
                                         "update",
                                         opObj,
-                                        /*status=*/boost::none);
+                                        /*status=*/boost::none,
+                                        /*isCappedCollection=*/collPtr->isCapped());
             // This error is always fatal regardless of steady state constraints. We throw an error
             // here instead of deferring to the typical nDeleted = 0 handling since this should
             // be a fatal error for capped collections. We also don't need the special casing that
@@ -2295,7 +2306,8 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                 OplogConstraintViolationEnum::kRecordIdsReplicatedDocIdMismatch,
                 "delete",
                 opObj,
-                /*status=*/boost::none);
+                /*status=*/boost::none,
+                /*isCappedCollection=*/collPtr->isCapped());
             // This error is always fatal regardless of steady state constraints. We throw an error
             // here instead of deferring to the typical nDeleted = 0 handling since this should also
             // be a fatal error for capped collections.
@@ -2365,7 +2377,8 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                         OplogConstraintViolationEnum::kReplicatedSizeDeltaMismatch,
                         "delete",
                         redact(op.toBSONForLogging()),
-                        /*status=*/boost::none);
+                        /*status=*/boost::none,
+                        /*isCappedCollection=*/collPtr->isCapped());
                 }
                 uassert(
                     12380200,
@@ -2916,6 +2929,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         }
                         if (mode == OplogApplication::Mode::kSecondary) {
                             const auto& opObj = redact(op.toBSONForLogging());
+                            const bool enforcesSteadyStateConstraints =
+                                oplogApplicationEnforcesSteadyStateConstraints.load();
+                            // Capped collections may have diverged between nodes, so we tolerate
+                            // this violation by retrying the insert as an upsert below. That only
+                            // happens when we aren't enforcing steady state constraints (otherwise
+                            // we return the DuplicateKey error) and the collection doesn't
+                            // replicate recordIds (otherwise this is fatal).
+                            const bool cappedViolationIsTolerated = collection->isCapped() &&
+                                !enforcesSteadyStateConstraints && !opRid.has_value();
 
                             opCountersToUse->gotInsertOnExistingDoc();
                             logOplogConstraintViolation(
@@ -2924,9 +2946,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                 OplogConstraintViolationEnum::kInsertOnExistingDoc,
                                 "insert",
                                 opObj,
-                                /*status=*/boost::none);
+                                /*status=*/boost::none,
+                                /*isCappedCollection=*/collection->isCapped(),
+                                cappedViolationIsTolerated);
 
-                            if (oplogApplicationEnforcesSteadyStateConstraints.load()) {
+                            if (enforcesSteadyStateConstraints) {
                                 return status;
                             }
                         } else if (inStableRecovery) {
@@ -3190,10 +3214,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             // updates are ignored at a higher level for recovery and initial sync.
                             // Capped collections with Replicated RecordIds should be the same on
                             // every node so we don't allow this leniency.
-                            LOGV2_DEBUG(2170003,
-                                        2,
-                                        "couldn't find doc in capped collection",
-                                        "op"_attr = redact(op.toBSONForLogging()));
+                            logOplogConstraintViolation(
+                                opCtx,
+                                op.getNss(),
+                                OplogConstraintViolationEnum::kUpdateWasEmpty,
+                                "update",
+                                redact(op.toBSONForLogging()),
+                                /*status=*/boost::none,
+                                /*isCappedCollection=*/true,
+                                /*cappedViolationIsTolerated=*/true);
 
                         } else {
                             // this could happen benignly on an oplog duplicate replay of an upsert
@@ -3240,6 +3269,22 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                 "an upsert.",
                                 "oplogEntry"_attr = redact(op.toBSONForLogging()));
                         }
+                    } else if (!upsertOplogEntry && !ur.upsertedId.isEmpty() && collection &&
+                               collection->isCapped() &&
+                               mode == OplogApplication::Mode::kSecondary) {
+                        // We upconverted an update on a capped collection to an upsert. This can
+                        // happen benignly if the document was already removed from this node's
+                        // copy of the capped collection, so it is logged separately from other
+                        // constraint violations.
+                        logOplogConstraintViolation(
+                            opCtx,
+                            op.getNss(),
+                            OplogConstraintViolationEnum::kUpdateOnMissingDoc,
+                            "update",
+                            redact(op.toBSONForLogging()),
+                            /*status=*/boost::none,
+                            /*isCappedCollection=*/true,
+                            /*cappedViolationIsTolerated=*/true);
                     }
 
                     if (op.getNeedsRetryImage()) {
@@ -3459,7 +3504,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                 OplogConstraintViolationEnum::kDeleteWasEmpty,
                                 "delete",
                                 opObj,
-                                /*status=*/boost::none);
+                                /*status=*/boost::none,
+                                /*isCappedCollection=*/isCapped,
+                                /*cappedViolationIsTolerated=*/isCapped);
                         } else {
                             opCountersToUse->gotDeleteFromMissingNamespace();
                             logOplogConstraintViolation(

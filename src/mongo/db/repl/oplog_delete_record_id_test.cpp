@@ -8,11 +8,13 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
+#include "mongo/db/repl/oplog_constraint_violation_logger.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -489,7 +491,9 @@ TEST_F(CappedDeleteWithRecordIdTestDisableSteadyStateConstraints,
     // of steady state constraints.
     auto op = makeDeleteOplogEntryWithRecordId(nextOpTime(), _nss, _uuid, BSON("_id" << 999), rid);
 
+    unittest::LogCaptureGuard logs;
     ASSERT_EQ(runOpSteadyState(op).code(), 7835001);
+    assertLoggedNonToleratedCappedViolation(logs, kRecordIdsReplicatedDocIdMismatch);
     // Original document should remain unchanged.
     ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
 }
@@ -506,7 +510,9 @@ TEST_F(CappedDeleteWithRecordIdTestEnableSteadyStateConstraints,
     // of steady state constraints.
     auto op = makeDeleteOplogEntryWithRecordId(nextOpTime(), _nss, _uuid, BSON("_id" << 999), rid);
 
+    unittest::LogCaptureGuard logs;
     ASSERT_NOT_OK(runOpSteadyState(op));
+    assertLoggedNonToleratedCappedViolation(logs, kRecordIdsReplicatedDocIdMismatch);
     ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
 }
 
@@ -525,7 +531,9 @@ TEST_F(CappedDeleteWithRecordIdTestDisableSteadyStateConstraints,
     // is a fatal error regardless of steady state constraints.
     auto op = makeDeleteOplogEntryWithRecordId(
         nextOpTime(), _nss, _uuid, BSON("_id" << 999), nonExistentRid);
+    unittest::LogCaptureGuard logs;
     ASSERT_EQ(runOpSteadyState(op).code(), 11902400);
+    assertLoggedNonToleratedCappedViolation(logs, kDeleteWasEmptyMsg);
 }
 
 TEST_F(CappedDeleteWithRecordIdTestEnableSteadyStateConstraints,
@@ -543,7 +551,9 @@ TEST_F(CappedDeleteWithRecordIdTestEnableSteadyStateConstraints,
     // is a fatal error regardless of steady state constraints.
     auto op = makeDeleteOplogEntryWithRecordId(
         nextOpTime(), _nss, _uuid, BSON("_id" << 999), nonExistentRid);
+    unittest::LogCaptureGuard logs;
     ASSERT_EQ(runOpSteadyState(op).code(), 11902400);
+    assertLoggedNonToleratedCappedViolation(logs, kDeleteWasEmptyMsg);
 }
 
 }  // namespace

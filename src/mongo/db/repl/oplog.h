@@ -240,7 +240,16 @@ void logOplogConstraintViolation(OperationContext* opCtx,
                                  OplogConstraintViolationEnum type,
                                  const std::string& operation,
                                  const BSONObj& opObj,
-                                 boost::optional<Status> status);
+                                 boost::optional<Status> status,
+                                 bool isCappedCollection = false,
+                                 bool cappedViolationIsTolerated = false);
+
+/**
+ * Resets the rate limiting state of the process-wide oplog constraint violation logger, so that
+ * tests can assert on constraint violation logs regardless of which tests ran before them. Only
+ * for use in tests.
+ */
+void resetOplogConstraintViolationLoggerForTest();
 
 /**
  * Used for applying from an oplog entry or grouped inserts.

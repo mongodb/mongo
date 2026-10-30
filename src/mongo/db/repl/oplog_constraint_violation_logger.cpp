@@ -5,6 +5,7 @@
 
 #include "mongo/logv2/log.h"
 
+#include <algorithm>
 #include <string_view>
 
 #include <boost/optional/optional.hpp>
@@ -34,6 +35,8 @@ std::string_view toString(OplogConstraintViolationEnum type) {
             return kRecordIdsReplicatedDocIdMismatch;
         case mongo::repl::OplogConstraintViolationEnum::kReplicatedSizeDeltaMismatch:
             return kReplicatedSizeDeltaMismatch;
+        case OplogConstraintViolationEnum::kUpdateWasEmpty:
+            return kUpdateWasEmptyMsg;
         default:
             return "";
     }
@@ -41,11 +44,17 @@ std::string_view toString(OplogConstraintViolationEnum type) {
 
 void OplogConstraintViolationLogger::logViolationIfReady(OplogConstraintViolationEnum type,
                                                          const BSONObj& obj,
-                                                         boost::optional<Status> status) {
+                                                         boost::optional<Status> status,
+                                                         bool isCappedCollection,
+                                                         bool cappedViolationIsTolerated) {
+    tassert(10836102,
+            "Only violations on capped collections can be tolerated",
+            isCappedCollection || !cappedViolationIsTolerated);
     const auto index = static_cast<int>(type);
 
     std::lock_guard lk(_mutex);
-    const auto lastLog = _lastLogTimes[index];
+    auto& lastLogTimes = cappedViolationIsTolerated ? _lastCappedLogTimes : _lastLogTimes;
+    const auto lastLog = lastLogTimes[index];
     const auto now = Date_t::now();
 
     if (now < lastLog + OplogConstraintViolationLogger::kPeriodicLogTimeout) {
@@ -53,21 +62,51 @@ void OplogConstraintViolationLogger::logViolationIfReady(OplogConstraintViolatio
         return;
     }
 
-    if (!status) {
+    if (cappedViolationIsTolerated) {
+        // Capped collections may have diverged between nodes before FCV 5.0, and oplog application
+        // tolerates this violation, so it is expected and harmless. Log it separately from other
+        // constraint violations.
+        if (!status) {
+            LOGV2(10836100,
+                  "Replication constraint violation on a capped collection during steady state "
+                  "replication. This is expected if capped collection contents diverged between "
+                  "nodes and is harmless",
+                  "msg"_attr = toString(type),
+                  "isCappedCollection"_attr = isCappedCollection,
+                  "obj"_attr = obj);
+        } else {
+            LOGV2(10836101,
+                  "Replication constraint violation on a capped collection during steady state "
+                  "replication. This is expected if capped collection contents diverged between "
+                  "nodes and is harmless",
+                  "msg"_attr = toString(type),
+                  "isCappedCollection"_attr = isCappedCollection,
+                  "obj"_attr = obj,
+                  "status"_attr = *status);
+        }
+    } else if (!status) {
         LOGV2_WARNING(7149000,
                       "Potential replication constraint violation during steady state replication",
                       "msg"_attr = toString(type),
+                      "isCappedCollection"_attr = isCappedCollection,
                       "obj"_attr = obj);
     } else {
         LOGV2_WARNING(7149001,
                       "Potential replication constraint violation during steady state replication",
                       "msg"_attr = toString(type),
+                      "isCappedCollection"_attr = isCappedCollection,
                       "obj"_attr = obj,
                       "status"_attr = *status);
     }
 
     // Update the last log time to now.
-    _lastLogTimes[index] = now;
+    lastLogTimes[index] = now;
+}
+
+void OplogConstraintViolationLogger::resetForTest() {
+    std::lock_guard lk(_mutex);
+    std::fill(_lastLogTimes.begin(), _lastLogTimes.end(), Date_t());
+    std::fill(_lastCappedLogTimes.begin(), _lastCappedLogTimes.end(), Date_t());
 }
 
 }  // namespace repl

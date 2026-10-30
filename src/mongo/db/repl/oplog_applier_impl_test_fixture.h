@@ -34,6 +34,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -388,6 +389,21 @@ void createCappedCollection(OperationContext* opCtx, const NamespaceString& nss)
  * Create test collection with UUID.
  */
 UUID createCollectionWithUuid(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Returns how many logs in 'logs' report a constraint violation with the given message on a capped
+ * collection that oplog application tolerated, i.e. continued replicating past.
+ */
+size_t countToleratedCappedViolationLogs(const unittest::LogCaptureGuard& logs,
+                                         std::string_view msg);
+
+/**
+ * Asserts that 'logs' report exactly one constraint violation with the given message as a warning
+ * on a capped collection, and none as tolerated. Used for violations that stop replication, such as
+ * those on capped collections with replicated recordIds.
+ */
+void assertLoggedNonToleratedCappedViolation(const unittest::LogCaptureGuard& logs,
+                                             std::string_view msg);
 
 /**
  * Creates a collection with change stream pre-images enabled.

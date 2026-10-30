@@ -76,6 +76,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -383,6 +384,85 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
                              BSON("_id" << 0));
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(
         ErrorCodes::UpdateOperationFailed, op, nss, false);
+}
+
+UUID createCappedCollectionWithUuid(OperationContext* opCtx, const NamespaceString& nss) {
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    options.capped = true;
+    options.cappedSize = 1024 * 1024;
+    createCollection(opCtx, nss, options);
+    return options.uuid.value();
+}
+
+TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
+       applyOplogEntryOrGroupedInsertsInsertExistingDocumentCappedCollection) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    auto uuid = createCappedCollectionWithUuid(_opCtx.get(), nss);
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
+    auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, uuid);
+    // Without steady state constraints the insert is retried as an upsert, so the divergence is
+    // tolerated.
+    unittest::LogCaptureGuard logs;
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
+    ASSERT_EQ(1, countToleratedCappedViolationLogs(logs, kInsertOnExistingDocMsg));
+}
+
+TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
+       applyOplogEntryOrGroupedInsertsInsertExistingDocumentCappedCollection) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    auto uuid = createCappedCollectionWithUuid(_opCtx.get(), nss);
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
+    auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, uuid);
+    // With steady state constraints the DuplicateKey error stops replication, so it must not be
+    // reported as harmless capped divergence.
+    unittest::LogCaptureGuard logs;
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::DuplicateKey, op, nss, false);
+    ASSERT_EQ(0, countToleratedCappedViolationLogs(logs, kInsertOnExistingDocMsg));
+}
+
+TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
+       applyOplogEntryOrGroupedInsertsUpdateMissingDocumentCappedCollection) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    auto uuid = createCappedCollectionWithUuid(_opCtx.get(), nss);
+    auto op = makeOplogEntry(repl::OpTypeEnum::kUpdate,
+                             nss,
+                             uuid,
+                             update_oplog_entry::makeDeltaOplogEntry(
+                                 BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                             BSON("_id" << 0));
+    unittest::LogCaptureGuard logs;
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
+    ASSERT_EQ(1, countToleratedCappedViolationLogs(logs, kUpdateOnMissingDocMsg));
+}
+
+TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
+       applyOplogEntryOrGroupedInsertsUpdateMissingDocumentCappedCollection) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    auto uuid = createCappedCollectionWithUuid(_opCtx.get(), nss);
+    auto op = makeOplogEntry(repl::OpTypeEnum::kUpdate,
+                             nss,
+                             uuid,
+                             update_oplog_entry::makeDeltaOplogEntry(
+                                 BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                             BSON("_id" << 0));
+    // Updates that match nothing on capped collections are tolerated even when enforcing steady
+    // state constraints.
+    unittest::LogCaptureGuard logs;
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
+    ASSERT_EQ(1, countToleratedCappedViolationLogs(logs, kUpdateWasEmptyMsg));
+}
+
+TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
+       applyOplogEntryOrGroupedInsertsDeleteMissingDocumentCappedCollection) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    auto uuid = createCappedCollectionWithUuid(_opCtx.get(), nss);
+    auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, uuid);
+    // Deletes that delete nothing on capped collections are tolerated even when enforcing steady
+    // state constraints.
+    unittest::LogCaptureGuard logs;
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
+    ASSERT_EQ(1, countToleratedCappedViolationLogs(logs, kDeleteWasEmptyMsg));
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollectionLockedByUUID) {

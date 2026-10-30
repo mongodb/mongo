@@ -12,6 +12,7 @@
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
+#include "mongo/db/repl/oplog_constraint_violation_logger.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
@@ -24,6 +25,7 @@
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -686,7 +688,9 @@ TEST_F(CappedUpdateWithRecordIdTestDisableSteadyStateConstraints,
     auto op = makeUpdateOplogEntryWithRecordId(
         nextOpTime(), _nss, BSON("_id" << 999), BSON("$set" << BSON("y" << 1)), rid);
 
+    unittest::LogCaptureGuard logs;
     ASSERT_EQ(runOpSteadyState(op).code(), 7834902);
+    assertLoggedNonToleratedCappedViolation(logs, kRecordIdsReplicatedDocIdMismatch);
     // Original document should remain unchanged.
     ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
     auto existingDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
@@ -706,7 +710,9 @@ TEST_F(CappedUpdateWithRecordIdTestEnableSteadyStateConstraints,
     auto op = makeUpdateOplogEntryWithRecordId(
         nextOpTime(), _nss, BSON("_id" << 999), BSON("$set" << BSON("y" << 1)), rid);
 
+    unittest::LogCaptureGuard logs;
     ASSERT_EQ(runOpSteadyState(op).code(), 7834902);
+    assertLoggedNonToleratedCappedViolation(logs, kRecordIdsReplicatedDocIdMismatch);
     ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
     auto unchangedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_BSONOBJ_EQ(doc, unchangedDoc.value());
@@ -727,7 +733,9 @@ TEST_F(CappedUpdateWithRecordIdTestDisableSteadyStateConstraints,
     // is a fatal error regardless of steady state constraints.
     auto op = makeUpdateOplogEntryWithRecordId(
         nextOpTime(), _nss, BSON("_id" << 999), BSON("$set" << BSON("a" << 1)), nonExistentRid);
+    unittest::LogCaptureGuard logs;
     ASSERT_EQ(runOpSteadyState(op).code(), 11902401);
+    assertLoggedNonToleratedCappedViolation(logs, kUpdateOnMissingDocMsg);
 }
 
 
@@ -746,7 +754,9 @@ TEST_F(CappedUpdateWithRecordIdTestEnableSteadyStateConstraints,
     // is a fatal error regardless of steady state constraints.
     auto op = makeUpdateOplogEntryWithRecordId(
         nextOpTime(), _nss, BSON("_id" << 999), BSON("$set" << BSON("a" << 1)), nonExistentRid);
+    unittest::LogCaptureGuard logs;
     ASSERT_EQ(runOpSteadyState(op).code(), 11902401);
+    assertLoggedNonToleratedCappedViolation(logs, kUpdateOnMissingDocMsg);
 }
 
 

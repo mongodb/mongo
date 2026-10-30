@@ -24,6 +24,8 @@ inline constexpr std::string_view kUpdateOnMissingDocMsg{
     "ran update as upsert and failed to match any documents"};
 inline constexpr std::string_view kDeleteWasEmptyMsg{
     "applied a delete that did not delete anything"};
+inline constexpr std::string_view kUpdateWasEmptyMsg{
+    "applied an update that did not match any documents"};
 inline constexpr std::string_view kDeleteOnMissingNs{"applied a delete on missing namespace"};
 inline constexpr std::string_view kAcceptableErrorInCommand{
     "received an acceptable error during oplog application"};
@@ -41,6 +43,7 @@ enum class OplogConstraintViolationEnum {
     kAcceptableErrorInCommand,
     kRecordIdsReplicatedDocIdMismatch,
     kReplicatedSizeDeltaMismatch,
+    kUpdateWasEmpty,
     NUM_VIOLATION_TYPES,
 };
 
@@ -52,6 +55,13 @@ std::string_view toString(OplogConstraintViolationEnum type);
  *
  * To avoid flooding the logs if continuous oplog constraint violations occur, we will only log
  * once every 10 minutes per each oplog constraint violation type.
+ *
+ * Before FCV 5.0 each node deleted excess capped documents independently, so capped collection
+ * contents may have diverged between nodes, and later oplog entries on those collections can
+ * harmlessly violate constraints. Violations that oplog application tolerates for this reason
+ * ('cappedViolationIsTolerated') are logged separately from other violations, with their own log
+ * id and rate limit, so that they cannot suppress the logging of real ones. Violations on capped
+ * collections that oplog application does not tolerate are logged like any other violation.
  */
 class OplogConstraintViolationLogger {
 public:
@@ -60,12 +70,20 @@ public:
 
     void logViolationIfReady(OplogConstraintViolationEnum type,
                              const BSONObj& obj,
-                             boost::optional<Status> status);
+                             boost::optional<Status> status,
+                             bool isCappedCollection = false,
+                             bool cappedViolationIsTolerated = false);
+
+    // Clears the last log times so that every violation type can be logged again immediately.
+    // Only for use in tests.
+    void resetForTest();
 
 private:
     mutable std::mutex _mutex;
 
     std::vector<Date_t> _lastLogTimes = std::vector<Date_t>(
+        static_cast<int>(OplogConstraintViolationEnum::NUM_VIOLATION_TYPES));  // (M)
+    std::vector<Date_t> _lastCappedLogTimes = std::vector<Date_t>(
         static_cast<int>(OplogConstraintViolationEnum::NUM_VIOLATION_TYPES));  // (M)
 };
 

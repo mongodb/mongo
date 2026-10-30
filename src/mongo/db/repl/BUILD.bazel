@@ -1847,6 +1847,7 @@ mongo_cc_library(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
+        ":oplog",
         ":oplog_application",
         ":oplog_entry_test_helpers",
         ":replmocks",
@@ -2040,6 +2041,7 @@ mongo_cc_unit_test(
         "isself_test.cpp",
         "local_oplog_info_test.cpp",
         "member_config_test.cpp",
+        "oplog_constraint_violation_logger_test.cpp",
         "optime_extract_test.cpp",
         "primary_only_service_test.cpp",
         "primary_only_service_util_test.cpp",
@@ -2073,6 +2075,7 @@ mongo_cc_unit_test(
         ":oplog",
         ":oplog_application_interface",
         ":oplog_applier_batcher_test_fixture",
+        ":oplog_constraint_violation_logger",
         ":oplog_entry",
         ":oplog_write",
         ":optime",
