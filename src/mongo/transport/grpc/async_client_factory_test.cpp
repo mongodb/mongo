@@ -636,9 +636,9 @@ TEST_P(LateAcquisitionTest, RejectAfterShutdown) {
                 shutdownThread.join();
             }
         });
-        registration->waitForOneNewEntry();
+        registration->wait();
         shutdownThread = stdx::thread([&] { getFactory().shutdown(); });
-        shutdownWait->waitForOneNewEntry();
+        shutdownWait->wait();
         shutdownWait.reset();
         registration.reset();
         auto result = acquisition.future.getNoThrow();
@@ -671,7 +671,7 @@ TEST_P(PendingCancellationTest, ShutdownCancelsIndefiniteEstablishment) {
                                             ConnectSSLMode::kGlobalSSLMode,
                                             Milliseconds::max(),
                                             CancellationToken::uncancelable());
-        pending.waitForOneNewEntry();
+        pending.wait();
         getFactory().shutdown();
         ASSERT_EQ(acquisition.getNoThrow().getStatus(), ErrorCodes::ShutdownInProgress);
         EXPECT_THAT(
@@ -705,7 +705,7 @@ TEST_P(CancellationPreservationTest, PreservesReasonDuringShutdown) {
                                             ConnectSSLMode::kGlobalSSLMode,
                                             Milliseconds::max(),
                                             caller.token());
-        pending.waitForOneNewEntry();
+        pending.wait();
         // entered and release ensure that the test remains lock-step with the reactor, in
         // particular it ensures that cancellation can't run on the reactor before shutdown has
         // been called.
@@ -733,7 +733,7 @@ TEST_P(CancellationPreservationTest, PreservesReasonDuringShutdown) {
             caller.cancel();
         }
         shutdownThread = stdx::thread([&] { getFactory().shutdown(); });
-        shutdownWait->waitForOneNewEntry();
+        shutdownWait->wait();
         shutdownWait.reset();
         release.promise.emplaceValue();
         released = true;
@@ -789,12 +789,12 @@ TEST_F(DirectMockGRPCAsyncClientFactoryTest, ShutdownWaitsForTimeoutDiagnostics)
                 shutdownThread.join();
             }
         });
-        diagnostics->waitForOneNewEntry();
+        diagnostics->wait();
         shutdownThread = stdx::thread([&] {
             getFactory().shutdown();
             shutdown.promise.emplaceValue();
         });
-        shutdownWait->waitForOneNewEntry();
+        shutdownWait->wait();
         shutdownWait.reset();
         auto client = getServiceContext()->getService()->makeClient("ShutdownWaitTest");
         // Creating an OperationContext with a deadline is the simplest way to ensure
@@ -833,14 +833,14 @@ TEST_F(DirectMockGRPCAsyncClientFactoryTest, RejectAdmittedSetupBeforeConnect) {
             shutdownThread.join();
         }
     });
-    beforeConnect->waitForOneNewEntry();
+    beforeConnect->wait();
     shutdownThread = stdx::thread([&] { getFactory().shutdown(); });
-    shutdownWait->waitForOneNewEntry();
+    shutdownWait->wait();
     shutdownWait.reset();
     beforeConnect.reset();
     EXPECT_EQ(acquisition.future.getNoThrow().getStatus(), ErrorCodes::ShutdownInProgress);
     shutdownThread.join();
-    ASSERT_EQ(channel.waitForNNewEntries(0), 0);
+    ASSERT_EQ(channel.wait(0), 0);
     EXPECT_THAT(getFactory().getStats(),
                 AllOf(HasNoRegisteredStreams(), SuccessfulStreamCount(0), FailedStreamCount(0)));
 }
@@ -850,7 +850,7 @@ TEST_F(DirectMockGRPCAsyncClientFactoryTest, SynchronousStreamFactoryExceptionDr
         FailPointEnableBlock failure("grpcThrowOnChannelEstablishment");
         auto acquisition = getFactory().get(
             kServerHostAndPort, ConnectSSLMode::kGlobalSSLMode, Milliseconds::max());
-        failure.waitForOneNewEntry();
+        failure.wait();
         auto status = acquisition.getNoThrow().getStatus();
         EXPECT_THAT(status,
                     StatusIs(ErrorCodes::HostUnreachable,
@@ -945,7 +945,7 @@ TEST_F(MockGRPCAsyncClientFactoryTest, CancelChannelEstablishment) {
     });
     ON_BLOCK_EXIT([&] { cmdThread.join(); });
 
-    fpb->waitForOneNewEntry();
+    fpb->wait();
     cancellationSource.cancel();
     fpb.reset();
 
@@ -983,7 +983,7 @@ TEST_F(MockGRPCAsyncClientFactoryTest, CancelStreamEstablishment) {
         });
         ON_BLOCK_EXIT([&] { cmdThread.join(); });
 
-        fpb->waitForOneNewEntry();
+        fpb->wait();
         cancellationSource.cancel();
         fpb.reset();
 

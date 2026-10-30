@@ -307,7 +307,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelLocally) {
                                     .getNoThrow(interruptible()));
             });
 
-        fpb.waitForOneNewEntry();
+        fpb.wait();
 
         cancellationSource.cancel();
 
@@ -433,7 +433,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
         cancellationSource.cancel();
 
         // Wait for _killOperations for 'echo' to time out.
-        cmdFailedFpb.waitForOneNewEntry(interruptible());
+        cmdFailedFpb.wait(interruptible(), 1);
 
         return deferred;
     }();
@@ -731,7 +731,7 @@ TEST_F(NetworkInterfaceTest, NumRequestsTimedOutBeforeSentToRemoteMetric) {
 
     // Wait for the command to enter the failpoint, then reset it. The failpoint sleeps
     // internally for kDeadline+1ms, so by the time it exits the deadline is guaranteed expired.
-    fpb->waitForOneNewEntry();
+    fpb->wait();
     fpb.reset();
 
     auto result = fut.get(interruptible());
@@ -916,7 +916,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TearDownWaitsForInProgress) 
         });
 
         // Wait for the completion of the command
-        fpb.waitForOneNewEntry();
+        fpb.wait();
 
         tearDownThread = stdx::thread([this, promise = std::move(tearDownPF.promise)]() mutable {
             tearDown();
@@ -999,7 +999,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownBeforeSendRequest) {
     });
 
     // Once the command thread has reached the failpoint, begin shutdown.
-    fpb->waitForOneNewEntry();
+    fpb->wait();
 
     Notification<void> shutdownComplete;
     auto shutdownThread = stdx::thread([&]() {
@@ -1009,7 +1009,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownBeforeSendRequest) {
     ON_BLOCK_EXIT([&] { shutdownThread.join(); });
 
     // Wait for the shutdown thread to start draining operations in shutdown.
-    shutdownFp->waitForOneNewEntry();
+    shutdownFp->wait();
 
     // Disable the failpoint so the reactor can proceed and attempt to send the request.
     // Shutdown and draining should then complete despite the blocking failCommand, since the

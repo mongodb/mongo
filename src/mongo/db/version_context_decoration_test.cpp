@@ -118,7 +118,7 @@ TEST_F(VersionContextDecorationTest, FixedOperationFCVRegionSetDuringFcvTransiti
     // Make the FixedOperationFCVRegion constructor race with a FCV transition (last-lts to latest),
     // then check that the target FCV version has been set
     unittest::JoinThread setFcvToLatestThread([&] {
-        failPointBlock.waitForOneNewEntry();
+        failPointBlock.wait();
 
         serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
         // Explicitly disable to release the blocked FixedOperationFCVRegion constructor.

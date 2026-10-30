@@ -885,7 +885,7 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesSurvivesWCEWhenDeletingKeysLess
     deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
 
     // Exactly one WCE must have fired when removing keys < 6.
-    EXPECT_EQ(1, failPoint->waitForOneNewEntry());
+    EXPECT_EQ(1, failPoint->wait());
 
     auto remainingKeys = getSorterKeys(opCtx, container);
     EXPECT_EQ(remainingKeys.size(), 5u);
@@ -934,7 +934,7 @@ TEST_F(UtilTest,
     deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
 
     // Exactly one WCE must have fired when removing keys >= 11.
-    EXPECT_EQ(1, failPoint->waitForOneNewEntry());
+    EXPECT_EQ(1, failPoint->wait());
 
     auto remainingKeys = getSorterKeys(opCtx, container);
     EXPECT_EQ(remainingKeys.size(), 5u);

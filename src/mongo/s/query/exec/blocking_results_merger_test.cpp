@@ -817,7 +817,7 @@ TEST_F(BlockingResultsMergerTestFixture,
     // NOTE: don't call 'runScheduledTasks()' here - see warning in that function's comment for
     // details. The BRM self-drives the baton; advanceTime() + runReadyCallbacks() below are all it
     // needs.
-    retryScheduledFp.waitForOneNewEntry();
+    retryScheduledFp.wait();
     runReadyCallbacks();
     ASSERT_FALSE(networkHasReadyRequests());
 
@@ -887,7 +887,7 @@ TEST_F(BlockingResultsMergerTestFixture,
     // touch the clock below, so the negative assertion is meaningful. Wait relative to when the
     // block enabled the fail point, since the fail point's absolute counter accumulates across
     // tests in this binary.
-    retryScheduledFp.waitForOneNewEntry();
+    retryScheduledFp.wait();
     ASSERT_FALSE(networkHasReadyRequests());
 
     // Advancing the network clock partway is still before the deadline: no retry yet.

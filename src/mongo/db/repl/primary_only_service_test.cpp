@@ -1156,7 +1156,7 @@ TEST_F(PrimaryOnlyServiceTest, StateTransitionFromRebuildingShouldWakeUpConditio
             stepUp();
         });
 
-        stepUpFailpoint.waitForOneNewEntry();
+        stepUpFailpoint.wait();
 
         lookUpInstanceThread = stdx::thread([this] {
             ThreadClient tc("LookUpInstanceThread", getServiceContext()->getService());
@@ -1260,7 +1260,7 @@ TEST_F(PrimaryOnlyServiceTest, RebuildServiceFailsShouldSetStateFromRebuilding) 
             stepUp();
         });
 
-        stepUpFailpoint.waitForOneNewEntry();
+        stepUpFailpoint.wait();
 
         lookUpInstanceThread = stdx::thread([this, &lookupError] {
             try {
@@ -1273,7 +1273,7 @@ TEST_F(PrimaryOnlyServiceTest, RebuildServiceFailsShouldSetStateFromRebuilding) 
         });
     }
 
-    failRebuildServiceFailPoint.waitForOneNewEntry();
+    failRebuildServiceFailPoint.wait();
     stepUpThread.join();
     lookUpInstanceThread.join();
 

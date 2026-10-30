@@ -230,7 +230,7 @@ TEST_F(SizeCountCheckpointCoordinatorTest, DestructorDuringFlushCycleInterruptsA
         FailPointEnableBlock hangFp("hangAfterReplicatedFastCountSnapshot");
 
         _coordinator->requestFlush();
-        hangFp.waitForOneNewEntry();
+        hangFp.wait();
 
         // Destroy the coordinator while the flush thread is stalled inside flush().
         // The destructor interrupts the flush thread's opCtx, but the thread cannot unblock

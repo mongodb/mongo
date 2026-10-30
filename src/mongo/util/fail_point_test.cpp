@@ -13,7 +13,6 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
@@ -561,63 +560,36 @@ void repeatedlyTestFailPoint(FailPoint& failPoint, int n) {
 }
 }  // namespace
 
-// Test that we immediately return from 'waitForNNewEntries()' if the fail point has already been
+// Test that we immediately return from 'wait()' if the fail point has already been
 // entered 'n' times.
-TEST(FailPointBlock, WaitForNNewEntriesSuccessCase) {
+TEST(FailPointBlock, WaitReturnsImmediatelyWhenSatisfied) {
     FailPoint failPoint("testFP");
     FailPointEnableBlock fpb(&failPoint);
     ThrowOnBlock interruptible;
     for (int i = 0; i < 3; ++i) {
         ASSERT_TRUE(failPoint.shouldFail());
     }
-    ASSERT_EQ(fpb.waitForNNewEntries(&interruptible, 3), 3);
+    ASSERT_EQ(fpb.wait(&interruptible, 3), 3);
 }
 
-// Test that we immediately return from 'waitForOneNewEntry()' if the fail point has already been
-// entered once.
-TEST(FailPointBlock, WaitForOneNewEntrySuccessCase) {
-    FailPoint failPoint("testFP");
-    FailPointEnableBlock fpb(&failPoint);
-    ThrowOnBlock interruptible;
-    ASSERT_TRUE(failPoint.shouldFail());
-    ASSERT_EQ(fpb.waitForOneNewEntry(&interruptible), 1);
-}
-
-// Test that entries from before the block was created don't count towards the wait, so
-// 'waitForOneNewEntry()' would block until a new entry occurs.
-TEST(FailPointBlock, WaitForOneNewEntryIgnoresEntriesBeforeBlock) {
-    FailPoint failPoint("testFP");
-    repeatedlyTestFailPoint(failPoint, 3);
-
-    FailPointEnableBlock fpb(&failPoint);
-    ThrowOnBlock interruptible;
-    ASSERT_THROWS_CODE(
-        fpb.waitForOneNewEntry(&interruptible), DBException, ErrorCodes::Interrupted);
-
-    ASSERT_TRUE(failPoint.shouldFail());
-    ASSERT_EQ(fpb.waitForOneNewEntry(&interruptible), 1);
-}
-
-// Test that 'waitForNNewEntries()' ignores entries from before the block was created and blocks
+// Test that 'wait()' ignores entries from before the block was created and blocks
 // until the fail point has been entered 'n' more times.
-TEST(FailPointBlock, WaitForNNewEntriesIgnoresEntriesBeforeBlock) {
+TEST(FailPointBlock, WaitIgnoresEntriesBeforeBlock) {
     FailPoint failPoint("testFP");
     repeatedlyTestFailPoint(failPoint, 3);
 
     FailPointEnableBlock fpb(&failPoint);
     ThrowOnBlock interruptible;
-    ASSERT_THROWS_CODE(
-        fpb.waitForNNewEntries(&interruptible, 2), DBException, ErrorCodes::Interrupted);
+    ASSERT_THROWS_CODE(fpb.wait(&interruptible, 2), DBException, ErrorCodes::Interrupted);
 
     ASSERT_TRUE(failPoint.shouldFail());
-    ASSERT_THROWS_CODE(
-        fpb.waitForNNewEntries(&interruptible, 2), DBException, ErrorCodes::Interrupted);
+    ASSERT_THROWS_CODE(fpb.wait(&interruptible, 2), DBException, ErrorCodes::Interrupted);
 
     ASSERT_TRUE(failPoint.shouldFail());
-    ASSERT_EQ(fpb.waitForNNewEntries(&interruptible, 2), 2);
+    ASSERT_EQ(fpb.wait(&interruptible, 2), 2);
 }
 
-TEST(FailPointBlock, WaitForOneNewEntryResumesAfterAnotherThreadEnters) {
+TEST(FailPointBlock, WaitResumesAfterAnotherThreadEnters) {
     FailPoint failPoint("testFP");
     repeatedlyTestFailPoint(failPoint, 3);
     FailPointEnableBlock fpb(&failPoint);
@@ -633,7 +605,7 @@ TEST(FailPointBlock, WaitForOneNewEntryResumesAfterAnotherThreadEnters) {
     std::exception_ptr waiterException;
     stdx::thread waiter([&] {
         try {
-            entries = fpb.waitForOneNewEntry(opCtx.get());
+            entries = fpb.wait(opCtx.get(), 1);
         } catch (...) {
             waiterException = std::current_exception();
         }
@@ -669,7 +641,7 @@ TEST(FailPointBlock, WaitCountsEntriesBeforeWaitIsCalled) {
     FailPointEnableBlock fpb(&failPoint);
     ThrowOnBlock interruptible;
     ASSERT_TRUE(failPoint.shouldFail());
-    ASSERT_EQ(fpb.waitForOneNewEntry(&interruptible), 1);
+    ASSERT_EQ(fpb.wait(&interruptible, 1), 1);
 }
 
 // Test that the waits return the number of entries since the block was created, not the absolute
@@ -680,42 +652,20 @@ TEST(FailPointBlock, WaitReturnsEntriesSinceBlockCreated) {
 
     FailPointEnableBlock fpb(&failPoint);
     ThrowOnBlock interruptible;
-    ASSERT_EQ(fpb.waitForNNewEntries(&interruptible, 0), 0);
+    ASSERT_EQ(fpb.wait(&interruptible, 0), 0);
     for (int i = 1; i <= 3; ++i) {
         ASSERT_TRUE(failPoint.shouldFail());
-        ASSERT_EQ(fpb.waitForNNewEntries(&interruptible, 0), i);
+        ASSERT_EQ(fpb.wait(&interruptible, 0), i);
     }
 }
 
-// Test that waiting for a negative number of entries trips a tassert rather than returning
-// instantly.
-TEST(FailPointBlock, WaitForNegativeEntriesTasserts) {
-    FailPoint failPoint("testFP");
-    FailPointEnableBlock fpb(&failPoint);
-    ASSERT_TASSERT_CODE(fpb.waitForNNewEntries(-1), 13570300);
-}
-
-TEST(FailPointBlock, WaitForIntMaxEntriesTasserts) {
-    FailPoint failPoint("testFP");
-    repeatedlyTestFailPoint(failPoint, 3);
-    FailPointEnableBlock fpb(&failPoint);
-    ASSERT_TASSERT_CODE(fpb.waitForNNewEntries(std::numeric_limits<FailPoint::EntryCountT>::max()),
-                        13570301);
-    ASSERT_TASSERT_CODE(
-        fpb.waitForNNewEntries(std::numeric_limits<FailPoint::EntryCountT>::max() - 1), 13570301);
-    ASSERT_TASSERT_CODE(
-        fpb.waitForNNewEntries(std::numeric_limits<FailPoint::EntryCountT>::max() - 2), 13570301);
-}
-
 // Test that the waits can be interrupted while the fail point has not yet been entered.
-TEST(FailPointBlock, WaitForNewEntriesIsInterruptible) {
+TEST(FailPointBlock, WaitIsInterruptible) {
     FailPoint failPoint("testFP");
     FailPointEnableBlock fpb(&failPoint);
 
     assertFunctionInterruptible(
-        [&fpb](Interruptible* interruptible) { fpb.waitForOneNewEntry(interruptible); });
-    assertFunctionInterruptible(
-        [&fpb](Interruptible* interruptible) { fpb.waitForNNewEntries(interruptible, 2); });
+        [&fpb](Interruptible* interruptible) { fpb.wait(interruptible, 2); });
 }
 
 }  // namespace mongo

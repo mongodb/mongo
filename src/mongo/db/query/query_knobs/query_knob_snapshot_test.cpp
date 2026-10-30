@@ -269,7 +269,7 @@ TEST(QueryKnobSnapshotCacheTest, WritersAreSerializedByIntentLock) {
     auto aFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{1}, KnobSource::kSetParameter);
     });
-    fp->waitForOneNewEntry();
+    fp->wait();
 
     auto bFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{1}, QueryKnobValue{2}, KnobSource::kSetParameter);
@@ -294,7 +294,7 @@ TEST(QueryKnobSnapshotCacheTest, HeldReadLockBlocksWriterInstall) {
     fp.emplace("hangInQueryKnobSnapshotCacheRead");
 
     auto readerFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
-    fp->waitForOneNewEntry();
+    fp->wait();
 
     auto writerFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{1}, KnobSource::kSetParameter);
@@ -317,7 +317,7 @@ TEST(QueryKnobSnapshotCacheTest, WriterBuildPhaseDoesNotBlockReaders) {
     auto writerFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{2}, KnobSource::kSetParameter);
     });
-    fp->waitForOneNewEntry();
+    fp->wait();
 
     // Writer is parked after building, before taking the write lock. A concurrent reader
     // must see the pre-write value without blocking.
@@ -335,10 +335,10 @@ TEST(QueryKnobSnapshotCacheTest, ConcurrentReadersDontBlockEachOther) {
     fp.emplace("hangInQueryKnobSnapshotCacheRead");
 
     auto readerAFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
-    fp->waitForOneNewEntry();
+    fp->wait();
 
     auto readerBFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
-    fp->waitForNNewEntries(2);
+    fp->wait(2);
 
     fp.reset();
     readerAFut.get();

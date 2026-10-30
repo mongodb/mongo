@@ -234,7 +234,7 @@ TEST_F(TaskExecutorCursorFixture, PinnedExecutorDestroyedOnUnderlying) {
         // Destroy the TEC and ensure we reach the code block that will destroy the pinned executor.
         tec.reset();
         LOGV2(7361301, "Waiting for TaskExecutorCursor to destroy its pinning executor.");
-        fpb.waitForOneNewEntry();
+        fpb.wait();
     }
     // Allow the pinned executor's destruction to proceed.
 }

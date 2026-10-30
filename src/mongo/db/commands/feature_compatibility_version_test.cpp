@@ -262,7 +262,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture, FindFCVDocumentRetriesWriteConfli
 
     auto fcvDocument =
         FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext());
-    EXPECT_EQ(1, failPoint->waitForOneNewEntry());
+    EXPECT_EQ(1, failPoint->wait());
     ASSERT_OK(fcvDocument);
     ASSERT_EQ(FeatureCompatibilityVersionDocument::parse(fcvDocument.getValue()).getVersion(),
               multiversion::GenericFCV::kLatest);

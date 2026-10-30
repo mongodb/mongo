@@ -871,7 +871,7 @@ void waitForFlushFailpoint(FailPointEnableBlock& fp, std::function<void()> reque
             sleepFor(Milliseconds(10));
         }
     });
-    fp.waitForOneNewEntry();
+    fp.wait();
     stop.store(true);
     driver.join();
 }

@@ -107,7 +107,7 @@ TEST_F(MockClientTest, ConnectTimeout) {
         FailPointEnableBlock fp("grpcHangOnStreamEstablishment");
         auto status =
             client.connect(defaultServerAddress(), getReactor(), Milliseconds(5), {}).getNoThrow();
-        fp.waitForOneNewEntry();
+        fp.wait();
         ASSERT_NOT_OK(status);
         ASSERT_EQ(status.getStatus().code(), ErrorCodes::ExceededTimeLimit);
     };
@@ -126,7 +126,7 @@ TEST_F(MockClientTest, ConnectCancelled) {
         FailPointEnableBlock fp("grpcHangOnStreamEstablishment");
         auto connectFut = client.connect(
             defaultServerAddress(), getReactor(), Minutes(30), {}, cancelSource.token());
-        fp.waitForOneNewEntry();
+        fp.wait();
         cancelSource.cancel();
         auto status = connectFut.getNoThrow();
         ASSERT_NOT_OK(status);
@@ -145,7 +145,7 @@ TEST_F(MockClientTest, ConnectCancelledByShutdown) {
         client.start();
         FailPointEnableBlock fp("grpcHangOnStreamEstablishment");
         auto connectFut = client.connect(defaultServerAddress(), getReactor(), Minutes(30), {});
-        fp.waitForOneNewEntry();
+        fp.wait();
         client.shutdown();
         auto status = connectFut.getNoThrow();
         ASSERT_NOT_OK(status);

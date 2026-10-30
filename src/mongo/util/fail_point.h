@@ -277,7 +277,10 @@ public:
     }
 
     /**
-     * Waits until the fail point has been entered the desired number of times.
+     * Waits until the fail point has been entered the desired number of times, based on
+     * an absolute count of entries accumulated over the fail point's lifetime. Because
+     * the count is cumulative, a call like `waitForTimesEntered(1)` can be vacuously
+     * satisfied by entries from tests that ran earlier in the same process.
      *
      * @param targetTimesEntered the number of times the fail point has been entered.
      *
@@ -631,37 +634,24 @@ public:
     }
 
     /**
-     * Waits until the fail point has been entered once since this block enabled it. Prefer this
-     * over `FailPoint::waitForTimesEntered`, which uses an absolute count accumulated over the
-     * fail point's lifetime and so can be pre-satisfied by earlier tests in the same binary.
-     *
+     * Waits until the fail point has been entered `n` times since this block enabled it.
      * Returns the number of times the fail point has been entered since this block enabled it,
-     * which can be used to assert an exact count without racing against further entries, e.g.
-     * `ASSERT_EQ(fpb.waitForOneNewEntry(), 1);`
+     * which can be used to assert an exact count without racing against further entries, e.g.,
+     * `ASSERT_EQ(fpb.wait(1), 1);`
      */
-    FailPoint::EntryCountT waitForOneNewEntry() const {
-        return waitForNNewEntries(1);
-    }
-
-    FailPoint::EntryCountT waitForOneNewEntry(Interruptible* interruptible) const {
-        return waitForNNewEntries(interruptible, 1);
+    FailPoint::EntryCountT wait(FailPoint::EntryCountT n = 1) const {
+        return wait(Interruptible::notInterruptible(), n);
     }
 
     /**
-     * Like `waitForOneNewEntry`, but waits for `n` entries since enable. `n` must be
-     * non-negative.
+     * Disambiguates wait(0) calls, where 0 might otherwise convert to a nullptr Interruptible*.
      */
-    FailPoint::EntryCountT waitForNNewEntries(FailPoint::EntryCountT n) const {
-        return waitForNNewEntries(Interruptible::notInterruptible(), n);
+    FailPoint::EntryCountT wait(int n) const {
+        return wait(static_cast<long long>(n));
     }
 
-    FailPoint::EntryCountT waitForNNewEntries(Interruptible* interruptible,
-                                              FailPoint::EntryCountT n) const {
-        tassert(
-            13570300, "Number of new fail point entries to wait for must be non-negative", n >= 0);
-        tassert(13570301,
-                "Number of new fail point entries to wait for must be representable",
-                n <= std::numeric_limits<FailPoint::EntryCountT>::max() - _initialTimesEntered);
+    FailPoint::EntryCountT wait(Interruptible* interruptible, FailPoint::EntryCountT n = 1) const {
+        invariant(n >= 0);
         return _failPoint->waitForTimesEntered(interruptible, _initialTimesEntered + n) -
             _initialTimesEntered;
     }

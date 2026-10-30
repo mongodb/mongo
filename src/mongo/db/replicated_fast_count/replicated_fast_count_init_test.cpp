@@ -567,7 +567,7 @@ TEST_F(ReplicatedFastCountInitOplogTest, CreateContainersRetriesOnWriteConflict)
 
     ASSERT_OK(createContainers());
 
-    ASSERT_EQ(1, failPoint->waitForOneNewEntry());
+    ASSERT_EQ(1, failPoint->wait());
 
     assertContainersExistAndAreEmpty();
     ASSERT_EQ(countInitOplogEntries(), 1);
@@ -579,7 +579,7 @@ TEST_F(ReplicatedFastCountInitOplogTest, CreateContainersRetriesRepeatedlyOnWrit
 
     ASSERT_OK(createContainers());
 
-    ASSERT_EQ(3, failPoint->waitForNNewEntries(3));
+    ASSERT_EQ(3, failPoint->wait(3));
 
     assertContainersExistAndAreEmpty();
     ASSERT_EQ(countInitOplogEntries(), 1);
@@ -591,7 +591,7 @@ TEST_F(ReplicatedFastCountInitOplogTest, SetUpReplicatedFastCountDoesNotCrashOnW
 
     setUpReplicatedFastCount(_opCtx);
 
-    ASSERT_EQ(1, failPoint->waitForOneNewEntry());
+    ASSERT_EQ(1, failPoint->wait());
 
     assertContainersExistAndAreEmpty();
 }

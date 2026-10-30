@@ -1376,7 +1376,7 @@ TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
     });
 
     // Cancel after network response received in the TaskExecutor.
-    pauseAfterNetworkResponse.waitForOneNewEntry();
+    pauseAfterNetworkResponse.wait();
     source.cancel();
     pauseAfterNetworkResponseFailPoint->setMode(FailPoint::off);
 

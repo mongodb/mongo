@@ -1774,7 +1774,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
                                               IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                               IndexBuildInterceptor::DrainPhase::kFinal));
         // Exactly one WCE fired during the drain.
-        EXPECT_EQ(1, failPoint->waitForOneNewEntry());
+        EXPECT_EQ(1, failPoint->wait());
     }
 
     // The index has exactly kNumKeys keys — no duplicates from a double-applied batch, no losses
@@ -1877,7 +1877,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
                                               IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                               IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                               IndexBuildInterceptor::DrainPhase::kFinal));
-        EXPECT_EQ(1, failPoint->waitForOneNewEntry());
+        EXPECT_EQ(1, failPoint->wait());
     }
 
     // Both batches landed exactly once: no records lost from the rolled-back batch and no records
@@ -1955,7 +1955,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexRollbackAfterPartialBatc
 
     auto* opCtx = operationContext();
     unittest::JoinThread killer([&] {
-        fp.waitForOneNewEntry();
+        fp.wait();
         ClientLock lk(opCtx->getClient());
         opCtx->getServiceContext()->killOperation(lk, opCtx, ErrorCodes::Interrupted);
     });
@@ -2003,7 +2003,7 @@ TEST_F(IndexBuilderInterceptorTest, CheckDuplicateKeyConstraintsSurvivesWriteCon
             FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
         ASSERT_OK(interceptor->checkDuplicateKeyConstraints(
             operationContext(), _coll->getCollectionPtr(), entry));
-        EXPECT_EQ(failPoint->waitForNNewEntries(0), 1);
+        EXPECT_EQ(failPoint->wait(0), 1);
     }
     EXPECT_EQ(getDuplicateKeyTableContents(indexBuildInfo).size(), 0);
 }

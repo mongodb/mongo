@@ -283,7 +283,7 @@ void AsyncClientIntegrationTestFixture::testRunCommandCancelBetweenSendAndRead()
                                .getNoThrow(interruptible()));
     });
 
-    fpb->waitForOneNewEntry();
+    fpb->wait();
     cancelSource.cancel();
     fpb.reset();
 

@@ -274,7 +274,7 @@ TEST_F(RouterMultiStatementTransactionRequestsSenderTest, NextDrainsSiblingsAfte
                              << BSON_ARRAY(BSON("shardId" << kTestRemoteShardId3 << "readOnly"
                                                           << true << "term" << 6LL)));
         });
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        fp.wait();
     }
     onCommand([&](const auto& request) {
         ASSERT_EQ(request.target, kTestRemoteHostAndPort2);
@@ -358,7 +358,7 @@ TEST_F(RouterMultiStatementTransactionRequestsSenderTest,
                              << BSON_ARRAY(BSON("shardId" << kTestRemoteShardId3 << "readOnly"
                                                           << true << "term" << 6LL)));
         });
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        fp.wait();
     }
     onCommand([&](const auto& request) -> StatusWith<BSONObj> {
         ASSERT_EQ(request.target, kTestRemoteHostAndPort2);

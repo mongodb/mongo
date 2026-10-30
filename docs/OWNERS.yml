@@ -21,6 +21,9 @@ filters:
   - "exception_architecture.md":
     approvers:
       - 10gen/server-programmability
+  - "fail_points.md":
+    approvers:
+      - 10gen/server-programmability
   - "futures_and_promises.md":
     approvers:
       - 10gen/server-programmability

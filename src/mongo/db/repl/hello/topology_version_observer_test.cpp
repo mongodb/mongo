@@ -220,7 +220,7 @@ TEST_F(TopologyVersionObserverTest, HandleDBException) {
         // Kill the operation waiting on the `isMaster` future to make it throw
         if (!tryKillOperation()) {
             // If we weren't able to kill, then block until there is an opCtx again.
-            failBlock.waitForOneNewEntry();
+            failBlock.wait();
 
             // Try again to kill now that we've waited for the failpoint.
             ASSERT(tryKillOperation()) << "Unable to acquire and kill observer OpCtx";
@@ -259,7 +259,7 @@ TEST_F(TopologyVersionObserverTest, HandleQuiesceMode) {
     }
 
     // Wait for the background thread to fully shutdown.
-    failBlock.waitForOneNewEntry();
+    failBlock.wait();
 
     // In quiescence, the observer should be shutdown and have nothing in cache.
     ASSERT(!observer->getCached());
@@ -280,7 +280,7 @@ TEST_F(TopologyVersionObserverInterruptedTest, ShutdownAlwaysInterruptsWorkerOpe
         observer = std::make_unique<TopologyVersionObserver>();
         observer->init(getServiceContext(), getReplCoord());
 
-        workerFailBlock.waitForOneNewEntry();
+        workerFailBlock.wait();
         blockerThread = stdx::thread([&] {
             FailPointEnableBlock requestFailBlock("topologyVersionObserverExpectsInterruption");
             b1.countDownAndWait();
@@ -292,7 +292,7 @@ TEST_F(TopologyVersionObserverInterruptedTest, ShutdownAlwaysInterruptsWorkerOpe
             FailPointEnableBlock shutdownFailBlock("topologyVersionObserverShutdownShouldWait");
             observerThread = stdx::thread([&] { observer->shutdown(); });
 
-            shutdownFailBlock.waitForOneNewEntry();
+            shutdownFailBlock.wait();
         }
     }
     observerThread->join();

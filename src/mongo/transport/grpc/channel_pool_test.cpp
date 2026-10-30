@@ -161,7 +161,7 @@ TEST_F(ChannelPoolTest, CannotDropIdleChannelWhileCreatingNewStub) {
 
     FailPointEnableBlock fp("blockBeforeCreatingNewChannel");
     beforeCreatingStub.countDownAndWait();
-    fp.waitForOneNewEntry();
+    fp.wait();
     // At this point, `worker` is blocked on the creation of a new channel, which should have
     // already been added to the list of open channels.
     ASSERT_EQ(pool().size(), 1);
@@ -242,13 +242,13 @@ TEST_F(ChannelPoolTest, OneChannelForMultipleStubs) {
     {
         FailPointEnableBlock cFP("blockBeforeCreatingNewChannel");
         beforeCreatingFirstStub.countDownAndWait();
-        cFP.waitForOneNewEntry();
+        cFP.wait();
         // `channelCreator` is now blocked in the factory function for creating new channels.
         beforeCreatingSecondStub.countDownAndWait();
         // `channelUser` can now go ahead with creating `stub2`, but it should wait for
         // `channelCreator` to return from creating the new channel.
     }
-    sFP.waitForNNewEntries(2);
+    sFP.wait(2);
     ASSERT_EQ(pool().size(), 1);
 }
 

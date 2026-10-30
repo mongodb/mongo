@@ -148,7 +148,7 @@ TEST_F(GatherResponsesTest, DrainsSiblingResponsesAfterBailOut) {
             ASSERT_EQ(request.target, kTestRemoteHostAndPort1);
             return errorResponse(staleDbVersionStatus());
         });
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        fp.wait();
     }
     onCommand([&](const auto& request) {
         ASSERT_EQ(request.target, kTestRemoteHostAndPort2);
@@ -176,7 +176,7 @@ TEST_F(GatherResponsesTest, FirstBailOutErrorWins) {
             ASSERT_EQ(request.target, kTestRemoteHostAndPort1);
             return errorResponse(staleDbVersionStatus());
         });
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        fp.wait();
     }
     onCommand([&](const auto& request) {
         ASSERT_EQ(request.target, kTestRemoteHostAndPort2);
@@ -210,7 +210,7 @@ TEST_F(GatherResponsesTest, BailOutWinsOverLaterMetadataFailure) {
                                 << BSON_ARRAY(BSON("shardId" << kTestRemoteShardId3 << "readOnly"
                                                              << true << "term" << 5LL))));
         });
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        fp.wait();
     }
     onCommand([&](const auto& request) {
         ASSERT_EQ(request.target, kTestRemoteHostAndPort2);
@@ -254,7 +254,7 @@ TEST_F(GatherResponsesTest, BailOutStopsRetryingBeforeDraining) {
             ASSERT_EQ(request.target, kTestRemoteHostAndPort1);
             return errorResponse(staleDbVersionStatus());
         });
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        fp.wait();
     }
     onCommand([&](const auto& request) -> StatusWith<BSONObj> {
         ASSERT_EQ(request.target, kTestRemoteHostAndPort2);

@@ -1798,7 +1798,7 @@ TEST_F(ContainerBasedSpillerWriteConflictTest, MergeSpillsRemoveSurvivesWCE) {
                         /*numTargetedSpills=*/1,
                         /*maxSpillsPerMerge=*/3);
 
-    ASSERT_EQ(writeConflict->waitForOneNewEntry(), 1)
+    ASSERT_EQ(writeConflict->wait(), 1)
         << "Expected exactly one WCE to fire inside mergeSpills_remove";
 
     ASSERT_EQ(spiller.iterators().size(), 1);

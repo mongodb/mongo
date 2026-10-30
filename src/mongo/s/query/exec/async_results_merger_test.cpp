@@ -5862,7 +5862,7 @@ TEST_F(AsyncResultsMergerTest, RetryNotDispatchedBeforeBackoffDeadlineWhileDetac
     // has not advanced past the deadline. Use a count relative to when the block enabled the fail
     // point rather than an absolute 1, because 'armRetryScheduledForTesting' is a global fail point
     // whose entry counter persists across tests in this binary.
-    retryScheduledFp.waitForOneNewEntry();
+    retryScheduledFp.wait();
     ASSERT_FALSE(networkHasReadyRequests());
 
     // Advancing the network clock to just before the deadline must not dispatch the retry.

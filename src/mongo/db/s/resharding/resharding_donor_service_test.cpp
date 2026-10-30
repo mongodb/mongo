@@ -1701,7 +1701,7 @@ TEST_F(ReshardingDonorServiceTest, PostValidationReadsMajorityCommittedState) {
     checkStateDocumentRemoved(opCtx.get());
 
     opCtx->setDeadlineByDate(Date_t::now() + Seconds(5), ErrorCodes::ExceededTimeLimit);
-    ASSERT_EQ(majorityRead.waitForOneNewEntry(opCtx.get()), 1);
+    ASSERT_EQ(majorityRead.wait(opCtx.get()), 1);
 }
 
 }  // namespace

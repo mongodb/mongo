@@ -45,32 +45,26 @@ command implementations, see [here][fail_point_commands].
 
 ### Waiting on Fail Points in C++
 
-If you hold a `FailPointEnableBlock`, use `waitForOneNewEntry()` / `waitForNNewEntries(n)`. Never
-pass an absolute count.
+A fail point can be enabled via `FailPoint::setMode()` and waited on using `waitForTimesEntered()`
+like so: `auto n = fp->setMode(...); fp->waitForTimesEntered(n + 1);`. The count passed to
+`waitForTimesEntered` is an absolute count over the fail point's lifetime, so it should be computed
+from the number of entries when the fail point was enabled and the desired number of new entries.
+Otherwise, the wait could return immediately, being vacuously satisfied by entries from earlier
+tests in the same process.
+
+`FailPointEnableBlock` provides a more convenient wrapper around that functionality. For example:
 
 ```cpp
 FailPointEnableBlock fpb("myFailPoint");
 startBackgroundWork();
-
-// Each call counts from when `fpb` enabled the fail point, not from the previous call. Pick one:
-fpb.waitForOneNewEntry();          // At least 1 entry since enable.
-fpb.waitForNNewEntries(3);         // At least 3 entries since enable.
-fpb.waitForOneNewEntry(opCtx);     // Interruptible overloads take an `Interruptible*` first.
-fpb.waitForNNewEntries(opCtx, 3);
+fpb.wait(3);        // Counts from when `fpb` enabled the fail point.
+fpb.wait(opCtx, 3); // Can also pass an `Interruptible*`.
 ```
 
-A fail point's `timesEntered` count is cumulative over the lifetime of the process, so an absolute
-count passed to `FailPoint::waitForTimesEntered()` can already be satisfied by earlier tests in the
-same unittest binary. Never hand-roll the relative count with
-`fpb->waitForTimesEntered(fpb.initialTimesEntered() + n)` either; use the methods above.
-
-Each method returns the number of entries since the block enabled the fail point, so you can assert
-an exact count: `ASSERT_EQ(1, fpb.waitForOneNewEntry());`
-
-If you enable a fail point with `FailPoint::setMode()` rather than a `FailPointEnableBlock`, use the
-count `setMode()` returns as the base: `auto n = fp->setMode(...); fp->waitForTimesEntered(n + 1);`.
-
-A lint rule may enforce this in the future.
+The `FailPointEnableBlock` methods take a relative count of _new_ entries since the block enabled
+the fail point, in contrast to `waitForTimesEntered()`, which takes an absolute count that is
+cumulative over the fail point's lifetime. Each method returns the number of entries when the wait
+completes, so you can assert an exact count: `ASSERT_EQ(fpb.wait(3), 3);`.
 
 ## The `failCommand` Fail Point
 

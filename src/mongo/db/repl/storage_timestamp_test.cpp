@@ -3698,7 +3698,7 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
 
             // We cannot use the OperationContext to wait for the thread to reach the fail point
             // because it also uses the ClockSourceMock.
-            fpb.waitForOneNewEntry(Interruptible::notInterruptible());
+            fpb.wait();
         }
 
         auto mdbCatalog = _opCtx->getServiceContext()->getStorageEngine()->getMDBCatalog();

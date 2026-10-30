@@ -1839,13 +1839,13 @@ TEST_F(PipelinedOplogApplierRunTest, DrainWaitsForPublicationAfterTheLastBatchIs
         FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
         pushToBuffer({op});
         startApplier();
-        publishing.waitForOneNewEntry();
+        publishing.wait();
         unittest::LogCaptureGuard logs;
         {
             // Pause drain after it sees the advancer is still busy, despite the empty FIFO queue.
             FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
             shutdownApplier();
-            beforeWait.waitForOneNewEntry();
+            beforeWait.wait();
             ASSERT_FALSE(_finished->isReady());
             ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier advancer"),
                       0);
@@ -1871,12 +1871,12 @@ TEST_F(PipelinedOplogApplierRunTest, DrainWaitsForPublicationOfAZeroWorkerBatch)
         FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
         pushToBuffer({op});
         startApplier();
-        publishing.waitForOneNewEntry();
+        publishing.wait();
         unittest::LogCaptureGuard logs;
         {
             FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
             shutdownApplier();
-            beforeWait.waitForOneNewEntry();
+            beforeWait.wait();
             ASSERT_FALSE(_finished->isReady());
             ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier advancer"),
                       0);
@@ -1959,7 +1959,7 @@ TEST_F(PipelinedOplogApplierRunTest,
         // Prove the dispatcher entered the step-up drain while the worker is still held.
         FailPointEnableBlock drainFp("hangBeforePipelinedApplierDrain");
         mock->setOplogSyncState(ReplicationCoordinator::OplogSyncState::ApplierDraining);
-        drainFp.waitForOneNewEntry();
+        drainFp.wait();
         // The drain cannot complete while the held worker has not finished, so the signal cannot
         // have fired.
         ASSERT_FALSE(
@@ -2059,12 +2059,12 @@ TEST_F(PipelinedOplogApplierRunTest, StepUpDrainWaitsForAdvancerPublication) {
         FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
         pushToBuffer({op});
         startApplier();
-        publishing.waitForOneNewEntry();
+        publishing.wait();
         {
             // Prove the dispatcher's step-up drain reached the advancer idle wait.
             FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
             mock->setOplogSyncState(ReplicationCoordinator::OplogSyncState::ApplierDraining);
-            beforeWait.waitForOneNewEntry();
+            beforeWait.wait();
             // Workers are idle but publication is held, so the drain cannot complete yet.
             ASSERT_FALSE(
                 mock->applierDrainCompleteNotification().waitFor(_opCtx.get(), Milliseconds(500)));
@@ -2612,7 +2612,7 @@ TEST_F(PipelinedMultikeyPublishTest, FlushCompletesAboveStableBeforePublicationA
     {
         FailPointEnableBlock waiting("hangBeforePipelinedApplierIdleWait");
         shutdownApplier();
-        waiting.waitForOneNewEntry();
+        waiting.wait();
         ASSERT_FALSE(_finished->isReady());
         ASSERT_EQ(replCoord->getMyLastAppliedOpTime(), previous);
         assertIndexMultikey(_opCtx.get(), kNss, "idx", false, MultikeyPaths({{}}));
@@ -2791,7 +2791,7 @@ TEST_F(PipelinedOplogApplierRunTest, DispatchesTheNextBatchWhileAnEarlierBatchIs
     {
         FailPointEnableBlock drainHang("hangBeforePipelinedApplierDrain");
         shutdownApplier();
-        drainHang.waitForOneNewEntry();
+        drainHang.wait();
     }
     // The drain is blocked waiting for the held worker's batch to be applied and published, so
     // shutdown cannot complete yet.
@@ -3059,7 +3059,7 @@ TEST_F(PipelinedOplogApplierRunTest,
         FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
         pushToBuffer({createOther});
         startApplier();
-        publishing.waitForOneNewEntry();
+        publishing.wait();
 
         // The create is applied and the workers are idle, but lastApplied has not reached it.
         ASSERT_TRUE(createCalled.waitFor(false, Seconds(60)));
