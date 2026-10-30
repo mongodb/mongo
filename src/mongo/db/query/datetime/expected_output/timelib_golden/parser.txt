@@ -1,0 +1,35 @@
+ -> ERROR ConversionFailure: Error parsing date string ''; 0: Empty string '\0'
+  -> ERROR ConversionFailure: Error parsing date string ' '; 0: Empty string '\0'
+\t -> ERROR ConversionFailure: Error parsing date string '\t'; 0: Empty string '\0'
+  2024-01-01 -> 1704067200000 [2024-01-01T00:00:00.000Z]
+2024-01-01   -> 1704067200000 [2024-01-01T00:00:00.000Z]
+2024-01-01  10:11:12 -> 1704103872000 [2024-01-01T10:11:12.000Z]
+2024-01-01T00:00:00 (UTC) -> 1704067200000 [2024-01-01T00:00:00.000Z]
+2024-01-01T00:00:00 UTC) -> 1704067200000 [2024-01-01T00:00:00.000Z]
+2024-01-01T00:00:00 ((EST) -> ERROR ConversionFailure: Error parsing date string '2024-01-01T00:00:00 ((EST)'; 20: Unexpected character '('
+2024-01-01T00:00:00+0530 -> 1704047400000 [2023-12-31T18:30:00.000Z]
+2024-01-01T00:00:00+05:30 -> 1704047400000 [2023-12-31T18:30:00.000Z]
+2024-01-01T00:00:00Z -> 1704067200000 [2024-01-01T00:00:00.000Z]
+2024-01-01 00:00:00 GMT+1 -> 1704063600000 [2023-12-31T23:00:00.000Z]
+2024-01-01 EST -> 1704085200000 [2024-01-01T05:00:00.000Z]
+2024-01-01 CEST -> 1704060000000 [2023-12-31T22:00:00.000Z]
+2024-03-01 -> 1709251200000 [2024-03-01T00:00:00.000Z]
+2024-03-01T10:11:12 -> 1709287872000 [2024-03-01T10:11:12.000Z]
+2024-03-01T10:11:12.123Z -> 1709287872123 [2024-03-01T10:11:12.123Z]
+20240301 -> 1709251200000 [2024-03-01T00:00:00.000Z]
+2024-03-01 10:11:12 -> 1709287872000 [2024-03-01T10:11:12.000Z]
+2024-W09-5 -> 1709251200000 [2024-03-01T00:00:00.000Z]
+2024W095 -> 1709251200000 [2024-03-01T00:00:00.000Z]
+2024-061 -> ERROR ConversionFailure: Error parsing date string '2024-061'; 9: The parsed date was invalid '\0'
+2024061 -> ERROR ConversionFailure: Error parsing date string '2024061'; 8: The parsed date was invalid '\0'
+2024-02-30 -> ERROR ConversionFailure: Error parsing date string '2024-02-30'; 11: The parsed date was invalid '\0'
+2024-13-01 -> ERROR ConversionFailure: Error parsing date string '2024-13-01'; 6: Unexpected character '3'
+0000-01-01 -> -62167219200000 [0000-01-01T00:00:00.000Z]
+-0001-01-01 -> -62198755200000 [ERROR Location18537]
+03/01/2024 -> 1709251200000 [2024-03-01T00:00:00.000Z]
+2024-01-01xyz -> ERROR ConversionFailure: Error parsing date string '2024-01-01xyz'; 10: passing a time zone identifier as part of the string is not allowed 'x'
+not a date -> ERROR ConversionFailure: Error parsing date string 'not a date'; 0: passing a time zone identifier as part of the string is not allowed 'n'; 6: Double timezone specification 'd'; 4: Double timezone specification 'a'
+2024-01-01\xC3\xA9 -> ERROR ConversionFailure: Error parsing date string '2024-01-01\xC3\xA9'; 10: Unexpected character '\xC3'; 11: Unexpected character '\xA9'
+\xEF\xBC\x92\xEF\xBC\x90\xEF\xBC\x92\xEF\xBC\x94-01-01 -> ERROR ConversionFailure: Error parsing date string '\xEF\xBC\x92\xEF\xBC\x90\xEF\xBC\x92\xEF\xBC\x94-01-01'; 0: Unexpected character '\xEF'; 1: Unexpected character '\xBC'; 2: Unexpected character '\x92'; 3: Unexpected character '\xEF'; 4: Unexpected character '\xBC'; 5: Unexpected character '\x90'; 6: Unexpected character '\xEF'; 7: Unexpected character '\xBC'; 8: Unexpected character '\x92'; 9: Unexpected character '\xEF'; 10: Unexpected character '\xBC'; 11: Unexpected character '\x94'; 15: Double timezone specification '-'
+embedded NUL -> ERROR ConversionFailure: Error parsing date string '2024-01-01\0junk'; 11: passing a time zone identifier as part of the string is not allowed 'j'
+'2024-01-01' + 10k spaces -> 1704067200000 [2024-01-01T00:00:00.000Z]

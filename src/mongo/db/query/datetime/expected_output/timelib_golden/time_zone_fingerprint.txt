@@ -1,0 +1,1251 @@
+Africa/Abidjan -> 32c0cef7fbc693f5
+Africa/Accra -> 32c0cef7fbc693f5
+Africa/Addis_Ababa -> 13e0767b676f9b85
+Africa/Algiers -> d9938f856478a99d
+Africa/Asmara -> 13e0767b676f9b85
+Africa/Asmera -> 13e0767b676f9b85
+Africa/Bamako -> 32c0cef7fbc693f5
+Africa/Bangui -> 9a05ad9b18ca1125
+Africa/Banjul -> 32c0cef7fbc693f5
+Africa/Bissau -> e336435c20389b1f
+Africa/Blantyre -> 283e997d69b9e7e5
+Africa/Brazzaville -> 9a05ad9b18ca1125
+Africa/Bujumbura -> 283e997d69b9e7e5
+Africa/Cairo -> a1bdd57907869445
+Africa/Casablanca -> cbf74c41a0ff7704
+Africa/Ceuta -> 5eadd5964898b72d
+Africa/Conakry -> 32c0cef7fbc693f5
+Africa/Dakar -> 32c0cef7fbc693f5
+Africa/Dar_es_Salaam -> 13e0767b676f9b85
+Africa/Djibouti -> 13e0767b676f9b85
+Africa/Douala -> 9a05ad9b18ca1125
+Africa/El_Aaiun -> aea757055477a364
+Africa/Freetown -> 32c0cef7fbc693f5
+Africa/Gaborone -> 283e997d69b9e7e5
+Africa/Harare -> 283e997d69b9e7e5
+Africa/Johannesburg -> 283e997d69b9e7e5
+Africa/Juba -> e656e2283f2c8a6d
+Africa/Kampala -> 13e0767b676f9b85
+Africa/Khartoum -> 7b2eeee6db21b20d
+Africa/Kigali -> 283e997d69b9e7e5
+Africa/Kinshasa -> 9a05ad9b18ca1125
+Africa/Lagos -> 9a05ad9b18ca1125
+Africa/Libreville -> 9a05ad9b18ca1125
+Africa/Lome -> 32c0cef7fbc693f5
+Africa/Luanda -> 9a05ad9b18ca1125
+Africa/Lubumbashi -> 283e997d69b9e7e5
+Africa/Lusaka -> 283e997d69b9e7e5
+Africa/Malabo -> 9a05ad9b18ca1125
+Africa/Maputo -> 283e997d69b9e7e5
+Africa/Maseru -> 283e997d69b9e7e5
+Africa/Mbabane -> 283e997d69b9e7e5
+Africa/Mogadishu -> 13e0767b676f9b85
+Africa/Monrovia -> 386012e6e1014159
+Africa/Nairobi -> 13e0767b676f9b85
+Africa/Ndjamena -> e11adcfb7e3fb9e5
+Africa/Niamey -> 9a05ad9b18ca1125
+Africa/Nouakchott -> 32c0cef7fbc693f5
+Africa/Ouagadougou -> 32c0cef7fbc693f5
+Africa/Porto-Novo -> 9a05ad9b18ca1125
+Africa/Sao_Tome -> 5d9a20b019a4ee55
+Africa/Timbuktu -> 32c0cef7fbc693f5
+Africa/Tripoli -> 249e4ae7dbb19be5
+Africa/Tunis -> caf8b38726928465
+Africa/Windhoek -> caa4129cd18eb9f5
+America/Adak -> 9cad93f768624abb
+America/Anchorage -> f536493934a9fe26
+America/Anguilla -> 0efa0fadcd2ce7d9
+America/Antigua -> 0efa0fadcd2ce7d9
+America/Araguaina -> c8ce05843f72323f
+America/Argentina/Buenos_Aires -> 351ff98df7eab3d7
+America/Argentina/Catamarca -> 19156329820876df
+America/Argentina/ComodRivadavia -> 19156329820876df
+America/Argentina/Cordoba -> bc3ade23e2b89ed7
+America/Argentina/Jujuy -> 763a94506c821a1f
+America/Argentina/La_Rioja -> 88d051a7122522d7
+America/Argentina/Mendoza -> bb1e0dbd0a187207
+America/Argentina/Rio_Gallegos -> 1461c283e47c3ddf
+America/Argentina/Salta -> f26e13432c4dcd87
+America/Argentina/San_Juan -> 8dcea114dba4443f
+America/Argentina/San_Luis -> 2678c79a5689f2fd
+America/Argentina/Tucuman -> 62ff41c8f3ef1aa7
+America/Argentina/Ushuaia -> ce7129931557630f
+America/Aruba -> 0efa0fadcd2ce7d9
+America/Asuncion -> e08d837e562a22e1
+America/Atikokan -> fd3b1b4a154a8de1
+America/Atka -> 9cad93f768624abb
+America/Bahia -> 3648b458c5e2e451
+America/Bahia_Banderas -> 70e757ab31dbd48d
+America/Barbados -> 0ee846c4269a2f91
+America/Belem -> f68c400eead6a8c3
+America/Belize -> 4f78738568215759
+America/Blanc-Sablon -> 0efa0fadcd2ce7d9
+America/Boa_Vista -> 68909869c55cfcd9
+America/Bogota -> 95d2fceb63b6bc49
+America/Boise -> 14bf864c4fef45c1
+America/Buenos_Aires -> 351ff98df7eab3d7
+America/Cambridge_Bay -> b0142cfac92dcf51
+America/Campo_Grande -> 8b2d87464a565e59
+America/Cancun -> f36170347798860b
+America/Caracas -> d5d44a37baff5489
+America/Catamarca -> 19156329820876df
+America/Cayenne -> c151dd3e0c928e11
+America/Cayman -> fd3b1b4a154a8de1
+America/Chicago -> 4262e4b7ac229dcb
+America/Chihuahua -> 0cbcbfde22369049
+America/Ciudad_Juarez -> e75aa32ed061cb89
+America/Coral_Harbour -> fd3b1b4a154a8de1
+America/Cordoba -> bc3ade23e2b89ed7
+America/Costa_Rica -> 89e5b4a722b92dcf
+America/Coyhaique -> 46fd5100882b0421
+America/Creston -> 4ce11edbeb2dffa9
+America/Cuiaba -> d87089b9e4c02d59
+America/Curacao -> 0efa0fadcd2ce7d9
+America/Danmarkshavn -> a19dcf2607596cd3
+America/Dawson -> 8c6d30db94471f57
+America/Dawson_Creek -> 802eee81c180c4e9
+America/Denver -> 7ca6d0ec086fcab9
+America/Detroit -> b5ea4333d8f79cc9
+America/Dominica -> 0efa0fadcd2ce7d9
+America/Edmonton -> dd9e797cd0096f49
+America/Eirunepe -> 8643d8bb237187e9
+America/El_Salvador -> d710d81bc4989e37
+America/Ensenada -> 1f895432c058a264
+America/Fort_Nelson -> 7ca9ba8074bdf662
+America/Fort_Wayne -> 95635cf169d30111
+America/Fortaleza -> e9537af0ef4399ef
+America/Glace_Bay -> 3367ec806b1e7bb9
+America/Godthab -> 613c8cb97f42330b
+America/Goose_Bay -> 4f63a36f70cc874b
+America/Grand_Turk -> 85a7b2a058dbe4c9
+America/Grenada -> 0efa0fadcd2ce7d9
+America/Guadeloupe -> 0efa0fadcd2ce7d9
+America/Guatemala -> def89790ee431a33
+America/Guayaquil -> 9b831267fb586d89
+America/Guyana -> 9525950f5472169d
+America/Halifax -> e74b79010fd84099
+America/Havana -> e0cb65fe8acc0031
+America/Hermosillo -> 1dfb6b4008024fd1
+America/Indiana/Indianapolis -> 95635cf169d30111
+America/Indiana/Knox -> 5406e90383aa23e5
+America/Indiana/Marengo -> 23a6710d8b7f7111
+America/Indiana/Petersburg -> 76a8f2dec4f51f21
+America/Indiana/Tell_City -> 99bb024b6047bcb7
+America/Indiana/Vevay -> e6b819d84e0b9591
+America/Indiana/Vincennes -> e60d4445fc6e8849
+America/Indiana/Winamac -> caaa7372f9d37ac9
+America/Indianapolis -> 95635cf169d30111
+America/Inuvik -> 1a9a43dc3041bb31
+America/Iqaluit -> 06202dce222ffbe9
+America/Jamaica -> 8ed5fac4bf892709
+America/Jujuy -> 763a94506c821a1f
+America/Juneau -> 8219fea089e0c9a4
+America/Kentucky/Louisville -> 0c758ed65060e771
+America/Kentucky/Monticello -> ef22521e4aefc2cf
+America/Knox_IN -> 5406e90383aa23e5
+America/Kralendijk -> 0efa0fadcd2ce7d9
+America/La_Paz -> 0efa0fadcd2ce7d9
+America/Lima -> d9dcec697eab2f81
+America/Los_Angeles -> 7eecaaace721e926
+America/Louisville -> 0c758ed65060e771
+America/Lower_Princes -> 0efa0fadcd2ce7d9
+America/Maceio -> 10d9106c5b7a72d5
+America/Managua -> 8d475cfcab17f647
+America/Manaus -> b355a1773a44a4e9
+America/Marigot -> 0efa0fadcd2ce7d9
+America/Martinique -> e9a4d184272bd251
+America/Matamoros -> 7ad86b9ef5bdc3e3
+America/Mazatlan -> b8371f27b1c6e2e9
+America/Mendoza -> bb1e0dbd0a187207
+America/Menominee -> dc382b301b29081b
+America/Merida -> 66fc6f5d0270bc4b
+America/Metlakatla -> 2212f074f37c7d0b
+America/Mexico_City -> 48bc333ffc451773
+America/Miquelon -> cdcec7025855317d
+America/Moncton -> 58d24b6674faf529
+America/Monterrey -> 853276d8eaa8397b
+America/Montevideo -> bdaef602254130cd
+America/Montreal -> 91de60c9d5fd0071
+America/Montserrat -> 0efa0fadcd2ce7d9
+America/Nassau -> 91de60c9d5fd0071
+America/New_York -> 9dd47ae54f43e889
+America/Nipigon -> 91de60c9d5fd0071
+America/Nome -> d8caee024f9a40fc
+America/Noronha -> 9aca5f2c7fee9b1d
+America/North_Dakota/Beulah -> b98e8e5859ab7d95
+America/North_Dakota/Center -> 0d443710ebca010d
+America/North_Dakota/New_Salem -> d42232812809b807
+America/Nuuk -> 613c8cb97f42330b
+America/Ojinaga -> 1abe23d06cb86dc1
+America/Panama -> fd3b1b4a154a8de1
+America/Pangnirtung -> 06202dce222ffbe9
+America/Paramaribo -> 7a93eb2137039d65
+America/Phoenix -> 4ce11edbeb2dffa9
+America/Port-au-Prince -> d4e39cbefa296269
+America/Port_of_Spain -> 0efa0fadcd2ce7d9
+America/Porto_Acre -> e57b6896754a0029
+America/Porto_Velho -> 16f94a0ba3560529
+America/Puerto_Rico -> 0efa0fadcd2ce7d9
+America/Punta_Arenas -> b9d600bee529fb01
+America/Rainy_River -> 703085a7dea72483
+America/Rankin_Inlet -> 689072d1ca698edd
+America/Recife -> 1e1fd82abccbc667
+America/Regina -> aeb78ba7fb82ec81
+America/Resolute -> f9bf0bcf838f3c15
+America/Rio_Branco -> e57b6896754a0029
+America/Rosario -> bc3ade23e2b89ed7
+America/Santa_Isabel -> 1f895432c058a264
+America/Santarem -> 15276d7c0348d631
+America/Santiago -> 439a1d0238ce0ea9
+America/Santo_Domingo -> adbc16f69674dc39
+America/Sao_Paulo -> fadd44b23e6fdf35
+America/Scoresbysund -> 2de5117d41e6789d
+America/Shiprock -> 7ca6d0ec086fcab9
+America/Sitka -> ec46c40e349a5a5c
+America/St_Barthelemy -> 0efa0fadcd2ce7d9
+America/St_Johns -> 627abc0419d9925d
+America/St_Kitts -> 0efa0fadcd2ce7d9
+America/St_Lucia -> 0efa0fadcd2ce7d9
+America/St_Thomas -> 0efa0fadcd2ce7d9
+America/St_Vincent -> 0efa0fadcd2ce7d9
+America/Swift_Current -> 87d0a3bca908ce41
+America/Tegucigalpa -> 3228d5bc88e145b7
+America/Thule -> 2c3674cf14ccc8d1
+America/Thunder_Bay -> 91de60c9d5fd0071
+America/Tijuana -> 1f895432c058a264
+America/Toronto -> 91de60c9d5fd0071
+America/Tortola -> 0efa0fadcd2ce7d9
+America/Vancouver -> 178e26efa899c7ae
+America/Virgin -> 0efa0fadcd2ce7d9
+America/Whitehorse -> 3fcf8ba41623034f
+America/Winnipeg -> 703085a7dea72483
+America/Yakutat -> 232c8bc8c828176c
+America/Yellowknife -> dd9e797cd0096f49
+Antarctica/Casey -> 883129a254aff4cd
+Antarctica/Davis -> 67427c425da9f94d
+Antarctica/DumontDUrville -> 5d30d1bfcecd75a5
+Antarctica/Macquarie -> 8e1c522776f36851
+Antarctica/Mawson -> df90de98960ff185
+Antarctica/McMurdo -> 6de7b2403c2b11b9
+Antarctica/Palmer -> 928217ab7a978097
+Antarctica/Rothera -> aa3b3c75beaa73bd
+Antarctica/South_Pole -> 6de7b2403c2b11b9
+Antarctica/Syowa -> 13e0767b676f9b85
+Antarctica/Troll -> a42977c91c187963
+Antarctica/Vostok -> 4e1d33d00a54ec65
+Arctic/Longyearbyen -> 15b4c9437ea9a825
+Asia/Aden -> 13e0767b676f9b85
+Asia/Almaty -> 2836d4bb430af175
+Asia/Amman -> c6f3c720336c64c5
+Asia/Anadyr -> 979f905af53e036d
+Asia/Aqtau -> 3735b732054d6285
+Asia/Aqtobe -> 23e0492a3bf35105
+Asia/Ashgabat -> 1f02322150182a85
+Asia/Ashkhabad -> 1f02322150182a85
+Asia/Atyrau -> 933d4e1934f02ae5
+Asia/Baghdad -> 91960d1b1f5d4c25
+Asia/Bahrain -> 08dc6e27866260e5
+Asia/Baku -> 63305f68079dd4a5
+Asia/Bangkok -> 02045601767da595
+Asia/Barnaul -> f5d7804a97cb5cb5
+Asia/Beirut -> 393bdaa2e46d5555
+Asia/Bishkek -> 6546b79bd6ea1645
+Asia/Brunei -> 70a3c161d0b69f7d
+Asia/Calcutta -> dd5e0f01ab4861bd
+Asia/Chita -> 7f35b2e714e6e5fd
+Asia/Choibalsan -> cdaab91569f35e55
+Asia/Chongqing -> 63e5d82d1b91fba5
+Asia/Chungking -> 63e5d82d1b91fba5
+Asia/Colombo -> 4efc9fed83b52569
+Asia/Dacca -> 75ddece1c46d5865
+Asia/Damascus -> 2aeba78f29e7b2c5
+Asia/Dhaka -> 75ddece1c46d5865
+Asia/Dili -> b0e67731ffb7bc89
+Asia/Dubai -> 17c3f2a384e3a5e5
+Asia/Dushanbe -> 150f10ee6158f345
+Asia/Famagusta -> 3b3e53c32238c9b5
+Asia/Gaza -> 5e6f29f261ea0ac5
+Asia/Harbin -> 63e5d82d1b91fba5
+Asia/Hebron -> d204a717cb810665
+Asia/Ho_Chi_Minh -> 5fbbbfe7caf9eb89
+Asia/Hong_Kong -> f2c3350a8e71be41
+Asia/Hovd -> ff6ddbae232d4bad
+Asia/Irkutsk -> 91093c7e4180e9dd
+Asia/Istanbul -> f07a62ce22db2205
+Asia/Jakarta -> 02045601767da595
+Asia/Jayapura -> cc5f5fd79ede0665
+Asia/Jerusalem -> 14617ba2af01f745
+Asia/Kabul -> 5a1e209c61ca3765
+Asia/Kamchatka -> 28b1eedd380fedbd
+Asia/Karachi -> 5005b338917ac805
+Asia/Kashgar -> ea5a8876e449ea05
+Asia/Kathmandu -> 80f1e8ccbcfd3a05
+Asia/Katmandu -> 80f1e8ccbcfd3a05
+Asia/Khandyga -> e194978452632989
+Asia/Kolkata -> dd5e0f01ab4861bd
+Asia/Krasnoyarsk -> a3044db74cd4c095
+Asia/Kuala_Lumpur -> e2c724f9a37170fd
+Asia/Kuching -> 70a3c161d0b69f7d
+Asia/Kuwait -> 13e0767b676f9b85
+Asia/Macao -> f2c3350a8e71be41
+Asia/Macau -> f2c3350a8e71be41
+Asia/Magadan -> 17bd53804e8a262d
+Asia/Makassar -> 70a3c161d0b69f7d
+Asia/Manila -> 1ebad1aa71bf243d
+Asia/Muscat -> 17c3f2a384e3a5e5
+Asia/Nicosia -> 60aaa34728087b15
+Asia/Novokuznetsk -> d5231b3d2b996d15
+Asia/Novosibirsk -> cca062afb54e0015
+Asia/Omsk -> 03bd9ea8c1d52085
+Asia/Oral -> cd3c1fc9945ea585
+Asia/Phnom_Penh -> 02045601767da595
+Asia/Pontianak -> d06c9021f8bfbdd5
+Asia/Pyongyang -> 27a715ad45f136c5
+Asia/Qatar -> 08dc6e27866260e5
+Asia/Qostanay -> dc995de2f1708b05
+Asia/Qyzylorda -> 74cb8a9b2cba8a85
+Asia/Rangoon -> e2acf73046e145f5
+Asia/Riyadh -> 13e0767b676f9b85
+Asia/Saigon -> 5fbbbfe7caf9eb89
+Asia/Sakhalin -> 97a17d13d632ea9d
+Asia/Samarkand -> 0154124241b93c05
+Asia/Seoul -> c4ac706f301dece5
+Asia/Shanghai -> 63e5d82d1b91fba5
+Asia/Singapore -> e2c724f9a37170fd
+Asia/Srednekolymsk -> 2273a355a4cd315d
+Asia/Taipei -> 967a45f7c3326e55
+Asia/Tashkent -> 7d072439920c0b45
+Asia/Tbilisi -> 96e1ee79dd6d0605
+Asia/Tehran -> 17fdd12f03524ff5
+Asia/Tel_Aviv -> 14617ba2af01f745
+Asia/Thimbu -> 4e7f1c84eee5cdbd
+Asia/Thimphu -> 4e7f1c84eee5cdbd
+Asia/Tokyo -> cc5f5fd79ede0665
+Asia/Tomsk -> 523fb36e34ca1aed
+Asia/Ujung_Pandang -> 70a3c161d0b69f7d
+Asia/Ulaanbaatar -> cdaab91569f35e55
+Asia/Ulan_Bator -> cdaab91569f35e55
+Asia/Urumqi -> ea5a8876e449ea05
+Asia/Ust-Nera -> 0e4633715eff5c01
+Asia/Vientiane -> 02045601767da595
+Asia/Vladivostok -> 0ae7815ad33a50e5
+Asia/Yakutsk -> 32fac10e40e01c05
+Asia/Yangon -> e2acf73046e145f5
+Asia/Yekaterinburg -> 9d25a2ce7a5f2985
+Asia/Yerevan -> d3aab35198c0fb05
+Atlantic/Azores -> be20aec4de1f6981
+Atlantic/Bermuda -> 8bbbf415b6574859
+Atlantic/Canary -> f4e480d39a17364b
+Atlantic/Cape_Verde -> e63e70a0a31dacc5
+Atlantic/Faeroe -> a27c79d1c782d703
+Atlantic/Faroe -> a27c79d1c782d703
+Atlantic/Jan_Mayen -> 15b4c9437ea9a825
+Atlantic/Madeira -> 0ad606f9eb3a940b
+Atlantic/Reykjavik -> 32c0cef7fbc693f5
+Atlantic/South_Georgia -> d9da3e5188974ee5
+Atlantic/St_Helena -> 32c0cef7fbc693f5
+Atlantic/Stanley -> a067c3f260f12589
+Australia/ACT -> d4e8026e847d5b59
+Australia/Adelaide -> 14356236949a03e1
+Australia/Brisbane -> 274e781013b5b51d
+Australia/Broken_Hill -> 3093142477324451
+Australia/Canberra -> d4e8026e847d5b59
+Australia/Currie -> 4e84ef0e3025f641
+Australia/Darwin -> 6b36ef91a63c5945
+Australia/Eucla -> e0cd7b34364102e5
+Australia/Hobart -> 4e84ef0e3025f641
+Australia/LHI -> 098b864d86fd2595
+Australia/Lindeman -> f727290bc9412af5
+Australia/Lord_Howe -> 098b864d86fd2595
+Australia/Melbourne -> a588c5ff128835f9
+Australia/NSW -> d4e8026e847d5b59
+Australia/North -> 6b36ef91a63c5945
+Australia/Perth -> d0745c0e600f6811
+Australia/Queensland -> 274e781013b5b51d
+Australia/South -> 14356236949a03e1
+Australia/Sydney -> d4e8026e847d5b59
+Australia/Tasmania -> 4e84ef0e3025f641
+Australia/Victoria -> a588c5ff128835f9
+Australia/West -> d0745c0e600f6811
+Australia/Yancowinna -> 3093142477324451
+Brazil/Acre -> e57b6896754a0029
+Brazil/DeNoronha -> 9aca5f2c7fee9b1d
+Brazil/East -> fadd44b23e6fdf35
+Brazil/West -> b355a1773a44a4e9
+CET -> db52ca7e565525e5
+CST6CDT -> 4262e4b7ac229dcb
+Canada/Atlantic -> e74b79010fd84099
+Canada/Central -> 703085a7dea72483
+Canada/Eastern -> 91de60c9d5fd0071
+Canada/Mountain -> dd9e797cd0096f49
+Canada/Newfoundland -> 627abc0419d9925d
+Canada/Pacific -> 178e26efa899c7ae
+Canada/Saskatchewan -> aeb78ba7fb82ec81
+Canada/Yukon -> 3fcf8ba41623034f
+Chile/Continental -> 439a1d0238ce0ea9
+Chile/EasterIsland -> c9dc034538e16c4d
+Cuba -> e0cb65fe8acc0031
+EET -> 6643fc04a17b609d
+EST -> fd3b1b4a154a8de1
+EST5EDT -> 9dd47ae54f43e889
+Egypt -> a1bdd57907869445
+Eire -> 76199a6e2a80ddc3
+Etc/GMT -> 32c0cef7fbc693f5
+Etc/GMT+0 -> 32c0cef7fbc693f5
+Etc/GMT+1 -> a157ccc90e1b6635
+Etc/GMT+10 -> 55c72afce2c21901
+Etc/GMT+11 -> e659c98036e469fd
+Etc/GMT+12 -> bef0495db0f50281
+Etc/GMT+2 -> d9da3e5188974ee5
+Etc/GMT+3 -> c151dd3e0c928e11
+Etc/GMT+4 -> 0efa0fadcd2ce7d9
+Etc/GMT+5 -> fd3b1b4a154a8de1
+Etc/GMT+6 -> aeb78ba7fb82ec81
+Etc/GMT+7 -> 4ce11edbeb2dffa9
+Etc/GMT+8 -> ebd3e32063c7f965
+Etc/GMT+9 -> b75efddec283b0a9
+Etc/GMT-0 -> 32c0cef7fbc693f5
+Etc/GMT-1 -> 9a05ad9b18ca1125
+Etc/GMT-10 -> 5d30d1bfcecd75a5
+Etc/GMT-11 -> c76deab754bdab7d
+Etc/GMT-12 -> 9e374b3fac6cba75
+Etc/GMT-13 -> b3acf227ad888da5
+Etc/GMT-14 -> 4b3dbdf4c3929ea5
+Etc/GMT-2 -> 283e997d69b9e7e5
+Etc/GMT-3 -> 13e0767b676f9b85
+Etc/GMT-4 -> 17c3f2a384e3a5e5
+Etc/GMT-5 -> 6049f3681e900a05
+Etc/GMT-6 -> ea5a8876e449ea05
+Etc/GMT-7 -> 02045601767da595
+Etc/GMT-8 -> 70a3c161d0b69f7d
+Etc/GMT-9 -> cc5f5fd79ede0665
+Etc/GMT0 -> 32c0cef7fbc693f5
+Etc/Greenwich -> 32c0cef7fbc693f5
+Etc/UCT -> 32c0cef7fbc693f5
+Etc/UTC -> 32c0cef7fbc693f5
+Etc/Universal -> 32c0cef7fbc693f5
+Etc/Zulu -> 32c0cef7fbc693f5
+Europe/Amsterdam -> db52ca7e565525e5
+Europe/Andorra -> 0bf5a32c710e6f45
+Europe/Astrakhan -> f0b3cba4b79243e5
+Europe/Athens -> 6643fc04a17b609d
+Europe/Belfast -> 76199a6e2a80ddc3
+Europe/Belgrade -> 39968db967a9a445
+Europe/Berlin -> 15b4c9437ea9a825
+Europe/Bratislava -> 68940cf53ec7f1b5
+Europe/Brussels -> db52ca7e565525e5
+Europe/Bucharest -> 19b0149a370891c5
+Europe/Budapest -> 15b4c9437ea9a825
+Europe/Busingen -> c59bc493b2525945
+Europe/Chisinau -> fc1073e44b951cc5
+Europe/Copenhagen -> 15b4c9437ea9a825
+Europe/Dublin -> 76199a6e2a80ddc3
+Europe/Gibraltar -> fd562afb98684ec5
+Europe/Guernsey -> 76199a6e2a80ddc3
+Europe/Helsinki -> b1db201d26a97c95
+Europe/Isle_of_Man -> 76199a6e2a80ddc3
+Europe/Istanbul -> f07a62ce22db2205
+Europe/Jersey -> 76199a6e2a80ddc3
+Europe/Kaliningrad -> efc6d5eec7b52f85
+Europe/Kiev -> 8de20f7a5fc554d5
+Europe/Kirov -> 6903307cbdb82025
+Europe/Kyiv -> 8de20f7a5fc554d5
+Europe/Lisbon -> 508c22aa3e3b8903
+Europe/Ljubljana -> 39968db967a9a445
+Europe/London -> 76199a6e2a80ddc3
+Europe/Luxembourg -> db52ca7e565525e5
+Europe/Madrid -> cc6edec633d05d65
+Europe/Malta -> d18b44c4fd2afbf5
+Europe/Mariehamn -> b1db201d26a97c95
+Europe/Minsk -> af70dd9c72ddeda5
+Europe/Monaco -> ec0c24ab08f01065
+Europe/Moscow -> 3e1ae0db03f01405
+Europe/Nicosia -> 60aaa34728087b15
+Europe/Oslo -> 15b4c9437ea9a825
+Europe/Paris -> ec0c24ab08f01065
+Europe/Podgorica -> 39968db967a9a445
+Europe/Prague -> 68940cf53ec7f1b5
+Europe/Riga -> 5b8d0f998fd66575
+Europe/Rome -> 25416d0214c02805
+Europe/Samara -> 0cde026dcca40925
+Europe/San_Marino -> 25416d0214c02805
+Europe/Sarajevo -> 39968db967a9a445
+Europe/Saratov -> 7b93b1ebe76b6df5
+Europe/Simferopol -> 622e6c754a7735e5
+Europe/Skopje -> 39968db967a9a445
+Europe/Sofia -> 458d21962c11cbe5
+Europe/Stockholm -> 15b4c9437ea9a825
+Europe/Tallinn -> 6a1630c3e3ff25b5
+Europe/Tirane -> e19ec1012ec9e9a5
+Europe/Tiraspol -> fc1073e44b951cc5
+Europe/Ulyanovsk -> 3da6d5b85b8310e5
+Europe/Uzhgorod -> 8de20f7a5fc554d5
+Europe/Vaduz -> c59bc493b2525945
+Europe/Vatican -> 25416d0214c02805
+Europe/Vienna -> 15b4c9437ea9a825
+Europe/Vilnius -> b6ae33b4a94f9255
+Europe/Volgograd -> 9862adab8e96b9e5
+Europe/Warsaw -> f857982c974139e5
+Europe/Zagreb -> 39968db967a9a445
+Europe/Zaporozhye -> 8de20f7a5fc554d5
+Europe/Zurich -> c59bc493b2525945
+Factory -> 32c0cef7fbc693f5
+GB -> 76199a6e2a80ddc3
+GB-Eire -> 76199a6e2a80ddc3
+GMT -> 32c0cef7fbc693f5
+GMT+0 -> 32c0cef7fbc693f5
+GMT-0 -> 32c0cef7fbc693f5
+GMT0 -> 32c0cef7fbc693f5
+Greenwich -> 32c0cef7fbc693f5
+HST -> 55c72afce2c21901
+Hongkong -> f2c3350a8e71be41
+Iceland -> 32c0cef7fbc693f5
+Indian/Antananarivo -> 13e0767b676f9b85
+Indian/Chagos -> d5defe3085021c05
+Indian/Christmas -> 02045601767da595
+Indian/Cocos -> e2acf73046e145f5
+Indian/Comoro -> 13e0767b676f9b85
+Indian/Kerguelen -> 6049f3681e900a05
+Indian/Mahe -> 17c3f2a384e3a5e5
+Indian/Maldives -> 6049f3681e900a05
+Indian/Mauritius -> 1104072ef8d2acb5
+Indian/Mayotte -> 13e0767b676f9b85
+Indian/Reunion -> 17c3f2a384e3a5e5
+Iran -> 17fdd12f03524ff5
+Israel -> 14617ba2af01f745
+Jamaica -> 8ed5fac4bf892709
+Japan -> cc5f5fd79ede0665
+Kwajalein -> 4c7b404835d989c5
+Libya -> 249e4ae7dbb19be5
+MET -> db52ca7e565525e5
+MST -> 4ce11edbeb2dffa9
+MST7MDT -> 7ca6d0ec086fcab9
+Mexico/BajaNorte -> 1f895432c058a264
+Mexico/BajaSur -> b8371f27b1c6e2e9
+Mexico/General -> 48bc333ffc451773
+NZ -> 6de7b2403c2b11b9
+NZ-CHAT -> 7c63d615aedf468d
+Navajo -> 7ca6d0ec086fcab9
+PRC -> 63e5d82d1b91fba5
+PST8PDT -> 7eecaaace721e926
+Pacific/Apia -> 2d4169f45e87eccf
+Pacific/Auckland -> 6de7b2403c2b11b9
+Pacific/Bougainville -> 4dbef88b93652cdd
+Pacific/Chatham -> 7c63d615aedf468d
+Pacific/Chuuk -> 5d30d1bfcecd75a5
+Pacific/Easter -> c9dc034538e16c4d
+Pacific/Efate -> 18042660f66999ad
+Pacific/Enderbury -> 01b74e915a372ab6
+Pacific/Fakaofo -> e95f6587253347e5
+Pacific/Fiji -> 3a77309813e527dd
+Pacific/Funafuti -> 9e374b3fac6cba75
+Pacific/Galapagos -> 6abcbd645f3ad07b
+Pacific/Gambier -> b75efddec283b0a9
+Pacific/Guadalcanal -> c76deab754bdab7d
+Pacific/Guam -> 6b89fa7b4526f1d5
+Pacific/Honolulu -> 55c72afce2c21901
+Pacific/Johnston -> 55c72afce2c21901
+Pacific/Kanton -> 01b74e915a372ab6
+Pacific/Kiritimati -> bb39c5f07f157803
+Pacific/Kosrae -> f15189340d4b2f1d
+Pacific/Kwajalein -> 4c7b404835d989c5
+Pacific/Majuro -> 9e374b3fac6cba75
+Pacific/Marquesas -> bdd0843b2b97a891
+Pacific/Midway -> e659c98036e469fd
+Pacific/Nauru -> 1759a0b607760475
+Pacific/Niue -> e659c98036e469fd
+Pacific/Norfolk -> 52c40f598eafb361
+Pacific/Noumea -> 9a84fceb1d700e81
+Pacific/Pago_Pago -> e659c98036e469fd
+Pacific/Palau -> cc5f5fd79ede0665
+Pacific/Pitcairn -> df093564a9ec69f5
+Pacific/Pohnpei -> c76deab754bdab7d
+Pacific/Ponape -> c76deab754bdab7d
+Pacific/Port_Moresby -> 5d30d1bfcecd75a5
+Pacific/Rarotonga -> 916f30a8df988acb
+Pacific/Saipan -> 6b89fa7b4526f1d5
+Pacific/Samoa -> e659c98036e469fd
+Pacific/Tahiti -> 55c72afce2c21901
+Pacific/Tarawa -> 9e374b3fac6cba75
+Pacific/Tongatapu -> 6ca77ab94cd56c25
+Pacific/Truk -> 5d30d1bfcecd75a5
+Pacific/Wake -> 9e374b3fac6cba75
+Pacific/Wallis -> 9e374b3fac6cba75
+Pacific/Yap -> 5d30d1bfcecd75a5
+Poland -> f857982c974139e5
+Portugal -> 508c22aa3e3b8903
+ROC -> 967a45f7c3326e55
+ROK -> c4ac706f301dece5
+Singapore -> e2c724f9a37170fd
+Turkey -> f07a62ce22db2205
+UCT -> 32c0cef7fbc693f5
+US/Alaska -> f536493934a9fe26
+US/Aleutian -> 9cad93f768624abb
+US/Arizona -> 4ce11edbeb2dffa9
+US/Central -> 4262e4b7ac229dcb
+US/East-Indiana -> 95635cf169d30111
+US/Eastern -> 9dd47ae54f43e889
+US/Hawaii -> 55c72afce2c21901
+US/Indiana-Starke -> 5406e90383aa23e5
+US/Michigan -> b5ea4333d8f79cc9
+US/Mountain -> 7ca6d0ec086fcab9
+US/Pacific -> 7eecaaace721e926
+US/Samoa -> e659c98036e469fd
+UTC -> 32c0cef7fbc693f5
+Universal -> 32c0cef7fbc693f5
+W-SU -> 3e1ae0db03f01405
+WET -> 508c22aa3e3b8903
+Zulu -> 32c0cef7fbc693f5
+## America/Edmonton
+1972-05-01: -25200 -> -21600
+1972-10-30: -21600 -> -25200
+1973-04-30: -25200 -> -21600
+1973-10-29: -21600 -> -25200
+1974-04-29: -25200 -> -21600
+1974-10-28: -21600 -> -25200
+1975-04-28: -25200 -> -21600
+1975-10-27: -21600 -> -25200
+1976-04-26: -25200 -> -21600
+1976-11-01: -21600 -> -25200
+1977-04-25: -25200 -> -21600
+1977-10-31: -21600 -> -25200
+1978-05-01: -25200 -> -21600
+1978-10-30: -21600 -> -25200
+1979-04-30: -25200 -> -21600
+1979-10-29: -21600 -> -25200
+1980-04-28: -25200 -> -21600
+1980-10-27: -21600 -> -25200
+1981-04-27: -25200 -> -21600
+1981-10-26: -21600 -> -25200
+1982-04-26: -25200 -> -21600
+1982-11-01: -21600 -> -25200
+1983-04-25: -25200 -> -21600
+1983-10-31: -21600 -> -25200
+1984-04-30: -25200 -> -21600
+1984-10-29: -21600 -> -25200
+1985-04-29: -25200 -> -21600
+1985-10-28: -21600 -> -25200
+1986-04-28: -25200 -> -21600
+1986-10-27: -21600 -> -25200
+1987-04-06: -25200 -> -21600
+1987-10-26: -21600 -> -25200
+1988-04-04: -25200 -> -21600
+1988-10-31: -21600 -> -25200
+1989-04-03: -25200 -> -21600
+1989-10-30: -21600 -> -25200
+1990-04-02: -25200 -> -21600
+1990-10-29: -21600 -> -25200
+1991-04-08: -25200 -> -21600
+1991-10-28: -21600 -> -25200
+1992-04-06: -25200 -> -21600
+1992-10-26: -21600 -> -25200
+1993-04-05: -25200 -> -21600
+1993-11-01: -21600 -> -25200
+1994-04-04: -25200 -> -21600
+1994-10-31: -21600 -> -25200
+1995-04-03: -25200 -> -21600
+1995-10-30: -21600 -> -25200
+1996-04-08: -25200 -> -21600
+1996-10-28: -21600 -> -25200
+1997-04-07: -25200 -> -21600
+1997-10-27: -21600 -> -25200
+1998-04-06: -25200 -> -21600
+1998-10-26: -21600 -> -25200
+1999-04-05: -25200 -> -21600
+1999-11-01: -21600 -> -25200
+2000-04-03: -25200 -> -21600
+2000-10-30: -21600 -> -25200
+2001-04-02: -25200 -> -21600
+2001-10-29: -21600 -> -25200
+2002-04-08: -25200 -> -21600
+2002-10-28: -21600 -> -25200
+2003-04-07: -25200 -> -21600
+2003-10-27: -21600 -> -25200
+2004-04-05: -25200 -> -21600
+2004-11-01: -21600 -> -25200
+2005-04-04: -25200 -> -21600
+2005-10-31: -21600 -> -25200
+2006-04-03: -25200 -> -21600
+2006-10-30: -21600 -> -25200
+2007-03-12: -25200 -> -21600
+2007-11-05: -21600 -> -25200
+2008-03-10: -25200 -> -21600
+2008-11-03: -21600 -> -25200
+2009-03-09: -25200 -> -21600
+2009-11-02: -21600 -> -25200
+2010-03-15: -25200 -> -21600
+2010-11-08: -21600 -> -25200
+2011-03-14: -25200 -> -21600
+2011-11-07: -21600 -> -25200
+2012-03-12: -25200 -> -21600
+2012-11-05: -21600 -> -25200
+2013-03-11: -25200 -> -21600
+2013-11-04: -21600 -> -25200
+2014-03-10: -25200 -> -21600
+2014-11-03: -21600 -> -25200
+2015-03-09: -25200 -> -21600
+2015-11-02: -21600 -> -25200
+2016-03-14: -25200 -> -21600
+2016-11-07: -21600 -> -25200
+2017-03-13: -25200 -> -21600
+2017-11-06: -21600 -> -25200
+2018-03-12: -25200 -> -21600
+2018-11-05: -21600 -> -25200
+2019-03-11: -25200 -> -21600
+2019-11-04: -21600 -> -25200
+2020-03-09: -25200 -> -21600
+2020-11-02: -21600 -> -25200
+2021-03-15: -25200 -> -21600
+2021-11-08: -21600 -> -25200
+2022-03-14: -25200 -> -21600
+2022-11-07: -21600 -> -25200
+2023-03-13: -25200 -> -21600
+2023-11-06: -21600 -> -25200
+2024-03-11: -25200 -> -21600
+2024-11-04: -21600 -> -25200
+2025-03-10: -25200 -> -21600
+2025-11-03: -21600 -> -25200
+2026-03-09: -25200 -> -21600
+## America/Winnipeg
+1970-04-27: -21600 -> -18000
+1970-10-26: -18000 -> -21600
+1971-04-26: -21600 -> -18000
+1971-11-01: -18000 -> -21600
+1972-05-01: -21600 -> -18000
+1972-10-30: -18000 -> -21600
+1973-04-30: -21600 -> -18000
+1973-10-29: -18000 -> -21600
+1974-04-29: -21600 -> -18000
+1974-10-28: -18000 -> -21600
+1975-04-28: -21600 -> -18000
+1975-10-27: -18000 -> -21600
+1976-04-26: -21600 -> -18000
+1976-11-01: -18000 -> -21600
+1977-04-25: -21600 -> -18000
+1977-10-31: -18000 -> -21600
+1978-05-01: -21600 -> -18000
+1978-10-30: -18000 -> -21600
+1979-04-30: -21600 -> -18000
+1979-10-29: -18000 -> -21600
+1980-04-28: -21600 -> -18000
+1980-10-27: -18000 -> -21600
+1981-04-27: -21600 -> -18000
+1981-10-26: -18000 -> -21600
+1982-04-26: -21600 -> -18000
+1982-11-01: -18000 -> -21600
+1983-04-25: -21600 -> -18000
+1983-10-31: -18000 -> -21600
+1984-04-30: -21600 -> -18000
+1984-10-29: -18000 -> -21600
+1985-04-29: -21600 -> -18000
+1985-10-28: -18000 -> -21600
+1986-04-28: -21600 -> -18000
+1986-10-27: -18000 -> -21600
+1987-04-06: -21600 -> -18000
+1987-10-26: -18000 -> -21600
+1988-04-04: -21600 -> -18000
+1988-10-31: -18000 -> -21600
+1989-04-03: -21600 -> -18000
+1989-10-30: -18000 -> -21600
+1990-04-02: -21600 -> -18000
+1990-10-29: -18000 -> -21600
+1991-04-08: -21600 -> -18000
+1991-10-28: -18000 -> -21600
+1992-04-06: -21600 -> -18000
+1992-10-26: -18000 -> -21600
+1993-04-05: -21600 -> -18000
+1993-11-01: -18000 -> -21600
+1994-04-04: -21600 -> -18000
+1994-10-31: -18000 -> -21600
+1995-04-03: -21600 -> -18000
+1995-10-30: -18000 -> -21600
+1996-04-08: -21600 -> -18000
+1996-10-28: -18000 -> -21600
+1997-04-07: -21600 -> -18000
+1997-10-27: -18000 -> -21600
+1998-04-06: -21600 -> -18000
+1998-10-26: -18000 -> -21600
+1999-04-05: -21600 -> -18000
+1999-11-01: -18000 -> -21600
+2000-04-03: -21600 -> -18000
+2000-10-30: -18000 -> -21600
+2001-04-02: -21600 -> -18000
+2001-10-29: -18000 -> -21600
+2002-04-08: -21600 -> -18000
+2002-10-28: -18000 -> -21600
+2003-04-07: -21600 -> -18000
+2003-10-27: -18000 -> -21600
+2004-04-05: -21600 -> -18000
+2004-11-01: -18000 -> -21600
+2005-04-04: -21600 -> -18000
+2005-10-31: -18000 -> -21600
+2006-04-03: -21600 -> -18000
+2006-10-30: -18000 -> -21600
+2007-03-12: -21600 -> -18000
+2007-11-05: -18000 -> -21600
+2008-03-10: -21600 -> -18000
+2008-11-03: -18000 -> -21600
+2009-03-09: -21600 -> -18000
+2009-11-02: -18000 -> -21600
+2010-03-15: -21600 -> -18000
+2010-11-08: -18000 -> -21600
+2011-03-14: -21600 -> -18000
+2011-11-07: -18000 -> -21600
+2012-03-12: -21600 -> -18000
+2012-11-05: -18000 -> -21600
+2013-03-11: -21600 -> -18000
+2013-11-04: -18000 -> -21600
+2014-03-10: -21600 -> -18000
+2014-11-03: -18000 -> -21600
+2015-03-09: -21600 -> -18000
+2015-11-02: -18000 -> -21600
+2016-03-14: -21600 -> -18000
+2016-11-07: -18000 -> -21600
+2017-03-13: -21600 -> -18000
+2017-11-06: -18000 -> -21600
+2018-03-12: -21600 -> -18000
+2018-11-05: -18000 -> -21600
+2019-03-11: -21600 -> -18000
+2019-11-04: -18000 -> -21600
+2020-03-09: -21600 -> -18000
+2020-11-02: -18000 -> -21600
+2021-03-15: -21600 -> -18000
+2021-11-08: -18000 -> -21600
+2022-03-14: -21600 -> -18000
+2022-11-07: -18000 -> -21600
+2023-03-13: -21600 -> -18000
+2023-11-06: -18000 -> -21600
+2024-03-11: -21600 -> -18000
+2024-11-04: -18000 -> -21600
+2025-03-10: -21600 -> -18000
+2025-11-03: -18000 -> -21600
+2026-03-09: -21600 -> -18000
+## America/New_York
+1970-04-27: -18000 -> -14400
+1970-10-26: -14400 -> -18000
+1971-04-26: -18000 -> -14400
+1971-11-01: -14400 -> -18000
+1972-05-01: -18000 -> -14400
+1972-10-30: -14400 -> -18000
+1973-04-30: -18000 -> -14400
+1973-10-29: -14400 -> -18000
+1974-01-07: -18000 -> -14400
+1974-10-28: -14400 -> -18000
+1975-02-24: -18000 -> -14400
+1975-10-27: -14400 -> -18000
+1976-04-26: -18000 -> -14400
+1976-11-01: -14400 -> -18000
+1977-04-25: -18000 -> -14400
+1977-10-31: -14400 -> -18000
+1978-05-01: -18000 -> -14400
+1978-10-30: -14400 -> -18000
+1979-04-30: -18000 -> -14400
+1979-10-29: -14400 -> -18000
+1980-04-28: -18000 -> -14400
+1980-10-27: -14400 -> -18000
+1981-04-27: -18000 -> -14400
+1981-10-26: -14400 -> -18000
+1982-04-26: -18000 -> -14400
+1982-11-01: -14400 -> -18000
+1983-04-25: -18000 -> -14400
+1983-10-31: -14400 -> -18000
+1984-04-30: -18000 -> -14400
+1984-10-29: -14400 -> -18000
+1985-04-29: -18000 -> -14400
+1985-10-28: -14400 -> -18000
+1986-04-28: -18000 -> -14400
+1986-10-27: -14400 -> -18000
+1987-04-06: -18000 -> -14400
+1987-10-26: -14400 -> -18000
+1988-04-04: -18000 -> -14400
+1988-10-31: -14400 -> -18000
+1989-04-03: -18000 -> -14400
+1989-10-30: -14400 -> -18000
+1990-04-02: -18000 -> -14400
+1990-10-29: -14400 -> -18000
+1991-04-08: -18000 -> -14400
+1991-10-28: -14400 -> -18000
+1992-04-06: -18000 -> -14400
+1992-10-26: -14400 -> -18000
+1993-04-05: -18000 -> -14400
+1993-11-01: -14400 -> -18000
+1994-04-04: -18000 -> -14400
+1994-10-31: -14400 -> -18000
+1995-04-03: -18000 -> -14400
+1995-10-30: -14400 -> -18000
+1996-04-08: -18000 -> -14400
+1996-10-28: -14400 -> -18000
+1997-04-07: -18000 -> -14400
+1997-10-27: -14400 -> -18000
+1998-04-06: -18000 -> -14400
+1998-10-26: -14400 -> -18000
+1999-04-05: -18000 -> -14400
+1999-11-01: -14400 -> -18000
+2000-04-03: -18000 -> -14400
+2000-10-30: -14400 -> -18000
+2001-04-02: -18000 -> -14400
+2001-10-29: -14400 -> -18000
+2002-04-08: -18000 -> -14400
+2002-10-28: -14400 -> -18000
+2003-04-07: -18000 -> -14400
+2003-10-27: -14400 -> -18000
+2004-04-05: -18000 -> -14400
+2004-11-01: -14400 -> -18000
+2005-04-04: -18000 -> -14400
+2005-10-31: -14400 -> -18000
+2006-04-03: -18000 -> -14400
+2006-10-30: -14400 -> -18000
+2007-03-12: -18000 -> -14400
+2007-11-05: -14400 -> -18000
+2008-03-10: -18000 -> -14400
+2008-11-03: -14400 -> -18000
+2009-03-09: -18000 -> -14400
+2009-11-02: -14400 -> -18000
+2010-03-15: -18000 -> -14400
+2010-11-08: -14400 -> -18000
+2011-03-14: -18000 -> -14400
+2011-11-07: -14400 -> -18000
+2012-03-12: -18000 -> -14400
+2012-11-05: -14400 -> -18000
+2013-03-11: -18000 -> -14400
+2013-11-04: -14400 -> -18000
+2014-03-10: -18000 -> -14400
+2014-11-03: -14400 -> -18000
+2015-03-09: -18000 -> -14400
+2015-11-02: -14400 -> -18000
+2016-03-14: -18000 -> -14400
+2016-11-07: -14400 -> -18000
+2017-03-13: -18000 -> -14400
+2017-11-06: -14400 -> -18000
+2018-03-12: -18000 -> -14400
+2018-11-05: -14400 -> -18000
+2019-03-11: -18000 -> -14400
+2019-11-04: -14400 -> -18000
+2020-03-09: -18000 -> -14400
+2020-11-02: -14400 -> -18000
+2021-03-15: -18000 -> -14400
+2021-11-08: -14400 -> -18000
+2022-03-14: -18000 -> -14400
+2022-11-07: -14400 -> -18000
+2023-03-13: -18000 -> -14400
+2023-11-06: -14400 -> -18000
+2024-03-11: -18000 -> -14400
+2024-11-04: -14400 -> -18000
+2025-03-10: -18000 -> -14400
+2025-11-03: -14400 -> -18000
+2026-03-09: -18000 -> -14400
+2026-11-02: -14400 -> -18000
+2027-03-15: -18000 -> -14400
+2027-11-08: -14400 -> -18000
+2028-03-13: -18000 -> -14400
+2028-11-06: -14400 -> -18000
+2029-03-12: -18000 -> -14400
+2029-11-05: -14400 -> -18000
+2030-03-11: -18000 -> -14400
+2030-11-04: -14400 -> -18000
+2031-03-10: -18000 -> -14400
+2031-11-03: -14400 -> -18000
+2032-03-15: -18000 -> -14400
+2032-11-08: -14400 -> -18000
+2033-03-14: -18000 -> -14400
+2033-11-07: -14400 -> -18000
+2034-03-13: -18000 -> -14400
+2034-11-06: -14400 -> -18000
+2035-03-12: -18000 -> -14400
+2035-11-05: -14400 -> -18000
+2036-03-10: -18000 -> -14400
+2036-11-03: -14400 -> -18000
+2037-03-09: -18000 -> -14400
+2037-11-02: -14400 -> -18000
+2038-03-15: -18000 -> -14400
+2038-11-08: -14400 -> -18000
+2039-03-14: -18000 -> -14400
+2039-11-07: -14400 -> -18000
+2040-03-12: -18000 -> -14400
+2040-11-05: -14400 -> -18000
+## Europe/London
+1971-11-01: 3600 -> 0
+1972-03-20: 0 -> 3600
+1972-10-30: 3600 -> 0
+1973-03-19: 0 -> 3600
+1973-10-29: 3600 -> 0
+1974-03-18: 0 -> 3600
+1974-10-28: 3600 -> 0
+1975-03-17: 0 -> 3600
+1975-10-27: 3600 -> 0
+1976-03-22: 0 -> 3600
+1976-10-25: 3600 -> 0
+1977-03-21: 0 -> 3600
+1977-10-24: 3600 -> 0
+1978-03-20: 0 -> 3600
+1978-10-30: 3600 -> 0
+1979-03-19: 0 -> 3600
+1979-10-29: 3600 -> 0
+1980-03-17: 0 -> 3600
+1980-10-27: 3600 -> 0
+1981-03-30: 0 -> 3600
+1981-10-26: 3600 -> 0
+1982-03-29: 0 -> 3600
+1982-10-25: 3600 -> 0
+1983-03-28: 0 -> 3600
+1983-10-24: 3600 -> 0
+1984-03-26: 0 -> 3600
+1984-10-29: 3600 -> 0
+1985-04-01: 0 -> 3600
+1985-10-28: 3600 -> 0
+1986-03-31: 0 -> 3600
+1986-10-27: 3600 -> 0
+1987-03-30: 0 -> 3600
+1987-10-26: 3600 -> 0
+1988-03-28: 0 -> 3600
+1988-10-24: 3600 -> 0
+1989-03-27: 0 -> 3600
+1989-10-30: 3600 -> 0
+1990-03-26: 0 -> 3600
+1990-10-29: 3600 -> 0
+1991-04-01: 0 -> 3600
+1991-10-28: 3600 -> 0
+1992-03-30: 0 -> 3600
+1992-10-26: 3600 -> 0
+1993-03-29: 0 -> 3600
+1993-10-25: 3600 -> 0
+1994-03-28: 0 -> 3600
+1994-10-24: 3600 -> 0
+1995-03-27: 0 -> 3600
+1995-10-23: 3600 -> 0
+1996-04-01: 0 -> 3600
+1996-10-28: 3600 -> 0
+1997-03-31: 0 -> 3600
+1997-10-27: 3600 -> 0
+1998-03-30: 0 -> 3600
+1998-10-26: 3600 -> 0
+1999-03-29: 0 -> 3600
+1999-11-01: 3600 -> 0
+2000-03-27: 0 -> 3600
+2000-10-30: 3600 -> 0
+2001-03-26: 0 -> 3600
+2001-10-29: 3600 -> 0
+2002-04-01: 0 -> 3600
+2002-10-28: 3600 -> 0
+2003-03-31: 0 -> 3600
+2003-10-27: 3600 -> 0
+2004-03-29: 0 -> 3600
+2004-11-01: 3600 -> 0
+2005-03-28: 0 -> 3600
+2005-10-31: 3600 -> 0
+2006-03-27: 0 -> 3600
+2006-10-30: 3600 -> 0
+2007-03-26: 0 -> 3600
+2007-10-29: 3600 -> 0
+2008-03-31: 0 -> 3600
+2008-10-27: 3600 -> 0
+2009-03-30: 0 -> 3600
+2009-10-26: 3600 -> 0
+2010-03-29: 0 -> 3600
+2010-11-01: 3600 -> 0
+2011-03-28: 0 -> 3600
+2011-10-31: 3600 -> 0
+2012-03-26: 0 -> 3600
+2012-10-29: 3600 -> 0
+2013-04-01: 0 -> 3600
+2013-10-28: 3600 -> 0
+2014-03-31: 0 -> 3600
+2014-10-27: 3600 -> 0
+2015-03-30: 0 -> 3600
+2015-10-26: 3600 -> 0
+2016-03-28: 0 -> 3600
+2016-10-31: 3600 -> 0
+2017-03-27: 0 -> 3600
+2017-10-30: 3600 -> 0
+2018-03-26: 0 -> 3600
+2018-10-29: 3600 -> 0
+2019-04-01: 0 -> 3600
+2019-10-28: 3600 -> 0
+2020-03-30: 0 -> 3600
+2020-10-26: 3600 -> 0
+2021-03-29: 0 -> 3600
+2021-11-01: 3600 -> 0
+2022-03-28: 0 -> 3600
+2022-10-31: 3600 -> 0
+2023-03-27: 0 -> 3600
+2023-10-30: 3600 -> 0
+2024-04-01: 0 -> 3600
+2024-10-28: 3600 -> 0
+2025-03-31: 0 -> 3600
+2025-10-27: 3600 -> 0
+2026-03-30: 0 -> 3600
+2026-10-26: 3600 -> 0
+2027-03-29: 0 -> 3600
+2027-11-01: 3600 -> 0
+2028-03-27: 0 -> 3600
+2028-10-30: 3600 -> 0
+2029-03-26: 0 -> 3600
+2029-10-29: 3600 -> 0
+2030-04-01: 0 -> 3600
+2030-10-28: 3600 -> 0
+2031-03-31: 0 -> 3600
+2031-10-27: 3600 -> 0
+2032-03-29: 0 -> 3600
+2032-11-01: 3600 -> 0
+2033-03-28: 0 -> 3600
+2033-10-31: 3600 -> 0
+2034-03-27: 0 -> 3600
+2034-10-30: 3600 -> 0
+2035-03-26: 0 -> 3600
+2035-10-29: 3600 -> 0
+2036-03-31: 0 -> 3600
+2036-10-27: 3600 -> 0
+2037-03-30: 0 -> 3600
+2037-10-26: 3600 -> 0
+2038-03-29: 0 -> 3600
+2038-11-01: 3600 -> 0
+2039-03-28: 0 -> 3600
+2039-10-31: 3600 -> 0
+2040-03-26: 0 -> 3600
+2040-10-29: 3600 -> 0
+## Australia/Lord_Howe
+1981-03-01: 36000 -> 37800
+1981-10-25: 37800 -> 41400
+1982-03-07: 41400 -> 37800
+1982-10-31: 37800 -> 41400
+1983-03-06: 41400 -> 37800
+1983-10-30: 37800 -> 41400
+1984-03-04: 41400 -> 37800
+1984-10-28: 37800 -> 41400
+1985-03-03: 41400 -> 37800
+1985-10-27: 37800 -> 39600
+1986-03-16: 39600 -> 37800
+1986-10-19: 37800 -> 39600
+1987-03-15: 39600 -> 37800
+1987-10-25: 37800 -> 39600
+1988-03-20: 39600 -> 37800
+1988-10-30: 37800 -> 39600
+1989-03-19: 39600 -> 37800
+1989-10-29: 37800 -> 39600
+1990-03-04: 39600 -> 37800
+1990-10-28: 37800 -> 39600
+1991-03-03: 39600 -> 37800
+1991-10-27: 37800 -> 39600
+1992-03-01: 39600 -> 37800
+1992-10-25: 37800 -> 39600
+1993-03-07: 39600 -> 37800
+1993-10-31: 37800 -> 39600
+1994-03-06: 39600 -> 37800
+1994-10-30: 37800 -> 39600
+1995-03-05: 39600 -> 37800
+1995-10-29: 37800 -> 39600
+1996-03-31: 39600 -> 37800
+1996-10-27: 37800 -> 39600
+1997-03-30: 39600 -> 37800
+1997-10-26: 37800 -> 39600
+1998-03-29: 39600 -> 37800
+1998-10-25: 37800 -> 39600
+1999-03-28: 39600 -> 37800
+1999-10-31: 37800 -> 39600
+2000-03-26: 39600 -> 37800
+2000-08-27: 37800 -> 39600
+2001-03-25: 39600 -> 37800
+2001-10-28: 37800 -> 39600
+2002-03-31: 39600 -> 37800
+2002-10-27: 37800 -> 39600
+2003-03-30: 39600 -> 37800
+2003-10-26: 37800 -> 39600
+2004-03-28: 39600 -> 37800
+2004-10-31: 37800 -> 39600
+2005-03-27: 39600 -> 37800
+2005-10-30: 37800 -> 39600
+2006-04-02: 39600 -> 37800
+2006-10-29: 37800 -> 39600
+2007-03-25: 39600 -> 37800
+2007-10-28: 37800 -> 39600
+2008-04-06: 39600 -> 37800
+2008-10-05: 37800 -> 39600
+2009-04-05: 39600 -> 37800
+2009-10-04: 37800 -> 39600
+2010-04-04: 39600 -> 37800
+2010-10-03: 37800 -> 39600
+2011-04-03: 39600 -> 37800
+2011-10-02: 37800 -> 39600
+2012-04-01: 39600 -> 37800
+2012-10-07: 37800 -> 39600
+2013-04-07: 39600 -> 37800
+2013-10-06: 37800 -> 39600
+2014-04-06: 39600 -> 37800
+2014-10-05: 37800 -> 39600
+2015-04-05: 39600 -> 37800
+2015-10-04: 37800 -> 39600
+2016-04-03: 39600 -> 37800
+2016-10-02: 37800 -> 39600
+2017-04-02: 39600 -> 37800
+2017-10-01: 37800 -> 39600
+2018-04-01: 39600 -> 37800
+2018-10-07: 37800 -> 39600
+2019-04-07: 39600 -> 37800
+2019-10-06: 37800 -> 39600
+2020-04-05: 39600 -> 37800
+2020-10-04: 37800 -> 39600
+2021-04-04: 39600 -> 37800
+2021-10-03: 37800 -> 39600
+2022-04-03: 39600 -> 37800
+2022-10-02: 37800 -> 39600
+2023-04-02: 39600 -> 37800
+2023-10-01: 37800 -> 39600
+2024-04-07: 39600 -> 37800
+2024-10-06: 37800 -> 39600
+2025-04-06: 39600 -> 37800
+2025-10-05: 37800 -> 39600
+2026-04-05: 39600 -> 37800
+2026-10-04: 37800 -> 39600
+2027-04-04: 39600 -> 37800
+2027-10-03: 37800 -> 39600
+2028-04-02: 39600 -> 37800
+2028-10-01: 37800 -> 39600
+2029-04-01: 39600 -> 37800
+2029-10-07: 37800 -> 39600
+2030-04-07: 39600 -> 37800
+2030-10-06: 37800 -> 39600
+2031-04-06: 39600 -> 37800
+2031-10-05: 37800 -> 39600
+2032-04-04: 39600 -> 37800
+2032-10-03: 37800 -> 39600
+2033-04-03: 39600 -> 37800
+2033-10-02: 37800 -> 39600
+2034-04-02: 39600 -> 37800
+2034-10-01: 37800 -> 39600
+2035-04-01: 39600 -> 37800
+2035-10-07: 37800 -> 39600
+2036-04-06: 39600 -> 37800
+2036-10-05: 37800 -> 39600
+2037-04-05: 39600 -> 37800
+2037-10-04: 37800 -> 39600
+2038-04-04: 39600 -> 37800
+2038-10-03: 37800 -> 39600
+2039-04-03: 39600 -> 37800
+2039-10-02: 37800 -> 39600
+2040-04-01: 39600 -> 37800
+2040-10-07: 37800 -> 39600
+## Pacific/Apia
+2010-09-27: -39600 -> -36000
+2011-04-03: -36000 -> -39600
+2011-09-25: -39600 -> -36000
+2011-12-31: -36000 -> 50400
+2012-04-01: 50400 -> 46800
+2012-09-30: 46800 -> 50400
+2013-04-07: 50400 -> 46800
+2013-09-29: 46800 -> 50400
+2014-04-06: 50400 -> 46800
+2014-09-28: 46800 -> 50400
+2015-04-05: 50400 -> 46800
+2015-09-27: 46800 -> 50400
+2016-04-03: 50400 -> 46800
+2016-09-25: 46800 -> 50400
+2017-04-02: 50400 -> 46800
+2017-09-24: 46800 -> 50400
+2018-04-01: 50400 -> 46800
+2018-09-30: 46800 -> 50400
+2019-04-07: 50400 -> 46800
+2019-09-29: 46800 -> 50400
+2020-04-05: 50400 -> 46800
+2020-09-27: 46800 -> 50400
+2021-04-04: 50400 -> 46800
+## Asia/Kolkata

@@ -1,0 +1,23 @@
+dateFromParts(UTC, -1-3-1 0:0:0.0) -> -62193657600000 [ERROR Location18537] | roundtrip -1-3-1 0:0:0.0
+dateFromParts(UTC, 0-1-1 0:0:0.0) -> -62167219200000 [0000-01-01T00:00:00.000Z] | roundtrip 0-1-1 0:0:0.0
+dateFromParts(UTC, 0-2-29 0:0:0.0) -> -62162121600000 [0000-02-29T00:00:00.000Z] | roundtrip 0-2-29 0:0:0.0
+dateFromParts(UTC, 1-1-1 0:0:0.0) -> -62135596800000 [0001-01-01T00:00:00.000Z] | roundtrip 1-1-1 0:0:0.0
+dateFromParts(UTC, 9999-12-31 0:0:0.0) -> 253402214400000 [9999-12-31T00:00:00.000Z] | roundtrip 9999-12-31 0:0:0.0
+dateFromParts(UTC, 2024-2-29 0:0:0.0) -> 1709164800000 [2024-02-29T00:00:00.000Z] | roundtrip 2024-2-29 0:0:0.0
+dateFromParts(UTC, 1969-12-31 0:0:0.0) -> -86400000 [1969-12-31T00:00:00.000Z] | roundtrip 1969-12-31 0:0:0.0
+dateFromParts(UTC, 1970-1-1 0:0:0.0) -> 0 [1970-01-01T00:00:00.000Z] | roundtrip 1970-1-1 0:0:0.0
+dateFromParts(UTC, 2024-0-15 0:0:0.0) -> 1702598400000 [2023-12-15T00:00:00.000Z] | roundtrip 2023-12-15 0:0:0.0
+dateFromParts(UTC, 2024-13-15 0:0:0.0) -> 1736899200000 [2025-01-15T00:00:00.000Z] | roundtrip 2025-1-15 0:0:0.0
+dateFromParts(UTC, 2024-3-0 0:0:0.0) -> 1709164800000 [2024-02-29T00:00:00.000Z] | roundtrip 2024-2-29 0:0:0.0
+dateFromParts(UTC, 2024-3-32 0:0:0.0) -> 1711929600000 [2024-04-01T00:00:00.000Z] | roundtrip 2024-4-1 0:0:0.0
+dateFromParts(UTC, 2024-3-1 25:0:0.0) -> 1709341200000 [2024-03-02T01:00:00.000Z] | roundtrip 2024-3-2 1:0:0.0
+dateFromParts(America/New_York, 2026-3-8 2:30:0.0) -> 1772955000000 [2026-03-08T07:30:00.000Z] | roundtrip 2026-3-8 3:30:0.0
+dateFromParts(America/New_York, 2026-11-1 1:30:0.0) -> 1793514600000 [2026-11-01T06:30:00.000Z] | roundtrip 2026-11-1 1:30:0.0
+dateFromIsoWeekParts(2024, 9, 5) -> 1709251200000 [2024-03-01T00:00:00.000Z] | roundtrip 2024-W9-5
+dateFromIsoWeekParts(2019, 52, 7) -> 1577577600000 [2019-12-29T00:00:00.000Z] | roundtrip 2019-W52-7
+dateFromIsoWeekParts(2020, 53, 7) -> 1609632000000 [2021-01-03T00:00:00.000Z] | roundtrip 2020-W53-7
+dateFromIsoWeekParts(2021, 53, 1) -> 1641168000000 [2022-01-03T00:00:00.000Z] | roundtrip 2022-W1-1
+dateFromIsoWeekParts(2024, 0, 1) -> 1703462400000 [2023-12-25T00:00:00.000Z] | roundtrip 2023-W52-1
+dateFromIsoWeekParts(2024, 9, 8) -> 1709510400000 [2024-03-04T00:00:00.000Z] | roundtrip 2024-W10-1
+dateFromIsoWeekParts(0, 1, 1) -> -62167046400000 [0000-01-03T00:00:00.000Z] | roundtrip 0-W1-1
+dateFromIsoWeekParts(-1, 1, 1) -> -62198496000000 [ERROR Location18537] | roundtrip -1-W1-1

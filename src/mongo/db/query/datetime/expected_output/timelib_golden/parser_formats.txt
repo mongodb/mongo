@@ -1,0 +1,23 @@
+%Y-%m-%d | 2024-03-01 -> 1709251200000 [2024-03-01T00:00:00.000Z]
+%Y-%m-%d | 2024-3-1 -> 1709251200000 [2024-03-01T00:00:00.000Z]
+%Y-%m-%d | 2024-03-01junk -> ERROR ConversionFailure: Error parsing date string '2024-03-01junk'; 10: Trailing data 'j'
+%Y-%m-%d | 24-03-01 -> -61404652800000 [0024-03-01T00:00:00.000Z]
+%Y-%m-%d | 2024-13-01 -> ERROR ConversionFailure: Error parsing date string '2024-13-01'; 10: The parsed date was invalid '\0'
+%Y-%m-%d | 0000-01-01 -> -62167219200000 [0000-01-01T00:00:00.000Z]
+%Y-%m-%dT%H:%M:%S | 2024-03-01T10:11:12 -> 1709287872000 [2024-03-01T10:11:12.000Z]
+%Y-%m-%d %H:%M:%S.%L | 2024-03-01 10:11:12.123 -> 1709287872123 [2024-03-01T10:11:12.123Z]
+%Y-%m-%d %z | 2024-03-01 +0530 -> 1709231400000 [2024-02-29T18:30:00.000Z]
+%Y-%m-%d %z | 2024-03-01 +05:30 -> 1709231400000 [2024-02-29T18:30:00.000Z]
+%Y-%m-%d %z | 2024-03-01 -0000 -> 1709251200000 [2024-03-01T00:00:00.000Z]
+%Y-%m-%d %z | 2024-03-01 Z -> 1709251200000 [2024-03-01T00:00:00.000Z]
+%Y-%m-%d %Z | 2024-03-01 UTC -> ERROR ConversionFailure: Error parsing date string '2024-03-01 UTC'; 11: Invalid timezone offset in minutes 'U'; 11: Trailing data 'U'
+%Y-%m-%d %Z | 2024-03-01 EST -> ERROR ConversionFailure: Error parsing date string '2024-03-01 EST'; 11: Invalid timezone offset in minutes 'E'; 11: Trailing data 'E'
+%Y-%m-%d %Z | 2024-03-01 CEST -> ERROR ConversionFailure: Error parsing date string '2024-03-01 CEST'; 11: Invalid timezone offset in minutes 'C'; 11: Trailing data 'C'
+%Y-%m-%d %Z | 2024-03-01 GMT+1 -> ERROR ConversionFailure: Error parsing date string '2024-03-01 GMT+1'; 11: Invalid timezone offset in minutes 'G'; 11: Trailing data 'G'
+%G-W%V-%u | 2024-W09-5 -> 1709251200000 [2024-03-01T00:00:00.000Z]
+%G-W%V-%u | 2019-W52-7 -> 1577577600000 [2019-12-29T00:00:00.000Z]
+%G-W%V-%u | 2020-W53-7 -> 1609632000000 [2021-01-03T00:00:00.000Z]
+%Y-%j | 2024-061 -> 1709337600000 [2024-03-02T00:00:00.000Z]
+%Y-%j | 2023-365 -> 1704067200000 [2024-01-01T00:00:00.000Z]
+%Y-%j | 2024-366 -> 1735689600000 [2025-01-01T00:00:00.000Z]
+%d/%m/%Y | 01/03/2024 -> 1709251200000 [2024-03-01T00:00:00.000Z]

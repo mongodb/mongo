@@ -45,6 +45,23 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "timelib_golden_test",
+    srcs = [
+        "timelib_golden_test.cpp",
+    ],
+    data = [
+        "//src/mongo/db/query/datetime/expected_output:test_data",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":date_time_support",
+        "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/unittest",
+    ],
+)
+
 mongo_cc_fuzzer_test_deprecated(
     name = "date_time_support_fuzzer",
     srcs = [
