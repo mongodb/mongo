@@ -30,7 +30,11 @@
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
+#include <array>
+#include <barrier>
+#include <thread>
 #include <utility>
+#include <vector>
 
 
 namespace mongo {
@@ -38,6 +42,70 @@ namespace {
 using namespace std::literals::string_view_literals;
 
 using ExpressionContextTest = ServiceContextTest;
+
+TEST_F(ExpressionContextTest, MqlJsEngineGapFeatureFlagIsSafeForConcurrentFirstAccess) {
+    constexpr size_t kThreads = 8;
+    constexpr size_t kContexts = 1024;
+
+    auto opCtx = makeOperationContext();
+    for (const bool enabled : {false, true}) {
+        unittest::ServerParameterGuard flag{"featureFlagMqlJsEngineGap", enabled};
+        const bool expected =
+            feature_flags::gFeatureFlagMqlJsEngineGap.isEnabledUseLatestFCVWhenUninitialized(
+                kNoVersionContext, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+        std::vector<boost::intrusive_ptr<ExpressionContext>> contexts;
+        for (size_t i = 0; i < kContexts; ++i) {
+            auto expCtx =
+                ExpressionContextBuilder{}
+                    .opCtx(opCtx.get())
+                    .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                    .build();
+            // Use the detached-context setup already supported for profile filters. Only the
+            // feature-flag accessor is exercised here, independently of expression evaluation.
+            expCtx->setIsProfileFilter(true);
+            expCtx->setOperationContext(nullptr);
+            contexts.push_back(std::move(expCtx));
+        }
+
+        std::array<std::array<bool, kContexts>, kThreads> results{};
+        std::barrier start(kThreads);
+        std::vector<std::thread> threads;
+        for (size_t thread = 0; thread < kThreads; ++thread) {
+            threads.emplace_back([&, thread] {
+                start.arrive_and_wait();
+                for (size_t i = 0; i < kContexts; ++i) {
+                    results[thread][i] = contexts[i]->isFeatureFlagMqlJsEngineGapEnabled();
+                }
+            });
+        }
+        for (auto& thread : threads) {
+            thread.join();
+        }
+        for (const auto& threadResults : results) {
+            for (const bool result : threadResults) {
+                ASSERT_EQ(result, expected);
+            }
+        }
+    }
+}
+
+TEST_F(ExpressionContextTest, MqlJsEngineGapFeatureFlagIsCached) {
+    unittest::ServerParameterGuard disabled{"featureFlagMqlJsEngineGap", false};
+    auto opCtx = makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                      .build();
+    expCtx->setIsProfileFilter(true);
+    expCtx->setOperationContext(nullptr);
+
+    ASSERT_FALSE(expCtx->isFeatureFlagMqlJsEngineGapEnabled());
+    {
+        unittest::ServerParameterGuard enabled{"featureFlagMqlJsEngineGap", true};
+        ASSERT_FALSE(expCtx->isFeatureFlagMqlJsEngineGapEnabled());
+    }
+}
 
 TEST_F(ExpressionContextTest, AdoptsOpCtxInstalledIFRContext) {
     // When no IFRContext is threaded in and the opCtx already has one installed, the

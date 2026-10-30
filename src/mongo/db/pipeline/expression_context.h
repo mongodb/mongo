@@ -53,6 +53,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -1074,7 +1075,12 @@ public:
     }
 
     bool isFeatureFlagMqlJsEngineGapEnabled() const {
-        return _featureFlagMqlJsEngineGap.get(versionContextForFeatureFlagCheck());
+        const auto& vCtx = versionContextForFeatureFlagCheck();
+        // Initialization must happen only once and synchronously across all threads.
+        // Subsequent calls will skip this and just directly return.
+        std::call_once(_featureFlagMqlJsEngineGapInit,
+                       [&] { _featureFlagMqlJsEngineGap.get(vCtx); });
+        return _featureFlagMqlJsEngineGap.get(vCtx);
     }
 
     void setPathArraynessForNss(const NamespaceString& nss,
@@ -1533,11 +1539,16 @@ private:
                     vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         }};
 
+    // Please wrap get(vCtx) calls in a std::call_once to _featureFlagMqlJsEngineGapInit.
     Deferred<bool (*)(const VersionContext&)> _featureFlagMqlJsEngineGap{
         [](const VersionContext& vCtx) {
             return feature_flags::gFeatureFlagMqlJsEngineGap.isEnabledUseLatestFCVWhenUninitialized(
                 vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         }};
+
+    // Validators and profile filters share their ExpressionContext across operation threads.
+    // Synchronizes initialization.
+    mutable std::once_flag _featureFlagMqlJsEngineGapInit;
 
     // Initialized in constructor to avoid including server_feature_flags_gen.h
     // in this header file.
