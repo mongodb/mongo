@@ -10,6 +10,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/commands/server_status/histogram_server_status_metric.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/service_context.h"
@@ -22,6 +23,8 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/transport_layer.h"
@@ -29,6 +32,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/observable_mutex_registry.h"
@@ -88,6 +92,18 @@ void appendMetadata(RemoteCommandRequest* request,
 auto& shardRequestsInQueue = *MetricBuilder<Counter64>{"shardRequests.inQueue"};
 auto& shardRequestsAwaitingResponse = *MetricBuilder<Counter64>{"shardRequests.awaitingResponse"};
 auto& shardRequestsComplete = *MetricBuilder<Counter64>{"shardRequests.complete"};
+
+auto& killOperationsEgressLatencyHistogram =
+    otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kNetworkEgressKillOperationsLatency,
+        "Round-trip latency of remote _killOperations commands, from dispatch until response",
+        otel::metrics::MetricUnit::kMicroseconds,
+        {.serverStatusOptions =
+             otel::metrics::ServerStatusOptions{.dottedPath =
+                                                    "operation.killOperationsEgressLatencyMicros",
+                                                .role = ClusterRole::None},
+         .explicitBucketBoundaries = HistogramServerStatusMetric::computeBounds<double>(8, 64, 4),
+         .serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts});
 }  // namespace
 
 /**
@@ -670,14 +686,19 @@ void NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill) try {
         this, killOpRequest, cbHandle, nullptr, CancellationToken::uncancelable());
     _registerCommand(cbHandle, killOpCmdState);
     _runCommand(killOpCmdState)
-        .getAsync([this, operationKey, killOpRequest](StatusWith<RemoteCommandResponse> swr) {
+        .getAsync([this, operationKey, killOpCmdState](StatusWith<RemoteCommandResponse> swr) {
             invariant(swr);
             auto rs = std::move(swr.getValue());
+
+            const auto latencyMicros =
+                durationCount<Microseconds>(killOpCmdState->stopwatch.elapsed());
+            killOperationsEgressLatencyHistogram.record(latencyMicros);
+
             LOGV2_DEBUG(51813,
                         2,
                         "Remote _killOperations request to cancel command finished with response",
                         "operationKey"_attr = operationKey,
-                        "target"_attr = killOpRequest.target,
+                        "target"_attr = killOpCmdState->request.target,
                         "response"_attr =
                             redact(rs.isOK() ? rs.data.toString() : rs.status.toString()));
         });

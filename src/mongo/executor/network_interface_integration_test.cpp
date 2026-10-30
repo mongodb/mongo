@@ -127,6 +127,15 @@ long long getMetric(std::string name) {
     return obj["metrics"]["operation"][name].numberLong();
 }
 
+/**
+ * Reads the totalCount of a serverStatus histogram metric.
+ */
+long long getServerStatusHistogramCount(const std::string& name) {
+    BSONObjBuilder bob;
+    globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+    return bob.obj()["metrics"]["operation"][name]["totalCount"].numberLong();
+}
+
 class NetworkInterfaceTest : public NetworkInterfaceIntegrationFixture {
 public:
     constexpr static Milliseconds kNoTimeout = RemoteCommandRequest::kNoTimeout;
@@ -247,6 +256,7 @@ public:
     void testCancelMissingOperation();
     void testCancelLocally();
     void testCancelRemotely();
+    void testCancelRemotelyRecordsEgressLatencyMetric();
     void testCancelRemotelyTimedOut();
     void testLateCancel();
     void testConnectionErrorDropsSingleConnection();
@@ -380,6 +390,82 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotely) {
     // We have one canceled operation (echo), and two other succeeded operations
     // on top of the currentOp operations (configureFailPoint and _killOperations).
     assertNumOps({.canceled = 1u, .timedOut = 0u, .failed = 0u, .succeeded = 2u + numCurrentOpRan});
+}
+
+TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyRecordsEgressLatencyMetric) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    auto otelEnabled = otel::metrics::OtelMetricsCapturer::canReadMetrics();
+    auto before = getServerStatusHistogramCount("killOperationsEgressLatencyMicros");
+
+    // Enable blockConnection for "echo".
+    FailPointEnableBlock fpb("increaseTimeoutOnKillOp");
+    assertCommandOK(DatabaseName::kAdmin,
+                    BSON("configureFailPoint"
+                         << "failCommand"
+                         << "mode"
+                         << "alwaysOn"
+                         << "data"
+                         << BSON("blockConnection" << true << "blockTimeMS" << 1000000000
+                                                   << "failCommands" << BSON_ARRAY("echo"))),
+                    kNoTimeout);
+
+    ON_BLOCK_EXIT([&] {
+        assertCommandOK(DatabaseName::kAdmin,
+                        BSON("configureFailPoint" << "failCommand"
+                                                  << "mode"
+                                                  << "off"),
+                        kNoTimeout);
+    });
+
+    auto cbh = makeCallbackHandle();
+    CancellationSource cancellationSource;
+    auto deferred = [&] {
+        // Kick off a blocking "echo" operation with an operation key, so cancelling it sends a
+        // remote _killOperations command.
+        auto deferred = runCommand(cbh,
+                                   makeTestCommand(kNoTimeout,
+                                                   makeEchoCmdObj(),
+                                                   /*opCtx=*/nullptr,
+                                                   /*fireAndForget=*/false,
+                                                   /*timeoutCode=*/{},
+                                                   /*operationKey=*/UUID::gen()),
+                                   cancellationSource.token());
+
+        // Wait for the "echo" operation to start, then cancel it.
+        waitForCommandToStart("echo", kMaxWait);
+        cancellationSource.cancel();
+
+        return deferred;
+    }();
+
+    // Wait for the command to return, assert that it was canceled.
+    auto result = deferred.get(interruptible());
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
+
+    // The _killOperations response is handled asynchronously on the reactor thread, so poll until
+    // its latency has been recorded in the histogram.
+    boost::optional<otel::metrics::HistogramData<int64_t>> data;
+    const auto deadline = net().now() + kMaxWait;
+    while (net().now() < deadline) {
+        if (getServerStatusHistogramCount("killOperationsEgressLatencyMicros") < before + 1) {
+            sleepFor(Milliseconds(100));
+            continue;
+        }
+
+        if (otelEnabled) {
+            data = capturer.readInt64Histogram(
+                otel::metrics::MetricNames::kNetworkEgressKillOperationsLatency);
+        }
+        break;
+    }
+
+    if (otelEnabled) {
+        ASSERT(data);
+        ASSERT_GTE(data->count, 1UL);
+        ASSERT_GTE(data->sum, 1);
+    }
+
+    ASSERT_GTE(getServerStatusHistogramCount("killOperationsEgressLatencyMicros"), before + 1);
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
