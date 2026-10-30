@@ -30,3 +30,6 @@ leak:UnitTest_SuiteNameTaskExecutorCursorFixtureTestNamePinnedExecutorDestroyedO
 # to do the root-set, resulting in false-positive leak reports.
 # TODO SERVER-65936: Re-evaluate if this is needed with a clean shutdown that joins all threads.
 leak:__res_context_send
+
+# The system GSSAPI library leaks credentials acquired by client-side GSSAPI authentication.
+leak:gss_acquire_cred_from
