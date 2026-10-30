@@ -82,7 +82,20 @@ void ServerReadConcernMetrics::recordReadConcern(const repl::ReadConcernArgs& re
     }
 }
 
+void ServerReadConcernMetrics::recordAcceptedAfterOpTime() {
+    _afterOpTime.accepted.fetchAndAdd(1);
+}
+
+void ServerReadConcernMetrics::recordRejectedAfterOpTime() {
+    _afterOpTime.rejected.fetchAndAdd(1);
+}
+
 void ServerReadConcernMetrics::updateStats(ReadConcernStats* stats, OperationContext* opCtx) {
+    AfterOpTimeOps afterOpTime;
+    afterOpTime.setAccepted(_afterOpTime.accepted.load());
+    afterOpTime.setRejected(_afterOpTime.rejected.load());
+    stats->setAfterOpTime(afterOpTime);
+
     stats->setAvailable(_levelAvailableCount.load());
     stats->setLinearizable(_levelLinearizableCount.load());
     stats->setLocal(_levelLocalCount.load());

@@ -566,6 +566,8 @@ env.Library(
         'commands/server_status_core',
         'commands/test_commands_enabled',
         'namespace_string',
+        'repl/repl_server_parameters',
+        'stats/server_read_concern_write_concern_metrics',
     ],
 )
 
