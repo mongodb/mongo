@@ -260,10 +260,12 @@ SharedSemiFuture<void> ReplicationCoordinatorNoOp::registerWaiterForMajorityRead
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::stepDown(OperationContext*,
-                                          const bool,
-                                          const Milliseconds&,
-                                          const Milliseconds&) {
+void ReplicationCoordinatorNoOp::stepDown(
+    OperationContext*,
+    const bool,
+    const Milliseconds&,
+    const Milliseconds&,
+    boost::optional<int> fassertOnLockTimeoutForStepDownOverride) {
     MONGO_UNREACHABLE;
 }
 

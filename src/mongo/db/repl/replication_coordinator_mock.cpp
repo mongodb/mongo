@@ -162,10 +162,12 @@ SharedSemiFuture<void> ReplicationCoordinatorMock::awaitReplicationAsyncNoWTimeo
     return Future<ReplicationCoordinator::StatusAndDuration>::makeReady(result).ignoreValue();
 }
 
-void ReplicationCoordinatorMock::stepDown(OperationContext* opCtx,
-                                          bool force,
-                                          const Milliseconds& waitTime,
-                                          const Milliseconds& stepdownTime) {}
+void ReplicationCoordinatorMock::stepDown(
+    OperationContext* opCtx,
+    bool force,
+    const Milliseconds& waitTime,
+    const Milliseconds& stepdownTime,
+    boost::optional<int> fassertOnLockTimeoutForStepDownOverride) {}
 
 bool ReplicationCoordinatorMock::isWritablePrimaryForReportingPurposes() {
     // TODO

@@ -253,10 +253,12 @@ public:
      * false, before doing so it will wait for 'waitTime' for one other electable node to be caught
      * up before stepping down. Throws on error.
      */
-    virtual void stepDown(OperationContext* opCtx,
-                          bool force,
-                          const Milliseconds& waitTime,
-                          const Milliseconds& stepdownTime) = 0;
+    virtual void stepDown(
+        OperationContext* opCtx,
+        bool force,
+        const Milliseconds& waitTime,
+        const Milliseconds& stepdownTime,
+        boost::optional<int> fassertOnLockTimeoutForStepDownOverride = boost::none) = 0;
 
     /**
      * Returns true if the primary can be considered writable for the purpose of introspective

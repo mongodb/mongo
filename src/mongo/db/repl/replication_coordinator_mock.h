@@ -121,10 +121,12 @@ public:
     SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
         const OpTime& opTime, const WriteConcernOptions& writeConcern) override;
 
-    void stepDown(OperationContext* opCtx,
-                  bool force,
-                  const Milliseconds& waitTime,
-                  const Milliseconds& stepdownTime) override;
+    void stepDown(
+        OperationContext* opCtx,
+        bool force,
+        const Milliseconds& waitTime,
+        const Milliseconds& stepdownTime,
+        boost::optional<int> fassertOnLockTimeoutForStepDownOverride = boost::none) override;
 
     bool isWritablePrimaryForReportingPurposes() override;
 

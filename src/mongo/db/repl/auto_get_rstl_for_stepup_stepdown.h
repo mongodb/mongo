@@ -39,6 +39,17 @@ public:
         size_t numOpsRunning) const = 0;
 };
 
+/**
+ * Returns the number of seconds after which a failure to acquire the RSTL during a state
+ * transition causes an fassert. A value of 0 means the timeout is disabled.
+ *
+ * 'fassertOnLockTimeoutForStepDownOverride' applies only to commanded step down and only when
+ * positive. In all other cases 'globalTimeoutSecs' (fassertOnLockTimeoutForStepUpDown) is used.
+ */
+int getRstlTimeoutSecs(ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+                       boost::optional<int> fassertOnLockTimeoutForStepDownOverride,
+                       int globalTimeoutSecs);
+
 // This object acquires RSTL in X mode to perform state transition to (step up)/from (step down)
 // primary. In order to acquire RSTL, it also starts "RstlKillOpthread" which kills conflicting
 // operations (user/system) and aborts stashed running transactions.
@@ -48,7 +59,8 @@ public:
         StepUpStepDownCoordinator* repl,
         OperationContext* opCtx,
         ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
-        Date_t deadline = Date_t::max());
+        Date_t deadline = Date_t::max(),
+        boost::optional<int> fassertOnLockTimeoutForStepDownOverride = boost::none);
 
     ~AutoGetRstlForStepUpStepDown();
 

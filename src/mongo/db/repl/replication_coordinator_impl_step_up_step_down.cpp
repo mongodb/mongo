@@ -61,10 +61,12 @@ void ReplicationCoordinatorImpl::autoGetRstlExitStepDown() {
 }
 
 
-void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
-                                          const bool force,
-                                          const Milliseconds& waitTime,
-                                          const Milliseconds& stepdownTime) {
+void ReplicationCoordinatorImpl::stepDown(
+    OperationContext* opCtx,
+    const bool force,
+    const Milliseconds& waitTime,
+    const Milliseconds& stepdownTime,
+    boost::optional<int> fassertOnLockTimeoutForStepDownOverride) {
     const Date_t startTime = _replExecutor->now();
     const Date_t stepDownUntil = startTime + stepdownTime;
     const Date_t waitUntil = startTime + waitTime;
@@ -88,8 +90,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     const Date_t startTimeKillConflictingOperations = _replExecutor->now();
     if (gFeatureFlagIntentRegistration.isEnabled()) {
-        rstg.emplace(_killConflictingOperations(
-            rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx));
+        rstg.emplace(
+            _killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepDown,
+                                       opCtx,
+                                       fassertOnLockTimeoutForStepDownOverride));
     }
     const Date_t endTimeKillConflictingOperations = _replExecutor->now();
     LOGV2(962666,
@@ -98,8 +102,11 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
               (endTimeKillConflictingOperations - startTimeKillConflictingOperations));
 
     const Date_t startTimeAcquireRSTL = _replExecutor->now();
-    arsd.emplace(
-        this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, deadline);
+    arsd.emplace(this,
+                 opCtx,
+                 ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown,
+                 deadline,
+                 fassertOnLockTimeoutForStepDownOverride);
     const Date_t endTimeAcquireRSTL = _replExecutor->now();
     LOGV2(962661,
           "Acquired RSTL for stepDown",
@@ -266,7 +273,9 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             const Date_t startTimeKillConflictingOps = _replExecutor->now();
             if (gFeatureFlagIntentRegistration.isEnabled()) {
                 rstg.emplace(_killConflictingOperations(
-                    rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx));
+                    rss::consensus::IntentRegistry::InterruptionType::StepDown,
+                    opCtx,
+                    fassertOnLockTimeoutForStepDownOverride));
             }
             const Date_t endTimeKillConflictingOps = _replExecutor->now();
             LOGV2(962667,

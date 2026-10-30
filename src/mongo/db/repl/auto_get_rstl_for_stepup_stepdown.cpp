@@ -14,11 +14,22 @@
 namespace mongo {
 namespace repl {
 
+int getRstlTimeoutSecs(ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+                       boost::optional<int> fassertOnLockTimeoutForStepDownOverride,
+                       int globalTimeoutSecs) {
+    if (stateTransition == ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown &&
+        fassertOnLockTimeoutForStepDownOverride && *fassertOnLockTimeoutForStepDownOverride > 0) {
+        return *fassertOnLockTimeoutForStepDownOverride;
+    }
+    return globalTimeoutSecs;
+}
+
 AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpStepDown(
     StepUpStepDownCoordinator* stepUpStepDownCoord,
     OperationContext* opCtx,
     const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
-    Date_t deadline)
+    Date_t deadline,
+    boost::optional<int> fassertOnLockTimeoutForStepDownOverride)
     : _stepUpStepDownCoord(stepUpStepDownCoord), _opCtx(opCtx), _stateTransition(stateTransition) {
     invariant(_stepUpStepDownCoord);
     invariant(_opCtx);
@@ -32,7 +43,17 @@ AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpStepDown(
         if (_stateTransition == ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown)
             _stepUpStepDownCoord->autoGetRstlExitStepDown();
     });
-    int rstlTimeout = fassertOnLockTimeoutForStepUpDown.load();
+
+    const int rstlTimeout = getRstlTimeoutSecs(_stateTransition,
+                                               fassertOnLockTimeoutForStepDownOverride,
+                                               fassertOnLockTimeoutForStepUpDown.load());
+
+    LOGV2(12705500,
+          "RSTL timeout set for step up/down operation",
+          "rstlTimeout"_attr = rstlTimeout,
+          "customTimeoutProvided"_attr = (fassertOnLockTimeoutForStepDownOverride &&
+                                          fassertOnLockTimeoutForStepDownOverride.value() > 0));
+
     Date_t start{Date_t::now()};
     if (rstlTimeout > 0 && deadline - start > Seconds(rstlTimeout)) {
         deadline = start + Seconds(rstlTimeout);  // cap deadline

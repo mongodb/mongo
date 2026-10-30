@@ -8,6 +8,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/decorable.h"
 
 #include <mutex>
@@ -364,7 +365,16 @@ IntentRegistry::killConflictingOperations(IntentRegistry::InterruptionType inter
 
     //  NOLINTNEXTLINE
     return std::async(
-        std::launch::async, [&, interrupt, timeOutSec, cb = std::move(postInterruptionCallback)] {
+        std::launch::async,
+        [&,
+         interrupt,
+         timeOutSec,
+         cb = std::move(postInterruptionCallback),
+         sigAltStackController = stdx::support::SigAltStackController()] {
+            // std::async threads don't get the sigaltstack that stdx::thread installs, which the
+            // fatal signal handlers need to print a backtrace if the drain below fasserts.
+            auto sigAltStackGuard = sigAltStackController.makeInstallGuard();
+
             const std::vector<Intent>* intents = nullptr;
             switch (interrupt) {
                 case InterruptionType::Rollback: {

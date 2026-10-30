@@ -512,6 +512,13 @@ public:
         return "{ replSetStepDown : <seconds> }\n"
                "Step down as primary.  Will not try to reelect self for the specified time period "
                "(1 minute if no numeric secs value specified, or secs is 0).\n"
+               "Optional parameters:\n"
+               "  secondaryCatchUpPeriodSecs : <seconds> - Wait time for secondaries to catch up\n"
+               "  force : <bool> - Force stepdown without waiting\n"
+               "  fassertOnLockTimeoutForStepDownOverride : <seconds> - Override for timeout period"
+               "before the node acquires the replication state transition lock (RSTL) during "
+               "stepdown.\n"
+               "Defaults to the fassertOnLockTimeoutForStepUpDown server parameter.\n"
                "(If another member with same priority takes over in the meantime, it will stay "
                "primary.)\n"
                "http://dochub.mongodb.org/core/replicasetcommands";
@@ -576,10 +583,31 @@ public:
             uassertStatusOK(status);
         }
 
+        // Extract optional fassertOnLockTimeoutForStepDownOverride parameter.
+        boost::optional<int> fassertOnLockTimeoutForStepDownOverride;
+        long long rstlTimeoutValue;
+        status = bsonExtractIntegerField(
+            cmdObj, "fassertOnLockTimeoutForStepDownOverride", &rstlTimeoutValue);
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            // The field is optional. When absent, the global fassertOnLockTimeoutForStepUpDown
+            // applies.
+        } else if (!status.isOK()) {
+            uassertStatusOK(status);
+        } else if (!(rstlTimeoutValue > 0 && std::in_range<int>(rstlTimeoutValue))) {
+            uasserted(
+                ErrorCodes::BadValue,
+                "fassertOnLockTimeoutForStepDownOverride must be a positive integer or absent");
+        } else {
+            fassertOnLockTimeoutForStepDownOverride = static_cast<int>(rstlTimeoutValue);
+        }
+
         LOGV2(21579, "Attempting to step down in response to replSetStepDown command");
 
-        ReplicationCoordinator::get(opCtx)->stepDown(
-            opCtx, force, Seconds(secondaryCatchUpPeriodSecs), Seconds(stepDownForSecs));
+        ReplicationCoordinator::get(opCtx)->stepDown(opCtx,
+                                                     force,
+                                                     Seconds(secondaryCatchUpPeriodSecs),
+                                                     Seconds(stepDownForSecs),
+                                                     fassertOnLockTimeoutForStepDownOverride);
 
         LOGV2(21580, "replSetStepDown command completed");
 

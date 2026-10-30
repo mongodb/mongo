@@ -3842,7 +3842,9 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
 
 rss::consensus::ReplicationStateTransitionGuard
 ReplicationCoordinatorImpl::_killConflictingOperations(
-    rss::consensus::IntentRegistry::InterruptionType interrupt, OperationContext* opCtx) {
+    rss::consensus::IntentRegistry::InterruptionType interrupt,
+    OperationContext* opCtx,
+    boost::optional<int> timeoutSecs) {
     auto svcCtx = opCtx->getServiceContext();
     auto callback = [svcCtx] {
         // Kill unprepared transactions to release intents whose lifetimes were extended by the WUOW
@@ -3857,7 +3859,12 @@ ReplicationCoordinatorImpl::_killConflictingOperations(
         killSessionsAbortUnpreparedTransactions(
             killOpCtx.get(), matcher, ErrorCodes::InterruptedDueToReplStateChange);
     };
-    return _intentRegistry.killConflictingOperations(interrupt, opCtx, std::move(callback)).get();
+    boost::optional<uint32_t> timeout;
+    if (timeoutSecs) {
+        timeout = static_cast<uint32_t>(*timeoutSecs);
+    }
+    return _intentRegistry.killConflictingOperations(interrupt, opCtx, std::move(callback), timeout)
+        .get();
 }
 
 void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,

@@ -180,10 +180,12 @@ public:
     SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
         const OpTime& opTime, const WriteConcernOptions& writeConcern) override;
 
-    void stepDown(OperationContext* opCtx,
-                  bool force,
-                  const Milliseconds& waitTime,
-                  const Milliseconds& stepdownTime) override;
+    void stepDown(
+        OperationContext* opCtx,
+        bool force,
+        const Milliseconds& waitTime,
+        const Milliseconds& stepdownTime,
+        boost::optional<int> fassertOnLockTimeoutForStepDownOverride = boost::none) override;
 
     bool isWritablePrimaryForReportingPurposes() override;
 
@@ -1184,7 +1186,9 @@ private:
                                   const std::string& replSetName);
 
     rss::consensus::ReplicationStateTransitionGuard _killConflictingOperations(
-        rss::consensus::IntentRegistry::InterruptionType interrupt, OperationContext* opCtx);
+        rss::consensus::IntentRegistry::InterruptionType interrupt,
+        OperationContext* opCtx,
+        boost::optional<int> timeoutSecs = boost::none);
 
     void _trackHeartbeatHandle(WithLock,
                                const StatusWith<executor::TaskExecutor::CallbackHandle>& handle,

@@ -12,6 +12,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -371,13 +372,110 @@ TEST_F(OpsAndSessionsKillerTest, ZeroRSTLTimeoutGivesMaxDeadlineToKillOpThread) 
 
     // Ensure constructor does not time out and crash after stall during session checkout in
     // kill op thread execution.
+    unittest::LogCaptureGuard logs;
     AutoGetRstlForStepUpStepDown autoGet(
         &coord,
         opCtx,
         ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepUp,
         Date_t::max());
+    logs.stop();
+
+    ASSERT_EQ(1,
+              logs.countBSONContainingSubset(
+                  BSON("id" << 12705500 << "attr"
+                            << BSON("rstlTimeout" << 0 << "customTimeoutProvided" << false))));
 
     blockingThread.join();
+}
+
+// Verifies that the constructor selects and logs the stepdown override when one is provided.
+TEST_F(OpsAndSessionsKillerTest, StepDownOverrideIsUsedAndLoggedByConstructor) {
+    fassertOnLockTimeoutForStepUpDown.store(60);
+
+    testing::NiceMock<MockStepUpStepDownCoordinator> coord;
+    auto* opCtx = makeOpCtx("stepDownOpCtx");
+
+    unittest::LogCaptureGuard logs;
+    AutoGetRstlForStepUpStepDown autoGet(
+        &coord,
+        opCtx,
+        ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown,
+        Date_t::max(),
+        10);
+    logs.stop();
+
+    ASSERT_EQ(1,
+              logs.countBSONContainingSubset(
+                  BSON("id" << 12705500 << "attr"
+                            << BSON("rstlTimeout" << 10 << "customTimeoutProvided" << true))));
+}
+
+// Verifies that the stepdown override is ignored during a step up; a
+// global timeout parameter is used instead.
+TEST_F(OpsAndSessionsKillerTest, StepUpIgnoresOverrideInConstructor) {
+    fassertOnLockTimeoutForStepUpDown.store(60);
+
+    testing::NiceMock<MockStepUpStepDownCoordinator> coord;
+    auto* opCtx = makeOpCtx("stepUpOpCtx");
+
+    unittest::LogCaptureGuard logs;
+    AutoGetRstlForStepUpStepDown autoGet(
+        &coord,
+        opCtx,
+        ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepUp,
+        Date_t::max(),
+        10);
+    logs.stop();
+
+    ASSERT_EQ(1,
+              logs.countBSONContainingSubset(
+                  BSON("id" << 12705500 << "attr" << BSON("rstlTimeout" << 60))));
+    ASSERT_EQ(0,
+              logs.countBSONContainingSubset(
+                  BSON("id" << 12705500 << "attr" << BSON("rstlTimeout" << 10))));
+}
+
+TEST(GetRstlTimeoutSecsTest, StepDownWithOverrideUsesOverride) {
+    ASSERT_EQ(getRstlTimeoutSecs(
+                  ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, 10, 60),
+              10);
+}
+
+TEST(GetRstlTimeoutSecsTest, StepDownWithoutOverrideUsesGlobal) {
+    ASSERT_EQ(getRstlTimeoutSecs(ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown,
+                                 boost::none,
+                                 60),
+              60);
+}
+
+TEST(GetRstlTimeoutSecsTest, StepDownWithZeroOverrideUsesGlobal) {
+    ASSERT_EQ(
+        getRstlTimeoutSecs(ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, 0, 60),
+        60);
+}
+
+TEST(GetRstlTimeoutSecsTest, StepDownWithNegativeOverrideUsesGlobal) {
+    ASSERT_EQ(getRstlTimeoutSecs(
+                  ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, -5, 60),
+              60);
+}
+
+TEST(GetRstlTimeoutSecsTest, StepUpIgnoresOverride) {
+    ASSERT_EQ(
+        getRstlTimeoutSecs(ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepUp, 10, 60),
+        60);
+}
+
+TEST(GetRstlTimeoutSecsTest, StepDownOverrideAppliesWhenGlobalTimeoutDisabled) {
+    ASSERT_EQ(
+        getRstlTimeoutSecs(ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, 10, 0),
+        10);
+}
+
+TEST(GetRstlTimeoutSecsTest, StepDownWithoutOverrideKeepsDisabledGlobal) {
+    ASSERT_EQ(getRstlTimeoutSecs(
+                  ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, boost::none, 0),
+              0);
 }
 
 }  // namespace repl

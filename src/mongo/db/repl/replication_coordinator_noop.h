@@ -128,10 +128,14 @@ public:
                                                                const OpTime&,
                                                                const WriteConcernOptions&) final;
 
+    void stepDown(OperationContext*,
+                  bool,
+                  const Milliseconds&,
+                  const Milliseconds&,
+                  boost::optional<int> fassertOnLockTimeoutForStepDownOverride = boost::none) final;
+
     SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
         const OpTime& opTime, const WriteConcernOptions& writeConcern) final;
-
-    void stepDown(OperationContext*, bool, const Milliseconds&, const Milliseconds&) final;
 
     Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions&) const final;
 
