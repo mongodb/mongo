@@ -209,6 +209,7 @@ mongo_cc_library(
         "//src/mongo/util:exit.cpp",
         "//src/mongo/util:file.cpp",
         "//src/mongo/util:hex.cpp",
+        "//src/mongo/util:invariant_action_hook.cpp",
         "//src/mongo/util:itoa.cpp",
         "//src/mongo/util:observable_mutex_registry.cpp",
         "//src/mongo/util:platform_init.cpp",

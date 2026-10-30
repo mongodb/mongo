@@ -8,13 +8,16 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/demangle.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/invariant_action_hook.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
 
 #include <csignal>
+#include <functional>
 #include <ostream>
 #include <type_traits>
 
@@ -521,9 +524,92 @@ DEATH_TEST(FassertionTerminationTestDeathTest,
 }
 
 // invariant and its friends
-DEATH_TEST_REGEX(InvariantTerminationTestDeathTest,
-                 invariant,
+DEATH_TEST_REGEX(InvariantDefangDeathTest, invariant, "Invariant failure.*false.*" __FILE__) {
+    invariant(false);
+}
+
+DEATH_TEST_REGEX(InvariantDefangDeathTest, invariantNoMsg, "Invariant failure.*false.*" __FILE__) {
+    setLookupInvariantAbortsFn([](std::string_view invariantID) { return true; });
+    invariant(false);
+}
+
+DEATH_TEST_REGEX(InvariantDefangDeathTest,
+                 invariantReentrantHook,
+                 "Aborting due to re-entrancy in invariantActionImpl") {
+    setLookupInvariantAbortsFn([](std::string_view) {
+        invariant(false);
+        return false;
+    });
+    invariant(false);
+}
+
+class InvariantDefangFunctionGuard {
+public:
+    explicit InvariantDefangFunctionGuard(std::function<bool(std::string_view)> fn) {
+        setLookupInvariantAbortsFn(std::move(fn));
+    }
+
+    ~InvariantDefangFunctionGuard() {
+        setLookupInvariantAbortsFn(nullptr);
+    }
+};
+
+TEST(InvariantDefangTest, invariantDefanged) {
+    InvariantDefangFunctionGuard defangAll([](std::string_view) { return false; });
+    ASSERT_TASSERT_CODE(invariant(false), ErrorCodes::InternalError);
+}
+
+TEST(InvariantDefangTest, invariantDefangedMsg) {
+    InvariantDefangFunctionGuard defangAll([](std::string_view) { return false; });
+    ASSERT_TASSERT_CODE(invariant(false, "msg"), ErrorCodes::InternalError);
+}
+
+TEST(InvariantDefangTest, invariantOKDefanged) {
+    InvariantDefangFunctionGuard defangAll([](std::string_view) { return false; });
+    ASSERT_TASSERT_CODE(invariant(Status(ErrorCodes::UnknownError, "msg")),
+                        ErrorCodes::InternalError);
+}
+
+TEST(InvariantDefangTest, invariantStatusOKDefanged) {
+    InvariantDefangFunctionGuard defangAll([](std::string_view) { return false; });
+    ASSERT_TASSERT_CODE(invariantStatusOK(Status(ErrorCodes::UnknownError, "msg")),
+                        ErrorCodes::InternalError);
+}
+
+TEST(InvariantDefangTest, invariantStatusOKWithContextDefanged) {
+    InvariantDefangFunctionGuard defangAll([](std::string_view) { return false; });
+    ASSERT_TASSERT_CODE(
+        invariantStatusOKWithContext(Status(ErrorCodes::UnknownError, "msg"), "ctx"),
+        ErrorCodes::InternalError);
+}
+
+TEST(InvariantDefangTest, invariantDefangedSourceLocation) {
+    // clang-format off
+    SourceLocation sl = MONGO_SOURCE_LOCATION(); auto trigger_defanged = []{ invariant(false); };
+    // clang-format on
+
+    InvariantDefangFunctionGuard defangLocation([&sl](std::string_view invariantID) {
+        return !(fmt::format("{}:{}", sl.file_name(), sl.line()) == invariantID);
+    });
+
+    ASSERT_TASSERT_CODE(trigger_defanged(), ErrorCodes::InternalError);
+}
+
+DEATH_TEST_REGEX(InvariantDefangDeathTest,
+                 invariantDefangedSourceLocationSpecific,
                  "Invariant failure.*false.*" __FILE__) {
+    auto trigger_defanged = [] {
+#include "false_invariant.inl"
+    };
+
+    setLookupInvariantAbortsFn([](std::string_view invariantID) {
+        // Defang the invariant from the inl file
+        return "src/mongo/util/false_invariant.inl:1" != invariantID;
+    });
+
+    ASSERT_THROWS_CODE_AND_WHAT(
+        trigger_defanged(), DBException, ErrorCodes::InternalError, "Internal Error");
+
     invariant(false);
 }
 

@@ -10,6 +10,7 @@
 #include "mongo/util/debugger.h"
 #include "mongo/util/demangle.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/invariant_action_hook.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace.h"
@@ -155,30 +156,58 @@ void DBException::traceIfNeeded(const DBException& e) {
 }
 
 namespace {
-MONGO_COMPILER_NORETURN void invariantFailedImpl(const char* expr, auto loc) {
+thread_local int invariantActionImplReentrancyCount = 0;
+
+// TODO(SERVER-134199): Use a fixed log id instead
+MONGO_COMPILER_NORETURN void invariantActionImpl(int logID, auto loc) {
+    const auto isReentrant = invariantActionImplReentrancyCount++;
+    auto _ = ScopeGuard{[&] {
+        --invariantActionImplReentrancyCount;
+    }};
+    if (isReentrant) {
+        LOGV2_FATAL_CONTINUE(13420100, "Aborting due to re-entrancy in invariantActionImpl");
+        callAbort();
+    }
+
     try {
-        LOGV2_FATAL_CONTINUE(23079, "Invariant failure", "expr"_attr = expr, "location"_attr = loc);
         breakpoint();
-        LOGV2_FATAL_CONTINUE(23080, "\n\n***aborting after invariant() failure\n\n");
+        if (shouldInvariantAbort(loc)) {
+            LOGV2_FATAL_CONTINUE(logID, "\n\n***aborting after invariant() failure\n\n");
+            callAbort();
+        }
+    } catch (...) {
+        callAbort();
+    }
+
+    try {
+        bumpAssertion(AssertionKind::kTripwire);
+        LOGV2_ERROR(23097, "Invariant defanged: tripwire assertion instead of aborting");
+        logErrorBlock();
     } catch (...) {
     }
-    callAbort();
+    error_details::throwExceptionForStatus(Status(ErrorCodes::InternalError, "Internal Error"));
+}
+
+MONGO_COMPILER_NORETURN void invariantFailedImpl(const char* expr, auto loc) {
+    try {
+        LOGV2_ERROR(23079, "Invariant failure", "expr"_attr = expr, "location"_attr = loc);
+    } catch (...) {
+    }
+    invariantActionImpl(23080, loc);
 }
 
 MONGO_COMPILER_NORETURN void invariantFailedImpl(const char* expr,
                                                  const std::string& msg,
                                                  auto loc) {
     try {
-        LOGV2_FATAL_CONTINUE(23081,
-                             "Invariant failure",
-                             "expr"_attr = expr,
-                             "msg"_attr = msg,
-                             "location"_attr = loc);
-        breakpoint();
-        LOGV2_FATAL_CONTINUE(23082, "\n\n***aborting after invariant() failure\n\n");
+        LOGV2_ERROR(23081,
+                    "Invariant failure",
+                    "expr"_attr = expr,
+                    "msg"_attr = msg,
+                    "location"_attr = loc);
     } catch (...) {
     }
-    callAbort();
+    invariantActionImpl(23082, loc);
 }
 }  // namespace
 
@@ -225,37 +254,40 @@ MONGO_COMPILER_NOINLINE void verifyFailed(const char* expr, SourceLocation loc) 
 MONGO_COMPILER_NOINLINE void invariantOKFailed(const char* expr,
                                                const Status& status,
                                                SourceLocation loc) {
-    LOGV2_FATAL_CONTINUE(23083,
-                         "Invariant failure",
-                         "expr"_attr = expr,
-                         "error"_attr = redact(status),
-                         "location"_attr = loc);
-    breakpoint();
-    LOGV2_FATAL_CONTINUE(23084, "\n\n***aborting after invariant() failure\n\n");
-    callAbort();
+    try {
+        LOGV2_ERROR(23083,
+                    "Invariant failure",
+                    "expr"_attr = expr,
+                    "error"_attr = redact(status),
+                    "location"_attr = loc);
+    } catch (...) {
+    }
+    invariantActionImpl(23084, loc);
 }
 
 MONGO_COMPILER_NOINLINE void invariantOKFailedWithMsg(const char* expr,
                                                       const Status& status,
                                                       const std::string& msg,
                                                       SourceLocation loc) {
-    LOGV2_FATAL_CONTINUE(23085,
-                         "Invariant failure",
-                         "expr"_attr = expr,
-                         "msg"_attr = msg,
-                         "error"_attr = redact(status),
-                         "location"_attr = loc);
-    breakpoint();
-    LOGV2_FATAL_CONTINUE(23086, "\n\n***aborting after invariant() failure\n\n");
-    callAbort();
+    try {
+        LOGV2_ERROR(23085,
+                    "Invariant failure",
+                    "expr"_attr = expr,
+                    "msg"_attr = msg,
+                    "error"_attr = redact(status),
+                    "location"_attr = loc);
+    } catch (...) {
+    }
+    invariantActionImpl(23086, loc);
 }
 
 MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status, SourceLocation loc) {
-    LOGV2_FATAL_CONTINUE(
-        23087, "Invariant failure", "error"_attr = redact(status), "location"_attr = loc);
-    breakpoint();
-    LOGV2_FATAL_CONTINUE(23088, "\n\n***aborting after invariant() failure\n\n");
-    callAbort();
+    try {
+        LOGV2_ERROR(
+            23087, "Invariant failure", "error"_attr = redact(status), "location"_attr = loc);
+    } catch (...) {
+    }
+    invariantActionImpl(23088, loc);
 }
 }  // namespace error_details
 

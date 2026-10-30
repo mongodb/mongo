@@ -13,6 +13,7 @@ exports_files(
         "*.cpp",
         "*.py",
         "*.in",
+        "*.inl",
     ]),
 )
 
@@ -883,6 +884,7 @@ mongo_cc_unit_test(
         "dynamic_catch_test.cpp",
         "errno_util_test.cpp",
         "fail_point_test.cpp",
+        "false_invariant.inl",
         "fixed_string_test.cpp",
         "functional_test.cpp",
         "future_test_edge_cases.cpp",
