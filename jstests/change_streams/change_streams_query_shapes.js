@@ -149,37 +149,32 @@ checkQueryShapeAndHash(
     "8BFCDD5DA40E82A947514CD30503795B72B3B61DD2F5455133F1D7120F9394B2",
 );
 
-// The following tests rely on fields that were added to the $changeStreams stage in v8.2, and for
-// which query shape hash computation was changed in v8.3, so we only execute them if the FCV
-// version is high enough.
-if (isFCVgte(db, "8.3")) {
-    // Check shape and hash when setting the change stream reader version.
-    checkQueryShapeAndHash(
-        db,
-        {aggregate: 1, pipeline: [{$changeStream: {version: "v1"}}], $db: db.getName()},
-        kQueryHashForOptionLessStream,
-    );
+// Check shape and hash when setting the change stream reader version.
+checkQueryShapeAndHash(
+    db,
+    {aggregate: 1, pipeline: [{$changeStream: {version: "v1"}}], $db: db.getName()},
+    kQueryHashForOptionLessStream,
+);
 
-    checkQueryShapeAndHash(
-        db,
-        {aggregate: 1, pipeline: [{$changeStream: {version: "v2"}}], $db: db.getName()},
-        kQueryHashForOptionLessStream,
-    );
+checkQueryShapeAndHash(
+    db,
+    {aggregate: 1, pipeline: [{$changeStream: {version: "v2"}}], $db: db.getName()},
+    kQueryHashForOptionLessStream,
+);
 
-    // Check shape and hash when setting the 'supportedEvents' field.
-    checkQueryShapeAndHash(
-        db,
-        {aggregate: 1, pipeline: [{$changeStream: {supportedEvents: ["foo"]}}], $db: db.getName()},
-        kQueryHashForOptionLessStream,
-    );
+// Check shape and hash when setting the 'supportedEvents' field.
+checkQueryShapeAndHash(
+    db,
+    {aggregate: 1, pipeline: [{$changeStream: {supportedEvents: ["foo"]}}], $db: db.getName()},
+    kQueryHashForOptionLessStream,
+);
 
-    // Check shape and hash for a change stream pipeline using the 'ignoreRemovedShards' flag.
-    checkQueryShapeAndHash(
-        db,
-        {aggregate: 1, pipeline: [{$changeStream: {ignoreRemovedShards: true}}], $db: db.getName()},
-        "796AFF268E3D2A16D9FFCD9F5929CB6C78D704560AC6F19A2BE40DC2B688200D",
-    );
-}
+// Check shape and hash for a change stream pipeline using the 'ignoreRemovedShards' flag.
+checkQueryShapeAndHash(
+    db,
+    {aggregate: 1, pipeline: [{$changeStream: {ignoreRemovedShards: true}}], $db: db.getName()},
+    "796AFF268E3D2A16D9FFCD9F5929CB6C78D704560AC6F19A2BE40DC2B688200D",
+);
 
 if (isEndOfTransactionUsable(db)) {
     // Setting 'showEndOfTransaction' to 'off' is equivalent to not setting it at all: the option
