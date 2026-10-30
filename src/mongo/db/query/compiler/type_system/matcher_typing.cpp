@@ -9,6 +9,7 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/query/compiler/type_system/expression_typing.h"
 #include "mongo/util/assert_util.h"
 
@@ -116,6 +117,19 @@ struct NarrowTypeMatchExpressionVisitor final : public SelectiveMatchExpressionV
     void visit(const InternalSchemaTypeExpression* expr) override {
         // Same type set as $type, but the element path does not traverse the leaf array.
         applyPathConstraint(expr, Type::fromMatcherTypeSet(expr->typeSet()));
+    }
+
+    void visit(const InternalSchemaObjectMatchExpression* expr) override {
+        // We negate the child here and pass assumeTrue=true to narrowPath, rather than forwarding
+        // assumeTrue, because narrowPath negates via complement(), which can't complement a shape:
+        // it would collapse a shaped object like {b: number} to ~object, dropping the "object that
+        // fails the child" case. Under negation we also add the non-object case, which fails too.
+        Type constraint = narrowType(Type::anyObject(), expr->getChild(0), assumeTrue);
+        if (!assumeTrue) {
+            constraint = unionType(std::move(constraint), complement(Type::anyObject()));
+        }
+        type =
+            matcher::narrowPath(std::move(type), *expr->elementPath(), std::move(constraint), true);
     }
 
     void visit(const NotMatchExpression* expr) override {
