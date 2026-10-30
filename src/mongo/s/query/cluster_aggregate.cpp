@@ -60,6 +60,8 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -379,6 +381,35 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         expCtx, request, *pipeline, involvedNamespaces, executionNss));
 
     return pipeline;
+}
+
+/**
+ * A '$_passthroughToShard' change stream is forwarded unparsed to the shard, which runs it as the
+ * router's internal user and so cannot tell whether the actual user may read system.js. If the
+ * stream uses 'showSystemEvents' and the user is not authorized for system.js events, add a $match
+ * right after $changeStream that drops them, before any user stage can change the event shape.
+ */
+Document filterSystemJsEventsForPassthroughIfNeeded(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    Document cmd) {
+    auto pipeline = cmd[AggregateCommandRequest::kPipelineFieldName].getArray();
+    if (pipeline.empty()) {
+        return cmd;
+    }
+    const auto spec = pipeline[0][DocumentSourceChangeStream::kStageName];
+    if (spec.getType() != BSONType::Object ||
+        !spec[DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName].coerceToBool() ||
+        DocumentSourceChangeStream::isAuthorizedForSystemJsEvents(opCtx, nss)) {
+        return cmd;
+    }
+
+    constexpr auto systemJs = NamespaceString::kSystemDotJavascriptCollectionName;
+    pipeline.insert(pipeline.begin() + 1,
+                    Value(BSON("$match" << BSON("ns.coll" << BSON("$ne" << systemJs) << "to.coll"
+                                                          << BSON("$ne" << systemJs)))));
+    MutableDocument newCmd(std::move(cmd));
+    newCmd[AggregateCommandRequest::kPipelineFieldName] = Value(std::move(pipeline));
+    return newCmd.freeze();
 }
 
 }  // namespace
@@ -733,7 +764,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                         expCtx,
                         namespaces,
                         request.getExplain(),
-                        aggregation_request_helper::serializeToCommandDoc(expCtx, request),
+                        filterSystemJsEventsForPassthroughIfNeeded(
+                            opCtx,
+                            namespaces.executionNss,
+                            aggregation_request_helper::serializeToCommandDoc(expCtx, request)),
                         privileges,
                         shardId,
                         eligibleForSampling,

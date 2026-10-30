@@ -2401,10 +2401,12 @@ export const authCommandsLib = {
               expectFail: true,  // because no replication enabled
           }]
         },
-        // showSystemEvents re-admits system.js into db/cluster-scoped streams, requiring an extra privilege.
+        // 'showSystemEvents' requires no privileges beyond those of the stream's scope. Events on
+        // system.js are filtered out of the stream if the user cannot read system.js.
         {
           testname: "aggregate_changeStream_whole_db_showSystemEvents",
-          command: {aggregate: 1, pipeline: [{$changeStream: {showSystemEvents: true}}], cursor: {}},
+          command:
+              {aggregate: 1, pipeline: [{$changeStream: {showSystemEvents: true}}], cursor: {}},
           testcases: [
               {
                 runOnDb: firstDbName,
@@ -2418,27 +2420,20 @@ export const authCommandsLib = {
                     searchCoordinator: 1,
                     __system: 1
                 },
-                privileges: [
-                    {resource: {db: firstDbName, collection: ""}, actions: ["changeStream", "find"]},
-                    {resource: {db: firstDbName, collection: "system.js"}, actions: ["changeStream", "find"]}
-                ],
+                privileges: [{
+                    resource: {db: firstDbName, collection: ""},
+                    actions: ["changeStream", "find"]
+                }],
                 expectFail: true,  // because no replication enabled
               },
               {
-                // A role scoped to firstDbName's system.js (e.g. 'read') must not satisfy this
-                // check against a different database.
                 runOnDb: secondDbName,
                 roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, searchCoordinator: 1, __system: 1},
-                privileges: [
-                    {resource: {db: secondDbName, collection: ""}, actions: ["changeStream", "find"]},
-                    {resource: {db: secondDbName, collection: "system.js"}, actions: ["changeStream", "find"]}
-                ],
+                privileges: [{
+                    resource: {db: secondDbName, collection: ""},
+                    actions: ["changeStream", "find"]
+                }],
                 expectFail: true,  // because no replication enabled
-              },
-              {
-                expectAuthzFailure: true,
-                runOnDb: firstDbName,
-                privileges: [{resource: {db: firstDbName, collection: ""}, actions: ["changeStream", "find"]}]
               }
           ]
         },
@@ -2449,22 +2444,12 @@ export const authCommandsLib = {
               pipeline: [{$changeStream: {allChangesForCluster: true, showSystemEvents: true}}],
               cursor: {}
           },
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, searchCoordinator: 1, __system: 1},
-                privileges: [
-                    {resource: {db: "", collection: ""}, actions: ["changeStream", "find"]},
-                    {resource: {db: "", collection: "system.js"}, actions: ["changeStream", "find"]}
-                ],
-                expectFail: true,  // because no replication enabled
-              },
-              {
-                expectAuthzFailure: true,
-                runOnDb: adminDbName,
-                privileges: [{resource: {db: "", collection: ""}, actions: ["changeStream", "find"]}]
-              }
-          ]
+          testcases: [{
+              runOnDb: adminDbName,
+              roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, searchCoordinator: 1, __system: 1},
+              privileges: [{resource: {db: "", collection: ""}, actions: ["changeStream", "find"]}],
+              expectFail: true,  // because no replication enabled
+          }]
         },
         {
           testname: "aggregate_changeStreamSplitLargeEvent_one_collection",
