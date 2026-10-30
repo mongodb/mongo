@@ -9,10 +9,13 @@
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {
@@ -305,6 +308,26 @@ TEST_F(CheckpointValidationTest, CheckpointValidatesDroppedCollection) {
 }
 
 using CheckpointValidationDeathTest = CheckpointValidationTest;
+
+TEST_F(CheckpointValidationTest,
+       DroppedCollectionRecreatedWithSameUuidDoesNotFailInShardedCluster) {
+    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
+        "enableContinuousInternodePerCollectionValidation", true);
+
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer};
+    ON_BLOCK_EXIT([] { serverGlobalParams.clusterRole = ClusterRole::None; });
+
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.checkpointDroppedRecreatedSharded");
+    const NsAndUUID coll{.nss = nss, .uuid = UUID::gen()};
+
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeCreateOplogEntry(nextOpTime().getTimestamp(), coll));
+    oplog.push_back(makeWatermarkEntry(nextOpTime().getTimestamp()));
+    oplog.push_back(makeDropOplogEntry(nextOpTime().getTimestamp(), coll));
+    oplog.push_back(makeCreateOplogEntry(nextOpTime().getTimestamp(), coll));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
 
 DEATH_TEST_F(CheckpointValidationDeathTest,
              CheckpointValidationFailsWhenStandbyMissingEntry,
