@@ -980,7 +980,7 @@ TEST(MakeCopyFromExpressionContext, CopiesNonArrayPathsForNss) {
 }
 
 // Tests for PathArrayness::isIndexEligibleToAddToPathArrayness.
-// Only BTREE indexes that are neither partial, sparse, nor hidden are eligible.
+// Only BTREE indexes that are neither partial nor hidden are eligible.
 
 TEST(PathArraynessIndexEligibilityTest, BtreeIsEligible) {
     BSONObj spec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1");
@@ -1002,13 +1002,6 @@ TEST(PathArraynessIndexEligibilityTest, BtreeHiddenIsNotEligible) {
                             << "hidden" << true);
     IndexDescriptor desc(IndexNames::BTREE, spec);
     ASSERT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
-}
-
-TEST(PathArraynessIndexEligibilityTest, BtreeSparseIsNotEligible) {
-    auto spec =
-        BSON("v" << 2 << "key" << BSON("a.b" << 1) << "name" << "a.b_1" << "sparse" << true);
-    IndexDescriptor desc(IndexNames::BTREE, spec);
-    EXPECT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
 }
 
 TEST(PathArraynessIndexEligibilityTest, TwoDSphereIsNotEligible) {

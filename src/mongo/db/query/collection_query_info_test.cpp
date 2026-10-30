@@ -234,47 +234,6 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndex) {
     }
 }
 
-TEST_F(CollectionQueryInfoTest, SparseIndexDoesNotContributeToPathArrayness) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
-    ExpressionContextForTest expCtx;
-    auto spec = BSON("v" << 2 << "name" << "a_1_b_1" << "key" << BSON("a" << 1 << "b" << 1)
-                         << "sparse" << true);
-    createIndexOnEmptyCollection(spec);
-
-    uint64_t epochBefore;
-    {
-        auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
-        auto paths =
-            CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
-        EXPECT_TRUE(paths->canPathBeArray("a", &expCtx));
-        EXPECT_TRUE(paths->canPathBeArray("b", &expCtx));
-        epochBefore = paths->epoch();
-    }
-
-    insertDocuments(_kTestNss, {BSON("_id" << 0 << "a" << BSON_ARRAY(1) << "b" << 1)});
-    {
-        auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
-        auto paths =
-            CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
-        EXPECT_TRUE(paths->canPathBeArray("a", &expCtx));
-        EXPECT_TRUE(paths->canPathBeArray("b", &expCtx));
-        EXPECT_EQ(paths->epoch(), epochBefore);
-    }
-
-    {
-        WriteUnitOfWork wuow{operationContext()};
-        auto coll = acquireForMetadataWrite();
-        CollectionWriter collectionWriter{operationContext(), &coll};
-        auto* collection = collectionWriter.getWritableCollection(operationContext());
-        auto& info = CollectionQueryInfo::get(collection);
-        info.rebuildPathArrayness(operationContext(), collection);
-        auto paths = info.getPathArrayness();
-        EXPECT_TRUE(paths->canPathBeArray("a", &expCtx));
-        EXPECT_TRUE(paths->canPathBeArray("b", &expCtx));
-        wuow.commit();
-    }
-}
-
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultikeyChange) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
     unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};

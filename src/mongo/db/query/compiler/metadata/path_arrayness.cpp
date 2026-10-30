@@ -27,7 +27,7 @@ const PathArrayness& PathArrayness::emptyPathArrayness() {
 }
 
 bool PathArrayness::isIndexEligibleToAddToPathArrayness(const IndexDescriptor& descriptor) {
-    if (descriptor.isPartial() || descriptor.behavesAsSparse() || descriptor.hidden()) {
+    if (descriptor.isPartial() || descriptor.hidden()) {
         return false;
     }
     if (descriptor.getIndexType() != INDEX_BTREE) {
