@@ -152,7 +152,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, NothingTrackedNothingAdvanced) 
 
     EXPECT_FALSE(readTimestamp().has_value());
 
-    EXPECT_EQ(sizeCountStore->rs_ForTest()->numRecords(), 0);
+    EXPECT_EQ(sizeCountStore->rs_ForTest()->approximateNumRecords(), 0);
 }
 
 // Test: `advanceCheckpoint` correctly updates the size count and timestamp entries for an

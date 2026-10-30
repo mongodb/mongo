@@ -211,11 +211,11 @@ public:
         virtual void reset(OperationContext* opCtx) = 0;
 
         int64_t numRecords() const {
-            return getRecordStore()->numRecords();
+            return getRecordStore()->approximateNumRecords();
         }
 
         int64_t dataSize() const {
-            return getRecordStore()->dataSize();
+            return getRecordStore()->approximateDataSize();
         }
     };
 

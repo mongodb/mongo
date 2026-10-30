@@ -29,7 +29,7 @@ TEST(RecordStoreTest, DeleteRecord) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     string data = "my record";
     RecordId loc;
@@ -50,7 +50,7 @@ TEST(RecordStoreTest, DeleteRecord) {
         }
     }
 
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -63,7 +63,7 @@ TEST(RecordStoreTest, DeleteRecord) {
         }
     }
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 }
 
 // Insert multiple records and try to delete them.
@@ -71,7 +71,7 @@ TEST(RecordStoreTest, DeleteMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
@@ -96,7 +96,7 @@ TEST(RecordStoreTest, DeleteMultipleRecords) {
         }
     }
 
-    ASSERT_EQUALS(nToInsert, rs->numRecords());
+    ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
 
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -109,7 +109,7 @@ TEST(RecordStoreTest, DeleteMultipleRecords) {
         }
     }
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 }
 
 // Delete a non-existent record and expect it to crash with a log message.

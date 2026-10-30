@@ -30,7 +30,7 @@ TEST(RecordStoreTest, GetRandomIteratorEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -49,7 +49,7 @@ TEST(RecordStoreTest, GetRandomIteratorNonEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     const unsigned nToInsert =
         5000;  // should be non-trivial amount, so we get multiple btree levels
@@ -75,7 +75,7 @@ TEST(RecordStoreTest, GetRandomIteratorNonEmpty) {
         }
     }
 
-    ASSERT_EQUALS(nToInsert, rs->numRecords());
+    ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
 
     set<RecordId> remain(locs, locs + nToInsert);
     {
@@ -111,7 +111,7 @@ TEST(RecordStoreTest, GetRandomIteratorSingleton) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQ(0, rs->numRecords());
+    ASSERT_EQ(0, rs->approximateNumRecords());
 
     // Insert one record.
     RecordId idToRetrieve;
@@ -131,7 +131,7 @@ TEST(RecordStoreTest, GetRandomIteratorSingleton) {
     }
 
     // Double-check that the record store has one record in it now.
-    ASSERT_EQ(1, rs->numRecords());
+    ASSERT_EQ(1, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

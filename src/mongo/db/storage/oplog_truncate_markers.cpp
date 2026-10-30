@@ -151,7 +151,9 @@ OplogTruncateMarkers::InitialSetOfOplogMarkers OplogTruncateMarkers::beginMarker
           "markersCount"_attr = initialSetOfMarkers.markers.size(),
           "markerCreationMethod"_attr = toString(initialSetOfMarkers.methodUsed),
           "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
-    LOGV2(10621110, "Initial set of markers created.", "oplogSizeBytes"_attr = rs.dataSize());
+    LOGV2(10621110,
+          "Initial set of markers created.",
+          "approximateOplogSizeBytes"_attr = rs.approximateDataSize());
 
     return {std::move(initialSetOfMarkers),
             minBytesPerTruncateMarker,

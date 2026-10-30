@@ -29,7 +29,7 @@ TEST(RecordStoreTest, TruncateEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -41,7 +41,7 @@ TEST(RecordStoreTest, TruncateEmpty) {
         }
     }
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 }
 
 // Insert multiple records, and verify that calling truncate() on a nonempty collection
@@ -50,7 +50,7 @@ TEST(RecordStoreTest, TruncateNonEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
@@ -73,7 +73,7 @@ TEST(RecordStoreTest, TruncateNonEmpty) {
         }
     }
 
-    ASSERT_EQUALS(nToInsert, rs->numRecords());
+    ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -85,7 +85,7 @@ TEST(RecordStoreTest, TruncateNonEmpty) {
         }
     }
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 }
 
 DEATH_TEST(RecordStoreTestDeathTest,

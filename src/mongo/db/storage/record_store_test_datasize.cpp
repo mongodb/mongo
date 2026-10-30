@@ -29,9 +29,9 @@ TEST(RecordStoreTest, DataSizeEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
-    ASSERT(rs->dataSize() == 0);
+    ASSERT(rs->approximateDataSize() == 0);
 }
 
 // Verify that a nonempty collection takes up some space.
@@ -39,7 +39,7 @@ TEST(RecordStoreTest, DataSizeNonEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
@@ -64,10 +64,10 @@ TEST(RecordStoreTest, DataSizeNonEmpty) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(nToInsert, rs->numRecords());
+        ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
     }
 
-    ASSERT(rs->dataSize() > 0);
+    ASSERT(rs->approximateDataSize() > 0);
 }
 
 }  // namespace

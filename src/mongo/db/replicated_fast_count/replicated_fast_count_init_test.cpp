@@ -96,7 +96,7 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
         const char data[] = "value";
         ASSERT_OK(metadataRS->insertRecord(_opCtx, *ru, rid, data, sizeof(data), Timestamp{}));
         wuow.commit();
-        EXPECT_EQ(metadataRS->numRecords(), 1);
+        EXPECT_EQ(metadataRS->approximateNumRecords(), 1);
     }
 
     setUpReplicatedFastCount(_opCtx);

@@ -975,7 +975,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, StorageStatsSubsequentTransactions) {
     StatusWith<RecordId> s = rs->insertRecord(
         opCtx, *shard_role_details::getRecoveryUnit(opCtx), "rec1", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
 
     // Checking the storage stats
     auto storageStats = ru1->computeOperationStatisticsSinceLastCall();
@@ -1012,7 +1012,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsCached) {
     StatusWith<RecordId> s = rs->insertRecord(
         opCtx, *shard_role_details::getRecoveryUnit(opCtx), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
     txn.commit();
 
     // Test 1: A normal read should create a new cursor and release it into the session cache.

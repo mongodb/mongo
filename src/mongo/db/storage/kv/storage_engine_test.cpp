@@ -840,8 +840,8 @@ TEST_F(StorageEngineTest, InternalRecordStoreDoesNotTrackSizeAdjustments) {
         EXPECT_TRUE(s.isOK());
         wuow.commit();
 
-        EXPECT_EQ(rs->numRecords(), 0);
-        EXPECT_EQ(rs->dataSize(), 0);
+        EXPECT_EQ(rs->approximateNumRecords(), 0);
+        EXPECT_EQ(rs->approximateDataSize(), 0);
     };
 
     // Create the internal record store and get its ident.

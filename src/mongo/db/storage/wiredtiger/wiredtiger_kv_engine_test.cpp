@@ -399,7 +399,7 @@ TEST_F(WiredTigerKVEngineTest, SizeStorerFlushesAfterSyncPeriodElapses) {
         }
         txn.commit();
     }
-    EXPECT_EQ(kNumRecords, rs->numRecords());
+    EXPECT_EQ(kNumRecords, rs->approximateNumRecords());
 
     // A fresh size storer reads persisted fast counts directly from the size storer table,
     // bypassing the engine's in-memory buffer.
@@ -1916,7 +1916,7 @@ int64_t insertRecordsAndGetSizeInfoCount(WiredTigerKVEngine* engine,
         }
         txn.commit();
     }
-    return rs->numRecords();
+    return rs->approximateNumRecords();
 }
 
 TEST_F(WiredTigerKVEngineTest, GetRecordStoreTracksSizeAdjustmentsWhenNotUsingReplicatedFastCount) {

@@ -722,7 +722,7 @@ void testTruncateRange(int64_t numRecordsToInsert,
         recordIds.emplace_back(std::move(recordId.getValue()));
     }
 
-    auto sizePerRecord = wtRS->dataSize() / wtRS->numRecords();
+    auto sizePerRecord = wtRS->approximateDataSize() / wtRS->approximateNumRecords();
 
     std::sort(recordIds.begin(), recordIds.end());
 
@@ -740,8 +740,9 @@ void testTruncateRange(int64_t numRecordsToInsert,
                                       -(sizePerRecord * numRecordsDeleted),
                                       -numRecordsDeleted));
 
-        ASSERT_EQ(wtRS->dataSize(), sizePerRecord * (numRecordsToInsert - numRecordsDeleted));
-        ASSERT_EQ(wtRS->numRecords(), (numRecordsToInsert - numRecordsDeleted));
+        ASSERT_EQ(wtRS->approximateDataSize(),
+                  sizePerRecord * (numRecordsToInsert - numRecordsDeleted));
+        ASSERT_EQ(wtRS->approximateNumRecords(), (numRecordsToInsert - numRecordsDeleted));
 
         txn.commit();
     }
@@ -1203,7 +1204,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
                                                   strlen(data),
                                                   Timestamp());
         ASSERT_TRUE(s.isOK());
-        ASSERT_EQUALS(1, rs->numRecords());
+        ASSERT_EQUALS(1, rs->approximateNumRecords());
         txn.commit();
     }
     // Read the record back.
@@ -1220,7 +1221,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
                                    rid,
                                    dataUpdated,
                                    strlen(dataUpdated)));
-        ASSERT_EQUALS(1, rs->numRecords());
+        ASSERT_EQUALS(1, rs->approximateNumRecords());
         txn.commit();
     }
     ASSERT_TRUE(
@@ -1247,16 +1248,16 @@ TEST(WiredTigerRecordStoreTest, AdoptSharedSizeState) {
     auto& source = *checked_cast<WiredTigerRecordStore*>(sourceRs.get());
     auto& adopter = *checked_cast<WiredTigerRecordStore*>(adopterRs.get());
 
-    source.setSize(10, 100);
-    ASSERT_EQ(adopter.numRecords(), 0);
+    source.setApproximateSize(10, 100);
+    ASSERT_EQ(adopter.approximateNumRecords(), 0);
 
     adopter.adoptSharedSizeState_forTest(source);
-    ASSERT_EQ(adopter.numRecords(), 10);
-    ASSERT_EQ(adopter.dataSize(), 100);
+    ASSERT_EQ(adopter.approximateNumRecords(), 10);
+    ASSERT_EQ(adopter.approximateDataSize(), 100);
 
-    source.setSize(42, 420);
-    ASSERT_EQ(adopter.numRecords(), 42);
-    ASSERT_EQ(adopter.dataSize(), 420);
+    source.setApproximateSize(42, 420);
+    ASSERT_EQ(adopter.approximateNumRecords(), 42);
+    ASSERT_EQ(adopter.approximateDataSize(), 420);
 }
 
 TEST(WiredTigerRecordStoreTest, AdoptSharedSizeStateRejectsMismatchedUri) {
@@ -1292,8 +1293,8 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
         txn.commit();
     }
 
-    ASSERT_EQ(1, rs->numRecords());
-    ASSERT_EQ(2, rs->dataSize());
+    ASSERT_EQ(1, rs->approximateNumRecords());
+    ASSERT_EQ(2, rs->approximateDataSize());
 
     StorageWriteTransaction txn(ru);
 
@@ -1325,8 +1326,8 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
     txn.commit();
 
     abortedThread.join();
-    ASSERT_EQ(0, rs->numRecords());
-    ASSERT_EQ(0, rs->dataSize());
+    ASSERT_EQ(0, rs->approximateNumRecords());
+    ASSERT_EQ(0, rs->approximateDataSize());
 }
 
 // Makes sure that when records are inserted with provided recordIds, the
@@ -1361,7 +1362,7 @@ TEST(WiredTigerRecordStoreTest, LargestRecordIdSeenIsCorrectWhenGivenRecordIds) 
     rs->reserveRecordIds(
         ctx.get(), *shard_role_details::getRecoveryUnit(ctx.get()), &reservedRids, 1);
     ASSERT_GT(reservedRids[0].getLong(), RecordId(7).getLong());
-    ASSERT_EQ(1, rs->numRecords());
+    ASSERT_EQ(1, rs->approximateNumRecords());
 
     // Insert a few records at once, where the recordIds are not in order. And ensure that
     // we still reserve recordIds from the right point afterwards.
@@ -1383,7 +1384,7 @@ TEST(WiredTigerRecordStoreTest, LargestRecordIdSeenIsCorrectWhenGivenRecordIds) 
     rs->reserveRecordIds(
         ctx.get(), *shard_role_details::getRecoveryUnit(ctx.get()), &reservedRids, 1);
     ASSERT_GT(reservedRids[0].getLong(), RecordId(14).getLong());
-    ASSERT_EQ(3, rs->numRecords());
+    ASSERT_EQ(3, rs->approximateNumRecords());
 
     // Insert a few records at once, where the recordIds are in order. And ensure that
     // we still reserve recordIds from the right point afterwards.
@@ -1404,7 +1405,7 @@ TEST(WiredTigerRecordStoreTest, LargestRecordIdSeenIsCorrectWhenGivenRecordIds) 
     rs->reserveRecordIds(
         ctx.get(), *shard_role_details::getRecoveryUnit(ctx.get()), &reservedRids, 1);
     ASSERT_GT(reservedRids[0].getLong(), RecordId(20).getLong());
-    ASSERT_EQ(5, rs->numRecords());
+    ASSERT_EQ(5, rs->approximateNumRecords());
 }
 
 // Test WiredTiger fails to create a table, with the configuration string generated by
@@ -1470,37 +1471,37 @@ TEST(WiredTigerRecordStoreTest, AccurateSizeCountDefaultsToZero) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    EXPECT_EQ(rs->accurateNumRecords(), 0);
-    EXPECT_EQ(rs->accurateDataSize(), 0);
+    EXPECT_EQ(rs->numRecords(), 0);
+    EXPECT_EQ(rs->dataSize(), 0);
 }
 
 TEST(WiredTigerRecordStoreTest, SetAccurateSizeCount) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    rs->setAccurateSizeCount(/*size=*/42, /*count=*/1024);
-    EXPECT_EQ(rs->accurateDataSize(), 42);
-    EXPECT_EQ(rs->accurateNumRecords(), 1024);
+    rs->setSizeCount(/*size=*/42, /*count=*/1024);
+    EXPECT_EQ(rs->dataSize(), 42);
+    EXPECT_EQ(rs->numRecords(), 1024);
 
     // Overwrite with new values.
-    rs->setAccurateSizeCount(/*size=*/100, /*count=*/5000);
-    EXPECT_EQ(rs->accurateDataSize(), 100);
-    EXPECT_EQ(rs->accurateNumRecords(), 5000);
+    rs->setSizeCount(/*size=*/100, /*count=*/5000);
+    EXPECT_EQ(rs->dataSize(), 100);
+    EXPECT_EQ(rs->numRecords(), 5000);
 }
 
 TEST(WiredTigerRecordStoreTest, AdjustAccurateSizeCount) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    rs->setAccurateSizeCount(/*size=*/10, /*count=*/500);
-    rs->adjustAccurateSizeCount(/*sizeDelta=*/5, /*countDelta=*/200);
-    EXPECT_EQ(rs->accurateDataSize(), 10 + 5);
-    EXPECT_EQ(rs->accurateNumRecords(), 500 + 200);
+    rs->setSizeCount(/*size=*/10, /*count=*/500);
+    rs->adjustSizeCount(/*sizeDelta=*/5, /*countDelta=*/200);
+    EXPECT_EQ(rs->dataSize(), 10 + 5);
+    EXPECT_EQ(rs->numRecords(), 500 + 200);
 
     // Negative adjustments.
-    rs->adjustAccurateSizeCount(/*sizeDelta=*/-3, /*countDelta=*/-100);
-    EXPECT_EQ(rs->accurateDataSize(), 10 + 5 - 3);
-    EXPECT_EQ(rs->accurateNumRecords(), 500 + 200 - 100);
+    rs->adjustSizeCount(/*sizeDelta=*/-3, /*countDelta=*/-100);
+    EXPECT_EQ(rs->dataSize(), 10 + 5 - 3);
+    EXPECT_EQ(rs->numRecords(), 500 + 200 - 100);
 }
 
 TEST(WiredTigerRecordStoreTest, NumRecordsAndDataSizeUseAccurateValuesWhenNoSizeStorer) {
@@ -1511,17 +1512,17 @@ TEST(WiredTigerRecordStoreTest, NumRecordsAndDataSizeUseAccurateValuesWhenNoSize
     wtRS->setSizeStorer(nullptr);
 
     // Accurate values.
-    rs->setAccurateSizeCount(/*size=*/42, /*count=*/1024);
+    rs->setSizeCount(/*size=*/42, /*count=*/1024);
 
     // Values stored in _sizeInfo.
-    rs->setSize(/*numRecords=*/24, /*dataSize=*/512);
+    rs->setApproximateSize(/*numRecords=*/24, /*dataSize=*/512);
 
     // numRecords()/dataSize() return the accurate values.
+    EXPECT_EQ(rs->approximateNumRecords(), 1024);
+    EXPECT_EQ(rs->approximateDataSize(), 42);
+
     EXPECT_EQ(rs->numRecords(), 1024);
     EXPECT_EQ(rs->dataSize(), 42);
-
-    EXPECT_EQ(rs->accurateNumRecords(), 1024);
-    EXPECT_EQ(rs->accurateDataSize(), 42);
 }
 
 }  // namespace

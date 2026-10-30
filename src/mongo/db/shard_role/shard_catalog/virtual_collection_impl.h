@@ -456,21 +456,21 @@ public:
     }
 
     long long numRecords(OperationContext* opCtx) const final {
-        return _shared->_recordStore->numRecords();
+        return _shared->_recordStore->approximateNumRecords();
     }
 
     long long dataSize(OperationContext* opCtx) const final {
-        return _shared->_recordStore->dataSize();
+        return _shared->_recordStore->approximateDataSize();
     }
 
     CollectionSizeCount latestSizeCount(OperationContext* opCtx) const final {
-        return CollectionSizeCount{_shared->_recordStore->dataSize(),
-                                   _shared->_recordStore->numRecords()};
+        return CollectionSizeCount{_shared->_recordStore->approximateDataSize(),
+                                   _shared->_recordStore->approximateNumRecords()};
     }
 
     CollectionSizeCount persistedSizeCount(OperationContext* opCtx) const final {
-        return CollectionSizeCount{_shared->_recordStore->dataSize(),
-                                   _shared->_recordStore->numRecords()};
+        return CollectionSizeCount{_shared->_recordStore->approximateDataSize(),
+                                   _shared->_recordStore->approximateNumRecords()};
     }
 
     int64_t sizeOnDisk(OperationContext* opCtx, const StorageEngine& storageEngine) const final {
@@ -478,7 +478,7 @@ public:
     }
 
     bool isEmpty(OperationContext* opCtx) const final {
-        return _shared->_recordStore->dataSize() == 0LL;
+        return _shared->_recordStore->approximateDataSize() == 0LL;
     }
 
     inline int averageObjectSize(OperationContext* opCtx) const override {

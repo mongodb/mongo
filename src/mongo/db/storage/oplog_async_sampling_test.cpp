@@ -207,7 +207,7 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampling) 
         // Force initialize the oplog truncate markers to use sampling by providing very large,
         // inaccurate sizes. This should cause us to over sample the records in the oplog.
         ASSERT_OK(rs->oplog()->updateSize(1024 * 1024 * 1024));
-        rs->setSize(/*numRecords=*/1024 * 1024, /*dataSize=*/1024 * 1024 * 1024);
+        rs->setApproximateSize(/*numRecords=*/1024 * 1024, /*dataSize=*/1024 * 1024 * 1024);
     }
 
     LocalOplogInfo::get(opCtx)->setRecordStore(opCtx, rs);

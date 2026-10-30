@@ -719,18 +719,18 @@ void WiredTigerRecordStore::checkSize(OperationContext* opCtx, RecoveryUnit& ru)
         _sizeStorer->store(getURI(), _sizeInfo);
 }
 
-long long WiredTigerRecordStore::dataSize() const {
+long long WiredTigerRecordStore::approximateDataSize() const {
     if (!_sizeStorer) {
-        return _accurateDataSize.load();
+        return _dataSize.load();
     }
 
     auto dataSize = _sizeInfo->dataSize.load();
     return dataSize > 0 ? dataSize : 0;
 }
 
-long long WiredTigerRecordStore::numRecords() const {
+long long WiredTigerRecordStore::approximateNumRecords() const {
     if (!_sizeStorer) {
-        return _accurateNumRecords.load();
+        return _numRecords.load();
     }
 
     auto numRecords = _sizeInfo->numRecords.load();
@@ -753,7 +753,7 @@ int64_t WiredTigerRecordStore::storageSize(RecoveryUnit& ru,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel) const {
     if (_inMemory) {
-        return dataSize();
+        return approximateDataSize();
     }
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
     auto result = WiredTigerUtil::getStatisticsValue(
@@ -1108,7 +1108,7 @@ Status WiredTigerRecordStore::_truncate(OperationContext* opCtx, RecoveryUnit& r
     }
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     wtTruncate(opCtx, wtRu);
-    _changeNumRecordsAndDataSize(wtRu, -numRecords(), -dataSize());
+    _changeNumRecordsAndDataSize(wtRu, -approximateNumRecords(), -approximateDataSize());
     return Status::OK();
 }
 
@@ -1389,7 +1389,7 @@ void WiredTigerRecordStore::_changeNumRecordsAndDataSize(RecoveryUnit& ru,
     updateAndStoreSizeInfo(numRecordDiff, dataSizeDiff);
 }
 
-void WiredTigerRecordStore::setSize(long long numRecords, long long dataSize) {
+void WiredTigerRecordStore::setApproximateSize(long long numRecords, long long dataSize) {
     _sizeInfo->numRecords.store(std::max(numRecords, 0ll));
     _sizeInfo->dataSize.store(std::max(dataSize, 0ll));
 
@@ -1403,22 +1403,22 @@ void WiredTigerRecordStore::setSize(long long numRecords, long long dataSize) {
     _sizeStorer->flush(syncToDisk);
 }
 
-int64_t WiredTigerRecordStore::accurateNumRecords() const {
-    return _accurateNumRecords.load();
+int64_t WiredTigerRecordStore::numRecords() const {
+    return _numRecords.load();
 }
 
-int64_t WiredTigerRecordStore::accurateDataSize() const {
-    return _accurateDataSize.load();
+int64_t WiredTigerRecordStore::dataSize() const {
+    return _dataSize.load();
 }
 
-void WiredTigerRecordStore::setAccurateSizeCount(int64_t size, int64_t count) {
-    _accurateDataSize.store(size);
-    _accurateNumRecords.store(count);
+void WiredTigerRecordStore::setSizeCount(int64_t size, int64_t count) {
+    _dataSize.store(size);
+    _numRecords.store(count);
 }
 
-void WiredTigerRecordStore::adjustAccurateSizeCount(int64_t sizeDelta, int64_t countDelta) {
-    _accurateDataSize.addAndFetch(sizeDelta);
-    _accurateNumRecords.addAndFetch(countDelta);
+void WiredTigerRecordStore::adjustSizeCount(int64_t sizeDelta, int64_t countDelta) {
+    _dataSize.addAndFetch(sizeDelta);
+    _numRecords.addAndFetch(countDelta);
 }
 
 std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::getCursor(OperationContext* opCtx,

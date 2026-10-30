@@ -505,7 +505,7 @@ int64_t EphemeralForTestRecordStore::storageSize(RecoveryUnit&,
                                                  int infoLevel) const {
     // Note: not making use of extraInfo or infoLevel since we don't have extents
     std::lock_guard<std::recursive_mutex> lock(_data->mutex);
-    const int64_t recordOverhead = numRecords() * sizeof(EphemeralForTestRecord);
+    const int64_t recordOverhead = approximateNumRecords() * sizeof(EphemeralForTestRecord);
     return _data->dataSize + recordOverhead;
 }
 

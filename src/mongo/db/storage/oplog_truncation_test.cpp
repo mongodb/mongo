@@ -250,13 +250,13 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Truncate) {
     EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
     EXPECT_EQ(size, oplogTruncateMarkers->currentBytes_forTest());
 
-    EXPECT_EQ(count, rs->numRecords());
-    EXPECT_EQ(size * count, rs->dataSize());
+    EXPECT_EQ(count, rs->approximateNumRecords());
+    EXPECT_EQ(size * count, rs->approximateDataSize());
 
     ASSERT_OK(storage.truncateCollection(opCtx, oplogNs));
 
-    EXPECT_EQ(0, rs->dataSize());
-    EXPECT_EQ(0, rs->numRecords());
+    EXPECT_EQ(0, rs->approximateDataSize());
+    EXPECT_EQ(0, rs->approximateNumRecords());
     EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
     EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
     EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
@@ -358,8 +358,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
         insertOplog(9, 150);
         storage.oplogDiskLocRegister(opCtx, Timestamp{1, 9}, true);
 
-        EXPECT_EQ(9, rs->numRecords());
-        EXPECT_EQ(2600, rs->dataSize());
+        EXPECT_EQ(9, rs->approximateNumRecords());
+        EXPECT_EQ(2600, rs->approximateDataSize());
         EXPECT_EQ(2U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(3, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(300, oplogTruncateMarkers->currentBytes_forTest());
@@ -381,8 +381,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);
 
-        EXPECT_EQ(7, rs->numRecords());
-        EXPECT_EQ(2350, rs->dataSize());
+        EXPECT_EQ(7, rs->approximateNumRecords());
+        EXPECT_EQ(2350, rs->approximateDataSize());
         EXPECT_EQ(2U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
@@ -402,8 +402,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);
 
-        EXPECT_EQ(5, rs->numRecords());
-        EXPECT_EQ(1950, rs->dataSize());
+        EXPECT_EQ(5, rs->approximateNumRecords());
+        EXPECT_EQ(1950, rs->approximateDataSize());
         EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(3, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(750, oplogTruncateMarkers->currentBytes_forTest());
@@ -416,8 +416,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // being filled.
     {
         recovery.truncateOplogToTimestamp(opCtx, Timestamp(1, 3));
-        EXPECT_EQ(3, rs->numRecords());
-        EXPECT_EQ(1400, rs->dataSize());
+        EXPECT_EQ(3, rs->approximateNumRecords());
+        EXPECT_EQ(1400, rs->approximateDataSize());
         EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(200, oplogTruncateMarkers->currentBytes_forTest());
@@ -428,8 +428,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // The truncate marker should remain intact.
     {
         recovery.truncateOplogToTimestamp(opCtx, Timestamp(1, 2));
-        EXPECT_EQ(2, rs->numRecords());
-        EXPECT_EQ(1200, rs->dataSize());
+        EXPECT_EQ(2, rs->approximateNumRecords());
+        EXPECT_EQ(1200, rs->approximateDataSize());
         EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
@@ -439,8 +439,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // truncate marker should become the one currently being filled.
     {
         recovery.truncateOplogToTimestamp(opCtx, Timestamp(1, 1));
-        EXPECT_EQ(1, rs->numRecords());
-        EXPECT_EQ(400, rs->dataSize());
+        EXPECT_EQ(1, rs->approximateNumRecords());
+        EXPECT_EQ(400, rs->approximateDataSize());
         EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(400, oplogTruncateMarkers->currentBytes_forTest());
@@ -472,8 +472,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         insertOplog(2, 110);
         insertOplog(3, 120);
 
-        EXPECT_EQ(3, rs->numRecords());
-        EXPECT_EQ(330, rs->dataSize());
+        EXPECT_EQ(3, rs->approximateNumRecords());
+        EXPECT_EQ(330, rs->approximateDataSize());
         EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
@@ -490,8 +490,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         EXPECT_EQ(RecordId(), truncatedUpTo);
         EXPECT_EQ(Timestamp(1, 1), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        EXPECT_EQ(3, rs->numRecords());
-        EXPECT_EQ(330, rs->dataSize());
+        EXPECT_EQ(3, rs->approximateNumRecords());
+        EXPECT_EQ(330, rs->approximateDataSize());
         EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
@@ -506,8 +506,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         EXPECT_EQ(RecordId(1, 1), truncatedUpTo);
         EXPECT_EQ(Timestamp(1, 2), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        EXPECT_EQ(2, rs->numRecords());
-        EXPECT_EQ(230, rs->dataSize());
+        EXPECT_EQ(2, rs->approximateNumRecords());
+        EXPECT_EQ(230, rs->approximateDataSize());
         EXPECT_EQ(2U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
@@ -518,8 +518,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         insertOplog(5, 140);
         insertOplog(6, 50);
 
-        EXPECT_EQ(5, rs->numRecords());
-        EXPECT_EQ(550, rs->dataSize());
+        EXPECT_EQ(5, rs->approximateNumRecords());
+        EXPECT_EQ(550, rs->approximateDataSize());
         EXPECT_EQ(4U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
@@ -534,8 +534,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         EXPECT_EQ(RecordId(1, 4), truncatedUpTo);
         EXPECT_EQ(Timestamp(1, 5), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        EXPECT_EQ(2, rs->numRecords());
-        EXPECT_EQ(190, rs->dataSize());
+        EXPECT_EQ(2, rs->approximateNumRecords());
+        EXPECT_EQ(190, rs->approximateDataSize());
         EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
@@ -550,8 +550,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         EXPECT_EQ(RecordId(), truncatedUpTo);
         EXPECT_EQ(Timestamp(1, 5), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        EXPECT_EQ(2, rs->numRecords());
-        EXPECT_EQ(190, rs->dataSize());
+        EXPECT_EQ(2, rs->approximateNumRecords());
+        EXPECT_EQ(190, rs->approximateDataSize());
         EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
@@ -563,8 +563,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         insertOplog(7, 190);
         insertOplog(9, 120);
 
-        EXPECT_EQ(4, rs->numRecords());
-        EXPECT_EQ(500, rs->dataSize());
+        EXPECT_EQ(4, rs->approximateNumRecords());
+        EXPECT_EQ(500, rs->approximateDataSize());
         EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
@@ -577,8 +577,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         EXPECT_EQ(RecordId(1, 5), truncatedUpTo);
         EXPECT_EQ(Timestamp(1, 6), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        EXPECT_EQ(3, rs->numRecords());
-        EXPECT_EQ(360, rs->dataSize());
+        EXPECT_EQ(3, rs->approximateNumRecords());
+        EXPECT_EQ(360, rs->approximateDataSize());
         EXPECT_EQ(2U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
@@ -589,8 +589,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         insertOplog(10, 90);
         insertOplog(11, 210);
 
-        EXPECT_EQ(5, rs->numRecords());
-        EXPECT_EQ(660, rs->dataSize());
+        EXPECT_EQ(5, rs->approximateNumRecords());
+        EXPECT_EQ(660, rs->approximateDataSize());
         EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
@@ -604,8 +604,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         EXPECT_EQ(RecordId(1, 9), truncatedUpTo);
         EXPECT_EQ(Timestamp(1, 10), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        EXPECT_EQ(2, rs->numRecords());
-        EXPECT_EQ(300, rs->dataSize());
+        EXPECT_EQ(2, rs->approximateNumRecords());
+        EXPECT_EQ(300, rs->approximateDataSize());
         EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
@@ -617,8 +617,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         // Use timestamp (1, 13) as we can't commit at the stable timestamp (1, 12).
         insertOplog(13, 90);
 
-        EXPECT_EQ(3, rs->numRecords());
-        EXPECT_EQ(390, rs->dataSize());
+        EXPECT_EQ(3, rs->approximateNumRecords());
+        EXPECT_EQ(390, rs->approximateDataSize());
         EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(90, oplogTruncateMarkers->currentBytes_forTest());
@@ -631,8 +631,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         EXPECT_EQ(RecordId(1, 11), truncatedUpTo);
         EXPECT_EQ(Timestamp(1, 13), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        EXPECT_EQ(1, rs->numRecords());
-        EXPECT_EQ(90, rs->dataSize());
+        EXPECT_EQ(1, rs->approximateNumRecords());
+        EXPECT_EQ(90, rs->approximateDataSize());
         EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(90, oplogTruncateMarkers->currentBytes_forTest());
@@ -775,8 +775,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_TestReclaimOverPreviouslyTrunca
         insertOplog(2, 110);
         insertOplog(3, 120);
 
-        EXPECT_EQ(3, rs->numRecords());
-        EXPECT_EQ(330, rs->dataSize());
+        EXPECT_EQ(3, rs->approximateNumRecords());
+        EXPECT_EQ(330, rs->approximateDataSize());
         EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
@@ -793,8 +793,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_TestReclaimOverPreviouslyTrunca
         LocalOplogInfo::get(opCtx)->setTruncateMarkers(oplogTruncateMarkers);
         wuow.commit();
 
-        EXPECT_EQ(0, rs->numRecords());
-        EXPECT_EQ(0, rs->dataSize());
+        EXPECT_EQ(0, rs->approximateNumRecords());
+        EXPECT_EQ(0, rs->approximateDataSize());
         EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
     }
 
@@ -803,8 +803,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_TestReclaimOverPreviouslyTrunca
         insertOplog(5, 110);
         insertOplog(6, 120);
 
-        EXPECT_EQ(3, rs->numRecords());
-        EXPECT_EQ(330, rs->dataSize());
+        EXPECT_EQ(3, rs->approximateNumRecords());
+        EXPECT_EQ(330, rs->approximateDataSize());
         EXPECT_EQ(6U, oplogTruncateMarkers->numMarkers());
         EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
         EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
@@ -949,7 +949,7 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning)
 
     // Force the estimates of 'dataSize' and 'numRecords' to be lower than the real values.
     long long fakeNumRecords = realNumRecords - 1;
-    rs->setSize(fakeNumRecords, fakeNumRecords * realSizePerRecord);
+    rs->setApproximateSize(fakeNumRecords, fakeNumRecords * realSizePerRecord);
 
     // Re-initialize the truncate markers.
     LocalOplogInfo::get(opCtx)->setRecordStore(opCtx, rs);
@@ -966,8 +966,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning)
     // A forced scan over the RecordStore should force the 'currentBytes' to be accurate in the
     // truncate markers as well as the RecordStore's 'numRecords' and 'dataSize'.
     EXPECT_EQ(oplogTruncateMarkers->currentBytes_forTest(), realNumRecords * realSizePerRecord);
-    EXPECT_EQ(rs->dataSize(), realNumRecords * realSizePerRecord);
-    EXPECT_EQ(rs->numRecords(), realNumRecords);
+    EXPECT_EQ(rs->approximateDataSize(), realNumRecords * realSizePerRecord);
+    EXPECT_EQ(rs->approximateNumRecords(), realNumRecords);
 }
 
 // Ensure that if we sample and create duplicate oplog truncate markers, perform truncation
@@ -995,7 +995,7 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Duplicates) {
         // Force initialize the oplog truncate markers to use sampling by providing very large,
         // inaccurate sizes. This should cause us to over sample the records in the oplog.
         ASSERT_OK(rs->oplog()->updateSize(1024 * 1024 * 1024));
-        rs->setSize(/*numRecords=*/1024 * 1024, /*dataSize=*/1024 * 1024 * 1024);
+        rs->setApproximateSize(/*numRecords=*/1024 * 1024, /*dataSize=*/1024 * 1024 * 1024);
     }
 
     // Confirm that some truncate markers were generated.
@@ -1039,8 +1039,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Duplicates) {
         EXPECT_EQ(1, oplogTruncateMarkers->numMarkers());
 
         // The original oplog should have rolled over and the size and count should be accurate.
-        EXPECT_EQ(1, rs->numRecords());
-        EXPECT_EQ(100, rs->dataSize());
+        EXPECT_EQ(1, rs->approximateNumRecords());
+        EXPECT_EQ(100, rs->approximateDataSize());
     }
 }
 

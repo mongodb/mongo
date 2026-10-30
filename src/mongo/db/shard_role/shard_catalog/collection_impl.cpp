@@ -1035,16 +1035,15 @@ long long CollectionImpl::getCappedMaxSize() const {
 
 long long CollectionImpl::numRecords(OperationContext* opCtx) const {
     return (shouldReadFromReplicatedFastCount(opCtx, _ns))
-        ? _shared->_recordStore->accurateNumRecords() +
+        ? _shared->_recordStore->numRecords() +
             UncommittedFastCountChanges::find(opCtx, uuid()).count
-        : _shared->_recordStore->numRecords();
+        : _shared->_recordStore->approximateNumRecords();
 }
 
 long long CollectionImpl::dataSize(OperationContext* opCtx) const {
     return (shouldReadFromReplicatedFastCount(opCtx, _ns))
-        ? _shared->_recordStore->accurateDataSize() +
-            UncommittedFastCountChanges::find(opCtx, uuid()).size
-        : _shared->_recordStore->dataSize();
+        ? _shared->_recordStore->dataSize() + UncommittedFastCountChanges::find(opCtx, uuid()).size
+        : _shared->_recordStore->approximateDataSize();
 }
 
 CollectionSizeCount CollectionImpl::latestSizeCount(OperationContext* opCtx) const {
@@ -1053,8 +1052,8 @@ CollectionSizeCount CollectionImpl::latestSizeCount(OperationContext* opCtx) con
 
 CollectionSizeCount CollectionImpl::persistedSizeCount(OperationContext* opCtx) const {
     if (!shouldReadFromReplicatedFastCount(opCtx, _ns)) {
-        return CollectionSizeCount{_shared->_recordStore->dataSize(),
-                                   _shared->_recordStore->numRecords()};
+        return CollectionSizeCount{_shared->_recordStore->approximateDataSize(),
+                                   _shared->_recordStore->approximateNumRecords()};
     }
 
     auto persisted =

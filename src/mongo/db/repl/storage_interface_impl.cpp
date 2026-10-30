@@ -1549,7 +1549,7 @@ Status StorageInterfaceImpl::setCollectionCount(OperationContext* opCtx,
     auto rs = collection->getRecordStore();
     // We cannot fix the data size correctly, so we just get the current cached value and keep it
     // the same.
-    long long dataSize = rs->dataSize();
+    long long dataSize = rs->approximateDataSize();
     rs->updateStatsAfterRepair(newCount, dataSize);
     return Status::OK();
 }

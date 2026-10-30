@@ -340,7 +340,7 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
             }
 
             if (auto it = accumulator.find(coll->uuid()); it != accumulator.end()) {
-                coll->getRecordStore()->setAccurateSizeCount(it->second.size, it->second.count);
+                coll->getRecordStore()->setSizeCount(it->second.size, it->second.count);
             } else {
                 // The oplog collection can have a different UUID on every node. When this happens,
                 // the accumulator will not contain an entry for this node's oplog UUID because the
@@ -441,7 +441,7 @@ void ReplicatedFastCountManager::finalizeMetadataFromInitialSync(OperationContex
                 size += it->second.size;
                 count += it->second.count;
             }
-            recordStore->setAccurateSizeCount(size, count);
+            recordStore->setSizeCount(size, count);
             ++numFromCheckpoint;
         }
     }
@@ -461,7 +461,7 @@ void ReplicatedFastCountManager::commit(OperationContext* opCtx,
         invariant(change.recordStore,
                   fmt::format("Missing RecordStore for fast count change on collection {}",
                               uuid.toString()));
-        change.recordStore->adjustAccurateSizeCount(change.delta.size, change.delta.count);
+        change.recordStore->adjustSizeCount(change.delta.size, change.delta.count);
         // TODO SERVER-120203: Re-enable this invariant once outstanding bugs are fixed.
         // invariant(stored.metadata.sizeCount.size >= 0 && stored.metadata.sizeCount.count >= 0,
         //           fmt::format("Expected fast count size and count to be non-negative, but saw

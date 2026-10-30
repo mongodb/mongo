@@ -958,7 +958,7 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
         ASSERT_OK(res);
         ridA = res.getValue();
         uow.commit();
-        ASSERT_EQUALS(1, rs->numRecords());
+        ASSERT_EQUALS(1, rs->approximateNumRecords());
     }
 
     {
@@ -988,7 +988,7 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
                              Timestamp(3, 3));
         ASSERT_OK(swRid);
         ridB = swRid.getValue();
-        ASSERT_EQUALS(2, rs->numRecords());
+        ASSERT_EQUALS(2, rs->approximateNumRecords());
         uow.commit();
     }
 
@@ -1009,7 +1009,7 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
         ASSERT_EQ(std::string("abc"), rd.data());
         ASSERT_FALSE(rs->findRecord(
             opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), ridB, nullptr));
-        ASSERT_EQUALS(2, rs->numRecords());
+        ASSERT_EQUALS(2, rs->approximateNumRecords());
     }
 }
 

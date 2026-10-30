@@ -72,31 +72,31 @@ public:
         return "devnull";
     }
 
-    long long dataSize() const override {
+    long long approximateDataSize() const override {
         return 0;
     }
 
-    long long numRecords() const override {
+    long long approximateNumRecords() const override {
         return 0;
     }
 
-    void setSize(long long numRecords, long long dataSize) override {
+    void setApproximateSize(long long numRecords, long long dataSize) override {
         // Do nothing.
     }
 
-    int64_t accurateNumRecords() const override {
+    int64_t numRecords() const override {
         return 0;
     }
 
-    int64_t accurateDataSize() const override {
+    int64_t dataSize() const override {
         return 0;
     }
 
-    void setAccurateSizeCount(int64_t, int64_t) override {
+    void setSizeCount(int64_t, int64_t) override {
         // Do nothing.
     }
 
-    void adjustAccurateSizeCount(int64_t, int64_t) override {
+    void adjustSizeCount(int64_t, int64_t) override {
         // Do nothing.
     }
 

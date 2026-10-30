@@ -112,8 +112,8 @@ void checkCommittedSizeCount(OperationContext* opCtx,
     const Collection* collection = catalog->lookupCollectionByUUID(opCtx, uuid);
     invariant(collection);
     const RecordStore* recordStore = collection->getRecordStore();
-    EXPECT_EQ(recordStore->accurateNumRecords(), expectedSizeCount.count);
-    EXPECT_EQ(recordStore->accurateDataSize(), expectedSizeCount.size);
+    EXPECT_EQ(recordStore->numRecords(), expectedSizeCount.count);
+    EXPECT_EQ(recordStore->dataSize(), expectedSizeCount.size);
 }
 
 void insertDocs(OperationContext* opCtx,

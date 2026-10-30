@@ -164,9 +164,9 @@ public:
         return std::visit([](const auto& v) -> uint64_t { return v.tableId(); }, _container);
     }
 
-    long long dataSize() const override;
+    long long approximateDataSize() const override;
 
-    long long numRecords() const override;
+    long long approximateNumRecords() const override;
 
     void adoptSharedSizeState_forTest(const RecordStore& source) override;
 
@@ -234,12 +234,12 @@ public:
     /**
      * Sets the new number of records and data size, and flushes the size storer.
      */
-    void setSize(long long numRecords, long long dataSize) override;
+    void setApproximateSize(long long numRecords, long long dataSize) override;
 
-    int64_t accurateNumRecords() const override;
-    int64_t accurateDataSize() const override;
-    void setAccurateSizeCount(int64_t size, int64_t count) override;
-    void adjustAccurateSizeCount(int64_t sizeDelta, int64_t countDelta) override;
+    int64_t numRecords() const override;
+    int64_t dataSize() const override;
+    void setSizeCount(int64_t size, int64_t count) override;
+    void adjustSizeCount(int64_t sizeDelta, int64_t countDelta) override;
 
     RecordStore::RecordStoreContainer getContainer() override;
 
@@ -389,11 +389,10 @@ protected:
     bool _tracksSizeAdjustments;
     WiredTigerKVEngineBase* _kvEngine;  // not owned.
 
-    // Accurate size and count, maintained separately from the legacy SizeInfo-based counters.
-    // These counters are populated in ReplicatedFastCountManager::initializeMetadata() during
-    // startup and updated on each WriteUnitOfWork commit.
-    Atomic<int64_t> _accurateDataSize{0};
-    Atomic<int64_t> _accurateNumRecords{0};
+    // Size and count maintained separately from the legacy SizeInfo-based counters.
+    // These counters are populated during startup and updated on each WriteUnitOfWork commit.
+    Atomic<int64_t> _dataSize{0};
+    Atomic<int64_t> _numRecords{0};
 
 private:
     std::variant<WiredTigerIntegerKeyedContainer, WiredTigerStringKeyedContainer> _makeContainer(

@@ -293,7 +293,7 @@ CatalogStats createCatalogStats(OperationContext* opCtx, const MultipleCollectio
         const boost::optional<double> approxNumLeafPages{recordStore->approxNumLeafPages(ru)};
         // TODO SERVER-117620: set .pageSizeBytes.
         collStats.emplace(coll->ns(),
-                          CollectionStats{static_cast<double>(recordStore->dataSize()),
+                          CollectionStats{static_cast<double>(recordStore->approximateDataSize()),
                                           static_cast<double>(recordStore->storageSize(ru) -
                                                               recordStore->freeStorageSize(ru)),
                                           kDefaultPageSizeBytes,

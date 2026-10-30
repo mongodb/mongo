@@ -830,7 +830,7 @@ TEST_F(CollectionMarkersTest, CursorYieldsAndIgnoresNewRecords) {
     }
 
     EXPECT_EQ(seenRecords, initialRecords);
-    EXPECT_LT(static_cast<long long>(seenRecords), coll->getRecordStore()->numRecords());
+    EXPECT_LT(static_cast<long long>(seenRecords), coll->getRecordStore()->approximateNumRecords());
 }
 
 // Test that random cursors will yield periodically. Since random cursors will see records added

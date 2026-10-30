@@ -148,7 +148,7 @@ void ValidateAdaptorParallel::traverseRecordStore(OperationContext* opCtx,
                                                   ValidationVersion validationVersion) {
     auto& validateState = getValidateState();
     const auto& coll = validateState.getCollection();
-    const int64_t totalRecords = coll->getRecordStore()->numRecords();
+    const int64_t totalRecords = coll->getRecordStore()->approximateNumRecords();
 
     int64_t dataSizeTotal{0};
     int64_t numRecords{0};

@@ -46,7 +46,7 @@ SamplingEstimatorMap makeSamplingEstimators(
         const auto& nss = node.accessPath->nss();
         if (samplingEstimators.find(nss) == samplingEstimators.end()) {
             cost_based_ranker::CardinalityType numRecords{static_cast<double>(
-                collections.lookupCollection(nss)->getRecordStore()->numRecords())};
+                collections.lookupCollection(nss)->getRecordStore()->approximateNumRecords())};
 
             const auto& cq = node.accessPath;
             const auto& qkc = cq->getExpCtx()->getQueryKnobConfiguration();

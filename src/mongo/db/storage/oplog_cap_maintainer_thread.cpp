@@ -227,7 +227,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
         LOGV2_DEBUG(10621107,
                     2,
                     "Looking for excess documents to delete",
-                    "oplogSizeBytes"_attr = rs->dataSize());
+                    "approximateOplogSizeBytes"_attr = rs->approximateDataSize());
 
         // Create another reference to the oplog truncate markers while holding a lock on
         // the collection to prevent it from being destructed.
@@ -268,8 +268,8 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
         LOGV2(22402,
               "Oplog truncation finished",
               "pinnedOplogTimestamp"_attr = mayTruncateUpTo,
-              "numRecords"_attr = rs->numRecords(),
-              "dataSize"_attr = rs->dataSize(),
+              "approximateNumRecords"_attr = rs->approximateNumRecords(),
+              "approximateDataSize"_attr = rs->approximateDataSize(),
               "duration"_attr = Milliseconds(elapsedMillis));
     }
 

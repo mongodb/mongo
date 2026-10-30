@@ -3531,7 +3531,7 @@ public:
             ASSERT_EQ(3, results.getNumRemovedCorruptRecords());
 
             // Check that the corrupted records have been removed from the record store.
-            ASSERT_EQ(0, rs->numRecords());
+            ASSERT_EQ(0, rs->approximateNumRecords());
 
             dumpOnErrorGuard.dismiss();
         }

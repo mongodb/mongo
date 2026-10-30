@@ -30,7 +30,7 @@ TEST(RecordStoreTest, InsertRecord) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords());
+        ASSERT_EQUALS(0, rs->approximateNumRecords());
     }
 
     string data = "my record";
@@ -52,7 +52,7 @@ TEST(RecordStoreTest, InsertRecord) {
         }
     }
 
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
 }
 
 // Insert multiple records and verify the number of entries in the collection
@@ -61,7 +61,7 @@ TEST(RecordStoreTest, InsertMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
@@ -86,7 +86,7 @@ TEST(RecordStoreTest, InsertMultipleRecords) {
         }
     }
 
-    ASSERT_EQUALS(nToInsert, rs->numRecords());
+    ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
 }
 
 // Insert a record with duplicated key and verify we got a DuplicateKeyError when allowOverwrite is
@@ -98,7 +98,7 @@ TEST(RecordStoreTest, InsertRecordDuplicateKey) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     // Insert an initial record
     auto data = BSON("_id" << 1);
@@ -111,7 +111,7 @@ TEST(RecordStoreTest, InsertRecordDuplicateKey) {
         loc = res.getValue();
         txn.commit();
     }
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
 
     // Insert another record with the same record id
     auto newData = BSON("_id" << 2);
@@ -127,7 +127,7 @@ TEST(RecordStoreTest, InsertRecordDuplicateKey) {
         ASSERT_EQUALS(ErrorCodes::DuplicateKey, res.getStatus());
         txn.abort();
     }
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
 
     // Verify that the data was unchanged
     auto cursor = rs->getCursor(opCtx.get(), ru);

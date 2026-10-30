@@ -150,8 +150,8 @@ void fillOutPlannerCollectionInfo(OperationContext* opCtx,
         // We only include these sometimes, since they are slightly expensive to compute.
         auto recordStore = collection->getRecordStore();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        out->noOfRecords = recordStore->numRecords();
-        out->approximateDataSizeBytes = recordStore->dataSize();
+        out->noOfRecords = recordStore->approximateNumRecords();
+        out->approximateDataSizeBytes = recordStore->approximateDataSize();
         out->storageSizeBytes = recordStore->storageSize(ru);
     }
 }
@@ -441,10 +441,10 @@ void QueryPlannerParams::fillOutSecondaryCollectionsInfo(
                 if (maxScanBytes >= 0) {
                     const bool ignore = nss.isSystem() || nss.isOnInternalDb();
                     if (!ignore && secondaryColl &&
-                        secondaryColl->getRecordStore()->dataSize() > maxScanBytes) {
+                        secondaryColl->getRecordStore()->approximateDataSize() > maxScanBytes) {
                         secondaryInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
                         secondaryInfo.maxEstimatedScanBytesCollectionSize =
-                            secondaryColl->getRecordStore()->dataSize();
+                            secondaryColl->getRecordStore()->approximateDataSize();
                         secondaryInfo.maxEstimatedScanBytesThreshold = maxScanBytes;
                         if (QueryKnobConfiguration::get(opCtx).getMaxEstimatedScanBytesDryRun()) {
                             secondaryInfo.options |=
@@ -524,7 +524,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
         const auto& nss = canonicalQuery.nss();
         const bool ignore = nss.isSystem() || nss.isOnInternalDb();
         if (maxScanBytes >= 0 && mainColl && !ignore &&
-            mainColl->getRecordStore()->dataSize() > maxScanBytes) {
+            mainColl->getRecordStore()->approximateDataSize() > maxScanBytes) {
             // A $natural hint in the command overrides the rejection.
             const auto& hint = canonicalQuery.getFindCommandRequest().getHint();
             if (!hint.isEmpty() && hint[query_request_helper::kNaturalSortField]) {
@@ -532,7 +532,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
             } else {
                 mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
                 mainCollectionInfo.maxEstimatedScanBytesCollectionSize =
-                    mainColl->getRecordStore()->dataSize();
+                    mainColl->getRecordStore()->approximateDataSize();
                 mainCollectionInfo.maxEstimatedScanBytesThreshold = maxScanBytes;
                 if (QueryKnobConfiguration::get(opCtx).getMaxEstimatedScanBytesDryRun()) {
                     mainCollectionInfo.options |=
@@ -565,7 +565,8 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     // so we need this catalog information.
     if (cbrEnabled) {
         mainCollectionInfo.collStats = std::make_unique<stats::CollectionStatisticsImpl>(
-            static_cast<double>(mainColl->getRecordStore()->numRecords()), canonicalQuery.nss());
+            static_cast<double>(mainColl->getRecordStore()->approximateNumRecords()),
+            canonicalQuery.nss());
     }
 
     // _id queries can skip checking the catalog for indices since they will always use the _id

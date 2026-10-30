@@ -144,7 +144,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         txn.commit();
     }
 
-    ASSERT_EQUALS(N, rs->numRecords());
+    ASSERT_EQUALS(N, rs->approximateNumRecords());
 
     rs.reset();
 
@@ -175,7 +175,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         rs.reset(ret);
     }
 
-    ASSERT_EQUALS(N, rs->numRecords());
+    ASSERT_EQUALS(N, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());

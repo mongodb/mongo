@@ -115,11 +115,11 @@ std::string_view SpillTable::ident() const {
 }
 
 long long SpillTable::dataSize() const {
-    return _rs->dataSize();
+    return _rs->approximateDataSize();
 }
 
 long long SpillTable::numRecords() const {
-    return _rs->numRecords();
+    return _rs->approximateNumRecords();
 }
 
 int64_t SpillTable::storageSize() const {

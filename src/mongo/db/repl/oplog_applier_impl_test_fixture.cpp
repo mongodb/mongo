@@ -395,7 +395,7 @@ Status OplogApplierImplTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
 long OplogApplierImplTest::getOplogSize() {
     AutoGetOplogFastPath oplogRead(_opCtx.get(), OplogAccessMode::kRead);
     const auto& oplog = oplogRead.getCollection();
-    return oplog->getRecordStore()->numRecords();
+    return oplog->getRecordStore()->approximateNumRecords();
 }
 
 BSONObj getOplogDoc(OperationContext* opCtx, bool forward) {

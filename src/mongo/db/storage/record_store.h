@@ -371,16 +371,16 @@ public:
     virtual KeyFormat keyFormat() const = 0;
 
     /**
-     * The dataSize is an approximation of the sum of the sizes (in bytes) of the
-     * documents or entries in the recordStore.
+     * Returns an approximation of the sum of the sizes (in bytes) of the documents or entries in
+     * the recordStore.
      */
-    virtual long long dataSize() const = 0;
+    virtual long long approximateDataSize() const = 0;
 
     /**
-     * Total number of records in the RecordStore. You may need to cache it, so this call
-     * takes constant time, as it is called often.
+     * Returns an approximation of the total number of records in the RecordStore. You may need to
+     * cache it, so this call takes constant time, as it is called often.
      */
-    virtual long long numRecords() const = 0;
+    virtual long long approximateNumRecords() const = 0;
 
     /**
      * Adopt `source`'s size-tracking state so this RecordStore and `source` share counters. Both
@@ -389,32 +389,32 @@ public:
     [[MONGO_MOD_PUBLIC]] virtual void adoptSharedSizeState_forTest(const RecordStore& source) {}
 
     /**
-     * Override the size of the collection (number of records and data size), required when
-     * creating a collection from pre-existing data.
+     * Override the approximate size of the collection (number of records and data size), required
+     * when creating a collection from pre-existing data.
      */
-    virtual void setSize(long long numRecords, long long dataSize) = 0;
+    virtual void setApproximateSize(long long numRecords, long long dataSize) = 0;
 
     /**
-     * Returns the accurate number of records in the `RecordStore`.
+     * Returns the number of records in the `RecordStore`.
      */
-    virtual int64_t accurateNumRecords() const = 0;
+    virtual int64_t numRecords() const = 0;
 
     /**
-     * Returns the accurate uncompressed data size of the `RecordStore` in bytes.
+     * Returns the uncompressed data size of the `RecordStore` in bytes.
      */
-    virtual int64_t accurateDataSize() const = 0;
+    virtual int64_t dataSize() const = 0;
 
     /**
-     * Overrides the accurate size and count of the `RecordStore` with the provided values.
+     * Overrides the size and count of the `RecordStore` with the provided values.
      */
-    virtual void setAccurateSizeCount(int64_t size, int64_t count) = 0;
+    virtual void setSizeCount(int64_t size, int64_t count) = 0;
 
     /**
-     * Increments the accurate size and count of the `RecordStore` with the provided values.
+     * Increments the size and count of the `RecordStore` with the provided values.
      *
      * Negative values are allowed.
      */
-    virtual void adjustAccurateSizeCount(int64_t sizeDelta, int64_t countDelta) = 0;
+    virtual void adjustSizeCount(int64_t sizeDelta, int64_t countDelta) = 0;
 
     /**
      * @param extraInfo - optional more debug info

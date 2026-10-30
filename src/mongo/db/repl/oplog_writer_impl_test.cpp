@@ -115,7 +115,7 @@ void OplogWriterImplTest::setUp() {
 int OplogWriterImplTest::getOplogDocsCount() const {
     AutoGetOplogFastPath oplogRead(opCtx(), OplogAccessMode::kRead);
     const auto& oplog = oplogRead.getCollection();
-    return oplog->getRecordStore()->numRecords();
+    return oplog->getRecordStore()->approximateNumRecords();
 }
 
 void OplogWriterImplTest::tearDown() {

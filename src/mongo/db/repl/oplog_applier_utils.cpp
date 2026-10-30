@@ -672,8 +672,8 @@ void applyRepairReplicatedMetadataNoop(OperationContext* opCtx, const BSONObj& o
     }
 
     const auto& metadata = parsed->getM();
-    collection.getCollectionPtr()->getRecordStore()->adjustAccurateSizeCount(
-        metadata.getSz().value_or(0), metadata.getCt().value_or(0));
+    collection.getCollectionPtr()->getRecordStore()->adjustSizeCount(metadata.getSz().value_or(0),
+                                                                     metadata.getCt().value_or(0));
 }
 
 }  // namespace

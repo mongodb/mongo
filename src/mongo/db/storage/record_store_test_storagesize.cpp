@@ -26,7 +26,7 @@ TEST(RecordStoreTest, StorageSizeNonEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
@@ -52,7 +52,7 @@ TEST(RecordStoreTest, StorageSizeNonEmpty) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(nToInsert, rs->numRecords());
+        ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
     }
 
     {

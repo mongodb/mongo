@@ -52,7 +52,7 @@ struct Fixture {
             }
             txn.commit();
         }
-        ASSERT_EQUALS(nToInsert, rs->numRecords());
+        ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
     }
 
     const int nToInsert;

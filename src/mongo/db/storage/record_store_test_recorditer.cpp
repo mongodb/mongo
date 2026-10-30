@@ -29,7 +29,7 @@ TEST(RecordStoreTest, IterateOverMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
@@ -56,7 +56,7 @@ TEST(RecordStoreTest, IterateOverMultipleRecords) {
         }
     }
 
-    ASSERT_EQUALS(nToInsert, rs->numRecords());
+    ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -78,7 +78,7 @@ TEST(RecordStoreTest, IterateOverMultipleRecordsReversed) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
@@ -105,7 +105,7 @@ TEST(RecordStoreTest, IterateOverMultipleRecordsReversed) {
         }
     }
 
-    ASSERT_EQUALS(nToInsert, rs->numRecords());
+    ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -128,7 +128,7 @@ TEST(RecordStoreTest, IterateStartFromMiddle) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
@@ -155,7 +155,7 @@ TEST(RecordStoreTest, IterateStartFromMiddle) {
         }
     }
 
-    ASSERT_EQUALS(nToInsert, rs->numRecords());
+    ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -178,7 +178,7 @@ TEST(RecordStoreTest, IterateStartFromMiddleReversed) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
@@ -205,7 +205,7 @@ TEST(RecordStoreTest, IterateStartFromMiddleReversed) {
         }
     }
 
-    ASSERT_EQUALS(nToInsert, rs->numRecords());
+    ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -230,7 +230,7 @@ TEST(RecordStoreTest, RecordIteratorEOF) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
@@ -257,7 +257,7 @@ TEST(RecordStoreTest, RecordIteratorEOF) {
         }
     }
 
-    ASSERT_EQUALS(nToInsert, rs->numRecords());
+    ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -305,7 +305,7 @@ TEST(RecordStoreTest, RecordIteratorSaveRestore) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
@@ -332,7 +332,7 @@ TEST(RecordStoreTest, RecordIteratorSaveRestore) {
         }
     }
 
-    ASSERT_EQUALS(nToInsert, rs->numRecords());
+    ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
 
     {
         // Get a forward iterator starting at the beginning of the record store.

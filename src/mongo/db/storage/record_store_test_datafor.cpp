@@ -26,7 +26,7 @@ TEST(RecordStoreTest, DataFor) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     std::string data = "record-";
     RecordId loc;
@@ -47,7 +47,7 @@ TEST(RecordStoreTest, DataFor) {
         }
     }
 
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -66,7 +66,7 @@ TEST(RecordStoreTest, DataForMultiple) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     const int nToInsert = 10;
     RecordId locs[nToInsert];
@@ -91,7 +91,7 @@ TEST(RecordStoreTest, DataForMultiple) {
         }
     }
 
-    ASSERT_EQUALS(nToInsert, rs->numRecords());
+    ASSERT_EQUALS(nToInsert, rs->approximateNumRecords());
 
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

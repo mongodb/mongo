@@ -35,7 +35,7 @@ TEST(RecordStoreTest, Simple1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     std::string s = "eliot was here";
 
@@ -66,7 +66,7 @@ TEST(RecordStoreTest, Simple1) {
             s,
             rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc1)
                 .data());
-        ASSERT_EQUALS(1, rs->numRecords());
+        ASSERT_EQUALS(1, rs->approximateNumRecords());
 
         RecordData rd;
         ASSERT(!rs->findRecord(opCtx.get(),
@@ -96,14 +96,14 @@ TEST(RecordStoreTest, Simple1) {
         }
     }
 
-    ASSERT_EQUALS(2, rs->numRecords());
+    ASSERT_EQUALS(2, rs->approximateNumRecords());
 }
 
 TEST(RecordStoreTest, Delete1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     std::string s = "eliot was here";
 
@@ -128,7 +128,7 @@ TEST(RecordStoreTest, Delete1) {
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), ru, loc).data());
     }
 
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -140,7 +140,7 @@ TEST(RecordStoreTest, Delete1) {
             txn.commit();
         }
 
-        ASSERT_EQUALS(0, rs->numRecords());
+        ASSERT_EQUALS(0, rs->approximateNumRecords());
     }
 }
 
@@ -148,7 +148,7 @@ TEST(RecordStoreTest, Delete2) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     std::string s = "eliot was here";
 
@@ -183,7 +183,7 @@ TEST(RecordStoreTest, Delete2) {
             s,
             rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
                 .data());
-        ASSERT_EQUALS(2, rs->numRecords());
+        ASSERT_EQUALS(2, rs->approximateNumRecords());
     }
 
     {
@@ -203,7 +203,7 @@ TEST(RecordStoreTest, Update1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords());
+        ASSERT_EQUALS(0, rs->approximateNumRecords());
     }
 
     std::string s1 = "eliot was here";
@@ -249,7 +249,7 @@ TEST(RecordStoreTest, Update1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(1, rs->numRecords());
+        ASSERT_EQUALS(1, rs->approximateNumRecords());
         ASSERT_EQUALS(
             s2,
             rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
@@ -334,7 +334,7 @@ TEST(RecordStoreTest, Truncate1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     std::string s = "eliot was here";
 
@@ -365,7 +365,7 @@ TEST(RecordStoreTest, Truncate1) {
                 .data());
     }
 
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -378,7 +378,7 @@ TEST(RecordStoreTest, Truncate1) {
         }
     }
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 }
 
 TEST(RecordStoreTest, Cursor1) {
@@ -387,7 +387,7 @@ TEST(RecordStoreTest, Cursor1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -407,7 +407,7 @@ TEST(RecordStoreTest, Cursor1) {
         }
     }
 
-    ASSERT_EQUALS(N, rs->numRecords());
+    ASSERT_EQUALS(N, rs->approximateNumRecords());
 
     {
         int x = 0;
@@ -801,7 +801,7 @@ TEST(RecordStoreTest, ClusteredRecordStore) {
         }
         txn.commit();
 
-        ASSERT_EQ(numRecords - 10, rs->numRecords());
+        ASSERT_EQ(numRecords - 10, rs->approximateNumRecords());
     }
 }
 

@@ -34,7 +34,7 @@ void updateWithDamages(bool usePreexistingCursor, bool positionCursorCorrectly) 
     if (!rs->updateWithDamagesSupported())
         return;
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     std::string data = "00010111";
     RecordId loc;
@@ -76,7 +76,7 @@ void updateWithDamages(bool usePreexistingCursor, bool positionCursorCorrectly) 
         }
     }
 
-    ASSERT_EQUALS((1 + !positionCursorCorrectly), rs->numRecords());
+    ASSERT_EQUALS((1 + !positionCursorCorrectly), rs->approximateNumRecords());
 
     std::string modifiedData = "11101000";
     {
@@ -150,7 +150,7 @@ void updateWithOverlappingDamageEvents(bool usePreexistingCursor) {
     if (!rs->updateWithDamagesSupported())
         return;
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     std::string data = "00010111";
     RecordId loc;
@@ -172,7 +172,7 @@ void updateWithOverlappingDamageEvents(bool usePreexistingCursor) {
         }
     }
 
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
 
     std::string modifiedData = "10100010";
     {
@@ -233,7 +233,7 @@ void updateWithOverlappingDamageEventsReversed(bool usePreexistingCursor) {
     if (!rs->updateWithDamagesSupported())
         return;
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     std::string data = "00010111";
     RecordId loc;
@@ -255,7 +255,7 @@ void updateWithOverlappingDamageEventsReversed(bool usePreexistingCursor) {
         }
     }
 
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
 
     std::string modifiedData = "10111010";
     {
@@ -314,7 +314,7 @@ void updateWithNoDamages(bool usePreexistingCursor) {
     if (!rs->updateWithDamagesSupported())
         return;
 
-    ASSERT_EQUALS(0, rs->numRecords());
+    ASSERT_EQUALS(0, rs->approximateNumRecords());
 
     std::string data = "my record";
     RecordId loc;
@@ -336,7 +336,7 @@ void updateWithNoDamages(bool usePreexistingCursor) {
         }
     }
 
-    ASSERT_EQUALS(1, rs->numRecords());
+    ASSERT_EQUALS(1, rs->approximateNumRecords());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
