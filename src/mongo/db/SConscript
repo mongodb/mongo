@@ -676,6 +676,8 @@ env.Library(
         'coll_mod_command_idl',
         'index_commands_idl',
         'namespace_string',
+        'repl/repl_server_parameters',
+        'stats/server_read_concern_write_concern_metrics',
     ],
 )
 

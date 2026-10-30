@@ -111,11 +111,26 @@ structs:
         # Not supported in transactions.
         optional: true
 
+  AfterOpTimeOps:
+    description: "A struct representing the number of operations that supplied the deprecated
+                  readConcern.afterOpTime argument, split by whether the argument was accepted or
+                  rejected"
+    strict: true
+    fields:
+      accepted:
+        type: long
+        default: 0
+      rejected:
+        type: long
+        default: 0
+
   ReadConcernStats:
     description: "A struct representing the section of the server status
                   command with information about readConcern levels used by operations"
     strict: true
     fields:
+      afterOpTime:
+        type: AfterOpTimeOps
       nonTransactionOps:
         type: ReadConcernOps
       transactionOps:

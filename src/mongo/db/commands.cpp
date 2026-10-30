@@ -53,6 +53,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/idl/basic_types_gen.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
@@ -854,6 +856,37 @@ std::shared_ptr<CommandInvocation> CommandInvocation::get(OperationContext* opCt
 
 CommandInvocation::~CommandInvocation() = default;
 
+/**
+ * Rejects a client-supplied readConcern.afterOpTime unless the client holds ActionType::internal.
+ *
+ * Both outcomes are counted in the 'readConcernCounters' server status section, so that operators
+ * can see how much the deprecated argument is still relied upon before it is removed.
+ */
+void checkAuthForAfterOpTime(OperationContext* opCtx, const OpMsgRequest& request) {
+    const auto readConcernElem = request.body[repl::ReadConcernArgs::kReadConcernFieldName];
+    if (MONGO_likely(readConcernElem.type() != BSONType::Object ||
+                     !readConcernElem.Obj().hasField(repl::ReadConcernArgs::kAfterOpTimeFieldName)))
+        return;
+
+    auto* metrics = ServerReadConcernMetrics::get(opCtx);
+
+    if (MONGO_unlikely(repl::gAllowDeprecatedAfterOpTimeReadConcern.load())) {
+        metrics->recordAcceptedAfterOpTime();
+        return;
+    }
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    const bool isInternal = authSession->isAuthorizedForActionsOnResource(
+        ResourcePattern::forClusterResource(), ActionType::internal);
+    if (isInternal) {
+        metrics->recordAcceptedAfterOpTime();
+    } else {
+        metrics->recordRejectedAfterOpTime();
+        uasserted(ErrorCodes::Unauthorized,
+                  "Not authorized to run command with readConcern.afterOpTime");
+    }
+}
+
 void CommandInvocation::checkAuthorization(OperationContext* opCtx,
                                            const OpMsgRequest& request) const {
     // Always send an authorization event to audit log, even if OK.
@@ -864,6 +897,7 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
             // Blanket authorization: don't need to check anything else.
         } else {
             try {
+                checkAuthForAfterOpTime(opCtx, request);
                 doCheckAuthorization(opCtx);
             } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
                 namespace mmb = mutablebson;
