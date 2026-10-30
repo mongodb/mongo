@@ -73,8 +73,17 @@ checkLog.containsJson(primary, 20663);
 // On Windows builds, triggering a failure will result in writing a minidump, disable this.
 secondaryDB.adminCommand({setParameter: 1, win32MinidumpEnabled: false});
 
-// Kill the index build.
-assert.commandWorked(secondaryDB.killOp(opId));
+// Kill the index build. The killOp interrupt is what triggers the expected crash below, so the
+// response races with the process exiting. Only tolerate that race here; any other failure is a
+// real error.
+try {
+    assert.commandWorked(secondaryDB.killOp(opId));
+} catch (e) {
+    if (!isNetworkError(e)) {
+        throw e;
+    }
+    jsTest.log.info("killOp response lost to the expected crash", {error: e});
+}
 
 // Expect the secondary to crash. Depending on timing, this can be either because the secondary
 // was waiting for a primary abort when a 'commitIndexBuild' is applied, or because the build

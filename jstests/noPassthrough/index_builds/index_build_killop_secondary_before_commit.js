@@ -63,8 +63,17 @@ function killopIndexBuildOnSecondaryOnFailpoint(rst, failpointName, shouldSuccee
     // On Windows builds, triggering a failure will result in writing a minidump, disable this.
     secondaryDB.adminCommand({setParameter: 1, win32MinidumpEnabled: false});
 
-    // Kill it
-    assert.commandWorked(secondaryDB.killOp(opId));
+    // Kill it. When we expect the server to crash, the killOp interrupt is what triggers the
+    // abort, so the response races with the process exiting. Only tolerate that race there; any
+    // other failure is a real error.
+    try {
+        assert.commandWorked(secondaryDB.killOp(opId));
+    } catch (e) {
+        if (shouldSucceed || !isNetworkError(e)) {
+            throw e;
+        }
+        jsTest.log.info("killOp response lost to the expected crash", {error: e});
+    }
 
     if (shouldSucceed) {
         // The failpoint only has to be disabled when we don't expect a crash. Otherwise, the test
