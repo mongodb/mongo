@@ -223,8 +223,8 @@ const char* _describeDocumentValidationResult(Collection::DocumentValidationResu
                            "log id 11634800.";
                 case BCV::kIndexOutOfRange:
                     return "Detected one or more time-series bucket documents with a data field "
-                           "index that exceeds the measurement count. Check logs for log id "
-                           "11634800.";
+                           "index that is not less than the measurement count. Check logs for log "
+                           "id 11634800.";
                 case BCV::kIndexBadValue:
                     return "Detected one or more time-series bucket documents with a negative or "
                            "non-numerical data field index. Check logs for log id 11634800.";

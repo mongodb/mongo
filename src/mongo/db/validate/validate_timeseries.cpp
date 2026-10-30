@@ -477,7 +477,7 @@ TimeseriesValidationStatus validateTimeSeriesDataField(const CollectionPtr& coll
                                     metric.fieldNameStringData(),
                                     fieldName)};
             }
-            if (idx > bucketCount) {
+            if (idx >= bucketCount) {
                 return {TimeseriesValidationResult::kIndexOutOfRange,
                         fmt::format("The index '{}' in time-series bucket data field '{}' is "
                                     "out of range",

@@ -47,6 +47,8 @@ describe("Tests validate command checks indexes in the time-series buckets data 
         // Drops collection and creates it again with new data, checking that collection is valid before
         // faulty data is inserted.
         testCount += 1;
+        // Tests may set this to also check the message validate reports (see afterEach).
+        this.expectedErrorSubstring = undefined;
         collName = collPrefix + testCount;
         this.db.getCollection(collName).drop();
         assert.commandWorked(
@@ -121,6 +123,19 @@ describe("Tests validate command checks indexes in the time-series buckets data 
         );
     });
 
+    it("Fails to validate for Index equal to the bucket measurement count", function () {
+        // The bucket has 3 measurements, so the legal indexes are 0 through 2.
+        assert.commandWorked(
+            getTimeseriesCollForRawOps(this.db, this.coll).update(
+                {},
+                {"$rename": {"data.temp.1": "data.temp.3"}},
+                getRawOperationSpec(this.db),
+            ),
+        );
+
+        this.expectedErrorSubstring = "out of range";
+    });
+
     it("Fails to validate for Negative Index", function () {
         assert.commandWorked(
             getTimeseriesCollForRawOps(this.db, this.coll).update(
@@ -147,6 +162,9 @@ describe("Tests validate command checks indexes in the time-series buckets data 
         assert(!res.valid, tojson(res));
         assert(res.errors.length == 1, tojson(res));
         assert(res.nNonCompliantDocuments == 1, tojson(res));
+        if (this.expectedErrorSubstring) {
+            assert(res.errors[0].includes(this.expectedErrorSubstring), tojson(res));
+        }
 
         const record = getTimeseriesCollForRawOps(this.db, this.coll).findOneWithRawData();
         TimeseriesTest.checkForDocumentValidationFailureLog(this.coll, record);

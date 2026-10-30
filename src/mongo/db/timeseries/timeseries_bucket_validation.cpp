@@ -118,7 +118,7 @@ BCV _validateUncompressedMinMax(std::string_view fieldName,
         if (idx <= prevIdx) {
             return BCV::kIndexNotIncreasing;
         }
-        if (idx > maxCount) {
+        if (idx >= maxCount) {
             return BCV::kIndexOutOfRange;
         }
         if (idx < 0) {
