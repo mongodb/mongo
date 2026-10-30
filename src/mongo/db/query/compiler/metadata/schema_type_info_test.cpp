@@ -83,21 +83,19 @@ TEST(SchemaTypeInfoTest, PopulateFromValidatorLeavesFieldUnknownForNonTypePredic
     ASSERT_TRUE(info.canPathBeArray(FieldRef("x")));
 }
 
-// TODO SERVER-134937: $jsonSchema's "bsonType" keyword translates to InternalSchemaTypeExpression,
-// which narrowType does not yet handle, so nothing is narrowed.
-TEST(SchemaTypeInfoTest, PopulateFromValidatorLeavesFieldUnknownForJSONSchemaBsonType) {
+TEST(SchemaTypeInfoTest, PopulateFromValidatorNarrowsOptionalFieldForJSONSchemaBsonType) {
     auto expr = parseMatchExpr("{$jsonSchema: {properties: {x: {bsonType: 'string'}}}}");
 
     SchemaTypeInfo info;
     info.populateFromValidator(expr.get());
 
-    ASSERT_TRUE(info.getPathType(FieldRef("x")) == Type::any());
-    ASSERT_TRUE(info.canPathBeArray(FieldRef("x")));
+    // Without "required", 'x' may be absent, but if present its "bsonType" keyword translates to an
+    // InternalSchemaTypeExpression that forces it to be a string. InternalSchemaTypeExpression does
+    // not traverse leaf arrays, so 'x' can never be an array.
+    ASSERT_EQ(info.getPathType(FieldRef("x")).toDebugString(), "missing|string");
+    ASSERT_FALSE(info.canPathBeArray(FieldRef("x")));
 }
 
-// TODO SERVER-134937: $jsonSchema's "required" keyword translates to
-// InternalSchemaTypeExpression and ExistsMatchExpression nodes.
-// InternalSchemaTypeExpression is not yet implemented.
 TEST(SchemaTypeInfoTest, PopulateFromValidatorWithTypedRequiredField) {
     auto expr =
         parseMatchExpr("{$jsonSchema: {required: ['x'], properties: {x: {bsonType: 'string'}}}}");
@@ -109,8 +107,10 @@ TEST(SchemaTypeInfoTest, PopulateFromValidatorWithTypedRequiredField) {
     SchemaTypeInfo info;
     info.populateFromValidator(expr.get());
 
-    ASSERT_EQ(info.getPathType(FieldRef("x")).toDebugString(), "~missing");
-    ASSERT_TRUE(info.canPathBeArray(FieldRef("x")));
+    // "required" forces 'x' to exist and "bsonType" forces it to be a string, so 'x' is exactly a
+    // string and can never be an array.
+    ASSERT_EQ(info.getPathType(FieldRef("x")).toDebugString(), "string");
+    ASSERT_FALSE(info.canPathBeArray(FieldRef("x")));
 }
 
 TEST(SchemaTypeInfoTest, CanPathBeArrayIsTrueByDefault) {

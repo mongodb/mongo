@@ -273,3 +273,17 @@ runTest({
         expectedCount: 2,
     },
 });
+
+runTest({
+    name: "$match $_internalSchemaType object predicate + $addFields complex rename {a: '$x.y'}",
+    pipeline: [
+        {$match: {x: {$_internalSchemaType: "object"}}},
+        {$addFields: {a: "$x.y"}},
+        {$match: {a: 42}},
+    ],
+    [typeInferenceEnabled ? "positive" : "negative"]: {
+        docs: [{x: {y: 42}}, {x: {y: 99}}, {x: {y: 42}}, {x: [{y: 42}]}],
+        index: {"x.y": 1},
+        expectedCount: 2,
+    },
+});

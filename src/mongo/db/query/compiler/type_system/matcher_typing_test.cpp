@@ -737,6 +737,55 @@ TEST(MatcherTypingTest, TypeMatchExpressionNarrowingOnCorpus) {
     }
 }
 
+TEST(MatcherTypingTest, InternalSchemaTypeNarrowsFieldToTypeWithoutArrayTraversal) {
+    // Unlike $type, $_internalSchemaType does not traverse into a leaf array, so no array type is
+    // added to the narrowed field.
+    ASSERT_EQ(narrowedDebugString("{x: {$_internalSchemaType: 'number'}}", Type::anyObject()),
+              "{x: number, ...}");
+}
+
+TEST(MatcherTypingTest, InternalSchemaTypeArrayDoesNotMatchElementsOfArray) {
+    // $_internalSchemaType does not traverse into a leaf array, so a numeric array does not match
+    // and the narrowed field excludes 'array'.
+    const std::string query = "{x: {$_internalSchemaType: 'number'}}";
+    ASSERT_TRUE(matches(query, "{x: 1}"));
+    ASSERT_FALSE(matches(query, "{x: [1]}"));
+    ASSERT_EQ(narrowedDebugString(query, Type::anyObject()), "{x: number, ...}");
+}
+
+TEST(MatcherTypingTest, NegatedInternalSchemaTypeRemovesTypeButKeepsArrays) {
+    ASSERT_EQ(
+        narrowedDebugString("{x: {$not: {$_internalSchemaType: 'number'}}}", Type::anyObject()),
+        "{x: ~number, ...}");
+}
+
+TEST(MatcherTypingTest, InternalSchemaTypeUnionNarrowsFieldToEitherType) {
+    ASSERT_EQ(
+        narrowedDebugString("{x: {$_internalSchemaType: ['number', 'string']}}", Type::anyObject()),
+        "{x: number|string, ...}");
+}
+
+TEST(MatcherTypingTest, JSONSchemaBsonTypeNarrowsRequiredFieldToType) {
+    ASSERT_EQ(
+        narrowedDebugString(
+            "{$jsonSchema: {required: ['a'], properties: {a: {bsonType: 'number', maximum: 10}}}}",
+            Type::anyObject()),
+        "{a: number, ...}");
+}
+
+TEST(MatcherTypingTest, InternalSchemaTypeMatchExpressionNarrowingOnCorpus) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    for (auto predicate : {"{$_internalSchemaType: 'number'}",
+                           "{$_internalSchemaType: 'array'}",
+                           "{$_internalSchemaType: 'object'}",
+                           "{$_internalSchemaType: 'null'}",
+                           "{$_internalSchemaType: 'string'}",
+                           "{$_internalSchemaType: ['number', 'string']}",
+                           "{$_internalSchemaType: ['number', 'array']}"}) {
+        testPathExpressionOnCorpus(predicate, expCtx);
+    }
+}
+
 TEST(MatcherTypingTest, EmptyPredicateNarrowsNothing) {
     auto input = Type::anyObject();
     auto predicate = "{}";

@@ -113,6 +113,11 @@ struct NarrowTypeMatchExpressionVisitor final : public SelectiveMatchExpressionV
         applyPathConstraint(expr, complement(Type::missing()));
     }
 
+    void visit(const InternalSchemaTypeExpression* expr) override {
+        // Same type set as $type, but the element path does not traverse the leaf array.
+        applyPathConstraint(expr, Type::fromMatcherTypeSet(expr->typeSet()));
+    }
+
     void visit(const NotMatchExpression* expr) override {
         type = narrowType(std::move(type), expr->getChild(0), !assumeTrue);
     }
