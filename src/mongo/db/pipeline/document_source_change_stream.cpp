@@ -32,7 +32,8 @@
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
@@ -111,38 +112,42 @@ constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
 
 constexpr StringData DocumentSourceChangeStream::kRegexAllCollections;
 constexpr StringData DocumentSourceChangeStream::kRegexAllCollectionsShowSystemEvents;
+constexpr StringData DocumentSourceChangeStream::kRegexAllCollectionsShowSystemEventsExceptSystemJs;
 
 constexpr StringData DocumentSourceChangeStream::kRegexAllDBs;
 constexpr StringData DocumentSourceChangeStream::kRegexCmdColl;
 
-void DocumentSourceChangeStream::LiteParsed::_addShowSystemEventsPrivilegesIfNeeded(
-    PrivilegeVector* privileges) const {
-    const BSONElement showSystemEvents =
-        _spec.Obj()[DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName];
-
-    // A non-boolean value is rejected later, when the spec is fully parsed.
-    if (!showSystemEvents.booleanSafe()) {
-        return;
+bool DocumentSourceChangeStream::isAuthorizedForSystemJsEvents(OperationContext* opCtx,
+                                                               const NamespaceString& nss) {
+    if (!opCtx || !opCtx->getClient()) {
+        // Without a client we cannot check authorization, so do not expose system.js.
+        return false;
     }
 
-    // Db/cluster privileges exclude system collections, but the flag re-admits system.js, so
-    // those scopes need an explicit system.js grant.
+    auto* client = opCtx->getClient();
+    if (!AuthorizationSession::exists(client)) {
+        // No authorization manager is set up for this service, so authorization is not enforced.
+        return true;
+    }
+
+    const ActionSet actions{ActionType::find, ActionType::changeStream};
     constexpr auto systemJs = NamespaceString::kSystemDotJavascriptCollectionName;
-    switch (getChangeStreamType(_nss)) {
-        case ChangeStreamType::kSingleCollection:
-            // A collection stream only emits events for _nss, so system.js documents can only
-            // appear when the stream is opened on system.js itself, which the exact-namespace
-            // privilege above already covers.
-            return;
-        case ChangeStreamType::kSingleDatabase:
-            privileges->push_back(Privilege(
+    auto* authzSession = AuthorizationSession::get(client);
+    switch (DocumentSourceChangeStream::getChangeStreamType(nss)) {
+        case DocumentSourceChangeStream::ChangeStreamType::kSingleCollection:
+            // A collection stream only matches its own namespace, which is authorized by the
+            // privileges required to open the stream.
+            return true;
+        case DocumentSourceChangeStream::ChangeStreamType::kSingleDatabase:
+            return authzSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(
-                    NamespaceStringUtil::parseNamespaceFromRequest(_nss.dbName(), systemJs)),
-                actions));
-            return;
-        case ChangeStreamType::kAllChangesForCluster:
-            privileges->push_back(Privilege(ResourcePattern::forCollectionName(systemJs), actions));
-            return;
+                    NamespaceStringUtil::parseNamespaceFromRequest(nss.dbName(), systemJs)),
+                actions);
+        case DocumentSourceChangeStream::ChangeStreamType::kAllChangesForCluster:
+            // Grants on system.js of individual databases are not considered: a whole-cluster
+            // stream only shows system.js events if system.js is readable in every database.
+            return authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forCollectionName(systemJs), actions);
     }
     MONGO_UNREACHABLE;
 }
@@ -180,10 +185,15 @@ StringData DocumentSourceChangeStream::resolveAllCollectionsRegex(
     tassert(6189300,
             "Expected change stream spec to be set on the expression context",
             expCtx->changeStreamSpec);
-    // If 'showSystemEvents' is set, return a less stringent regex.
-    return (expCtx->changeStreamSpec->getShowSystemEvents()
-                ? DocumentSourceChangeStream::kRegexAllCollectionsShowSystemEvents
-                : DocumentSourceChangeStream::kRegexAllCollections);
+    if (!expCtx->changeStreamSpec->getShowSystemEvents()) {
+        return DocumentSourceChangeStream::kRegexAllCollections;
+    }
+
+    // If 'showSystemEvents' is set, return a less stringent regex. system.js is only included if
+    // the user is authorized to read it.
+    return isAuthorizedForSystemJsEvents(expCtx->opCtx, expCtx->ns)
+        ? DocumentSourceChangeStream::kRegexAllCollectionsShowSystemEvents
+        : DocumentSourceChangeStream::kRegexAllCollectionsShowSystemEventsExceptSystemJs;
 }
 
 std::string DocumentSourceChangeStream::getNsRegexForChangeStream(

@@ -50,6 +50,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
+        '$BUILD_DIR/mongo/db/pipeline/change_stream_pipeline',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         'async_results_merger',
         'cqf_utils',
