@@ -9,12 +9,6 @@
 //   does_not_support_stepdowns,
 //   requires_majority_read_concern,
 //   uses_change_streams,
-//   # This test detects the per-shard $changeStream cursors by their collection namespace and hangs
-//   # shard cursor establishment via a collection-scoped failpoint. Whole-db/whole-cluster
-//   # upconversion rewrites the shard cursors to be collectionless ('$cmd.aggregate') and bypasses
-//   # the collection-scoped failpoint, so 'waitForShardCursor' would spin forever.
-//   do_not_run_in_whole_db_passthrough,
-//   do_not_run_in_whole_cluster_passthrough,
 // ]
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

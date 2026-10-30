@@ -61,11 +61,6 @@ struct RepresentativeQueryInfo {
     // If this parameter is true, then the query operates on documents directly in the format in
     // which they are stored.
     const bool isRawDataQuery;
-
-    // True if the query is a whole-cluster change stream. Such a stream runs on the internal
-    // 'admin' database (admin.$cmd.aggregate) but is a legitimate, user-facing query shape, and is
-    // therefore eligible for query settings despite the internal-database checks.
-    const bool isAllChangesForClusterChangeStream;
 };
 
 /**

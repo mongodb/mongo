@@ -81,8 +81,7 @@ boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
     OperationContext* opCtx,
     const query_shape::DeferredQueryShape& deferredShape,
     const NamespaceString& nss,
-    bool skipInternalClientCheck,
-    bool isAllChangesForClusterChangeStream) {
+    bool skipInternalClientCheck) {
     // QueryShapeHash is not computed for:
     // - internal clients, i.e. queries coming from mongos
     // and
@@ -92,10 +91,8 @@ boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
         return boost::none;
     }
 
-    // QueryShapeHash is not computed for internal dbs or system collections in user dbs. The one
-    // exception is a whole-cluster change stream, which runs on the internal 'admin' database
-    // (admin.$cmd.aggregate) but is a legitimate, user-facing query shape.
-    if ((nss.isOnInternalDb() || nss.isSystem()) && !isAllChangesForClusterChangeStream) {
+    // QueryShapeHash is not computed for internal dbs or system collections in user dbs.
+    if (nss.isOnInternalDb() || nss.isSystem()) {
         return boost::none;
     }
 
@@ -122,15 +119,10 @@ boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
         return boost::none;
     }
 
-    const auto& spec = expCtx->getChangeStreamSpec();
-    const bool isAllChangesForClusterChangeStream =
-        spec && spec->getAllChangesForCluster().value_or(false);
-
     return computeQueryShapeHash(expCtx->getOperationContext(),
                                  deferredShape,
                                  expCtx->getNamespaceString(),
-                                 skipInternalClientCheck,
-                                 isAllChangesForClusterChangeStream);
+                                 skipInternalClientCheck);
 }
 
 }  // namespace mongo::shape_helpers

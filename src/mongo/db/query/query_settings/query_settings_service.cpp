@@ -103,16 +103,6 @@ void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& exp
     uasserted(ErrorCodes::QueryRejectedBySettings, "Query rejected by admin query settings");
 }
 
-/**
- * Returns true if 'expCtx' represents a whole-cluster change stream. Such a stream runs on the
- * internal 'admin' database (admin.$cmd.aggregate) but is a legitimate, user-facing query shape,
- * and is therefore eligible for query settings.
- */
-bool isAllChangesForClusterChangeStream(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto& spec = expCtx->getChangeStreamSpec();
-    return spec && spec->getAllChangesForCluster().value_or(false);
-}
-
 /*
  * Creates the corresponding RepresentativeQueryInfo for Find query representatives.
  */
@@ -162,7 +152,6 @@ RepresentativeQueryInfo createRepresentativeInfoFind(OperationContext* opCtx,
             isIdHackEligibleQueryWithoutCollator(*parsedFindCommand->findCommandRequest),
         .systemStage = {/* no unsupported agg stages */},
         .isRawDataQuery = parsedFindCommand->findCommandRequest->getRawData().value_or(false),
-        .isAllChangesForClusterChangeStream = false,
     };
 }
 
@@ -210,7 +199,6 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(OperationContext* opCtx
         .systemStage = {/* no unsupported agg stages */},
         .isRawDataQuery =
             parsedDistinctCommand->distinctCommandRequest->getRawData().value_or(false),
-        .isAllChangesForClusterChangeStream = false,
     };
 }
 
@@ -263,7 +251,6 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
         .isIdHackQuery = false,
         .systemStage = getStageExemptedFromRejection(parsedPipeline),
         .isRawDataQuery = aggregateCommandRequest.getRawData().value_or(false),
-        .isAllChangesForClusterChangeStream = isAllChangesForClusterChangeStream(expCtx),
     };
 }
 
@@ -860,14 +847,10 @@ bool QuerySettingsService::isEligibleForQuerySettings(
         return false;
     }
 
-    // Query settings can not be set on internal dbs or system collections in user dbs. The one
-    // exception is a whole-cluster change stream, which runs on the internal 'admin' database
-    // (admin.$cmd.aggregate) but is a legitimate, user-facing query shape.
+    // Query settings can not be set on internal dbs or system collections in user dbs.
     const auto& nss = expCtx->getNamespaceString();
     if (nss.isOnInternalDb() || nss.isSystem()) {
-        if (!isAllChangesForClusterChangeStream(expCtx)) {
-            return false;
-        }
+        return false;
     }
 
     return true;
@@ -1026,17 +1009,13 @@ void QuerySettingsService::validateQueryCompatibleWithAnyQuerySettings(
     if (MONGO_unlikely(allowAllSetQuerySettings.shouldFail())) {
         return;
     }
-    // A whole-cluster change stream runs on the internal 'admin' database but is a legitimate,
-    // user-facing query shape, so it is allowed despite the internal-database checks.
     uassert(8584900,
             "setQuerySettings command cannot be used on internal databases",
-            !representativeQueryInfo.namespaceString.isOnInternalDb() ||
-                representativeQueryInfo.isAllChangesForClusterChangeStream);
+            !representativeQueryInfo.namespaceString.isOnInternalDb());
 
     uassert(8584901,
             "setQuerySettings command cannot be used on system collections",
-            !representativeQueryInfo.namespaceString.isSystem() ||
-                representativeQueryInfo.isAllChangesForClusterChangeStream);
+            !representativeQueryInfo.namespaceString.isSystem());
 
     uassert(1064380,
             "setQuerySetting command cannot be used with rawData enabled",

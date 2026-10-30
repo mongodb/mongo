@@ -42,8 +42,9 @@
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {configureFailPointForAllShardsAndMongos} from "jstests/libs/fail_point_util.js";
 import {
-    advanceClusterTimeIncludingConfigServer,
     ChangeStreamTest,
+    ChangeStreamWatchMode,
+    changeStreamPassthroughType,
     getClusterTime,
 } from "jstests/libs/query/change_stream_util.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
@@ -244,11 +245,6 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
 
         // Record the cluster time before creating the collection. The change stream will start
         // at T0, so the oplog scan covers the createCollection entry and all subsequent inserts.
-        // Advance the cluster time first: otherwise 'getClusterTime' can return the timestamp of a
-        // preceding operation (e.g. a 'dropDatabase' from the suite's per-test cleanup), and the
-        // stream, which includes the entry at its start time, would observe that event and
-        // invalidate immediately.
-        advanceClusterTimeIncludingConfigServer(db);
         startTime = getClusterTime(db);
 
         assert.commandWorked(db.createCollection(collName));
@@ -308,6 +304,20 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
         });
 
         it(`returns multiple empty batches with a postBatchResumeToken - using query settings override${testCaseSuffix}`, () => {
+            // TODO SERVER-135301: querySettings is never applied to a whole-cluster stream
+            // (admin db, allChangesForCluster) because isEligbleForQuerySettings() rejects the
+            // admin namespace outright. Remove this skip once that is fixed.
+            const isDirectToShard =
+                TestData.connectedDirectlyToShard || TestData.changeStreamCommandsDirectToShard;
+            if (
+                isDirectToShard &&
+                changeStreamPassthroughType() === ChangeStreamWatchMode.kCluster
+            ) {
+                jsTest.log.info(
+                    "Skipping case: querySettings has no effect on a whole-cluster stream when directly connected to a shard",
+                );
+                return;
+            }
             runTest(
                 {queryKnobs: {operationResponseMaxMS: NumberLong(kScanMaxMS)}},
                 restartChangeStream,
