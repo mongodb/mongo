@@ -34,18 +34,6 @@ std::unique_ptr<MatchExpression> parseMatchExpr(const std::string& query) {
     return parseMatchExpr(query, expCtx);
 }
 
-Type allValues(BSONType type) {
-    return Type(type, Extent::kAll);
-}
-
-Type openObject(const StringMap<Type>& fields) {
-    return Type::object(fields, Open::kYes);
-}
-
-Type closedObject(const StringMap<Type>& fields) {
-    return Type::object(fields, Open::kNo);
-}
-
 ElementPath traversedPath(std::string_view path) {
     return ElementPath(path, ElementPath::LeafArrayBehavior::kTraverse);
 }

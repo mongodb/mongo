@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/type_system/type.h"
 
 namespace mongo::pipeline::type_system {
@@ -25,5 +26,20 @@ Type getOutputType(const Type& inputType, const Expression* expr);
  * type of the field 'a' in the document 'inputType'.
  */
 Type narrowType(Type inputType, const Expression* expr, bool assumeTrue);
+
+namespace expression {
+enum class PathSemantics {
+    /// Mirrors the semantics of an ExpressionFieldPath, e.g. "$a.b".
+    kFieldPath,
+    /// Not modelled. E.g. $getField.
+    kOther,
+};
+
+/**
+ * Returns the type 'path' evaluates to on 'inputType', when traversed following the given path
+ * traversal semantics.
+ */
+Type traversePath(Type inputType, const FieldPath& path, PathSemantics semantics);
+}  // namespace expression
 
 }  // namespace mongo::pipeline::type_system

@@ -19,6 +19,18 @@ namespace mongo::pipeline::type_system {
 
 using namespace std::literals::string_view_literals;
 
+Type allValues(BSONType type) {
+    return Type(type, Extent::kAll);
+}
+
+Type openObject(const StringMap<Type>& fields) {
+    return Type::object(fields, Open::kYes);
+}
+
+Type closedObject(const StringMap<Type>& fields) {
+    return Type::object(fields, Open::kNo);
+}
+
 std::vector<Value> scalarRepresentatives() {
     const OID oid("0123456789abcdef01234567");
     return {

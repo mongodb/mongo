@@ -13,6 +13,6 @@ input: {
 output:
   end of pipeline
     x: number|array(S)
-    x.y: any
+    x.y: missing|array(S)
     y: any
 

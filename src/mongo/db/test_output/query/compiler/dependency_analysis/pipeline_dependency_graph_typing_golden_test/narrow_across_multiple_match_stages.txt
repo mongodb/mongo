@@ -22,7 +22,7 @@ input: {
 output:
   after $match:0
     x: number|array(S)
-    x.y: any
+    x.y: missing|array(S)
   end of pipeline
     x: number
     x.y: missing

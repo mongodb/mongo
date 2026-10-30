@@ -4347,6 +4347,25 @@ TEST_F(PipelineDependencyGraphTest, GetTypeIgnoresRenameTypeUnderPossiblyArrayPr
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, GetTypeOfDottedPathThroughPossibleArray) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([{$match: {x: {$type: 'number'}}}])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "number|array(S)");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "missing|array(S)");
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "x.y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfInvalidFieldPathIsAny) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([{$match: {x: {$type: 'number'}}}])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x.").toDebugString(), "any");
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "x."));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, GetTypeOfGroupKeyRenameOfMissingField) {
     unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
     setPipeline(R"([

@@ -28,8 +28,8 @@ input: {
 }
 output:
   after $match:0
-    x.y: any
-    x.y.z: any
+    x.y: missing|array(S)
+    x.y.z: missing|array(S)
   after $match:1
     x.y: missing
     x.y.z: missing

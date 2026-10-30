@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/query/compiler/type_system/type.h"
 #include "mongo/stdx/unordered_set.h"
 
 #include <string>
@@ -32,6 +33,15 @@ enum class ScalarCorpus {
     /// Only missing, null, int 1 and double 1.0, enough to tell apart how path traversal matches.
     kMatchTraversal,
 };
+
+/// Returns the type holding every value of 'type'.
+Type allValues(BSONType type);
+
+/// Returns an object type with 'fields' that may also hold other fields.
+Type openObject(const StringMap<Type>& fields);
+
+/// Returns an object type that holds only 'fields'.
+Type closedObject(const StringMap<Type>& fields);
 
 /**
  * Returns an array containing one value of each BSONType, except array and object.

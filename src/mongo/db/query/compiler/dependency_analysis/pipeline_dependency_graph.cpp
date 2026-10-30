@@ -13,7 +13,7 @@
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
+#include "mongo/db/query/compiler/type_system/expression_typing.h"
 #include "mongo/db/query/compiler/type_system/matcher_typing.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/dynamic_bitset.h"
@@ -668,14 +668,18 @@ private:
 }  // namespace
 
 namespace {
+/// Returns the type of the given path in a value of the given type, when traversed following the
+/// semantics of an ExpressionFieldPath. If the given path is not a valid FieldPath, returns `any`.
 Type resolvePathType(Type type, PathRef path) {
-    for (auto field : splitPath(path)) {
-        if (type.isNever()) {
-            break;
-        }
-        type = ts::resolveFieldAccess(std::move(type), field);
+    if (path.empty()) {
+        return type;
     }
-    return type;
+    auto fieldPath = fieldPathWithValidationStatus(std::string(path));
+    if (!fieldPath.isOK()) {
+        return Type::any();
+    }
+    return ts::expression::traversePath(
+        std::move(type), fieldPath.getValue(), ts::expression::PathSemantics::kFieldPath);
 }
 }  // namespace
 

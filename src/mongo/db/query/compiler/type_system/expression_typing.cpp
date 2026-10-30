@@ -88,4 +88,48 @@ Type narrowType(Type inputType, const Expression* expr, bool assumeTrue) {
     return std::move(visitor.type);
 }
 
+namespace expression {
+namespace {
+Type traverseFieldPath(Type inputType, const FieldPath& path, size_t index);
+
+/// Returns the type of the given component in the path in given object type.
+Type traverseObject(Type inputType, const FieldPath& path, size_t index) {
+    Type field = inputType.getField(path.getFieldName(index));
+    if (++index == path.getPathLength()) {
+        return field;
+    }
+    return traverseFieldPath(std::move(field), path, index);
+}
+
+/// Returns the type 'path' (starting from position 'index') evaluates to on inputType when
+/// traversed following FieldPath semantics.
+Type traverseFieldPath(Type inputType, const FieldPath& path, size_t index) {
+    Type result = Type::never();
+    if (inputType.hasType(BSONType::object)) {
+        result = traverseObject(inputType, path, index);
+    }
+    if (inputType.hasType(BSONType::array)) {
+        // If there is an array along the path, we treat everything beneath it as possibly an array.
+        result = unionType(std::move(result), Type::someArray());
+    }
+    if (!intersectType(std::move(inputType), Type::anyScalar()).isNever()) {
+        // If there may be a scalar along the path, the result might be missing.
+        result = unionType(std::move(result), Type::missing());
+    }
+    return result;
+}
+}  // namespace
+
+Type traversePath(Type inputType, const FieldPath& path, PathSemantics semantics) {
+    switch (semantics) {
+        case PathSemantics::kFieldPath:
+            return traverseFieldPath(std::move(inputType), path, 0);
+        case PathSemantics::kOther:
+            // Not modelled.
+            return Type::any();
+    }
+    MONGO_UNREACHABLE_TASSERT(13597800);
+}
+}  // namespace expression
+
 }  // namespace mongo::pipeline::type_system
