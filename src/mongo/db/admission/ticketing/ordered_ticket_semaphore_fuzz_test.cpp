@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
+#include <limits>
 #include <vector>
 
 #include "fuzztest/fuzztest.h"
@@ -38,8 +40,9 @@ public:
      * count (lowest count = highest priority).
      */
     void FuzzPriorityOrdering(std::vector<int32_t> admissionCounts) {
+        // Widen first: std::abs(INT32_MIN) is not representable as int32_t.
         for (auto& c : admissionCounts)
-            c = std::abs(c) % 1000;
+            c = static_cast<int32_t>(std::abs(static_cast<int64_t>(c)) % 1000);
 
         const int n = static_cast<int>(admissionCounts.size());
 
@@ -134,7 +137,8 @@ public:
 };
 
 FUZZ_TEST_F(OrderedTicketSemaphoreFuzz, FuzzPriorityOrdering)
-    .WithDomains(fuzztest::VectorOf(fuzztest::Arbitrary<int32_t>()).WithMinSize(1).WithMaxSize(16));
+    .WithDomains(fuzztest::VectorOf(fuzztest::Arbitrary<int32_t>()).WithMinSize(1).WithMaxSize(16))
+    .WithSeeds({{std::vector<int32_t>{std::numeric_limits<int32_t>::min()}}});
 
 FUZZ_TEST_F(OrderedTicketSemaphoreFuzz, FuzzTryAcquireFairness)
     .WithDomains(fuzztest::InRange(1, 16),  // numWaiters
