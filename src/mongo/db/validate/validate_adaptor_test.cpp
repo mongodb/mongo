@@ -6,7 +6,10 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/validate/key_string_index_consistency.h"
 #include "mongo/db/validate/validate_adaptor_factory.h"
 #include "mongo/db/validate/validate_adaptor_parallel.h"
@@ -16,7 +19,10 @@
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/unittest/unittest.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <map>
+#include <memory>
 #include <string_view>
 #include <vector>
 
@@ -25,6 +31,94 @@
 namespace mongo::collection_validation {
 using namespace std::literals::string_view_literals;
 namespace {
+
+/**
+ * A cursor that replays scripted RecordIds regardless of what the record store holds, so that a
+ * record store that returns records out of order can be simulated. seek() replays the sequence
+ * scripted for the RecordId it is given, and next() continues through it until it runs out.
+ */
+class ScriptedValidateCursor final : public ValidateCursor {
+public:
+    using Script = std::map<int64_t, std::vector<int64_t>>;
+
+    explicit ScriptedValidateCursor(const Script& script) : _script(script) {}
+
+    boost::optional<Record> seek(const RecordId& recordId) override {
+        const auto it = _script.find(recordId.getLong());
+        uassert(
+            ErrorCodes::InternalError, "No sequence scripted for the seek", it != _script.end());
+        _sequence = &it->second;
+        _position = 0;
+        return current();
+    }
+    boost::optional<Record> next() override {
+        ++_position;
+        return current();
+    }
+    void yield() override {}
+
+private:
+    boost::optional<Record> current() {
+        if (_position >= _sequence->size()) {
+            return boost::none;
+        }
+        const auto id = (*_sequence)[_position];
+        _doc = BSON("_id" << id);
+        return Record{RecordId(id), RecordData(_doc.objdata(), _doc.objsize())};
+    }
+
+    const Script& _script;
+    const std::vector<int64_t>* _sequence{nullptr};
+    size_t _position{0};
+    BSONObj _doc;
+};
+
+class ScriptedSerialAdaptor final : public ValidateAdaptor {
+public:
+    ScriptedSerialAdaptor(OperationContext* opCtx,
+                          ValidateState& state,
+                          const ScriptedValidateCursor::Script& script)
+        : ValidateAdaptor(opCtx, state), _script(script) {}
+
+    void traverseRecordStore(OperationContext* opCtx,
+                             ValidateResults& validateResults,
+                             ValidationVersion validationVersion) final {
+        const auto progressGuard = preTraverseRecordStoreImpl(opCtx);
+        auto impl = traverseRecordStoreImpl(
+            opCtx,
+            validateResults,
+            getKeyBasedIndexConsistency(),
+            {.beginRecordId = getValidateState().getFirstRecordId(),
+             .cursorFactory = [this](OperationContext*) -> std::unique_ptr<ValidateCursor> {
+                 return std::make_unique<ScriptedValidateCursor>(_script);
+             }},
+            getProgress(),
+            validationVersion);
+        validateResults = std::move(impl.validateResults);
+    }
+
+private:
+    const ScriptedValidateCursor::Script& _script;
+};
+
+class ScriptedParallelAdaptor final : public ValidateAdaptorParallel {
+public:
+    ScriptedParallelAdaptor(OperationContext* opCtx,
+                            ValidateState& state,
+                            int64_t targetRecordsPerSlice,
+                            const ScriptedValidateCursor::Script& script)
+        : ValidateAdaptorParallel(opCtx, state, targetRecordsPerSlice), _script(script) {}
+
+protected:
+    std::unique_ptr<ValidateCursor> makeSliceCursor(OperationContext*,
+                                                    const RecordStore&,
+                                                    CancellationToken) const override {
+        return std::make_unique<ScriptedValidateCursor>(_script);
+    }
+
+private:
+    const ScriptedValidateCursor::Script& _script;
+};
 
 const auto kNss = NamespaceString::createNamespaceString_forTest("validateAdaptorDB.coll"sv);
 
@@ -84,7 +178,77 @@ protected:
             opCtx, record, result.results, keyStringIndexConsistency, indexEntries);
         return result;
     }
+
+    // Seeds the collection with records 1..numRecords, so that a parallel traversal slices it.
+    void insertRecords(int64_t numRecords) {
+        auto opCtx = operationContext();
+        const AutoGetCollection coll(opCtx, kNss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        for (int64_t id = 1; id <= numRecords; ++id) {
+            const auto doc = BSON("_id" << id);
+            ASSERT_OK(
+                coll->getRecordStore()->insertRecord(opCtx,
+                                                     *shard_role_details::getRecoveryUnit(opCtx),
+                                                     RecordId(id),
+                                                     doc.objdata(),
+                                                     doc.objsize(),
+                                                     Timestamp()));
+        }
+        wuow.commit();
+    }
+
+    // Runs the adaptor's record store traversal over a record store that is scripted to return
+    // 'serialOrder' to a whole-record-store scan, and 'sliceOrders' (keyed by the RecordId each
+    // slice begins at) to a parallel one. Both describe the same records in the same order.
+    ValidateResults traverseScripted(const std::vector<int64_t>& serialOrder,
+                                     const ScriptedValidateCursor::Script& sliceOrders) {
+        auto opCtx = operationContext();
+        const bool parallel = GetParam() == AdaptorKind::kParallel;
+        ValidateState state(
+            opCtx,
+            kNss,
+            ValidationOptions(ValidateMode::kForeground,
+                              RepairMode::kNone,
+                              /*logDiagnostics=*/false,
+                              currentValidationVersion,
+                              /*verifyConfigurationOverride=*/boost::none,
+                              /*readTimestamp=*/boost::none,
+                              /*hashPrefixes=*/boost::none,
+                              /*revealHashedIds=*/boost::none,
+                              parallel ? boost::optional<int64_t>(kSliceSize) : boost::none));
+        ASSERT_OK(state.initializeCollection(opCtx));
+        state.initializeCursors(opCtx);
+
+        ValidateResults results;
+        results.setNamespaceString(state.nss());
+        results.setUUID(state.uuid());
+        results.setRepairMode(state.getRepairMode());
+        results.setReadTimestamp(state.getReadTimestamp());
+
+        const ScriptedValidateCursor::Script serialScript{{serialOrder.front(), serialOrder}};
+        if (parallel) {
+            ScriptedParallelAdaptor(opCtx, state, kSliceSize, sliceOrders)
+                .traverseRecordStore(opCtx, results, currentValidationVersion);
+        } else {
+            ScriptedSerialAdaptor(opCtx, state, serialScript)
+                .traverseRecordStore(opCtx, results, currentValidationVersion);
+        }
+        return results;
+    }
+
+    // Twenty records at ten per slice make two slices, whose pivots are the first record and the
+    // one nine ids on from it.
+    static constexpr int64_t kNumRecords{20};
+    static constexpr int64_t kSliceSize{10};
+    static constexpr int64_t kSecondSliceBegin{10};
 };
+
+[[nodiscard]] bool reportsOutOfOrderRecords(const ValidateResults& results) {
+    return std::any_of(
+        results.getErrors().begin(), results.getErrors().end(), [](const auto& error) {
+            return error.find("out-of-order") != std::string::npos;
+        });
+}
 
 std::vector<char> toBuffer(const BSONObj& obj) {
     const char* begin = obj.objdata();
@@ -175,6 +339,61 @@ TEST_P(ValidateAdaptorTest, InvalidUTF8InCollatedPartialIndexFieldDoesNotThrow) 
         validateRecord(toBuffer(withInvalidUTF8("a")), ValidateMode::kForegroundCheckBSON);
     EXPECT_OK(result.record.status);
     EXPECT_FALSE(result.record.compliantDocument);
+}
+
+std::vector<int64_t> range(int64_t first, int64_t last) {
+    std::vector<int64_t> ids;
+    for (auto id = first; id <= last; ++id) {
+        ids.push_back(id);
+    }
+    return ids;
+}
+
+std::vector<int64_t> concat(std::vector<int64_t> a, std::span<const int64_t> b) {
+    a.insert(a.end(), b.begin(), b.end());
+    return a;
+}
+
+TEST_P(ValidateAdaptorTest, InOrderRecordsAreNotReportedOutOfOrder) {
+    createCollection({}, {});
+    insertRecords(kNumRecords);
+    const auto results = traverseScripted(
+        range(1, kNumRecords),
+        {{1, range(1, kSecondSliceBegin - 1)}, {kSecondSliceBegin, range(kSecondSliceBegin, 20)}});
+    EXPECT_FALSE(reportsOutOfOrderRecords(results));
+}
+
+TEST_P(ValidateAdaptorTest, OutOfOrderRecordsWithinASliceAreReported) {
+    createCollection({}, {});
+    insertRecords(kNumRecords);
+    const auto results = traverseScripted(concat(range(1, 5), concat({3}, range(6, kNumRecords))),
+                                          {{1, concat(range(1, 5), std::vector<int64_t>{3})},
+                                           {kSecondSliceBegin, range(kSecondSliceBegin, 20)}});
+    EXPECT_TRUE(reportsOutOfOrderRecords(results));
+}
+
+// The record store hands back a record the first slice already read as the first record of the
+// second one, so that the records are out of order only when the slices are read one after the
+// other. Neither slice sees the out-of-order pair on its own.
+TEST_P(ValidateAdaptorTest, OutOfOrderRecordsAcrossSliceBoundaryAreReported) {
+    createCollection({}, {});
+    insertRecords(kNumRecords);
+    const auto results = traverseScripted(
+        concat(range(1, kSecondSliceBegin - 1), concat({8}, range(kSecondSliceBegin, 20))),
+        {{1, range(1, kSecondSliceBegin - 1)},
+         {kSecondSliceBegin, concat({8}, range(kSecondSliceBegin, 20))}});
+    EXPECT_TRUE(reportsOutOfOrderRecords(results));
+}
+
+// Every slice's records are in order and the slices' ranges do not intersect, but the second slice
+// reads records that come after the third slice's.
+TEST_P(ValidateAdaptorTest, ReversedDisjointSlicesAreReported) {
+    createCollection({}, {});
+    insertRecords(30);
+    const auto results =
+        traverseScripted(concat(range(1, 9), concat(range(14, 18), range(12, 13))),
+                         {{1, range(1, 9)}, {10, range(14, 18)}, {19, range(12, 13)}});
+    EXPECT_TRUE(reportsOutOfOrderRecords(results));
 }
 
 INSTANTIATE_TEST_SUITE_P(,
