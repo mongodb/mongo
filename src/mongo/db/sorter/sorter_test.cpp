@@ -740,6 +740,42 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsTracksMergedSpillBatches) {
     EXPECT_EQ(tracker.mergedSpills.loadRelaxed(), kExpectedMergedSpills);
 }
 
+TYPED_TEST(MakeFromExistingRangesTest, IteratorsMaxNumAccountsForIteratorSize) {
+    unittest::TempDir spillDir = makeSpillDir();
+    SorterTracker sorterTracker;
+
+    // Size the memory limit so the sorter can hold at most two spills before it merges them.
+    unittest::ServerParameterGuard iteratorsMemoryPct{"maxIteratorsMemoryUsagePercentage", 1.0};
+    auto opts =
+        SortOptions()
+            .Tracker(&sorterTracker)
+            .MaxMemoryUsageBytes(sizeof(IWSorter::Data) + 2 * this->storage().iteratorSizeBytes());
+
+    auto sorter = IWSorter::make(opts,
+                                 IWComparator(ASC),
+                                 this->storage().makeSpiller(opts, spillDir.path()),
+                                 /*settings=*/{});
+
+    constexpr int kMaxAdds = 100;
+    int numAdded = 0;
+    auto addUntilSpilledRanges = [&](uint64_t spilledRanges) {
+        while (sorter->stats().spilledRanges() < spilledRanges) {
+            ASSERT_LT(numAdded, kMaxAdds);
+            sorter->add(numAdded, -numAdded);
+            ++numAdded;
+        }
+    };
+
+    // The first spill leaves one iterator, below the cap.
+    addUntilSpilledRanges(1);
+    EXPECT_EQ(sorter->stats().mergedSpills(), 0);
+
+    // The second spill reaches the cap and merges the two spills into one. If the per-iterator
+    // cost is under-estimated, the cap is higher and no merge happens here.
+    addUntilSpilledRanges(2);
+    EXPECT_EQ(sorter->stats().mergedSpills(), 1);
+}
+
 TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDisjointRanges) {
     unittest::TempDir spillDir = makeSpillDir();
     auto opts = SortOptions();

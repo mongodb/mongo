@@ -247,7 +247,8 @@ struct ContainerTraits {
     }
 
     static std::size_t iteratorSizeBytes() {
-        return sizeof(ContainerIterator<IntWrapper, IntWrapper>);
+        return sizeof(ContainerIterator<IntWrapper, IntWrapper>) +
+            ContainerBasedStorage<IntWrapper, IntWrapper>::kPerCursorOverheadBytes;
     }
 
 private:

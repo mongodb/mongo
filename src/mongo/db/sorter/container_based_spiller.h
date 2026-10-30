@@ -482,13 +482,15 @@ public:
             _opCtx, _ru, _container, _stats, opts, _currKey, this->getChecksumVersion(), settings);
     };
 
+    /**
+     * Returns the iterator object size plus a fixed per-cursor overhead.
+     */
     size_t getIteratorSize() override {
-        return sizeof(sorter::ContainerIterator<Key, Value>);
+        return sizeof(sorter::ContainerIterator<Key, Value>) + kPerCursorOverheadBytes;
     };
 
     /**
-     * Returns the estimated per-iterator memory cost during merge: the average serialized entry
-     * size plus a fixed per-cursor overhead.
+     * Returns the average serialized entry size plus a fixed per-cursor overhead.
      */
     size_t getBufferSize() override {
         auto count = _stats.numSpilledEntries();
