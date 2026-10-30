@@ -73,8 +73,10 @@ struct LookUpSharedState {
     LookupResolvedPipelineViewBinding resolvedPipelineViewBinding =
         LookupResolvedPipelineViewBinding::kNeedsBinding;
 
-    // Number of already-materialized foreign view stages at the front of resolvedPipeline. These
-    // stages must not be rebound, but user stages after them still need view binding.
+    // Number of already-materialized foreign view definition stages at the front of
+    // resolvedPipeline. Execution-time view binding must start after them: the definition stages
+    // get the same empty binding they receive on direct view reads, while user stages after them
+    // are bound to the view.
     size_t viewBindingStart = 0;
 
     // A pipeline parsed from _sharedState->resolvedPipeline at creation time, intended to support

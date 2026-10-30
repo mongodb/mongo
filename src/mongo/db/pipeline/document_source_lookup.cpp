@@ -112,10 +112,26 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
 // mongot helpers rather than in the generic $lookup code. This alias keeps the call sites terse.
 using namespace search_helper_bson_obj::mongot_lookup_prefix;
 
-namespace {
+// Returns the number of post-desugar stages in the foreign view definition.
+size_t foreignViewDefinitionPrefixLength(const NamespaceString& fromNs,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& resolvedNamespaces = expCtx->getResolvedNamespaces();
+    auto it = resolvedNamespaces.find(fromNs);
+    tassert(13636600,
+            str::stream() << "Expected " << fromNs.toStringForErrorMsg()
+                          << " to resolve to a view in the resolved namespace map",
+            it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView());
+    ResolvedNamespace view = it->second;
+    view.liteParseViewPipeline();
+    view.desugarViewPipeline();
+    const auto* parsed = view.getParsedPipeline();
+    if (!parsed || parsed->getStages().empty()) {
+        return 0;
+    }
+    return parsed->getStages().size();
+}
 
-size_t foreignViewSourceGeneratorPrefixLength(
-    const NamespaceString& fromNs, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+namespace {
 
 /**
  * Constructs a query of the following shape:
@@ -235,6 +251,11 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
         !isRawDataOperation(expCtx->getOperationContext()) ||
         !resolvedNamespace.getResolvedNamespace().isTimeseriesBucketsCollection()) {
         _sharedState->resolvedPipeline = resolvedNamespace.getBsonPipeline();
+        if (_fromNsIsAView) {
+            // The view definition is materialized at the front of the resolved pipeline; execution-
+            // time view binding must skip exactly these stages.
+            _sharedState->viewBindingStart = foreignViewDefinitionPrefixLength(_fromNs, expCtx);
+        }
     }
 
     _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
@@ -346,24 +367,6 @@ bool subpipelineAppliesView(bool fromNsIsAView,
         subpipelineViewPolicy == FirstStageViewApplicationPolicy::kDoNothing;
 }
 
-// Returns the number of stages in the foreign view definition when it begins with a source
-// generating stage. These stages are already materialized in the resolved lookup pipeline.
-size_t foreignViewSourceGeneratorPrefixLength(
-    const NamespaceString& fromNs, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto& resolvedNamespaces = expCtx->getResolvedNamespaces();
-    auto it = resolvedNamespaces.find(fromNs);
-    if (it == resolvedNamespaces.end() || !it->second.isInvolvedNamespaceAView()) {
-        return 0;
-    }
-    ResolvedNamespace view = it->second;
-    view.liteParseViewPipeline();
-    view.desugarViewPipeline();
-    const auto* parsed = view.getParsedPipeline();
-    if (!parsed || parsed->getStages().empty() || !parsed->getStages().front()->isInitialSource()) {
-        return 0;
-    }
-    return parsed->getStages().size();
-}
 }  // namespace
 
 void DocumentSourceLookUp::handleSelfApplyingViewStage(
@@ -390,10 +393,6 @@ void DocumentSourceLookUp::handleSelfApplyingViewStage(
 
 void DocumentSourceLookUp::handlePrependedViewPipeline(
     const std::vector<BSONObj>& pipeline, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (_fromNsIsAView) {
-        _sharedState->viewBindingStart = foreignViewSourceGeneratorPrefixLength(_fromNs, expCtx);
-    }
-
     if (_localField.has_value()) {
         // The $match stage should come after $documents if present.
         auto sourceStages = extractSourceStage(pipeline);

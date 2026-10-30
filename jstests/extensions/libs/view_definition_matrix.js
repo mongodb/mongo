@@ -84,6 +84,16 @@ export function getViewDefs(sideCollName) {
             expectedNames: ["a", "b"],
         },
         {
+            label: "plain stage then bind-sensitive extension",
+            // $disallowViews uasserts whenever it is bound to a view. In a view definition the
+            // stage is bound with an empty namespace on every access path (direct read,
+            // $unionWith, $graphLookup, and $lookup must all agree), because only the stages the
+            // user wrote run "on" the view.
+            pipeline: [{$addFields: {dv: true}}, {$disallowViews: {}}],
+            expectedNames: ["a", "b", "c", "d"],
+            marker: "dv",
+        },
+        {
             label: "kDoNothing view-policy desugarer",
             pipeline: [{$desugarAddViewName: {}}],
             expectedNames: ["a", "b", "c", "d"],

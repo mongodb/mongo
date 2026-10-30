@@ -388,6 +388,54 @@ describe("View policy extension stages", function () {
                 dropView(view.viewName);
             });
 
+            it(`should succeed when $disallowViews is in the view definition targeted by ${op.name}`, function () {
+                const viewName = "sub_viewdef_disallow" + suffix;
+                const view = createView(viewName, [
+                    {$addFields: {fromView: true}},
+                    {$disallowViews: {}},
+                ]);
+
+                // Reading the view directly binds the definition stages with an empty namespace,
+                // so the $disallowViews stage in the definition never fires. Accessing the view
+                // through a subpipeline operator must behave the same way.
+                const results = coll
+                    .aggregate(op.build(viewName, [{$match: {x: {$gte: 1}}}]))
+                    .toArray();
+
+                assert.gt(results.length, 0, "expected documents from the view definition", {
+                    results,
+                });
+                results.forEach((doc) => {
+                    assert(doc.hasOwnProperty("fromView"), "view pipeline must apply", {doc});
+                });
+
+                dropView(view.viewName);
+            });
+
+            it(`should not add view name when $addViewName is in the view definition targeted by ${op.name}`, function () {
+                const viewName = "sub_viewdef_addviewname" + suffix;
+                const view = createView(viewName, [
+                    {$addFields: {fromView: true}},
+                    {$addViewName: {}},
+                ]);
+
+                // The definition stages are bound with an empty namespace, so an $addViewName in
+                // the definition stamps nothing — the same as reading the view directly.
+                const results = coll
+                    .aggregate(op.build(viewName, [{$match: {x: {$gte: 1}}}]))
+                    .toArray();
+
+                assert.gt(results.length, 0, "expected documents from the view definition", {
+                    results,
+                });
+                verifyViewNameAbsent(results);
+                results.forEach((doc) => {
+                    assert(doc.hasOwnProperty("fromView"), "view pipeline must apply", {doc});
+                });
+
+                dropView(view.viewName);
+            });
+
             it(`should not prepend view pipeline when first stage in ${op.name} subpipeline has kDoNothing policy`, function () {
                 const viewName = "sub_donothing_first" + suffix;
                 const view = createView(viewName, [{$addFields: {fromViewPipeline: true}}]);

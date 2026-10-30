@@ -54,6 +54,12 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+
+// Defined at mongo scope (outside the anonymous namespace) in document_source_lookup.cpp so it can
+// be unit-tested here.
+size_t foreignViewDefinitionPrefixLength(const NamespaceString& fromNs,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 namespace {
 using namespace std::literals::string_view_literals;
 
@@ -1180,6 +1186,22 @@ TEST_F(DocumentSourceLookUpTest, ExplainSerializesSubpipelineIncludingViewStages
     ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 2UL);
     ASSERT_FALSE(serializedStage["pipeline"][0].getDocument().getField("$match").missing());
     ASSERT_FALSE(serializedStage["pipeline"][1].getDocument().getField("$addFields").missing());
+}
+
+TEST_F(DocumentSourceLookUpTest, ForeignViewDefinitionPrefixLengthCountsNonSourceViewDefinition) {
+    auto expCtx = getExpCtx();
+    NamespaceString viewNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "myView");
+
+    // A view definition whose first stage is not a source generator: the prefix must still span
+    // the whole (desugared) definition, since $lookup materializes it ahead of the user
+    // subpipeline regardless of what the first stage is.
+    std::vector<BSONObj> viewPipelineVec{BSON("$addFields" << BSON("a" << 1)),
+                                         BSON("$addFields" << BSON("b" << 2))};
+    expCtx->setResolvedNamespaces(
+        ResolvedNamespaceMap{{viewNs, {viewNs, viewPipelineVec, boost::none, true}}});
+
+    ASSERT_EQ(foreignViewDefinitionPrefixLength(viewNs, expCtx), 2UL);
 }
 
 TEST_F(DocumentSourceLookUpTest, RejectsUserSuppliedIsHybridSearchWhenExtensionsFlagOn) {

@@ -29,7 +29,7 @@ const foreignCollName = jsTestName() + "_foreign";
 const sideCollName = jsTestName() + "_side";
 
 // Must match the number of entries in getViewDefs(); the assert below catches a mismatch.
-const NUM_VIEW_DEFS = 16;
+const NUM_VIEW_DEFS = 17;
 
 // Operators that can target a view. Each returns the set of documents the view yielded, so the
 // same expectation applies to all of them.
