@@ -10,7 +10,9 @@ class CheckIdleCursors(jsfile.JSHook):
     # Tag you’ll set in the JS test files that are allowed to leak cursors.
     ALLOW_LEAK_TAG = "can_leak_idle_cursors"
 
-    def __init__(self, hook_logger, fixture, shell_options={}):
+    def __init__(self, hook_logger, fixture, shell_options=None):
+        if shell_options is None:
+            shell_options = {}
         description = "Checking for idle cursors in $currentOp"
         js_filename = os.path.join("jstests", "hooks", "jstest_infra", "run_check_idle_cursors.js")
         super().__init__(
