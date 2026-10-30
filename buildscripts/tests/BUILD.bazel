@@ -3,6 +3,12 @@ load("//bazel:mongo_script_rules.bzl", "mongo_toolchain_py_cxx_test")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 py_test(
+    name = "test_archive_artifacts",
+    srcs = ["test_archive_artifacts.py"],
+    deps = ["//buildscripts:archive_artifacts_lib"],
+)
+
+py_test(
     name = "test_bazel_wrapper_fallback",
     srcs = ["test_bazel_wrapper_fallback.py"],
     data = [

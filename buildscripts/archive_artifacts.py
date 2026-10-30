@@ -40,14 +40,15 @@ def create_tarball(output_filename, file_patterns, exclude_patterns):
     else:
         files_to_add = included_files
 
+    ZstdFile = None
     try:
         from pyzstd import ZstdFile
-    except:
+    except ImportError:
         pass
 
     print(f"Creating tarball: {output_filename}")
     try:
-        if shutil.which("zstd") and "pyzstd" in sys.modules:
+        if shutil.which("zstd") and ZstdFile is not None:
             print("Creating zstd archive")
             zstd_filename = output_filename + ".zst"
             with (
@@ -56,8 +57,10 @@ def create_tarball(output_filename, file_patterns, exclude_patterns):
             ):
                 for file_path in sorted(list(files_to_add)):
                     tar.add(file_path, file_path)
+        # Evergreen requires gzip and uploads zstd as an optional extra.
+        # Keep the gzip copy for consumers without zstd support.
         if shutil.which("pigz"):
-            print("pyzstd not installed. Using pigz.")
+            print("Creating gzip archive with pigz")
             with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as tmp_file:
                 for file in sorted(list(files_to_add)):
                     tmp_file.write(file + "\n")

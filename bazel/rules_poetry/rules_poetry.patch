@@ -1,6 +1,5 @@
 diff --git MODULE.bazel MODULE.bazel
 new file mode 100644
-index 0000000..c09945f
 --- /dev/null
 +++ MODULE.bazel
 @@ -0,0 +1,6 @@
@@ -11,18 +10,165 @@ index 0000000..c09945f
 +bazel_dep(name = "bazel_skylib", version = "1.5.0")
 +bazel_dep(name = "platforms", version = "0.0.8")
 diff --git rules_poetry/defs.bzl rules_poetry/defs.bzl
-index 5e0df55..10aa491 100644
 --- rules_poetry/defs.bzl
 +++ rules_poetry/defs.bzl
-@@ -5,8 +5,11 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
- # We no longer need to use this due to updates to rules_python, but we have not erased it for backward compatibility.
- def deterministic_env():
-     return {
-         # lifted from https://github.com/bazelbuild/rules_python/issues/154
-         "CFLAGS": "-g0",  # debug symbols contain non-deterministic file paths
-+        # Keep Rust-backed Python package builds in Bazel's writable sandbox.
-+        "CARGO_HOME": ".cargo",
-+        "HOME": ".",
-         "PATH": "/bin:/usr/bin:/usr/local/bin",
-         "PYTHONDONTWRITEBYTECODE": "1",
-         "PYTHONHASHSEED": "0",
+@@ -13,3 +13,2 @@
+         "SOURCE_DATE_EPOCH": "315532800",  # set wheel timestamps to 1980-01-01T00:00:00Z
+-        "USERPROFILE":".",
+     }
+@@ -63,2 +62,11 @@
+     destination = ctx.actions.declare_file("requirements/%s.txt" % ctx.attr.name)
++    if ctx.attr.requirements:
++        if ctx.attr.only_binary:
++            for requirement in ctx.attr.requirements:
++                if " @ " in requirement:
++                    url = requirement.split(" @ ", 1)[1].split(" ", 1)[0]
++                    if not url.split("#", 1)[0].split("?", 1)[0].endswith(".whl"):
++                        fail("{} requires a prebuilt wheel; direct source URLs are disabled".format(ctx.attr.pkg))
++        ctx.actions.write(output = destination, content = "\n".join(ctx.attr.requirements) + "\n")
++        return destination
+     marker = ctx.attr.marker
+@@ -94,3 +102,3 @@
+     runtime = toolchain.py3_runtime
+-    inputs = depset([requirements], transitive = [runtime.files])
++    inputs = depset([requirements, ctx.file._environment_runner], transitive = [runtime.files])
+     tools = depset(direct = [runtime.interpreter], transitive = [runtime.files])
+@@ -100,3 +108,3 @@
+     args = ctx.actions.args()
+-    args.add("-m")
++    args.add(ctx.file._environment_runner)
+     args.add("pip")
+@@ -104,2 +112,5 @@
+     args.add_all(COMMON_ARGS)
++    if ctx.attr.only_binary:
++        args.add("--only-binary")
++        args.add(":all:")
+     args.add("--require-hashes")
+@@ -151,2 +162,6 @@
+     attrs = {
++        "_environment_runner": attr.label(
++            default = Label("@@//bazel/rules_poetry:python_build_environment.py"),
++            allow_single_file = True,
++        ),
+         "pkg": attr.string(mandatory = True),
+@@ -155,3 +170,5 @@
+         "marker": attr.string(mandatory = True),
+-        "source_url": attr.string(mandatory = True)
++        "source_url": attr.string(mandatory = True),
++        "requirements": attr.string_list(),
++        "only_binary": attr.bool(default = False),
+     },
+@@ -166,3 +183,3 @@
+     args = [
+-        "-m",
++        ctx.file._environment_runner.path,
+         "pip",
+@@ -183,3 +200,3 @@
+         outputs = [installed_wheel],
+-        inputs = depset(ctx.files.wheel, transitive = [python.files]),
++        inputs = depset(ctx.files.wheel + [ctx.file._environment_runner], transitive = [python.files]),
+         arguments = args,
+@@ -213,2 +230,6 @@
+     attrs = {
++        "_environment_runner": attr.label(
++            default = Label("@@//bazel/rules_poetry:python_build_environment.py"),
++            allow_single_file = True,
++        ),
+         "wheel": attr.label(mandatory = True, providers = [WheelInfo]),
+diff --git rules_poetry/poetry.bzl rules_poetry/poetry.bzl
+--- rules_poetry/poetry.bzl
++++ rules_poetry/poetry.bzl
+@@ -156,2 +156,42 @@
+
++def collect_package_variants(lock_packages, excludes):
++    """Keep URL variants and their markers together under one Bazel target."""
++    grouped = {}
++    for package in lock_packages:
++        name = package["name"]
++        if name.lower() in excludes:
++            continue
++        if package.get("source", {}).get("type", "legacy") not in ["legacy", "url"]:
++            print("Skipping " + name)
++            continue
++        grouped.setdefault(_clean_name(name), []).append(package)
++    return grouped.values()
++
++def lock_marker(package):
++    marker = package.get("markers", package.get("marker", ""))
++    if type(marker) == "dict":
++        values = marker.values()
++        if "" in values:
++            return ""
++        return " or ".join(["(" + value + ")" for value in values])
++    return marker
++
++def locked_requirement(package, fallback_hashes):
++    source = package.get("source", {})
++    if source.get("type") == "url":
++        requirement = package["name"] + " @ " + source["url"]
++    else:
++        requirement = package["name"] + "==" + package["version"]
++    marker = lock_marker(package)
++    if marker:
++        requirement += " ; " + marker
++    hashes = [file["hash"] for file in package["files"]] if "files" in package else fallback_hashes
++    return requirement + " " + " ".join(["--hash=" + digest for digest in hashes])
++
++def package_marker(variants):
++    markers = [lock_marker(package) for package in variants]
++    if "" in markers:
++        return ""
++    return " or ".join(["(" + marker + ")" for marker in markers])
++
+ def _impl(repository_ctx):
+@@ -218,16 +258,5 @@
+     packages = []
+-    package_names = []
+-    for package in lockfile["package"]:
++    for variants in collect_package_variants(lockfile["package"], excludes):
++        package = variants[0]
+         name = package["name"]
+-
+-        if name.lower() in excludes:
+-            continue
+-
+-        if "source" in package and package["source"]["type"] != "legacy":
+-            # TODO: figure out how to deal with git and directory refs
+-            print("Skipping " + name)
+-            continue
+-
+-        if _clean_name(name) in package_names:
+-            continue
+
+@@ -242,3 +271,2 @@
+
+-        package_names.append(_clean_name(name))
+         packages.append(struct(
+@@ -248,7 +276,10 @@
+             hashes = hashes[name],
+-            marker = package.get("marker", None),
+-            source_url = package.get("source", {}).get("url", None),
++            marker = package_marker(variants),
++            # Direct URLs belong in requirements, not pip's --index-url.
++            source_url = package.get("source", {}).get("url", None) if package.get("source", {}).get("type") == "legacy" else None,
++            requirements = [locked_requirement(variant, hashes[name]) for variant in variants] if metadata["lock-version"] == "2.1" else [],
++            only_binary = name.lower() in repository_ctx.attr.wheel_only_packages,
+             dependencies = [
+                 _clean_name(name)
+-                for name in package.get("dependencies", {}).keys()
++                for name in {dep: True for variant in variants for dep in variant.get("dependencies", {})}.keys()
+                 if name.lower() not in excludes
+@@ -293,2 +324,4 @@
+     source_url = "{source_url}",
++    requirements = {requirements},
++    only_binary = {only_binary},
+     visibility = ["//visibility:private"],
+@@ -353,2 +386,4 @@
+             source_url = package.source_url or "",
++            requirements = repr(package.requirements),
++            only_binary = package.only_binary,
+             install_tags = ", ".join(install_tags),
+@@ -374,2 +409,3 @@
+     attrs = {
++        "wheel_only_packages": attr.string_list(),
+         "pyproject": attr.label(

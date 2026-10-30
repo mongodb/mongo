@@ -490,6 +490,12 @@ py_binary(
     ],
 )
 
+py_library(
+    name = "archive_artifacts_lib",
+    srcs = ["archive_artifacts.py"],
+    visibility = ["//buildscripts/tests:__pkg__"],
+)
+
 py_binary(
     name = "archive_artifacts",
     srcs = ["archive_artifacts.py"],
