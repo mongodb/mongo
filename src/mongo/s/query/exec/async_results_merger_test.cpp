@@ -33,6 +33,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -5357,7 +5358,7 @@ TEST_F(AsyncResultsMergerTest,
         ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
 
         // The 'RetryableError' label implies an exponential backoff delay. The retry must not be
-        // dispatched yet: 'outstandingRequest' stays true until the backoff timer fires, and
+        // dispatched yet: the remote stays 'InBackoff' until the backoff timer fires, and
         // '_scheduleGetMores()' skips remotes with an outstanding request.
         ASSERT_FALSE(networkHasReadyRequests());
 
@@ -5458,9 +5459,9 @@ TEST_F(AsyncResultsMergerTest,
 
     // Deliver the first retryable error to shard 1's outstanding getMore. The 'RetryableError'
     // label (without 'SystemOverloadedError') implies a zero-delay backoff: the timer fires, the
-    // retry callback defers (clears 'outstandingRequest') and signals 'readyEvent' - but no retry
+    // retry callback defers (returns the remote to 'Idle') and signals 'readyEvent' - but no retry
     // is dispatched yet. With shard 0 now non-outstanding, the defer signals via the
-    // '!_haveOutstandingBatchRequests()' branch.
+    // no-in-flight-work branch.
     scheduleNetworkResponseObjs({response});
     ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
 
@@ -5562,7 +5563,7 @@ TEST_F(AsyncResultsMergerTest,
         ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
 
         // The 'RetryableError' label implies an exponential backoff delay. The retry must not be
-        // dispatched yet: 'outstandingRequest' stays true until the backoff timer fires, and
+        // dispatched yet: the remote stays 'InBackoff' until the backoff timer fires, and
         // '_scheduleGetMores()' skips remotes with an outstanding request.
         ASSERT_FALSE(networkHasReadyRequests());
 
@@ -5764,7 +5765,7 @@ TEST_F(AsyncResultsMergerTest,
 
 // Specifies the "not too soon" half of the retry-timing contract (SERVER-133148): the retry is
 // not dispatched before the backoff deadline elapses. While the backoff timer is outstanding,
-// 'outstandingRequest' stays true, so '_scheduleGetMores()' skips the remote; and the current
+// the remote stays 'InBackoff', so '_scheduleGetMores()' skips the remote; and the current
 // event is deliberately held unsignaled until the timer callback defers, so a caller cannot
 // re-enter 'nextEvent()' to drive an early dispatch. Advancing the clock to just before the
 // deadline must not produce a ready request; only after the deadline does the timer fire, the
@@ -5786,24 +5787,25 @@ TEST_F(AsyncResultsMergerTest, RetryNotDispatchedBeforeBackoffDeadlineEvenIfCall
     ASSERT_FALSE(arm->ready());
     unittest::assertGet(arm->nextEvent());
 
-    // Deliver the retryable error; the backoff timer is scheduled with 'outstandingRequest' held
-    // true. No request is dispatched yet. 'runScheduledTasks()' drives the opCtx baton, which is
-    // what delivers the response callback (scheduled via 'scheduleRemoteCommand(..., *_subBaton)')
-    // and so deterministically arms the SubBaton timer before we touch the clock below.
+    // Deliver the retryable error; the backoff timer is scheduled with the remote held in
+    // 'InBackoff' true. No request is dispatched yet. 'runScheduledTasks()' drives the opCtx baton,
+    // which is what delivers the response callback (scheduled via 'scheduleRemoteCommand(...,
+    // *_subBaton)') and so deterministically arms the SubBaton timer before we touch the clock
+    // below.
     scheduleNetworkResponseObjs({retryableErrorResponse});
     runScheduledTasks(operationContext());
     ASSERT_FALSE(networkHasReadyRequests());
 
     // The caller waits for progress. Advancing the clock to just before the backoff deadline must
-    // not dispatch: the timer has not fired, 'outstandingRequest' is still true, and the current
+    // not dispatch: the timer has not fired, the remote is still 'InBackoff', and the current
     // event remains unsignaled (so 'nextEvent()' cannot legally be re-entered to force a retry).
     advanceTime(Milliseconds(backOffDelayMs - 1));
     ASSERT_FALSE(networkHasReadyRequests());
     ASSERT_FALSE(arm->ready());
 
-    // The deadline elapses: the timer fires, the retry callback defers (clears
-    // 'outstandingRequest' and signals the event). The next 'nextEvent()' then dispatches the
-    // retry via '_scheduleGetMores()'.
+    // The deadline elapses: the timer fires, the retry callback defers (returns the remote to
+    // 'Idle' and signals the event). The next 'nextEvent()' then dispatches the retry via
+    // '_scheduleGetMores()'.
     advanceTime(Milliseconds(2));
     runScheduledTasks(operationContext());
     runReadyCallbacks();
@@ -5871,8 +5873,8 @@ TEST_F(AsyncResultsMergerTest, RetryNotDispatchedBeforeBackoffDeadlineWhileDetac
     ASSERT_FALSE(networkHasReadyRequests());
     ASSERT_FALSE(arm->ready());
 
-    // Past the deadline: the 'sleepFor' timer fires, the retry callback defers (clears
-    // 'outstandingRequest' and signals 'readyEvent'). We wait for that signal before re-entering
+    // Past the deadline: the 'sleepFor' timer fires, the retry callback defers (returns the remote
+    // to 'Idle' and signals 'readyEvent'). We wait for that signal before re-entering
     // 'nextEvent()', which requires the prior event to have been signaled, then 'nextEvent()'
     // dispatches the retry via '_scheduleGetMores()'.
     advanceTime(Milliseconds(2));
@@ -5942,7 +5944,7 @@ TEST_F(AsyncResultsMergerTest, KillWhileRetryBackoffPendingCleansUp) {
 }
 
 // After the backoff timer fires, the retry callback defers: the remote is left with
-// 'outstandingRequest == false', a live cursor id, and no buffered results - owed a retry but
+// an 'Idle' state, a live cursor id, and no buffered results - owed a retry but
 // with nothing in flight. Killing the ARM in this window must still complete cleanly (the
 // kill-drain accounting in '_cleanUpKilledBatch()' must not depend on the owed retry).
 TEST_F(AsyncResultsMergerTest, KillAfterRetryDefersBeforeNextEventCleansUp) {
@@ -5966,7 +5968,7 @@ TEST_F(AsyncResultsMergerTest, KillAfterRetryDefersBeforeNextEventCleansUp) {
     runScheduledTasks(operationContext());
     ASSERT_FALSE(networkHasReadyRequests());
 
-    // Fire the backoff timer; the callback defers (clears 'outstandingRequest', signals the
+    // Fire the backoff timer; the callback defers (returns the remote to 'Idle', signals the
     // event). No retry is dispatched because no caller has driven 'nextEvent()' yet.
     advanceTime(Milliseconds(backOffDelayMs + 1));
     runScheduledTasks(operationContext());
@@ -6450,7 +6452,7 @@ TEST_F(AsyncResultsMergerTest, CloseShardCursorsDuringBackoffCleansUp) {
 
     // Advance past the backoff and fire the callback. The remote is still alive via its
     // intrusive_ptr (captured in the callback lambda), but is erased from _remotes. The
-    // callback defers (clears outstandingRequest, signals event) without asserting.
+    // callback defers (returns the remote to 'Idle', signals event) without asserting.
     advanceTime(Milliseconds(backOffDelayMs + 1));
     runScheduledTasks(operationContext());
     runReadyCallbacks();
@@ -6519,6 +6521,134 @@ TEST_F(AsyncResultsMergerTest, TailableAwaitDataRetryDefersCorrectly) {
 
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+}
+
+// Tests that a successful response which arrives after the ARM already recorded a fatal error is
+// still accounted for: its metrics are aggregated and it updates the remote's cursor id. Otherwise
+// a cursor that the shard already closed would be sent a redundant killCursors when the ARM is
+// killed.
+TEST_F(AsyncResultsMergerTest, FinalResponseAfterFatalErrorStillUpdatesCursorIdAndMetrics) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 6, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_EQ(2, getNumPendingRequests());
+
+    // The first shard's getMore fails fatally. 'CursorNotFound' means that cursor is already dead,
+    // so killing the ARM later does not send it a killCursors.
+    scheduleErrorResponse(executor::RemoteCommandResponse::make_forTest(
+        Status(ErrorCodes::CursorNotFound, "cursor is gone")));
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(ErrorCodes::CursorNotFound, arm->nextReady().getStatus().code());
+
+    // The second shard's getMore was still in flight. Its response closes the cursor.
+    CursorMetrics metrics(/*keysExamined=*/2,
+                          /*docsExamined=*/5,
+                          /*bytesRead=*/13,
+                          /*readingTimeMicros=*/17,
+                          /*workingTimeMillis=*/7,
+                          /*hasSortStage=*/false,
+                          /*usedDisk=*/false,
+                          /*fromMultiPlanner=*/false,
+                          /*fromPlanCache=*/false);
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
+    scheduleNetworkResponse(CursorResponse(kTestNss,
+                                           CursorId(0),
+                                           std::move(batch),
+                                           /*atClusterTime=*/boost::none,
+                                           /*postBatchResumeToken=*/boost::none,
+                                           /*writeConcernError=*/boost::none,
+                                           /*varsField=*/boost::none,
+                                           /*explainField=*/boost::none,
+                                           /*cursorType=*/boost::none,
+                                           std::move(metrics)));
+    runScheduledTasks(operationContext());
+
+    ASSERT_EQ(2, arm->peekMetrics_forTest().keysExamined);
+    ASSERT_EQ(5, arm->peekMetrics_forTest().docsExamined);
+
+    // Both cursors are closed on the shards, so killing the ARM must not send any killCursors.
+    auto killFuture = arm->kill(operationContext());
+    ASSERT_EQ(0, getNumPendingRequests());
+    killFuture.wait();
+}
+
+// Tests the per-remote 'RemoteState' across a successful getMore lifecycle. Buffered documents are
+// orthogonal to the state: a remote returns to 'Idle' as soon as its response is processed, whether
+// or not it has buffered documents or an open cursor.
+TEST_F(AsyncResultsMergerTest, PerRemoteStateTransitionsThroughSuccessLifecycle) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+    assertRemoteState<AsyncResultsMerger::Idle>(*arm, 0);
+
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    assertRemoteState<AsyncResultsMerger::GetMoreInFlight>(*arm, 0);
+
+    std::vector<CursorResponse> responses;
+    responses.emplace_back(kTestNss, CursorId(1), std::vector<BSONObj>{fromjson("{_id: 1}")});
+    scheduleNetworkResponses(std::move(responses));
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+    assertRemoteState<AsyncResultsMerger::Idle>(*arm, 0);
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+
+    readyEvent = unittest::assertGet(arm->nextEvent());
+    assertRemoteState<AsyncResultsMerger::GetMoreInFlight>(*arm, 0);
+
+    responses.clear();
+    responses.emplace_back(kTestNss, CursorId(0), std::vector<BSONObj>{fromjson("{_id: 2}")});
+    scheduleNetworkResponses(std::move(responses));
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+    assertRemoteState<AsyncResultsMerger::Idle>(*arm, 0);
+    ASSERT_TRUE(arm->remotesExhausted());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(arm->isEOF());
+}
+
+// Tests that a remote stays in 'InBackoff' until the timer fires, then returns to 'Idle' without
+// dispatching; the retry is dispatched by the next 'nextEvent()'.
+TEST_F(AsyncResultsMergerTest, PerRemoteRetryableErrorTransitionsToBackoffAndDefers) {
+    const auto backOffDelayMs = 1000;
+    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
+
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    unittest::assertGet(arm->nextEvent());
+    assertRemoteState<AsyncResultsMerger::GetMoreInFlight>(*arm, 0);
+
+    scheduleNetworkResponseObjs({makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable,
+        "dummy msg",
+        {ErrorLabel::kRetryableError, ErrorLabel::kSystemOverloadedError})});
+    runScheduledTasks(operationContext());
+    ASSERT_FALSE(networkHasReadyRequests());
+    assertRemoteState<AsyncResultsMerger::InBackoff>(*arm, 0);
+
+    advanceTime(Milliseconds(backOffDelayMs + 1));
+    runScheduledTasks(operationContext());
+    runReadyCallbacks();
+    assertRemoteState<AsyncResultsMerger::Idle>(*arm, 0);
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    unittest::assertGet(arm->nextEvent());
+    assertRemoteState<AsyncResultsMerger::GetMoreInFlight>(*arm, 0);
+    ASSERT_TRUE(networkHasReadyRequests());
+
+    std::vector<CursorResponse> responses;
+    responses.emplace_back(kTestNss, CursorId(0), std::vector<BSONObj>{fromjson("{_id: 1}")});
+    scheduleNetworkResponses(std::move(responses));
+    runScheduledTasks(operationContext());
+    assertRemoteState<AsyncResultsMerger::Idle>(*arm, 0);
+    ASSERT_TRUE(arm->remotesExhausted());
 }
 
 }  // namespace

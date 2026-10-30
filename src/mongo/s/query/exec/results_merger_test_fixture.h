@@ -46,6 +46,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/cstdint.hpp>
@@ -459,6 +460,19 @@ protected:
     }
 
     /**
+     * Waits for an ARM kill future while pumping the executor, so cancelled callbacks drain without
+     * relying on executor shutdown to flush them.
+     */
+    template <class FutureType>
+    void waitForKillFuture(FutureType& killFuture) {
+        waitForCondition([&] { return killFuture.isReady(); },
+                         [this] { runReadyCallbacks(); },
+                         "Waiting for ARM kill future",
+                         [] {});
+        killFuture.wait();
+    }
+
+    /**
      * Waits until the ARM has scheduled the killCursors command for an open cursor (proving it
      * has progressed past its cancel step). If the wait's budget is exhausted, a kill thread is
      * already in flight, so 'kill()' cannot be re-entered; instead flush ready callbacks so
@@ -473,6 +487,20 @@ protected:
             [] {},
             "Waiting for killCursors command to be scheduled",
             [this] { runReadyCallbacks(); });
+    }
+
+    /**
+     * Asserts that the remote at 'remoteIdx' is in the 'StateT' alternative of the ARM's private
+     * per-remote 'RemoteState'. 'ResultsMergerTestFixture' is a friend of 'AsyncResultsMerger';
+     * derived TEST_F classes are not, so tests route state probes through here.
+     */
+    template <class StateT>
+    void assertRemoteState(const AsyncResultsMerger& arm, std::size_t remoteIdx) const {
+        std::lock_guard lk(arm._mutex);
+        invariant(remoteIdx < arm._remotes.size());
+        const auto& state = arm._remotes[remoteIdx]->state;
+        ASSERT_TRUE(std::holds_alternative<StateT>(state))
+            << "unexpected state: " << AsyncResultsMerger::stateName(state);
     }
 
     void blackHoleNextRequest() {

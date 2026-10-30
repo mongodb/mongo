@@ -821,8 +821,8 @@ TEST_F(BlockingResultsMergerTestFixture,
     runReadyCallbacks();
     ASSERT_FALSE(networkHasReadyRequests());
 
-    // Advance partway: still before the deadline, so no timer fires yet. 'outstandingRequest' stays
-    // true and no getMore is dispatched.
+    // Advance partway: still before the deadline, so no timer fires yet. The remote stays
+    // 'InBackoff' and no getMore is dispatched.
     advanceTime(Milliseconds(kBackoffDelayMs / 2));
     runReadyCallbacks();
     ASSERT_FALSE(networkHasReadyRequests());

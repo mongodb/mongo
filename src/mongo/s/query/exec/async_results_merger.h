@@ -31,6 +31,7 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/overloaded_visitor.h"
 
 #include <cstddef>
 #include <deque>
@@ -39,6 +40,7 @@
 #include <queue>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <absl/container/btree_set.h>
@@ -78,6 +80,8 @@ class AsyncResultsMerger : public std::enable_shared_from_this<AsyncResultsMerge
     AsyncResultsMerger(const AsyncResultsMerger&) = delete;
     AsyncResultsMerger& operator=(const AsyncResultsMerger&) = delete;
 
+    friend class ResultsMergerTestFixture;
+
 public:
     // When mongos has to do a merge in order to return results to the client in the correct sort
     // order, it requests a sortKey meta-projection using this field name.
@@ -98,6 +102,34 @@ public:
         ShardId shardId;
         TransactionRouter::ParsedParticipantResponseMetadata parsedMetadata;
     };
+
+    // The per-remote lifecycle state, held by 'RemoteCursorData::state'. Models the remote's
+    // outstanding asynchronous work. These are public nested types so tests can name them.
+    struct Idle {};
+
+    struct GetMoreInFlight {
+        executor::TaskExecutor::CallbackHandle cbHandle;
+    };
+
+    // The backoff timer is cancelled ARM-wide via '_cancellationSource', so this state carries no
+    // per-remote handle.
+    struct InBackoff {};
+
+    using RemoteState = std::variant<Idle, GetMoreInFlight, InBackoff>;
+
+    // Returns whether 'state' describes outstanding async work (a getMore or a backoff timer).
+    static bool isInFlight(const RemoteState& state) {
+        return std::visit(OverloadedVisitor{[](const Idle&) { return false; },
+                                            [](const GetMoreInFlight&) { return true; },
+                                            [](const InBackoff&) {
+                                                return true;
+                                            }},
+                          state);
+    }
+
+    // Returns the name of the alternative held in 'state' ("Idle", "GetMoreInFlight", or
+    // "InBackoff"), for logging and test diagnostics.
+    static std::string_view stateName(const RemoteState& state);
 
     /**
      * Factory function to create an 'AsyncResultsMerger' instance. Calling this method is the only
@@ -481,6 +513,44 @@ private:
      * One 'RemoteCursorData' instance is instantiated per remote host. A 'RemoteCursorData'
      * contains the buffer of results that have been retrieved from the host but not yet returned,
      * as well as the cursor id, and any error reported by the remote.
+     *
+     * ### Per-remote lifecycle
+     *
+     * Each 'RemoteCursorData' owns a 'RemoteState' variant that models the remote's outstanding
+     * asynchronous work:
+     *
+     *     +------+  getMore sent   +-----------------+
+     *     | Idle | --------------> | GetMoreInFlight |
+     *     +------+ <-------------- +-----------------+
+     *      |    ^  response received
+     *      |    |
+     *      |    |  timer fired or cancelled  +-----------+
+     *      |    +--------------------------- | InBackoff |
+     *      +-------------------------------> +-----------+
+     *        retryable error response
+     *
+     * - 'Idle': no getMore is in flight and no backoff timer is pending. A remote whose cursor is
+     *   exhausted (cursorId == 0) also sits in 'Idle'.
+     * - 'GetMoreInFlight': a getMore is in flight. The state carries the request's callback
+     *   handle, which is used to cancel it.
+     * - 'InBackoff': the last getMore failed with a retryable error and a backoff timer is
+     *   pending. The response handler first returns the remote to 'Idle', then enters 'InBackoff',
+     *   hence the 'Idle' -> 'InBackoff' edge.
+     *
+     * Every transition happens under '_mutex' through one of the named transition functions
+     * ('_transitionToGetMoreInFlight()', '_completeGetMore()', '_enterBackoff()',
+     * '_completeBackoff()'), which tassert their from-state.
+     *
+     * Two properties are deliberately kept out of the state machine:
+     * - Whether the remote cursor is done: 'cursorId == 0' ('exhausted()') is the only authority.
+     * - Whether documents are buffered: 'docBuffer' is orthogonal to the state, so a remote can be
+     *   'GetMoreInFlight' while a looked-ahead document sits in its buffer (see 'undoNextReady()').
+     *
+     * Retry: the backoff timer never dispatches the retry itself. When it fires it returns the
+     * remote to 'Idle' and signals the current event; the next 'nextEvent()' dispatches the retry
+     * through '_scheduleGetMores()' with whatever OperationContext is attached then. While
+     * attached, the timer runs on the opCtx's sub-baton; while detached, it runs on the executor.
+     *
      */
     struct RemoteCursorData : public RefCountable {
         /**
@@ -569,11 +639,13 @@ private:
         // The buffer of results that have been retrieved but not yet returned to the caller.
         std::deque<BSONObj> docBuffer;
 
-        // Set to 'true' when at least one request is outstanding.
-        bool outstandingRequest = false;
+        // The remote's outstanding asynchronous work, if any.
+        RemoteState state = Idle{};
 
-        // Is valid if there is currently a pending request to this remote.
-        executor::TaskExecutor::CallbackHandle cbHandle;
+        // Returns whether this remote has a getMore in flight or a backoff timer pending.
+        bool hasInFlightWork() const {
+            return AsyncResultsMerger::isInFlight(state);
+        }
 
         // Set to an error status if there is an error retrieving a response from this remote or if
         // the command result contained an error.
@@ -797,6 +869,8 @@ private:
      */
     bool _haveOutstandingBatchRequests(WithLock);
 
+    void _assertIsReadyToDispatch(WithLock) const;
+
     /**
      * Called internally when attempting to get a new event for the caller to wait on. Throws if
      * the shard cursor from which the next result is due has already been invalidated.
@@ -890,6 +964,13 @@ private:
                                                 const RemoteCursorPtr& remote);
 
     /**
+     * Shared epilogue for an async-work continuation (getMore response or backoff timer) that has
+     * decided not to process its result: wakes any 'nextEvent()' waiter and, if a kill is in
+     * progress, completes it once this was the last outstanding work.
+     */
+    void _onAsyncWorkDropped(WithLock);
+
+    /**
      * Removes a remote from the _promisedMinSortKeys set, if already present in there.
      */
     void _removeRemoteFromPromisedMinSortKeys(WithLock lk, const RemoteCursorPtr& remote);
@@ -904,6 +985,28 @@ private:
      * Cancels any potential in-flight callback for the remote.
      */
     void _cancelCallbackForRemote(WithLock lk, const RemoteCursorPtr& remote);
+
+    /**
+     * The named transitions of the per-remote 'RemoteState' state machine. Each tasserts its
+     * expected from-state, so a stale continuation cannot silently clobber newer work:
+     *
+     * - '_transitionToGetMoreInFlight()': 'Idle' -> 'GetMoreInFlight', when a getMore is sent.
+     * - '_completeGetMore()': 'GetMoreInFlight' -> 'Idle', when its response is received.
+     * - '_enterBackoff()': 'Idle' -> 'InBackoff', after a retryable getMore error.
+     * - '_completeBackoff()': 'InBackoff' -> 'Idle', in the backoff timer's callback.
+     */
+    void _transitionToGetMoreInFlight(WithLock,
+                                      RemoteCursorData& remote,
+                                      executor::TaskExecutor::CallbackHandle cbHandle);
+    void _completeGetMore(WithLock, RemoteCursorData& remote);
+    void _enterBackoff(WithLock, RemoteCursorData& remote);
+    void _completeBackoff(WithLock, RemoteCursorData& remote);
+
+    /**
+     * The single assignment point for a remote's 'state'. Tasserts that in-flight work is never
+     * overwritten by other in-flight work and logs the transition at log level 4.
+     */
+    void _setRemoteState(WithLock, RemoteCursorData& remote, RemoteState newState);
 
     /**
      * Clear internal document buffers in order to release memory as early as possible.
