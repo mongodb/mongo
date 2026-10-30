@@ -298,6 +298,7 @@ const skippedAuthTestingCommands = [
     "endSessions",
     "explain",
     "exportCollection",
+    "failInvariant",
     "getAuditConfig",
     "getChangeStreamState",
     "getShardingReady",

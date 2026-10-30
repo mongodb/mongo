@@ -655,6 +655,7 @@ const allTestCases = {
             conditional: true,
         },
         explain: {skip: "already tested by each CRUD command through the 'explain' field"},
+        failInvariant: {skip: "internal command", conditional: true},
         features: {skip: "executes locally on mongos (not sent to any remote node)"},
         filemd5: {
             run: {
@@ -1405,6 +1406,7 @@ const allTestCases = {
         eseRotateActiveKEK: {skip: "TODO", conditional: true},
         explain: {skip: "TODO"},
         exportCollection: {skip: "TODO", conditional: true},
+        failInvariant: {skip: "internal command", conditional: true},
         features: {skip: "TODO"},
         filemd5: {skip: "TODO"},
         find: {skip: "TODO"},

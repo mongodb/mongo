@@ -302,6 +302,49 @@ MONGO_REGISTER_COMMAND(CommandFeatureFlaggedOnLatestFCVTestCmd91)
     .requiresFeatureFlag(feature_flags::gFeatureFlagBlender)
     .forShard();
 
+
+class FailInvariantTestCmd : public BasicCommand {
+public:
+    FailInvariantTestCmd() : BasicCommand("failInvariant") {}
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
+    std::string help() const override {
+        return "internal. for testing only.";
+    }
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        LOGV2(13420200, "Test-only command 'failInvariant' invoked");
+#include "mongo/util/false_invariant.inl"
+        uasserted(ErrorCodes::CommandFailed, "Invariant did not fail");
+    }
+};
+
+MONGO_REGISTER_COMMAND(FailInvariantTestCmd).testOnly().forShard();
+
 }  // namespace
 
 std::string TestingDurableHistoryPin::getName() {

@@ -1,0 +1,14 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+global:
+    mod_visibility: private
+    cpp_namespace: "mongo"
+
+server_parameters:
+    defangedInvariants:
+        description: "Controls which invariants are defanged (converted to tasserts) so that they throw instead of aborting."
+        set_at: ["startup", "runtime"]
+        cpp_class:
+            name: DefangedInvariantsServerParameter
+            override_set: true
+        redact: false

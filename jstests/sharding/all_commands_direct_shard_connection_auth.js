@@ -687,6 +687,7 @@ const allCommands = {
             assert.commandWorked(mongoS.getDB(dbName).runCommand({drop: collName}));
         },
     },
+    failInvariant: {skip: isAnInternalCommand},
     features: {command: {features: 1}, shouldFail: false},
     filemd5: {
         setUp: function (mongoS) {

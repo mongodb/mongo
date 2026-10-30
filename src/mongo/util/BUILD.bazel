@@ -530,6 +530,22 @@ idl_generator(
     src = "assert_util_parameters.idl",
 )
 
+idl_generator(
+    name = "defang_invariants_parameters_gen",
+    src = "defang_invariants_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "defang_invariants_parameters",
+    srcs = [
+        "defang_invariants_parameters.cpp",
+        ":defang_invariants_parameters_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
 mongo_cc_library(
     name = "assert_util_params",
     srcs = [
@@ -537,6 +553,7 @@ mongo_cc_library(
         ":assert_util_parameters_gen",
     ],
     deps = [
+        ":defang_invariants_parameters",
         "//src/mongo/db:server_base",
     ],
 )

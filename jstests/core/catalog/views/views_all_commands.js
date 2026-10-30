@@ -452,6 +452,7 @@ let viewsCommandTests = {
     endSessions: {skip: isUnrelated},
     eseRotateActiveKEK: {skip: isUnrelated},
     explain: {command: {explain: {count: "view"}}},
+    failInvariant: {skip: isAnInternalCommand},
     features: {skip: isUnrelated},
     filemd5: {skip: isUnrelated},
     find: {skip: "tested in views/views_find.js & views/views_sharded.js"},

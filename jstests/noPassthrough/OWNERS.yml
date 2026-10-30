@@ -12,6 +12,9 @@ filters:
   - "*tassert*":
     approvers:
       - 10gen/server-programmability
+  - "*defang_invariant*":
+    approvers:
+      - 10gen/server-programmability
   - "*pin_code_segments*":
     approvers:
       - 10gen/server-programmability

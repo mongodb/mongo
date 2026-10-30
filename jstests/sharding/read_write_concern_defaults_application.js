@@ -603,6 +603,7 @@ let testCases = {
     endSessions: {skip: "does not accept read or write concern"},
     eseRotateActiveKEK: {skip: "does not accept read or write concern"},
     explain: {skip: "TODO SERVER-45478"},
+    failInvariant: {skip: "internal command"},
     features: {skip: "internal command"},
     filemd5: {skip: "does not accept read or write concern"},
     find: {

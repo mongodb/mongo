@@ -744,6 +744,7 @@ mongo_cc_library(
         "test_commands.cpp",
         "whats_my_uri_cmd.cpp",
         ":sysprofile_gen",
+        "//src/mongo/util:false_invariant.inl",
     ],
     deps = [
         ":test_commands_enabled",
