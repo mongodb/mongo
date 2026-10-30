@@ -568,7 +568,9 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     }
 
     bool isParallelEligible() const override {
-        return true;
+        // A clustered scan provides a sort order, which the parallel planner cannot yet preserve
+        // through a gather.
+        return !clusteredIndex;
     }
 
     void computeProperties() override;
@@ -1167,10 +1169,6 @@ struct ProjectionNodeDefault final : ProjectionNode {
         return STAGE_PROJECTION_DEFAULT;
     }
 
-    bool isParallelEligible() const override {
-        return true;
-    }
-
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view projectionImplementationTypeToString() const final {
@@ -1193,10 +1191,6 @@ struct ProjectionNodeCovered final : ProjectionNode {
         return STAGE_PROJECTION_COVERED;
     }
 
-    bool isParallelEligible() const override {
-        return true;
-    }
-
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view projectionImplementationTypeToString() const final {
@@ -1216,10 +1210,6 @@ struct ProjectionNodeSimple final : ProjectionNode {
 
     StageType getType() const override {
         return STAGE_PROJECTION_SIMPLE;
-    }
-
-    bool isParallelEligible() const override {
-        return true;
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
@@ -1373,10 +1363,6 @@ struct LimitNode : public QuerySolutionNode {
 
     StageType getType() const override {
         return STAGE_LIMIT;
-    }
-
-    bool isParallelEligible() const override {
-        return true;
     }
 
     void appendToString(str::stream* ss, int indent) const override;
@@ -2466,6 +2452,10 @@ struct ExchangeNode : public QuerySolutionNode {
 
     StageType getType() const override {
         return STAGE_EXCHANGE;
+    }
+
+    bool isParallelEligible() const override {
+        return true;
     }
 
     void appendToString(str::stream* ss, int indent) const override;

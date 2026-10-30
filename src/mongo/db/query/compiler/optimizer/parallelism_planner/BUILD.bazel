@@ -12,9 +12,13 @@ exports_files(
 mongo_cc_library(
     name = "parallelism_planner",
     srcs = [
+        "op_selector.cpp",
+        "parallelism_planner.cpp",
         "required_distribution.cpp",
     ],
     hdrs = [
+        "op_selector.h",
+        "parallelism_planner.h",
         "parallelism_planner_context.h",
         "required_distribution.h",
     ],
@@ -26,10 +30,25 @@ mongo_cc_library(
 
 mongo_cc_unit_test(
     name = "required_distribution_test",
-    srcs = ["required_distribution_test.cpp"],
+    srcs = [
+        "parallelism_planner_test_fixture.h",
+        "required_distribution_test.cpp",
+    ],
     tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":parallelism_planner",
         "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "parallelism_planner_test",
+    srcs = [
+        "parallelism_planner_test.cpp",
+        "parallelism_planner_test_fixture.h",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":parallelism_planner",
     ],
 )

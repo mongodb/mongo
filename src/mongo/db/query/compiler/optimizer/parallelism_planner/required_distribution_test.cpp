@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/optimizer/parallelism_planner/required_distribution.h"
 
 #include "mongo/db/query/compiler/optimizer/parallelism_planner/parallelism_planner_context.h"
+#include "mongo/db/query/compiler/optimizer/parallelism_planner/parallelism_planner_test_fixture.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution_test_util.h"
 #include "mongo/unittest/death_test.h"
@@ -14,44 +15,12 @@
 namespace mongo::parallelism_planner {
 namespace {
 
-struct MockCollScanNode : public QuerySolutionNode {
-    MockCollScanNode() = default;
-
-    StageType getType() const override {
-        return STAGE_COLLSCAN;
-    }
-    void appendToString(str::stream* ss, int indent) const override {
-        *ss << "MOCK_COLL_SCAN\n";
-    }
-    bool fetched() const override {
-        return true;
-    }
-    FieldAvailability getFieldAvailability(const std::string&) const override {
-        return FieldAvailability::kFullyProvided;
-    }
-    bool sortedByDiskLoc() const override {
-        return false;
-    }
-    const ProvidedSortSet& providedSorts() const override {
-        return kEmptySet;
-    }
-    std::unique_ptr<QuerySolutionNode> clone() const override {
-        return std::make_unique<MockCollScanNode>();
-    }
-};
-
-std::unique_ptr<QuerySolutionNode> scan() {
-    return std::make_unique<MockCollScanNode>();
-}
-
-//
-// ParallelismPlannerContext
-//
-
-TEST(ParallelismPlannerContextTest, StoresMaxDoP) {
-    ASSERT_EQ(ParallelismPlannerContext(1).maxDoP(), 1);
-    ASSERT_EQ(ParallelismPlannerContext(12).maxDoP(), 12);
-}
+using ExchangeNodeTest = ParallelismPlannerTest;
+using ExchangeNodeDeathTest = ParallelismPlannerTest;
+using PlanDistributionTest = ParallelismPlannerTest;
+using PlanDistributionDeathTest = ParallelismPlannerTest;
+using ChildRequirementsTest = ParallelismPlannerTest;
+using ChildRequirementsDeathTest = ParallelismPlannerTest;
 
 TEST(DistributionDescTest, BroadcastProducesReplicatedDistribution) {
     auto out = toOutputDistribution(ExchangeRouting::broadcast());
@@ -86,9 +55,9 @@ DEATH_TEST(DistributionDescDeathTest,
     DistributionDesc::rangeOn({});
 }
 
-DEATH_TEST(ExchangeNodeDeathTest,
-           HashRoutingRejectsEmptyKeys,
-           "hash partitioning requires at least one key") {
+DEATH_TEST_F(ExchangeNodeDeathTest,
+             HashRoutingRejectsEmptyKeys,
+             "hash partitioning requires at least one key") {
     // An exchange builds its output distribution from its routing, so it is rejected there too.
     ExchangeNode exchange(scan(), ExchangeRouting::hashOn({}));
 }
@@ -152,12 +121,12 @@ TEST(RequiredDistributionTest, ToString) {
 // ExchangeNode
 //
 
-TEST(ExchangeNodeTest, StageTypeIsExchange) {
+TEST_F(ExchangeNodeTest, StageTypeIsExchange) {
     ExchangeNode exchange(scan(), ExchangeRouting::gather(false));
     ASSERT_EQ(exchange.getType(), STAGE_EXCHANGE);
 }
 
-TEST(ExchangeNodeTest, OutputDistributionFollowsRoutingFromConstruction) {
+TEST_F(ExchangeNodeTest, OutputDistributionFollowsRoutingFromConstruction) {
     ASSERT_EQ(ExchangeNode(scan(), ExchangeRouting::gather(false)).physicalProps.distribution,
               DistributionDesc::unpartitioned());
     ASSERT_EQ(ExchangeNode(scan(), ExchangeRouting::broadcast()).physicalProps.distribution,
@@ -169,7 +138,7 @@ TEST(ExchangeNodeTest, OutputDistributionFollowsRoutingFromConstruction) {
         DistributionDesc::hashOn({FieldPath("a")}));
 }
 
-TEST(ExchangeNodeTest, CloneRoundTrips) {
+TEST_F(ExchangeNodeTest, CloneRoundTrips) {
     auto exchange =
         std::make_unique<ExchangeNode>(scan(), ExchangeRouting::hashOn({FieldPath("a")}));
 
@@ -183,7 +152,7 @@ TEST(ExchangeNodeTest, CloneRoundTrips) {
     ASSERT_EQ(asExch->children.size(), 1u);
 }
 
-TEST(ExchangeNodeTest, AppendToStringDistinguishesTheThreeRoutingKinds) {
+TEST_F(ExchangeNodeTest, AppendToStringDistinguishesTheThreeRoutingKinds) {
     auto gather = std::make_unique<ExchangeNode>(scan(), ExchangeRouting::gather(false));
     ASSERT_STRING_CONTAINS(gather->toString(), "Gather");
 
@@ -199,7 +168,7 @@ TEST(ExchangeNodeTest, AppendToStringDistinguishesTheThreeRoutingKinds) {
     ASSERT_STRING_CONTAINS(gather->toString(), "\n---nodeId = ");
 }
 
-TEST(ExchangeNodeTest, OnlyASortPreservingGatherKeepsTheChildsSortOrder) {
+TEST_F(ExchangeNodeTest, OnlyASortPreservingGatherKeepsTheChildsSortOrder) {
     // An index scan on {a: 1}, which provides that sort order. Each exchange takes ownership of its
     // child, so every use gets a fresh one.
     auto sortedScan = [] {
@@ -224,7 +193,7 @@ TEST(ExchangeNodeTest, OnlyASortPreservingGatherKeepsTheChildsSortOrder) {
     }
 }
 
-TEST(ExchangeNodeTest, ReportsWhetherItIsAGather) {
+TEST_F(ExchangeNodeTest, ReportsWhetherItIsAGather) {
     ExchangeNode repartition(scan(), ExchangeRouting::hashOn({FieldPath("a")}));
     ASSERT_TRUE(repartition.providedSorts().getBaseSortPattern().isEmpty());
     ASSERT_FALSE(repartition.isGather());
@@ -234,10 +203,73 @@ TEST(ExchangeNodeTest, ReportsWhetherItIsAGather) {
     ASSERT_FALSE(gather.sortedByDiskLoc());
 }
 
-TEST(ExchangeNodeTest, ForwardsFetchedAndFieldAvailabilityFromChild) {
+TEST_F(ExchangeNodeTest, ForwardsFetchedAndFieldAvailabilityFromChild) {
     ExchangeNode exchange(scan(), ExchangeRouting::gather(false));
     ASSERT_TRUE(exchange.fetched());
     ASSERT_TRUE(exchange.getFieldAvailability("a") == FieldAvailability::kFullyProvided);
+}
+
+//
+// Tests for planDistribution() and insertExchangeFor().
+//
+
+DEATH_TEST_REGEX_F(PlanDistributionDeathTest, IneligibleNodeIsRejected, "13623108") {
+    IneligibleNode node(scan());
+    planDistribution(node, _parallelCtx);
+}
+
+TEST_F(PlanDistributionTest, ScanIsRoundRobin) {
+    auto root = scan();
+    planDistribution(*root, _parallelCtx);
+    ASSERT_EQ(root->physicalProps.distribution.type, DistributionDesc::Type::RoundRobin);
+}
+
+TEST_F(PlanDistributionTest, NoExchangeInsertedWhenRequirementAlreadySatisfied) {
+    auto root = matchOver(scan());
+    planDistribution(*root, _parallelCtx);
+    ASSERT_EQ(root->physicalProps.distribution.type, DistributionDesc::Type::RoundRobin);
+    ASSERT_EQ(root->children[0]->getType(), STAGE_COLLSCAN);
+}
+
+TEST_F(PlanDistributionTest, ExchangeSetsItsOwnDistributionToMatchItsRouting) {
+    auto exchange = insertExchangeFor(scan(), RequiredDistribution::hashOn({FieldPath("a")}));
+    ASSERT_EQ(exchange->physicalProps.distribution, DistributionDesc::hashOn({FieldPath("a")}));
+    exchange = insertExchangeFor(scan(), RequiredDistribution::replicated());
+    ASSERT_EQ(exchange->physicalProps.distribution, DistributionDesc::replicated());
+    exchange = insertExchangeFor(scan(), RequiredDistribution::unpartitioned());
+    ASSERT_EQ(exchange->physicalProps.distribution, DistributionDesc::unpartitioned());
+}
+
+TEST_F(PlanDistributionTest, GatherIsNeverSortPreserving) {
+    auto gather = insertExchangeFor(scan(), RequiredDistribution::unpartitioned());
+    ASSERT_FALSE(std::get<ExchangeRouting::Gather>(
+                     static_cast<const ExchangeNode*>(gather.get())->routing.mode)
+                     .sortPreserving);
+}
+
+DEATH_TEST_REGEX_F(PlanDistributionDeathTest, GatherOverOrderedInputIsRejected, "13623107") {
+    insertExchangeFor(std::make_unique<MockSortedNode>(scan(), BSON("a" << 1)),
+                      RequiredDistribution::unpartitioned());
+}
+
+TEST_F(PlanDistributionTest, RepartitionIsNeverSortPreserving) {
+    auto sorted = insertExchangeFor(std::make_unique<MockSortedNode>(scan(), BSON("a" << 1)),
+                                    RequiredDistribution::hashOn({FieldPath("a")}));
+    ASSERT_TRUE(sorted->providedSorts().getBaseSortPattern().isEmpty());
+}
+
+TEST_F(ChildRequirementsTest, PassThroughNodesImposeNothingOnTheirInput) {
+    auto root = matchOver(scan());
+    auto reqs = childRequirements(*root);
+    ASSERT_EQ(reqs.size(), 1u);
+    ASSERT_EQ(reqs[0].type, RequiredDistribution::Type::Any);
+    ASSERT_TRUE(childRequirements(*scan()).empty());
+}
+
+// MockSortedNode reports STAGE_SORT_DEFAULT, which has no requirement defined yet.
+DEATH_TEST_REGEX_F(ChildRequirementsDeathTest, UnsupportedNodeTypeIsRejected, "13623106") {
+    MockSortedNode node(scan(), BSON("a" << 1));
+    childRequirements(node);
 }
 
 }  // namespace

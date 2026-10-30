@@ -2832,21 +2832,29 @@ TEST(QuerySolutionTest, ParallelEligibleNodes) {
     };
 
     ASSERT_TRUE(scan()->isParallelEligible());
-    ASSERT_TRUE(LimitNode(scan(), 1, LimitSkipParameterization::Disabled).isParallelEligible());
     ASSERT_TRUE(ShardingFilterNode().isParallelEligible());
+    ASSERT_TRUE(ExchangeNode(scan(), ExchangeRouting::gather(false)).isParallelEligible());
+
+    // A clustered scan provides a sort order, so it is not eligible.
+    auto clusteredScan = scan();
+    clusteredScan->clusteredIndex = ClusteredIndexSpec{};
+    ASSERT_FALSE(clusteredScan->isParallelEligible());
 
     auto [filter, projection] = createMatchExprAndProjection(BSONObj(), BSON("a" << 1));
-    ASSERT_TRUE(ProjectionNodeDefault(scan(), filter.get(), projection).isParallelEligible());
-    ASSERT_TRUE(ProjectionNodeSimple(scan(), filter.get(), projection).isParallelEligible());
-    ASSERT_TRUE(ProjectionNodeCovered(scan(), filter.get(), projection, BSON("a" << 1))
-                    .isParallelEligible());
-    ASSERT_TRUE(MatchNode(scan(), std::move(filter)).isParallelEligible());
+    ASSERT_TRUE(MatchNode(scan(), filter->clone()).isParallelEligible());
+
+    // Projections can overwrite or drop a partitioning key, so they are not eligible yet.
+    ASSERT_FALSE(ProjectionNodeDefault(scan(), filter.get(), projection).isParallelEligible());
+    ASSERT_FALSE(ProjectionNodeSimple(scan(), filter.get(), projection).isParallelEligible());
+    ASSERT_FALSE(ProjectionNodeCovered(scan(), filter.get(), projection, BSON("a" << 1))
+                     .isParallelEligible());
 
     // Everything else is opted out by default.
     auto indexScan =
         std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
     ASSERT_FALSE(indexScan->isParallelEligible());
     ASSERT_FALSE(FetchNode(std::move(indexScan), mainNss).isParallelEligible());
+    ASSERT_FALSE(LimitNode(scan(), 1, LimitSkipParameterization::Disabled).isParallelEligible());
     ASSERT_FALSE(SkipNode(scan(), 1, LimitSkipParameterization::Disabled).isParallelEligible());
 }
 
