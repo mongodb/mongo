@@ -294,13 +294,23 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBet
             _metrics->setCoordinatorLowEstimateRemainingTimeMillis(clampIfMax(remainingTimes.min));
 
             // Check if all recipient shards are within the commit threshold.
-            if (remainingTimes.max <= threshold)
-                return true;
+            if (remainingTimes.max <= threshold) {
+                if (!gReshardingRequireExplicitCommit.load()) {
+                    return true;
+                }
 
-            // The following ensures that the monitor would never sleep for more than a predefined
-            // maximum delay between querying recipient shards. Thus, it can handle very large,
-            // and potentially inaccurate estimates of the remaining operation time.
-            *delay = std::min(remainingTimes.max - threshold, maxDelayBetweenQueries);
+                LOGV2_DEBUG(13828800,
+                            kDiagnosticLogLevel,
+                            "Recipients are within the commit threshold but not engaging the "
+                            "critical section because reshardingRequireExplicitCommit is enabled",
+                            logAttrs(_ns));
+                *delay = maxDelayBetweenQueries;
+            } else {
+                // The following ensures that the monitor would never sleep for more than a
+                // predefined maximum delay between querying recipient shards. Thus, it can handle
+                // very large, and potentially inaccurate estimates of the remaining operation time.
+                *delay = std::min(remainingTimes.max - threshold, maxDelayBetweenQueries);
+            }
 
             return false;
         })

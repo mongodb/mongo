@@ -331,6 +331,22 @@ server_parameters:
         default: true
         redact: false
 
+    reshardingRequireExplicitCommit:
+        description: >-
+            When true, the resharding coordinator will never engage the critical section on its
+            own, even after all recipients are within remainingReshardingOperationTimeThresholdMillis.
+            Instead, the resharding operation will remain in the applying state until the user
+            runs the commitReshardCollection command (or aborts the operation). It is recommended to
+            use a higher setting for reshardingCriticalSectionTimeoutMillis when attempting to manually
+            run commit. The user can turn this off again after turning it on to allow resharding to
+            commit automatically. This setting will have no effect if coordinator already started
+            engaging the critical sections.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingRequireExplicitCommit
+        default: false
+        redact: false
+
     reshardingRemainingTimeEstimateAccountsForRecipientReplicationLag:
         description: >-
             Controls whether the remaining time estimate on the resharding coordinator, when trying

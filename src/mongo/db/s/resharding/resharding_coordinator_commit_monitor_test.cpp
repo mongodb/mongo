@@ -521,6 +521,48 @@ TEST_F(CoordinatorCommitMonitorTest, UnblocksWhenRecipientsWithinCommitThreshold
     future.get();
 }
 
+TEST_F(CoordinatorCommitMonitorTest, BlocksWithinCommitThresholdWhenExplicitCommitRequired) {
+    boost::optional<unittest::ServerParameterGuard> requireExplicitCommit;
+    requireExplicitCommit.emplace("reshardingRequireExplicitCommit", true);
+
+    auto fp = globalFailPointRegistry().find("hangBeforeQueryingRecipients");
+    auto future = getCommitMonitor()->waitUntilRecipientsAreWithinCommitThreshold();
+
+    // Report that the recipients are within the commit threshold, and enable the fail-point so
+    // that the next query (if any) hangs.
+    FailPoint::EntryCountT timesEnteredBefore = 0;
+    runOnMockingNextResponse([&] { timesEnteredBefore = fp->setMode(FailPoint::alwaysOn); });
+    mockResponsesReadyToCommit();
+
+    // The monitor should query the recipients again instead of unblocking.
+    fp->waitForTimesEntered(timesEnteredBefore + 1);
+    ASSERT(!future.isReady());
+
+    // Once the parameter is turned off, the monitor should unblock after its next query.
+    requireExplicitCommit.reset();
+    fp->setMode(FailPoint::off);
+    mockResponsesReadyToCommit();
+    future.get();
+}
+
+TEST_F(CoordinatorCommitMonitorTest, UnblocksWhenCancelledWhileExplicitCommitRequired) {
+    unittest::ServerParameterGuard requireExplicitCommit{"reshardingRequireExplicitCommit", true};
+
+    auto fp = globalFailPointRegistry().find("hangBeforeQueryingRecipients");
+    auto future = getCommitMonitor()->waitUntilRecipientsAreWithinCommitThreshold();
+
+    FailPoint::EntryCountT timesEnteredBefore = 0;
+    runOnMockingNextResponse([&] { timesEnteredBefore = fp->setMode(FailPoint::alwaysOn); });
+    mockResponsesReadyToCommit();
+    fp->waitForTimesEntered(timesEnteredBefore + 1);
+    ASSERT(!future.isReady());
+
+    // The coordinator cancels the monitor when commitReshardCollection is run.
+    cancelMonitor();
+    fp->setMode(FailPoint::off);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
 TEST_F(CoordinatorCommitMonitorTest, UnblocksWhenCancellationTokenIsCancelled) {
     auto future = [&] {
         FailPointEnableBlock fp("hangBeforeQueryingRecipients");
