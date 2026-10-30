@@ -30,7 +30,7 @@ import {
     kRawOperationSpec,
 } from "jstests/core/libs/raw_operation_utils.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {aggPlanHasStage, getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {aggPlanHasStage, getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 Random.setRandomSeed();
 
@@ -574,13 +574,16 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
             assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
         }
         // The additional $match predicate should be pushed down and combined with the geo
-        // predicate. That is, the initial $cursor stage should include both.
-        const cursorStage = getAggPlanStage(plan, "$cursor");
-        const parsedQuery = cursorStage.$cursor.queryPlanner.parsedQuery;
-        const parsedQueryString = tojson(parsedQuery);
+        // predicate. That is, the initial $cursor stage should include both. If the collection is
+        // sharded across multiple shards, there is one $cursor stage per targeted shard.
+        const cursorStages = getAggPlanStages(plan, "$cursor");
         const planString = tojson(plan);
-        assert.includes(parsedQueryString, "no_such_field", planString);
-        assert.includes(parsedQueryString, "_internalBucketGeoWithin", planString);
+        assert.gt(cursorStages.length, 0, planString);
+        for (const cursorStage of cursorStages) {
+            const parsedQueryString = tojson(cursorStage.$cursor.queryPlanner.parsedQuery);
+            assert.includes(parsedQueryString, "no_such_field", planString);
+            assert.includes(parsedQueryString, "_internalBucketGeoWithin", planString);
+        }
     } else {
         assert(aggPlanHasStage(plan, "GEO_NEAR_2DSPHERE"), plan);
     }
