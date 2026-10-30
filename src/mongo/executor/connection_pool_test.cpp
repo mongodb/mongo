@@ -693,6 +693,59 @@ TEST_F(ConnectionPoolCheckoutTest, EgressConnectionsCreatedMetricOnlyCountsNewCo
     EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
 }
 
+TEST_F(ConnectionPoolCheckoutTest, EgressOperationsPerConnectionHistogramRecordsOnConnectionDeath) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto readSampleCount = [&]() -> uint64_t {
+        try {
+            return capturer
+                .readInt64Histogram(
+                    otel::metrics::MetricNames::kNetworkEgressOperationsPerConnection)
+                .count;
+        } catch (const DBException& ex) {
+            // Reading a histogram that has never been recorded throws, so treat that as "no
+            // samples".
+            if (ex.code() == ErrorCodes::KeyNotFound) {
+                return 0;
+            }
+            throw;
+        }
+    };
+
+    auto pool = makePool();
+
+    // Use one connection twice.
+    ConnectionImpl::pushSetup(Status::OK());
+    auto connection = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1)).get();
+    connection->indicateUsed();
+
+    // While the first is still checked out, a second checkout creates a new connection that is
+    // never used by the test.
+    ConnectionImpl::pushSetup(Status::OK());
+    auto secondConnection = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1)).get();
+
+    connection->indicateUsed();
+    doneWith(connection);
+    doneWith(secondConnection);
+
+    // Returning connections to the pool must not sample the histogram; only death does.
+    EXPECT_EQ(readSampleCount(), 0);
+
+    pool->dropConnections(HostAndPort());
+
+    auto histogram = capturer.readInt64Histogram(
+        otel::metrics::MetricNames::kNetworkEgressOperationsPerConnection);
+    // One sample per dead connection, each carrying that connection's lifetime use count. The
+    // mock's setup counts as a use (ConnectionImpl::processSetup calls indicateUsed), so the
+    // counts are 2 + 1 and 0 + 1 rather than 2 and 0.
+    EXPECT_EQ(histogram.count, 2);
+    EXPECT_EQ(histogram.min, 1);
+    EXPECT_EQ(histogram.max, 3);
+}
+
 TEST_F(ConnectionPoolCheckoutTest, EgressConnectionsCreatedMetricCountsQueuedNewConnections) {
     otel::metrics::OtelMetricsCapturer capturer;
     if (!capturer.canReadMetrics()) {

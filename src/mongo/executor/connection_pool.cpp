@@ -81,6 +81,23 @@ auto& egressConnectionsCreatedCounter =
                 .serverStatusOptions = otel::metrics::ServerStatusOptions{
                     .dottedPath = "network.egress.connectionsCreated", .role = ClusterRole::None}});
 
+const std::vector<double> kEgressOperationsPerConnectionBuckets = {
+    0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 5000, 10000};
+
+// Histogram samples are only recorded when a connection is destroyed, so long-lived connections
+// that serve many operations are rarely counted; the data is biased toward shorter-lived
+// connections with fewer operations.
+auto& egressOperationsPerConnectionHistogram =
+    otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kNetworkEgressOperationsPerConnection,
+        "Number of times an egress connection was used over its lifetime, incremented after a "
+        "connection is destroyed",
+        otel::metrics::MetricUnit::kOperations,
+        {.serverStatusOptions =
+             otel::metrics::ServerStatusOptions{
+                 .dottedPath = "network.egress.operationsPerConnection", .role = ClusterRole::None},
+         .explicitBucketBoundaries = kEgressOperationsPerConnectionBuckets,
+         .serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts});
 auto& egressConnectionsClosedCounter =
     otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(
         otel::metrics::MetricNames::kNetworkEgressConnectionsClosed,
@@ -593,14 +610,16 @@ private:
             ConnWrap(OwnedConnection conn, std::weak_ptr<SpecificPool> owner)
                 : conn{std::move(conn)}, owner{std::move(owner)} {}
             ~ConnWrap() {
+                const auto timesUsed = conn->getTimesUsed();
+                egressOperationsPerConnectionHistogram.record(static_cast<int64_t>(timesUsed));
                 if (conn->_closeReason != ConnectionCloseReason::kNotEstablished) {
                     egressConnectionsClosedCounter.add(
                         1, {connectionCloseReasonToAttributeValue(conn->_closeReason)});
                 }
-                if (conn->getTimesUsed() == 0) {
+                if (timesUsed == 0) {
                     if (auto ownerSp = owner.lock())
                         ownerSp->_neverUsed.fetchAndAddRelaxed(1);
-                } else if (conn->getTimesUsed() == 1) {
+                } else if (timesUsed == 1) {
                     if (auto ownerSp = owner.lock())
                         ownerSp->_usedOnce.fetchAndAddRelaxed(1);
                 }

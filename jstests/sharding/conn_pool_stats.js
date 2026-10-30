@@ -163,6 +163,24 @@ function neverUsedMetricTest(kDbName = "test") {
         },
         currentCheckNum,
     );
+
+    if (MongoRunner.compareBinVersions(mongosVersion, "9.1") >= 0) {
+        // The connections dropped above were never used, so they must also show up as samples in the
+        // operations-per-connection histogram.
+        const histogram = assert.commandWorked(mongos.adminCommand({serverStatus: 1})).metrics
+            .network.egress.operationsPerConnection;
+        jsTestLog("HISTDUMP " + tojson(histogram) + " neverUsedConns=" + neverUsedConns);
+        assert.gte(
+            histogram["[0, 1)"].count,
+            neverUsedConns,
+            "unused dropped connections missing from the zero-use histogram bucket",
+            {histogram, neverUsedConns},
+        );
+        assert.gte(histogram.totalCount, neverUsedConns, "histogram totalCount too low", {
+            histogram,
+        });
+    }
+
     fpRs.off();
     threads.forEach((t) => t.join());
 }
