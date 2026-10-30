@@ -1052,7 +1052,8 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
         }
     }
 
-    if (index.isMultikey(opCtx, coll)) {
+    // Documents contributing no index keys do not require their array paths in the catalog.
+    if (index.isMultikey(opCtx, coll) && !documentKeySet->empty()) {
         const MultikeyPaths& indexPaths = index.getMultikeyPaths(opCtx, coll);
         if (!MultikeyPathTracker::covers(indexPaths, *documentMultikeyPaths.get())) {
             if (_validateState->fixErrors()) {

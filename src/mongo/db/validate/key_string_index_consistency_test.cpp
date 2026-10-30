@@ -570,6 +570,46 @@ TEST_F(KeyStringIndexConsistencyTest, MultikeyPathCoverageErrorsCollapseAcrossDo
     EXPECT_THAT(*errors.begin(), HasSubstr("7556100"));
 }
 
+TEST_F(KeyStringIndexConsistencyTest, ZeroKeyDocumentsDoNotRequireMultikeyPathCoverage) {
+    auto opCtx = operationContext();
+    ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions{}));
+    constexpr auto indexName{"a.b_1"sv};
+
+    AutoGetCollection coll{opCtx, kNss, MODE_X};
+    CollectionWriter writer{opCtx, coll};
+    {
+        WriteUnitOfWork wuow{opCtx};
+        auto collWriter = writer.getWritableCollection(opCtx);
+        ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx,
+            collWriter,
+            BSON("name" << indexName << "v" << int(IndexConfig::kLatestIndexVersion) << "key"
+                        << BSON("a.b" << 1) << "sparse" << true)));
+        ASSERT_OK(Helpers::insert(
+            opCtx, writer.get(), BSON("_id" << 0 << "a" << BSON("b" << BSON_ARRAY(1 << 2)))));
+        wuow.commit();
+    }
+
+    auto* index = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    EXPECT_TRUE(index->isMultikey(opCtx, *coll));
+    auto originalPaths = index->getMultikeyPaths(opCtx, *coll);
+    EXPECT_EQ(originalPaths, MultikeyPaths({MultikeyComponents{1U}}));
+
+    collection_validation::ValidateState state{opCtx, kNss, kDefaultValidateOptions};
+    ASSERT_OK(state.initializeCollection(opCtx));
+    state.initializeCursors(opCtx);
+    ValidateResults results;
+
+    KeyStringIndexConsistency ksic{opCtx, &state};
+    ksic.traverseRecord(
+        opCtx, *coll, *index, RecordId{2}, fromjson("{_id: 1, a: [{c: 1}, {c: 2}]}"), results);
+    ksic.traverseRecord(opCtx, *coll, *index, RecordId{3}, fromjson("{_id: 2, a: []}"), results);
+
+    EXPECT_TRUE(results.getIndexValidateResult(std::string{indexName}).getErrors().empty());
+    EXPECT_TRUE(results.getErrors().empty());
+    EXPECT_EQ(index->getMultikeyPaths(opCtx, *coll), originalPaths);
+}
+
 // Splitting the record-store scan into disjoint slices and merging the per-slice
 // KeyStringIndexConsistency objects must reproduce a single serial scan, regardless of merge order.
 // This is the property that lets the scan be parallelized: the first-phase bucket counts are an
