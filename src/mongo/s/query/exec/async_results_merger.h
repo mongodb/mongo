@@ -548,8 +548,9 @@ private:
      *
      * Retry: the backoff timer never dispatches the retry itself. When it fires it returns the
      * remote to 'Idle' and signals the current event; the next 'nextEvent()' dispatches the retry
-     * through '_scheduleGetMores()' with whatever OperationContext is attached then. While
-     * attached, the timer runs on the opCtx's sub-baton; while detached, it runs on the executor.
+     * through '_scheduleGetMores()' with whatever OperationContext is attached then. The timer
+     * always runs on the executor, so detach/reattach never cuts a backoff short, and only a
+     * backoff that fully elapses is recorded with the retry strategy.
      *
      */
     struct RemoteCursorData : public RefCountable {
@@ -842,8 +843,8 @@ private:
                               const RemoteCursorPtr& remote);
 
     /**
-     * Schedules a retry loop generated callback. Needs to take caution to avoid problems like
-     * deadlocks and referencing a stale opCtx.
+     * Schedules 'callback' to run on the executor after 'delay', or earlier with a non-OK status
+     * if the ARM-wide '_cancellationSource' is cancelled ('kill()').
      */
     void _scheduleRetryCallback(std::function<void(Status)> callback, Milliseconds delay);
 

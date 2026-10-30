@@ -5770,6 +5770,11 @@ TEST_F(AsyncResultsMergerTest,
 // re-enter 'nextEvent()' to drive an early dispatch. Advancing the clock to just before the
 // deadline must not produce a ready request; only after the deadline does the timer fire, the
 // callback defer, and the next 'nextEvent()' dispatch the retry.
+//
+// This also pins the interaction between a pending backoff and an attach/detach round trip: the
+// backoff sleep lives on the executor, not the SubBaton, so detaching and reattaching while it is
+// armed must neither complete it early nor signal the current event. Only the original deadline
+// may do either.
 TEST_F(AsyncResultsMergerTest, RetryNotDispatchedBeforeBackoffDeadlineEvenIfCallerPolls) {
     const auto backOffDelayMs = 1000;
     FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
@@ -5790,25 +5795,42 @@ TEST_F(AsyncResultsMergerTest, RetryNotDispatchedBeforeBackoffDeadlineEvenIfCall
     // Deliver the retryable error; the backoff timer is scheduled with the remote held in
     // 'InBackoff' true. No request is dispatched yet. 'runScheduledTasks()' drives the opCtx baton,
     // which is what delivers the response callback (scheduled via 'scheduleRemoteCommand(...,
-    // *_subBaton)') and so deterministically arms the SubBaton timer before we touch the clock
-    // below.
+    // *_subBaton)') and so deterministically arms the executor backoff timer before we touch the
+    // clock below.
     scheduleNetworkResponseObjs({retryableErrorResponse});
     runScheduledTasks(operationContext());
     ASSERT_FALSE(networkHasReadyRequests());
+    assertRemoteState<AsyncResultsMerger::InBackoff>(*arm, 0);
+
+    // Detach and reattach while the backoff is still armed, well before its deadline. Detaching
+    // tears down the SubBaton, so this is exactly the round trip that could complete an armed
+    // backoff early. The backoff sleep lives on the executor rather than the baton, so the round
+    // trip changes nothing: after draining callbacks the remote is still 'InBackoff' and no retry
+    // has been dispatched.
+    arm->detachFromOperationContext();
+    arm->reattachToOperationContext(operationContext());
+    runReadyCallbacks();
+    assertRemoteState<AsyncResultsMerger::InBackoff>(*arm, 0);
+    ASSERT_FALSE(networkHasReadyRequests());
+    ASSERT_FALSE(arm->ready());
 
     // The caller waits for progress. Advancing the clock to just before the backoff deadline must
     // not dispatch: the timer has not fired, the remote is still 'InBackoff', and the current
     // event remains unsignaled (so 'nextEvent()' cannot legally be re-entered to force a retry).
     advanceTime(Milliseconds(backOffDelayMs - 1));
+    runReadyCallbacks();
     ASSERT_FALSE(networkHasReadyRequests());
     ASSERT_FALSE(arm->ready());
+    assertRemoteState<AsyncResultsMerger::InBackoff>(*arm, 0);
 
     // The deadline elapses: the timer fires, the retry callback defers (returns the remote to
-    // 'Idle' and signals the event). The next 'nextEvent()' then dispatches the retry via
+    // 'Idle' and signals the event). Only the executor is pumped here - the opCtx baton is never
+    // run again - because the backoff no longer depends on anyone driving the baton, which is what
+    // lets it survive a detach at full length. The next 'nextEvent()' then dispatches the retry via
     // '_scheduleGetMores()'.
     advanceTime(Milliseconds(2));
-    runScheduledTasks(operationContext());
     runReadyCallbacks();
+    assertRemoteState<AsyncResultsMerger::Idle>(*arm, 0);
     unittest::assertGet(arm->nextEvent());
     ASSERT_TRUE(networkHasReadyRequests());
 
@@ -5824,10 +5846,9 @@ TEST_F(AsyncResultsMergerTest, RetryNotDispatchedBeforeBackoffDeadlineEvenIfCall
 }
 
 // Companion to 'RetryNotDispatchedBeforeBackoffDeadlineEvenIfCallerPolls', but the retryable error
-// is received while the ARM is DETACHED. While detached, '_scheduleRetryCallback()' schedules the
-// retry via '_executor->sleepFor()', whose timer is driven by the mock *network* clock (advanced by
-// 'advanceTime()') rather than the SubBaton (driven by the precise clock). This pins the "not too
-// soon" half of the retry dispatch contract for the detached scheduling path: the retry getMore
+// is received while the ARM is DETACHED. Backoff timers always run on the executor ('sleepFor'),
+// whose timer is driven by the mock *network* clock (advanced by 'advanceTime()'); this tests the
+// "not too soon" half of the retry dispatch contract when the ARM is detached: the retry getMore
 // must NOT be dispatched until the network clock advances past the backoff deadline.
 TEST_F(AsyncResultsMergerTest, RetryNotDispatchedBeforeBackoffDeadlineWhileDetached) {
     const auto backOffDelayMs = 1000;
@@ -5853,8 +5874,8 @@ TEST_F(AsyncResultsMergerTest, RetryNotDispatchedBeforeBackoffDeadlineWhileDetac
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
-    // Detach before delivering the error so the ARM schedules the retry via 'sleepFor' (network
-    // clock) rather than the now-dead SubBaton (precise clock), then reattach.
+    // Detach before delivering the error: the backoff timer runs on the executor ('sleepFor',
+    // network clock) either way, so detach must be orthogonal to the pending retry. Then reattach.
     arm->detachFromOperationContext();
     scheduleNetworkResponseObjs({retryableErrorResponse});
     arm->reattachToOperationContext(operationContext());
@@ -5986,12 +6007,10 @@ TEST_F(AsyncResultsMergerTest, KillAfterRetryDefersBeforeNextEventCleansUp) {
     ASSERT_EQ(ErrorCodes::IllegalOperation, arm->nextReady().getStatus());
 }
 
-// Regression test for SERVER-123537: '_handleBatchResponse()' self-deadlocked the reactor thread
-// when a retry is scheduled through a dead SubBaton.
-// Root cause: '_handleBatchResponse()' is called while holding '_mutex'. In the retry path it calls
-// '_subBaton->waitUntil(...)'. If the SubBaton is dead (parent baton detached), 'waitUntil()'
-// returns an already-resolved future. Before the fix, '.getAsync()' on that future invoked the
-// callback inline on the same thread that already held '_mutex', causing a self-deadlock.
+// Tests that a retryable error delivered while detached still backs off on the executor and that
+// the retry is dispatched after reattach. The backoff no longer runs on the sub-baton, so the
+// SERVER-123537 self-deadlock (a retry continuation running inline under '_mutex' on a dead
+// sub-baton) can no longer occur on this path.
 TEST_F(AsyncResultsMergerTest, RetryWithDeadSubBatonDoesNotDeadlock) {
     const auto backOffDelayMs = 1000;
     FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
@@ -6144,9 +6163,8 @@ TEST_F(AsyncResultsMergerTest, RetryableErrorWhileDetachedDoesNotDeadlockAndRetr
     // SubBaton is now dead.
     arm->detachFromOperationContext();
 
-    // Deliver a retryable error response while the ARM is detached. Without the fix this deadlocks
-    // because _handleBatchResponse tries to schedule a retry on the dead SubBaton, which fires the
-    // retry callback inline on the same thread that holds _mutex.
+    // Deliver a retryable error response while the ARM is detached. The retry continuation runs
+    // on the executor and defers (it never dispatches the captured request itself).
     scheduleNetworkResponseObjs({retryableErrorResponse});
 
     // No results and no error: the ARM is not ready, but the remote is still open.
@@ -6173,13 +6191,14 @@ TEST_F(AsyncResultsMergerTest, RetryableErrorWhileDetachedDoesNotDeadlockAndRetr
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
 }
 
-// Regression test for AF-18251: if the ARM is detached while a rate-limited retry is pending on
-// its SubBaton, the retry callback must not re-dispatch the captured (now-stale) request.
+// Regression test for AF-18251: if the ARM is detached while a rate-limited retry is pending, the
+// retry continuation must not re-dispatch the captured (now-stale) request. Backoff continuations
+// run on the executor regardless of attach state, so the pending retry survives detach untouched.
 TEST_F(AsyncResultsMergerTest, DetachWhileRetryPendingDoesNotReissueStaleRequest) {
     const auto backOffDelayMs = 1000;
     FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
 
-    // SystemOverloadedError triggers a delayed backoff retry scheduled on the SubBaton.
+    // SystemOverloadedError triggers a delayed backoff retry.
     const BSONObj retryableErrorResponse = makeResponseObjWithErrorLabels(
         ErrorCodes::HostUnreachable,
         "dummy msg",
@@ -6192,7 +6211,7 @@ TEST_F(AsyncResultsMergerTest, DetachWhileRetryPendingDoesNotReissueStaleRequest
 
     ASSERT_FALSE(arm->ready());
     unittest::assertGet(arm->nextEvent());
-    // Deliver the error while attached; the retry is now pending on the SubBaton.
+    // Deliver the error while attached; the backoff timer is now pending on the executor.
     scheduleNetworkResponseObjs({retryableErrorResponse});
     runScheduledTasks(operationContext());
     ASSERT_FALSE(networkHasReadyRequests());

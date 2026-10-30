@@ -762,17 +762,9 @@ TEST_F(BlockingResultsMergerTestFixture,
     waitForFutureThenKill(std::move(future), blockingMerger);
 }
 
-// The ARM schedules a backoff retry through one of two mechanisms depending on whether it is
-// attached to an OperationContext:
-//
-//   * While attached, the retry is scheduled via
-//     '_subBaton->waitUntil(preciseNow + delay, token).thenRunOn(_executor).getAsync(cb)'.
-//     'SubBaton::waitUntil' forwards to the opCtx's parent DefaultBaton, which stores the timer in
-//     its '_timers' map keyed on the *precise* clock source.
-//   * While detached, the retry is scheduled via '_executor->sleepFor(delay, token).getAsync(cb)',
-//     whose timer is driven by the mock *network* clock.
-//
-// This difference makes the testing harness strategy differ between the two, as you can see below.
+// The ARM always schedules a backoff retry via '_executor->sleepFor(...)', whose timer is driven
+// by the mock *network* clock (advanced by 'advanceTime()'), regardless of whether the ARM is
+// attached to an OperationContext.
 //
 // The next two tests pin the "not too soon" half of that contract for the BRM: the retry getMore
 // must NOT be dispatched until the mock clock advances past the backoff deadline.
@@ -827,10 +819,10 @@ TEST_F(BlockingResultsMergerTestFixture,
     runReadyCallbacks();
     ASSERT_FALSE(networkHasReadyRequests());
 
-    // Only once the mock clock passes the deadline does the SubBaton timer fire: the retry
-    // continuation signals the event the BRM is blocked on, so it re-dispatches the retry getMore.
-    // The ClockSourceMocks all share one global mock (see clock_source_mock.cpp), so advancing the
-    // network clock here also moves the precise-clock SubBaton timer past its deadline;
+    // Only once the mock clock passes the deadline does the executor backoff timer fire: the
+    // retry continuation signals the event the BRM is blocked on, so it re-dispatches the retry
+    // getMore. The ClockSourceMocks all share one global mock (see clock_source_mock.cpp), so
+    // advancing the network clock here also moves the backoff timer past its deadline;
     // 'runReadyCallbacks()' then pumps the executor to run the continuation.
     advanceTime(Milliseconds(kBackoffDelayMs / 2 + 1));
     runReadyCallbacks();
@@ -844,8 +836,7 @@ TEST_F(BlockingResultsMergerTestFixture,
 
 // While detached, the retry getMore is not dispatched until the *network* clock advances past the
 // backoff deadline (via 'advanceTime()'). This clarifies that the 'advanceTime' trick, not
-// 'getMockClockSource()->advance', is what drives a retry scheduled while detached, because the
-// detached path uses '_executor->sleepFor' rather than the SubBaton.
+// 'getMockClockSource()->advance', is what drives the executor timer the retry is scheduled on.
 TEST_F(BlockingResultsMergerTestFixture,
        BlockingResultsMergerDoesNotRetryBeforeBackoffDeadlineWhileDetached) {
     unittest::ServerParameterGuard maxAttemptsGuard("defaultClientMaxRetryAttempts", 3);
@@ -875,8 +866,8 @@ TEST_F(BlockingResultsMergerTestFixture,
         ASSERT_TRUE(next.isEOF());
     });
 
-    // Detach before delivering the error so the ARM schedules the retry via 'sleepFor' (network
-    // clock) rather than the SubBaton (precise clock), then reattach.
+    // Detach before delivering the error: the backoff timer runs on the executor ('sleepFor',
+    // network clock) either way, so detach must be orthogonal to the pending retry. Then reattach.
     waitForGetMoreScheduled("Waiting for initial getMore to be scheduled");
     blockingMerger.detachFromOperationContext();
     scheduleNetworkResponseObjs({retryableError});

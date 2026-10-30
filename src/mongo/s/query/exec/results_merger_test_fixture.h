@@ -401,12 +401,11 @@ protected:
 
     // Advance any operations scheduled on 'opCtx's baton, because otherwise they would wait
     // forever. In these fixtures the baton is not driven by a transport layer, so work scheduled on
-    // it (including SubBaton timers armed by the ARM's attached retry path) only progresses when
-    // something explicitly calls 'Baton::run'. This schedules a sentinel task and runs the baton
-    // until that sentinel completes, which implicitly waits for all previously scheduled work
-    // (and fires any timers whose deadline the mock clock has passed) to run first. Pair with
-    // 'advanceTime()' / 'getMockClockSource()->advance()' to move the mock clock past a timer
-    // deadline before calling this.
+    // it only progresses when something explicitly calls 'Baton::run'. This schedules a sentinel
+    // task and runs the baton until that sentinel completes, which implicitly waits for all
+    // previously scheduled work (and fires any timers whose deadline the mock clock has passed) to
+    // run first. Pair with 'advanceTime()' / 'getMockClockSource()->advance()' to move the mock
+    // clock past a timer deadline before calling this.
     //
     // WARNING: never call this while another thread may be blocked in a wait on the same opCtx's
     // baton (e.g. a BlockingResultsMerger::next() running on a 'launchAsync' thread, which parks

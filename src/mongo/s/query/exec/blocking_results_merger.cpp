@@ -186,11 +186,9 @@ void BlockingResultsMerger::kill(OperationContext* opCtx) {
 
     auto future = _arm->kill(opCtx);
 
-    // Wait via the opCtx rather than a plain '.wait()'. The opCtx-based wait polls the baton, which
-    // is required because AsioNetworkingBaton::waitUntil schedules timer cancellation via
-    // '.thenRunOn(baton)'. If the ARM has a pending retry delay, the baton must be run for
-    // '_cancellationSource.cancel()' to actually cancel the timer and allow the retry callback to
-    // fire and complete the kill.
+    // Wait via the opCtx rather than a plain '.wait()', so that the wait polls the opCtx's baton
+    // (SERVER-123640). A pending retry backoff does not depend on that: it runs on the executor and
+    // 'kill()' cancels it through its cancellation source.
     // Use 'runWithoutInterruptionExceptAtGlobalShutdown()' because 'kill()' is called from
     // destructors where the opCtx may already be interrupted — a plain '.get(opCtx)' would throw
     // before polling the baton, and throwing from a destructor would terminate the process.

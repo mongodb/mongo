@@ -57,7 +57,7 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(stallBeforeReDispatchingArmRetry);
 
 // Test-only and observation-only. Entered at the end of '_scheduleRetryCallback', after the backoff
-// timer (or 'sleepFor') has been armed with a fixed deadline. Tests enable this fail point and call
+// sleep ('sleepFor') has been armed with a fixed deadline. Tests enable this fail point and call
 // 'waitForTimesEntered()' to deterministically learn that the retry alarm has been registered, so
 // they can advance the mock clock *after* the deadline is fixed. This replaces fixed 'sleepmillis'
 // waits that could not prove the alarm was armed and were vulnerable to a deadline-shift race.
@@ -1674,26 +1674,16 @@ bool AsyncResultsMerger::_checkHighWaterMarkEligibility(WithLock,
 
 void AsyncResultsMerger::_scheduleRetryCallback(std::function<void(Status)> callback,
                                                 Milliseconds delay) {
-    auto stallableCallback =
-        makeStallableRetryCallback(_executor, _cancellationSource.token(), std::move(callback));
-    if (!_opCtx) {
-        // ARM is detached — scheduling a retry on the dead SubBaton would cause it to
-        // resolve immediately and attempt to re-acquire _mutex on the same thread,
-        // deadlocking. Instead, wait on the executor.
-        _executor->sleepFor(delay, _cancellationSource.token()).getAsync(stallableCallback);
-    } else {
-        // Schedule a retry for the request on the baton. The 'AsyncResultsMerger' instance
-        // is captured here using a weak_ptr, so that the scheduled retry operation does not
-        // block the destruction of the instance. If the retry is scheduled after the
-        // instance was destroyed, we will notice this inside the callback and do nothing.
-        _subBaton
-            ->waitUntil(getGlobalServiceContext()->getPreciseClockSource()->now() + delay,
-                        _cancellationSource.token())
-            .thenRunOn(_executor)
-            .getAsync(stallableCallback);
-    }
+    // The backoff wait always runs on the executor, regardless of whether the ARM is attached: the
+    // callback runs on an executor thread either way, so detach/reattach is orthogonal to a pending
+    // backoff and the sleep survives detach at full length. The callback captures the ARM by
+    // weak_ptr, so a pending backoff does not keep the ARM alive. The ARM-wide
+    // '_cancellationSource' cancels a pending backoff when 'kill()' runs.
+    _executor->sleepFor(delay, _cancellationSource.token())
+        .getAsync(makeStallableRetryCallback(
+            _executor, _cancellationSource.token(), std::move(callback)));
 
-    // The backoff timer (or 'sleepFor') is now armed with a deadline fixed relative to the current
+    // The backoff sleep is now armed with a deadline fixed relative to the current
     // mock-clock reading. Enter the observation-only fail point so tests can synchronize on this
     // point via 'waitForTimesEntered()' before advancing the mock clock. Behavior is unchanged.
     if (MONGO_unlikely(armRetryScheduledForTesting.shouldFail())) {
@@ -1820,7 +1810,12 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                         return;
                     }
 
-                    remote->retryStrategy.recordBackoff(delay);
+                    // Record only a backoff that fully elapsed. A non-OK 's' means the sleep was
+                    // cut short (closeShardCursors(), kill(), or executor shutdown), so it
+                    // contributes no backoff time.
+                    if (s.isOK()) {
+                        remote->retryStrategy.recordBackoff(delay);
+                    }
                     self->_signalCurrentEventIfReady(lk);
                 };
             _enterBackoff(lk, *remote);
