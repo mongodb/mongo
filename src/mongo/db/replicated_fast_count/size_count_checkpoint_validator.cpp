@@ -11,7 +11,12 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store_oplog.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -66,6 +71,44 @@ UUID uuidFromContainerInnerOp(const repl::DurableReplOperation& inner) {
     }
     const auto keyBytes = key.getBytesKey();
     return UUID::fromCDR(ConstDataRange(keyBytes.data(), keyBytes.data() + keyBytes.size()));
+}
+
+absl::flat_hash_map<UUID, CollectionReplicatedMetadata> scanMetadataStore(OperationContext* opCtx) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    return writeConflictRetry(
+        opCtx, ru, "scanMetadataStore", NamespaceString::kAdminCommandNamespace, [&] {
+            Lock::GlobalLock readLock(opCtx, MODE_IS);
+            auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            invariant(storageEngine->getEngine()->hasIdent(ru, ident::kFastCountMetadataStore),
+                      "Replicated fast count metadata store must exist to adopt a checkpoint");
+            const auto recordStore = storageEngine->getEngine()->getRecordStore(
+                opCtx,
+                NamespaceString::kAdminCommandNamespace,
+                ident::kFastCountMetadataStore,
+                RecordStore::Options{.keyFormat = KeyFormat::String},
+                /*uuid=*/boost::none);
+
+            const auto& containerVariant = recordStore->getContainer();
+            massert(13629502,
+                    "Expected replicated fast count metadata record store to hold a "
+                    "StringKeyedContainer",
+                    std::holds_alternative<std::reference_wrapper<StringKeyedContainer>>(
+                        containerVariant));
+            auto& container =
+                std::get<std::reference_wrapper<StringKeyedContainer>>(containerVariant).get();
+            auto cursor = container.getCursor(ru);
+
+            absl::flat_hash_map<UUID, CollectionReplicatedMetadata> contents;
+            while (auto record = cursor->next()) {
+                const auto& [keySpan, valueSpan] = *record;
+                const auto uuid = UUID::fromCDR(ConstDataRange(keySpan.data(), keySpan.size()));
+                const auto entry = SizeCountStore::parseContainerValue(valueSpan);
+                contents[uuid] = CollectionReplicatedMetadata{
+                    .sizeCount = CollectionSizeCount{.size = entry.size, .count = entry.count},
+                    .hash = entry.hash};
+            }
+            return contents;
+        });
 }
 
 /**
@@ -318,9 +361,15 @@ SizeCountCheckpointValidator::ScopedThreadBuffer::~ScopedThreadBuffer() {
     tValidatorBuffer = nullptr;
 }
 
-void SizeCountCheckpointValidator::mergeAndValidate(const ValidatorBuffers& threadRecords,
+void SizeCountCheckpointValidator::mergeAndValidate(OperationContext* opCtx,
+                                                    const ValidatorBuffers& threadRecords,
                                                     UUID oplogUuid) {
     merge(threadRecords);
+
+    if (!_baseline.has_value()) {
+        adoptCheckpoint(opCtx);
+        return;
+    }
 
     for (const auto& entry : _checkpoints) {
         const Timestamp validAsOf =
@@ -331,14 +380,10 @@ void SizeCountCheckpointValidator::mergeAndValidate(const ValidatorBuffers& thre
             _intervals.begin(), _intervals.end(), [&](const ValidatorInterval& interval) {
                 return interval.cutoff == validAsOf;
             });
-        if (intervalIt == _intervals.end()) {
-            // TODO(SERVER-136295): Add a log and potentially a metric here. This should happen
-            // exactly once per node lifetime, after recovery.
-
-            // The watermark for this checkpoint was not recorded, so we cannot validate this
-            // checkpoint.
-            continue;
-        }
+        invariant(intervalIt != _intervals.end(),
+                  fmt::format("Replicated metadata checkpoint's validAsOf timestamp {} does not "
+                              "match any recorded watermark after the baseline was initialized",
+                              validAsOf));
 
         const CheckpointContents standby = computeExpectedCheckpoint(validAsOf);
         CheckpointContents primary = parseCheckpoint(entry);
@@ -398,7 +443,61 @@ void SizeCountCheckpointValidator::merge(const ValidatorBuffers& threadRecords) 
     }
 }
 
+void SizeCountCheckpointValidator::adoptCheckpoint(OperationContext* opCtx) {
+    if (_checkpoints.empty()) {
+        return;
+    }
+
+    // Since `_checkpoints` is sorted in increasing timestamp order, the last checkpoint is also the
+    // latest checkpoint.
+    const auto& latestCheckpoint = _checkpoints.back();
+    const Timestamp validAsOf =
+        getTimestampStoreValidAsOfFromOplogEntry(latestCheckpoint.getEntry().toBSON());
+
+    // To adopt a checkpoint, we must see its corresponding watermark first. Assume, for the sake of
+    // contradiction, that we can adopt a checkpoint without seeing its watermark. Then, given the
+    // following oplog with a watermark at timestamp T and a fault at timestamp T':
+    //
+    // ...--[W]----[deltas]----X---------[ckpt]---...
+    //    ts = T            ts = T'   validAsOf = T
+    //
+    // When the standby restarts, starts applying oplog at T', and adopts ckpt with validAsOf T, it
+    // misses all deltas ∈ (T, T'), and subsequent validation is unsound.
+    //
+    // If we instead only adopt a checkpoint after seeing its watermark at timestamp T, then we must
+    // have recorded all deltas after T, and validation is sound.
+    //
+    // ...---X----[W]----[deltas]----[ckpt]---...
+    //          ts = T            validAsOf = T
+    //
+    const bool watermarkExistsForValidAsOf =
+        std::any_of(_intervals.begin(), _intervals.end(), [&](const ValidatorInterval& interval) {
+            return interval.cutoff == validAsOf;
+        });
+    if (watermarkExistsForValidAsOf) {
+        // `adoptCheckpoint()` runs after the batch has been applied, so the latest checkpoint's
+        // container writes are already persisted in the metadata store. To initialize `_baseline`,
+        // we scan the metadata store and adopt its contents without performing validation. From
+        // this point on, we can validate all checkpoints by combining `_baseline` with new deltas.
+        _baseline = scanMetadataStore(opCtx);
+        while (!_intervals.empty() && _intervals.front().cutoff <= validAsOf) {
+            _intervals.pop_front();
+        }
+        LOGV2(13629501, "Checkpoint validator adopted checkpoint", "validAsOf"_attr = validAsOf);
+    }
+
+    LOGV2(13629500,
+          "Checkpoint validator processed checkpoints without performing validation",
+          "checkpointsSkipped"_attr = _checkpoints.size());
+    // TODO(SERVER-137708): Increment _checkpoints.size() in checkpointsSkippedCounter.
+
+    _checkpoints.clear();
+}
+
 CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Timestamp validAsOf) {
+    invariant(_baseline.has_value(),
+              "Expected checkpoint computation requires an initialized baseline");
+
     // Compute the sum of intervals with cutoff <= validAsOf timestamp.
     ReplicatedMetadataDeltas observed;
     auto it = _intervals.begin();
@@ -420,13 +519,15 @@ CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Times
         if (delta.state == DDLState::kDropped) {
             // If `_baseline` contains an entry for this UUID, it must have been created in another
             // checkpoint, so we expect a `boost::none` entry in the checkpoint.
-            if (_baseline.contains(uuid)) {
+            if (_baseline->contains(uuid)) {
                 expected.emplace(uuid, boost::none);
             }
             // Otherwise, it might have been created and dropped within the same checkpoint, in
             // which case the entry would be absent from the primary's checkpoint. We do not add it
             // to `expected`.
-            _baseline.erase(uuid);
+            // TODO(SERVER-138264): Differentiate between a create and drop in one checkpoint vs. a
+            // drop without a create.
+            _baseline->erase(uuid);
             continue;
         }
         const CollectionReplicatedMetadata base = [&]() -> CollectionReplicatedMetadata {
@@ -435,17 +536,17 @@ CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Times
                                                         CollectionSizeCount{.size = 0, .count = 0},
                                                     .hash = kEmptyCollectionValidationHash};
             }
-            auto baseIt = _baseline.find(uuid);
-            // TODO(SERVER-136295): Invariant that the UUID exists in the baseline once the
+            auto baseIt = _baseline->find(uuid);
+            // TODO(SERVER-138205): Invariant that the UUID exists in the baseline once the
             // baseline is seeded with the primary's first checkpoint.
-            return baseIt == _baseline.end()
+            return baseIt == _baseline->end()
                 ? CollectionReplicatedMetadata{.sizeCount =
                                                    CollectionSizeCount{.size = 0, .count = 0}}
                 : baseIt->second;
         }();
         const CollectionReplicatedMetadata absolute = base + delta.metadata;
         expected[uuid] = absolute;
-        _baseline[uuid] = absolute;
+        (*_baseline)[uuid] = absolute;
     }
 
     if (MONGO_unlikely(skewStandbyCheckpointSize.shouldFail())) {

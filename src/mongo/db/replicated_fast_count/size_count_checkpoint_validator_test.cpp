@@ -448,7 +448,7 @@ TEST_F(CheckpointOplogParsingTest, SplitFlushEntriesAreNotClassifiedAsCheckpoint
     for (const auto& entry : applyOpsEntries) {
         validator.preprocessOplogEntry(entry);
     }
-    validator.mergeAndValidate({}, UUID::gen());
+    validator.mergeAndValidate(operationContext(), {}, UUID::gen());
 
     if (capturer.canReadMetrics()) {
         // mergeAndValidate() should validate zero checkpoints because no checkpoint oplog entries
@@ -513,16 +513,32 @@ DEATH_TEST(ParseCheckpointDeathTest, NonContainerOpInFastCountLedEntryTasserts, 
     isCheckpointApplyOpsEntry(checkpointEntry);
 }
 
+const Timestamp kAdopt{Seconds(50), 0};
 const Timestamp kT0{Seconds(100), 0};
 const Timestamp kT1{Seconds(200), 0};
 const Timestamp kT2{Seconds(250), 0};
 const Timestamp kT3{Seconds(300), 0};
+const Timestamp kT4{Seconds(350), 0};
 const Timestamp kEnd{Seconds(1000), 0};
 
 using test_helpers::makeCheckpointEntry;
 
-class SizeCountCheckpointValidatorTest : public unittest::Test {
+class SizeCountCheckpointValidatorRecoveryTest : public CatalogTestFixture {
+public:
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
+
 protected:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+
+        auto stores = test_helpers::createContainerFastCountStores(operationContext());
+        sizeCountStore = std::move(stores.sizeCountStore);
+        timestampStore = std::move(stores.timestampStore);
+    }
+
     /**
      * Performs preprocessing on the provided `ops`, then records each delta in `records`, then
      * validates the deltas against the watermark(s)/checkpoint(s) in `ops`.
@@ -540,14 +556,186 @@ protected:
                 SizeCountCheckpointValidator::recordDelta(record.uuid, record.ts, record.delta);
             }
         }
-        validator.mergeAndValidate({buffer}, oplogUuid);
+        validator.mergeAndValidate(operationContext(), {buffer}, oplogUuid);
     }
+
+    std::unique_ptr<SizeCountStore> sizeCountStore;
+    std::unique_ptr<SizeCountTimestampStore> timestampStore;
 
     SizeCountCheckpointValidator validator;
     const UUID oplogUuid = UUID::gen();
 
     unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation{
         "enableContinuousInternodePerCollectionValidation", true};
+};
+
+TEST_F(SizeCountCheckpointValidatorRecoveryTest, BatchWithNoCheckpointNotAdopted) {
+    const UUID uuid = UUID::gen();
+    applyBatch(validator,
+               /*ops=*/{},
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}}});
+    applyBatch(
+        validator,
+        {makeWatermarkEntry(kT1),
+         makeCheckpointEntry(kT1,
+                             {{uuid,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 999, .count = 9}}}})},
+        {});
+}
+
+TEST_F(SizeCountCheckpointValidatorRecoveryTest, CheckpointWithoutWatermarkNotAdopted) {
+    const UUID uuid = UUID::gen();
+    applyBatch(
+        validator,
+        {makeCheckpointEntry(kT1,
+                             {{uuid,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}})},
+        {});
+    applyBatch(
+        validator,
+        {makeWatermarkEntry(kT2),
+         makeCheckpointEntry(kT2,
+                             {{uuid,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 999, .count = 9}}}})},
+        {});
+}
+
+TEST_F(SizeCountCheckpointValidatorRecoveryTest, SingleCheckpointBatchAdopted) {
+    const UUID uuid = UUID::gen();
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        *sizeCountStore,
+        uuid,
+        SizeCountStore::Entry{.timestamp = kT2, .size = 10, .count = 1});
+    applyBatch(
+        validator,
+        {makeWatermarkEntry(kT2),
+         makeCheckpointEntry(kT2,
+                             {{uuid,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}})},
+        // This delta is ignored.
+        {{.ts = kT1,
+          .uuid = uuid,
+          .delta = ReplicatedMetadataDelta{
+              .metadata = {.sizeCount = CollectionSizeCount{.size = 7, .count = 3}}}}});
+    applyBatch(
+        validator,
+        {makeWatermarkEntry(kEnd),
+         makeCheckpointEntry(kEnd,
+                             {{uuid,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 15, .count = 1}}}})},
+        // This delta is not ignored!
+        {{.ts = kT3,
+          .uuid = uuid,
+          .delta = ReplicatedMetadataDelta{
+              .metadata = {.sizeCount = CollectionSizeCount{.size = 5, .count = 0}}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorRecoveryTest, MultiCheckpointBatchAdopted) {
+    const UUID uuid = UUID::gen();
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        *sizeCountStore,
+        uuid,
+        SizeCountStore::Entry{.timestamp = kT2, .size = 60, .count = 6});
+    applyBatch(
+        validator,
+        {makeWatermarkEntry(kT1),
+         // This checkpoint is ignored.
+         makeCheckpointEntry(kT1,
+                             {{uuid,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 50, .count = 5}}}}),
+         makeWatermarkEntry(kT3),
+         makeCheckpointEntry(kT3,
+                             {{uuid,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 60, .count = 6}}}})},
+        // This delta is also ignored.
+        {{.ts = kT2,
+          .uuid = uuid,
+          .delta = ReplicatedMetadataDelta{
+              .metadata = {.sizeCount = CollectionSizeCount{.size = 7, .count = 3}}}}});
+    applyBatch(
+        validator,
+        {makeWatermarkEntry(kEnd),
+         makeCheckpointEntry(kEnd,
+                             {{uuid,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 65, .count = 6}}}})},
+        {{.ts = kT4,
+          .uuid = uuid,
+          .delta = ReplicatedMetadataDelta{
+              .metadata = {.sizeCount = CollectionSizeCount{.size = 5, .count = 0}}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorRecoveryTest, SingleCheckpointAdoptedMultipleCollections) {
+    const UUID uuidA = UUID::gen();
+    const UUID uuidB = UUID::gen();
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        *sizeCountStore,
+        uuidA,
+        SizeCountStore::Entry{.timestamp = kT0, .size = 10, .count = 3});
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        *sizeCountStore,
+        uuidB,
+        SizeCountStore::Entry{.timestamp = kT1, .size = 4, .count = 8});
+    applyBatch(
+        validator,
+        {makeWatermarkEntry(kT2),
+         makeCheckpointEntry(kT2,
+                             {{uuidA,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 10, .count = 3}}},
+                              {uuidB,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 4, .count = 8}}}})},
+        {});
+    applyBatch(
+        validator,
+        {makeWatermarkEntry(kEnd),
+         makeCheckpointEntry(kEnd,
+                             {{uuidA,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 21, .count = 1}}}})},
+        {{.ts = kT3,
+          .uuid = uuidA,
+          .delta = ReplicatedMetadataDelta{
+              .metadata = {.sizeCount = CollectionSizeCount{.size = 11, .count = -2}}}}});
+}
+
+class SizeCountCheckpointValidatorTest : public SizeCountCheckpointValidatorRecoveryTest {
+protected:
+    void setUp() override {
+        SizeCountCheckpointValidatorRecoveryTest::setUp();
+
+        // `validator` needs to adopt one checkpoint before it can begin performing validation, so
+        // we do that here.
+        test_helpers::insertSizeCountEntry(
+            operationContext(),
+            *sizeCountStore,
+            adoptUuid,
+            SizeCountStore::Entry{.timestamp = kAdopt, .size = 5, .count = 1});
+        validator.preprocessOplogEntry(makeWatermarkEntry(kAdopt));
+        validator.preprocessOplogEntry(
+            makeCheckpointEntry(kAdopt,
+                                {{adoptUuid,
+                                  CollectionReplicatedMetadata{
+                                      .sizeCount = CollectionSizeCount{.size = 5, .count = 1}}}}));
+        validator.mergeAndValidate(operationContext(), {}, oplogUuid);
+    }
+
+    const UUID adoptUuid = UUID::gen();
 };
 
 TEST_F(SizeCountCheckpointValidatorTest, NoWatermarkNoCheckpointPasses) {
@@ -684,7 +872,7 @@ TEST_F(SizeCountCheckpointValidatorTest, DropOfKnownCollectionCheckedByMembershi
          {.ts = kT2, .uuid = uuid, .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}}});
 }
 
-// TODO(SERVER-136295): Convert this to a DEATH_TEST.
+// TODO(SERVER-138264): Convert this to a DEATH_TEST.
 TEST_F(SizeCountCheckpointValidatorTest, DropOfUnknownCollectionExcluded) {
     const UUID uuid = UUID::gen();
     const UUID otherUuid = UUID::gen();
@@ -933,6 +1121,19 @@ DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest, WrongCountInCheckpointFasser
                     .uuid = uuid,
                     .delta = ReplicatedMetadataDelta{
                         .metadata = {.sizeCount = CollectionSizeCount{.size = 50, .count = 5}}}}});
+}
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
+             RecordedCheckpointWithoutWatermarkFasserts,
+             "does not match any recorded watermark") {
+    const UUID uuid = UUID::gen();
+    applyBatch(
+        validator,
+        {makeCheckpointEntry(kT1,
+                             {{uuid,
+                               CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}})},
+        {});
 }
 
 DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,

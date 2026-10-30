@@ -3,6 +3,7 @@
 #pragma once
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/util/uuid.h"
@@ -130,7 +131,9 @@ public:
      * This function does not validate the primary's checkpoint entry for the oplog's replicated
      * metadata.
      */
-    void mergeAndValidate(const ValidatorBuffers& threadRecords, UUID oplogUuid);
+    void mergeAndValidate(OperationContext* opCtx,
+                          const ValidatorBuffers& threadRecords,
+                          UUID oplogUuid);
 
 private:
     /**
@@ -139,6 +142,19 @@ private:
      * `_ongoing` map of deltas instead.
      */
     void merge(const ValidatorBuffers& threadRecords);
+
+    /**
+     * Adopts the latest checkpoint from a batch into `_baseline`.
+     *
+     * The `SizeCountCheckpointValidator` must adopt a replicated metadata checkpoint from the
+     * primary before it can begin validation because the standby does not apply all oplog since the
+     * beginning of time. Rather, it installs a WiredTiger checkpoint from the primary which may
+     * include replicated metadata deltas, and these deltas are not recorded by the
+     * `SizeCountCheckpointValidator`.
+     *
+     * After a checkpoint is adopted, the `SizeCountCheckpointValidator` can begin validation.
+     */
+    void adoptCheckpoint(OperationContext* opCtx);
 
     /**
      * Computes the expected `CheckpointContents` for use in validation.
@@ -166,8 +182,10 @@ private:
      * Absolute replicated metadata values since the last `mergeAndValidate()`. Checkpoints in the
      * oplog contain the absolute size, count, and hash for a given validAsOf timestamp, so the
      * expected replicated metadata for a collection is defined as `_baseline` + deltas < validAsOf.
+     *
+     * `_baseline` is set to `boost::none` before it is initialized in `adoptCheckpoint()`.
      */
-    absl::flat_hash_map<UUID, CollectionReplicatedMetadata> _baseline;
+    boost::optional<absl::flat_hash_map<UUID, CollectionReplicatedMetadata>> _baseline;
 
     /**
      * Queue of `ValidatorIntervals` which contain the replicated metadata deltas between
@@ -185,7 +203,7 @@ private:
     ReplicatedMetadataDeltas _ongoing;
 
     /**
-     * List of checkpoints to be validated.
+     * List of checkpoints to be validated. Sorted in increasing timestamp order.
      */
     std::vector<repl::OplogEntry> _checkpoints;
 };
