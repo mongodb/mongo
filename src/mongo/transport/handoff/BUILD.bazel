@@ -97,6 +97,19 @@ mongo_cc_fuzztest(
     ],
 )
 
+mongo_cc_fuzztest(
+    name = "handoff_message_fuzz_test",
+    srcs = ["handoff_message_fuzz_test.cpp"],
+    data = ["//jstests/libs:test_pem_files"],
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":handoff_session",
+        ":handoff_test_util",
+        "//src/mongo:base",
+        "//src/mongo/rpc:message",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "handoff_session_manager_test",
     srcs = ["handoff_session_manager_test.cpp"],
