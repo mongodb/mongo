@@ -189,6 +189,18 @@ std::vector<MetadataInconsistencyItem> checkShardCatalogCollectionsConsistentWit
     OperationContext* opCtx);
 
 /**
+ * Reports legacy (viewful) timeseries collections on this shard. For a collection-level check on a
+ * view, also checks the backing system.buckets collection. Only runs on primaries.
+ */
+std::vector<MetadataInconsistencyItem> checkLegacyTimeseriesCollections(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& shardId,
+    const std::shared_ptr<const CollectionCatalog>& localCatalogSnapshot,
+    const std::vector<CollectionPtr>& localCatalogCollections,
+    RSNodeMode rsMode);
+
+/**
  * Main check consistency metadata logic ran by the participant commands (i.e.
  * _shardsvrCheckMetadataConsistencyParticipant and
  * _shardsvrCheckMetadataConsistencySecondaryParticipant).

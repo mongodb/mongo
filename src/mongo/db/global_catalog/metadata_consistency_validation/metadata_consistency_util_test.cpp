@@ -19,7 +19,9 @@
 #include "mongo/db/query/collation/collator_factory_icu.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
@@ -125,6 +127,25 @@ getLocalCatalog(OperationContext* opCtx, const NamespaceString& nss) {
     }();
 
     if (auto coll = collCatalogSnapshot->lookupCollectionByNamespace(opCtx, nss)) {
+        // The lifetime of the collection returned by the lookup is guaranteed to be valid as
+        // it's controlled by the test. The initialization is therefore safe.
+        localCatalogCollections.emplace_back(CollectionPtr::CollectionPtr_UNSAFE(coll));
+    }
+    return {collCatalogSnapshot, std::move(localCatalogCollections)};
+}
+
+std::pair<const std::shared_ptr<const CollectionCatalog>, std::vector<CollectionPtr>>
+getLocalCatalogForDb(OperationContext* opCtx, const DatabaseName& dbName) {
+    std::vector<CollectionPtr> localCatalogCollections;
+    auto collCatalogSnapshot = [&] {
+        AutoGetDb autoDb(opCtx, dbName, MODE_IS);
+        return CollectionCatalog::get(opCtx);
+    }();
+
+    for (auto&& coll : collCatalogSnapshot->range(dbName)) {
+        if (!coll) {
+            continue;
+        }
         // The lifetime of the collection returned by the lookup is guaranteed to be valid as
         // it's controlled by the test. The initialization is therefore safe.
         localCatalogCollections.emplace_back(CollectionPtr::CollectionPtr_UNSAFE(coll));
@@ -665,6 +686,149 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
                            generateTimeseriesOptions("x"),
                            generateTimeseriesOptions("x"),
                            false);
+}
+
+class MetadataConsistencyLegacyTimeseriesTest : public MetadataConsistencyTest {
+protected:
+    void createViewlessTimeseriesCollection(const NamespaceString& nss) {
+        CreateCommand cmd(nss);
+        cmd.getCreateCollectionRequest().setTimeseries(generateTimeseriesOptions("time"));
+        createTestCollection(operationContext(), nss, cmd.toBSON());
+    }
+
+    void createLegacyTimeseriesCollection(const NamespaceString& nss) {
+        // Legacy (viewful) timeseries collections are only created with the viewless feature flag
+        // disabled.
+        unittest::ServerParameterGuard viewlessTimeseriesGuard(
+            "featureFlagCreateViewlessTimeseriesCollections", false);
+        createViewlessTimeseriesCollection(nss);
+        ASSERT(CollectionCatalog::get(operationContext())
+                   ->lookupCollectionByNamespace(operationContext(),
+                                                 nss.makeTimeseriesBucketsNamespace()));
+    }
+
+    void assertOneLegacyTimeseriesInconsistencyFound(
+        const NamespaceString& bucketsNss,
+        const std::vector<MetadataInconsistencyItem>& inconsistencies) {
+        assertOneInconsistencyFound(
+            MetadataInconsistencyTypeEnum::kLegacyTimeseriesCollectionsPresent, inconsistencies);
+        const auto details = LegacyTimeseriesCollectionDetails::parse(
+            inconsistencies[0].getDetails(), IDLParserContext("LegacyTimeseriesCollectionDetails"));
+        ASSERT_EQ(bucketsNss, details.getNss());
+        ASSERT_EQ(_shardId, details.getShard());
+    }
+
+    const NamespaceString _legacyNss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "legacy");
+    const NamespaceString _legacyBucketsNss = _legacyNss.makeTimeseriesBucketsNamespace();
+    const NamespaceString _viewlessNss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "viewless");
+    const NamespaceString _dbLevelNss =
+        NamespaceString::makeCollectionlessAggregateNSS(_legacyNss.dbName());
+};
+
+TEST_F(MetadataConsistencyLegacyTimeseriesTest, ReportedAtDatabaseLevel) {
+    OperationContext* opCtx = operationContext();
+    createTestCollection(opCtx, _nss);
+    createViewlessTimeseriesCollection(_viewlessNss);
+    createLegacyTimeseriesCollection(_legacyNss);
+
+    const auto [localCatalogSnapshot, localCatalogCollections] =
+        getLocalCatalogForDb(opCtx, _legacyNss.dbName());
+
+    const auto inconsistencies = metadata_consistency_util::checkLegacyTimeseriesCollections(
+        opCtx,
+        _dbLevelNss,
+        _shardId,
+        localCatalogSnapshot,
+        localCatalogCollections,
+        metadata_consistency_util::RSNodeMode::kPrimary);
+    assertOneLegacyTimeseriesInconsistencyFound(_legacyBucketsNss, inconsistencies);
+}
+
+TEST_F(MetadataConsistencyLegacyTimeseriesTest, ReportedAtCollectionLevelOnView) {
+    OperationContext* opCtx = operationContext();
+    createLegacyTimeseriesCollection(_legacyNss);
+
+    // The legacy main namespace is a view, so the local catalog scan doesn't contain the buckets
+    // collection.
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _legacyNss);
+    ASSERT_EQ(0, localCatalogCollections.size());
+
+    const auto inconsistencies = metadata_consistency_util::checkLegacyTimeseriesCollections(
+        opCtx,
+        _legacyNss,
+        _shardId,
+        localCatalogSnapshot,
+        localCatalogCollections,
+        metadata_consistency_util::RSNodeMode::kPrimary);
+    assertOneLegacyTimeseriesInconsistencyFound(_legacyBucketsNss, inconsistencies);
+}
+
+TEST_F(MetadataConsistencyLegacyTimeseriesTest, ReportedOnceAtCollectionLevelOnBuckets) {
+    OperationContext* opCtx = operationContext();
+    createLegacyTimeseriesCollection(_legacyNss);
+
+    const auto [localCatalogSnapshot, localCatalogCollections] =
+        getLocalCatalog(opCtx, _legacyBucketsNss);
+    ASSERT_EQ(1, localCatalogCollections.size());
+
+    const auto inconsistencies = metadata_consistency_util::checkLegacyTimeseriesCollections(
+        opCtx,
+        _legacyBucketsNss,
+        _shardId,
+        localCatalogSnapshot,
+        localCatalogCollections,
+        metadata_consistency_util::RSNodeMode::kPrimary);
+    assertOneLegacyTimeseriesInconsistencyFound(_legacyBucketsNss, inconsistencies);
+}
+
+TEST_F(MetadataConsistencyLegacyTimeseriesTest, NotReportedOnSecondaries) {
+    OperationContext* opCtx = operationContext();
+    createLegacyTimeseriesCollection(_legacyNss);
+
+    const auto [dbSnapshot, dbCollections] = getLocalCatalogForDb(opCtx, _legacyNss.dbName());
+    const auto [collSnapshot, collCollections] = getLocalCatalog(opCtx, _legacyNss);
+
+    for (const auto rsMode : {metadata_consistency_util::RSNodeMode::kSecondary,
+                              metadata_consistency_util::RSNodeMode::kDelayedSecondary}) {
+        ASSERT_EQ(0,
+                  metadata_consistency_util::checkLegacyTimeseriesCollections(
+                      opCtx, _dbLevelNss, _shardId, dbSnapshot, dbCollections, rsMode)
+                      .size());
+        ASSERT_EQ(0,
+                  metadata_consistency_util::checkLegacyTimeseriesCollections(
+                      opCtx, _legacyNss, _shardId, collSnapshot, collCollections, rsMode)
+                      .size());
+    }
+}
+
+TEST_F(MetadataConsistencyLegacyTimeseriesTest, ViewlessTimeseriesNotReported) {
+    OperationContext* opCtx = operationContext();
+    createViewlessTimeseriesCollection(_viewlessNss);
+
+    const auto [dbSnapshot, dbCollections] = getLocalCatalogForDb(opCtx, _viewlessNss.dbName());
+    ASSERT_EQ(0,
+              metadata_consistency_util::checkLegacyTimeseriesCollections(
+                  opCtx,
+                  _dbLevelNss,
+                  _shardId,
+                  dbSnapshot,
+                  dbCollections,
+                  metadata_consistency_util::RSNodeMode::kPrimary)
+                  .size());
+
+    const auto [collSnapshot, collCollections] = getLocalCatalog(opCtx, _viewlessNss);
+    ASSERT_EQ(1, collCollections.size());
+    ASSERT_EQ(0,
+              metadata_consistency_util::checkLegacyTimeseriesCollections(
+                  opCtx,
+                  _viewlessNss,
+                  _shardId,
+                  collSnapshot,
+                  collCollections,
+                  metadata_consistency_util::RSNodeMode::kPrimary)
+                  .size());
 }
 
 TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {

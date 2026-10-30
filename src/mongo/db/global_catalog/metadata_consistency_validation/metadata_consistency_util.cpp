@@ -276,6 +276,25 @@ void _checkBucketCollectionInconsistencies(
     }
 }
 
+/*
+ * Reports the collection if it is a legacy (viewful) timeseries buckets collection. Does nothing if
+ * `localColl` is null.
+ */
+void _checkLegacyTimeseriesCollection(const Collection* localColl,
+                                      const ShardId& shardId,
+                                      std::vector<MetadataInconsistencyItem>& inconsistencies) {
+    // Viewless timeseries collections never use a system.buckets namespace, so a buckets namespace
+    // with timeseries options is a legacy (viewful) timeseries collection.
+    if (!localColl || !localColl->ns().isTimeseriesBucketsCollection() ||
+        !localColl->isTimeseriesCollection()) {
+        return;
+    }
+
+    inconsistencies.emplace_back(
+        makeInconsistency(MetadataInconsistencyTypeEnum::kLegacyTimeseriesCollectionsPresent,
+                          LegacyTimeseriesCollectionDetails{localColl->ns(), shardId}));
+}
+
 std::vector<ChunkType> getChunksFromGlobalCatalog(OperationContext* opCtx,
                                                   const CollectionType& coll,
                                                   const ShardId& shardId) {
@@ -3087,6 +3106,38 @@ std::vector<MetadataInconsistencyItem> checkShardCatalogCollectionsConsistentWit
     return result.value_or(std::vector<MetadataInconsistencyItem>{});
 }
 
+std::vector<MetadataInconsistencyItem> checkLegacyTimeseriesCollections(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& shardId,
+    const std::shared_ptr<const CollectionCatalog>& localCatalogSnapshot,
+    const std::vector<CollectionPtr>& localCatalogCollections,
+    RSNodeMode rsMode) {
+    std::vector<MetadataInconsistencyItem> inconsistencies;
+
+    // Secondaries' results are appended to the primary's, so only check on the primary to avoid
+    // reporting the same collection once per node.
+    if (rsMode != RSNodeMode::kPrimary) {
+        return inconsistencies;
+    }
+
+    for (const auto& localColl : localCatalogCollections) {
+        _checkLegacyTimeseriesCollection(localColl.get(), shardId, inconsistencies);
+    }
+
+    // A collection-level check on a legacy timeseries view finds no local collection, so look up
+    // its buckets collection explicitly.
+    if (getCommandLevel(nss) == MetadataConsistencyCommandLevelEnum::kCollectionLevel &&
+        !nss.isTimeseriesBucketsCollection()) {
+        _checkLegacyTimeseriesCollection(localCatalogSnapshot->lookupCollectionByNamespace(
+                                             opCtx, nss.makeTimeseriesBucketsNamespace()),
+                                         shardId,
+                                         inconsistencies);
+    }
+
+    return inconsistencies;
+}
+
 std::pair<std::vector<MetadataInconsistencyItem>, boost::optional<Timestamp>>
 runCheckMetadataConsistencyOnParticipant(OperationContext* opCtx,
                                          const NamespaceString& nss,
@@ -3193,6 +3244,12 @@ runCheckMetadataConsistencyOnParticipant(OperationContext* opCtx,
                                                               strictChunkChecksThreshold,
                                                               rsMode,
                                                               collectionsUnderCs);
+
+    auto legacyTimeseriesInconsistencies = checkLegacyTimeseriesCollections(
+        opCtx, nss, shardId, collCatalogSnapshot, localCatalogCollections, rsMode);
+    inconsistencies.insert(inconsistencies.end(),
+                           std::make_move_iterator(legacyTimeseriesInconsistencies.begin()),
+                           std::make_move_iterator(legacyTimeseriesInconsistencies.end()));
 
     // For collections that are not present neither in the local catalog nor in the global catalog,
     // verify that they are also not present on the shard catalog (CSR and its durable state
