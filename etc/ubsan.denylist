@@ -21,3 +21,8 @@ fun:access_mem
 
 # TODO SERVER-102630 warns of unaligned access on code whose purpose is to prevent unaligned access.
 src:src/third_party/gperftools/dist/src/base/basictypes.h
+
+# zstd forms an out-of-range prefetch address on corrupt input; it is never dereferenced. Still
+# present in 1.5.7; remove once we vendor a release with upstream fix d5b84f5a.
+[pointer-overflow]
+src:src/third_party/zstandard/zstd/lib/decompress/zstd_decompress_block.c
