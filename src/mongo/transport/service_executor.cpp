@@ -121,7 +121,7 @@ void ServiceExecutorContext::setThreadModel(ThreadModel model) {
     if (_threadModel == model)
         return;
 
-    std::exchange(_threadModel, model);
+    static_cast<void>(std::exchange(_threadModel, model));
 }
 
 void ServiceExecutorContext::setCanUseReserved(bool canUseReserved) {
