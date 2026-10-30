@@ -5,6 +5,7 @@
 
 #include "mongo/base/init.h"
 
+#include <charconv>
 #include <string_view>
 
 namespace mongo {

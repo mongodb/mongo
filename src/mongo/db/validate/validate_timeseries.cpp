@@ -28,6 +28,7 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/tracking/context.h"
 
+#include <charconv>
 #include <climits>
 #include <string>
 #include <string_view>

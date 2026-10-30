@@ -6,6 +6,7 @@
 
 #if !defined(_WIN32)
 #include <cerrno>
+#include <charconv>
 
 #include <fcntl.h>
 #include <netdb.h>
@@ -22,7 +23,6 @@
 #include <sys/uio.h>
 #endif
 #else
-#include <charconv>
 #include <string_view>
 
 #include <mstcpip.h>
