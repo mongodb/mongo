@@ -1167,6 +1167,7 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngineBase& engine,
         "statistics:",
         ss.str(),
         bob,
+        engine.getOTelMetricRegistry(),
         fieldsToInclude.empty() ? categoriesToIgnore : fieldsToInclude,
         fieldsToInclude.empty() ? FilterBehavior::kExcludeCategories
                                 : FilterBehavior::kIncludeStats);
@@ -1196,8 +1197,8 @@ bool WiredTigerUtil::historyStoreStatistics(WiredTigerKVEngine& engine, BSONObjB
 
     std::stringstream ss;
     ss << "statistics=(" << wiredTigerGlobalOptions.statisticsSetting << ")";
-    Status status =
-        WiredTigerUtil::exportStatsBSONAndOTel(*session, historyStorageStatUri, ss.str(), bob);
+    Status status = WiredTigerUtil::exportStatsBSONAndOTel(
+        *session, historyStorageStatUri, ss.str(), bob, nullptr);
     if (!status.isOK()) {
         bob.append("error", "unable to retrieve statistics");
         bob.append("code", static_cast<int>(status.code()));
@@ -1209,9 +1210,10 @@ bool WiredTigerUtil::historyStoreStatistics(WiredTigerKVEngine& engine, BSONObjB
 Status WiredTigerUtil::exportStatsBSONAndOTel(WiredTigerSession& session,
                                               const std::string& uri,
                                               const std::string& config,
-                                              BSONObjBuilder& bob) {
+                                              BSONObjBuilder& bob,
+                                              WiredTigerMetricRegistry* registry) {
     return exportStatsBSONAndOTel(
-        session, uri, config, bob, {}, FilterBehavior::kExcludeCategories);
+        session, uri, config, bob, registry, {}, FilterBehavior::kExcludeCategories);
 }
 
 namespace {
@@ -1366,9 +1368,9 @@ Status WiredTigerUtil::exportStatsBSONAndOTel(WiredTigerSession& session,
                                               const std::string& uri,
                                               const std::string& config,
                                               BSONObjBuilder& bob,
+                                              WiredTigerMetricRegistry* registry,
                                               const std::vector<std::string>& filter,
-                                              FilterBehavior filterBehavior,
-                                              WiredTigerMetricRegistry* registry) {
+                                              FilterBehavior filterBehavior) {
     std::vector<std::pair<WiredTigerUtil::OTelStatType, WT_CURSOR*>> cursors;
     ON_BLOCK_EXIT([&] {
         for (auto& [type, cursor] : cursors) {

@@ -10,10 +10,13 @@
 #include "mongo/util/string_map.h"
 
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <string_view>
 
 namespace mongo {
+
+class DBException;
 
 /**
  * Translates a WiredTiger statistic name into a valid otel metric name, e.g.
@@ -29,15 +32,17 @@ namespace mongo {
  * Lazily creates and owns the OpenTelemetry instruments backing WiredTiger statistics, keyed by the
  * WiredTiger stat name.
  *
- * This is not thread-safe. It relies on the collection job only ever invoking it from a single
- * thread. Concurrent calls are not supported.
+ * Updates are thread-safe. They run while WiredTiger statistics are read on background threads
+ * (e.g. FTDC and periodic jobs), so exceptions from the OTel API are caught and logged rather than
+ * propagated. If the instrument for a stat cannot be created (e.g. its name collides with a metric
+ * that has a different definition), the stat is skipped from then on.
  */
 class [[MONGO_MOD_PUBLIC]] WiredTigerMetricRegistry {
 public:
     /**
      * Records an increase in an OTel counter metric. WiredTiger reports counters as the increment
      * since the last reading, which is what the OTel counter API expects, so the value is passed
-     * through unchanged. The increment must be non-negative.
+     * through unchanged. A negative increment is rejected and logged.
      */
     void updateCounter(std::string_view statName, int64_t increment);
 
@@ -55,6 +60,10 @@ private:
     otel::metrics::Counter<int64_t>* _createCounter(std::string_view statName);
     otel::metrics::Gauge<int64_t>* _createGauge(std::string_view statName);
 
+    void _logUpdateError(std::string_view statName, const DBException& ex);
+
+    // Guards the members below.
+    std::mutex _mutex;
     StringMap<otel::metrics::Counter<int64_t>*> _counters;
     StringMap<otel::metrics::Gauge<int64_t>*> _gauges;
     StringSet _skipped;

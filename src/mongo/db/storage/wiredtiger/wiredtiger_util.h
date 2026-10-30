@@ -135,14 +135,15 @@ public:
     static Status exportStatsBSONAndOTel(WiredTigerSession& session,
                                          const std::string& uri,
                                          const std::string& config,
-                                         BSONObjBuilder& bob);
+                                         BSONObjBuilder& bob,
+                                         WiredTigerMetricRegistry* registry);
     static Status exportStatsBSONAndOTel(WiredTigerSession& session,
                                          const std::string& uri,
                                          const std::string& config,
                                          BSONObjBuilder& bob,
+                                         WiredTigerMetricRegistry* registry,
                                          const std::vector<std::string>& filter,
-                                         FilterBehavior filterBehavior,
-                                         WiredTigerMetricRegistry* registry = nullptr);
+                                         FilterBehavior filterBehavior);
 
     /**
      * Creates an import configuration string suitable for the 'config' parameter in

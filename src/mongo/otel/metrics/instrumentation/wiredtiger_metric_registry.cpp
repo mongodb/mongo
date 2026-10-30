@@ -8,6 +8,7 @@
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/otel_metric_name_validation.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 
 #include <boost/optional.hpp>
@@ -151,42 +152,67 @@ Gauge<int64_t>* WiredTigerMetricRegistry::_createGauge(std::string_view statName
         MetricUnit::kWiredTiger);
 }
 
-void WiredTigerMetricRegistry::updateCounter(std::string_view statName, int64_t increment) {
-    if (_skipped.contains(statName)) {
-        return;
-    }
+void WiredTigerMetricRegistry::_logUpdateError(std::string_view statName, const DBException& ex) {
+    LOGV2_WARNING(13501500,
+                  "Failed to update OTel metric for WiredTiger statistic",
+                  "stat"_attr = statName,
+                  "error"_attr = ex.toStatus());
+}
 
+void WiredTigerMetricRegistry::updateCounter(std::string_view statName, int64_t increment) {
+    std::lock_guard lk(_mutex);
     auto it = _counters.find(statName);
-    if (it == _counters.end()) {
-        auto* counter = _createCounter(statName);
-        if (!counter) {
-            _skipped.emplace(statName);
-            LOGV2_DEBUG(
-                13500903, 2, "Skipping update for WiredTiger counter", "stat"_attr = statName);
-            return;
+    try {
+        if (it == _counters.end()) {
+            if (_skipped.contains(statName)) {
+                return;
+            }
+
+            auto* counter = _createCounter(statName);
+            if (!counter) {
+                _skipped.emplace(statName);
+                LOGV2_DEBUG(
+                    13500903, 2, "Skipping update for WiredTiger counter", "stat"_attr = statName);
+                return;
+            }
+            it = _counters.emplace(statName, counter).first;
         }
-        it = _counters.emplace(statName, counter).first;
+        it->second->add(increment);
+    } catch (const DBException& ex) {
+        // Creating the instrument would fail the same way on every later attempt, so stop trying.
+        if (it == _counters.end()) {
+            _skipped.emplace(statName);
+        }
+        _logUpdateError(statName, ex);
     }
-    it->second->add(increment);
 }
 
 void WiredTigerMetricRegistry::updateGauge(std::string_view statName, int64_t currentValue) {
-    if (_skipped.contains(statName)) {
-        return;
-    }
-
+    std::lock_guard lk(_mutex);
     auto it = _gauges.find(statName);
-    if (it == _gauges.end()) {
-        auto* gauge = _createGauge(statName);
-        if (!gauge) {
-            _skipped.emplace(statName);
-            LOGV2_DEBUG(
-                13500902, 2, "Skipping update for WiredTiger gauge", "stat"_attr = statName);
-            return;
+    try {
+        if (it == _gauges.end()) {
+            if (_skipped.contains(statName)) {
+                return;
+            }
+
+            auto* gauge = _createGauge(statName);
+            if (!gauge) {
+                _skipped.emplace(statName);
+                LOGV2_DEBUG(
+                    13500902, 2, "Skipping update for WiredTiger gauge", "stat"_attr = statName);
+                return;
+            }
+            it = _gauges.emplace(statName, gauge).first;
         }
-        it = _gauges.emplace(statName, gauge).first;
+        it->second->set(currentValue);
+    } catch (const DBException& ex) {
+        // Creating the instrument would fail the same way on every later attempt, so stop trying.
+        if (it == _gauges.end()) {
+            _skipped.emplace(statName);
+        }
+        _logUpdateError(statName, ex);
     }
-    it->second->set(currentValue);
 }
 
 }  // namespace mongo

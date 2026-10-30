@@ -104,7 +104,8 @@ void checkOplogFormatVersion(WiredTigerRecoveryUnit& ru, const std::string& uri)
 void appendNumericStats(WiredTigerSession& s, const std::string& uri, BSONObjBuilder& bob) {
     std::stringstream ss;
     ss << "statistics=(" << wiredTigerGlobalOptions.statisticsSetting << ")";
-    Status status = WiredTigerUtil::exportStatsBSONAndOTel(s, "statistics:" + uri, ss.str(), bob);
+    Status status =
+        WiredTigerUtil::exportStatsBSONAndOTel(s, "statistics:" + uri, ss.str(), bob, nullptr);
     if (!status.isOK()) {
         bob.append("error", "unable to retrieve statistics");
         bob.append("code", static_cast<int>(status.code()));

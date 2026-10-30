@@ -6,10 +6,12 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/otel/metrics/otel_metric_name_validation.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -83,6 +85,54 @@ TEST_F(WiredTigerMetricRegistryTest, UntranslatableStatsAreSkipped) {
     _registry.updateCounter("(...)", 20);
     _registry.updateGauge("cache: 64KB pages", 30);
     _registry.updateGauge("cache: 64KB pages", 40);
+}
+
+TEST_F(WiredTigerMetricRegistryTest, NameCollisionIsSkipped) {
+    // Both stats translate to the same OTel name, but the instrument description is the stat name,
+    // so the second one collides with a metric that has a different definition.
+    const std::string stat = "test-registry: name collision";
+    const std::string collidingStat = "test-registry: name (collision)";
+    ASSERT_EQ(wtStatNameToOtelName(stat), wtStatNameToOtelName(collidingStat));
+
+    _registry.updateCounter(stat, 5);
+    ASSERT_DOES_NOT_THROW(_registry.updateCounter(collidingStat, 7));
+
+    // The colliding stat is not retried, and the original metric keeps being updated.
+    _registry.updateCounter(collidingStat, 7);
+    _registry.updateCounter(stat, 1);
+    ASSERT_EQ(readCounter(stat), 6);
+}
+
+TEST_F(WiredTigerMetricRegistryTest, TypeMismatchIsSkipped) {
+    const std::string stat = "test-registry: type mismatch";
+
+    _registry.updateCounter(stat, 5);
+    ASSERT_DOES_NOT_THROW(_registry.updateGauge(stat, 7));
+
+    // The gauge is not retried, and the counter that was created keeps being updated.
+    _registry.updateGauge(stat, 7);
+    _registry.updateCounter(stat, 1);
+    ASSERT_EQ(readCounter(stat), 6);
+}
+
+TEST_F(WiredTigerMetricRegistryTest, ConcurrentUpdatesAreAllRecorded) {
+    const std::string stat = "test-registry: concurrent updates";
+    constexpr int kThreads = 8;
+    constexpr int kUpdatesPerThread = 1000;
+
+    std::vector<stdx::thread> threads;
+    for (int i = 0; i < kThreads; ++i) {
+        threads.emplace_back([&] {
+            for (int j = 0; j < kUpdatesPerThread; ++j) {
+                _registry.updateCounter(stat, 1);
+            }
+        });
+    }
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    ASSERT_EQ(readCounter(stat), kThreads * kUpdatesPerThread);
 }
 
 }  // namespace
