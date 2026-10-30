@@ -837,7 +837,11 @@ const cacheInvalidationExpected = [
     },
 
     {
-        case: "TODO(SERVER-134231) Dropping and recreating an index with a different keyPattern (different sparseness)",
+        // The sparse replacement cannot prove that "a" is non-array across the collection, so
+        // the query is not eligible for join optimization and does not use the join cache.
+        // TODO (SERVER-138099): Revisit this expectation if sparse indexes can safely provide
+        // the non-array proof required for join optimization.
+        case: "Replacing the last non-array-proving index with a sparse index disables join optimization",
         ddls: [
             {
                 "dropIndexes": "base_coll",

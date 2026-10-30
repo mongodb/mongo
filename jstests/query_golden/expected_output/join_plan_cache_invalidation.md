@@ -846,7 +846,7 @@
 > Cache did not kick in at all
 
 
-### TODO(SERVER-134231) Dropping and recreating an index with a different keyPattern (different sparseness)
+### Replacing the last non-array-proving index with a sparse index disables join optimization
 ```json
 [
 	{
@@ -867,8 +867,8 @@
 	}
 ]
 ```
-> [!WARNING]
-> Cache entry was expected to be invalidated but was not!
+> [!INFO]
+> Cache did not kick in at all
 
 
 ### Dropping and recreating an index with a different keyPattern (different hidden state)
