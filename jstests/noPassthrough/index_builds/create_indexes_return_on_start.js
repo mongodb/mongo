@@ -233,49 +233,61 @@ const shardingTest = new ShardingTest({
     rs: {...replSetConfig, ...reduceOplogMaxTimeParam},
 });
 const shardingDb = shardingTest.s.getDB(jsTestName());
+// TODO (SERVER-138181): Remove this function.
+const runShardingSetupCommand = function (cmd) {
+    const diagnostics = {cmd};
+    assert.soon(
+        () => {
+            const res = shardingDb.adminCommand(cmd);
+            diagnostics.res = res;
+            // Migration errors can wrap a write conflict in OperationFailed.
+            if (
+                res.code === ErrorCodes.WriteConflict ||
+                (res.code === ErrorCodes.OperationFailed && res.errmsg.includes("WriteConflict"))
+            ) {
+                jsTest.log.info("Retrying sharding setup after write conflict", {cmd, res});
+                return false;
+            }
+            assert.commandWorked(res);
+            return true;
+        },
+        "Timed out running sharding setup command",
+        undefined,
+        undefined,
+        undefined,
+        diagnostics,
+    );
+};
+
 runTest(shardingDb, [shardingTest.rs0, shardingTest.rs1], false, (coll) => {
-    assert.commandWorked(
-        shardingDb.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}),
-    );
-    assert.commandWorked(shardingDb.adminCommand({split: coll.getFullName(), middle: {m: 5}}));
-    assert.commandWorked(
-        shardingDb.adminCommand({
-            moveChunk: coll.getFullName(),
-            find: {m: 0},
-            to: shardingTest.shard0.shardName,
-        }),
-    );
-    assert.commandWorked(
-        shardingDb.adminCommand({
-            moveChunk: coll.getFullName(),
-            find: {m: 10},
-            to: shardingTest.shard1.shardName,
-        }),
-    );
+    runShardingSetupCommand({shardCollection: coll.getFullName(), key: {m: 1}});
+    runShardingSetupCommand({split: coll.getFullName(), middle: {m: 5}});
+    runShardingSetupCommand({
+        moveChunk: coll.getFullName(),
+        find: {m: 0},
+        to: shardingTest.shard0.shardName,
+    });
+    runShardingSetupCommand({
+        moveChunk: coll.getFullName(),
+        find: {m: 10},
+        to: shardingTest.shard1.shardName,
+    });
 });
 runTest(shardingDb, [shardingTest.rs0, shardingTest.rs1], true, (coll) => {
-    assert.commandWorked(
-        shardingDb.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}),
-    );
-    assert.commandWorked(
-        shardingDb.adminCommand({
-            split: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
-            middle: {meta: 5},
-        }),
-    );
-    assert.commandWorked(
-        shardingDb.adminCommand({
-            moveChunk: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
-            find: {meta: 0},
-            to: shardingTest.shard0.shardName,
-        }),
-    );
-    assert.commandWorked(
-        shardingDb.adminCommand({
-            moveChunk: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
-            find: {meta: 10},
-            to: shardingTest.shard1.shardName,
-        }),
-    );
+    runShardingSetupCommand({shardCollection: coll.getFullName(), key: {m: 1}});
+    runShardingSetupCommand({
+        split: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
+        middle: {meta: 5},
+    });
+    runShardingSetupCommand({
+        moveChunk: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
+        find: {meta: 0},
+        to: shardingTest.shard0.shardName,
+    });
+    runShardingSetupCommand({
+        moveChunk: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
+        find: {meta: 10},
+        to: shardingTest.shard1.shardName,
+    });
 });
 shardingTest.stop();
