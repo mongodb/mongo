@@ -154,9 +154,6 @@ public:
     struct TraverseRecordStoreResults {
         Status status = Status::OK();
         int64_t dataSizeTotal{0};
-        // The first and last records the traversal read, null if it read none.
-        RecordId firstRecordId;
-        RecordId lastRecordId;
         ValidateResults validateResults;
         KeyStringIndexConsistency keyStringIndexConsistency;
         // Storage statistics accrued by a slice traversing on its own operation context.

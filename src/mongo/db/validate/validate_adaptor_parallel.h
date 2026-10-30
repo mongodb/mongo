@@ -10,7 +10,6 @@
 #include "mongo/util/cancellation.h"
 
 #include <memory>
-#include <span>
 
 namespace mongo {
 
@@ -80,14 +79,6 @@ protected:
                                                             CancellationToken cancellation) const;
 
 private:
-    /**
-     * Reports an error if a slice's first RecordId does not follow the last RecordId of the
-     * previous non-empty slice. 'slices' must be in pivot order, as the slices cover consecutive
-     * disjoint ranges of the record store.
-     */
-    void checkSliceIntervalsDoNotIntersect(std::span<const TraverseRecordStoreResults> slices,
-                                           ValidateResults& validateResults);
-
     boost::optional<int64_t> _targetRecordsPerSlice;
 };
 

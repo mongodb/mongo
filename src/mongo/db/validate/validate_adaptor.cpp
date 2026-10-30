@@ -1097,10 +1097,6 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                 }
             }
 
-            if (results.firstRecordId.isNull()) {
-                results.firstRecordId = record->id;
-            }
-            results.lastRecordId = record->id;
             prevRecordId = record->id;
 
             if (results.validateResults.getNumRecords().value() %

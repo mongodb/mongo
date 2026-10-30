@@ -32,12 +32,6 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeRecordStoreSliceTraversal);
-
-
-static constexpr char kSliceBoundaryOutOfOrderDocumentError[] =
-    "Detected out-of-order documents across record store slices. For more info, see logs with log "
-    "id 13344700.";
-
 /**
  * The snapshot settings a slice worker has to adopt from the thread that started the validation.
  *
@@ -148,27 +142,6 @@ ValidateAdaptorParallel::ValidateAdaptorParallel(
     collection_validation::ValidateState& validateState,
     boost::optional<int64_t> targetRecordsPerSlice)
     : ValidateAdaptor(opCtx, validateState), _targetRecordsPerSlice(targetRecordsPerSlice) {}
-
-void ValidateAdaptorParallel::checkSliceIntervalsDoNotIntersect(
-    std::span<const TraverseRecordStoreResults> slices, ValidateResults& validateResults) {
-    // The slices are in pivot order, so each one's records must all follow the previous one's.
-    boost::optional<const TraverseRecordStoreResults&> prev = boost::none;
-    for (const auto& slice : slices) {
-        if (!slice.firstRecordId.isNull()) {
-            if (prev.has_value() && slice.firstRecordId <= prev->lastRecordId) {
-                LOGV2_ERROR_OPTIONS(13344700,
-                                    {logv2::LogTruncation::Disabled},
-                                    "Document corruption details - Detected out-of-order document "
-                                    "across record store slices",
-                                    logAttrs(getValidateState().nss()),
-                                    "firstSliceLastRecordId"_attr = prev->lastRecordId,
-                                    "nextSliceFirstRecordId"_attr = slice.firstRecordId);
-                validateResults.addError(kSliceBoundaryOutOfOrderDocumentError);
-            }
-            prev = slice;
-        }
-    }
-}
 
 void ValidateAdaptorParallel::traverseRecordStore(OperationContext* opCtx,
                                                   ValidateResults& validateResults,
@@ -315,7 +288,6 @@ void ValidateAdaptorParallel::traverseRecordStore(OperationContext* opCtx,
 
     // Combine the per-slice results before surfacing any slice's failure, so that a partial
     // failure still reports everything the other slices accumulated.
-    checkSliceIntervalsDoNotIntersect(implResults, validateResults);
     for (const auto& ir : implResults) {
         validateResults.merge(ir.validateResults);
         getKeyBasedIndexConsistency().merge(ir.keyStringIndexConsistency);
