@@ -69,6 +69,13 @@ feature_flags:
         cpp_varname: gFeatureFlagPaliORPFallback
         default: false
         fcv_gated: false
+    featureFlagLogServerFrontierStream:
+        description: >-
+            On a standby, consume materialized offsets from the log service's dedicated
+            LogFrontiers stream, independently of ReadLog processing.
+        cpp_varname: gFeatureFlagLogServerFrontierStream
+        default: true
+        fcv_gated: false
     featureFlagEndOfTransactionChangeEvent:
         description: "Feature flag to enable endOfTransaction oplog entry and change stream event"
         cpp_varname: feature_flags::gFeatureFlagEndOfTransactionChangeEvent
