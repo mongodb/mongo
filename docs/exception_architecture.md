@@ -48,7 +48,7 @@ Some assertions will increment an assertion counter. The `serverStatus` command 
 - `user`
   - Incremented by `uassert`.
 - `tripwire`
-  - Incremented by `tassert`.
+  - Incremented by `tassert` and by defanged invariants.
 - `rollovers`
   - When any counter reaches a value of `1 << 30`, all of the counters are reset and the "rollovers"
     counter is incremented.
@@ -103,6 +103,30 @@ This convention can also be used for LOGV2 logging id numbers.
 
 The only real constraint for unique location numbers is that they must be unique across the
 codebase. This is verified at compile time with a [python script][errorcodes_py].
+
+### Defanging invariants
+
+Defanging invariants is a feature meant to be used as a temporary mitigation for the unavailability
+caused by an invariant firing in production. A selected set of invariants can be "defanged" via a
+server parameter. The defanged invariants throw an `InternalError` exception instead of aborting the
+process. Much like a `tassert`, a defanged invariant increments the tripwire counter.
+
+Defanging is controlled by the `defangedInvariants` server parameter, which may be set at startup or
+at runtime. Its value maps a MongoDB version to the list of invariant source locations to defang for
+that version:
+
+```javascript
+db.adminCommand({
+  setParameter: 1,
+  defangedInvariants: {
+    "8.3.0": ["src/mongo/db/foo.cpp:42"],
+  },
+});
+```
+
+Only the listed source locations are affected; every other invariant still aborts as usual. See the
+`defangedInvariants` parameter in the server parameter reference for details on the accepted value
+format.
 
 ## Exception
 
