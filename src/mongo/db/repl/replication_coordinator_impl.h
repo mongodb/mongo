@@ -818,12 +818,14 @@ private:
     //   5) The primary is too stale to catch up.
     //
     // On abort, the state resets the pointer to itself in ReplCoordImpl. In other words, the
-    // life cycle of the state object aligns with the conceptual state.
+    // life cycle of the state object aligns with the conceptual state. ReplCoordImpl holds the only
+    // strong reference; the waiter's completion callback holds a weak one, because the waiter can
+    // be completed while the state is being destroyed, or after it is gone.
     // In shutdown, the timeout callback will be canceled by the executor and the state is safe to
     // destroy.
     //
     // Any function of the state must be called while holding _mutex.
-    class CatchupState {
+    class CatchupState : public std::enable_shared_from_this<CatchupState> {
     public:
         CatchupState(ReplicationCoordinatorImpl* repl) : _repl(repl) {}
         // start() can only be called once.
@@ -1813,7 +1815,7 @@ private:
 
     // The catchup state including all catchup logic. The presence of a non-null pointer indicates
     // that the node is currently in catchup mode.
-    std::unique_ptr<CatchupState> _catchupState;  // (X)
+    std::shared_ptr<CatchupState> _catchupState;  // (X)
 
     // The election state that includes logic to start and return information from the election
     // voting process.

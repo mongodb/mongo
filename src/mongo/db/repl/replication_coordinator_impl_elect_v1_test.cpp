@@ -2685,6 +2685,25 @@ protected:
         net->exitNetwork();
     }
 
+    // Leaves two abandoned waiters in the lastApplied waiter list whose keys, together with a
+    // later catch-up target, are not consistently ordered by OpTime::operator<. The catch-up
+    // waiter then sorts after a key that never compares <= lastApplied, so advancing lastApplied
+    // past the catch-up target does not fulfill the catch-up waiter.
+    void plantUnorderedOpTimeWaiters(Timestamp aboveLastApplied) {
+        for (const auto& opTime : {OpTime(aboveLastApplied, OpTime::kUninitializedTerm),
+                                   OpTime(Timestamp(1, 1), 1LL << 40)}) {
+            auto opCtx = makeOperationContext();
+            {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                getServiceContext()->killOperation(lk, opCtx.get());
+            }
+            ASSERT_EQ(
+                ErrorCodes::Interrupted,
+                getReplCoord()->waitUntilOpTimeForRead(
+                    opCtx.get(), ReadConcernArgs(opTime, ReadConcernLevel::kLocalReadConcern)));
+        }
+    }
+
     // Simulate the work done by bgsync and applier threads. setMyLastAppliedOpTime() will signal
     // the optime waiter.
     void advanceMyLastAppliedOpTime(OpTime opTime, Date_t wallTime = Date_t()) {
@@ -2789,6 +2808,92 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
     ASSERT_EQ(0,
               ReplicationMetrics::get(opCtx.get())
                   .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
+}
+
+// The catch-up waiter is still registered when heartbeats show the node has already reached the
+// target. Concluding catch-up destroys that waiter, which must not conclude catch-up a second time
+// from the waiter's completion callback.
+TEST_F(PrimaryCatchUpTest, AlreadyCaughtUpWithUnfulfilledWaiterConcludesOnce) {
+    startCapturingLogMessages();
+
+    OpTime time1(Timestamp(100, 1), 0);
+    OpTime time2(Timestamp(100, 3), 0);
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1, 30000);
+    plantUnorderedOpTimeWaiters(Timestamp(100, 2));
+
+    processHeartbeatRequests([this, time2](const NetworkOpIter noi) {
+        getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time2));
+    });
+    advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+
+    // The next round of heartbeats sees that we have reached the target.
+    replyHeartbeatsAndRunUntil(getNet()->now() + config.getHeartbeatInterval() + Milliseconds(1),
+                               [this, time2](const NetworkOpIter noi) {
+                                   getNet()->scheduleResponse(
+                                       noi, getNet()->now(), makeHeartbeatResponse(time2));
+                               });
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Exited primary catch-up mode"));
+    ASSERT_EQUALS(
+        0, countTextFormatLogLinesContaining("Caught up to the latest known optime successfully"));
+
+    auto opCtx = makeOperationContext();
+    signalDrainComplete(opCtx.get());
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
+}
+
+// Heartbeats move the catch-up target while the waiter for the previous, already reached target is
+// still registered. Replacing that waiter must not conclude catch-up from under the heartbeat
+// handler that is still updating the catch-up state.
+TEST_F(PrimaryCatchUpTest, TargetChangeWithUnfulfilledWaiterKeepsCatchingUp) {
+    startCapturingLogMessages();
+
+    OpTime time1(Timestamp(100, 1), 0);
+    OpTime time2(Timestamp(100, 3), 0);
+    OpTime time3(Timestamp(100, 4), 0);
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1, 30000);
+    plantUnorderedOpTimeWaiters(Timestamp(100, 2));
+
+    processHeartbeatRequests([this, time2](const NetworkOpIter noi) {
+        getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time2));
+    });
+    advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
+
+    // Other nodes have moved on, so the target changes to one we have not reached.
+    replyHeartbeatsAndRunUntil(getNet()->now() + config.getHeartbeatInterval() + Milliseconds(1),
+                               [this, time3](const NetworkOpIter noi) {
+                                   getNet()->scheduleResponse(
+                                       noi, getNet()->now(), makeHeartbeatResponse(time3));
+                               });
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
+    ASSERT_EQUALS(time3,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
+
+    advanceMyLastAppliedOpTime(time3, Date_t() + Seconds(time3.getSecs()));
+    replyHeartbeatsAndRunUntil(getNet()->now() + config.getHeartbeatInterval() + Milliseconds(1),
+                               [this, time3](const NetworkOpIter noi) {
+                                   getNet()->scheduleResponse(
+                                       noi, getNet()->now(), makeHeartbeatResponse(time3));
+                               });
+    ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Exited primary catch-up mode"));
+
+    auto opCtx = makeOperationContext();
+    signalDrainComplete(opCtx.get());
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
+
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUps_forTesting());
+    ASSERT_EQ(0, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsSucceeded_forTesting());
+    ASSERT_EQ(1, ReplicationMetrics::get(opCtx.get()).getNumCatchUpsAlreadyCaughtUp_forTesting());
 }
 
 TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
