@@ -65,6 +65,10 @@ constexpr int kNumDocsDiscardedFieldBytes = 1 /* type indicator */ +
     (sizeof("numDocsDiscarded")) /* field name (including null-terminator) */
     + 8 /* long type */;
 
+constexpr int kNumPagesFieldBytes = 1 /* type indicator */ +
+    (sizeof("numPages")) /* field name (including null-terminator) */
+    + 4 /* int type */;
+
 /**
  * Appends every field of a sample page document except the `docs` array, leaving `builder` ready
  * for the caller to append that array.
@@ -135,7 +139,7 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
 
             // Calculate the maximum number of bytes this document would add to a page.
             const int docSizeWithOverheadBytes = doc.objsize() + kArrayElementMaxOverheadBytes +
-                kBytesToClosePage + kNumDocsDiscardedFieldBytes;
+                kBytesToClosePage + kNumDocsDiscardedFieldBytes + kNumPagesFieldBytes;
 
             // Calculate the maximum size the page could be after adding this document.
             const int projectedPageSize = builder.len() + docSizeWithOverheadBytes;
@@ -190,6 +194,7 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
     for (auto& builder : builders) {
         builder.append(PersistentSampleDoc::kNumDocsDiscardedFieldName,
                        static_cast<long long>(numDiscarded));
+        builder.append(PersistentSampleDoc::kNumPagesFieldName, static_cast<int>(builders.size()));
         BSONObj page = builder.obj();
         tassert(13044800,
                 str::stream() << "Assembled sample page of " << page.objsize()

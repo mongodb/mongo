@@ -73,6 +73,20 @@ StatusWith<uint64_t> parsePersistentSampleGenId(std::string_view id,
                                                 size_t requestedSampleSize,
                                                 boost::optional<int> numChunks);
 
+/**
+ * Groups `pages`, in any order, by gen_id and returns the pages, sorted by pageNo, of the highest
+ * generation whose pages 0 to numPages-1 are all present.
+ *
+ * Possible error codes:
+ * - `NoSuchKey` if no generation is complete.
+ * - `UnsupportedFormat` if any page is malformed.
+ */
+StatusWith<std::vector<BSONObj>> selectHighestCompleteGeneration(std::vector<BSONObj> pages,
+                                                                 const UUID& collectionUuid,
+                                                                 SamplingTechniqueEnum method,
+                                                                 size_t requestedSampleSize,
+                                                                 boost::optional<int> numChunks);
+
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
 
 /**
@@ -92,11 +106,11 @@ public:
     using SampleLoader::SampleLoader;
 
     /**
-     * Loads the persisted sample matching the spec.
+     * Loads the highest complete generation of the persisted sample matching the spec.
      *
      * Possible error codes:
      * - `NoSuchKey` if persistent samples are not usable (the feature flag is disabled, the spec
-     *   forces on-the-fly sampling, the collection does not exist) or no document matches.
+     *   forces on-the-fly sampling, the collection does not exist) or no generation is complete.
      * - `UnsupportedFormat` if the samples collection or the documents found in it are malformed.
      */
     StatusWith<Sample> tryLoad(const SampleSpec& spec) override;

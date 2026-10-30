@@ -206,6 +206,30 @@ void createCollAndInsertDocuments(OperationContext* opCtx,
     wuow.commit();
 }
 
+SampleSpec makeSpec(const NamespaceString& nss,
+                    size_t sampleSize,
+                    SamplingCEMethodEnum method,
+                    SamplingSourceEnum source,
+                    boost::optional<int> numChunks) {
+    return SampleSpec{
+        .nss = nss,
+        .requestedSampleSize = sampleSize,
+        .onTheFlySamplingMethod = method,
+        .persistentSamplingMethod = method,
+        .numChunks = numChunks,
+        .samplingSource = source,
+        .topLevelSampleFieldNames = {},
+    };
+}
+
+CollectionOrViewAcquisition acquireCollectionForSampling(OperationContext* opCtx,
+                                                         const NamespaceString& nss) {
+    return acquireCollectionOrView(
+        opCtx,
+        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        LockMode::MODE_IX);
+}
+
 int evaluateMatchExpressionAgainstDataWithLimit(const std::unique_ptr<MatchExpression> expr,
                                                 const std::vector<BSONObj>& data,
                                                 boost::optional<size_t> limit) {
@@ -659,27 +683,18 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
     return merged.obj();
 }
 
-BSONObj buildPage(const UUID& uuid,
-                  SamplingTechniqueEnum method,
-                  size_t requestedSampleSize,
-                  const std::vector<BSONObj>& docs,
-                  int pageNo,
-                  boost::optional<int> numChunks,
-                  size_t numDocsDiscarded,
-                  // TODO SERVER-135416. Non optional once write path always adds a gen_id.
-                  boost::optional<uint64_t> genId,
-                  boost::optional<int> numPages) {
+BSONObj buildPage(const UUID& uuid, const PageParams& params) {
     return buildPersistentSampleDoc(uuid,
-                                    method,
-                                    requestedSampleSize,
-                                    docs,
-                                    numChunks,
+                                    params.method,
+                                    params.requestedSampleSize,
+                                    params.docs,
+                                    params.numChunks,
                                     /*schemaVersion=*/kPersistentSampleSchemaVersion,
                                     /*overrides=*/BSONObj{},
-                                    pageNo,
-                                    numDocsDiscarded,
-                                    genId,
-                                    numPages);
+                                    params.pageNo,
+                                    params.numDocsDiscarded,
+                                    params.genId,
+                                    params.numPages);
 }
 
 BSONObj makeSizedDoc(int id, size_t sizeBytes) {

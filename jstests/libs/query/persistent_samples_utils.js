@@ -22,6 +22,7 @@ export const sampleDocFieldNames = {
     schemaVersionField: "schemaVersion",
     pageNoField: "pageNo",
     numDocsDiscardedField: "numDocsDiscarded",
+    numPagesField: "numPages",
 };
 
 export function getExpectedSamplingMethod(db, requestedSamplingMethod) {
@@ -293,6 +294,7 @@ export function validatePersistentSample(
             expectedFields,
             pageNo: i,
             expectedNumDocsDiscarded,
+            expectedNumPages,
         });
         totalDocs += page[sampleDocFieldNames.docsField].length;
     }
@@ -355,6 +357,7 @@ function validateSamplePage(
         expectedFields = [],
         pageNo,
         expectedNumDocsDiscarded = 0,
+        expectedNumPages = 1,
     },
 ) {
     assert.neq(null, page, "Expected to find a sample page, got null");
@@ -400,6 +403,9 @@ function validateSamplePage(
         "Unexpected numDocsDiscarded",
         {sampleId},
     );
+    assert.eq(expectedNumPages, page[sampleDocFieldNames.numPagesField], "Unexpected numPages", {
+        sampleId,
+    });
 
     // Verify that every sampled doc contains the expected fields from the source collection.
     const pageDocs = page[sampleDocFieldNames.docsField];
@@ -489,6 +495,7 @@ function assertPagesShareMetadata(pages) {
         sampleDocFieldNames.schemaVersionField,
         sampleDocFieldNames.createdAtField,
         sampleDocFieldNames.numDocsDiscardedField,
+        sampleDocFieldNames.numPagesField,
         // Only compare fields present on the first page (e.g. numChunks is absent for non-chunk
         // samples).
     ].filter((field) => pages[0][field] !== undefined);

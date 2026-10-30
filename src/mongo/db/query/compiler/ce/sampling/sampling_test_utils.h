@@ -9,6 +9,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/ce/ce_test_utils.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
+#include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
@@ -16,6 +17,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -272,6 +274,21 @@ void createCollAndInsertDocuments(OperationContext* opCtx,
                                   bool clustered = false);
 
 /**
+ * Builds a SampleSpec for `nss` that uses `method` both for on-the-fly and persistent sampling.
+ */
+SampleSpec makeSpec(const NamespaceString& nss,
+                    size_t sampleSize,
+                    SamplingCEMethodEnum method = SamplingCEMethodEnum::kRandom,
+                    SamplingSourceEnum source = SamplingSourceEnum::kPersistentSample,
+                    boost::optional<int> numChunks = boost::none);
+
+/**
+ * Acquires `nss` the way the sample loaders expect to find it in a MultipleCollectionAccessor.
+ */
+CollectionOrViewAcquisition acquireCollectionForSampling(OperationContext* opCtx,
+                                                         const NamespaceString& nss);
+
+/**
  * Given a MatchExpression and a vector of BSONObj, evaluate the MatchExpression against all the
  * BSONObjs and return the number of matching documents.
  * This function also takes an optional argument to limit the number of documents to evaluate, if it
@@ -337,21 +354,31 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  int pageNo = 0,
                                  size_t numDocsDiscarded = 0,
                                  boost::optional<uint64_t> genId = boost::none,
+                                 // TODO SERVER-135416: Make non optional and fix the fixtures that
+                                 // build pages without numPages.
                                  boost::optional<int> numPages = boost::none);
 
 /**
- * Builds a single page document for `pageNo` of a logical sample. All pages of a sample share the
- * same identity fields and differ only in page number and the docs they contain.
+ * The fields of a single persistent sample page.
  */
-BSONObj buildPage(const UUID& uuid,
-                  SamplingTechniqueEnum method,
-                  size_t requestedSampleSize,
-                  const std::vector<BSONObj>& docs,
-                  int pageNo,
-                  boost::optional<int> numChunks = boost::none,
-                  size_t numDocsDiscarded = 0,
-                  boost::optional<uint64_t> genId = boost::none,
-                  boost::optional<int> numPages = boost::none);
+struct PageParams {
+    SamplingTechniqueEnum method = SamplingTechniqueEnum::kRandom;
+    size_t requestedSampleSize = 384;
+    boost::optional<int> numChunks;
+    // TODO SERVER-135416. Non optional once write path always adds a gen_id.
+    boost::optional<uint64_t> genId;
+    int pageNo = 0;
+    // TODO SERVER-135416: Make non optional and fix the fixtures that build pages without
+    // numPages.
+    boost::optional<int> numPages;
+    size_t numDocsDiscarded = 0;
+    std::vector<BSONObj> docs;
+};
+
+/**
+ * Builds a single page document of a logical sample.
+ */
+BSONObj buildPage(const UUID& uuid, const PageParams& params = {});
 
 /**
  * Build a BSON document of size `sizeBytes`, or at minimum the size of the BSON overhead of the

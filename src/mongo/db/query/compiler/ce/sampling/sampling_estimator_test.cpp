@@ -2320,7 +2320,10 @@ TEST_F(SamplingEstimatorTest, SamplingEstimatorLoadsMultiPageSample) {
                                   boost::none,
                                   kPersistentSampleSchemaVersion,
                                   BSONObj(),
-                                  /*pageNo=*/0),
+                                  /*pageNo=*/0,
+                                  /*numDocsDiscarded=*/0,
+                                  /*genId=*/boost::none,
+                                  /*numPages=*/2),
          buildPersistentSampleDoc(uuid,
                                   SamplingTechniqueEnum::kRandom,
                                   persistedDocs.size(),
@@ -2328,7 +2331,10 @@ TEST_F(SamplingEstimatorTest, SamplingEstimatorLoadsMultiPageSample) {
                                   boost::none,
                                   kPersistentSampleSchemaVersion,
                                   BSONObj(),
-                                  /*pageNo=*/1)},
+                                  /*pageNo=*/1,
+                                  /*numDocsDiscarded=*/0,
+                                  /*genId=*/boost::none,
+                                  /*numPages=*/2)},
         /*clustered=*/true);
 
     auto coll = acquireCollection(operationContext(), kTestNss);
@@ -2372,7 +2378,10 @@ TEST_F(SamplingEstimatorTest, TryLoadReportsPagesReadAndBsonBytes) {
                                                       boost::none,
                                                       kPersistentSampleSchemaVersion,
                                                       BSONObj(),
-                                                      /*pageNo=*/0);
+                                                      /*pageNo=*/0,
+                                                      /*numDocsDiscarded=*/0,
+                                                      /*genId=*/boost::none,
+                                                      /*numPages=*/2);
     const BSONObj pageOne = buildPersistentSampleDoc(uuid,
                                                      SamplingTechniqueEnum::kRandom,
                                                      persistedDocs.size(),
@@ -2380,7 +2389,10 @@ TEST_F(SamplingEstimatorTest, TryLoadReportsPagesReadAndBsonBytes) {
                                                      boost::none,
                                                      kPersistentSampleSchemaVersion,
                                                      BSONObj(),
-                                                     /*pageNo=*/1);
+                                                     /*pageNo=*/1,
+                                                     /*numDocsDiscarded=*/0,
+                                                     /*genId=*/boost::none,
+                                                     /*numPages=*/2);
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
@@ -2431,8 +2443,9 @@ TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
+        {buildPage(
+            uuid,
+            {.requestedSampleSize = persistedDocs.size(), .numPages = 1, .docs = persistedDocs})},
         /*clustered=*/true);
 
     auto coll = acquireCollection(operationContext(), kTestNss);
@@ -2516,8 +2529,9 @@ TEST_F(SamplingEstimatorTest, OnTheFlySourceSkipsPersistedLookup) {
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
+        {buildPage(
+            uuid,
+            {.requestedSampleSize = persistedDocs.size(), .numPages = 1, .docs = persistedDocs})},
         /*clustered=*/true);
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
@@ -2561,11 +2575,12 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(uuid,
-                                  SamplingTechniqueEnum::kChunk,
-                                  persistedDocs.size(),
-                                  persistedDocs,
-                                  /*numChunks=*/testNumChunks)},
+        {buildPage(uuid,
+                   {.method = SamplingTechniqueEnum::kChunk,
+                    .requestedSampleSize = persistedDocs.size(),
+                    .numChunks = testNumChunks,
+                    .numPages = 1,
+                    .docs = persistedDocs})},
         /*clustered=*/true);
 
     auto coll = acquireCollection(operationContext(), kTestNss);
@@ -2609,8 +2624,9 @@ TEST_F(SamplingEstimatorTest,
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
+        {buildPage(
+            uuid,
+            {.requestedSampleSize = persistedDocs.size(), .numPages = 1, .docs = persistedDocs})},
         /*clustered=*/true);
 
     auto coll = acquireCollection(operationContext(), kTestNss);
@@ -2721,8 +2737,9 @@ TEST_F(SamplingEstimatorTest, RandomSamplingSkipsPersistentSampleWhenFeatureFlag
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
+        {buildPage(
+            uuid,
+            {.requestedSampleSize = persistedDocs.size(), .numPages = 1, .docs = persistedDocs})},
         /*clustered=*/true);
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(coll, {}, false);
@@ -2772,11 +2789,12 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingSkipsPersistentSampleWhenFeatureFlagD
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(uuid,
-                                  SamplingTechniqueEnum::kChunk,
-                                  persistedDocs.size(),
-                                  persistedDocs,
-                                  /*numChunks=*/testNumChunks)},
+        {buildPage(uuid,
+                   {.method = SamplingTechniqueEnum::kChunk,
+                    .requestedSampleSize = persistedDocs.size(),
+                    .numChunks = testNumChunks,
+                    .numPages = 1,
+                    .docs = persistedDocs})},
         /*clustered=*/true);
 
     auto coll = acquireCollection(operationContext(), kTestNss);

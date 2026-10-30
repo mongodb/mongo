@@ -24,33 +24,9 @@
 namespace mongo::ce {
 namespace {
 
-SampleSpec makeSpec(const NamespaceString& nss,
-                    size_t sampleSize,
-                    SamplingCEMethodEnum method = SamplingCEMethodEnum::kRandom,
-                    SamplingSourceEnum source = SamplingSourceEnum::kPersistentSample,
-                    boost::optional<int> numChunks = boost::none) {
-    return SampleSpec{
-        .nss = nss,
-        .requestedSampleSize = sampleSize,
-        .onTheFlySamplingMethod = method,
-        .persistentSamplingMethod = method,
-        .numChunks = numChunks,
-        .samplingSource = source,
-        .topLevelSampleFieldNames = {},
-    };
-}
-
 size_t countSamplesCollDocs(OperationContext* opCtx, const NamespaceString& samplesNss) {
     DBDirectClient client(opCtx);
     return static_cast<size_t>(client.count(samplesNss));
-}
-
-CollectionOrViewAcquisition acquireCollectionForSampling(OperationContext* opCtx,
-                                                         const NamespaceString& nss) {
-    return acquireCollectionOrView(
-        opCtx,
-        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
-        LockMode::MODE_IX);
 }
 
 }  // namespace
@@ -128,8 +104,9 @@ TEST_F(SamplingEstimatorTest, SampleManagerLoadsPersistedSample) {
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
+        {buildPage(
+            uuid,
+            {.requestedSampleSize = persistedDocs.size(), .numPages = 1, .docs = persistedDocs})},
         /*clustered=*/true);
 
     auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
@@ -168,7 +145,11 @@ TEST_F(SamplingEstimatorTest, PersistedFullCollScanSampleIsKeyedByRequestedMetho
                                  /*schemaVersion=*/kPersistentSampleSchemaVersion,
                                  /*overrides=*/
                                  BSON(PersistentSampleDoc::kSamplingMethodFieldName
-                                      << idlSerialize(SamplingTechniqueEnum::kFullCollScan)));
+                                      << idlSerialize(SamplingTechniqueEnum::kFullCollScan)),
+                                 /*pageNo=*/0,
+                                 /*numDocsDiscarded=*/0,
+                                 /*genId=*/boost::none,
+                                 /*numPages=*/1);
     // The _id should be keyed by the requested method, not the actual fullCollScan method.
     ASSERT_EQ(sampleDoc[PersistentSampleDoc::k_idFieldName].String(),
               makePersistentSampleId(
@@ -213,8 +194,9 @@ TEST_F(SamplingEstimatorTest, SampleManagerSkipsPersistedSampleForOnTheFlySource
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
+        {buildPage(
+            uuid,
+            {.requestedSampleSize = persistedDocs.size(), .numPages = 1, .docs = persistedDocs})},
         /*clustered=*/true);
 
     auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
@@ -245,14 +227,13 @@ TEST_F(SamplingEstimatorTest, SampleManagerLoadIsNotMemoized) {
     // matching page is inserted only after the first tryLoad(), which must have missed.
     const NamespaceString samplesNss =
         NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
-    createCollAndInsertDocuments(
-        operationContext(),
-        samplesNss,
-        {buildPersistentSampleDoc(uuid,
-                                  SamplingTechniqueEnum::kRandom,
-                                  /*requestedSampleSize=*/7,
-                                  {BSON("_id" << 100 << "tag" << "other")})},
-        /*clustered=*/true);
+    createCollAndInsertDocuments(operationContext(),
+                                 samplesNss,
+                                 {buildPage(uuid,
+                                            {.requestedSampleSize = 7,
+                                             .numPages = 1,
+                                             .docs = {BSON("_id" << 100 << "tag" << "other")}})},
+                                 /*clustered=*/true);
 
     auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
     MultipleCollectionAccessor colls(std::move(coll));
@@ -266,11 +247,11 @@ TEST_F(SamplingEstimatorTest, SampleManagerLoadIsNotMemoized) {
     // Persist a sample matching the spec, then load again. The second load finds the newly
     // persisted one.
     insertDocuments(samplesNss,
-                    {buildPersistentSampleDoc(uuid,
-                                              SamplingTechniqueEnum::kRandom,
-                                              2,
-                                              {BSON("_id" << 10 << "tag" << "persisted"),
-                                               BSON("_id" << 11 << "tag" << "persisted")})});
+                    {buildPage(uuid,
+                               {.requestedSampleSize = 2,
+                                .numPages = 1,
+                                .docs = {BSON("_id" << 10 << "tag" << "persisted"),
+                                         BSON("_id" << 11 << "tag" << "persisted")}})});
     auto second = manager.load(colls, spec);
     ASSERT_TRUE(second.isPersisted());
     ASSERT_EQUALS(second.size(), 2u);
@@ -440,137 +421,33 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshUsesRequestedMethodForFullColl
     ASSERT_EQUALS(loaded.getValue().size(), 2u);
 }
 
-TEST_F(SamplingEstimatorTest, PersistentLoaderRejectsNonClusteredSamplesCollection) {
-    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
+TEST_F(SamplingEstimatorTest, SampleManagerFallsBackToOnTheFlyWhenNoGenerationIsComplete) {
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
-    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
+    insertDocuments(_kTestNss,
+                    {BSON("_id" << 1 << "tag" << "live"),
+                     BSON("_id" << 2 << "tag" << "live"),
+                     BSON("_id" << 3 << "tag" << "live")});
     const UUID uuid = [&] {
         auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
         return srcColl.getCollectionPtr()->uuid();
     }();
-    const std::vector<BSONObj> persistedDocs{BSON("_id" << 10 << "tag" << "persisted")};
-
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
-        /*clustered=*/false);
-
-    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
-    MultipleCollectionAccessor colls(std::move(coll));
-    PersistentSampleLoader loader(operationContext(),
-                                  colls,
-                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                  nullptr /*customerQueryExpCtx*/);
-    auto loaded = loader.tryLoad(makeSpec(_kTestNss, persistedDocs.size()));
-    ASSERT_EQUALS(loaded.getStatus().code(), ErrorCodes::UnsupportedFormat);
-}
-
-TEST_F(SamplingEstimatorTest, PersistentLoaderLoadsSampleWithGenIdInItsIds) {
-    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
-    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
-    const UUID uuid = [&] {
-        auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
-        return srcColl.getCollectionPtr()->uuid();
-    }();
-    const std::vector<BSONObj> persistedDocs{BSON("_id" << 10 << "tag" << "persisted"),
-                                             BSON("_id" << 11 << "tag" << "persisted")};
-    createCollAndInsertDocuments(
-        operationContext(),
-        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
-        {buildPage(uuid,
-                   SamplingTechniqueEnum::kRandom,
-                   persistedDocs.size(),
-                   {persistedDocs[0]},
-                   /*pageNo=*/0,
-                   /*numChunks=*/boost::none,
-                   /*numDocsDiscarded=*/0,
-                   /*genId=*/9),
-         buildPage(uuid,
-                   SamplingTechniqueEnum::kRandom,
-                   persistedDocs.size(),
-                   {persistedDocs[1]},
-                   /*pageNo=*/1,
-                   /*numChunks=*/boost::none,
-                   /*numDocsDiscarded=*/0,
-                   /*genId=*/9)},
+        {buildPage(uuid, {.requestedSampleSize = 2, .genId = 1, .pageNo = 1, .numPages = 2}),
+         buildPage(uuid, {.requestedSampleSize = 2, .genId = 2, .pageNo = 0, .numPages = 2})},
         /*clustered=*/true);
 
     auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
     MultipleCollectionAccessor colls(std::move(coll));
-    PersistentSampleLoader loader(operationContext(),
-                                  colls,
-                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                  nullptr /*customerQueryExpCtx*/);
-    auto loaded = loader.tryLoad(makeSpec(_kTestNss, persistedDocs.size()));
-    ASSERT_OK(loaded.getStatus());
-    ASSERT_EQUALS(loaded.getValue().numPages().value(), 2u);
-    ASSERT_EQUALS(loaded.getValue().size(), persistedDocs.size());
-    for (size_t i = 0; i < persistedDocs.size(); ++i) {
-        ASSERT_BSONOBJ_EQ(loaded.getValue().docs()[i], persistedDocs[i]);
+    SampleManager manager(operationContext(),
+                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                          nullptr /*customerQueryExpCtx*/);
+    auto sample = manager.load(colls, makeSpec(_kTestNss, 2));
+    ASSERT_FALSE(sample.isPersisted());
+    for (const auto& doc : sample.docs()) {
+        ASSERT_EQUALS(doc.getStringField("tag"), "live");
     }
-}
-
-TEST_F(SamplingEstimatorTest, PersistentLoaderRejectsSampleSpanningGenerations) {
-    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
-    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
-    const UUID uuid = [&] {
-        auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
-        return srcColl.getCollectionPtr()->uuid();
-    }();
-    createCollAndInsertDocuments(
-        operationContext(),
-        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
-        {buildPage(uuid, SamplingTechniqueEnum::kRandom, 2, {BSON("_id" << 10)}, /*pageNo=*/0),
-         buildPage(uuid,
-                   SamplingTechniqueEnum::kRandom,
-                   2,
-                   {BSON("_id" << 11)},
-                   /*pageNo=*/1,
-                   /*numChunks=*/boost::none,
-                   /*numDocsDiscarded=*/0,
-                   /*genId=*/1)},
-        /*clustered=*/true);
-
-    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
-    MultipleCollectionAccessor colls(std::move(coll));
-    PersistentSampleLoader loader(operationContext(),
-                                  colls,
-                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                  nullptr /*customerQueryExpCtx*/);
-    auto loaded = loader.tryLoad(makeSpec(_kTestNss, 2));
-    ASSERT_EQUALS(loaded.getStatus().code(), ErrorCodes::UnsupportedFormat);
-}
-
-TEST_F(SamplingEstimatorTest, PersistentLoaderIgnoresSamplesOfOtherSizes) {
-    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
-    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
-    const UUID uuid = [&] {
-        auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
-        return srcColl.getCollectionPtr()->uuid();
-    }();
-    createCollAndInsertDocuments(
-        operationContext(),
-        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
-        {buildPage(uuid,
-                   SamplingTechniqueEnum::kRandom,
-                   10,
-                   {BSON("_id" << 10)},
-                   /*pageNo=*/0,
-                   /*numChunks=*/boost::none,
-                   /*numDocsDiscarded=*/0,
-                   /*genId=*/0)},
-        /*clustered=*/true);
-
-    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
-    MultipleCollectionAccessor colls(std::move(coll));
-    PersistentSampleLoader loader(operationContext(),
-                                  colls,
-                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                  nullptr /*customerQueryExpCtx*/);
-    auto loaded = loader.tryLoad(makeSpec(_kTestNss, 1));
-    ASSERT_EQUALS(loaded.getStatus().code(), ErrorCodes::NoSuchKey);
 }
 
 // ── makePersistentSamplePageDocs ──────────────────────────────────────────────────────────────
@@ -629,20 +506,8 @@ TEST(ReassemblePersistentSample, PagesWithMismatchedDiscardCountRejected) {
     const UUID uuid = UUID::gen();
     // page 0 declares numDocsDiscarded 1, page 1 declares numDocsDiscarded 2.
     auto result = reassemblePersistentSample({
-        buildPage(uuid,
-                  SamplingTechniqueEnum::kRandom,
-                  /*requestedSampleSize=*/4,
-                  /*docs=*/{BSON("a" << 0)},
-                  /*pageNo=*/0,
-                  /*numChunks=*/boost::none,
-                  /*numDocsDiscarded=*/1),
-        buildPage(uuid,
-                  SamplingTechniqueEnum::kRandom,
-                  /*requestedSampleSize=*/4,
-                  /*docs=*/{BSON("a" << 0)},
-                  /*pageNo=*/1,
-                  /*numChunks=*/boost::none,
-                  /*numDocsDiscarded=*/2),
+        buildPage(uuid, {.requestedSampleSize = 4, .pageNo = 0, .numDocsDiscarded = 1}),
+        buildPage(uuid, {.requestedSampleSize = 4, .pageNo = 1, .numDocsDiscarded = 2}),
     });
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),
@@ -952,6 +817,37 @@ TEST(MakePersistentSamplePageDocs, EveryPageReportsSampleWideDiscardCount) {
         ASSERT_OK(swParsed.getStatus());
         ASSERT_EQ(swParsed.getValue().getNumDocsDiscarded(), 2);
     }
+}
+
+TEST(MakePersistentSamplePageDocs, EveryPageDeclaresTheNumberOfPages) {
+    constexpr int kNumDocs = 40;
+    std::vector<BSONObj> sample;
+    sample.reserve(kNumDocs);
+    for (int i = 0; i < kNumDocs; ++i) {
+        sample.push_back(makeSizedDoc(i, 1 * 1024 * 1024));
+    }
+
+    const auto pages = makeRandomSamplePageDocs(sample, kNumDocs);
+    ASSERT_GTE(pages.size(), 3u);
+    for (const auto& page : pages) {
+        auto swParsed = parsePersistentSample(page);
+        ASSERT_OK(swParsed.getStatus());
+        ASSERT_EQ(swParsed.getValue().getNumPages(), static_cast<int>(pages.size()));
+    }
+}
+
+TEST(MakePersistentSamplePageDocs, TrailingDiscardedDocDoesNotCountAsAPage) {
+    std::vector<BSONObj> sample;
+    for (int i = 0; i < 20; ++i) {
+        sample.push_back(makeSizedDoc(i, 1024));
+    }
+    sample.push_back(makeSizedDoc(20, BSONObjMaxUserSize));
+
+    const auto pages = makeRandomSamplePageDocs(sample, sample.size());
+    ASSERT_EQ(pages.size(), 1u);
+    auto swParsed = parsePersistentSample(pages[0]);
+    ASSERT_OK(swParsed.getStatus());
+    ASSERT_EQ(swParsed.getValue().getNumPages(), 1);
 }
 
 }  // namespace
