@@ -228,4 +228,51 @@ TEST_F(SBERegexTest, RegexFindAllEndAnchorOnNonEmptyInput) {
     runAndAssertFindAllExpression(compiledExpr.get(), arrayView);
 }
 
+TEST_F(SBERegexTest, RegexFindAllEmptyMatchesBeforeMultiByteCharacters) {
+    // Only the first match validates the input as UTF-8. The second match starts after the first
+    // 'é', so it checks that empty matches advance to a character boundary.
+    value::OwnedValueAccessor slotAccessor1;
+    value::OwnedValueAccessor slotAccessor2;
+    auto regexSlot = bindAccessor(&slotAccessor1);
+    auto inputSlot = bindAccessor(&slotAccessor2);
+    auto regexExpr = sbe::makeE<sbe::EFunction>(
+        EFn::kRegexFindAll, sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
+    auto compiledExpr = compileExpression(*regexExpr);
+
+    auto expectedArr = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto arrayView = value::getArrayView(expectedArr.value());
+    addMatchResult(arrayView, /*matchStr=*/"", /*idx=*/1);
+    addMatchResult(arrayView, /*matchStr=*/"", /*idx=*/2);
+
+    auto [regexTag, regexVal] = makeNewPcreRegex("(?=é)", "").releaseToRaw();
+    auto [inputTag, inputVal] = value::makeNewString("aéé");
+    slotAccessor1.reset(regexTag, regexVal);
+    slotAccessor2.reset(inputTag, inputVal);
+    runAndAssertFindAllExpression(compiledExpr.get(), arrayView);
+}
+
+TEST_F(SBERegexTest, RegexFindAllRejectsInvalidUTF8AfterMatches) {
+    // Only the first match validates the input as UTF-8; later matches skip the check. Invalid
+    // UTF-8 past several matches must still be rejected.
+    value::OwnedValueAccessor slotAccessor1;
+    value::OwnedValueAccessor slotAccessor2;
+    auto regexSlot = bindAccessor(&slotAccessor1);
+    auto inputSlot = bindAccessor(&slotAccessor2);
+    auto regexExpr = sbe::makeE<sbe::EFunction>(
+        EFn::kRegexFindAll, sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
+    auto compiledExpr = compileExpression(*regexExpr);
+
+    std::string input = "aaa";
+    input += '\xe5';
+    input += "aaa";
+    auto [regexTag, regexVal] = makeNewPcreRegex("a", "").releaseToRaw();
+    auto [inputTag, inputVal] = value::makeNewString(input);
+    slotAccessor1.reset(regexTag, regexVal);
+    slotAccessor2.reset(inputTag, inputVal);
+
+    value::TagValueOwned result =
+        value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+    ASSERT_EQUALS(value::TypeTags::Nothing, result.tag());
+}
+
 }  // namespace mongo::sbe

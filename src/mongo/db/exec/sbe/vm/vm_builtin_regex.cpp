@@ -4,6 +4,7 @@
 #include "mongo/db/exec/sbe/util/pcre.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/util/str.h"
 
 #include <string_view>
 
@@ -22,13 +23,24 @@ namespace {
  * - codePointPos: The same position in terms of code points.
  * - isMatch: Boolean flag to mark if the caller function is $regexMatch, in which case the result
  * returned is true/false.
+ * - skipUTF8Check: Set when 'inputString' was already validated as UTF-8 by a previous call. PCRE
+ * validates from the start position to the end of the subject on every call, so callers that find
+ * every match in a string must set this after the first call to avoid quadratic work. The check
+ * still runs if 'startBytePos' falls inside a character.
  */
 value::TagValueMaybeOwned pcreNextMatch(pcre::Regex* pcre,
                                         std::string_view inputString,
                                         uint32_t& startBytePos,
                                         uint32_t& codePointPos,
-                                        bool isMatch) {
-    pcre::MatchData m = pcre->matchView(inputString, {}, startBytePos);
+                                        bool isMatch,
+                                        bool skipUTF8Check = false) {
+    // Skipping the check is only safe when the start offset is on a character boundary. Otherwise
+    // let PCRE validate, so it reports the bad offset as an error.
+    skipUTF8Check = skipUTF8Check &&
+        (startBytePos >= inputString.size() ||
+         !str::isUTF8ContinuationByte(inputString[startBytePos]));
+    pcre::MatchData m = pcre->matchView(
+        inputString, skipUTF8Check ? pcre::NO_UTF_CHECK : pcre::MatchOptions{}, startBytePos);
     if (!m && m.error() != pcre::Errc::ERROR_NOMATCH) {
         LOGV2_ERROR(5073414,
                     "Error occurred while executing regular expression.",
@@ -176,8 +188,11 @@ value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
     auto arrayView = value::getArrayView(arr.value());
 
     int resultSize = 0;
+    bool inputValidatedAsUTF8 = false;
     do {
-        auto match = pcreNextMatch(pcre, inputString, startBytePos, codePointPos, false);
+        auto match = pcreNextMatch(
+            pcre, inputString, startBytePos, codePointPos, false, inputValidatedAsUTF8);
+        inputValidatedAsUTF8 = true;
 
         if (match.tag() == value::TypeTags::Null) {
             break;

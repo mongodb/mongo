@@ -204,5 +204,29 @@ TEST(ExpressionEvaluateSplitTest, SplitWithUnicode) {
                     Value(std::vector<Value>{Value(""sv), Value(""sv)}));
 }
 
+TEST(ExpressionEvaluateSplitTest, EmptyMatchBeforeMultiByteCharacter) {
+    // After an empty match the next search must start one code point past the match position,
+    // not past the previous search's start position (which may be a shorter character).
+    ASSERT_VALUE_EQ(split("aé"sv, BSONRegEx("(?=é)")).second,
+                    Value(std::vector<Value>{Value("a"sv), Value("é"sv)}));
+    ASSERT_VALUE_EQ(split("aéé"sv, BSONRegEx("(?=é)")).second,
+                    Value(std::vector<Value>{Value("a"sv), Value("é"sv), Value("é"sv)}));
+}
+
+TEST(ExpressionEvaluateSplitTest, EmptyMatchAfterMultiByteCharacter) {
+    // After an empty match the next search must start one code point past the match position.
+    ASSERT_VALUE_EQ(split("éab"sv, BSONRegEx("(?=a|b)")).second,
+                    Value(std::vector<Value>{Value("é"sv), Value("a"sv), Value("b"sv)}));
+}
+
+TEST(ExpressionEvaluateSplitTest, RegexRejectsInvalidUTF8AfterMatches) {
+    // Only the first match validates the input as UTF-8; later matches skip the check. Invalid
+    // UTF-8 past several matches must still be rejected.
+    std::string input = "aaa";
+    input += '\xe5';
+    input += "aaa";
+    ASSERT_THROWS_CODE(split(Value(input), BSONRegEx("a")).second, AssertionException, 51156);
+}
+
 }  // namespace expression_evaluation_test
 }  // namespace mongo

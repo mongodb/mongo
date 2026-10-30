@@ -142,5 +142,30 @@ TEST(ExpressionRegexTest, InvalidUTF8InRegex) {
     ASSERT_THROWS_CODE(testAllExpressions(input, false, {}), AssertionException, 51111);
 }
 
+TEST(ExpressionRegexTest, EmptyMatchesBeforeMultiByteCharacters) {
+    // Only the first match validates the input as UTF-8. The second match starts after the first
+    // 'é', so it checks that empty matches advance to a character boundary.
+    testAllExpressions(BSON("$regexFindAll" << BSON("input" << "aéé"
+                                                            << "regex"
+                                                            << "(?=é)")),
+                       true,
+                       {Value(fromjson("{match: '', idx: 1, captures: []}")),
+                        Value(fromjson("{match: '', idx: 2, captures: []}"))});
+}
+
+TEST(ExpressionRegexTest, RegexFindAllRejectsInvalidUTF8AfterMatches) {
+    // Only the first match validates the input as UTF-8; later matches skip the check. Invalid
+    // UTF-8 past several matches must still be rejected.
+    std::string inputField = "aaa";
+    inputField += '\xe5';
+    inputField += "aaa";
+    auto expCtx = ExpressionContextForTest{};
+    auto expression = generateOptimizedExpression<ExpressionRegexFindAll>(
+        BSON("$regexFindAll" << BSON("input" << inputField << "regex"
+                                             << "a")),
+        &expCtx);
+    ASSERT_THROWS_CODE(expression->evaluate({}, &expCtx.variables), AssertionException, 51156);
+}
+
 }  // namespace expression_evaluation_test
 }  // namespace mongo

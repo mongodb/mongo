@@ -341,6 +341,28 @@ TEST(ExpressionEvaluateReplaceTest, SingleOversizedReplacementThrowsImmediately)
                        ErrorCodes::ExceededMemoryLimit);
 }
 
+TEST(ExpressionEvaluateReplaceTest, RegexEmptyMatchBeforeMultiByteCharacter) {
+    // After an empty match the next search must start one code point past the match position,
+    // not past the previous search's start position (which may be a shorter character).
+    ASSERT_VALUE_EQ(replaceAll("aé"sv, BSONRegEx("(?=é)"), "X"sv).second, Value("aXé"sv));
+    ASSERT_VALUE_EQ(replaceAll("aéé"sv, BSONRegEx("(?=é)"), "X"sv).second, Value("aXéXé"sv));
+}
+
+TEST(ExpressionEvaluateReplaceTest, RegexEmptyMatchAfterMultiByteCharacter) {
+    // After an empty match the next search must start one code point past the match position.
+    ASSERT_VALUE_EQ(replaceAll("éab"sv, BSONRegEx("(?=a|b)"), "X"sv).second, Value("éXaXb"sv));
+}
+
+TEST(ExpressionEvaluateReplaceTest, RegexRejectsInvalidUTF8AfterMatches) {
+    // Only the first match validates the input as UTF-8; later matches skip the check. Invalid
+    // UTF-8 past several matches must still be rejected.
+    std::string input = "aaa";
+    input += '\xe5';
+    input += "aaa";
+    ASSERT_THROWS_CODE(
+        replaceAll(Value(input), BSONRegEx("a"), "b"sv).second, AssertionException, 51156);
+}
+
 TEST(ExpressionEvaluateReplaceTest, ManySmallRegexReplacementsCollectivelyExceedLimit) {
     // Exercises the regex-'find' code path (replaceAllOpRegEx in evaluate_regex.cpp): many small
     // matches, none individually near the limit, must still trip it once accumulated.

@@ -6,6 +6,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
+#include "mongo/util/str.h"
 
 #include <string_view>
 
@@ -47,6 +48,12 @@ struct RegexExecutionState {
      * can be different from startBytePos.
      */
     int beforeMatchStrStart = 0;
+
+    /**
+     * Set once PCRE has validated 'input' as UTF-8, so subsequent matches against the same input
+     * can skip revalidation.
+     */
+    bool inputValidatedAsUTF8 = false;
 
     /**
      * If either the text input or regex pattern is nullish, then we consider the operation as a
@@ -212,11 +219,20 @@ pcre::MatchData execute(RegexExecutionState* regexState, const std::string& opNa
     tassert(11103510, "Expected regexState to contain a valid pcrePtr", regexState->pcrePtr);
 
     std::string_view in = *regexState->input;
-    auto m = regexState->pcrePtr->matchView(in, {}, regexState->startBytePos);
+    pcre::MatchOptions matchOptions{};
+    // Skipping the check is only safe when the start offset is on a character boundary. Otherwise
+    // let PCRE validate, so it reports the bad offset as an error.
+    if (regexState->inputValidatedAsUTF8 &&
+        (static_cast<size_t>(regexState->startBytePos) >= in.size() ||
+         !str::isUTF8ContinuationByte(in[regexState->startBytePos]))) {
+        matchOptions = pcre::NO_UTF_CHECK;
+    }
+    auto m = regexState->pcrePtr->matchView(in, matchOptions, regexState->startBytePos);
     uassert(51156,
             str::stream() << "Error occurred while executing the regular expression in " << opName
                           << ". Result code: " << errorMessage(m.error()),
             m || m.error() == pcre::Errc::ERROR_NOMATCH);
+    regexState->inputValidatedAsUTF8 = true;
     return m;
 }
 
@@ -283,13 +299,13 @@ std::pair<pcre::MatchData, std::string_view> nextMatchAndPrecedingString(
     // Move indices for next match.
     regexState->beforeMatchStrStart += beforeMatch.size() + m[0].size();
     if (m[0].empty()) {
-        // Move the startBytePos index to the next character, so we don't capture the same empty
-        // match in the next iteration. To accommodate unicode characters, we need the length of the
-        // current character to move, but this can only be done if the index points to a valid
-        // character (i.e. startBytePos < m.input().size()), if that's not the case we just increase
-        // by one because we will exit in the next iteration.
-        regexState->startBytePos = static_cast<size_t>(regexState->startBytePos) < m.input().size()
-            ? matchPos + str::getCodePointLength(m.input()[regexState->startBytePos])
+        // Move the startBytePos index to the character after the match, so we don't capture the
+        // same empty match in the next iteration. To accommodate unicode characters, we need the
+        // length of the character at the match position, but this can only be done if the match is
+        // not at the end of the input; if it is, we just move past the end because we will exit in
+        // the next iteration.
+        regexState->startBytePos = static_cast<size_t>(matchPos) < m.input().size()
+            ? matchPos + str::getCodePointLength(m.input()[matchPos])
             : m.input().size() + 1;
     } else {
         regexState->startBytePos = regexState->beforeMatchStrStart;
