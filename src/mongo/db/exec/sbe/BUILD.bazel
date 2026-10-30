@@ -528,6 +528,16 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "result_materializer_bm",
+    srcs = [
+        "//src/mongo/db/exec/sbe/values:result_materializer_bm.cpp",
+    ],
+    deps = [
+        ":result_materializer",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "sbe_bson_field_extraction_bm",
     srcs = [
         "//src/mongo/db/exec/sbe/stages:sbe_bson_field_extraction_bm.cpp",
