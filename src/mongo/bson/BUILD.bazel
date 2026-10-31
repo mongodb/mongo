@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_fuzzer_test_deprecated", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_fuzzer_test_deprecated", "mongo_cc_fuzztest", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -92,6 +92,15 @@ mongo_cc_fuzzer_test_deprecated(
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",
+    ],
+)
+
+mongo_cc_fuzztest(
+    name = "bson_spatial_safety_fuzz_test",
+    srcs = ["bson_spatial_safety_fuzz_test.cpp"],
+    tags = ["server-programmability"],
+    deps = [
+        "//src/mongo:base",
     ],
 )
 
