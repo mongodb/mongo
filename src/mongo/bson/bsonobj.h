@@ -775,12 +775,7 @@ public:
      */
     explicit BSONObjStlIterator(const BSONObj& obj) {
         _end = obj._end();
-        auto start = obj.objdata() + sizeof(int32_t);
-        auto ptr = start;
-        auto buffer = std::span{obj.objdata() + sizeof(int32_t), _end};
-        while (*ptr)
-            ++ptr;
-        _cur = BSONElement(buffer, ptr - start, BSONElement::TrustedInitTag{});
+        _advanceTo(obj.objdata() + sizeof(int32_t));
     }
 
     /**
@@ -798,14 +793,7 @@ public:
      */
     BSONObjStlIterator& operator++() {
         dassert(*_cur._data);  // Must not be EOO
-        const auto start = _cur._data + _cur.size();
-        auto ptr = _cur._data + _cur.fieldNameSize();  // ptr points to the 0 byte ending the name
-
-        ptr += _cur.valuesize() + 1;  // Skip the value and the 0 byte
-        while (*ptr)
-            ++ptr;
-
-        _cur = BSONElement(std::span{start, _end}, ptr - start, BSONElement::TrustedInitTag{});
+        _advanceTo(_cur._data + _curValueSize + 1 + _cur._fieldNameSize);
         return *this;
     }
 
@@ -835,7 +823,19 @@ public:
 private:
     explicit BSONObjStlIterator(BSONElement elem, const char* end) : _cur(elem), _end(end) {}
 
+    /**
+     * Positions the iterator at the element starting at `start`, updating _cur and _curValueSize.
+     */
+    void _advanceTo(const char* start) {
+        std::span buffer{start, _end};
+        auto fieldNameSize = BSONElement::fieldNameSizeFromBuffer(buffer);
+        auto valueSize = BSONElement::valueSizeFromBuffer(buffer, fieldNameSize);
+        _cur = BSONElement(buffer, fieldNameSize, BSONElement::TrustedInitTag{});
+        _curValueSize = valueSize;
+    }
+
     BSONElement _cur;
+    int _curValueSize = 0;
     const char* _end = nullptr;
 };
 
@@ -895,9 +895,11 @@ public:
 
     BSONElement next() {
         dassert(_pos <= _theend);
-        BSONElement e(std::span{_pos, _theend + 1});
-        _pos += e.size();
-        return e;
+        auto buffer = std::span{_pos, _theend + 1};
+        auto fieldNameSize = BSONElement::fieldNameSizeFromBuffer(buffer);
+        auto valueSize = BSONElement::valueSizeFromBuffer(buffer, fieldNameSize);
+        _pos += fieldNameSize + valueSize + 1;
+        return BSONElement(buffer, fieldNameSize, BSONElement::TrustedInitTag{});
     }
 
     /**
@@ -919,7 +921,10 @@ public:
 
     BSONElement operator*() {
         dassert(_pos <= _theend);
-        return BSONElement(std::span{_pos, _theend + 1});
+        auto buffer = std::span{_pos, _theend + 1};
+        auto fieldNameSize = BSONElement::fieldNameSizeFromBuffer(buffer);
+        return BSONElement(
+            std::span{_pos, _theend + 1}, fieldNameSize, BSONElement::TrustedInitTag{});
     }
 
     bool operator==(const BSONObjIterator& other) {

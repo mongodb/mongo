@@ -575,6 +575,7 @@ Status BSONObj::storageValidEmbedded() const {
 
 BSONElement BSONObj::getField(std::string_view name) const {
     const char* elem = objdata() + sizeof(int);
+    const auto end = _end();
     while (*elem) {
         auto ptr = elem;
         // Use the name comparison while computing the name length: this avoids having to look at
@@ -585,7 +586,7 @@ BSONElement BSONObj::getField(std::string_view name) const {
 
         // If the field name is found and complete, return the element.
         if (!*++ptr)
-            return BSONElement(std::span{elem, _end()}, ptr - elem, BSONElement::TrustedInitTag{});
+            return BSONElement(std::span{elem, end}, ptr - elem, BSONElement::TrustedInitTag{});
 
         // The name is found, but the field name is not yet complete, so there's no match.
         ++ptr;
@@ -594,8 +595,11 @@ next:
         while (*ptr)
             ++ptr;
 
-        elem +=
-            BSONElement(std::span{elem, _end()}, ptr - elem, BSONElement::TrustedInitTag{}).size();
+        // 'ptr - elem' counts the type byte, so it is the field name size including its NUL
+        // terminator, as expected by valueSizeFromBuffer.
+        const int fieldNameSize = ptr - elem;
+        const int valueSize = BSONElement::valueSizeFromBuffer(std::span{elem, end}, fieldNameSize);
+        elem += valueSize + 1 + fieldNameSize;
     }
     return BSONElement();
 }

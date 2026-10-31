@@ -17,6 +17,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/decimal128.h"
+#include "mongo/stdx/utility.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
@@ -92,6 +93,24 @@ public:
     using ComparisonRulesSet = BSONComparatorInterfaceBase<BSONElement>::ComparisonRulesSet;
 
     /**
+     * Constant double representation of 2^63, the smallest value that will overflow a long long.
+     *
+     * It is not safe to obtain this value by casting std::numeric_limits<long long>::max() to
+     * double, because the conversion loses precision, and the C++ standard leaves it up to the
+     * implementation to decide whether to round up to 2^63 or round down to the next representable
+     * value (2^63 - 2^10).
+     */
+    static const double kLongLongMaxPlusOneAsDouble;
+
+    /**
+     * Constant 'long long' representation of 2^53 (and -2^53). This is the largest (and smallest)
+     * 'long long' such that all 'long long's between the two can be safely represented as a double
+     * without losing precision.
+     */
+    static const long long kLargestSafeLongLongAsDouble;
+    static const long long kSmallestSafeLongLongAsDouble;
+
+    /**
      * Compares two BSON elements of the same canonical type.
      *
      * Returns <0 if 'l' is less than the element 'r'.
@@ -103,6 +122,43 @@ public:
                                ComparisonRulesSet rules,
                                const StringDataComparator* comparator);
 
+    /**
+     * For a buffer representing a BSON element, returns the size of the value that is located
+     * after the field name.
+     */
+    static constexpr int valueSizeFromBuffer(std::span<const char> buffer, int fieldNameSize) {
+        auto type = static_cast<uint8_t>(buffer.front());
+        auto mask = uint32_t{1} << (type & 0x1f);
+        int32_t size = kFixedSizes[type];
+        if (mask & kVariableSizeMask)  // These types use a 32-bit int to store their size
+            size += ConstDataView(buffer.data() + fieldNameSize + 1).read<LittleEndian<int32_t>>();
+        if (MONGO_unlikely(!size))  // 0 means we have a regex, minkey, maxkey, or invalid element
+            return computeRegexSize(buffer.data(), fieldNameSize) - fieldNameSize - 1;
+        return size - 1;
+    }
+
+    /**
+     * Returns the field name size from a buffer representing a span. The size of the field name
+     * includes the null terminator.
+     */
+    static constexpr int fieldNameSizeFromBuffer(std::span<const char> buffer) {
+        const auto begin = buffer.data();
+        auto ptr = begin;
+        // While we should skip the type, and add 1 for the terminating null byte, just include
+        // the type byte in the strlen loop: the extra byte cancels out. As an extra bonus, this
+        // also handles the EOO case, where the type byte is 0.
+        while (*ptr)
+            ++ptr;
+        return static_cast<int>(ptr - begin);
+    }
+
+    static BinDataType binDataType(const char* raw, size_t length) {
+        // BinData: <int len> <byte subtype> <byte[len] data>
+        MONGO_verify(length >= 5);
+        unsigned char c = raw[4];
+        return static_cast<BinDataType>(c);
+    }
+
     constexpr BSONElement() = default;
 
     /**
@@ -111,15 +167,8 @@ public:
      * The passed span starts at the start of the element and extends to one past the last byte
      * of the allocated buffer the element may occupy.
      */
-    explicit BSONElement(std::span<const char> buffer) : _data(buffer.data()) {
-        const char* d = _data;
-        // While we should skip the type, and add 1 for the terminating null byte, just include
-        // the type byte in the strlen loop: the extra byte cancels out. As an extra bonus, this
-        // also handles the EOO case, where the type byte is 0.
-        while (*d)
-            ++d;
-        _fieldNameSize = d - _data;
-    }
+    explicit BSONElement(std::span<const char> buffer)
+        : _data(buffer.data()), _fieldNameSize(fieldNameSizeFromBuffer(buffer)) {}
 
     /**
      * Constructs a known length BSONElement from part of an allocated buffer.
@@ -376,7 +425,7 @@ public:
      */
     MONGO_COMPILER_ALWAYS_INLINE int valuesize() const {
         auto type = static_cast<uint8_t>(*_data);
-        uint32_t mask = 1u << (type & 0x1fu);
+        uint32_t mask = uint32_t{1} << (type & 0x1f);
         int32_t size = kFixedSizes[type];
         if (mask & kVariableSizeMask)  // These types use a 32-bit int to store their size
             size += ConstDataView(value()).read<LittleEndian<int32_t>>();
@@ -697,13 +746,6 @@ public:
         }
     }
 
-    static BinDataType binDataType(const char* raw, size_t length) {
-        // BinData: <int len> <byte subtype> <byte[len] data>
-        MONGO_verify(length >= 5);
-        unsigned char c = raw[4];
-        return static_cast<BinDataType>(c);
-    }
-
     BinDataType binDataType() const {
         // BinData: <int len> <byte subtype> <byte[len] data>
         MONGO_verify(type() == BSONType::binData);
@@ -922,24 +964,6 @@ public:
 
     template <typename T>
     Status tryCoerce(T* out) const;
-
-    /**
-     * Constant double representation of 2^63, the smallest value that will overflow a long long.
-     *
-     * It is not safe to obtain this value by casting std::numeric_limits<long long>::max() to
-     * double, because the conversion loses precision, and the C++ standard leaves it up to the
-     * implementation to decide whether to round up to 2^63 or round down to the next representable
-     * value (2^63 - 2^10).
-     */
-    static const double kLongLongMaxPlusOneAsDouble;
-
-    /**
-     * Constant 'long long' representation of 2^53 (and -2^53). This is the largest (and smallest)
-     * 'long long' such that all 'long long's between the two can be safely represented as a double
-     * without losing precision.
-     */
-    static const long long kLargestSafeLongLongAsDouble;
-    static const long long kSmallestSafeLongLongAsDouble;
 
 private:
     // This needs to be 2 elements because we check the strlen of data + 1 and GCC sees that as
