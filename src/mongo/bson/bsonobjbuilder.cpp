@@ -286,7 +286,7 @@ Derived& BSONObjBuilderBase<Derived, B>::appendElementsUnique(const BSONObj& x) 
 template <class Derived, class B>
 BSONObjIterator BSONObjBuilderBase<Derived, B>::iterator() const {
     const char* s = _b.buf() + _offset;
-    const char* e = _b.buf() + _b.len();
+    const char* e = _b.buf() + _b.len() + (_doneCalled ? 0 : 1);
     return BSONObjIterator(s, e);
 }
 

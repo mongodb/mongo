@@ -36,11 +36,27 @@
 #include <utility>
 #include <vector>
 
+#include <boost/optional.hpp>
 #include <fmt/format.h>
 
 [[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
+namespace bson_details {
+MONGO_COMPILER_NORETURN void tassertedBSONOverread();
+
+/**
+ * Prefer this over `tassert` for errors within BSON hot paths.
+ * It avoids inline argument-setup and code-size overhead at
+ * each call site.
+ */
+MONGO_COMPILER_ALWAYS_INLINE inline void tassertBSONOverread(bool cond) {
+    if (MONGO_unlikely(!cond)) {
+        tassertedBSONOverread();
+    }
+}
+}  // namespace bson_details
+
 class BSONObj;
 
 class BSONElement;
@@ -126,14 +142,28 @@ public:
      * For a buffer representing a BSON element, returns the size of the value that is located
      * after the field name.
      */
-    static constexpr int valueSizeFromBuffer(std::span<const char> buffer, int fieldNameSize) {
+    MONGO_COMPILER_ALWAYS_INLINE static int valueSizeFromBuffer(std::span<const char> buffer,
+                                                                int fieldNameSize) {
         auto type = static_cast<uint8_t>(buffer.front());
-        auto mask = uint32_t{1} << (type & 0x1f);
         int32_t size = kFixedSizes[type];
-        if (mask & kVariableSizeMask)  // These types use a 32-bit int to store their size
-            size += ConstDataView(buffer.data() + fieldNameSize + 1).read<LittleEndian<int32_t>>();
-        if (MONGO_unlikely(!size))  // 0 means we have a regex, minkey, maxkey, or invalid element
-            return computeRegexSize(buffer.data(), fieldNameSize) - fieldNameSize - 1;
+        if (isVariableTypeByte(type)) {
+            // These types use a 32-bit int to store their size
+            bson_details::tassertBSONOverread(fieldNameSize + 1 + sizeof(int32_t) <= buffer.size());
+            int32_t embeddedSize =
+                ConstDataView(buffer.data() + fieldNameSize + 1).read<LittleEndian<int32_t>>();
+            // Ensure embeddedSize is at least the minimum required size for its type.
+            bson_details::tassertBSONOverread(embeddedSize >= kMinEmbeddedSize[type]);
+            // Use unsigned arithmetic to allow overflow. Overflow may cause the size to be
+            // negative, which is caught by the next check.
+            size = static_cast<int32_t>(static_cast<uint32_t>(size) +
+                                        static_cast<uint32_t>(embeddedSize));
+            bson_details::tassertBSONOverread(size >= 1);
+        }
+        if (MONGO_unlikely(!size)) {
+            // 0 means we have a regex, minkey, maxkey, or invalid element
+            return computeRegexSize(buffer.data(), buffer.size(), fieldNameSize) - fieldNameSize -
+                1;
+        }
         return size - 1;
     }
 
@@ -141,14 +171,17 @@ public:
      * Returns the field name size from a buffer representing a span. The size of the field name
      * includes the null terminator.
      */
-    static constexpr int fieldNameSizeFromBuffer(std::span<const char> buffer) {
+    MONGO_COMPILER_ALWAYS_INLINE static int fieldNameSizeFromBuffer(std::span<const char> buffer) {
+        bson_details::tassertBSONOverread(buffer.size() >= 1);
         const auto begin = buffer.data();
+        const auto bound = begin + buffer.size();
         auto ptr = begin;
         // While we should skip the type, and add 1 for the terminating null byte, just include
         // the type byte in the strlen loop: the extra byte cancels out. As an extra bonus, this
         // also handles the EOO case, where the type byte is 0.
-        while (*ptr)
+        while (ptr < bound && *ptr)
             ++ptr;
+        bson_details::tassertBSONOverread(ptr < bound);
         return static_cast<int>(ptr - begin);
     }
 
@@ -168,7 +201,11 @@ public:
      * of the allocated buffer the element may occupy.
      */
     explicit BSONElement(std::span<const char> buffer)
-        : _data(buffer.data()), _fieldNameSize(fieldNameSizeFromBuffer(buffer)) {}
+        : _data(buffer.data()), _fieldNameSize(fieldNameSizeFromBuffer(buffer)) {
+        const auto valSize = valueSizeFromBuffer(buffer, _fieldNameSize);
+        const auto totalSize = static_cast<int64_t>(valSize) + 1 + _fieldNameSize;
+        bson_details::tassertBSONOverread(totalSize <= static_cast<int64_t>(buffer.size()));
+    }
 
     /**
      * Constructs a known length BSONElement from part of an allocated buffer.
@@ -425,12 +462,13 @@ public:
      */
     MONGO_COMPILER_ALWAYS_INLINE int valuesize() const {
         auto type = static_cast<uint8_t>(*_data);
-        uint32_t mask = uint32_t{1} << (type & 0x1f);
         int32_t size = kFixedSizes[type];
-        if (mask & kVariableSizeMask)  // These types use a 32-bit int to store their size
+        if (isVariableTypeByte(type)) {
+            // These types use a 32-bit int to store their size
             size += ConstDataView(value()).read<LittleEndian<int32_t>>();
+        }
         if (MONGO_unlikely(!size))  // 0 means we have a regex, minkey, maxkey, or invalid element
-            return computeRegexSize(_data, fieldNameSize()) - fieldNameSize() - 1;
+            return computeRegexSize(_data, boost::none, _fieldNameSize) - _fieldNameSize - 1;
         return size - 1;
     }
 
@@ -966,6 +1004,10 @@ public:
     Status tryCoerce(T* out) const;
 
 private:
+    static bool isVariableTypeByte(uint8_t t) {
+        return t < 32 && (uint32_t{1} << t) & kVariableSizeMask;
+    }
+
     // This needs to be 2 elements because we check the strlen of data + 1 and GCC sees that as
     // accessing beyond the end of a constant string, even though we always check whether the
     // element is an eoo.
@@ -1007,6 +1049,22 @@ private:
     MONGO_STATIC_ASSERT(sizeof(kFixedSizes) == 256);
 
     /**
+     * Minimum allowed embedded size for each variable-size type.
+     */
+    alignas(32) static constexpr std::array<int8_t, 32> kMinEmbeddedSize = [] {
+        std::array<int8_t, 32> mins{};
+        mins[stdx::to_underlying(BSONType::string)] = 1;
+        mins[stdx::to_underlying(BSONType::object)] = 5;
+        mins[stdx::to_underlying(BSONType::array)] = 5;
+        mins[stdx::to_underlying(BSONType::binData)] = 0;
+        mins[stdx::to_underlying(BSONType::dbRef)] = 1;
+        mins[stdx::to_underlying(BSONType::code)] = 1;
+        mins[stdx::to_underlying(BSONType::symbol)] = 1;
+        mins[stdx::to_underlying(BSONType::codeWScope)] = 14;
+        return mins;
+    }();
+
+    /**
      * The kVariableSizeMask table provides a mask for the types that have a variable size. The mask
      * is 1 << type, so that we can use it to check whether a type is variable size with a single
      * bit test.
@@ -1026,8 +1084,12 @@ private:
      * Computes the size of the encoding of a Regex, MinKey or MaxKey. Throws if the element is
      * not any of these. This function is suitable as a fallback after other known BSON types are
      * handled, as it will try to dump extra diagnostic information in case of memory corruption.
+     *
+     * If a buffer size is given, this function will also bound check.
      */
-    static int computeRegexSize(const char* data, int fieldNameSize);
+    static int computeRegexSize(const char* elem,
+                                boost::optional<int> bufferSize,
+                                int fieldNameSize);
 
     /**
      * This is to enable structured bindings for BSONElement, it should not be used explicitly.

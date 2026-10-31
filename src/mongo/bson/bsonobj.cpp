@@ -95,10 +95,12 @@ void BSONObj::_assertInvalid(int maxSize) const {
     int os = objsize();
     ss << "BSONObj size: " << os << " (0x" << unsignedHex(os) << ") is invalid. "
        << "Size must be between 0 and " << maxSize << "(" << (maxSize / (1024 * 1024)) << "MB)";
-    try {
-        BSONElement e = firstElement();
-        ss << " First element: " << e.toString();
-    } catch (...) {
+    if (os >= kMinBSONLength) {
+        try {
+            BSONElement e = firstElement();
+            ss << " First element: " << e.toString();
+        } catch (...) {
+        }
     }
     massert(ErrorCodes::BSONObjectTooLarge, ss.str(), 0);
 }
@@ -575,8 +577,22 @@ Status BSONObj::storageValidEmbedded() const {
 
 BSONElement BSONObj::getField(std::string_view name) const {
     const char* elem = objdata() + sizeof(int);
-    const auto end = _end();
-    while (*elem) {
+    const char* const end = _end();
+
+    // Helper lambda to calculate the total size of the element for iteration, while performing
+    // spatial safety checks.
+    auto checkAndGetTotalSize = [&](int fieldNameSize) -> int64_t {
+        const int valueSize = BSONElement::valueSizeFromBuffer(std::span{elem, end}, fieldNameSize);
+        const auto totalSize = static_cast<int64_t>(valueSize) + 1 + fieldNameSize;
+        // Leave room for the terminating EOO byte.
+        bson_details::tassertBSONOverread(totalSize < end - elem);
+        return totalSize;
+    };
+
+    // The top level while must be bounds checked, but the inner loops may rely on the constraint
+    // that this is a `BSONObj` and has an eoo byte. Therefore, the inner loops are guaranteed to
+    // iterate within the buffer.
+    while (elem < end && *elem) {
         auto ptr = elem;
         // Use the name comparison while computing the name length: this avoids having to look at
         // the same name bytes twice.
@@ -585,8 +601,11 @@ BSONElement BSONObj::getField(std::string_view name) const {
                 goto next;  // *ptr is the first non-matching byte, possibly the 0 terminator
 
         // If the field name is found and complete, return the element.
-        if (!*++ptr)
-            return BSONElement(std::span{elem, end}, ptr - elem, BSONElement::TrustedInitTag{});
+        if (!*++ptr) {
+            const int fieldNameSize = ptr - elem;
+            checkAndGetTotalSize(fieldNameSize);
+            return BSONElement(std::span{elem, end}, fieldNameSize, BSONElement::TrustedInitTag{});
+        }
 
         // The name is found, but the field name is not yet complete, so there's no match.
         ++ptr;
@@ -596,10 +615,8 @@ next:
             ++ptr;
 
         // 'ptr - elem' counts the type byte, so it is the field name size including its NUL
-        // terminator, as expected by valueSizeFromBuffer.
-        const int fieldNameSize = ptr - elem;
-        const int valueSize = BSONElement::valueSizeFromBuffer(std::span{elem, end}, fieldNameSize);
-        elem += valueSize + 1 + fieldNameSize;
+        // terminator, as expected by _valuesizeForType.
+        elem += checkAndGetTotalSize(ptr - elem);
     }
     return BSONElement();
 }

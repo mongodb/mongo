@@ -32,6 +32,11 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
+namespace bson_details {
+MONGO_COMPILER_NOINLINE void tassertedBSONOverread() {
+    tasserted(ErrorCodes::BSONInternalError, "Invalid BSONElement detected");
+}
+}  // namespace bson_details
 using namespace std::literals::string_view_literals;
 
 using std::string;
@@ -609,7 +614,9 @@ BSONElement BSONElement::operator[](std::string_view field) const {
     return o[field];
 }
 
-int BSONElement::computeRegexSize(const char* elem, int fieldNameSize) {
+int BSONElement::computeRegexSize(const char* elem,
+                                  boost::optional<int> bufferSize,
+                                  int fieldNameSize) {
     int8_t type = *elem;
     // The following code handles all special cases: MinKey, MaxKey, RegEx and invalid types.
     if (type == stdx::to_underlying(BSONType::maxKey) ||
@@ -622,12 +629,21 @@ int BSONElement::computeRegexSize(const char* elem, int fieldNameSize) {
         uasserted(err, "BSONElement: bad type");
     }
 
+    auto checkOffsetInBound = [&](int offset) {
+        if (bufferSize) {
+            bson_details::tassertBSONOverread(offset < *bufferSize);
+        }
+        return offset;
+    };
+
     // RegEx is two c-strings back-to-back.
-    const char* p = elem + fieldNameSize + 1;
-    size_t len1 = strlen(p);
-    p = p + len1 + 1;
-    size_t len2 = strlen(p);
-    return (len1 + 1 + len2 + 1) + fieldNameSize + 1;
+    const auto patternOffset = checkOffsetInBound(fieldNameSize + 1);
+    const char* p = elem + patternOffset;
+    size_t len1 = bufferSize ? strnlen(p, *bufferSize - patternOffset) : strlen(p);
+    const auto optionsOffset = checkOffsetInBound(patternOffset + len1 + 1);
+    p = elem + optionsOffset;
+    size_t len2 = bufferSize ? strnlen(p, *bufferSize - optionsOffset) : strlen(p);
+    return checkOffsetInBound(optionsOffset + len2 + 1);
 }
 
 std::string BSONElement::toString(bool includeFieldName, bool full) const {

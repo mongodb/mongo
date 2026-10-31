@@ -402,6 +402,19 @@ constexpr auto kRootFieldName = ""sv;
 // logic errors. We don't make it zero so that we do execute the fastRep code paths.
 const size_t kFastReps = kDebugBuild ? 2 : 128;
 
+// Returns the sub-span of 'object's buffer beginning at 'offset', the location of an element
+// within that buffer, verifying that 'offset' falls within the buffer.
+std::span<const char> getSpanWithinObject(const BSONObj& object, uint32_t offset) {
+    // Compare in int64_t so that a negative 'objsize()' is correctly treated as out of bounds.
+    if (MONGO_unlikely(static_cast<int64_t>(offset) >= object.objsize())) {
+        LOGV2_FATAL(12987903,
+                    "mutable bson element offset outside its backing BSONObj",
+                    "offset"_attr = offset,
+                    "objsize"_attr = object.objsize());
+    }
+    return std::span{object.objdata(), static_cast<size_t>(object.objsize())}.subspan(offset);
+}
+
 // An ElementRep contains the information necessary to locate the data for an Element,
 // and the topology information for how the Element is related to other Elements in the
 // document.
@@ -462,11 +475,10 @@ struct ElementRep {
     }
 
     BSONElement toSerializedElement(const BSONObj& holder) const {
-        const char* bufferEnd = holder.objdata() + holder.objsize();
-        return _fieldNameSize > 0 ? BSONElement(std::span{holder.objdata() + offset, bufferEnd},
-                                                _fieldNameSize,
-                                                BSONElement::TrustedInitTag{})
-                                  : BSONElement(std::span{holder.objdata() + offset, bufferEnd});
+        auto buffer = getSpanWithinObject(holder, offset);
+        return _fieldNameSize > 0
+            ? BSONElement(buffer, _fieldNameSize, BSONElement::TrustedInitTag{})
+            : BSONElement(buffer);
     }
 
 private:
@@ -808,15 +820,21 @@ public:
         // It should be impossible to have an opaque left child and be non-serialized,
         dassert(rep->serialized);
 
+        const BSONObj& backing = getObject(rep->objIdx);
         int64_t thisObjectOffset;
         if (hasValue(*rep)) {
-            BSONElement thisElement = getSerializedElement(*rep);
-            tassert(
-                13324400, "Cannot resolve child on non-object element", thisElement.isABSONObj());
+            auto buffer = getSpanWithinObject(backing, rep->offset);
+
+            const auto eltFieldNameSize = BSONElement::fieldNameSizeFromBuffer(buffer);
+            const auto type = static_cast<BSONType>(static_cast<int8_t>(buffer.front()));
+
+            tassert(13324400,
+                    "Cannot resolve child on non-object element",
+                    type == BSONType::object || type == BSONType::array);
 
             // The offset of the embedded object is the offset of the wrapping element, plus the
             // size of its field name, plus the size of the type byte.
-            thisObjectOffset = static_cast<int64_t>(rep->offset) + thisElement.fieldNameSize() + 1;
+            thisObjectOffset = static_cast<int64_t>(rep->offset) + eltFieldNameSize + 1;
         } else {
             // The element referenced by 'index' is the root object and lives at offset 0 of its
             // underlying 'BSONObj' data.
@@ -824,7 +842,6 @@ public:
         }
 
         // The first child of an object is always exactly 4 bytes after the start of the object.
-        const BSONObj& backing = getObject(rep->objIdx);
         const int64_t childOffset = thisObjectOffset + 4;
         const int32_t objsize = backing.objsize();
         if (MONGO_unlikely(childOffset >= objsize)) {
@@ -835,8 +852,15 @@ public:
                         "childOffset"_attr = childOffset,
                         "objsize"_attr = objsize);
         }
-        BSONElement childElt(
-            std::span{backing.objdata() + childOffset, backing.objdata() + objsize});
+
+        // Here we deliberately skip bound checking for the value of the element.
+        // This is on purpose and the test ReadPastEndOfObjectGoesUnreported is verifying this
+        // behavior. This is fine as long as we don't actually read the value of the object.
+        auto childSpan =
+            std::span{backing.objdata(), static_cast<size_t>(objsize)}.subspan(childOffset);
+        BSONElement childElt(childSpan,
+                             BSONElement::fieldNameSizeFromBuffer(childSpan),
+                             BSONElement::TrustedInitTag{});
 
         if (!childElt.eoo()) {
             // Do this now before other writes so compiler can exploit knowing
@@ -906,18 +930,25 @@ public:
         if (rep->sibling.right != Element::kOpaqueRepIdx)
             return rep->sibling.right;
 
-        BSONElement elt = getSerializedElement(*rep);
-
         // Bound the next element's offset before constructing a BSONElement at it: the BSONElement
         // constructor scans forward for the field name's NUL terminator, so it must not be handed a
-        // pointer outside the buffer.
+        // pointer outside the buffer. The element offset in the backing must also be in-bounds.
         const BSONObj& backing = getObject(rep->objIdx);
-        const int64_t nextOffset = static_cast<int64_t>(rep->offset) + elt.size();
+        auto buffer = getSpanWithinObject(backing, rep->offset);
+
+        // We must derive the size of the element from the validated 'buffer' before constructing
+        // a BSONElement at 'nextOffset'. This is because we do a fatal bound check on
+        // 'nextOffset' in this context. The BSONElement must not be constructed until that
+        // check has passed, otherwise a tassert is triggered on construction.
+        const auto eltFieldNameSize = BSONElement::fieldNameSizeFromBuffer(buffer);
+        const auto eltValueSize = BSONElement::valueSizeFromBuffer(buffer, eltFieldNameSize);
+        const auto eltSize = 1 + eltFieldNameSize + eltValueSize;
+        const int64_t nextOffset = static_cast<int64_t>(rep->offset) + eltSize;
         if (MONGO_unlikely(nextOffset <= 0 || nextOffset >= backing.objsize())) {
             LOGV2_FATAL(12987902,
                         "mutable bson right sibling begins outside its backing BSONObj",
                         "offset"_attr = rep->offset,
-                        "elementSize"_attr = elt.size(),
+                        "elementSize"_attr = eltSize,
                         "nextOffset"_attr = nextOffset,
                         "objsize"_attr = backing.objsize());
         }
@@ -1757,7 +1788,7 @@ void Element::writeArrayTo(BSONArrayBuilder* const builder) const {
 Status Element::setValueDouble(const double value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
-    ElementRep thisRep = impl.getElementRep(_repIdx);
+    const ElementRep& thisRep = impl.getElementRep(_repIdx);
     const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementDouble(fieldName, value);
     return setValue(newValue._repIdx);
@@ -1834,7 +1865,7 @@ Status Element::setValueOID(const OID value) {
 Status Element::setValueBool(const bool value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
-    ElementRep thisRep = impl.getElementRep(_repIdx);
+    const ElementRep& thisRep = impl.getElementRep(_repIdx);
     const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementBool(fieldName, value);
     return setValue(newValue._repIdx);
@@ -1923,7 +1954,7 @@ Status Element::setValueCodeWithScope(std::string_view code, const BSONObj& scop
 Status Element::setValueInt(const int32_t value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
-    ElementRep thisRep = impl.getElementRep(_repIdx);
+    const ElementRep& thisRep = impl.getElementRep(_repIdx);
     const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementInt(fieldName, value);
     return setValue(newValue._repIdx);
@@ -1941,7 +1972,7 @@ Status Element::setValueTimestamp(const Timestamp value) {
 Status Element::setValueLong(const int64_t value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
-    ElementRep thisRep = impl.getElementRep(_repIdx);
+    const ElementRep& thisRep = impl.getElementRep(_repIdx);
     const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementLong(fieldName, value);
     return setValue(newValue._repIdx);
@@ -1950,7 +1981,7 @@ Status Element::setValueLong(const int64_t value) {
 Status Element::setValueDecimal(const Decimal128 value) {
     invariant(ok());
     Document::Impl& impl = getDocument().getImpl();
-    ElementRep thisRep = impl.getElementRep(_repIdx);
+    const ElementRep& thisRep = impl.getElementRep(_repIdx);
     const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementDecimal(fieldName, value);
     return setValue(newValue._repIdx);
@@ -1984,7 +2015,7 @@ Status Element::setValueBSONElement(const BSONElement& value) {
 
     dassert(impl.doesNotAlias(value));
 
-    ElementRep thisRep = impl.getElementRep(_repIdx);
+    const ElementRep& thisRep = impl.getElementRep(_repIdx);
     const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementWithNewFieldName(fieldName, value);
     return setValue(newValue._repIdx);
@@ -2025,7 +2056,7 @@ Status Element::setValueElement(ConstElement setFrom) {
     }
 
     Document::Impl& impl = getDocument().getImpl();
-    ElementRep thisRep = impl.getElementRep(_repIdx);
+    const ElementRep& thisRep = impl.getElementRep(_repIdx);
     const std::string_view fieldName = impl.getFieldNameForNewElement(thisRep);
     Element newValue = getDocument().makeElementWithNewFieldName(fieldName, setFrom);
     return setValue(newValue._repIdx);

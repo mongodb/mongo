@@ -53,6 +53,28 @@ class ExtendedCanonicalV200Generator;
 class ExtendedRelaxedV200Generator;
 class LegacyStrictGenerator;
 
+namespace bson_details {
+/**
+ * Asserts that the element described by `buffer`, `fieldNameSize`, and `valueSize` fits within
+ * `buffer`: only the eoo byte is allowed as the final element, and any other element must end
+ * before the final eoo byte.
+ */
+inline void assertElementWithinBuffer(std::span<const char> buffer,
+                                      int fieldNameSize,
+                                      int valueSize) {
+    // Only allow eoo byte at the end of the BSONObj.
+    tassertBSONOverread(!buffer.empty());
+    if (buffer.front() == stdx::to_underlying(BSONType::eoo)) {
+        // Check if there's an eoo byte not at the end.
+        tassertBSONOverread(buffer.size() == 1);
+    } else {
+        // Non eoo elements must end before the eoo byte.
+        const int avail = buffer.size() - (fieldNameSize + 1);
+        tassertBSONOverread(valueSize < avail);
+    }
+}
+}  // namespace bson_details
+
 /**
  * C++ representation of a "BSON" object -- that is, an extended JSON-style
  * object in a binary representation.
@@ -493,7 +515,7 @@ public:
         static_assert(Traits::MaxSize > 0 && Traits::MaxSize <= std::numeric_limits<int>::max(),
                       "BSONObj maximum size must be within possible limits");
         int x = objsize();
-        return x > 0 && x <= BufferMaxSize;
+        return x >= kMinBSONLength && x <= BufferMaxSize;
     }
 
     /**
@@ -792,7 +814,6 @@ public:
      * pre-increment
      */
     BSONObjStlIterator& operator++() {
-        dassert(*_cur._data);  // Must not be EOO
         _advanceTo(_cur._data + _curValueSize + 1 + _cur._fieldNameSize);
         return *this;
     }
@@ -828,8 +849,11 @@ private:
      */
     void _advanceTo(const char* start) {
         std::span buffer{start, _end};
+        // If the iterator passes end, empty buffer detection in fieldNameSizeFromBuffer
+        // will trigger.
         auto fieldNameSize = BSONElement::fieldNameSizeFromBuffer(buffer);
         auto valueSize = BSONElement::valueSizeFromBuffer(buffer, fieldNameSize);
+        bson_details::assertElementWithinBuffer(buffer, fieldNameSize, valueSize);
         _cur = BSONElement(buffer, fieldNameSize, BSONElement::TrustedInitTag{});
         _curValueSize = valueSize;
     }
@@ -856,17 +880,17 @@ public:
      */
     explicit BSONObjIterator(const BSONObj& jso) {
         int sz = jso.objsize();
-        if (MONGO_unlikely(sz == 0)) {
-            _pos = _theend = nullptr;
+        if (MONGO_unlikely(sz < static_cast<int>(BSONObj::kMinBSONLength))) {
+            _pos = _eoo = nullptr;
             return;
         }
         _pos = jso.objdata() + 4;
-        _theend = jso.objdata() + sz - 1;
+        _eoo = jso.objdata() + sz - 1;
     }
 
     BSONObjIterator(const char* start, const char* end) {
         _pos = start + 4;
-        _theend = end - 1;
+        _eoo = end - 1;
     }
 
     /**
@@ -874,7 +898,7 @@ public:
      * current element '_pos' is at.
      */
     void advance(const BSONElement& currentElement) {
-        dassert(BSONElement(std::span{_pos, _theend + 1}).size() == currentElement.size());
+        dassert(BSONElement(std::span{_pos, _eoo + 1}).size() == currentElement.size());
         _pos += currentElement.size();
     }
 
@@ -883,22 +907,25 @@ public:
      */
     bool currentElementBinaryEqual(const BSONElement& otherElement) {
         auto sz = otherElement.size();
-        return sz <= (_theend - _pos) && memcmp(otherElement.rawdata(), _pos, sz) == 0;
+        return sz <= (_eoo - _pos) && memcmp(otherElement.rawdata(), _pos, sz) == 0;
     }
 
     /**
      * @return true if more elements exist to be enumerated.
      */
     bool more() const {
-        return _pos < _theend;
+        return _pos < _eoo;
     }
 
     BSONElement next() {
-        dassert(_pos <= _theend);
-        auto buffer = std::span{_pos, _theend + 1};
+        // Ensure we're creating a valid span.
+        bson_details::tassertBSONOverread(_pos && _pos <= _eoo);
+        auto buffer = std::span{_pos, _eoo + 1};
         auto fieldNameSize = BSONElement::fieldNameSizeFromBuffer(buffer);
         auto valueSize = BSONElement::valueSizeFromBuffer(buffer, fieldNameSize);
-        _pos += fieldNameSize + valueSize + 1;
+
+        bson_details::assertElementWithinBuffer(buffer, fieldNameSize, valueSize);
+        _pos += fieldNameSize + 1 + valueSize;
         return BSONElement(buffer, fieldNameSize, BSONElement::TrustedInitTag{});
     }
 
@@ -920,15 +947,18 @@ public:
     }
 
     BSONElement operator*() {
-        dassert(_pos <= _theend);
-        auto buffer = std::span{_pos, _theend + 1};
+        // Ensure we're creating a valid span.
+        bson_details::tassertBSONOverread(_pos && _pos <= _eoo);
+        std::span buffer{_pos, _eoo + 1};
         auto fieldNameSize = BSONElement::fieldNameSizeFromBuffer(buffer);
-        return BSONElement(
-            std::span{_pos, _theend + 1}, fieldNameSize, BSONElement::TrustedInitTag{});
+        auto valueSize = BSONElement::valueSizeFromBuffer(buffer, fieldNameSize);
+
+        bson_details::assertElementWithinBuffer(buffer, fieldNameSize, valueSize);
+        return BSONElement(buffer, fieldNameSize, BSONElement::TrustedInitTag{});
     }
 
     bool operator==(const BSONObjIterator& other) {
-        dassert(_theend == other._theend);
+        dassert(_eoo == other._eoo);
         return _pos == other._pos;
     }
 
@@ -938,7 +968,7 @@ public:
 
 private:
     const char* _pos;
-    const char* _theend;
+    const char* _eoo;
 };
 
 /**
