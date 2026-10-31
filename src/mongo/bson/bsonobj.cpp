@@ -90,19 +90,22 @@ int compareObjects(const BSONObj& firstObj,
 
 const BSONObj BSONObj::kEmptyObject;
 
-void BSONObj::_assertInvalid(int maxSize) const {
-    StringBuilder ss;
-    int os = objsize();
-    ss << "BSONObj size: " << os << " (0x" << unsignedHex(os) << ") is invalid. "
-       << "Size must be between 0 and " << maxSize << "(" << (maxSize / (1024 * 1024)) << "MB)";
-    if (os >= kMinBSONLength) {
+void BSONObj::_throwInvalidSize(int size, int maxSize) const {
+    std::string msg =
+        fmt::format("BSONObj size: {} ({:#x}) is invalid. Size must be between {} and {} ({} MiB).",
+                    size,
+                    size,
+                    kMinBSONLength,
+                    maxSize,
+                    maxSize >> 20);
+    if (size >= kMinBSONLength) {
         try {
-            BSONElement e = firstElement();
-            ss << " First element: " << e.toString();
+            fmt::format_to(
+                std::back_inserter(msg), " First element: {}", firstElement().toString());
         } catch (...) {
         }
     }
-    massert(ErrorCodes::BSONObjectTooLarge, ss.str(), 0);
+    massert(ErrorCodes::BSONObjectTooLarge, msg, 0);
 }
 
 BSONObj BSONObj::copy() const {

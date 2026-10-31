@@ -18,14 +18,17 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <string>
 #include <string_view>
@@ -789,6 +792,25 @@ TEST(BSONObj, sizeChecks) {
         }(),
         DBException,
         ErrorCodes::BSONObjectTooLarge);
+}
+
+TEST(BSONObj, OwnedBufferMustContainObject) {
+    const auto owned = BSON("a" << 1);
+
+    {
+        auto buffer = SharedBuffer::allocate(static_cast<size_t>(owned.objsize()));
+        std::memcpy(buffer.get(), owned.objdata(), static_cast<size_t>(owned.objsize()));
+        ASSERT_BSONOBJ_EQ(BSONObj(ConstSharedBuffer(std::move(buffer))), owned);
+    }
+
+    // A buffer too small to contain the claimed object size is rejected.
+    {
+        auto buffer = SharedBuffer::allocate(static_cast<size_t>(BSONObj::kMinBSONLength));
+        DataRange bufferRange(buffer.get(), buffer.get() + BSONObj::kMinBSONLength);
+        ASSERT_OK(bufferRange.writeNoThrow(LittleEndian<int32_t>(100)));
+        ASSERT_TASSERT_CODE(BSONObj(ConstSharedBuffer(std::move(buffer))),
+                            ErrorCodes::BSONInternalError);
+    }
 }
 
 TEST(BSONObj, nullByteInStringBasic) {

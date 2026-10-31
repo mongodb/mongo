@@ -26,12 +26,14 @@
 #include <array>
 #include <bitset>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <functional>
 #include <iosfwd>
 #include <iterator>
 #include <limits>
 #include <list>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -168,16 +170,22 @@ public:
 
     template <typename Traits>
     BSONObj(const char* bsonData, Traits) : _objdata(bsonData) {
-        // TODO(SERVER-133681): Remove size traits and move the run time size check out.
+        static_assert(Traits::MaxSize > 0 && Traits::MaxSize <= std::numeric_limits<int>::max(),
+                      "BSONObj maximum size must be within possible limits");
+        const auto size = objsize();
         if (!isValid<Traits>())
-            _assertInvalid(Traits::MaxSize);
-        _validateEoo();
+            _throwInvalidSize(size, Traits::MaxSize);
+        _checkEoo(size);
     }
 
     explicit BSONObj(ConstSharedBuffer ownedBuffer)
         : _objdata(ownedBuffer.get() ? ownedBuffer.get() : BSONObj().objdata()),
           _ownedBuffer(std::move(ownedBuffer)) {
-        _validateEoo();
+        if (_ownedBuffer.get()) {
+            const auto size =
+                _checkSpanGetSize({_objdata, _ownedBuffer.capacity()}, LargeSizeTrait::MaxSize);
+            _checkEoo(size);
+        }
     }
 
     /**
@@ -257,11 +265,12 @@ public:
     BSONObj& shareOwnershipWith(ConstSharedBuffer buffer) & {
         invariant(buffer);
         _ownedBuffer = std::move(buffer);
-        _validateEoo();
         return *this;
     }
     BSONObj& shareOwnershipWith(const BSONObj& other) & {
-        shareOwnershipWith(other.sharedBuffer());
+        auto buffer = other.sharedBuffer();
+        invariant(buffer);
+        _ownedBuffer = std::move(buffer);
         return *this;
     }
     BSONObj&& shareOwnershipWith(ConstSharedBuffer buffer) && {
@@ -733,43 +742,44 @@ private:
                                  fmt::memory_buffer& buffer,
                                  size_t writeLimit) const;
 
-    void _assertInvalid(int maxSize) const;
+    void _throwInvalidSize(int size, int maxSize) const;
 
     void _validateUnownedSize(int size) const;
 
-    void _validateEoo() const {
+    bool _isEooAt(int index) const {
+        return static_cast<BSONType>(static_cast<signed char>(_objdata[index])) == BSONType::eoo;
+    }
+
+    void _checkEoo(int size) const {
         // Casting mimics type extraction in BSONElement::type().
-        tassert(ErrorCodes::BSONInternalError,
-                "BSONObj does not end with EOO",
-                static_cast<BSONType>(static_cast<signed char>(_objdata[objsize() - 1])) ==
-                    BSONType::eoo);
+        tassert(ErrorCodes::BSONInternalError, "BSONObj does not end with EOO", _isEooAt(size - 1));
     }
 
     const char* _end() const {
         return objdata() + objsize();
     }
 
+    int _checkSpanGetSize(std::span<const char> buffer, int maxSize) const {
+        tassert(ErrorCodes::BSONInternalError,
+                fmt::format("BSONObj buffer size is {}, smaller than the minimum object size {}",
+                            buffer.size(),
+                            kMinBSONLength),
+                buffer.size() >= static_cast<size_t>(kMinBSONLength));
+        const int size = objsize();
+        tassert(ErrorCodes::BSONInternalError,
+                "BSONObj extends past buffer",
+                size >= static_cast<int>(kMinBSONLength) &&
+                    static_cast<size_t>(size) <= buffer.size());
+        // size <= buffer.size() does not cap the object: the span can be larger than
+        // BufferMaxSize. The minimum length was already checked above.
+        if (MONGO_unlikely(size > maxSize)) {
+            _throwInvalidSize(size, maxSize);
+        }
+        return size;
+    }
+
     const char* _objdata;
     ConstSharedBuffer _ownedBuffer;
-};
-
-MONGO_STATIC_ASSERT(std::is_nothrow_move_constructible_v<BSONObj>);
-MONGO_STATIC_ASSERT(std::is_nothrow_move_assignable_v<BSONObj>);
-
-std::ostream& operator<<(std::ostream& s, const BSONObj& o);
-std::ostream& operator<<(std::ostream& s, const BSONElement& e);
-
-StringBuilder& operator<<(StringBuilder& s, const BSONObj& o);
-StringBuilder& operator<<(StringBuilder& s, const BSONElement& e);
-
-inline void swap(BSONObj& l, BSONObj& r) noexcept {
-    l.swap(r);
-}
-
-struct BSONArray : BSONObj {
-    // Don't add anything other than forwarding constructors!!!
-    BSONArray() : BSONObj() {}
-    explicit BSONArray(const BSONObj& obj) : BSONObj(obj) {}
 };
 
 /**
@@ -861,6 +871,25 @@ private:
     BSONElement _cur;
     int _curValueSize = 0;
     const char* _end = nullptr;
+};
+
+MONGO_STATIC_ASSERT(std::is_nothrow_move_constructible_v<BSONObj>);
+MONGO_STATIC_ASSERT(std::is_nothrow_move_assignable_v<BSONObj>);
+
+std::ostream& operator<<(std::ostream& s, const BSONObj& o);
+std::ostream& operator<<(std::ostream& s, const BSONElement& e);
+
+StringBuilder& operator<<(StringBuilder& s, const BSONObj& o);
+StringBuilder& operator<<(StringBuilder& s, const BSONElement& e);
+
+inline void swap(BSONObj& l, BSONObj& r) noexcept {
+    l.swap(r);
+}
+
+struct BSONArray : BSONObj {
+    // Don't add anything other than forwarding constructors!!!
+    BSONArray() = default;
+    explicit BSONArray(const BSONObj& obj) : BSONObj(obj) {}
 };
 
 /**

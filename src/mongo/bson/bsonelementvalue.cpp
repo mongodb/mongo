@@ -22,7 +22,19 @@ BSONObj BSONElementValue::CodeWScopeObj() const {
 }
 
 BSONObj BSONElementValue::_codeWScopeObj(int codeSizeWithNull) const {
-    return BSONObj(value() + kCountBytes + kCountBytes + codeSizeWithNull);
+    const int valueSize = ConstDataView(value()).read<LittleEndian<int>>();
+    constexpr auto minCodeWScopeSize = 8 + static_cast<int>(BSONObj::kMinBSONLength);
+    tassert(ErrorCodes::BSONInternalError,
+            "BSONObj scope starts outside codeWScope value",
+            valueSize >= minCodeWScopeSize && codeSizeWithNull >= 1 &&
+                codeSizeWithNull <= valueSize - minCodeWScopeSize);
+    const char* const start = value() + kCountBytes + kCountBytes + codeSizeWithNull;
+    const int scopeSize = ConstDataView(start).read<LittleEndian<int>>();
+    tassert(ErrorCodes::BSONInternalError,
+            "BSONObj scope extends past codeWScope value",
+            scopeSize >= static_cast<int>(BSONObj::kMinBSONLength) &&
+                scopeSize <= valueSize - minCodeWScopeSize);
+    return BSONObj(start);
 }
 
 }  // namespace mongo
