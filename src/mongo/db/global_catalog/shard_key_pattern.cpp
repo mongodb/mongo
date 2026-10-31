@@ -126,7 +126,7 @@ std::pair<BSONElement, bool> extractFieldFromIndexData(
             invariant(keyDataIt.more());
             BSONElement keyDataElt = keyDataIt.next();
             if (fieldName == keyPatternElt.fieldNameStringData()) {
-                const auto isHashed = (keyPatternElt.valueStringData() == IndexNames::HASHED);
+                const auto isHashed = (keyPatternElt.valueStringDataSafe() == IndexNames::HASHED);
                 output = {keyDataElt, isHashed};
                 if (!isHashed) {
                     return output;

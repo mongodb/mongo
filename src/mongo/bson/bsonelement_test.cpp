@@ -7,6 +7,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
@@ -463,6 +464,319 @@ TEST(BSONElementTrustedInitTag, EmptyFieldName) {
     // 'fieldNameSize()' includes the NUL-terminator.
     ASSERT_EQ(1, elem.fieldNameSize());
     ASSERT_EQ(""sv, elem.fieldNameStringData());
+}
+
+TEST(BSONElement, GettersTassertOnWrongType) {
+    const auto testObj = BSON("x" << "no");
+    const auto stringElem = testObj["x"];
+
+    ASSERT_TASSERT_CODE(stringElem.boolean(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem.date(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem._numberDouble(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem._numberInt(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem._numberDecimal(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem._numberLong(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem.__oid(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem.binDataType(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem._binDataVector(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem.regex(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem.regexFlags(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem.timestampTime(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem.timestampInc(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem.timestampValue(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem.embeddedObject(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem.codeWScopeObject(), ErrorCodes::BSONInternalError);
+    int len = 0;
+    ASSERT_TASSERT_CODE(stringElem.binData(len), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(stringElem.binDataClean(len), ErrorCodes::BSONInternalError);
+
+    const auto numberObj = BSON("n" << 1);
+    ASSERT_TASSERT_CODE(numberObj["n"].valueStringData(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(numberObj["n"].valuestrsize(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(numberObj["n"].objsize(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(BSONElement().valuestrsize(), ErrorCodes::BSONInternalError);
+    ASSERT_TASSERT_CODE(BSONElement().objsize(), ErrorCodes::BSONInternalError);
+}
+
+BSONObj makeFixedSizeTypeObj(BSONType type) {
+    switch (type) {
+        case BSONType::eoo:
+            return BSONObj();
+        case BSONType::undefined:
+            return BSON("v" << BSONUndefined);
+        case BSONType::null:
+            return BSON("v" << BSONNULL);
+        case BSONType::boolean:
+            return BSON("v" << true);
+        case BSONType::numberInt:
+            return BSON("v" << 1);
+        case BSONType::numberLong:
+            return BSON("v" << 1LL);
+        case BSONType::numberDouble:
+            return BSON("v" << 1.5);
+        case BSONType::numberDecimal:
+            return BSON("v" << Decimal128(1));
+        case BSONType::date:
+            return BSON("v" << Date_t::fromMillisSinceEpoch(0));
+        case BSONType::timestamp:
+            return BSON("v" << Timestamp(1, 2));
+        case BSONType::oid:
+            return BSON("v" << OID::gen());
+        case BSONType::string:
+            return BSON("v" << "x");
+        case BSONType::object:
+            return BSON("v" << BSONObj());
+        case BSONType::array:
+            return BSON("v" << BSONArray());
+        case BSONType::minKey:
+            return BSON("v" << MINKEY);
+        case BSONType::maxKey:
+            return BSON("v" << MAXKEY);
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+template <typename Getter>
+void assertTypePunning(Getter getter,
+                       std::initializer_list<BSONType> accepted,
+                       std::initializer_list<BSONType> rejected) {
+    for (auto type : accepted) {
+        SCOPED_TRACE(type);
+        const auto obj = makeFixedSizeTypeObj(type);
+        ASSERT_DOES_NOT_THROW(getter(obj.firstElement()));
+    }
+    for (auto type : rejected) {
+        SCOPED_TRACE(type);
+        const auto obj = makeFixedSizeTypeObj(type);
+        ASSERT_TASSERT_CODE(getter(obj.firstElement()), ErrorCodes::BSONInternalError);
+    }
+}
+
+TEST(BSONElement, BooleanGetterTypePunning) {
+    // boolean() special cases eoo and null to false instead of tripping the type check.
+    ASSERT_EQ(BSONElement().boolean(), false);
+    ASSERT_EQ(BSON("v" << BSONNULL).firstElement().boolean(), false);
+    // boolean() reads only the first value byte, so a larger fixed-size payload is accepted.
+    ASSERT_EQ(BSON("v" << 255).firstElement().boolean(), true);
+    ASSERT_EQ(BSON("v" << 256).firstElement().boolean(), false);
+
+    assertTypePunning([](const BSONElement& e) { (void)e.boolean(); },
+                      {BSONType::eoo,
+                       BSONType::null,
+                       BSONType::boolean,
+                       BSONType::numberInt,
+                       BSONType::numberLong,
+                       BSONType::numberDouble,
+                       BSONType::numberDecimal,
+                       BSONType::date,
+                       BSONType::timestamp,
+                       BSONType::oid},
+                      {BSONType::undefined,
+                       BSONType::string,
+                       BSONType::object,
+                       BSONType::array,
+                       BSONType::minKey,
+                       BSONType::maxKey});
+}
+
+TEST(BSONElement, NumberIntGetterTypePunning) {
+    // _numberInt reads the low 4 bytes of a larger fixed-size payload.
+    const auto longObj = BSON("a" << 0x0102030405060708LL);
+    ASSERT_EQ(longObj["a"]._numberInt(), static_cast<int>(0x05060708));
+
+    assertTypePunning([](const BSONElement& e) { (void)e._numberInt(); },
+                      {BSONType::numberInt,
+                       BSONType::numberLong,
+                       BSONType::numberDouble,
+                       BSONType::numberDecimal,
+                       BSONType::date,
+                       BSONType::timestamp,
+                       BSONType::oid},
+                      {BSONType::eoo,
+                       BSONType::undefined,
+                       BSONType::null,
+                       BSONType::boolean,
+                       BSONType::string,
+                       BSONType::object,
+                       BSONType::array,
+                       BSONType::minKey,
+                       BSONType::maxKey});
+}
+
+TEST(BSONElement, NumberLongGetterTypePunning) {
+    // 1.5 has the exact bit pattern 0x3FF8000000000000.
+    const auto doubleObj = BSON("a" << 1.5);
+    ASSERT_EQ(doubleObj["a"]._numberLong(), 0x3FF8000000000000LL);
+    const auto tsObj = BSON("a" << Timestamp(0x01020304u, 0x05060708u));
+    ASSERT_EQ(tsObj["a"]._numberLong(), 0x0102030405060708LL);
+
+    assertTypePunning([](const BSONElement& e) { (void)e._numberLong(); },
+                      {BSONType::numberLong,
+                       BSONType::numberDouble,
+                       BSONType::numberDecimal,
+                       BSONType::date,
+                       BSONType::timestamp,
+                       BSONType::oid},
+                      {BSONType::eoo,
+                       BSONType::undefined,
+                       BSONType::null,
+                       BSONType::boolean,
+                       BSONType::numberInt,
+                       BSONType::string,
+                       BSONType::object,
+                       BSONType::array,
+                       BSONType::minKey,
+                       BSONType::maxKey});
+}
+
+TEST(BSONElement, NumberDoubleGetterTypePunning) {
+    assertTypePunning([](const BSONElement& e) { (void)e._numberDouble(); },
+                      {BSONType::numberDouble,
+                       BSONType::numberLong,
+                       BSONType::numberDecimal,
+                       BSONType::date,
+                       BSONType::timestamp,
+                       BSONType::oid},
+                      {BSONType::eoo,
+                       BSONType::undefined,
+                       BSONType::null,
+                       BSONType::boolean,
+                       BSONType::numberInt,
+                       BSONType::string,
+                       BSONType::object,
+                       BSONType::array,
+                       BSONType::minKey,
+                       BSONType::maxKey});
+}
+
+TEST(BSONElement, NumberDecimalGetterTypePunning) {
+    // An OID (12 value bytes) is smaller than a Decimal128 (16 value bytes).
+    const auto oidObj = BSON("a" << OID::gen());
+    ASSERT_TASSERT_CODE(oidObj["a"]._numberDecimal(), ErrorCodes::BSONInternalError);
+
+    assertTypePunning([](const BSONElement& e) { (void)e._numberDecimal(); },
+                      {BSONType::numberDecimal},
+                      {BSONType::eoo,
+                       BSONType::undefined,
+                       BSONType::null,
+                       BSONType::boolean,
+                       BSONType::numberInt,
+                       BSONType::numberLong,
+                       BSONType::numberDouble,
+                       BSONType::date,
+                       BSONType::timestamp,
+                       BSONType::oid,
+                       BSONType::string,
+                       BSONType::object,
+                       BSONType::array,
+                       BSONType::minKey,
+                       BSONType::maxKey});
+}
+
+TEST(BSONElement, DateGetterTypePunning) {
+    // Timestamp, Date, NumberDouble and NumberLong share an 8-byte payload layout.
+    const auto tsObj = BSON("a" << Timestamp(0x01020304u, 0x05060708u));
+    ASSERT_EQ(tsObj["a"].date(), Date_t::fromMillisSinceEpoch(0x0102030405060708LL));
+
+    assertTypePunning([](const BSONElement& e) { (void)e.date(); },
+                      {BSONType::date,
+                       BSONType::numberLong,
+                       BSONType::numberDouble,
+                       BSONType::numberDecimal,
+                       BSONType::timestamp,
+                       BSONType::oid},
+                      {BSONType::eoo,
+                       BSONType::undefined,
+                       BSONType::null,
+                       BSONType::boolean,
+                       BSONType::numberInt,
+                       BSONType::string,
+                       BSONType::object,
+                       BSONType::array,
+                       BSONType::minKey,
+                       BSONType::maxKey});
+}
+
+TEST(BSONElement, TimestampGetterTypePunning) {
+    const auto tsObj = BSON("a" << Timestamp(0x01020304u, 0x05060708u));
+    const auto& tsElem = tsObj["a"];
+    ASSERT_EQ(tsElem.timestampValue(), 0x0102030405060708ULL);
+    ASSERT_EQ(tsElem.timestampInc(), 0x05060708u);
+    ASSERT_EQ(tsElem.timestampTime(), Date_t::fromMillisSinceEpoch(0x01020304ull * 1000));
+
+    assertTypePunning(
+        [](const BSONElement& e) {
+            (void)e.timestampValue();
+            (void)e.timestampInc();
+            (void)e.timestampTime();
+        },
+        {BSONType::timestamp,
+         BSONType::numberLong,
+         BSONType::numberDouble,
+         BSONType::numberDecimal,
+         BSONType::date,
+         BSONType::oid},
+        {BSONType::eoo,
+         BSONType::undefined,
+         BSONType::null,
+         BSONType::boolean,
+         BSONType::numberInt,
+         BSONType::string,
+         BSONType::object,
+         BSONType::array,
+         BSONType::minKey,
+         BSONType::maxKey});
+}
+
+TEST(BSONElement, OidGetterTypePunning) {
+    assertTypePunning([](const BSONElement& e) { (void)e.__oid(); },
+                      {BSONType::oid, BSONType::numberDecimal},
+                      {BSONType::eoo,
+                       BSONType::undefined,
+                       BSONType::null,
+                       BSONType::boolean,
+                       BSONType::numberInt,
+                       BSONType::numberLong,
+                       BSONType::numberDouble,
+                       BSONType::date,
+                       BSONType::timestamp,
+                       BSONType::string,
+                       BSONType::object,
+                       BSONType::array,
+                       BSONType::minKey,
+                       BSONType::maxKey});
+}
+
+TEST(BSONElement, UntrustedConstructorBoundsChecks) {
+    const std::array<char, 0> empty{};
+    ASSERT_TASSERT_CODE(BSONElement(std::span<const char>(empty)), ErrorCodes::BSONInternalError);
+
+    const std::array<char, 4> missingNul{static_cast<char>(BSONType::numberInt), 'a', 'b', 'c'};
+    ASSERT_TASSERT_CODE(BSONElement(std::span<const char>(missingNul)),
+                        ErrorCodes::BSONInternalError);
+
+    const std::array<char, 1> eoo{static_cast<char>(BSONType::eoo)};
+    ASSERT(BSONElement(std::span<const char>(eoo)).eoo());
+
+    // Truncated fixed-size payload (numberInt needs 4 bytes value after "a\0", but only 2
+    // provided).
+    const std::array<char, 5> truncatedFixed{
+        static_cast<char>(BSONType::numberInt), 'a', '\0', 1, 0};
+    ASSERT_TASSERT_CODE(BSONElement(std::span<const char>(truncatedFixed)),
+                        ErrorCodes::BSONInternalError);
+
+    // Truncated variable-size payload (string header says 10 bytes, but buffer only has 2 bytes).
+    const std::array<char, 9> truncatedVariable{
+        static_cast<char>(BSONType::string), 'a', '\0', 10, 0, 0, 0, 'h', 'i'};
+    ASSERT_TASSERT_CODE(BSONElement(std::span<const char>(truncatedVariable)),
+                        ErrorCodes::BSONInternalError);
+
+    const std::array<char, 7> namedInt{
+        static_cast<char>(BSONType::numberInt), 'a', '\0', 1, 0, 0, 0};
+    BSONElement elem{std::span<const char>(namedInt)};
+    ASSERT_EQ(elem.fieldNameStringData(), "a"sv);
+    ASSERT_EQ(elem.numberInt(), 1);
 }
 
 TEST(BSONElementTrustedInitTag, NonEmptyFieldName) {

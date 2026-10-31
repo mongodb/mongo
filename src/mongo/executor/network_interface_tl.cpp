@@ -448,8 +448,8 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
             deadline = interface->now();
         },
         [&](const BSONObj& data) {
-            return data["collectionNS"].valueStringData() ==
-                request.cmdObj.firstElement().valueStringData();
+            return data["collectionNS"].valueStringDataSafe() ==
+                request.cmdObj.firstElement().valueStringDataSafe();
         });
 
     if (deadline == kNoExpirationDate || !request.enforceLocalTimeout) {
@@ -854,8 +854,8 @@ NetworkInterfaceTL::CommandStateBase::getClient(AsyncClientFactory& factory) {
                 "PooledConnectionAcquisitionExceededTimeLimit triggered via fail point."};
         },
         [&](const BSONObj& data) {
-            return data["collectionNS"].valueStringData() ==
-                request.cmdObj.firstElement().valueStringData();
+            return data["collectionNS"].valueStringDataSafe() ==
+                request.cmdObj.firstElement().valueStringDataSafe();
         });
     if (!failPointStatus.isOK()) {
         return failPointStatus;

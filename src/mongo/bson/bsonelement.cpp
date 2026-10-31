@@ -110,25 +110,25 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
 
     switch (type()) {
         case BSONType::string:
-            g.writeString(buffer, valueStringData());
+            g.writeString(buffer, _valueStringDataUnchecked());
             break;
         case BSONType::symbol:
-            g.writeSymbol(buffer, valueStringData());
+            g.writeSymbol(buffer, _valueStringDataUnchecked());
             break;
         case BSONType::numberLong:
-            g.writeInt64(buffer, _numberLong());
+            g.writeInt64(buffer, _numberLongUnchecked());
             break;
         case BSONType::numberInt:
-            g.writeInt32(buffer, _numberInt());
+            g.writeInt32(buffer, _numberIntUnchecked());
             break;
         case BSONType::numberDouble:
-            g.writeDouble(buffer, number());
+            g.writeDouble(buffer, _numberDoubleUnchecked());
             break;
         case BSONType::numberDecimal:
-            g.writeDecimal128(buffer, numberDecimal());
+            g.writeDecimal128(buffer, _numberDecimalUnchecked());
             break;
         case BSONType::boolean:
-            g.writeBool(buffer, boolean());
+            g.writeBool(buffer, _booleanUnchecked());
             break;
         case BSONType::null:
             g.writeNull(buffer);
@@ -137,8 +137,8 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
             g.writeUndefined(buffer);
             break;
         case BSONType::object: {
-            BSONObj truncated =
-                embeddedObject().jsonStringGenerator(g, pretty, false, buffer, writeLimit);
+            BSONObj truncated = _embeddedObjectUnchecked().jsonStringGenerator(
+                g, pretty, false, buffer, writeLimit);
             if (!truncated.isEmpty()) {
                 BSONObjBuilder builder;
                 builder.append(fieldNameStringData(), truncated);
@@ -149,7 +149,7 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
         }
         case BSONType::array: {
             BSONObj truncated =
-                embeddedObject().jsonStringGenerator(g, pretty, true, buffer, writeLimit);
+                _embeddedObjectUnchecked().jsonStringGenerator(g, pretty, true, buffer, writeLimit);
             if (!truncated.isEmpty()) {
                 BSONObjBuilder builder;
                 builder.append(fieldNameStringData(), truncated);
@@ -159,11 +159,10 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
             return truncated;
         }
         case BSONType::dbRef:
-            // valuestrsize() returns the size including the null terminator
-            g.writeDBRef(buffer, valueStringData(), OID::from(valuestr() + valuestrsize()));
+            g.writeDBRef(buffer, _dbrefNSStringViewUnchecked(), _dbrefOIDUnchecked());
             break;
         case BSONType::oid:
-            g.writeOID(buffer, __oid());
+            g.writeOID(buffer, _oidUnchecked());
             break;
         case BSONType::binData: {
             ConstDataCursor reader(value());
@@ -174,26 +173,26 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
 
         break;
         case BSONType::date:
-            g.writeDate(buffer, date());
+            g.writeDate(buffer, _dateUnchecked());
             break;
         case BSONType::regEx: {
-            std::string_view pattern(regex());
+            std::string_view pattern(_regexUnchecked());
             g.writeRegex(buffer, pattern, std::string_view(pattern.data() + pattern.size() + 1));
         } break;
         case BSONType::codeWScope: {
-            BSONObj scope = codeWScopeObject();
+            BSONObj scope = _codeWScopeObjectUnchecked();
             if (!scope.isEmpty()) {
-                g.writeCodeWithScope(buffer, _asCode(), scope);
+                g.writeCodeWithScope(buffer, _codeWScopeCodeStringViewUnchecked(), scope);
                 break;
             }
-            // fall through if scope is empty
-            [[fallthrough]];
+            g.writeCode(buffer, _codeWScopeCodeStringViewUnchecked());
+            break;
         }
         case BSONType::code:
-            g.writeCode(buffer, _asCode());
+            g.writeCode(buffer, _valueStringDataUnchecked());
             break;
         case BSONType::timestamp:
-            g.writeTimestamp(buffer, timestamp());
+            g.writeTimestamp(buffer, Timestamp(_timestampValueUnchecked()));
             break;
         case BSONType::minKey:
             g.writeMinKey(buffer);
@@ -248,13 +247,17 @@ BSONObj BSONElement::jsonStringGenerator(LegacyStrictGenerator const& generator,
 
 namespace {
 
-// Compares two string elements using a simple binary compare.
-int compareElementStringValues(const BSONElement& leftStr, const BSONElement& rightStr) {
+/** synthesize a 3-way comparison from `==` and `<`. */
+int synthCmp(const auto& a, const auto& b) {
+    return a == b ? 0 : a < b ? -1 : 1;
+}
+
+int compareStringValues(std::string_view leftStr, std::string_view rightStr) {
     // we use memcmp as we allow zeros in UTF8 strings
-    int lsz = leftStr.valuestrsize();
-    int rsz = rightStr.valuestrsize();
+    int lsz = leftStr.size();
+    int rsz = rightStr.size();
     int common = std::min(lsz, rsz);
-    int res = memcmp((leftStr.value() + 4), (rightStr.value() + 4), common);
+    int res = memcmp(leftStr.data(), rightStr.data(), common);
     if (res)
         return res;
     // longer std::string is the greater one
@@ -267,47 +270,33 @@ int BSONElement::compareElements(const BSONElement& l,
                                  const BSONElement& r,
                                  ComparisonRulesSet rules,
                                  const StringDataComparator* comparator) {
+    bson_details::tassertBSONOverread(l.canonicalType() == r.canonicalType());
     switch (l.type()) {
         case BSONType::eoo:
         case BSONType::undefined:  // EOO and Undefined are same canonicalType
         case BSONType::null:
         case BSONType::maxKey:
-        case BSONType::minKey: {
-            auto f = l.canonicalType() - r.canonicalType();
-            if (f < 0)
-                return -1;
-            return f == 0 ? 0 : 1;
-        }
+        case BSONType::minKey:
+            return synthCmp(l.canonicalType(), r.canonicalType());
         case BSONType::boolean:
             return *l.value() - *r.value();
         case BSONType::timestamp:
-            // unsigned compare for timestamps - note they are not really dates but (ordinal +
-            // time_t)
-            if (l.timestamp() < r.timestamp())
-                return -1;
-            return l.timestamp() == r.timestamp() ? 0 : 1;
+            return synthCmp(l._timestampValueUnchecked(), r._timestampValueUnchecked());
         case BSONType::date:
-            // Signed comparisons for Dates.
-            {
-                const Date_t a = l.Date();
-                const Date_t b = r.Date();
-                if (a < b)
-                    return -1;
-                return a == b ? 0 : 1;
-            }
-
+            return synthCmp(l._dateUnchecked(), r._dateUnchecked());
         case BSONType::numberInt: {
             // All types can precisely represent all NumberInts, so it is safe to simply convert to
             // whatever rhs's type is.
             switch (r.type()) {
                 case BSONType::numberInt:
-                    return compareInts(l._numberInt(), r._numberInt());
+                    return compareInts(l._numberIntUnchecked(), r._numberIntUnchecked());
                 case BSONType::numberLong:
-                    return compareLongs(l._numberInt(), r._numberLong());
+                    return compareLongs(l._numberIntUnchecked(), r._numberLongUnchecked());
                 case BSONType::numberDouble:
-                    return compareDoubles(l._numberInt(), r._numberDouble());
+                    return compareDoubles(l._numberIntUnchecked(), r._numberDoubleUnchecked());
                 case BSONType::numberDecimal:
-                    return compareIntToDecimal(l._numberInt(), r._numberDecimal());
+                    return compareIntToDecimal(l._numberIntUnchecked(),
+                                               r._numberDecimalUnchecked());
                 default:
                     MONGO_UNREACHABLE;
             }
@@ -316,13 +305,15 @@ int BSONElement::compareElements(const BSONElement& l,
         case BSONType::numberLong: {
             switch (r.type()) {
                 case BSONType::numberLong:
-                    return compareLongs(l._numberLong(), r._numberLong());
+                    return compareLongs(l._numberLongUnchecked(), r._numberLongUnchecked());
                 case BSONType::numberInt:
-                    return compareLongs(l._numberLong(), r._numberInt());
+                    return compareLongs(l._numberLongUnchecked(), r._numberIntUnchecked());
                 case BSONType::numberDouble:
-                    return compareLongToDouble(l._numberLong(), r._numberDouble());
+                    return compareLongToDouble(l._numberLongUnchecked(),
+                                               r._numberDoubleUnchecked());
                 case BSONType::numberDecimal:
-                    return compareLongToDecimal(l._numberLong(), r._numberDecimal());
+                    return compareLongToDecimal(l._numberLongUnchecked(),
+                                                r._numberDecimalUnchecked());
                 default:
                     MONGO_UNREACHABLE;
             }
@@ -331,13 +322,15 @@ int BSONElement::compareElements(const BSONElement& l,
         case BSONType::numberDouble: {
             switch (r.type()) {
                 case BSONType::numberDouble:
-                    return compareDoubles(l._numberDouble(), r._numberDouble());
+                    return compareDoubles(l._numberDoubleUnchecked(), r._numberDoubleUnchecked());
                 case BSONType::numberInt:
-                    return compareDoubles(l._numberDouble(), r._numberInt());
+                    return compareDoubles(l._numberDoubleUnchecked(), r._numberIntUnchecked());
                 case BSONType::numberLong:
-                    return compareDoubleToLong(l._numberDouble(), r._numberLong());
+                    return compareDoubleToLong(l._numberDoubleUnchecked(),
+                                               r._numberLongUnchecked());
                 case BSONType::numberDecimal:
-                    return compareDoubleToDecimal(l._numberDouble(), r._numberDecimal());
+                    return compareDoubleToDecimal(l._numberDoubleUnchecked(),
+                                                  r._numberDecimalUnchecked());
                 default:
                     MONGO_UNREACHABLE;
             }
@@ -346,13 +339,17 @@ int BSONElement::compareElements(const BSONElement& l,
         case BSONType::numberDecimal: {
             switch (r.type()) {
                 case BSONType::numberDecimal:
-                    return compareDecimals(l._numberDecimal(), r._numberDecimal());
+                    return compareDecimals(l._numberDecimalUnchecked(),
+                                           r._numberDecimalUnchecked());
                 case BSONType::numberInt:
-                    return compareDecimalToInt(l._numberDecimal(), r._numberInt());
+                    return compareDecimalToInt(l._numberDecimalUnchecked(),
+                                               r._numberIntUnchecked());
                 case BSONType::numberLong:
-                    return compareDecimalToLong(l._numberDecimal(), r._numberLong());
+                    return compareDecimalToLong(l._numberDecimalUnchecked(),
+                                                r._numberLongUnchecked());
                 case BSONType::numberDouble:
-                    return compareDecimalToDouble(l._numberDecimal(), r._numberDouble());
+                    return compareDecimalToDouble(l._numberDecimalUnchecked(),
+                                                  r._numberDoubleUnchecked());
                 default:
                     MONGO_UNREACHABLE;
             }
@@ -361,19 +358,22 @@ int BSONElement::compareElements(const BSONElement& l,
         case BSONType::oid:
             return memcmp(l.value(), r.value(), OID::kOIDSize);
         case BSONType::code:
-            return compareElementStringValues(l, r);
+            return compareStringValues(l._valueStringDataUnchecked(),
+                                       r._valueStringDataUnchecked());
         case BSONType::symbol:
         case BSONType::string: {
             if (comparator) {
-                return comparator->compare(l.valueStringData(), r.valueStringData());
+                return comparator->compare(l._valueStringDataUnchecked(),
+                                           r._valueStringDataUnchecked());
             } else {
-                return compareElementStringValues(l, r);
+                return compareStringValues(l._valueStringDataUnchecked(),
+                                           r._valueStringDataUnchecked());
             }
         }
         case BSONType::object:
         case BSONType::array: {
-            return l.embeddedObject().woCompare(
-                r.embeddedObject(),
+            return l._embeddedObjectUnchecked().woCompare(
+                r._embeddedObjectUnchecked(),
                 BSONObj(),
                 rules | BSONElement::ComparisonRules::kConsiderFieldName,
                 comparator);
@@ -386,29 +386,30 @@ int BSONElement::compareElements(const BSONElement& l,
             return memcmp(l.value(), r.value(), lsz);
         }
         case BSONType::binData: {
-            int lsz = l.objsize();  // our bin data size in bytes, not including the subtype byte
-            int rsz = r.objsize();
+            int lsz = l._objsizeUnchecked();  // our bin data size in bytes, not including the
+                                              // subtype byte
+            int rsz = r._objsizeUnchecked();
             if (lsz - rsz != 0)
                 return lsz - rsz;
             return memcmp(l.value() + 4, r.value() + 4, lsz + 1 /*+1 for subtype byte*/);
         }
         case BSONType::regEx: {
-            int c = strcmp(l.regex(), r.regex());
+            int c = strcmp(l._regexUnchecked(), r._regexUnchecked());
             if (c)
                 return c;
-            return strcmp(l.regexFlags(), r.regexFlags());
+            return strcmp(l._regexFlagsUnchecked(), r._regexFlagsUnchecked());
         }
         case BSONType::codeWScope: {
-            int cmp = std::string_view(l.codeWScopeCode(), l.codeWScopeCodeLen() - 1)
-                          .compare(std::string_view(r.codeWScopeCode(), r.codeWScopeCodeLen() - 1));
+            int cmp = l._codeWScopeCodeStringViewUnchecked().compare(
+                r._codeWScopeCodeStringViewUnchecked());
             if (cmp)
                 return cmp;
 
             // When comparing the scope object, we should consider field names. Special string
             // comparison semantics do not apply to strings nested inside the CodeWScope scope
             // object, so we do not pass through the string comparator.
-            return l.codeWScopeObject().woCompare(
-                r.codeWScopeObject(),
+            return l._codeWScopeObjectUnchecked().woCompare(
+                r._codeWScopeObjectUnchecked(),
                 BSONObj(),
                 rules | BSONElement::ComparisonRules::kConsiderFieldName);
         }
@@ -422,7 +423,7 @@ std::vector<BSONElement> BSONElement::Array() const {
 
     std::vector<BSONElement> v;
     DecimalCounter<std::uint32_t> counter(0);
-    for (auto element : Obj()) {
+    for (auto element : _embeddedObjectUnchecked()) {
         auto fieldName = element.fieldNameStringData();
         uassert(ErrorCodes::BadValue,
                 fmt::format("Invalid array index field name: \"{}\", expected \"{}\"",
@@ -499,7 +500,7 @@ StatusWith<long long> BSONElement::parseIntegerElementToLong() const {
 
     long long number = 0;
     if (type() == BSONType::numberDouble) {
-        auto eDouble = numberDouble();
+        auto eDouble = _numberDoubleUnchecked();
 
         // NaN doubles are rejected.
         if (std::isnan(eDouble)) {
@@ -527,14 +528,16 @@ StatusWith<long long> BSONElement::parseIntegerElementToLong() const {
         number = numberLong();
     } else if (type() == BSONType::numberDecimal) {
         uint32_t signalingFlags = Decimal128::kNoFlag;
-        number = numberDecimal().toLongExact(&signalingFlags);
+        number = _numberDecimalUnchecked().toLongExact(&signalingFlags);
         if (signalingFlags != Decimal128::kNoFlag) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream()
                               << "Cannot represent as a 64-bit integer: " << toString(true, true));
         }
+    } else if (type() == BSONType::numberInt) {
+        number = _numberIntUnchecked();
     } else {
-        number = numberLong();
+        number = _numberLongUnchecked();
     }
 
     return number;
@@ -570,22 +573,29 @@ StatusWith<int> BSONElement::parseIntegerElementToNonNegativeInt() const {
     return number;
 }
 
+BSONObj BSONElement::_embeddedObjectUnchecked() const {
+    return BSONObj(value(), BSONObj::LargeSizeTrait{});
+}
+
+BSONObj BSONElement::_codeWScopeObjectUnchecked() const {
+    return BSONObj(value() + kCodeWScopeHeaderSize + _codeWScopeCodeLenUnchecked());
+}
+
 BSONObj BSONElement::embeddedObjectUserCheck() const {
     if (MONGO_likely(isABSONObj()))
-        return BSONObj(value(), BSONObj::LargeSizeTrait{});
+        return _embeddedObjectUnchecked();
     uasserted(10065,
               str::stream() << "invalid parameter: expected an object (" << fieldName() << ")");
 }
 
 BSONObj BSONElement::embeddedObject() const {
-    MONGO_verify(isABSONObj());
-    return BSONObj(value(), BSONObj::LargeSizeTrait{});
+    _checkObjectLike();
+    return _embeddedObjectUnchecked();
 }
 
 BSONObj BSONElement::codeWScopeObject() const {
-    MONGO_verify(type() == BSONType::codeWScope);
-    int strSizeWNull = ConstDataView(value() + 4).read<LittleEndian<int>>();
-    return BSONObj(value() + 4 + 4 + strSizeWNull);
+    _checkType(BSONType::codeWScope);
+    return _codeWScopeObjectUnchecked();
 }
 
 // wrap this element up as a singleton object.
@@ -671,9 +681,9 @@ void BSONElement::toString(
 
     switch (type()) {
         case BSONType::object:
-            return embeddedObject().toString(s, false, full, redactValues, depth + 1);
+            return _embeddedObjectUnchecked().toString(s, false, full, redactValues, depth + 1);
         case BSONType::array:
-            return embeddedObject().toString(s, true, full, redactValues, depth + 1);
+            return _embeddedObjectUnchecked().toString(s, true, full, redactValues, depth + 1);
         default:
             break;
     }
@@ -688,28 +698,28 @@ void BSONElement::toString(
             s << "EOO";
             break;
         case BSONType::date:
-            s << "new Date(" << date().toMillisSinceEpoch() << ')';
+            s << "new Date(" << _dateUnchecked().toMillisSinceEpoch() << ')';
             break;
         case BSONType::regEx: {
-            s << "/" << regex() << '/';
-            const char* p = regexFlags();
+            s << "/" << _regexUnchecked() << '/';
+            const char* p = _regexFlagsUnchecked();
             if (p)
                 s << p;
         } break;
         case BSONType::numberDouble:
-            s.appendDoubleNice(number());
+            s.appendDoubleNice(_numberDoubleUnchecked());
             break;
         case BSONType::numberLong:
-            s << _numberLong();
+            s << _numberLongUnchecked();
             break;
         case BSONType::numberInt:
-            s << _numberInt();
+            s << _numberIntUnchecked();
             break;
         case BSONType::numberDecimal:
-            s << _numberDecimal().toString();
+            s << _numberDecimalUnchecked().toString();
             break;
         case BSONType::boolean:
-            s << (boolean() ? "true" : "false");
+            s << (_booleanUnchecked() ? "true" : "false");
             break;
         case BSONType::undefined:
             s << "undefined";
@@ -724,40 +734,41 @@ void BSONElement::toString(
             s << "MinKey";
             break;
         case BSONType::codeWScope:
-            s << "CodeWScope( " << codeWScopeCode() << ", " << codeWScopeObject().toString() << ")";
+            s << "CodeWScope( " << _codeWScopeCodeUnchecked() << ", "
+              << _codeWScopeObjectUnchecked().toString() << ")";
             break;
         case BSONType::code:
-            if (!full && valuestrsize() > 80) {
+            if (!full && _valuestrsizeUnchecked() > 80) {
                 s.write(valuestr(), 70);
                 s << "...";
             } else {
-                s.write(valuestr(), valuestrsize() - 1);
+                s.write(valuestr(), _valuestrsizeUnchecked() - 1);
             }
             break;
         case BSONType::symbol:
         case BSONType::string:
             s << '"';
-            if (!full && valuestrsize() > 160) {
+            if (!full && _valuestrsizeUnchecked() > 160) {
                 s.write(valuestr(), 150);
                 s << "...\"";
             } else {
-                s.write(valuestr(), valuestrsize() - 1);
+                s.write(valuestr(), _valuestrsizeUnchecked() - 1);
                 s << '"';
             }
             break;
         case BSONType::dbRef:
-            s << "DBRef('" << valuestr() << "',";
-            s << OID::from(valuestr() + valuestrsize()) << ')';
+            s << "DBRef('" << _dbrefNSUnchecked() << "',";
+            s << _dbrefOIDUnchecked() << ')';
             break;
         case BSONType::oid:
             s << "ObjectId('";
-            s << __oid() << "')";
+            s << _oidUnchecked() << "')";
             break;
         case BSONType::binData: {
             int len;
-            const char* data = binDataClean(len);
+            const char* data = _binDataCleanUnchecked(len);
             // If the BinData is a correctly sized newUUID, display it as such.
-            if (binDataType() == newUUID && len == 16) {
+            if (_binDataTypeUnchecked() == newUUID && len == 16) {
                 std::string_view sd(data, len);
                 // 4 Octets - 2 Octets - 2 Octets - 2 Octets - 6 Octets
                 s << fmt::format("UUID(\"{}-{}-{}-{}-{}\")",
@@ -768,7 +779,7 @@ void BSONElement::toString(
                                  hexblob::encodeLower(sd.substr(10, 6)));
                 break;
             }
-            s << "BinData(" << binDataType() << ", ";
+            s << "BinData(" << _binDataTypeUnchecked() << ", ";
             if (!full && len > 80) {
                 s << hexblob::encode(data, 70) << "...)";
             } else {
@@ -778,8 +789,8 @@ void BSONElement::toString(
 
         case BSONType::timestamp: {
             // Convert from Milliseconds to Seconds for consistent Timestamp printing.
-            auto secs = duration_cast<Seconds>(timestampTime().toDurationSinceEpoch());
-            s << "Timestamp(" << secs.count() << ", " << timestampInc() << ")";
+            auto secs = duration_cast<Seconds>(_timestampTimeUnchecked().toDurationSinceEpoch());
+            s << "Timestamp(" << secs.count() << ", " << _timestampIncUnchecked() << ")";
         } break;
         default:
             s << "?type=" << type();
@@ -791,10 +802,9 @@ std::string BSONElement::_asCode() const {
     switch (type()) {
         case BSONType::string:
         case BSONType::code:
-            return std::string{valueStringData()};
+            return std::string{_valueStringDataUnchecked()};
         case BSONType::codeWScope:
-            return std::string(codeWScopeCode(),
-                               ConstDataView(valuestr()).read<LittleEndian<int>>() - 1);
+            return std::string{_codeWScopeCodeStringViewUnchecked()};
         default:
             LOGV2(20100, "can't convert type: {int_type} to code", "int_type"_attr = (int)(type()));
     }
@@ -814,7 +824,7 @@ StringBuilder& operator<<(StringBuilder& s, const BSONElement& e) {
 bool BSONElement::coerce(std::string* out) const {
     if (type() != BSONType::string)
         return false;
-    *out = String();
+    *out = std::string{_valueStringDataUnchecked()};
     return true;
 }
 
@@ -854,7 +864,7 @@ bool BSONElement::coerce(bool* out) const {
 bool BSONElement::coerce(std::vector<std::string>* out) const {
     if (type() != BSONType::array)
         return false;
-    return Obj().coerceVector<std::string>(out);
+    return _embeddedObjectUnchecked().coerceVector<std::string>(out);
 }
 
 template <typename T>

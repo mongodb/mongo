@@ -73,7 +73,7 @@ void appendGeoJSONCoordinatesLiteral(BSONObjBuilder& bob,
     // This means we can query for a $geoNear expression that specifies an invalid type, or no type
     // at all. In order to accomodate this case, we default to type: 'Point' to ensure our
     // representative shape is re-parseable.
-    auto geoType = GeoParser::geoJSONTypeStringToEnum(typeElem.valueStringData());
+    auto geoType = GeoParser::geoJSONTypeStringToEnum(typeElem.valueStringDataSafe());
     if (geoType == GeoParser::GEOJSON_UNKNOWN) {
         geoType = GeoParser::GEOJSON_POINT;
     }

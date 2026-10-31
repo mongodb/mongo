@@ -623,7 +623,7 @@ next:
 
 int BSONObj::getIntField(std::string_view name) const {
     BSONElement e = getField(name);
-    return e.isNumber() ? (int)e.number() : std::numeric_limits<int>::min();
+    return e.isNumber() ? e.numberInt() : std::numeric_limits<int>::min();
 }
 
 bool BSONObj::getBoolField(std::string_view name) const {

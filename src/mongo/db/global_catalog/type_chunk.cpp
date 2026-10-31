@@ -187,7 +187,7 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSON(const BSONObj& source,
         if (versionElem.eoo())
             return Status(ErrorCodes::NoSuchKey, "No version found");
         if (versionElem.type() == BSONType::timestamp || versionElem.type() == BSONType::date) {
-            auto chunkLastmod = Timestamp(versionElem._numberLong());
+            auto chunkLastmod = versionElem.timestamp();
             chunk._version =
                 ChunkVersion({epoch, timestamp}, {chunkLastmod.getSecs(), chunkLastmod.getInc()});
         } else {
@@ -288,7 +288,7 @@ StatusWith<ChunkType> ChunkType::parseFromShardBSON(const BSONObj& source,
         if (lastmodElem.eoo())
             return Status(ErrorCodes::NoSuchKey, "No version found");
         if (lastmodElem.type() == BSONType::timestamp || lastmodElem.type() == BSONType::date) {
-            auto chunkLastmod = Timestamp(lastmodElem._numberLong());
+            auto chunkLastmod = lastmodElem.timestamp();
             chunk._version =
                 ChunkVersion({epoch, timestamp}, {chunkLastmod.getSecs(), chunkLastmod.getInc()});
         } else {
