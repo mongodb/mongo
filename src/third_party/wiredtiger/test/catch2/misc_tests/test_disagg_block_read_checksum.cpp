@@ -156,6 +156,23 @@ struct stub_page_log {
 
 stub_page_log *g_page_log = nullptr;
 
+/*
+ * A corrupt read dumps each page through the error handler, so a counting handler installed on the
+ * connection confirms every result is dumped rather than only the one that failed.
+ */
+int g_corrupt_dump_count = 0;
+
+int
+counting_handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *message)
+{
+    if (strstr(message, "corrupt dump:") != nullptr)
+        g_corrupt_dump_count++;
+    return (0);
+}
+
+WT_EVENT_HANDLER g_counting_event_handler = {
+  counting_handle_error, nullptr, nullptr, nullptr, nullptr};
+
 int
 stub_plh_get(WT_PAGE_LOG_HANDLE *, WT_SESSION *, uint64_t, uint64_t, WT_PAGE_LOG_GET_ARGS *args,
   WT_ITEM *results_array, uint32_t *results_count)
@@ -212,7 +229,8 @@ struct read_checksum_fixture {
     static constexpr uint64_t BASE_LSN = 50;
 
     read_checksum_fixture()
-        : conn_wrapper("WT_TEST.block_disagg_read_checksum", "create,statistics=(all)")
+        : conn_wrapper("WT_TEST.block_disagg_read_checksum", "create,statistics=(all)",
+            &g_counting_event_handler)
     {
         memset(results, 0, sizeof(results));
 
@@ -385,6 +403,35 @@ TEST_CASE_METHOD(read_checksum_fixture, "disagg block read: checksum validation"
         REQUIRE(read_multiple(cookie_checksum) == WT_ERROR);
         CHECK(corruption_flagged());
         CHECK_FALSE(F_ISSET_ATOMIC_32(conn, WT_CONN_PANIC));
+    }
+
+    /*
+     * A corrupt read should dump every block it received, not just the one that failed. Build a
+     * base page with three deltas, break the link between two of them, and confirm all four blocks
+     * are dumped and the read still fails without a panic.
+     */
+    SECTION("a corrupt delta chain dumps every page and is rejected under verify")
+    {
+        build_chain(blocks, 3, WT_BLOCK_DISAGG_DATA_CKSUM);
+        blocks[2].relink(blocks[1].checksum ^ 1);
+        blocks[3].relink(blocks[2].checksum);
+
+        /*
+         * The read dumps the blocks only while this flag is clear, and verify mode turns the
+         * corruption into an error return instead of a panic.
+         */
+        F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
+        block_disagg.verify = true;
+
+        g_corrupt_dump_count = 0;
+
+        REQUIRE(read_multiple(blocks[3].checksum) == WT_ERROR);
+
+        CHECK(corruption_flagged());
+        CHECK_FALSE(F_ISSET_ATOMIC_32(conn, WT_CONN_PANIC));
+
+        /* The whole base-plus-delta chain is dumped, not only the block that failed. */
+        CHECK(g_corrupt_dump_count == static_cast<int>(blocks.size()));
     }
 
     /*

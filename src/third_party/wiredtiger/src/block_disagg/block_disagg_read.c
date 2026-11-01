@@ -346,6 +346,11 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
                 }
 
                 /*
+                 * Restore the checksum zeroed above, we store the swapped value for corrupt dump.
+                 */
+                blk->checksum = swap.checksum;
+
+                /*
                  * Swap the page-header as needed; this doesn't belong here, but it's the best place
                  * to catch all callers.
                  */
@@ -374,10 +379,21 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
               swap.checksum, checksum);
 
 corrupt:
+        /*
+         * Dump every page the page service returned, not only the one that failed. A corrupt block
+         * is often part of a page delta chain, and the rest of the chain is useful context.
+         */
         if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
-            __wt_log_data_dump(session, current->data, current->size,
-              "corrupt dump: {%" PRIu32 ": %" PRIuMAX ", %" PRIu32 ", %#" PRIx32 "}", (uint32_t)0,
-              (uintmax_t)page_id, size, checksum);
+            for (int i = 0; i <= last; i++) {
+                __wt_block_disagg_header_byteswap_copy(
+                  WT_BLOCK_HEADER_REF(results_array[i].data), &swap);
+                __wt_log_data_dump(session, results_array[i].data, results_array[i].size,
+                  "corrupt dump: {%" PRIu32 ": %" PRIuMAX ", %" PRIu32 ", %#" PRIx32
+                  "} result %d of %" PRIu32 ", %s%s",
+                  (uint32_t)0, (uintmax_t)page_id, (uint32_t)results_array[i].size, swap.checksum,
+                  i + 1, *results_count, i == 0 ? "base page" : "delta page",
+                  i == result ? " (read error)" : "");
+            }
 
         /* Panic if a checksum fails during an ordinary read. */
         F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);

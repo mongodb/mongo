@@ -2561,7 +2561,10 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 
     WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
-    /* Skip running checkpoint for standby. */
+    /*
+     * A follower has nothing to checkpoint: only the leader writes shared objects, and a follower
+     * writes nothing local either. Succeed without doing any work.
+     */
     if (__wt_conn_is_disagg(session) &&
       !__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader))
         goto done;

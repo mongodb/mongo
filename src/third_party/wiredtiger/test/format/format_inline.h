@@ -412,6 +412,21 @@ lock_writeunlock(WT_SESSION *session, RWLOCK *lock)
 }
 
 /*
+ * lock_try_readlock --
+ *     Try to get a shared lock. Fail immediately if not available.
+ */
+static inline int
+lock_try_readlock(WT_SESSION *session, RWLOCK *lock)
+{
+    testutil_assert(lock->lock_type != LOCK_NONE);
+
+    if (lock->lock_type == LOCK_WT)
+        return (__wt_try_readlock((WT_SESSION_IMPL *)session, &lock->l.wt));
+
+    return (pthread_rwlock_tryrdlock(&lock->l.pthread));
+}
+
+/*
  * lock_readlock --
  *     Wait to get read lock.
  */

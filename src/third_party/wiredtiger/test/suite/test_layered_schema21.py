@@ -33,6 +33,7 @@
 import errno
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages, DisaggSchemaEpochMixin
+from wiredtiger import stat
 from wtscenario import make_scenarios
 
 @disagg_test_class
@@ -85,13 +86,16 @@ class test_layered_schema21(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
         self.assertEqual(count, self.nrows)
 
     def assert_drop_refused(self):
-        """Assert that dropping the table is refused with EBUSY / WT_DIRTY_DATA."""
+        """Assert that dropping the table is refused with EBUSY / WT_DIRTY_DATA, and counted."""
+        refused = self.get_stat(stat.conn.disagg_drop_refused_unpublished_data)
         self.assertRaisesException(wiredtiger.WiredTigerError,
             lambda: self.session.drop(self.uri))
         err, sub, msg = self.session.get_last_error()
         self.assertEqual(err, errno.EBUSY)
         self.assertEqual(sub, wiredtiger.WT_DIRTY_DATA)
         self.assertTrue('unpublished data' in msg)
+        self.assertEqual(
+            self.get_stat(stat.conn.disagg_drop_refused_unpublished_data), refused + 1)
 
     def truncate_all_rows(self, commit_ts):
         """Truncate the whole key range at commit_ts."""

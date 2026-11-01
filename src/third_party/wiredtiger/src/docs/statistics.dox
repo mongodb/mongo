@@ -5,36 +5,47 @@ data-source statistics.  As maintaining statistics may involve updating
 shared-memory data structures and traversing disk-based data structures,
 configuring statistics may decrease application performance.
 
-The ::wiredtiger_open \c statistics configuration must be set in order
-for statistics to be maintained.  When configured to \c none (the
-default), no statistics are maintained and attempting to read the
-statistics will result in an error.   Alternatively, the \c fast
-configuration maintains a subset of the statistics which are relatively
-inexpensive, and the \c all configuration maintains all statistics
-regardless of cost.
+Statistics are gathered and returned to the application using a statistics
+cursor, which returns key/value pairs to the application.  See
+@ref data_statistics for information about accessing the gathered statistics.
+
+@section statistics_config Statistics configuration
+
+The \c statistics configuration passed to ::wiredtiger_open or
+WT_CONNECTION::reconfigure controls which statistics the connection
+maintains, while the configuration passed to WT_SESSION::open_cursor
+controls which statistics a statistics cursor gathers:
+
+- \c none (connection-only, the connection default) disables statistics,
+  and attempts to open a statistics cursor fail.
+- \c fast gathers a subset of statistics that are relatively inexpensive.
+- \c all gathers all statistics regardless of cost, including \c fast,
+  \c tree_walk and \c cache_walk statistics.
+- \c tree_walk gathers per-page B-tree statistics by traversing the
+  underlying trees, reading pages from disk as needed, with cost
+  proportional to tree size.
+- \c cache_walk gathers per-page cache statistics by traversing the
+  underlying trees' cached pages, with cost proportional to the number of
+  cached pages.
+- \c size (cursor-only) retrieves the underlying on-disk size of a data
+  source and cannot be combined with \c all, \c fast, \c clear, \c tree_walk
+  or \c cache_walk.
+- \c clear resets statistics, where appropriate, after they are gathered.
+
+By default, a statistics cursor uses the current connection statistics
+configuration when no \c statistics configuration is specified to
+WT_SESSION::open_cursor.
 
 The following example configures WiredTiger to maintain all statistics,
 regardless of cost:
 
 @snippet ex_all.c Statistics configuration
 
-Statistics are gathered and returned to the application using a statistics
-cursor, which returns key/value pairs to the application.  See
-@ref data_statistics for information about accessing the gathered statistics.
+@section statistics_cursors Accessing statistics
 
-When the WT_SESSION::open_cursor method is called to open a statistics
-cursor, the statistics configuration specifies the statistics to be
-gathered, similarly to the ::wiredtiger_open function.   The \c fast
-configuration gathers the subset of the statistics that are relatively
-inexpensive, and the \c all configuration gathers all statistics,
-regardless of cost.  If no configuration is specified, the current
-database statistics configuration is assumed.
-
-The configuration of the WT_SESSION::open_cursor method must agree with the
-database configuration: if the database is configured to maintain \c fast
-statistics, attempts to open a statistics cursor in \c all mode will fail.
-If the database has been configured to maintain \c all statistics, the
-statistics cursor can be configured in either \c fast or \c all modes.
+A statistics cursor requesting \c all requires the connection to be
+configured with \c all; opening such a cursor on a connection configured
+with \c fast will fail.
 For example, an application might configure the database to maintain all
 available statistics, but the application might gather expensive statistics
 less frequently than inexpensive ones.
@@ -52,8 +63,20 @@ only the relatively inexpensive statistics:
 
 @snippet ex_all.c Statistics cursor table fast
 
-The WT_SESSION::open_cursor method and the ::wiredtiger_open function
-also support the statistics configuration value \c clear.
+The following example opens a statistics cursor on an open WiredTiger session:
+
+@snippet ex_all.c Statistics cursor session
+
+A reset call on this cursor would reset the session statistics values to zero,
+with or without the statistics configuration \c clear being specified to the
+WT_SESSION::open_cursor method.
+
+The following example shows that the application can indicate columns
+that will not be needed:
+
+@snippet ex_all.c Statistics cursor ignore column
+
+@section statistics_clear Clearing statistics
 
 When \c clear is specified to the WT_SESSION::open_cursor method, gathered
 statistics will be reset, where appropriate, after they are gathered.  For
@@ -78,19 +101,6 @@ inexpensive statistics, and to clear statistics after they are gathered or
 logged:
 
 @snippet ex_all.c Statistics clear configuration
-
-The following example opens a statistics cursor on an open WiredTiger session:
-
-@snippet ex_all.c Statistics cursor session
-
-A reset call on this cursor would reset the session statistics values to zero,
-with or without the statistics configuration \c clear being specified to the
-WT_SESSION::open_cursor method.
-
-The following example shows that the application can indicate columns
-that will not be needed:
-
-@snippet ex_all.c Statistics cursor ignore column
 
 @section statistics_otel OpenTelemetry (OTel) statistic types
 

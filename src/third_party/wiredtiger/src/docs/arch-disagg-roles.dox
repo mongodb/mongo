@@ -30,6 +30,10 @@ Followers eventually adopt new checkpoints produced by the leader. Adopting a ch
 covered ingest table content eligible for removal once it is safe for readers. See
 @ref arch-disagg-layered-cursor for the merged view.
 
+A follower never takes a checkpoint of its own: a checkpoint call on a follower returns success
+without doing any work, so the only checkpoints it can adopt are the ones the leader produced. See
+@ref arch-checkpoint.
+
 The table above describes steady state; the rules can differ during role transitions.
 
 @htmlonly

@@ -1754,6 +1754,9 @@ __wt_layered_truncate(WT_TRUNCATE_INFO *trunc_info)
     WT_ASSERT(session, trunc_info->start != NULL);
     WT_ASSERT(session, trunc_info->stop != NULL);
 
+    WT_ASSERT_ALWAYS(session, !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECONFIGURING_STEP_UP),
+      "truncate is not supported during step-up");
+
     WT_ASSERT_ALWAYS(session,
       __wt_atomic_load_uint64_relaxed(&S2C(session)->txn_global.step_down_timestamp) == WT_TS_NONE,
       "truncate is not supported while the step-down timestamp is set");

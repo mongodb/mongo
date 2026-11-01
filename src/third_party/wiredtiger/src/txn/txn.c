@@ -2682,11 +2682,15 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
     /* Fetch the global timestamp values for debugging purposes.*/
     WT_STAT_CONN_SET(session, txn_global_checkpoint_timestamp, checkpoint_timestamp);
     WT_STAT_CONN_SET(session, txn_global_durable_timestamp, durable_timestamp);
+    WT_STAT_CONN_SET(session, txn_global_last_checkpoint_schema_epoch,
+      __wt_atomic_load_uint64_relaxed(&txn_global->last_ckpt_disaggregated_schema_epoch));
     WT_STAT_CONN_SET(session, txn_global_last_running_timestamp, oldest_active_read_timestamp);
     WT_STAT_CONN_SET(session, txn_global_newest_timestamp,
       __wt_atomic_load_uint64_relaxed(&txn_global->newest_seen_timestamp));
     WT_STAT_CONN_SET(session, txn_global_oldest_timestamp, oldest_timestamp);
     WT_STAT_CONN_SET(session, txn_global_pinned_timestamp, pinned_timestamp);
+    WT_STAT_CONN_SET(
+      session, txn_global_stable_schema_epoch, __wt_get_stable_disaggregated_schema_epoch(session));
     WT_STAT_CONN_SET(session, txn_global_stable_timestamp,
       __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp));
 

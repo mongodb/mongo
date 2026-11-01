@@ -662,3 +662,65 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
             '/zero not permitted/')
         self.assertStatEqualSoon(stat.conn.session_table_publish_success, 3)
         self.assertStatEqualSoon(stat.conn.session_table_publish_fail, 1)
+
+    def assert_queue_stats(self, awaiting_publish, awaiting_checkpoint, conn=None):
+        """Assert how many queued schema operations await publish and await a checkpoint."""
+        self.assertEqual(
+            self.get_stat(stat.conn.disagg_schema_awaiting_publish, conn=conn), awaiting_publish)
+        self.assertEqual(self.get_stat(stat.conn.disagg_schema_awaiting_checkpoint, conn=conn),
+            awaiting_checkpoint)
+
+    def test_queue_stats(self):
+        """
+        Test the statistics on schema operations awaiting publish and awaiting a checkpoint.
+        """
+        table_config = 'key_format=i,value_format=S'
+        uri_unpublished = self.uri + '_unpublished'
+        uri_follower = self.uri + '_follower'
+
+        # Schema operations before the stable schema epoch is set are not counted.
+        self.session.create(self.uri + '_legacy', table_config)
+        self.assert_queue_stats(0, 0)
+        self.leader_checkpoint(1)
+
+        self.set_stable_epoch(1)
+        self.session.create(self.uri, table_config)
+        self.publish(self.uri, 10)
+        self.session.create(uri_unpublished, table_config)
+        self.assert_queue_stats(1, 1)
+        self.assertEqual(self.get_stat(stat.conn.txn_global_stable_schema_epoch), 1)
+
+        # Sleep to let both operations age.
+        time.sleep(2)
+        self.assertGreaterEqual(self.get_stat(stat.conn.disagg_schema_awaiting_publish_oldest), 1)
+        self.assertGreaterEqual(
+            self.get_stat(stat.conn.disagg_schema_awaiting_checkpoint_oldest), 1)
+
+        # Dropping the unpublished table cancels its create.
+        self.session.drop(uri_unpublished)
+        self.assert_queue_stats(0, 1)
+        self.assertEqual(self.get_stat(stat.conn.disagg_schema_awaiting_publish_oldest), 0)
+        self.assertEqual(self.get_stat(stat.conn.disagg_schema_canceled), 1)
+
+        # A checkpoint whose schema epoch covers the published create applies it.
+        self.set_stable_epoch(10)
+        self.leader_checkpoint(10)
+        self.assert_queue_stats(0, 0)
+        self.assertEqual(self.get_stat(stat.conn.disagg_schema_awaiting_checkpoint_oldest), 0)
+        self.assertEqual(self.get_stat(stat.conn.txn_global_last_checkpoint_schema_epoch), 10)
+
+        # On a follower, a published create awaits a picked-up checkpoint that covers it.
+        conn_follower = self.open_follower()
+        self.disagg_advance_checkpoint(conn_follower)
+        self.set_stable_epoch(10, conn_follower)
+        session_follower = conn_follower.open_session('')
+        session_follower.create(uri_follower, table_config)
+        self.publish(uri_follower, 20, session_follower)
+        self.assert_queue_stats(0, 1, conn_follower)
+
+        self.set_stable_epoch(20)
+        self.leader_checkpoint(20)
+        self.disagg_advance_checkpoint(conn_follower)
+        self.assert_queue_stats(0, 0, conn_follower)
+        session_follower.close()
+        conn_follower.close()

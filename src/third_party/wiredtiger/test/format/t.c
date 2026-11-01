@@ -155,6 +155,11 @@ locks_init(WT_CONNECTION *conn)
     lock_init(session, &g.backup_lock);
     lock_init(session, &g.prepare_commit_lock);
     lock_init(session, &g.timestamp_lock);
+
+    u_int first = ntables == 0 ? 0 : 1;
+    for (u_int i = first; i <= ntables; ++i)
+        lock_init(session, &tables[i]->rwlock);
+
     testutil_check(session->close(session, NULL));
 }
 
@@ -171,6 +176,11 @@ locks_destroy(WT_CONNECTION *conn)
     lock_destroy(session, &g.backup_lock);
     lock_destroy(session, &g.prepare_commit_lock);
     lock_destroy(session, &g.timestamp_lock);
+
+    u_int first = ntables == 0 ? 0 : 1;
+    for (u_int i = first; i <= ntables; ++i)
+        lock_destroy(session, &tables[i]->rwlock);
+
     testutil_check(session->close(session, NULL));
 }
 

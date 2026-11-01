@@ -673,17 +673,20 @@ set:
      * Once the step-down timestamp is set, committed writes are directed to the ingest constituent
      * (or mirrored to both stable and ingest when write mirroring is enabled) and everything from
      * before belongs to stable. The application is expected to step down after setting it, which
-     * clears it, so it is only valid on a leader and cannot be changed while set. The step-down
-     * epoch is stored in the same locked section so readers observe the boundary in both spaces or
-     * in neither.
+     * clears it, so it is only valid on a leader and cannot be changed while set.
      */
     if (has_step_down) {
         __wt_writelock(session, &txn_global->step_down_lock);
         __wt_atomic_store_uint64_relaxed(&txn_global->step_down_timestamp, step_down_ts);
-        if (has_step_down_epoch)
+        __wt_writeunlock(session, &txn_global->step_down_lock);
+
+        /* The schema lock held in this function orders the schema epoch assignment. */
+        if (has_step_down_epoch) {
+            WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
             __wt_atomic_store_uint64_relaxed(
               &txn_global->step_down_disaggregated_schema_epoch, step_down_epoch);
-        __wt_writeunlock(session, &txn_global->step_down_lock);
+        }
+
         WT_STAT_CONN_INCR(session, disagg_step_down_attempted);
         WT_STAT_CONN_SET(session, txn_stepdown_ts_set, 1);
         if (has_step_down_epoch)

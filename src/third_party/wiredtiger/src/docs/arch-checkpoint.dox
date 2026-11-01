@@ -83,6 +83,23 @@ A new entry into the metadata file is created for every data file checkpointed, 
 history store. As such the metadata file is the last file to be checkpointed. As WiredTiger
 maintains two checkpoints, the location of the most recent checkpoint is written to the turtle file.
 
+\anchor checkpoint-disagg
+# Disaggregated storage #
+
+In a disaggregated cluster only the leader writes shared objects, and a checkpoint is what
+publishes them. On a leader the shared metadata table is checkpointed last, and the checkpoint
+metadata that points at it (the metadata root, the checkpoint timestamp, the schema epoch and the
+oldest timestamp) is written to shared storage through the page log. The page holding it stands in
+for the turtle file, and a follower reads it when it picks up a checkpoint.
+
+A checkpoint on a follower is a no-op: WT_SESSION::checkpoint returns success without entering the
+checkpoint code, and no internal caller runs a checkpoint on a follower (see
+@ref checkpoint-internal-callers). This is due to the fact that applications may checkpoint without
+regard to their role. Followers only adopt checkpoints written by a leader.
+
+See @ref arch-disagg-roles for leader and follower responsibilities, and @ref arch-disagg-layered
+for layered tables.
+
 # Multi-threaded checkpoints #
 
 By default, WiredTiger checkpoints are single-threaded: they walk each B-tree

@@ -178,7 +178,8 @@ typedef struct {
     table_type type;       /* table type */
     char track_prefix[32]; /* table track message prefix */
 
-    bool mirror; /* Table is in a mirrored group */
+    bool mirror;   /* Table is in a mirrored group */
+    RWLOCK rwlock; /* Lock for shared/exclusive ops */
 
     uint32_t max_intl_page; /* page size configurations converted to bytes */
     uint32_t max_leaf_page;

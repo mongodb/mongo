@@ -855,6 +855,9 @@ err:
             WT_STAT_CONN_DSRC_INCR(session, cursor_next_skip_lt_100);
         else
             WT_STAT_CONN_DSRC_INCR(session, cursor_next_skip_ge_100);
+        /* Charge the session only for its own tables, not internal history store or metadata. */
+        if (!WT_IS_HS(cbt->dhandle) && !WT_IS_ANY_METADATA(cbt->dhandle))
+            WT_STAT_SESSION_INCRV(session, cursor_next_entries_skipped, total_skipped);
     }
 
     WT_STAT_CONN_DSRC_INCRV(session, cursor_next_skip_total, total_skipped);
