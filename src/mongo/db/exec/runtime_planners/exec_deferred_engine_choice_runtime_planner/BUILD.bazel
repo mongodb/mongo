@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_unit_test")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -5,4 +7,17 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+mongo_cc_unit_test(
+    name = "exec_deferred_engine_choice_runtime_planner_test",
+    srcs = [
+        "exec_deferred_engine_choice_runtime_planner_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        "//src/mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe:classic_runtime_planner_for_sbe_test_util",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
 )
