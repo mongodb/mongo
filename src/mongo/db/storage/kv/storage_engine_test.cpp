@@ -31,6 +31,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/storage_engine_impl.h"
+#include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
@@ -40,6 +41,7 @@
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/join_thread.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/periodic_runner.h"
@@ -1296,7 +1298,7 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         catalog.onCloseCatalog();
         catalog.deregisterAllCollectionsAndViews(getServiceContext());
     });
-    auto lastShutdownState = reinitializeStorageEngine(
+    reinitializeStorageEngine(
         opCtx.get(), StorageEngineInitFlags{}, false, false, false, false, [&newPath] {
             storageGlobalParams.dbpath = newPath;
         });
@@ -1308,7 +1310,6 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     }
     getGlobalServiceContext()->getStorageEngine()->notifyStorageStartupRecoveryComplete();
     LOGV2(5781103, "Started up storage engine in alternate location");
-    ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
     StorageEngineTest::_storageEngine = getServiceContext()->getStorageEngine();
     // Alternate storage location should have no collections.
     EXPECT_FALSE(collectionExists(opCtx.get(), coll1Ns));
@@ -1327,7 +1328,7 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         catalog.onCloseCatalog();
         catalog.deregisterAllCollectionsAndViews(getServiceContext());
     });
-    lastShutdownState = reinitializeStorageEngine(
+    reinitializeStorageEngine(
         opCtx.get(), StorageEngineInitFlags{}, false, false, false, false, [&oldPath] {
             storageGlobalParams.dbpath = oldPath;
         });
@@ -1338,7 +1339,6 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
                                              catalog::InitMode::kStorageChange);
     }
     getGlobalServiceContext()->getStorageEngine()->notifyStorageStartupRecoveryComplete();
-    ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
     StorageEngineTest::_storageEngine = getServiceContext()->getStorageEngine();
     EXPECT_TRUE(collectionExists(opCtx.get(), coll1Ns));
     EXPECT_FALSE(collectionExists(opCtx.get(), coll2Ns));
@@ -1737,6 +1737,23 @@ TEST_F(StorageEngineTest, ReinitializeStorageEngineWaitsForOperationsPendingDest
     auto opCtx = cc().makeOperationContext();
     _storageEngine = reconfigureStorageEngine(opCtx.get(), [] {});
     ASSERT_TRUE(interrupted);
+}
+
+TEST_F(StorageEngineTest, ReinitializeStorageEngineIgnoresUncleanProcessLockFile) {
+    // A non-empty lock file marks the process as having started after an unclean shutdown.
+    unittest::TempDir lockFileDir("ReinitializeStorageEngineIgnoresUncleanProcessLockFile");
+    {
+        std::ofstream ofs(StorageEngineLockFile::lockFilePath(lockFileDir.path()));
+        ofs << 12345 << std::endl;
+    }
+    auto& processLockFile = StorageEngineLockFile::get(getServiceContext());
+    processLockFile.emplace(lockFileDir.path());
+    ScopeGuard resetLockFile([&] { processLockFile = boost::none; });
+    ASSERT_TRUE(processLockFile->createdByUncleanShutdown());
+
+    auto opCtx = cc().makeOperationContext();
+    _storageEngine = reconfigureStorageEngine(opCtx.get(), [] {});
+    ASSERT_FALSE(lockFileCreatedByUncleanShutdown());
 }
 
 }  // namespace

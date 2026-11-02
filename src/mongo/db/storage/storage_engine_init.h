@@ -65,7 +65,7 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service, bool memLeakAll
  * no storage engine is active may be made in the changeConfigurationCallback.  At that point the
  * opCtx will have a no op recovery unit and any access to storage is not allowed.
  */
-StorageEngine::LastShutdownState reinitializeStorageEngine(
+void reinitializeStorageEngine(
     OperationContext* opCtx,
     StorageEngineInitFlags initFlags,
     bool isReplSet,

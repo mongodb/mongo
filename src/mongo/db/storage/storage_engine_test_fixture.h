@@ -154,6 +154,11 @@ public:
             reinterpret_cast<StorageEngineImpl*>(_storageEngine)->_options.forRepair);
     }
 
+    bool lockFileCreatedByUncleanShutdown() {
+        return reinterpret_cast<StorageEngineImpl*>(_storageEngine)
+            ->_options.lockFileCreatedByUncleanShutdown;
+    }
+
     std::vector<std::string> getAllKVEngineIdents(OperationContext* opCtx) {
         return _storageEngine->getEngine()->getAllIdents(
             *shard_role_details::getRecoveryUnit(opCtx));
