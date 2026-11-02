@@ -664,6 +664,12 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.watermarksWritten");
     static constexpr MetricName kReplicatedFastCountTailerWatermarksSeen = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.replicatedFastCount.tailer.watermarksSeen");
+    static constexpr MetricName kReplicatedFastCountWatermarksRecorded = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.watermarksRecorded");
+    static constexpr MetricName kReplicatedFastCountWatermarksEvicted =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.watermarksEvicted");
+    static constexpr MetricName kReplicatedFastCountCheckpointsSkipped = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.checkpointsSkipped");
     static constexpr MetricName kReplicatedFastCountWatermarkAwaitTimeMsTotal =
         MetricNameMaker::make(
             "mongodb.serverStatus.metrics.replicatedFastCount.flush.watermarkAwaitTime.total");

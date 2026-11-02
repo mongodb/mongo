@@ -128,6 +128,32 @@ auto& checkpointsValidatedCounter = MetricsService::instance().createInt64Counte
     {.serverStatusOptions = ServerStatusOptions{
          .dottedPath = "replicatedFastCount.checkpointsValidated", .role = ClusterRole::None}});
 
+// The number of watermarks recorded and evicted by the checkpoint validator. On a healthy node
+// these are approximately equal; a growing gap means matching checkpoints are not arriving and
+// deltas are accumulating in memory.
+auto& watermarksRecordedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountWatermarksRecorded,
+    "Total number of watermarks recorded by the replicated fast count checkpoint validator",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.watermarksRecorded", .role = ClusterRole::None}});
+
+auto& watermarksEvictedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountWatermarksEvicted,
+    "Total number of watermarks evicted by the replicated fast count checkpoint validator",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.watermarksEvicted", .role = ClusterRole::None}});
+
+// The number of checkpoints the validator processed without validating, because it had not yet
+// adopted a baseline. This includes the checkpoint that is adopted.
+auto& checkpointsSkippedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountCheckpointsSkipped,
+    "Total number of checkpoints skipped by the replicated fast count checkpoint validator",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.checkpointsSkipped", .role = ClusterRole::None}});
+
 // Total time the flusher spent blocked waiting for the oplog tailer to cut a batch at a
 // watermark.
 auto& watermarkAwaitTimeMsTotalCounter = MetricsService::instance().createInt64Counter(
@@ -207,6 +233,18 @@ void incrementTailerWatermarksSeenCount() {
 
 void incrementCheckpointsValidatedCount() {
     checkpointsValidatedCounter.add(1);
+}
+
+void incrementWatermarksRecordedCount() {
+    watermarksRecordedCounter.add(1);
+}
+
+void incrementWatermarksEvictedCount() {
+    watermarksEvictedCounter.add(1);
+}
+
+void incrementCheckpointsSkippedCount(int64_t count) {
+    checkpointsSkippedCounter.add(count);
 }
 
 void recordWatermarkAwaitTime(Milliseconds waitTime) {

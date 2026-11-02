@@ -56,6 +56,9 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
              MetricNames::kReplicatedFastCountTailerWatermarksSeen,
              MetricNames::kReplicatedFastCountWatermarkAwaitTimeMsTotal,
              MetricNames::kReplicatedFastCountCheckpointsValidated,
+             MetricNames::kReplicatedFastCountWatermarksRecorded,
+             MetricNames::kReplicatedFastCountWatermarksEvicted,
+             MetricNames::kReplicatedFastCountCheckpointsSkipped,
          }) {
         EXPECT_EQ(capturer.readInt64Counter(counterName), 0);
     }
@@ -164,6 +167,21 @@ TEST(ReplicatedFastCountMetricsTest, WatermarkCountersIncrement) {
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarksWritten), 3);
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountTailerWatermarksSeen), 2);
+}
+
+TEST(ReplicatedFastCountMetricsTest, ValidatorWatermarkCountersIncrement) {
+    OtelMetricsCapturer capturer;
+
+    incrementWatermarksRecordedCount();
+    incrementWatermarksRecordedCount();
+    incrementWatermarksRecordedCount();
+    incrementWatermarksEvictedCount();
+    incrementCheckpointsSkippedCount(1);
+    incrementCheckpointsSkippedCount(4);
+
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointsSkipped), 5);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarksRecorded), 3);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarksEvicted), 1);
 }
 
 TEST(ReplicatedFastCountMetricsTest, WatermarkAwaitTimeTotalAccumulates) {

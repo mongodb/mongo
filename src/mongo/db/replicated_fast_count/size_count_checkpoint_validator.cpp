@@ -334,6 +334,7 @@ void SizeCountCheckpointValidator::recordWatermark(Timestamp watermarkTs) {
                           _intervals.back().cutoff));
     _intervals.push_back(ValidatorInterval{.cutoff = watermarkTs, .deltas = std::move(_ongoing)});
     _ongoing = ReplicatedMetadataDeltas{};
+    incrementWatermarksRecordedCount();
 }
 
 void SizeCountCheckpointValidator::recordCheckpoint(const repl::OplogEntry& entry) {
@@ -407,6 +408,7 @@ void SizeCountCheckpointValidator::mergeAndValidate(OperationContext* opCtx,
         // checkpoint. We would simply erase the interval once.
         while (!_intervals.empty() && _intervals.front().cutoff <= validAsOf) {
             _intervals.pop_front();
+            incrementWatermarksEvictedCount();
         }
 
         LOGV2(13380115,
@@ -482,14 +484,15 @@ void SizeCountCheckpointValidator::adoptCheckpoint(OperationContext* opCtx) {
         _baseline = scanMetadataStore(opCtx);
         while (!_intervals.empty() && _intervals.front().cutoff <= validAsOf) {
             _intervals.pop_front();
+            incrementWatermarksEvictedCount();
         }
         LOGV2(13629501, "Checkpoint validator adopted checkpoint", "validAsOf"_attr = validAsOf);
     }
 
+    incrementCheckpointsSkippedCount(_checkpoints.size());
     LOGV2(13629500,
           "Checkpoint validator processed checkpoints without performing validation",
           "checkpointsSkipped"_attr = _checkpoints.size());
-    // TODO(SERVER-137708): Increment _checkpoints.size() in checkpointsSkippedCounter.
 
     _checkpoints.clear();
 }
