@@ -107,5 +107,12 @@ inline AllowedWithClientType toAllowedWithClientType(MongoExtensionClientType cl
     }
     MONGO_UNREACHABLE_TASSERT(11436401);
 }
+
+// Extension stages are not part of the Stable API. However, internal-only stages are permitted
+// under apiStrict for internal clients to allow intra-cluster traffic to use internal stages.
+inline AllowedWithApiStrict toAllowedWithApiStrict(AllowedWithClientType clientType) {
+    return clientType == AllowedWithClientType::kInternal ? AllowedWithApiStrict::kInternal
+                                                          : AllowedWithApiStrict::kNeverInVersion1;
+}
 }  // namespace descriptor_util
 }  // namespace mongo::extension::host

@@ -24,6 +24,28 @@ function makeInternalConn(host) {
     return conn;
 }
 
+// Runs an aggregate over 'coll' from an internal client. mongos does not honor the internalClient
+// handshake (cluster hello ignores the field) — internal traffic enters at the shard layer — so
+// handshake the node hosting the database (the shard primary on sharded fixtures, the current node
+// otherwise).
+function runInternalAgg(coll, pipeline, extraParams = {}) {
+    const conn = makeInternalConn(
+        FixtureHelpers.getPrimaryForNodeHostingDatabase(coll.getDB()).host,
+    );
+    try {
+        return conn.getDB(coll.getDB().getName()).runCommand({
+            aggregate: coll.getName(),
+            pipeline,
+            cursor: {},
+            // internalClient connections must send an explicit writeConcern.
+            writeConcern: {w: 1},
+            ...extraParams,
+        });
+    } finally {
+        conn.close();
+    }
+}
+
 describe("internal-only extension stage", function () {
     before(function () {
         this.coll = db.internal_only_stage_rejected;
@@ -41,24 +63,28 @@ describe("internal-only extension stage", function () {
     });
 
     it("is accepted from an internal client", function () {
-        // mongos does not honor the internalClient handshake (cluster hello ignores the field) —
-        // internal traffic enters at the shard layer — so handshake the node hosting the database
-        // (the shard primary on sharded fixtures, the current node otherwise).
-        const host = FixtureHelpers.getPrimaryForNodeHostingDatabase(db).host;
-        const conn = makeInternalConn(host);
-        try {
-            assert.commandWorked(
-                conn.getDB(db.getName()).runCommand({
-                    aggregate: this.coll.getName(),
-                    pipeline: [{$_testInternalStage: {}}],
-                    cursor: {},
-                    // internalClient connections must send an explicit writeConcern.
-                    writeConcern: {w: 1},
-                }),
-            );
-        } finally {
-            conn.close();
-        }
+        assert.commandWorked(runInternalAgg(this.coll, [{$_testInternalStage: {}}]));
+    });
+
+    it("is rejected from a user pipeline with apiStrict: true by the client-type check", function () {
+        // The client-type check runs before the apiStrict check, so a user client sees the
+        // internal-only error rather than APIStrictError.
+        assertErrorCode(
+            this.coll,
+            [{$_testInternalStage: {}}],
+            kNotAllowedInUserRequestsCode,
+            "Specifying an internal-only extension stage in a user pipeline should be rejected",
+            {apiVersion: "1", apiStrict: true},
+        );
+    });
+
+    it("is accepted from an internal client with apiStrict: true", function () {
+        assert.commandWorked(
+            runInternalAgg(this.coll, [{$_testInternalStage: {}}], {
+                apiVersion: "1",
+                apiStrict: true,
+            }),
+        );
     });
 
     it("does not restrict a user-facing stage that desugars into an internal-only stage", function () {

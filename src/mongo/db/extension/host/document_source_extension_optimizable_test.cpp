@@ -165,6 +165,11 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ParseTransformSuccess) {
     host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
     portal.getImpl().registerStageDescriptor(&_transformStaticDescriptor);
 
+    // Extension stages are not part of the Stable API.
+    auto lpds = LiteParsedDocumentSource::parse(_nss, kValidSpec, LiteParserOptions{});
+    ASSERT_EQUALS(lpds->getClientType(), AllowedWithClientType::kAny);
+    ASSERT_EQUALS(lpds->getApiStrict(), AllowedWithApiStrict::kNeverInVersion1);
+
     auto parsedPipeline = buildTestPipeline(testPipeline);
     ASSERT(parsedPipeline);
 
@@ -192,12 +197,14 @@ TEST_F(DocumentSourceExtensionOptimizableTest, RegisterInternalStageRestrictsCli
         BSON(sdk::shared_test_stages::InternalTransformAggStageDescriptor::kStageName << BSONObj());
     auto lpds = LiteParsedDocumentSource::parse(_nss, internalSpec, LiteParserOptions{});
     ASSERT_EQUALS(lpds->getClientType(), AllowedWithClientType::kInternal);
+    ASSERT_EQUALS(lpds->getApiStrict(), AllowedWithApiStrict::kInternal);
 
     // clone() must preserve the metadata: the router copies the LiteParsedPipeline (cloning every
     // stage spec) before validating, so a clone that dropped kInternal would escape client-type
     // validation on mongos.
     auto cloned = lpds->clone();
     ASSERT_EQUALS(cloned->getClientType(), AllowedWithClientType::kInternal);
+    ASSERT_EQUALS(cloned->getApiStrict(), AllowedWithApiStrict::kInternal);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, ExpandToExtAst) {

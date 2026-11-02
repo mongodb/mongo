@@ -6,6 +6,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/extension/host/extension_host_utils.h"
 #include "mongo/db/extension/host/load_extension.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/server_options.h"
@@ -68,7 +69,8 @@ void registerStubParser(std::string stageName, std::string message, FeatureFlag*
         {.parser = std::move(stubParser),
          .fromExtension = true,
          .isStub = true,
-         .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+         .allowedWithApiStrict =
+             descriptor_util::toAllowedWithApiStrict(AllowedWithClientType::kAny),
          .allowedWithClientType = AllowedWithClientType::kAny});
 }
 

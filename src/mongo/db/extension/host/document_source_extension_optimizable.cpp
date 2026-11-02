@@ -291,13 +291,14 @@ void DocumentSourceExtensionOptimizable::registerStage(AggStageDescriptorHandle 
         };
     }();
 
+    const auto allowedWithClientType =
+        descriptor_util::toAllowedWithClientType(descriptor->getClientType());
     LiteParsedDocumentSource::registerParser(
         stageName,
         {.parser = std::move(parser),
          .fromExtension = true,
-         .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
-         .allowedWithClientType =
-             descriptor_util::toAllowedWithClientType(descriptor->getClientType())});
+         .allowedWithApiStrict = descriptor_util::toAllowedWithApiStrict(allowedWithClientType),
+         .allowedWithClientType = allowedWithClientType});
 }
 
 ALLOCATE_DOCUMENT_SOURCE_ID(extensionOptimizable, DocumentSourceExtensionOptimizable::id);
