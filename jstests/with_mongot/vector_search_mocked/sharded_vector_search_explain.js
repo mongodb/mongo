@@ -4,7 +4,6 @@
  * TODO SERVER-118983 Delete this test once we have mutliple node coverage in E2E.
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForVectorSearchQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
@@ -315,21 +314,19 @@ runTestOnPrimaries((shard0Conn, shard1Conn) =>
     testLimit(shard0Conn, shard1Conn, "queryPlanner", higherUserLimit),
 );
 
-if (FeatureFlagUtil.isEnabled(testDB.getMongo(), "SearchExplainExecutionStats")) {
-    runExplainTest("executionStats");
-    runTestOnPrimaries((shard0Conn, shard1Conn) =>
-        testLimit(shard0Conn, shard1Conn, "executionStats", lowerUserLimit),
-    );
-    runTestOnPrimaries((shard0Conn, shard1Conn) =>
-        testLimit(shard0Conn, shard1Conn, "executionStats", higherUserLimit),
-    );
+runExplainTest("executionStats");
+runTestOnPrimaries((shard0Conn, shard1Conn) =>
+    testLimit(shard0Conn, shard1Conn, "executionStats", lowerUserLimit),
+);
+runTestOnPrimaries((shard0Conn, shard1Conn) =>
+    testLimit(shard0Conn, shard1Conn, "executionStats", higherUserLimit),
+);
 
-    runExplainTest("allPlansExecution");
-    runTestOnPrimaries((shard0Conn, shard1Conn) =>
-        testLimit(shard0Conn, shard1Conn, "allPlansExecution", lowerUserLimit),
-    );
-    runTestOnPrimaries((shard0Conn, shard1Conn) =>
-        testLimit(shard0Conn, shard1Conn, "allPlansExecution", higherUserLimit),
-    );
-}
+runExplainTest("allPlansExecution");
+runTestOnPrimaries((shard0Conn, shard1Conn) =>
+    testLimit(shard0Conn, shard1Conn, "allPlansExecution", lowerUserLimit),
+);
+runTestOnPrimaries((shard0Conn, shard1Conn) =>
+    testLimit(shard0Conn, shard1Conn, "allPlansExecution", higherUserLimit),
+);
 stWithMock.stop();

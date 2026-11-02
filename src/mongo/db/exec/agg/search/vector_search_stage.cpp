@@ -118,11 +118,6 @@ GetNextResult VectorSearchStage::doGetNext() {
         return GetNextResult::makeEOF();
     }
 
-    if (pExpCtx->getExplain() &&
-        !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled()) {
-        return GetNextResult::makeEOF();
-    }
-
     // If this is the first call, establish the cursor.
     if (!_cursor) {
         _cursor =

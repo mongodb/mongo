@@ -139,37 +139,33 @@ function testSearchMatchLargeLimitPipelineExplain(batchSizeExpectedArray) {
 }
 
 function testBatchSizeExplain(batchSizeExpectedArray, pipeline, expectsPrefetchingOneExtra) {
-    if (FeatureFlagUtil.isEnabled(db.getMongo(), "SearchExplainExecutionStats")) {
-        mockRequests(batchSizeExpectedArray, {verbosity: "executionStats"});
-        const explainResult = assert.commandWorked(
-            coll.explain("executionStats").aggregate(pipeline),
-        );
-        const searchStage = getAggPlanStage(explainResult, "$_internalSearchMongotRemote");
-        const stage = searchStage["$_internalSearchMongotRemote"];
-        assert(stage.hasOwnProperty("internalMongotBatchSizeHistory"), stage);
-        const batchSizeHistory = stage["internalMongotBatchSizeHistory"];
+    mockRequests(batchSizeExpectedArray, {verbosity: "executionStats"});
+    const explainResult = assert.commandWorked(coll.explain("executionStats").aggregate(pipeline));
+    const searchStage = getAggPlanStage(explainResult, "$_internalSearchMongotRemote");
+    const stage = searchStage["$_internalSearchMongotRemote"];
+    assert(stage.hasOwnProperty("internalMongotBatchSizeHistory"), stage);
+    const batchSizeHistory = stage["internalMongotBatchSizeHistory"];
 
-        // Explain output includes value x as NumberLong(x);
-        let numberLongBatchSizeExpectedArray = batchSizeExpectedArray.map(function (batchSize) {
-            return NumberLong(batchSize);
-        });
-        let expectedNumBatches = batchSizeExpectedArray.length;
+    // Explain output includes value x as NumberLong(x);
+    let numberLongBatchSizeExpectedArray = batchSizeExpectedArray.map(function (batchSize) {
+        return NumberLong(batchSize);
+    });
+    let expectedNumBatches = batchSizeExpectedArray.length;
 
-        // If we're expecting to prefetch one extra batch, it's possible that mongod realizes
-        // it doesn't need the last batch fast enough to cancel it before it's retrieved from
-        // mongot. In that case, we tolerate exactly one fewer batch than expected.
-        if (expectsPrefetchingOneExtra && batchSizeHistory.length < batchSizeExpectedArray.length) {
-            assert.eq(batchSizeHistory.length, expectedNumBatches - 1);
-            expectedNumBatches--;
-            numberLongBatchSizeExpectedArray = numberLongBatchSizeExpectedArray.slice(0, -1);
+    // If we're expecting to prefetch one extra batch, it's possible that mongod realizes
+    // it doesn't need the last batch fast enough to cancel it before it's retrieved from
+    // mongot. In that case, we tolerate exactly one fewer batch than expected.
+    if (expectsPrefetchingOneExtra && batchSizeHistory.length < batchSizeExpectedArray.length) {
+        assert.eq(batchSizeHistory.length, expectedNumBatches - 1);
+        expectedNumBatches--;
+        numberLongBatchSizeExpectedArray = numberLongBatchSizeExpectedArray.slice(0, -1);
 
-            // Clear the remaining responses since there is one extra.
-            mongotMock.clearQueuedResponses();
-        }
-
-        assert.eq(batchSizeHistory.length, expectedNumBatches);
-        assert.eq(batchSizeHistory, numberLongBatchSizeExpectedArray);
+        // Clear the remaining responses since there is one extra.
+        mongotMock.clearQueuedResponses();
     }
+
+    assert.eq(batchSizeHistory.length, expectedNumBatches);
+    assert.eq(batchSizeHistory, numberLongBatchSizeExpectedArray);
 }
 
 function mockRequests(expectedBatchSizes, explainVerbosity = null) {

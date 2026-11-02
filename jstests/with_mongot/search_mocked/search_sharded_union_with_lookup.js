@@ -410,15 +410,6 @@ unionTest(shardedBaseColl, shardedSearchColl, {
     secondary: [kPlanMaybe, kSearch],
 });
 
-// TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is removed.
-if (!FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchExplainExecutionStats")) {
-    jsTestLog(
-        "Skipping explain tests with $lookup and $unionWith because search explain execution stats must be enabled.",
-    );
-    stWithMock.stop();
-    quit();
-}
-
 // ----------------------
 // $lookup explain tests
 // ----------------------

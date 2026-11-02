@@ -211,11 +211,6 @@ bool InternalSearchMongotRemoteStage::shouldReturnEOF() const {
         return true;
     }
 
-    if (pExpCtx->getExplain() &&
-        !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled()) {
-        return true;
-    }
-
     return false;
 }
 }  // namespace exec::agg

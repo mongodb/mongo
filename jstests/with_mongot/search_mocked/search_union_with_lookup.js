@@ -970,14 +970,12 @@ assert.commandWorked(
     }),
 );
 
-// TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is removed.
 if (
-    (checkSbeRestrictedOrFullyEnabled(db) &&
-        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")) ||
-    !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchExplainExecutionStats")
+    checkSbeRestrictedOrFullyEnabled(db) &&
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")
 ) {
     jsTestLog(
-        "Skipping explain tests with $lookup and $unionWith because it only applies to $search in classic engine with searchExplainExecStats enabled.",
+        "Skipping explain tests with $lookup and $unionWith because it only applies to $search in classic engine.",
     );
     MongoRunner.stopMongod(conn);
     mongotmock.stop();

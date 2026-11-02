@@ -110,12 +110,6 @@ feature_flags:
         default: false
         fcv_gated: true
 
-    featureFlagSearchExplainExecutionStats:
-        description: "Feature flag to enable executing search queries for explain."
-        cpp_varname: gFeatureFlagSearchExplainExecutionStats
-        default: true
-        fcv_gated: false
-
     featureFlagShardFilteringDistinctScan:
         description: "Feature flag to support shard filtering in distinct scan optimization"
         cpp_varname: gFeatureFlagShardFilteringDistinctScan

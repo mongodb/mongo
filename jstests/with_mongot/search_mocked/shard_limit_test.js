@@ -41,11 +41,7 @@ const searchInSbe =
     checkSbeRestrictedOrFullyEnabled(testDB) &&
     FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe");
 
-// TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is removed.
-if (
-    FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchExplainExecutionStats") &&
-    !searchInSbe
-) {
+if (!searchInSbe) {
     protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 }
 
