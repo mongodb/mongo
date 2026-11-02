@@ -31,7 +31,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -55,7 +54,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -1758,27 +1756,6 @@ TEST_F(ReplicationRecoveryTest, RecoverStartFromClosestLTEEntryIfRecoveryTsNotIn
     getStorageInterfaceRecovery()->setRecoveryTimestamp(recoveryTs);
     _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 5, 6, 7});
     recovery.recoverFromOplog(opCtx, recoveryTs);
-}
-
-TEST_F(ReplicationRecoveryTest, RecoverySetsValidateFeaturesAsPrimaryToFalseWhileApplyingOplog) {
-    FailPointEnableBlock failpoint(
-        "skipResettingValidateFeaturesAsPrimaryAfterRecoveryOplogApplication");
-
-    // The reset will be skipped due to the failpoint so we make the test do it instead.
-    auto validateValue = serverGlobalParams.validateFeaturesAsPrimary.load();
-    ON_BLOCK_EXIT(
-        [validateValue] { serverGlobalParams.validateFeaturesAsPrimary.store(validateValue); });
-
-    serverGlobalParams.validateFeaturesAsPrimary.store(true);
-    ASSERT(serverGlobalParams.validateFeaturesAsPrimary.load());
-
-    auto opCtx = getOperationContext();
-    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(3, 3), 1));
-    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
-    recovery.recoverFromOplog(opCtx, /*stableTimestamp=*/boost::none);
-
-    ASSERT_FALSE(serverGlobalParams.validateFeaturesAsPrimary.load());
 }
 
 TEST_F(ReplicationRecoveryTest, StartupRecoveryRunsCompletionHook) {

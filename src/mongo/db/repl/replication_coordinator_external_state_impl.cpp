@@ -710,8 +710,6 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
             .createQueryShapeRepresentativeQueriesCollection(opCtx);
     }
 
-    serverGlobalParams.validateFeaturesAsPrimary.store(true);
-
     return opTimeToReturn;
 }
 

@@ -311,12 +311,6 @@ struct [[MONGO_MOD_PUBLIC]] ServerGlobalParams {
     // Const reference for featureCompatibilityVersion checks.
     const MutableFCV& featureCompatibility = mutableFCV;
 
-    // Feature validation differs depending on the role of a mongod in a replica set. Replica set
-    // primaries can accept user-initiated writes and validate based on the feature compatibility
-    // version. A secondary always validates in the upgraded mode so that it can sync new features,
-    // even when in the downgraded feature compatibility mode.
-    Atomic<bool> validateFeaturesAsPrimary{true};
-
     std::vector<std::string> disabledSecureAllocatorDomains;
 
     // List of absolute paths to extension shared object files. These will be loaded during startup.

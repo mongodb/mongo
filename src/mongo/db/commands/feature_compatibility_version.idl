@@ -13,17 +13,6 @@ server_parameters:
             name: FeatureCompatibilityVersionParameter
         redact: false
 
-    internalValidateFeaturesAsPrimary:
-        deprecated_name: "internalValidateFeaturesAsMaster"
-        description: >
-            Startup parameter to ignore featureCompatibilityVersion checks. This parameter cannot be set if
-            the node is started with --replSet. This should never be set by end users.
-        set_at: startup
-        cpp_vartype: bool
-        cpp_varname: gInternalValidateFeaturesAsPrimary
-        default: true
-        redact: false
-
     defaultStartupFCV:
         description: >
             Startup parameter to set a default FCV at startup. This parameter is also settable at

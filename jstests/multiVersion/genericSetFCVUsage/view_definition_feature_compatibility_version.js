@@ -221,8 +221,7 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
         );
     });
 
-    // Set the feature compatibility version to the last version and then restart with
-    // internalValidateFeaturesAsPrimary=false.
+    // Set the feature compatibility version to the last version before restarting with its binary.
     assert.commandWorked(
         testDB.adminCommand({
             setFeatureCompatibilityVersion: binVersionToFCV(lastVersion),

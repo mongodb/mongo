@@ -173,25 +173,6 @@ Status validateServerOptions(const moe::Environment& params) {
         if (authMechParameter != parameters.end() && authMechParameter->second.empty()) {
             haveAuthenticationMechanisms = false;
         }
-
-        bool internalValidateFeaturesAsPrimaryUsed =
-            parameters.find("internalValidateFeaturesAsPrimary") != parameters.end();
-        bool internalValidateFeaturesAsMasterUsed =
-            parameters.find("internalValidateFeaturesAsMaster") != parameters.end();
-
-        if (internalValidateFeaturesAsPrimaryUsed || internalValidateFeaturesAsMasterUsed) {
-            // Command line options that are disallowed when internalValidateFeaturesAsPrimary or
-            // internalValidateFeaturesAsMaster, the deprecated alias, is specified.
-            std::string parameterName = internalValidateFeaturesAsPrimaryUsed
-                ? "internalValidateFeaturesAsPrimary"
-                : "internalValidateFeaturesAsMaster";
-            if (params.count("replication.replSet")) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() <<  //
-                                  "Cannot specify both " + parameterName +
-                                      " and replication.replSet");
-            }
-        }
     }
     if ((params.count("security.authorization") &&
          params["security.authorization"].as<std::string>() == "enabled") ||

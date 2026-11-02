@@ -228,8 +228,7 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
         );
     });
 
-    // Set the feature compatibility version to the last version and then restart with
-    // internalValidateFeaturesAsPrimary=false.
+    // Set the feature compatibility version to the last version before shutting down.
     assert.commandWorked(
         adminDB.runCommand({
             setFeatureCompatibilityVersion: binVersionToFCV(lastVersion),
