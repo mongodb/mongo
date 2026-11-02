@@ -12,6 +12,7 @@
  *
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 /**
@@ -141,6 +142,18 @@ export function InitialSyncTest(
     }
 
     /**
+     * Each pause enters a synchronization failpoint twice: once in shouldFail() before the server
+     * logs the synchronization point, and once in pauseWhileSet() after. Waiting for the second
+     * entry guarantees those log messages exist, which callers may check with checkLog after
+     * step().
+     */
+    const kSyncFailPointWaitOptions = {
+        timesEntered: 2,
+        maxTimeMS: 1000,
+        expectedErrorCodes: [ErrorCodes.MaxTimeMSExpired],
+    };
+
+    /**
      * Restarts the secondary with the first synchronization failpoint enabled so that we ensure
      * that initial sync pauses the first time the node reaches out to the sync source.
      */
@@ -168,17 +181,28 @@ export function InitialSyncTest(
     }
 
     /**
+     * Binaries before 9.1 evaluate initialSyncFuzzerSynchronizationPoint1 in every cloner stage,
+     * so its timesEntered also counts stages that don't pause. On those binaries, detect pauses
+     * with the RamLog instead.
+     */
+    function waitUsesFailPointEntryCounts() {
+        return MongoRunner.compareBinVersions(secondary.getDB("admin").version(), "9.1") >= 0;
+    }
+
+    /**
      * Wait until the first synchronization fail point is hit to show that initial sync is paused
      * or until initial sync has completed.
      */
-    function waitUntilInitialSyncPausedOrCompleted() {
+    function waitUntilInitialSyncPausedOrCompleted(sp1) {
+        const useFailPointEntryCounts = waitUsesFailPointEntryCounts();
         assert.soon(function () {
-            if (
-                checkLog.checkContainsOnce(
-                    secondary,
-                    "initialSyncFuzzerSynchronizationPoint1 fail point enabled",
-                )
-            ) {
+            const paused = useFailPointEntryCounts
+                ? sp1.wait(kSyncFailPointWaitOptions)
+                : checkLog.checkContainsOnce(
+                      secondary,
+                      "initialSyncFuzzerSynchronizationPoint1 fail point enabled",
+                  );
+            if (paused) {
                 return true;
             }
             return hasCompletedInitialSync();
@@ -192,19 +216,12 @@ export function InitialSyncTest(
      * failpoint again.
      */
     function pauseBeforeSyncSourceCommand() {
-        assert.commandWorked(
-            secondary.adminCommand({
-                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint2",
-                "mode": "alwaysOn",
-            }),
+        const sp2 = configureFailPoint(secondary, "initialSyncFuzzerSynchronizationPoint2");
+        configureFailPoint(secondary, "initialSyncFuzzerSynchronizationPoint1", {}, "off");
+        assert.soon(
+            () => sp2.wait(kSyncFailPointWaitOptions),
+            "initial sync did not reach the second synchronization point",
         );
-        assert.commandWorked(
-            secondary.adminCommand({
-                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint1",
-                "mode": "off",
-            }),
-        );
-        checkLog.contains(secondary, "initialSyncFuzzerSynchronizationPoint2 fail point enabled");
     }
 
     /**
@@ -213,20 +230,10 @@ export function InitialSyncTest(
      * can be issued.
      */
     function resumeAndPauseBeforeNextSyncSourceCommand() {
-        assert.commandWorked(
-            secondary.adminCommand({
-                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint1",
-                "mode": "alwaysOn",
-            }),
-        );
-        assert.commandWorked(
-            secondary.adminCommand({
-                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint2",
-                "mode": "off",
-            }),
-        );
+        const sp1 = configureFailPoint(secondary, "initialSyncFuzzerSynchronizationPoint1");
+        configureFailPoint(secondary, "initialSyncFuzzerSynchronizationPoint2", {}, "off");
 
-        waitUntilInitialSyncPausedOrCompleted();
+        waitUntilInitialSyncPausedOrCompleted(sp1);
     }
 
     /**
@@ -256,10 +263,23 @@ export function InitialSyncTest(
             assert.soon(hasStartedInitialSync, "failed to start initial sync", initialSyncTimeout);
             transitionIfAllowed(State.kDuringInitialSync);
 
-            checkLog.contains(
-                secondary,
-                "initialSyncFuzzerSynchronizationPoint1 fail point enabled",
-            );
+            // The node was just restarted with the failpoint enabled at startup, so initial sync
+            // may already be paused here. Don't reconfigure it with configureFailPoint(), because
+            // that would capture the failpoint's current entry count and make the wait below
+            // request an entry count that is too high. Instead, wait for the absolute count of
+            // 2: each pause enters the failpoint twice, once in shouldFail() and once in
+            // pauseWhileSet().
+            assert.soon(() => {
+                const res = assert.commandWorkedOrFailedWithCode(
+                    secondary.adminCommand({
+                        waitForFailPoint: "initialSyncFuzzerSynchronizationPoint1",
+                        timesEntered: 2,
+                        maxTimeMS: kSyncFailPointWaitOptions.maxTimeMS,
+                    }),
+                    ErrorCodes.MaxTimeMSExpired,
+                );
+                return res.ok === 1;
+            }, "initial sync did not reach the first synchronization point");
 
             return false;
         }
@@ -275,8 +295,7 @@ export function InitialSyncTest(
 
         pauseBeforeSyncSourceCommand();
 
-        // Clear ramlog so checkLog can't find log messages from previous times either failpoint was
-        // enabled.
+        // Clear the RamLog so that callers' checkLog assertions only see messages from this step.
         assert.commandWorked(secondary.adminCommand({clearLog: "global"}));
 
         resumeAndPauseBeforeNextSyncSourceCommand();
@@ -284,12 +303,7 @@ export function InitialSyncTest(
         // If initial sync is completed, let the caller know.
         if (hasCompletedInitialSync()) {
             transitionIfAllowed(State.kInitialSyncCompleted);
-            assert.commandWorked(
-                secondary.adminCommand({
-                    "configureFailPoint": "initialSyncFuzzerSynchronizationPoint1",
-                    "mode": "off",
-                }),
-            );
+            configureFailPoint(secondary, "initialSyncFuzzerSynchronizationPoint1", {}, "off");
             return true;
         }
 
@@ -305,18 +319,8 @@ export function InitialSyncTest(
     };
 
     this.fail = function () {
-        assert.commandWorked(
-            secondary.adminCommand({
-                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint1",
-                "mode": "off",
-            }),
-        );
-        assert.commandWorked(
-            secondary.adminCommand({
-                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint2",
-                "mode": "off",
-            }),
-        );
+        configureFailPoint(secondary, "initialSyncFuzzerSynchronizationPoint1", {}, "off");
+        configureFailPoint(secondary, "initialSyncFuzzerSynchronizationPoint2", {}, "off");
     };
 
     /**
