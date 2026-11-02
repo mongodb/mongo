@@ -58,9 +58,11 @@ Value convertToValue(value::TagValueView view) {
         case value::TypeTags::Array:
         case value::TypeTags::ArraySet:
         case value::TypeTags::ArrayMultiSet: {
-            // TODO SERVER-138113 add reserve call.
             std::vector<Value> vals;
             auto enumerator = value::ArrayEnumerator{tag, val};
+            if (auto size = enumerator.trySize()) {
+                vals.reserve(*size);
+            }
             while (!enumerator.atEnd()) {
                 vals.push_back(convertToValue(enumerator.getViewOfValue()));
                 enumerator.advance();
