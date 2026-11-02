@@ -328,6 +328,57 @@ describe("$lookup result cache", function () {
         assert.eq(actual.length, 3);
     });
 
+    it("keys cache entries on the operation's collation", function () {
+        // $lookup inherits the local collection's default collation. the foreign collection's
+        // default plays no part, so it is left simple.
+        assert.commandWorked(
+            this.db.createCollection("local", {collation: {locale: "en", strength: 2}}),
+        );
+        assert.commandWorked(
+            this.db.foreign.insertMany([
+                {_id: 0, k: "Hat"},
+                {_id: 1, k: "hat"},
+            ]),
+        );
+        assert.commandWorked(
+            this.db.local.insertMany([
+                {_id: 0, local_k: "hat"},
+                {_id: 1, local_k: "HAT"},
+                {_id: 2, local_k: "Hat"},
+            ]),
+        );
+        const pipeline = [
+            {$lookup: {from: "foreign", localField: "local_k", foreignField: "k", as: "f"}},
+            {$project: {f: "$f._id"}},
+        ];
+
+        // Case-insensitive: all three keys share one entry, so the foreign query runs once. The
+        // cache is compiled out of debug builds, where only the results can be checked.
+        let expected = [
+            {_id: 0, f: [0, 1]},
+            {_id: 1, f: [0, 1]},
+            {_id: 2, f: [0, 1]},
+        ];
+        let actual = this.db.local.aggregate(pipeline).toArray();
+        assert(resultsEq(expected, actual), "wrong results under case-insensitive collation", {
+            expected,
+            actual,
+        });
+
+        // Simple collation override: the keys are now distinct, so a cache keyed on the
+        // collection's default collation would wrongly serve "hat"'s result for "HAT" and "Hat".
+        expected = [
+            {_id: 0, f: [1]},
+            {_id: 1, f: []},
+            {_id: 2, f: [0]},
+        ];
+        actual = this.db.local.aggregate(pipeline, {collation: {locale: "simple"}}).toArray();
+        assert(resultsEq(expected, actual), "wrong results under simple collation", {
+            expected,
+            actual,
+        });
+    });
+
     it("does not cache results when the foreign namespace is a non-deterministic view", function () {
         // A view's underlying pipeline could be non-deterministic (e.g. $rand), so the cache must
         // never serve stale results for it -- confirmed here end-to-end, not just via the
