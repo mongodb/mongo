@@ -73,7 +73,9 @@ public:
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
-        invariant(pipeState != PipelineSplitState::kSplitForShards);
+        tassert(13836101,
+                "should not split the pipeline for shards",
+                pipeState != PipelineSplitState::kSplitForShards);
 
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,

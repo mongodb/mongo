@@ -185,7 +185,7 @@ void ChangeStreamExpiredPreImagesRemoverService::
             !_periodicJob.has_value());
 
     auto periodicRunner = opCtx->getServiceContext()->getPeriodicRunner();
-    invariant(periodicRunner);
+    tassert(13836100, "periodic runner must be available", periodicRunner);
 
     PeriodicRunner::PeriodicJob changeStreamExpiredPreImagesRemoverServiceJob(
         "ChangeStreamExpiredPreImagesRemover",
