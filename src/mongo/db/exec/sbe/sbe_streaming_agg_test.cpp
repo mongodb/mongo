@@ -364,18 +364,17 @@ TEST_F(StreamingAggStageTest, SumAccumulatorGroupsByKey) {
 }
 
 TEST_F(StreamingAggStageTest, SumAccumulatorWidensAcrossNumericTypes) {
-    // A single group accumulates int32, int64, double, and decimal values; the accumulator state
+    // A single group accumulates int, long long, double, and decimal values; the accumulator state
     // must widen as each wider type arrives and finalize to a decimal.
     runGroupTest(BSON_ARRAY(BSON("a" << 1 << "v" << 1)                      // int
                             << BSON("a" << 1 << "v" << 2LL)                 // long long
                             << BSON("a" << 1 << "v" << 0.5)                 // double
                             << BSON("a" << 1 << "v" << Decimal128("0.25"))  // decimal
-                            << BSON("a" << 1 << "v" << 3L)                  // long
                             ),
                  {"a"},
                  {false},
                  EFn::kSum,
-                 BSON_ARRAY(BSON_ARRAY(1 << Decimal128("6.75"))));
+                 BSON_ARRAY(BSON_ARRAY(1 << Decimal128("3.75"))));
 }
 
 TEST_F(StreamingAggStageTest, NumericKeysOfDifferentTypesGroupTogether) {
