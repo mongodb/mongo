@@ -88,9 +88,9 @@ Resolve WheelBuild actions and Python toolchains from the selected execution gro
      _handle_py_deps(ctx, args, tools)
      _handle_native_deps(ctx, args, tools)
      _handle_target_environment(ctx, args, inputs)
-@@ -370,17 +387,20 @@
-     # rules_poetry's deterministic_env().
-     env.setdefault("CARGO_HOME", ".cargo")
+@@ -361,17 +378,20 @@
+     env = dict(cc_vars)
+     env.update(ctx.configuration.default_shell_env)
  
 -    ctx.actions.run(
 -        inputs = inputs,

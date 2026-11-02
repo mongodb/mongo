@@ -1,38 +1,105 @@
-Set CARGO_HOME inside the WheelBuild action sandbox.
+Resolve wheel-build HOME, caches, and temporary files inside the action at runtime.
 
-pycross_wheel_build's action env is the C++ toolchain vars plus
---action_env entries; nothing provides CARGO_HOME. When an sdist's
-PEP 517 backend invokes cargo (setuptools-rust, maturin), cargo
-resolves $HOME/.cargo — which is unwritable inside Bazel's sandbox
-(failing the build) and non-hermetic outside it (registry/cache state
-leaks between builds). Default CARGO_HOME to `.cargo`, relative to the
-action's working directory, so cargo state stays inside the sandbox
-and is discarded with it.
+Relative HOME is ignored by recent platformdirs. Resolve the disposable build
+directory before changing cwd, and override path variables after build-env merging.
+Keep scratch files inside the Bazel action even if the process is killed; preserve
+rules_pycross's debug retention and normal success/failure cleanup.
 
-No package in mongodb's current uv.lock builds Rust from sdist (the
-one Rust-heavy dep, cryptography, uses prebuilt wheels for the
-platforms PyPI doesn't cover), so this is insurance for the first dep
-that does — carried over from the equivalent tweak mongodb applied to
-rules_poetry's deterministic_env() in the pre-uv setup.
+diff --git a/pycross/private/tools/wheel_builder.py b/pycross/private/tools/wheel_builder.py
+--- a/pycross/private/tools/wheel_builder.py
++++ b/pycross/private/tools/wheel_builder.py
+@@ -747,6 +747,29 @@
+     return Path(wheel_file)
 
-Applied via `single_version_override(patches=...)` on rules_pycross in
-//MODULE.bazel. Candidate for upstreaming to jvolkman/rules_pycross.
 
---- a/pycross/private/wheel_build.bzl	2026-07-24 10:35:15
-+++ b/pycross/private/wheel_build.bzl	2026-07-24 10:35:31
-@@ -348,6 +348,15 @@
-     env = dict(cc_vars)
-     env.update(ctx.configuration.default_shell_env)
-
-+    # Keep Rust-backed sdist builds (cargo, invoked by build backends like
-+    # setuptools-rust / maturin) inside the action's writable sandbox.
-+    # Without CARGO_HOME, cargo resolves $HOME/.cargo — unwritable in the
-+    # sandbox and non-hermetic outside it. The relative path lands under the
-+    # action's working directory (the execroot) and is discarded with the
-+    # sandbox. Carried over from the equivalent tweak mongodb applied to
-+    # rules_poetry's deterministic_env().
-+    env.setdefault("CARGO_HOME", ".cargo")
++def _sandbox_environment(temp_dir: Path) -> Dict[str, str]:
++    """Resolve paths before a backend changes cwd; keep all state under the action."""
++    home = (temp_dir / "home").resolve()
++    cache = home / ".cache"
++    cargo = home / ".cargo"
++    tmp = (temp_dir / "tmp").resolve()
++    local = home / "AppData" / "Local"
++    roaming = home / "AppData" / "Roaming"
++    for directory in (home, cache, cargo, tmp, local, roaming):
++        directory.mkdir(parents=True, exist_ok=True)
++    return {
++        "HOME": str(home),
++        "USERPROFILE": str(home),
++        "CARGO_HOME": str(cargo),
++        "XDG_CACHE_HOME": str(cache),
++        "LOCALAPPDATA": str(local),
++        "APPDATA": str(roaming),
++        "TMPDIR": str(tmp),
++        "TEMP": str(tmp),
++        "TMP": str(tmp),
++    }
 +
-     ctx.actions.run(
-         inputs = inputs,
-         outputs = [pycross_wheel_info.wheel_file, pycross_wheel_info.name_file],
++
+ def init_build_env_vars(
+     args: Any,
+     temp_dir: Path,
+@@ -766,6 +789,9 @@
+         for key, val in additional_build_env.items():
+             set_or_append(vars, key, val)
+
++    # Override path variables after merging build_env, which appends existing values.
++    vars.update(_sandbox_environment(temp_dir))
++
+     vars["PYCROSS_INCLUDE_PATH"] = os.pathsep.join(map(str, include_dirs))
+     vars["PYCROSS_LIBRARY_PATH"] = os.pathsep.join(map(str, lib_dirs))
+     vars["PYCROSS_BAZEL_ROOT"] = str(bazel_root)
+@@ -864,7 +890,10 @@
+
+     # Extract the sdist and rename it to 'sdist'
+     sdist_dir = temp_dir / "sdist"
+-    _sdist_extracted_dir = extract_sdist(args.sdist, temp_dir)
++    # Keep extraction separate from the home/cache directories already in temp_dir.
++    extract_dir = temp_dir / "extract"
++    extract_dir.mkdir()
++    _sdist_extracted_dir = extract_sdist(args.sdist, extract_dir)
+     _sdist_extracted_dir.rename(sdist_dir)
+
+     # Change into the new directory
+@@ -1131,11 +1160,25 @@
+     os.environ.pop("__PYVENV_LAUNCHER__", None)
+
+     _is_debug = "RULES_PYCROSS_DEBUG" in os.environ
+-    _temp_dir = Path(tempfile.mkdtemp(prefix="wheelbuild"))
++    _cwd = Path.cwd().resolve()
++    _temp_dir = Path(tempfile.mkdtemp(prefix="wheelbuild", dir=_cwd))
++    _environment = _sandbox_environment(_temp_dir)
++    _previous = {name: os.environ.get(name) for name in _environment}
++    _previous_tempdir = tempfile.tempdir
+
+     try:
++        os.environ.update(_environment)
++        tempfile.tempdir = _environment["TMPDIR"]
+         main(args, _temp_dir, _is_debug)
+     finally:
++        # Leave the build directory before removing it, including on Windows.
++        os.chdir(_cwd)
++        tempfile.tempdir = _previous_tempdir
++        for name, value in _previous.items():
++            if value is None:
++                os.environ.pop(name, None)
++            else:
++                os.environ[name] = value
+         if not _is_debug:
+             shutil.rmtree(_temp_dir, ignore_errors=True)
+
+diff --git a/pycross/private/tools/BUILD.bazel b/pycross/private/tools/BUILD.bazel
+--- a/pycross/private/tools/BUILD.bazel
++++ b/pycross/private/tools/BUILD.bazel
+@@ -152,6 +152,12 @@
+     ],
+ )
+
++filegroup(
++    name = "wheel_builder_source",
++    srcs = ["wheel_builder.py"],
++    visibility = ["@@//bazel/rules_pycross:__pkg__"],
++)
++
+ py_binary(
+     name = "wheel_builder",
+     srcs = ["wheel_builder.py"],

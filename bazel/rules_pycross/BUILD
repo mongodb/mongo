@@ -3,6 +3,8 @@
 
 load("@rules_python//python:defs.bzl", "py_test")
 load(":wheel_library_tool_runfiles_test.bzl", "wheel_installer_runfiles_analysis_test")
+load(":prebuilt_wheel_required.bzl", "prebuilt_wheel_required")
+load(":prebuilt_wheel_required_test.bzl", "source_build_disabled_test")
 
 exports_files([
     "installer_repo_extract.patch",
@@ -31,5 +33,25 @@ py_test(
     srcs = ["wheel_installer_patch_ng_runfiles_test.py"],
     args = ["$(location @rules_pycross//pycross/private/tools:wheel_installer_source)"],
     data = ["@rules_pycross//pycross/private/tools:wheel_installer_source"],
+    tags = ["unit"],
+)
+
+prebuilt_wheel_required(
+    name = "cryptography_source_build_disabled",
+    package = "cryptography",
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+source_build_disabled_test(
+    name = "cryptography_source_build_disabled_test",
+    target_under_test = ":cryptography_source_build_disabled",
+)
+
+py_test(
+    name = "wheel_build_environment_test",
+    srcs = ["wheel_build_environment_test.py"],
+    args = ["$(location @rules_pycross//pycross/private/tools:wheel_builder_source)"],
+    data = ["@rules_pycross//pycross/private/tools:wheel_builder_source"],
     tags = ["unit"],
 )

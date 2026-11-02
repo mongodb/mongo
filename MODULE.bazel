@@ -136,10 +136,9 @@ single_version_override(
 #   installer_repo_extract + installer_tools_build: extract the `installer`
 #     wheel at repo-rule time and expose as a py_library instead of via
 #     zipimport (Windows runfiles staging bug).
-#   wheel_build_cargo_home: default CARGO_HOME into the WheelBuild action
-#     sandbox so Rust-backed sdist builds don't reach for an unwritable
-#     $HOME/.cargo (carried over from mongo's old rules_poetry patch; no
-#     current lock entry needs it — insurance for the first one that does).
+#   wheel_build_cargo_home: resolve HOME, caches, and temporary files at
+#     runtime inside the disposable WheelBuild action directory. Recent
+#     platformdirs rejects relative HOME and otherwise uses the account home.
 #   wheel_build_no_werror: strip -Werror from the toolchain flags forwarded
 #     into sdist builds — third-party build systems aren't held to mongo's
 #     warning policy (clang otherwise fatals on the harmless -L../lib that
@@ -1052,6 +1051,14 @@ lock_import.package(
 lock_import.package(
     name = "ct3",
     install_exclude_globs = ["**/__pycache__/**"],
+    repo = "pypi",
+)
+
+# Cryptography must use the upstream or hosted wheels in uv.lock. Fail during
+# analysis if a platform would otherwise compile its Rust extension from source.
+lock_import.package(
+    name = "cryptography",
+    build_target = "//bazel/rules_pycross:cryptography_source_build_disabled",
     repo = "pypi",
 )
 
