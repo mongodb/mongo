@@ -136,10 +136,11 @@ assert.soon(() => {
     return donorPrimary.getCollection("config.rangeDeletions").countDocuments({}) === 0;
 }, "Timed out waiting for range deletions to complete on donor");
 
-const donorCountDeprioritizableAfterRangeDeletion = getTotalDeprioritizationCount(donorPrimary);
-assert.gt(
-    donorCountDeprioritizableAfterRangeDeletion,
-    donorCountDeprioritizableBeforeRangeDeletion,
+// The task document can be removed before the worker's operation context is destroyed and its
+// deprioritization statistics are finalized, so wait for the counter to increase.
+assert.soon(
+    () =>
+        getTotalDeprioritizationCount(donorPrimary) > donorCountDeprioritizableBeforeRangeDeletion,
     "Donor should have executed range deletions as deprioritizable",
 );
 
