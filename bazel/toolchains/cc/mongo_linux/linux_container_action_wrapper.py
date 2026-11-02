@@ -65,6 +65,8 @@ _PODMAN_STORAGE_DIR_PREFIX = "mongo-linux-podman-storage-"
 _PODMAN_TASK_ID_ENV = "MONGO_PODMAN_TASK_ID"
 _PODMAN_AUTH_FILE_ENV = "REGISTRY_AUTH_FILE"
 _PODMAN_CONFIG_ENV = "CONTAINERS_CONF"
+# Podman locates helpers such as nsenter through PATH; actions run with `env -` have none.
+_PODMAN_DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 _TRUSTED_CONFIG_ROOT = pathlib.Path("/var/tmp")
 _TRUSTED_CONFIG_DIR_PREFIX = "mongo-linux-action-config-"
 _MOUNT_PROBE_PREFIX = ".mongo-linux-action-mount-"
@@ -302,6 +304,7 @@ def _container_runtime_env(command: Sequence[str]) -> dict[str, str] | None:
         _podman_containers_config(runtime_dir)
     )
     runtime_env = dict(os.environ)
+    runtime_env.setdefault("PATH", _PODMAN_DEFAULT_PATH)
     runtime_env.update(
         {
             "CONTAINERS_STORAGE_CONF": str(storage_config),

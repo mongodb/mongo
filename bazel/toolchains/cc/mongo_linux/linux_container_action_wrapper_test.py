@@ -1136,6 +1136,19 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
         popen.assert_called_once()
         diagnostics.assert_called_once()
 
+    def test_container_runtime_env_defaults_path_for_empty_action_environment(self) -> None:
+        with (
+            mock.patch.dict("os.environ", {}, clear=True),
+            mock.patch.object(wrapper, "_podman_runtime_dir", return_value=pathlib.Path("/rt")),
+            mock.patch.object(wrapper, "_podman_storage_config", return_value=pathlib.Path("/s")),
+            mock.patch.object(
+                wrapper, "_podman_containers_config", return_value=pathlib.Path("/c")
+            ),
+        ):
+            runtime_env = wrapper._container_runtime_env(["/usr/bin/podman", "exec"])
+
+        self.assertEqual(wrapper._PODMAN_DEFAULT_PATH, runtime_env["PATH"])
+
     def test_run_in_container_uses_private_podman_runtime_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = pathlib.Path(temp_dir)
