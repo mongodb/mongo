@@ -22,7 +22,7 @@ namespace mongo::replicated_fast_count {
  * Locking: this class reads and writes the underlying container and does not acquire any locks of
  * its own. Callers must therefore hold the global lock for the duration of the call:
  *   MODE_IS - read()
- *   MODE_IX - write()
+ *   MODE_IX - insert(), writeToTable()
  */
 class SizeCountTimestampStore {
 public:
@@ -46,14 +46,16 @@ public:
     /**
      * Upserts `timestamp` into the store. If a timestamp already exists, it will be replaced.
      *
-     * write() must be called within a WriteUnitOfWork. Otherwise, the function raises an assertion
+     * Returns the old timestamp if one existed, or boost::none otherwise.
+     *
+     * insert() must be called within a WriteUnitOfWork. Otherwise, the function raises an assertion
      * error.
      */
-    void write(OperationContext* opCtx, Timestamp timestamp);
+    boost::optional<Timestamp> insert(OperationContext* opCtx, Timestamp timestamp);
 
     /**
      * Performs a single write of `timestamp` directly to the underlying physical table. Unlike
-     * write(), this does not log to the oplog: it skips invoking op observers and bypasses the
+     * insert(), this does not log to the oplog: it skips invoking op observers and bypasses the
      * `canAcceptWritesFor` primary check, so the write is not replicated.
      */
     void writeToTable(OperationContext* opCtx, Timestamp timestamp);

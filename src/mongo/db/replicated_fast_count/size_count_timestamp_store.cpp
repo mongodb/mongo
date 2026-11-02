@@ -23,11 +23,11 @@ IntegerKeyedContainer& getIntegerKeyedContainer(RecordStore& recordStore) {
 
 void assertInWriteUnitOfWorkAndLocked(OperationContext* opCtx) {
     massert(12280400,
-            "SizeCountTimestampStore::write() must be called within a WriteUnitOfWork",
+            "SizeCountTimestampStore::insert() must be called within a WriteUnitOfWork",
             shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     massert(
         12915201,
-        "Must hold the GlobalLock in a write mode when calling SizeCountTimestampStore::write()",
+        "Must hold the GlobalLock in a write mode when calling SizeCountTimestampStore::insert()",
         shard_role_details::getLocker(opCtx)->isWriteLocked());
 }
 }  // namespace
@@ -48,7 +48,8 @@ boost::optional<Timestamp> SizeCountTimestampStore::read(OperationContext* opCtx
     return data.getField(kValidAsOfKey).timestamp();
 }
 
-void SizeCountTimestampStore::write(OperationContext* opCtx, Timestamp timestamp) {
+boost::optional<Timestamp> SizeCountTimestampStore::insert(OperationContext* opCtx,
+                                                           Timestamp timestamp) {
     assertInWriteUnitOfWorkAndLocked(opCtx);
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
@@ -58,13 +59,17 @@ void SizeCountTimestampStore::write(OperationContext* opCtx, Timestamp timestamp
 
     // Check if the key exists. Containers currently only support strict inserts or strict updates.
     auto cursor = container.getCursor(ru);
-    if (cursor->find(kTimestampContainerKey)) {
+    const auto previousValue = cursor->find(kTimestampContainerKey);
+    boost::optional<Timestamp> previousTimestamp = boost::none;
+    if (previousValue.has_value()) {
+        previousTimestamp = BSONObj(previousValue->data()).getField(kValidAsOfKey).timestamp();
         massertStatusOK(
             container_write::update(opCtx, ru, container, kTimestampContainerKey, valSpan));
     } else {
         massertStatusOK(
             container_write::insert(opCtx, ru, container, kTimestampContainerKey, valSpan));
     }
+    return previousTimestamp;
 }
 
 RecordStore* SizeCountTimestampStore::rs_ForTest() const {

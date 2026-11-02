@@ -35,7 +35,7 @@ inline constexpr std::string_view kValidAsOfKey = "valid-as-of"sv;
  * Locking: this class reads and writes the underlying container and does not acquire any locks of
  * its own. Callers must therefore hold the global lock for the duration of the call:
  *     MODE_IS - read(), readAndIncrementReplicatedMetadata()
- *     MODE_IX - write(), insert(), remove()
+ *     MODE_IX - insert(), remove()
  */
 class SizeCountStore {
 public:
@@ -108,7 +108,7 @@ public:
 
     /**
      * Performs a single write of `entry` for `uuid` directly to the underlying physical table.
-     * Unlike write(), this does not log to the oplog: it skips invoking op observers and bypasses
+     * Unlike insert(), this does not log to the oplog: it skips invoking op observers and bypasses
      * the `canAcceptWritesFor` primary check, so the write is not replicated.
      */
     void writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry);

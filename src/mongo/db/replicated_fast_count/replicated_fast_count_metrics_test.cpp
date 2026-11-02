@@ -528,7 +528,7 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
               3);
 }
 
-// Tests that writes through `SizeCountTimestampStore::write` advance `oplog_lag_secs` via the
+// Tests that writes through `SizeCountTimestampStore::insert` advance `oplog_lag_secs` via the
 // `ReplicatedFastCountOpObserver` hooks — container writes fire `onContainerInsert`/
 // `onContainerUpdate`.
 class TimestampStoreMetricsTest : public CatalogTestFixture {
@@ -560,7 +560,7 @@ TEST_F(TimestampStoreMetricsTest, WriteAdvancesOplogLagSecsOnCommit) {
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        store->write(opCtx, Timestamp(400, 1));
+        store->insert(opCtx, Timestamp(400, 1));
         // Pre-commit the gauge must remain at its prior value; the on-commit hook hasn't fired.
         EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 0);
         wuow.commit();
@@ -575,7 +575,7 @@ TEST_F(TimestampStoreMetricsTest, RolledBackWriteDoesNotAdvanceOplogLagSecs) {
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        store->write(opCtx, Timestamp(400, 1));
+        store->insert(opCtx, Timestamp(400, 1));
         // No commit; WUOW destructor rolls back.
     }
 
@@ -588,7 +588,7 @@ TEST_F(TimestampStoreMetricsTest, RepeatedWritesAdvanceOplogLagSecs) {
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        store->write(opCtx, Timestamp(200, 1));
+        store->insert(opCtx, Timestamp(200, 1));
         wuow.commit();
     }
     EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 800);
@@ -597,7 +597,7 @@ TEST_F(TimestampStoreMetricsTest, RepeatedWritesAdvanceOplogLagSecs) {
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        store->write(opCtx, Timestamp(900, 1));
+        store->insert(opCtx, Timestamp(900, 1));
         wuow.commit();
     }
     EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 100);

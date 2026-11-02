@@ -776,13 +776,14 @@ boost::optional<SizeCountStore::Entry> insertSizeCountEntry(OperationContext* op
     return oldValue;
 }
 
-void insertSizeCountTimestamp(OperationContext* opCtx,
-                              SizeCountTimestampStore& store,
-                              Timestamp timestamp) {
+boost::optional<Timestamp> insertSizeCountTimestamp(OperationContext* opCtx,
+                                                    SizeCountTimestampStore& store,
+                                                    Timestamp timestamp) {
     Lock::GlobalLock writeLock(opCtx, MODE_IX);
     WriteUnitOfWork wuow(opCtx);
-    store.write(opCtx, timestamp);
+    const auto oldValue = store.insert(opCtx, timestamp);
     wuow.commit();
+    return oldValue;
 }
 
 BSONObj makeEntryBson(int64_t count, int64_t size) {

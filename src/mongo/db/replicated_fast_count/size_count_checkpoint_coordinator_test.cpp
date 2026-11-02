@@ -159,7 +159,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushWithNoNewDataPreservesP
     {
         Lock::GlobalLock writeLock(_opCtx, MODE_IX);
         WriteUnitOfWork wuow(_opCtx);
-        _timestampStore->write(_opCtx, persistedTs);
+        _timestampStore->insert(_opCtx, persistedTs);
         wuow.commit();
     }
     // Write an oplog entry at persistedTs so scanToNoHolesEOF() can seekExact() to it (simulating

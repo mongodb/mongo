@@ -166,7 +166,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, AdvancesExistingSizeCountAndTim
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
-        timestampStore->write(opCtx, Timestamp(1, 1));
+        timestampStore->insert(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
 
@@ -206,7 +206,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, NoReplicatedSizeCountInOplogFor
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
-        timestampStore->write(opCtx, Timestamp(1, 1));
+        timestampStore->insert(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
 
@@ -243,7 +243,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TimestampUpdatedForSum0SizeCoun
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
-        timestampStore->write(opCtx, Timestamp(1, 1));
+        timestampStore->insert(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
 
@@ -315,7 +315,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
-        timestampStore->write(opCtx, Timestamp(1, 1));
+        timestampStore->insert(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
 
@@ -465,7 +465,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, DropCollectionRemovesEntry) {
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
-        timestampStore->write(opCtx, Timestamp(1, 1));
+        timestampStore->insert(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
 
@@ -617,7 +617,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeAppliesNegativeDel
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 5});
-        timestampStore->write(opCtx, Timestamp(1, 1));
+        timestampStore->insert(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
 
@@ -672,7 +672,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeOnlyAffectsTargetC
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 4});
-        timestampStore->write(opCtx, Timestamp(1, 1));
+        timestampStore->insert(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
 
@@ -921,7 +921,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogTruncationUpdatesOplogFast
                                SizeCountStore::Entry{.timestamp = Timestamp(1, 1),
                                                      .size = oplogStartingSize,
                                                      .count = oplogStartingCount});
-        timestampStore->write(opCtx, Timestamp(1, 1));
+        timestampStore->insert(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
 
@@ -959,7 +959,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
                                SizeCountStore::Entry{.timestamp = Timestamp(1, 1),
                                                      .size = oplogStartingSize,
                                                      .count = oplogStartingCount});
-        timestampStore->write(opCtx, Timestamp(1, 1));
+        timestampStore->insert(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
 

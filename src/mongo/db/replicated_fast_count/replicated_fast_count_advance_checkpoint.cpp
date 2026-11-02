@@ -100,7 +100,7 @@ CheckpointWriteCounts persistCheckpointSnapshot(
     // Advance the timestamp in `config.fast_count_metadata_store_timestamps` to the new checkpoint
     // timestamp. This moves the global valid-as-of forward so that future checkpoint passes this
     // point.
-    timestampStore.write(opCtx, checkpoint.validAsOf);
+    timestampStore.insert(opCtx, checkpoint.validAsOf);
 
     return writeCounts;
 }

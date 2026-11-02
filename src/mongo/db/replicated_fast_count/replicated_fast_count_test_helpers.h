@@ -438,12 +438,11 @@ boost::optional<SizeCountStore::Entry> insertSizeCountEntry(OperationContext* op
                                                             const SizeCountStore::Entry& entry);
 
 /**
- * Inserts a timestamp into `store`.
+ * Inserts a timestamp into `store` and returns the old timestamp, if one existed.
  */
-// TODO(SERVER-136271): Return boost::optional<Timestamp>.
-void insertSizeCountTimestamp(OperationContext* opCtx,
-                              SizeCountTimestampStore& store,
-                              Timestamp timestamp);
+boost::optional<Timestamp> insertSizeCountTimestamp(OperationContext* opCtx,
+                                                    SizeCountTimestampStore& store,
+                                                    Timestamp timestamp);
 
 /**
  * Creates a BSONObj representing a fast count metadata store entry with a fixed valid-as-of

@@ -23,11 +23,8 @@ protected:
         _store = test_helpers::createContainerFastCountStores(operationContext()).timestampStore;
     }
 
-    void writeTs(Timestamp timestamp) {
-        Lock::GlobalLock writeLock(operationContext(), MODE_IX);
-        WriteUnitOfWork wuow(operationContext());
-        _store->write(operationContext(), timestamp);
-        wuow.commit();
+    boost::optional<Timestamp> insertTs(Timestamp timestamp) {
+        return test_helpers::insertSizeCountTimestamp(operationContext(), *_store, timestamp);
     }
 
     boost::optional<Timestamp> readTs() {
@@ -42,45 +39,78 @@ TEST_F(SizeCountTimestampStoreTest, ReadMassertsWithoutGlobalReadLock) {
     ASSERT_THROWS_CODE(_store->read(operationContext()), DBException, 12915200);
 }
 
-TEST_F(SizeCountTimestampStoreTest, WriteMassertsWithoutWriteUnitOfWork) {
-    ASSERT_THROWS_CODE(_store->write(operationContext(), Timestamp(10, 1)), DBException, 12280400);
+TEST_F(SizeCountTimestampStoreTest, InsertMassertsWithoutWriteUnitOfWork) {
+    ASSERT_THROWS_CODE(_store->insert(operationContext(), Timestamp(10, 1)), DBException, 12280400);
 }
 
-TEST_F(SizeCountTimestampStoreTest, WriteMassertsWithoutGlobalWriteLock) {
+TEST_F(SizeCountTimestampStoreTest, InsertMassertsWithoutGlobalWriteLock) {
     auto opCtx = operationContext();
     Lock::GlobalLock readLock(opCtx, MODE_IS);
     WriteUnitOfWork wuow(opCtx);
-    ASSERT_THROWS_CODE(_store->write(opCtx, Timestamp(10, 1)), DBException, 12915201);
+    ASSERT_THROWS_CODE(_store->insert(opCtx, Timestamp(10, 1)), DBException, 12915201);
 }
 
 TEST_F(SizeCountTimestampStoreTest, ReadReturnsNoneWhenEmpty) {
     EXPECT_FALSE(readTs().has_value());
 }
 
-TEST_F(SizeCountTimestampStoreTest, ReadWriteRoundTripNewEntry) {
-    writeTs(Timestamp(10, 1));
+TEST_F(SizeCountTimestampStoreTest, InsertReturnsNoneForNewEntry) {
+    EXPECT_FALSE(insertTs(Timestamp(10, 1)).has_value());
 
     const auto result = readTs();
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(Timestamp(10, 1), *result);
 }
 
-TEST_F(SizeCountTimestampStoreTest, WriteUpdatesExistingDocument) {
-    writeTs(Timestamp(10, 1));
-    writeTs(Timestamp(20, 2));
+TEST_F(SizeCountTimestampStoreTest, InsertReturnsOldTimestampAndUpdatesExistingDocument) {
+    EXPECT_FALSE(insertTs(Timestamp(10, 1)).has_value());
+    const auto oldTimestamp = insertTs(Timestamp(20, 2));
+    ASSERT_TRUE(oldTimestamp.has_value());
+    EXPECT_EQ(Timestamp(10, 1), *oldTimestamp);
 
     const auto result = readTs();
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(Timestamp(20, 2), *result);
 }
 
-TEST_F(SizeCountTimestampStoreTest, WriteWithSameTimestampIsIdempotent) {
-    writeTs(Timestamp(10, 1));
-    writeTs(Timestamp(10, 1));
+TEST_F(SizeCountTimestampStoreTest, InsertWithSameTimestampReturnsOldTimestamp) {
+    EXPECT_FALSE(insertTs(Timestamp(10, 1)).has_value());
+    const auto oldTimestamp = insertTs(Timestamp(10, 1));
+    ASSERT_TRUE(oldTimestamp.has_value());
+    EXPECT_EQ(Timestamp(10, 1), *oldTimestamp);
 
     const auto result = readTs();
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(Timestamp(10, 1), *result);
+}
+
+TEST_F(SizeCountTimestampStoreTest, AbortedInsertLeavesStoreEmpty) {
+    {
+        auto opCtx = operationContext();
+        Lock::GlobalLock writeLock(opCtx, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        EXPECT_FALSE(_store->insert(opCtx, Timestamp(10, 1)).has_value());
+    }
+    EXPECT_FALSE(readTs().has_value());
+    EXPECT_FALSE(insertTs(Timestamp(20, 2)).has_value());
+}
+
+TEST_F(SizeCountTimestampStoreTest, AbortedUpdatePreservesOldTimestamp) {
+    EXPECT_FALSE(insertTs(Timestamp(10, 1)).has_value());
+    {
+        auto opCtx = operationContext();
+        Lock::GlobalLock writeLock(opCtx, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        const auto oldTimestamp = _store->insert(opCtx, Timestamp(20, 2));
+        ASSERT_TRUE(oldTimestamp.has_value());
+        EXPECT_EQ(Timestamp(10, 1), *oldTimestamp);
+    }
+    const auto result = readTs();
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(Timestamp(10, 1), *result);
+    const auto oldTimestamp = insertTs(Timestamp(30, 3));
+    ASSERT_TRUE(oldTimestamp.has_value());
+    EXPECT_EQ(Timestamp(10, 1), *oldTimestamp);
 }
 
 }  // namespace
