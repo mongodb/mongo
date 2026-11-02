@@ -636,6 +636,11 @@ struct SbBlueprintNodeIdx {
     uint32_t value{0};
 
     bool operator==(const SbBlueprintNodeIdx&) const = default;
+
+    template <typename H>
+    friend H AbslHashValue(H h, const SbBlueprintNodeIdx& idx) {
+        return H::combine(std::move(h), idx.value);
+    }
 };
 
 /**

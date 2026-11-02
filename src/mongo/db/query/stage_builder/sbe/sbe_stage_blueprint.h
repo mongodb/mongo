@@ -47,6 +47,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <string>
 #include <utility>
@@ -1469,10 +1470,11 @@ static_assert(kAllSbBlueprintNodeTypes<SbBlueprintNode>,
 // so that a node is little more than the largest small node type.
 
 /**
- * Holds the nodes of a blueprint tree. Children are referenced by their index in the vector.
+ * Holds the nodes of a blueprint tree. Children are referenced by their index. Adding a node never
+ * moves the others, so a reference to a node stays valid while nodes are added. This lets code
+ * hold node references as it would with a pointer-based tree.
  */
-
-using SbBlueprintNodeVector = std::vector<SbBlueprintNode>;
+using SbBlueprintNodeVector = std::deque<SbBlueprintNode>;
 
 /**
  * Appends 'node' to 'nodes' and returns its index.
@@ -1484,7 +1486,7 @@ inline SbBlueprintNodeIdx addBlueprintNode(SbBlueprintNodeVector& nodes, SbBluep
 
 /**
  * The blueprint tree of a plan under construction, owned by StageBuilderState. Nodes are appended
- * as the stage builders create stages and are referenced by index, so the node vector is
+ * as the stage builders create stages and are referenced by index, so the node storage is
  * append-only; lowering takes a node out and leaves SbBlueprintLowered in its place.
  */
 class SbBlueprint {

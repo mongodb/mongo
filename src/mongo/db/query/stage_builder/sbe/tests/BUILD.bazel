@@ -43,6 +43,7 @@ mongo_cc_unit_test(
         "sbe_builder_test.cpp",
         "sbe_builder_ts_test.cpp",
         "sbe_stage_blueprint_node_slots_test.cpp",
+        "sbe_stage_blueprint_rewrite_test.cpp",
         "sbe_stage_blueprint_slot_usage_test.cpp",
         "sbe_stage_blueprint_test.cpp",
         "shard_filter_test.cpp",
