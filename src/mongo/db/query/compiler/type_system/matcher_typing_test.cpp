@@ -19,17 +19,27 @@ namespace {
 
 namespace exec_matcher = ::mongo::exec::matcher;
 
-std::unique_ptr<MatchExpression> parseMatchExpr(
-    const std::string& query, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto result = MatchExpressionParser::parse(fromjson(query),
-                                               expCtx,
-                                               ExtensionsCallbackNoop(),
-                                               MatchExpressionParser::kAllowAllSpecialFeatures);
+// Holds the BSONObj to ensure it outlives the MatchExpression.
+struct MatchExpressionDeleter {
+    void operator()(MatchExpression* expr) const {
+        delete expr;
+    }
+    BSONObj owned;
+};
+
+// Unique ptr which holds the original BSONObj in the deleter.
+using MatchExpressionPtr = std::unique_ptr<MatchExpression, MatchExpressionDeleter>;
+
+MatchExpressionPtr parseMatchExpr(const std::string& query,
+                                  const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto obj = fromjson(query);
+    auto result = MatchExpressionParser::parse(
+        obj, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_OK(result.getStatus()) << query;
-    return std::move(result.getValue());
+    return {result.getValue().release(), MatchExpressionDeleter(obj)};
 }
 
-std::unique_ptr<MatchExpression> parseMatchExpr(const std::string& query) {
+MatchExpressionPtr parseMatchExpr(const std::string& query) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     return parseMatchExpr(query, expCtx);
 }
