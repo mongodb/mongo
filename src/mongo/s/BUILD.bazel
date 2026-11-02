@@ -333,6 +333,7 @@ mongo_cc_library(
         "//src/mongo/s/resharding:common_types_gen",
         "//src/mongo/s/resharding:resharding_coordinator_service_conflicting_op_in_progress_info.cpp",
         "//src/mongo/s/resharding:resharding_feature_flag_gen",
+        "//src/mongo/s/resharding:resharding_tunables_gen",
         "//src/mongo/s/resharding:resume_token_gen",
         "//src/mongo/s/resharding:type_collection_fields_gen",
     ],

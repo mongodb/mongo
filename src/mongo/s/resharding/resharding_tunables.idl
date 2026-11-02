@@ -1,0 +1,267 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+# This file defines the per-operation resharding settings (tunables) that mirror the resharding
+# server parameters in mongo/db/s/resharding/resharding_server_parameters.idl.
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/client/read_preference_validators.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    ReshardingTunables:
+        description: >-
+            Per-operation settings that control how a resharding operation executes (performance,
+            resource usage, timing, and safety checks) but not what it produces. A field belongs
+            here only if, after the resharding operation completes, changing its value would not
+            change the outcome (the resulting collection: shard key, chunks, zones, data
+            placement). Fields that define the operation itself, such as the new shard key, zones,
+            or shard distribution, are top-level fields on the command and must not be added here.
+            Each field mirrors the server parameter named in its description; an unset field means
+            "use the default from the server parameter". All fields are currently init-only.
+            The validators here intentionally duplicate those on the server parameters.
+        mod_visibility: private
+        strict: false
+        fields:
+            collectionClonerMaxStalenessSeconds:
+                type: safeInt64
+                optional: true
+                description: "See the reshardingCollectionClonerMaxStalenessSeconds server parameter."
+                validator:
+                    callback: validateMaxStalenessSecondsExternal
+                    gt: 0
+            collectionClonerBatchSizeCount:
+                type: int
+                optional: true
+                description: "See the reshardingCollectionClonerBatchSizeCount server parameter."
+                validator:
+                    gt: 0
+            collectionClonerWriteThreadCount:
+                type: int
+                optional: true
+                description: "See the reshardingCollectionClonerWriteThreadCount server parameter."
+                validator:
+                    gte: 1
+            txnClonerProgressBatchSize:
+                type: int
+                optional: true
+                description: "See the reshardingTxnClonerProgressBatchSize server parameter."
+                validator:
+                    gte: 1
+            oplogFetcherInsertBatchLimitOperations:
+                type: int
+                optional: true
+                description: "See the reshardingOplogFetcherInsertBatchLimitOperations server parameter."
+                validator:
+                    gte: 1
+                    lte:
+                        expr: 1000 * 1000
+            oplogFetcherInsertBatchLimitBytes:
+                type: int
+                optional: true
+                description: "See the reshardingOplogFetcherInsertBatchLimitBytes server parameter."
+                validator:
+                    lte:
+                        expr: 16 * 1024 * 1024
+            oplogFetcherSleepMillisBeforeCriticalSection:
+                type: int
+                optional: true
+                description: "See the reshardingOplogFetcherSleepMillisBeforeCriticalSection server parameter."
+                validator:
+                    gte: 0
+            oplogFetcherSleepMillisDuringCriticalSection:
+                type: int
+                optional: true
+                description: "See the reshardingOplogFetcherSleepMillisDuringCriticalSection server parameter."
+                validator:
+                    gte: 0
+            oplogFetcherTargetPrimaryDuringCriticalSection:
+                type: bool
+                optional: true
+                description: "See the reshardingOplogFetcherTargetPrimaryDuringCriticalSection server parameter."
+            oplogBatchTaskCount:
+                type: int
+                optional: true
+                description: "See the reshardingOplogBatchTaskCount server parameter."
+                validator:
+                    gte: 1
+                    lte: 256
+            oplogBatchLimitOperations:
+                type: int
+                optional: true
+                description: "See the reshardingOplogBatchLimitOperations server parameter."
+                validator:
+                    gte: 1
+                    lte:
+                        expr: 1000 * 1000
+            oplogBatchLimitBytes:
+                type: int
+                optional: true
+                description: "See the reshardingOplogBatchLimitBytes server parameter."
+                validator:
+                    gte:
+                        expr: 16 * 1024 * 1024
+                    lte:
+                        expr: 100 * 1024 * 1024
+            oplogApplierMaxLockRequestTimeoutMillis:
+                type: int
+                optional: true
+                description: "See the reshardingOplogApplierMaxLockRequestTimeoutMillis server parameter."
+            minimumOperationDurationMillis:
+                type: int
+                optional: true
+                description: "See the reshardingMinimumOperationDurationMillis server parameter."
+                validator:
+                    gte: 0
+            delayBeforeRemainingOperationTimeQueryMillis:
+                type: int
+                optional: true
+                description: "See the reshardingDelayBeforeRemainingOperationTimeQueryMillis server parameter."
+                validator:
+                    gte: 0
+            maxDelayBetweenRemainingOperationTimeQueriesMillis:
+                type: int
+                optional: true
+                description: "See the reshardingMaxDelayBetweenRemainingOperationTimeQueriesMillis server parameter."
+                validator:
+                    gte: 0
+            criticalSectionTimeoutMillis:
+                type: int
+                optional: true
+                description: "See the reshardingCriticalSectionTimeoutMillis server parameter."
+                validator:
+                    gte: 0
+            verificationDeltaWaitRemainingCriticalSectionPercent:
+                type: int
+                optional: true
+                description: "See the reshardingVerificationDeltaWaitRemainingCriticalSectionPercent server parameter."
+                validator:
+                    gte: 0
+                    lte: 100
+            remainingReshardingOperationTimeThresholdMillis:
+                type: int
+                optional: true
+                description: "See the remainingReshardingOperationTimeThresholdMillis server parameter."
+                validator:
+                    gte: 0
+            remainingReshardingOperationTimePrepareThresholdMillis:
+                type: int
+                optional: true
+                description: "See the remainingReshardingOperationTimePrepareThresholdMillis server parameter."
+                validator:
+                    gte: 0
+            remainingTimeEstimateAccountsForDonorReplicationLag:
+                type: bool
+                optional: true
+                description: "See the reshardingRemainingTimeEstimateAccountsForDonorReplicationLag server parameter."
+            remainingTimeEstimateAccountsForRecipientReplicationLag:
+                type: bool
+                optional: true
+                description: "See the reshardingRemainingTimeEstimateAccountsForRecipientReplicationLag server parameter."
+            requireExplicitCommit:
+                type: bool
+                optional: true
+                description: "See the reshardingRequireExplicitCommit server parameter."
+            remainingTimeEstimateBasedOnMovingAverage:
+                type: bool
+                optional: true
+                description: "See the reshardingRemainingTimeEstimateBasedOnMovingAverage server parameter."
+            exponentialMovingAverageTimeToFetchAndApplySmoothingFactor:
+                type: double
+                optional: true
+                description: "See the reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor server parameter."
+                validator:
+                    gt: 0
+                    lt: 1
+            exponentialMovingAverageTimeToFetchAndApplyIntervalMillis:
+                type: int
+                optional: true
+                description: "See the reshardingExponentialMovingAverageTimeToFetchAndApplyIntervalMillis server parameter."
+                validator:
+                    gt: 0
+            coordinatorQuiescePeriodMillis:
+                type: int
+                optional: true
+                description: "See the reshardingCoordinatorQuiescePeriodMillis server parameter."
+                validator:
+                    gte: 0
+            verificationChangeStreamsEventsBatchSizeLimit:
+                type: int
+                optional: true
+                description: "See the reshardingVerificationChangeStreamsEventsBatchSizeLimit server parameter."
+                validator:
+                    gte: 0
+            verificationChangeStreamsEventsBatchTimeLimitMillis:
+                type: int
+                optional: true
+                description: "See the reshardingVerificationChangeStreamsEventsBatchTimeLimitMillis server parameter."
+                validator:
+                    gte: 0
+            verificationChangeStreamsSleepMS:
+                type: int
+                optional: true
+                description: "See the reshardingVerificationChangeStreamsSleepMS server parameter."
+                validator:
+                    gte: 0
+            verificationChangeStreamsGetMoreMaxTimeMS:
+                type: int
+                optional: true
+                description: "See the reshardingVerificationChangeStreamsGetMoreMaxTimeMS server parameter."
+                validator:
+                    gte: 1
+            waitForReplicationIntervalMilliseconds:
+                type: int
+                optional: true
+                description: "See the reshardingWaitForReplicationIntervalMilliseconds server parameter."
+                validator:
+                    gte: 0
+            waitForReplicationTimeoutSeconds:
+                type: int
+                optional: true
+                description: "See the reshardingWaitForReplicationTimeoutSeconds server parameter."
+                validator:
+                    gte: 0
+            maxReplicationLagSecondsBeforeBuildingIndexes:
+                type: int
+                optional: true
+                description: "See the reshardingMaxReplicationLagSecondsBeforeBuildingIndexes server parameter."
+                validator:
+                    gte: 0
+            fetchDocumentsToCopyTimeoutSecs:
+                type: int
+                optional: true
+                description: "See the reshardingFetchDocumentsToCopyTimeoutSecs server parameter."
+                validator:
+                    gte: 0
+            abortUnpreparedTransactionsUponPreparingToBlockWrites:
+                type: bool
+                optional: true
+                description: "See the reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites server parameter."
+            indexVerification:
+                type: bool
+                optional: true
+                description: "See the reshardingIndexVerification server parameter."
+            collectionOptionsVerification:
+                type: bool
+                optional: true
+                description: "See the reshardingCollectionOptionsVerification server parameter."
+            documentVerification:
+                type: bool
+                optional: true
+                description: "See the reshardingDocumentVerification server parameter."
+            documentValidationMaxCollectionSizeBytes:
+                type: long
+                optional: true
+                description: "See the reshardingDocumentValidationMaxCollectionSizeBytes server parameter."
+                validator:
+                    gte: 0
+            collectionSizeEstimationTimeoutMS:
+                type: int
+                optional: true
+                description: "See the reshardingCollectionSizeEstimationTimeoutMS server parameter."
+                validator:
+                    gt: 0
