@@ -20,6 +20,9 @@ selector:
     # Tests that do not use setupCollection() or otherwise bypass creating an experiment collection.
     - jstests/core/index/express_pbt.js
     - jstests/aggregation/sources/documents/collectionless_options_pbt.js
+    # Tests in noPassthrough provide their own fixtures.
+    - jstests/noPassthrough/**/*.js
+    - jstests/noPassthroughWithMongod/**/*.js
 
 executor:
   archive:
