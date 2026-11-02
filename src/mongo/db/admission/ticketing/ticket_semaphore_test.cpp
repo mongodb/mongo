@@ -83,6 +83,85 @@ public:
         });
     }
 
+    /**
+     * Spawns a thread with its own client/opCtx that blocks in acquire() on 'sem' using
+     * 'admCtx' until 'deadline'. 'admCtx' must outlive the returned future.
+     */
+    Future<bool> spawnWaiter(TicketSemaphore* sem,
+                             std::string name,
+                             AdmissionContext* admCtx,
+                             Date_t deadline = getDeadline()) {
+        return spawn(
+            [sem, name = std::move(name), admCtx, deadline, svcCtx = getServiceContext()]() {
+                auto client = svcCtx->getService()->makeClient(name);
+                auto waiterOpCtx = client->makeOperationContext();
+                return sem->acquire(waiterOpCtx.get(), admCtx, deadline, /*interruptible=*/true);
+            });
+    }
+
+    /**
+     * Same as above for waiters whose admission context the test never inspects.
+     */
+    Future<bool> spawnWaiter(TicketSemaphore* sem,
+                             std::string name,
+                             Date_t deadline = getDeadline()) {
+        return spawn([sem, name = std::move(name), deadline, svcCtx = getServiceContext()]() {
+            auto client = svcCtx->getService()->makeClient(name);
+            auto waiterOpCtx = client->makeOperationContext();
+            MockAdmissionContext admCtx;
+            return sem->acquire(waiterOpCtx.get(), &admCtx, deadline, /*interruptible=*/true);
+        });
+    }
+
+    /**
+     * Spawns 'n' waiters named "waiter0".."waiter{n-1}" and blocks until all are queued.
+     */
+    std::vector<Future<bool>> spawnWaiters(TicketSemaphore* sem, int n) {
+        std::vector<Future<bool>> futures;
+        for (int i = 0; i < n; ++i) {
+            futures.push_back(spawnWaiter(sem, "waiter" + std::to_string(i)));
+        }
+        waitUntilBlocked(sem, n);
+        return futures;
+    }
+
+    /**
+     * Asserts that acquiring 'sem' from the test opCtx with 'admCtx' is load shed with
+     * AdmissionQueueOverflow and that the waiter count is unchanged.
+     */
+    void assertAcquireIsShed(TicketSemaphore* sem, AdmissionContext* admCtx) {
+        auto waitersBefore = sem->waiters();
+        ASSERT_THROWS_CODE(sem->acquire(opCtx(), admCtx, getDeadline(), /*interruptible=*/true),
+                           DBException,
+                           ErrorCodes::AdmissionQueueOverflow);
+        ASSERT_TRUE(admCtx->getLoadShed());
+        ASSERT_EQ(sem->waiters(), waitersBefore);
+    }
+
+    /**
+     * Waits (bounded by getDeadline()) for a spawned waiter to finish and asserts it acquired.
+     */
+    void assertWaiterAcquired(Future<bool>&& waiter) {
+        ASSERT_TRUE(waitForWaiter(std::move(waiter)));
+    }
+
+    void assertAllWaitersAcquired(std::vector<Future<bool>>& waiters) {
+        for (auto& f : waiters) {
+            assertWaiterAcquired(std::move(f));
+        }
+    }
+
+    /**
+     * Waits (bounded by getDeadline()) for a spawned waiter to finish and returns its result.
+     */
+    bool waitForWaiter(Future<bool>&& waiter) {
+        bool result = false;
+        _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+            result = std::move(waiter).get(_opCtx.get());
+        });
+        return result;
+    }
+
     template <std::invocable Callable>
     auto spawn(Callable&& cb) -> Future<std::invoke_result_t<Callable>> {
         using ReturnType = std::invoke_result_t<Callable>;
@@ -242,25 +321,12 @@ TEST_P(TicketSemaphoreTest, AcquireBlocksAndSucceedsWhenReleased) {
     ASSERT_EQ(sem->available(), 0);
 
     // Spawn a thread that waits to acquire.
-    auto* rawSem = sem.get();
-    Future<bool> acquireFuture = spawn([&, rawSem]() {
-        auto client = getServiceContext()->getService()->makeClient("waiter");
-        auto waiterOpCtx = client->makeOperationContext();
-        MockAdmissionContext waiterAdmCtx;
-        return rawSem->acquire(waiterOpCtx.get(), &waiterAdmCtx, getDeadline(), true);
-    });
-
-    waitUntilBlocked(rawSem, 1);
+    auto waiter = spawnWaiter(sem.get(), "waiter");
+    waitUntilBlocked(sem.get(), 1);
 
     // Release the permit -- the waiter should wake up and succeed.
-    rawSem->release();
-
-    bool result = false;
-    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        result = std::move(acquireFuture).get(_opCtx.get());
-    });
-
-    ASSERT_TRUE(result);
+    sem->release();
+    assertWaiterAcquired(std::move(waiter));
 }
 
 TEST_P(TicketSemaphoreTest, AcquireBeforeShortDeadlineSucceedsWhenReleased) {
@@ -274,24 +340,10 @@ TEST_P(TicketSemaphoreTest, AcquireBeforeShortDeadlineSucceedsWhenReleased) {
     // The minimum jittered poll interval is 8 seconds. Use a deadline 5 seconds away so this
     // is the final wait, with a multi-second margin for slow test hosts. Waking because a
     // permit becomes available must not be mistaken for that deadline expiring.
-    auto* rawSem = sem.get();
-    Future<bool> acquireFuture = spawn([&, rawSem]() {
-        auto client = getServiceContext()->getService()->makeClient("shortDeadlineWaiter");
-        auto waiterOpCtx = client->makeOperationContext();
-        MockAdmissionContext waiterAdmCtx;
-        auto deadline = Date_t::now() + Seconds{5};
-        return rawSem->acquire(waiterOpCtx.get(), &waiterAdmCtx, deadline, true);
-    });
-
-    waitUntilBlocked(rawSem, 1);
-    rawSem->release();
-
-    bool result = false;
-    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        result = std::move(acquireFuture).get(_opCtx.get());
-    });
-
-    ASSERT_TRUE(result);
+    auto waiter = spawnWaiter(sem.get(), "shortDeadlineWaiter", Date_t::now() + Seconds{5});
+    waitUntilBlocked(sem.get(), 1);
+    sem->release();
+    assertWaiterAcquired(std::move(waiter));
 }
 
 TEST_P(TicketSemaphoreTest, AcquireRespectsInterrupt) {
@@ -300,15 +352,14 @@ TEST_P(TicketSemaphoreTest, AcquireRespectsInterrupt) {
     auto client = getServiceContext()->getService()->makeClient("interruptee");
     auto interruptOpCtx = client->makeOperationContext();
 
-    auto* rawSem = sem.get();
     auto* rawOpCtx = interruptOpCtx.get();
 
-    Future<void> acquireFuture = spawn([&, rawSem, rawOpCtx]() {
+    Future<void> acquireFuture = spawn([rawSem = sem.get(), rawOpCtx]() {
         MockAdmissionContext admCtx;
         rawSem->acquire(rawOpCtx, &admCtx, Date_t::max(), /*interruptible=*/true);
     });
 
-    waitUntilBlocked(rawSem, 1);
+    waitUntilBlocked(sem.get(), 1);
 
     // Kill the operation -- the waiter should throw.
     interruptOpCtx->markKilled(ErrorCodes::Interrupted);
@@ -325,106 +376,58 @@ TEST_P(TicketSemaphoreTest, AcquireRespectsInterrupt) {
 
 TEST_P(TicketSemaphoreTest, MultipleWaitersAllAcquire) {
     auto sem = makeSemaphore(0);
-    auto* rawSem = sem.get();
 
     constexpr int numWaiters = 5;
-    std::vector<Future<bool>> futures;
+    auto futures = spawnWaiters(sem.get(), numWaiters);
 
     for (int i = 0; i < numWaiters; ++i) {
-        futures.push_back(spawn([&, i, rawSem, svcCtx = getServiceContext()]() {
-            auto client = svcCtx->getService()->makeClient("waiter" + std::to_string(i));
-            auto waiterOpCtx = client->makeOperationContext();
-            MockAdmissionContext admCtx;
-            return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
-        }));
+        sem->release();
     }
 
-    waitUntilBlocked(rawSem, numWaiters);
-
-    for (int i = 0; i < numWaiters; ++i) {
-        rawSem->release();
-    }
-
-    for (auto& f : futures) {
-        bool result = false;
-        _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-            result = std::move(f).get(_opCtx.get());
-        });
-        ASSERT_TRUE(result);
-    }
-    ASSERT_EQ(rawSem->available(), 0);
+    assertAllWaitersAcquired(futures);
+    ASSERT_EQ(sem->available(), 0);
 }
 
 TEST_P(TicketSemaphoreTest, ResizeWakesWaiters) {
     auto sem = makeSemaphore(0);
-    auto* rawSem = sem.get();
 
     // Spawn a waiter that blocks because there are 0 permits.
-    Future<bool> waiter = spawn([&, rawSem, svcCtx = getServiceContext()]() {
-        auto client = svcCtx->getService()->makeClient("waiter");
-        auto waiterOpCtx = client->makeOperationContext();
-        MockAdmissionContext admCtx;
-        return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
-    });
-
-    waitUntilBlocked(rawSem, 1);
+    auto waiter = spawnWaiter(sem.get(), "waiter");
+    waitUntilBlocked(sem.get(), 1);
 
     // Resizing from 0 to 1 permit should wake the waiter.
-    rawSem->resize(1);
+    sem->resize(1);
 
-    bool result = false;
-    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        result = std::move(waiter).get(_opCtx.get());
-    });
-
-    ASSERT_TRUE(result);
+    assertWaiterAcquired(std::move(waiter));
 }
 
 TEST_P(TicketSemaphoreTest, ResizeNegativeWhileWaitersAreWaiting) {
     // Start with 2 permits, acquire both so available = 0, then spawn waiters.
     auto sem = makeSemaphore(2);
-    auto* rawSem = sem.get();
 
     ASSERT_TRUE(sem->tryAcquire());
     ASSERT_TRUE(sem->tryAcquire());
     ASSERT_EQ(sem->available(), 0);
 
     constexpr int numWaiters = 2;
-    std::vector<Future<bool>> futures;
-
-    for (int i = 0; i < numWaiters; ++i) {
-        futures.push_back(spawn([&, i, rawSem, svcCtx = getServiceContext()]() {
-            auto client = svcCtx->getService()->makeClient("waiter" + std::to_string(i));
-            auto waiterOpCtx = client->makeOperationContext();
-            MockAdmissionContext admCtx;
-            return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
-        }));
-    }
-
-    waitUntilBlocked(rawSem, numWaiters);
+    auto futures = spawnWaiters(sem.get(), numWaiters);
 
     // Resize permits into negative territory while waiters are blocked.
-    rawSem->resize(-3);
-    ASSERT_EQ(rawSem->available(), -3);
+    sem->resize(-3);
+    ASSERT_EQ(sem->available(), -3);
 
     // Releasing the 2 held permits only brings available to -1; waiters stay blocked.
-    rawSem->release();
-    rawSem->release();
+    sem->release();
+    sem->release();
     ASSERT_FALSE(futures[0].isReady());
     ASSERT_FALSE(futures[1].isReady());
 
     // Additional releases bring available positive so waiters can acquire.
-    rawSem->release();
-    rawSem->release();
-    rawSem->release();
+    sem->release();
+    sem->release();
+    sem->release();
 
-    for (auto& f : futures) {
-        bool result = false;
-        _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-            result = std::move(f).get(_opCtx.get());
-        });
-        ASSERT_TRUE(result);
-    }
+    assertAllWaitersAcquired(futures);
 }
 
 TEST_P(TicketSemaphoreTest, MaxWaitersZeroRejectsWaiters) {
@@ -441,71 +444,112 @@ TEST_P(TicketSemaphoreTest, MaxWaitersZeroRejectsWaiters) {
 
     // But once no permits are available, it must queue — which is rejected at maxWaiters 0.
     MockAdmissionContext admCtx2;
-    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx2, getDeadline(), /*interruptible=*/true),
-                       DBException,
-                       ErrorCodes::AdmissionQueueOverflow);
+    assertAcquireIsShed(sem.get(), &admCtx2);
 }
 
 TEST_P(TicketSemaphoreTest, MaxWaitersAllowsUpToLimit) {
     auto sem = makeSemaphore(0);
     sem->setMaxWaiters(2);
-    auto* rawSem = sem.get();
 
-    std::vector<Future<bool>> futures;
-
-    for (int i = 0; i < 2; ++i) {
-        futures.push_back(spawn([&, i, rawSem, svcCtx = getServiceContext()]() {
-            auto client = svcCtx->getService()->makeClient("waiter" + std::to_string(i));
-            auto waiterOpCtx = client->makeOperationContext();
-            MockAdmissionContext admCtx;
-            return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
-        }));
-    }
-
-    waitUntilBlocked(rawSem, 2);
+    auto futures = spawnWaiters(sem.get(), 2);
 
     // A 3rd waiter exceeds the limit.
     MockAdmissionContext admCtx;
-    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx, getDeadline(), /*interruptible=*/true),
-                       DBException,
-                       ErrorCodes::AdmissionQueueOverflow);
+    assertAcquireIsShed(sem.get(), &admCtx);
 
-    rawSem->release();
-    rawSem->release();
+    sem->release();
+    sem->release();
 
-    for (auto& f : futures) {
-        bool result = false;
-        _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-            result = std::move(f).get(_opCtx.get());
-        });
-        ASSERT_TRUE(result);
-    }
+    assertAllWaitersAcquired(futures);
+}
+
+TEST_P(TicketSemaphoreTest, LoadShedExemptBypassesMaxWaitersLimit) {
+    class ExemptAdmissionContext : public MockAdmissionContext {
+    public:
+        bool isLoadShedExempt() const override {
+            return true;
+        }
+    };
+
+    auto sem = makeSemaphore(0);
+    sem->setMaxWaiters(1);
+
+    // Fill the single waiter slot.
+    MockAdmissionContext waiterCtx;
+    auto firstWaiter = spawnWaiter(sem.get(), "waiter", &waiterCtx);
+    waitUntilBlocked(sem.get(), 1);
+
+    // A non-exempt operation should be load shed.
+    MockAdmissionContext shedCtx;
+    assertAcquireIsShed(sem.get(), &shedCtx);
+
+    // An exempt operation should queue past the limit.
+    ExemptAdmissionContext exemptCtx;
+    auto exemptWaiter = spawnWaiter(sem.get(), "exemptWaiter", &exemptCtx);
+    waitUntilBlocked(sem.get(), 2);
+
+    sem->resize(2);
+    assertWaiterAcquired(std::move(firstWaiter));
+    assertWaiterAcquired(std::move(exemptWaiter));
+}
+
+TEST_P(TicketSemaphoreTest, LowAdmissionsBypassesMaxWaitersLimit) {
+    auto sem = makeSemaphore(0);
+    sem->setMaxWaiters(1);
+
+    // Fill the single waiter slot.
+    MockAdmissionContext waiterCtx;
+    auto firstWaiter = spawnWaiter(sem.get(), "waiter", &waiterCtx);
+    waitUntilBlocked(sem.get(), 1);
+
+    // An operation that has never been admitted at low priority should be load shed.
+    MockAdmissionContext shedCtx;
+    assertAcquireIsShed(sem.get(), &shedCtx);
+
+    // An operation that was already admitted at low priority should queue past the limit.
+    MockAdmissionContext lowAdmissionCtx;
+    lowAdmissionCtx.recordLowAdmission();
+    auto lowAdmissionWaiter = spawnWaiter(sem.get(), "lowAdmissionWaiter", &lowAdmissionCtx);
+    waitUntilBlocked(sem.get(), 2);
+
+    sem->resize(2);
+    assertWaiterAcquired(std::move(firstWaiter));
+    assertWaiterAcquired(std::move(lowAdmissionWaiter));
+}
+
+TEST_P(TicketSemaphoreTest, ShedOperationDoesNotOccupyWaiterSlot) {
+    auto sem = makeSemaphore(0);
+    sem->setMaxWaiters(1);
+
+    MockAdmissionContext waiterCtx;
+    auto waiter = spawnWaiter(sem.get(), "waiter", &waiterCtx);
+    waitUntilBlocked(sem.get(), 1);
+
+    // The shed operation must decrement the waiter count it incremented, leaving the slot free
+    // for the next operation, which is in turn shed rather than admitted past the limit.
+    MockAdmissionContext shedCtx;
+    assertAcquireIsShed(sem.get(), &shedCtx);
+    MockAdmissionContext nextCtx;
+    assertAcquireIsShed(sem.get(), &nextCtx);
+
+    sem->release();
+    assertWaiterAcquired(std::move(waiter));
+    ASSERT_EQ(sem->waiters(), 0);
 }
 
 TEST_P(TicketSemaphoreTest, SetMaxWaitersDoesNotAffectExistingWaiters) {
     auto sem = makeSemaphore(0);
-    auto* rawSem = sem.get();
 
-    Future<bool> waiter = spawn([&, rawSem, svcCtx = getServiceContext()]() {
-        auto client = svcCtx->getService()->makeClient("waiter");
-        auto waiterOpCtx = client->makeOperationContext();
-        MockAdmissionContext admCtx;
-        return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
-    });
-
-    waitUntilBlocked(rawSem, 1);
+    auto waiter = spawnWaiter(sem.get(), "waiter");
+    waitUntilBlocked(sem.get(), 1);
 
     // Shrink maxWaiters to 0 while 1 waiter is already queued.
-    rawSem->setMaxWaiters(0);
+    sem->setMaxWaiters(0);
 
     // The existing waiter should still succeed when a permit becomes available.
-    rawSem->release();
+    sem->release();
 
-    bool result = false;
-    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        result = std::move(waiter).get(_opCtx.get());
-    });
-    ASSERT_TRUE(result);
+    assertWaiterAcquired(std::move(waiter));
 }
 
 TEST_P(TicketSemaphoreTest, TryAcquireBypassesMaxWaiters) {
@@ -520,112 +564,76 @@ TEST_P(TicketSemaphoreTest, TryAcquireBypassesMaxWaiters) {
 
 TEST_P(TicketSemaphoreTest, WaitersCountReflectsBlockedThreads) {
     auto sem = makeSemaphore(0);
-    auto* rawSem = sem.get();
-    ASSERT_EQ(rawSem->waiters(), 0);
+    ASSERT_EQ(sem->waiters(), 0);
 
     constexpr int numWaiters = 3;
-    std::vector<Future<bool>> futures;
+    auto futures = spawnWaiters(sem.get(), numWaiters);
 
     for (int i = 0; i < numWaiters; ++i) {
-        futures.push_back(spawn([&, i, rawSem, svcCtx = getServiceContext()]() {
-            auto client = svcCtx->getService()->makeClient("waiter" + std::to_string(i));
-            auto waiterOpCtx = client->makeOperationContext();
-            MockAdmissionContext admCtx;
-            return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
-        }));
+        sem->release();
     }
 
-    waitUntilBlocked(rawSem, numWaiters);
-
-    for (int i = 0; i < numWaiters; ++i) {
-        rawSem->release();
-    }
-
-    for (auto& f : futures) {
-        _opCtx->runWithDeadline(
-            getDeadline(), ErrorCodes::ExceededTimeLimit, [&] { std::move(f).get(_opCtx.get()); });
-    }
-    ASSERT_EQ(rawSem->waiters(), 0);
+    assertAllWaitersAcquired(futures);
+    ASSERT_EQ(sem->waiters(), 0);
 }
 
 TEST_P(TicketSemaphoreTest, NonInterruptibleAcquireReturnsFalseOnKillAndTimeout) {
     auto sem = makeSemaphore(0);
-    auto* rawSem = sem.get();
 
     auto client = getServiceContext()->getService()->makeClient("survivor");
     auto survivorOpCtx = client->makeOperationContext();
     auto* rawOpCtx = survivorOpCtx.get();
 
     auto deadline = Date_t::now() + Milliseconds{500};
-    Future<bool> acquireFuture = spawn([&, rawSem, rawOpCtx, deadline]() {
+    Future<bool> acquireFuture = spawn([rawSem = sem.get(), rawOpCtx, deadline]() {
         MockAdmissionContext admCtx;
         return rawSem->acquire(rawOpCtx, &admCtx, deadline, /*interruptible=*/false);
     });
 
-    waitUntilBlocked(rawSem, 1);
+    waitUntilBlocked(sem.get(), 1);
     survivorOpCtx->markKilled(ErrorCodes::Interrupted);
 
-    bool result = true;
-    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        result = std::move(acquireFuture).get(_opCtx.get());
-    });
-    ASSERT_FALSE(result);
+    ASSERT_FALSE(waitForWaiter(std::move(acquireFuture)));
 }
 
 TEST_P(TicketSemaphoreTest, NonInterruptibleAcquireWaitsForPermitAfterKill) {
     auto sem = makeSemaphore(0);
-    auto* rawSem = sem.get();
 
     auto client = getServiceContext()->getService()->makeClient("survivor");
     auto survivorOpCtx = client->makeOperationContext();
     auto* rawOpCtx = survivorOpCtx.get();
 
-    Future<bool> acquireFuture = spawn([&, rawSem, rawOpCtx]() {
+    Future<bool> acquireFuture = spawn([rawSem = sem.get(), rawOpCtx]() {
         MockAdmissionContext admCtx;
         return rawSem->acquire(rawOpCtx, &admCtx, Date_t::max(), /*interruptible=*/false);
     });
 
-    waitUntilBlocked(rawSem, 1);
+    waitUntilBlocked(sem.get(), 1);
     survivorOpCtx->markKilled(ErrorCodes::Interrupted);
 
     sleepFor(Milliseconds{500});
     ASSERT_FALSE(acquireFuture.isReady());
 
-    rawSem->resize(1);
+    sem->resize(1);
 
-    bool result = false;
-    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        result = std::move(acquireFuture).get(_opCtx.get());
-    });
-    ASSERT_TRUE(result);
+    assertWaiterAcquired(std::move(acquireFuture));
 }
 
 TEST_P(TicketSemaphoreTest, WaiterCountDecreasesAfterTimeout) {
     auto sem = makeSemaphore(0);
     sem->setMaxWaiters(1);
-    auto* rawSem = sem.get();
 
     MockAdmissionContext admCtx;
     auto shortDeadline = Date_t::now() + Milliseconds{50};
     ASSERT_FALSE(sem->acquire(opCtx(), &admCtx, shortDeadline, /*interruptible=*/false));
-    ASSERT_EQ(rawSem->waiters(), 0);
+    ASSERT_EQ(sem->waiters(), 0);
 
     // The waiter slot was reclaimed, so a new waiter can queue without overflow.
-    Future<bool> waiter = spawn([&, rawSem, svcCtx = getServiceContext()]() {
-        auto client = svcCtx->getService()->makeClient("waiter");
-        auto waiterOpCtx = client->makeOperationContext();
-        MockAdmissionContext admCtx2;
-        return rawSem->acquire(waiterOpCtx.get(), &admCtx2, getDeadline(), /*interruptible=*/true);
-    });
+    auto waiter = spawnWaiter(sem.get(), "waiter");
+    waitUntilBlocked(sem.get(), 1);
+    sem->release();
 
-    waitUntilBlocked(rawSem, 1);
-    rawSem->release();
-
-    bool result = false;
-    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        result = std::move(waiter).get(_opCtx.get());
-    });
-    ASSERT_TRUE(result);
+    assertWaiterAcquired(std::move(waiter));
 }
 
 TEST_P(TicketSemaphoreTest, ConcurrentAcquireDoesNotOverbookOrLeak) {
@@ -634,7 +642,6 @@ TEST_P(TicketSemaphoreTest, ConcurrentAcquireDoesNotOverbookOrLeak) {
     constexpr int opsPerThread = 50;
 
     auto sem = makeSemaphore(numPermits);
-    auto* rawSem = sem.get();
 
     // Track maximum concurrent permit holders to verify no overbooking.
     Atomic<int> concurrentHolders{0};
@@ -642,7 +649,7 @@ TEST_P(TicketSemaphoreTest, ConcurrentAcquireDoesNotOverbookOrLeak) {
 
     std::vector<stdx::thread> threads;
     for (int i = 0; i < numThreads; ++i) {
-        threads.emplace_back([&, i]() {
+        threads.emplace_back([&, i, rawSem = sem.get()]() {
             auto client =
                 getServiceContext()->getService()->makeClient("worker" + std::to_string(i));
             auto workerOpCtx = client->makeOperationContext();
@@ -675,7 +682,7 @@ TEST_P(TicketSemaphoreTest, ConcurrentAcquireDoesNotOverbookOrLeak) {
     ASSERT_LTE(maxConcurrentHolders.load(), numPermits);
 
     // No leak: all permits are returned.
-    ASSERT_EQ(rawSem->available(), numPermits);
+    ASSERT_EQ(sem->available(), numPermits);
     ASSERT_EQ(concurrentHolders.load(), 0);
 }
 
@@ -685,40 +692,23 @@ TEST_P(TicketSemaphoreTest, ConcurrentAcquireDoesNotOverbookOrLeak) {
  */
 TEST_P(TicketSemaphoreTest, ResizeWakesExactlyNOfMWaiters) {
     auto sem = makeSemaphore(0);
-    auto* rawSem = sem.get();
 
     constexpr int numWaiters = 5;
-    std::vector<Future<bool>> futures;
-    for (int i = 0; i < numWaiters; ++i) {
-        futures.push_back(spawn([&, i, rawSem, svcCtx = getServiceContext()]() {
-            auto client = svcCtx->getService()->makeClient("waiter" + std::to_string(i));
-            auto waiterOpCtx = client->makeOperationContext();
-            MockAdmissionContext admCtx;
-            return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
-        }));
-    }
+    auto futures = spawnWaiters(sem.get(), numWaiters);
 
-    waitUntilBlocked(rawSem, numWaiters);
-
-    rawSem->resize(3);
+    sem->resize(3);
 
     _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        while (rawSem->waiters() > 2)
+        while (sem->waiters() > 2)
             std::this_thread::yield();
     });
-    ASSERT_EQ(rawSem->waiters(), 2);
-    ASSERT_EQ(rawSem->available(), 0);
+    ASSERT_EQ(sem->waiters(), 2);
+    ASSERT_EQ(sem->available(), 0);
 
-    rawSem->resize(2);
+    sem->resize(2);
 
-    for (auto& f : futures) {
-        bool result = false;
-        _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-            result = std::move(f).get(_opCtx.get());
-        });
-        ASSERT_TRUE(result);
-    }
-    ASSERT_EQ(rawSem->available(), 0);
+    assertAllWaitersAcquired(futures);
+    ASSERT_EQ(sem->available(), 0);
 }
 
 /**
@@ -728,33 +718,16 @@ TEST_P(TicketSemaphoreTest, ResizeWakesExactlyNOfMWaiters) {
  */
 TEST_P(TicketSemaphoreTest, ResizeExcessPermitsRemainAvailable) {
     auto sem = makeSemaphore(0);
-    auto* rawSem = sem.get();
 
     constexpr int numWaiters = 2;
-    std::vector<Future<bool>> futures;
-    for (int i = 0; i < numWaiters; ++i) {
-        futures.push_back(spawn([&, i, rawSem, svcCtx = getServiceContext()]() {
-            auto client = svcCtx->getService()->makeClient("waiter" + std::to_string(i));
-            auto waiterOpCtx = client->makeOperationContext();
-            MockAdmissionContext admCtx;
-            return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
-        }));
-    }
-
-    waitUntilBlocked(rawSem, numWaiters);
+    auto futures = spawnWaiters(sem.get(), numWaiters);
 
     // Add 5 permits: both waiters unblock and consume 2 permits, leaving 3 available.
-    rawSem->resize(5);
+    sem->resize(5);
 
-    for (auto& f : futures) {
-        bool result = false;
-        _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-            result = std::move(f).get(_opCtx.get());
-        });
-        ASSERT_TRUE(result);
-    }
-    ASSERT_EQ(rawSem->available(), 3);
-    ASSERT_EQ(rawSem->waiters(), 0);
+    assertAllWaitersAcquired(futures);
+    ASSERT_EQ(sem->available(), 3);
+    ASSERT_EQ(sem->waiters(), 0);
 }
 
 /**
@@ -763,51 +736,33 @@ TEST_P(TicketSemaphoreTest, ResizeExcessPermitsRemainAvailable) {
  */
 TEST_P(TicketSemaphoreTest, ResizePositiveButRemainsNegativeKeepsWaitersBlocked) {
     auto sem = makeSemaphore(0);
-    auto* rawSem = sem.get();
 
     constexpr int numWaiters = 2;
-    std::vector<Future<bool>> futures;
-    for (int i = 0; i < numWaiters; ++i) {
-        futures.push_back(spawn([&, i, rawSem, svcCtx = getServiceContext()]() {
-            auto client = svcCtx->getService()->makeClient("waiter" + std::to_string(i));
-            auto waiterOpCtx = client->makeOperationContext();
-            MockAdmissionContext admCtx;
-            return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
-        }));
-    }
+    auto futures = spawnWaiters(sem.get(), numWaiters);
 
-    waitUntilBlocked(rawSem, numWaiters);
-
-    rawSem->resize(-5);
-    ASSERT_EQ(rawSem->available(), -5);
+    sem->resize(-5);
+    ASSERT_EQ(sem->available(), -5);
 
     // A positive resize that stays negative must not wake any waiter.
-    rawSem->resize(3);
-    ASSERT_EQ(rawSem->available(), -2);
-    ASSERT_EQ(rawSem->waiters(), numWaiters);
+    sem->resize(3);
+    ASSERT_EQ(sem->available(), -2);
+    ASSERT_EQ(sem->waiters(), numWaiters);
     ASSERT_FALSE(futures[0].isReady());
     ASSERT_FALSE(futures[1].isReady());
 
     // Cross zero — both waiters should finally unblock.
-    rawSem->resize(4);
+    sem->resize(4);
 
-    for (auto& f : futures) {
-        bool result = false;
-        _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-            result = std::move(f).get(_opCtx.get());
-        });
-        ASSERT_TRUE(result);
-    }
-    ASSERT_EQ(rawSem->available(), 0);
+    assertAllWaitersAcquired(futures);
+    ASSERT_EQ(sem->available(), 0);
 }
 
 TEST_P(TicketSemaphoreTest, AcquireHonorsDeadlineWhenPermitsRemainNegative) {
     constexpr auto kBasePollInterval = Milliseconds{50};
     constexpr auto kAcquireTimeout = Milliseconds{200};
     auto sem = makeSemaphore(0, kBasePollInterval);
-    auto* rawSem = sem.get();
 
-    Future<bool> acquireFuture = spawn([&, rawSem]() {
+    Future<bool> acquireFuture = spawn([&, rawSem = sem.get()]() {
         auto client = getServiceContext()->getService()->makeClient("negativePermitsWaiter");
         auto waiterOpCtx = client->makeOperationContext();
         waiterOpCtx->setDeadlineAfterNowBy(Milliseconds{500}, ErrorCodes::ExceededTimeLimit);
@@ -815,17 +770,13 @@ TEST_P(TicketSemaphoreTest, AcquireHonorsDeadlineWhenPermitsRemainNegative) {
         return rawSem->acquire(waiterOpCtx.get(), &admCtx, Date_t::now() + kAcquireTimeout, true);
     });
 
-    waitUntilBlocked(rawSem, 1);
+    waitUntilBlocked(sem.get(), 1);
 
     // Immediate resizing can make the permit count negative while existing tickets are still held.
     // The waiter must continue sleeping and honor its explicit deadline rather than busy-looping.
-    rawSem->resize(-1);
+    sem->resize(-1);
 
-    bool result = true;
-    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        result = std::move(acquireFuture).get(_opCtx.get());
-    });
-    ASSERT_FALSE(result);
+    ASSERT_FALSE(waitForWaiter(std::move(acquireFuture)));
 }
 
 TEST_P(TicketSemaphoreTest, AcquireWithNegativePermitsAndShortDeadlineReturnsFalse) {

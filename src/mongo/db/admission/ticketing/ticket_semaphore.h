@@ -65,4 +65,16 @@ public:
     virtual int waiters() const = 0;
 };
 
+/**
+ * Returns true if an operation attempting to queue behind 'queuedOps' waiters, given a limit of
+ * 'maxQueuedOps', should be load shed for queue overflow. Load-shed exempt operations, and
+ * operations that have already been admitted at low priority, are never shed.
+ */
+inline bool shouldShedForQueueOverflow(const AdmissionContext* admCtx,
+                                       int64_t queuedOps,
+                                       int maxQueuedOps) {
+    return admCtx->getLowAdmissions() == 0 && queuedOps >= maxQueuedOps &&
+        !admCtx->isLoadShedExempt();
+}
+
 }  // namespace mongo

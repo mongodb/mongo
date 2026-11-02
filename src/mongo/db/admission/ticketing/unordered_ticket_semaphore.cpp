@@ -71,7 +71,7 @@ bool UnorderedTicketSemaphore::acquire(OperationContext* opCtx,
             const auto maxWaiters = _maxWaiters.loadRelaxed();
             const auto previousWaiters = _waiters.fetchAndAdd(1);
             hasStartedWaiting = true;
-            if (previousWaiters >= maxWaiters) {
+            if (shouldShedForQueueOverflow(admCtx, previousWaiters, maxWaiters)) {
                 admCtx->recordOperationLoadShed();
                 uasserted(
                     ErrorCodes::AdmissionQueueOverflow,
