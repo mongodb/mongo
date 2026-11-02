@@ -56,6 +56,12 @@ describe("initial sync and the 'initiating set' oplog entry", function () {
         delaySecs = 0,
         failFirstBatchOnce = false,
     }) {
+        // Replicated fast count can independently fetch from the oldest oplog entry, even when
+        // the initiating-set rewind is disabled or skipped. Disable it to isolate that rewind.
+        setParameter = {
+            ...setParameter,
+            "failpoint.disableReplicatedFastCount": tojson({mode: "alwaysOn"}),
+        };
         const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter}});
         rst.startSet();
         rst.initiate();
