@@ -62,7 +62,9 @@ const explain = localColl
 assert.eq(getEngine(explain), "sbe", explain);
 
 const logs = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
-const planSelectionLogs = logs.filter((log) => log.includes("11986305"));
+const planSelectionLogs = logs.filter(
+    (log) => log.includes("11986305") && log.includes("engine_selection.localColl"),
+);
 assert.eq(planSelectionLogs.length, 1);
 assert(planSelectionLogs[0].includes("EQ_LOOKUP_UNWIND"));
 
