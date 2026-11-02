@@ -8,6 +8,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 
 #include <limits>
 
@@ -21,6 +22,123 @@ namespace expression_evaluation_test {
 using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
+
+TEST(ExpressionLogicalInterrupt, CheapScansAmortizeInterruptChecks) {
+    for (const auto& spec : {BSON("$in" << BSON_ARRAY(-1 << "$values")),
+                             BSON("$anyElementTrue" << BSON_ARRAY("$values")),
+                             BSON("$allElementsTrue" << BSON_ARRAY("$values"))}) {
+        ExpressionContextForTest expCtx;
+        auto expr = Expression::parseExpression(&expCtx, spec, expCtx.variablesParseState);
+        const bool all = spec.hasField("$allElementsTrue");
+        Document input{{"values", Value(std::vector<Value>(16384, Value(all)))}};
+        auto* opCtx = expCtx.getOperationContext();
+        const auto before = opCtx->numInterruptChecks();
+        ASSERT_VALUE_EQ(expr->evaluate(input, &expCtx.variables), Value(all));
+        const auto interruptChecks = opCtx->numInterruptChecks() - before;
+        ASSERT_GT(interruptChecks, 1);
+        ASSERT_LT(interruptChecks, 256);
+    }
+}
+
+TEST(ExpressionLogicalInterrupt, ResultsAcrossChunkBoundaries) {
+    for (const auto& spec : {BSON("$in" << BSON_ARRAY(true << "$values")),
+                             BSON("$anyElementTrue" << BSON_ARRAY("$values")),
+                             BSON("$allElementsTrue" << BSON_ARRAY("$values"))}) {
+        ExpressionContextForTest expCtx;
+        auto expr = Expression::parseExpression(&expCtx, spec, expCtx.variablesParseState);
+        const bool all = spec.hasField("$allElementsTrue");
+        for (const auto& [position, expectedChecks] :
+             {std::pair{0, 1}, std::pair{1023, 1}, std::pair{1024, 2}, std::pair{2048, 3}}) {
+            std::vector<Value> values(2049, Value(all));
+            values[position] = Value(!all);
+            const auto before = expCtx.getOperationContext()->numInterruptChecks();
+            ASSERT_VALUE_EQ(expr->evaluate(Document{{"values", Value(values)}}, &expCtx.variables),
+                            Value(!all));
+            const auto interruptChecks =
+                expCtx.getOperationContext()->numInterruptChecks() - before;
+            ASSERT_EQ(interruptChecks, expectedChecks);
+        }
+    }
+}
+
+TEST(ExpressionLogicalInterrupt, KilledOperation) {
+    for (const auto& spec : {BSON("$in" << BSON_ARRAY(-1 << "$values")),
+                             BSON("$anyElementTrue" << BSON_ARRAY("$values")),
+                             BSON("$allElementsTrue" << BSON_ARRAY("$values"))}) {
+        ExpressionContextForTest expCtx;
+        auto expr = Expression::parseExpression(&expCtx, spec, expCtx.variablesParseState);
+        const bool all = spec.hasField("$allElementsTrue");
+        Document input{{"values", Value(std::vector<Value>(1024, Value(all)))}};
+        expCtx.getOperationContext()->markKilled(ErrorCodes::Interrupted);
+        ASSERT_THROWS_CODE(
+            expr->evaluate(input, &expCtx.variables), DBException, ErrorCodes::Interrupted);
+    }
+}
+
+TEST(ExpressionLogicalInterrupt, CancellationAfterFirstChunk) {
+    for (const auto& spec : {BSON("$in" << BSON_ARRAY(-1 << "$values")),
+                             BSON("$anyElementTrue" << BSON_ARRAY("$values")),
+                             BSON("$allElementsTrue" << BSON_ARRAY("$values"))}) {
+        ExpressionContextForTest expCtx;
+        auto expr = Expression::parseExpression(&expCtx, spec, expCtx.variablesParseState);
+        const bool all = spec.hasField("$allElementsTrue");
+        Document input{{"values", Value(std::vector<Value>(16384, Value(all)))}};
+        auto* opCtx = expCtx.getOperationContext();
+        const auto before = opCtx->numInterruptChecks();
+        FailPointEnableBlock failPoint(
+            "checkForInterruptFail",
+            FailPoint::ModeOptions{
+                FailPoint::skip,
+                1,
+                BSON("threadName" << opCtx->getClient()->desc() << "chance" << 1.0)});
+        ASSERT_THROWS_CODE(
+            expr->evaluate(input, &expCtx.variables), DBException, ErrorCodes::Interrupted);
+        ASSERT_EQ(opCtx->numInterruptChecks() - before, 2);
+    }
+}
+
+TEST(ExpressionLogicalInterrupt, ExpiredDeadline) {
+    for (const auto& spec : {BSON("$in" << BSON_ARRAY(-1 << "$values")),
+                             BSON("$anyElementTrue" << BSON_ARRAY("$values")),
+                             BSON("$allElementsTrue" << BSON_ARRAY("$values"))}) {
+        ExpressionContextForTest expCtx;
+        auto expr = Expression::parseExpression(&expCtx, spec, expCtx.variablesParseState);
+        const bool all = spec.hasField("$allElementsTrue");
+        Document input{{"values", Value(std::vector<Value>(1024, Value(all)))}};
+        expCtx.getOperationContext()->setDeadlineAfterNowBy(Milliseconds(0),
+                                                            ErrorCodes::MaxTimeMSExpired);
+        ASSERT_THROWS_CODE(
+            expr->evaluate(input, &expCtx.variables), DBException, ErrorCodes::MaxTimeMSExpired);
+    }
+}
+
+TEST(ExpressionLogicalInterrupt, NoOperationContext) {
+    for (const auto& spec : {BSON("$in" << BSON_ARRAY(-1 << "$values")),
+                             BSON("$anyElementTrue" << BSON_ARRAY("$values")),
+                             BSON("$allElementsTrue" << BSON_ARRAY("$values"))}) {
+        ExpressionContextForTest expCtx;
+        auto expr = Expression::parseExpression(&expCtx, spec, expCtx.variablesParseState);
+        const bool all = spec.hasField("$allElementsTrue");
+        Document input{{"values", Value(std::vector<Value>(1024, Value(all)))}};
+        auto* opCtx = expCtx.getOperationContext();
+        expCtx.setOperationContext(nullptr);
+        ON_BLOCK_EXIT([&] { expCtx.setOperationContext(opCtx); });
+        ASSERT_VALUE_EQ(expr->evaluate(input, &expCtx.variables), Value(all));
+    }
+}
+
+TEST(ExpressionLogicalInterrupt, ArgumentErrorsPrecedeInterruptChecks) {
+    for (const auto& [spec, code] :
+         {std::pair{BSON("$in" << BSON_ARRAY(0 << "$values")), 40081},
+          std::pair{BSON("$anyElementTrue" << BSON_ARRAY("$values")), 17041},
+          std::pair{BSON("$allElementsTrue" << BSON_ARRAY("$values")), 17040}}) {
+        ExpressionContextForTest expCtx;
+        auto expr = Expression::parseExpression(&expCtx, spec, expCtx.variablesParseState);
+        expCtx.getOperationContext()->markKilled(ErrorCodes::Interrupted);
+        ASSERT_THROWS_CODE(
+            expr->evaluate(Document{{"values", 1}}, &expCtx.variables), DBException, code);
+    }
+}
 
 namespace all_any_elements {
 void runTest(Document spec) {

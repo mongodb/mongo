@@ -8,6 +8,29 @@ namespace mongo {
 
 namespace exec::expression {
 
+namespace {
+template <typename Predicate>
+bool anyWithInterrupt(const std::vector<Value>& values,
+                      OperationContext* opCtx,
+                      Predicate predicate) {
+    // Keep interrupt accounting and its branch outside the cheap per-element loop.
+    constexpr size_t kInterval = 1024;
+    for (size_t start = 0; start < values.size();) {
+        if (opCtx) {
+            opCtx->checkForInterrupt();
+        }
+        const auto count = std::min(kInterval, values.size() - start);
+        const auto end = start + count;
+        for (; start < end; ++start) {
+            if (predicate(values[start])) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+}  // namespace
+
 Value evaluate(const ExpressionAllElementsTrue& expr,
                const Document& root,
                Variables* variables,
@@ -18,12 +41,9 @@ Value evaluate(const ExpressionAllElementsTrue& expr,
                           << typeName(arr.getType()),
             arr.isArray());
     const std::vector<Value>& array = arr.getArray();
-    for (auto it = array.begin(); it != array.end(); ++it) {
-        if (!it->coerceToBool()) {
-            return Value(false);
-        }
-    }
-    return Value(true);
+    return Value(!anyWithInterrupt(array,
+                                   expr.getExpressionContext()->getOperationContext(),
+                                   [](const Value& value) { return !value.coerceToBool(); }));
 }
 
 Value evaluate(const ExpressionAnyElementTrue& expr,
@@ -36,12 +56,9 @@ Value evaluate(const ExpressionAnyElementTrue& expr,
                           << typeName(arr.getType()),
             arr.isArray());
     const std::vector<Value>& array = arr.getArray();
-    for (auto it = array.begin(); it != array.end(); ++it) {
-        if (it->coerceToBool()) {
-            return Value(true);
-        }
-    }
-    return Value(false);
+    return Value(anyWithInterrupt(array,
+                                  expr.getExpressionContext()->getOperationContext(),
+                                  [](const Value& value) { return value.coerceToBool(); }));
 }
 
 Value evaluate(const ExpressionIn& expr,
@@ -55,12 +72,12 @@ Value evaluate(const ExpressionIn& expr,
             str::stream() << "$in requires an array as a second argument, found: "
                           << typeName(arrayOfValues.getType()),
             arrayOfValues.isArray());
-    for (auto&& value : arrayOfValues.getArray()) {
-        if (expr.getExpressionContext()->getValueComparator().evaluate(argument == value)) {
-            return Value(true);
-        }
-    }
-    return Value(false);
+    return Value(anyWithInterrupt(
+        arrayOfValues.getArray(),
+        expr.getExpressionContext()->getOperationContext(),
+        [&](const Value& value) {
+            return expr.getExpressionContext()->getValueComparator().evaluate(argument == value);
+        }));
 }
 
 namespace {
