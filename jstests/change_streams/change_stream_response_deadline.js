@@ -46,6 +46,7 @@ import {
     ChangeStreamWatchMode,
     changeStreamPassthroughType,
     getClusterTime,
+    getNextClusterTime,
 } from "jstests/libs/query/change_stream_util.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {checkLog} from "src/mongo/shell/check_log.js";
@@ -245,7 +246,13 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
 
         // Record the cluster time before creating the collection. The change stream will start
         // at T0, so the oplog scan covers the createCollection entry and all subsequent inserts.
-        startTime = getClusterTime(db);
+        //
+        // Use 'getNextClusterTime' rather than the current cluster time directly: if a previous
+        // run of this test dropped this collection, that drop is the most recent oplog entry, so
+        // the current cluster time would be equal to the drop's timestamp. Because
+        // 'startAtOperationTime' is inclusive, the change stream would then immediately observe
+        // the drop and invalidate before it can reach the createCollection and insert events.
+        startTime = getNextClusterTime(getClusterTime(db));
 
         assert.commandWorked(db.createCollection(collName));
 
