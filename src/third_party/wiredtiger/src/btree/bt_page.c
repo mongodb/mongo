@@ -571,7 +571,7 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
     new_image->size = WT_PTRDIFF(cell_ptr, new_image->data);
 
     WT_ERR(__wt_cell_pack_internal_key_addr(
-      session, new_image, &base_state.unpack_key, &base_state.unpack_val, NULL, false, &cell_ptr));
+      session, new_image, &base_state.unpack_key, &base_state.unpack_val, &cell_ptr));
     /* key + value cells */
     entry_count += 2;
 #ifdef HAVE_DIAGNOSTIC
@@ -651,8 +651,8 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
 
         if (cmp < 0) {
             /* Base entry wins: pack it and advance the base stream. */
-            WT_ERR(__wt_cell_pack_internal_key_addr(session, new_image, &base_state.unpack_key,
-              &base_state.unpack_val, NULL, false, &cell_ptr));
+            WT_ERR(__wt_cell_pack_internal_key_addr(
+              session, new_image, &base_state.unpack_key, &base_state.unpack_val, &cell_ptr));
             /* key + value cells */
             entry_count += 2;
 #ifdef HAVE_DIAGNOSTIC
@@ -663,8 +663,8 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
         } else {
             /* Delta entry wins (or equal): pack it if visible, then advance the delta stream. */
             if (!__wt_delta_cell_type_visible_all(&delta_state[j].unpack)) {
-                WT_ERR(__wt_cell_pack_internal_key_addr(
-                  session, new_image, NULL, NULL, &delta_state[j].unpack, true, &cell_ptr));
+                WT_ERR(__wt_cell_pack_internal_key_addr(session, new_image,
+                  &delta_state[j].unpack.key, &delta_state[j].unpack.value, &cell_ptr));
                 /* key + value cells */
                 entry_count += 2;
 #ifdef HAVE_DIAGNOSTIC

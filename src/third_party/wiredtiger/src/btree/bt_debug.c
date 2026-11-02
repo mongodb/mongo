@@ -1006,7 +1006,7 @@ __debug_cell_delta_int(WT_DBG *ds, WT_CELL_UNPACK_DELTA_INT *unpack)
     WT_DECL_RET;
     const uint8_t *cookie_data;
 
-    WT_RET(__debug_cell_kv(ds, NULL, WT_PAGE_ROW_INT, "K", &unpack->key));
+    WT_RET(__debug_item_key(ds, "K", unpack->key.data, unpack->key.size));
 
     cookie_data = unpack->value.data;
     ret = __wt_block_disagg_addr_unpack(ds->session, &cookie_data, unpack->value.size, &cookie);

@@ -324,7 +324,13 @@ functions:
         # bazel wrapper and build directly on the host.
         export MONGO_BAZEL_USE_HERMETIC_CONTAINER=0
 
-        bazel build --mongo_toolchain_version=v5 --config=opt --build_enterprise=False install-mongod
+        # Match MongoDB's sys-perf Bazel configuration for this mongod build.
+        bazel build \
+            --mongo_toolchain_version=v5 \
+            --config=evg \
+            --config=opt_profiled \
+            --release=True \
+            install-mongod
   "checkout develop": &checkout_develop
     command: shell.exec
     type: setup

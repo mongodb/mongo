@@ -1751,10 +1751,7 @@ __wti_disagg_set_last_materialized_lsn(WT_SESSION_IMPL *session, uint64_t lsn)
 
 /*
  * __disagg_abandon_checkpoint --
- *     Abandon the current incomplete checkpoint, if the operation is supported by the provided PALI
- *     implementation. It is a no-op if the operation is not supported, in which case the
- *     application must either perform the equivalent operation before changing roles, or otherwise
- *     guarantee that no updates have been made since the last completed checkpoint.
+ *     Abandon the current incomplete checkpoint.
  *
  * If there are any updates after the last completed checkpoint beyond this point, performing any
  *     writes to the disaggregated tables may lead to undefined behavior, such as illegal delta
@@ -1777,16 +1774,6 @@ __disagg_abandon_checkpoint(WT_SESSION_IMPL *session)
     if (disagg->npage_log == NULL ||
       !__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader))
         WT_RET(EINVAL);
-
-    /*
-     * FIXME-WT-16524: This function is no longer an optional operation for testing, remove this
-     * check.
-     */
-    if (disagg->npage_log->page_log->pl_abandon_checkpoint == NULL) {
-        __wt_verbose_warning(session, WT_VERB_DISAGGREGATED_STORAGE, "%s",
-          "Abandon checkpoint operation is not supported by the current PALI implementation");
-        return (0);
-    }
 
     /*
      * Call the PALI function to abandon the checkpoint. Since we are not specifying the latest
@@ -1883,8 +1870,8 @@ __disagg_wait_for_deferred_pickup(WT_SESSION_IMPL *session)
 
 /*
  * __disagg_restart_checkpoint --
- *     Restart the current checkpoint: Abandon the current checkpoint if it is incomplete (and the
- *     operation to abandon a checkpoint is supported), and begin a new checkpoint.
+ *     Restart the current checkpoint: Abandon the current checkpoint if it is incomplete, and begin
+ *     a new checkpoint.
  */
 static int
 __disagg_restart_checkpoint(WT_SESSION_IMPL *session)
