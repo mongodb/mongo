@@ -567,6 +567,12 @@ void ExpressionConstEval::transport(abt::ABT& n,
         case sbe::EFn::kSetIsSubset:
         case sbe::EFn::kSetDifference:
         case sbe::EFn::kSetEquals:
+        case sbe::EFn::kCollSetIsSubset:
+        case sbe::EFn::kCollSetDifference:
+        case sbe::EFn::kCollSetEquals: {
+            const bool collationAware = op.fn() == sbe::EFn::kCollSetIsSubset ||
+                op.fn() == sbe::EFn::kCollSetDifference || op.fn() == sbe::EFn::kCollSetEquals;
+            const CollatorInterface* setCollator = collationAware ? _collator : nullptr;
             // Convert any argument of type Array to an ArraySet.
             for (size_t idx = 0; idx < args.size(); idx++) {
                 if (args[idx].is<abt::Constant>()) {
@@ -575,7 +581,8 @@ void ExpressionConstEval::transport(abt::ABT& n,
                         case sbe::value::TypeTags::Array:
                         case sbe::value::TypeTags::ArrayMultiSet:
                         case sbe::value::TypeTags::bsonArray: {
-                            auto [setTag, setVal] = sbe::value::makeNewArraySet(tag, val, nullptr);
+                            auto [setTag, setVal] =
+                                sbe::value::makeNewArraySet(tag, val, setCollator);
                             swapAndUpdate(args[idx], abt::make<abt::Constant>(setTag, setVal));
                             break;
                         }
@@ -585,6 +592,7 @@ void ExpressionConstEval::transport(abt::ABT& n,
                 }
             }
             break;
+        }
         default:
             break;
     }

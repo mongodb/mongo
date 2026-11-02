@@ -571,6 +571,33 @@ TEST(ConstEvalTest, FoldIsInListForConstants) {
         abt);
 }
 
+TEST(ConstEvalTest, CollSetFunctionsBuildCollatedSets) {
+    const CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
+    ExpressionConstEval evaluator{&collator};
+
+    for (const char* fnName : {"collSetIsSubset", "collSetDifference", "collSetEquals"}) {
+        sbe::value::Array array;
+        auto [lowerTag, lowerVal] = sbe::value::makeNewString("a");
+        array.push_back_raw(lowerTag, lowerVal);
+        auto [upperTag, upperVal] = sbe::value::makeNewString("A");
+        array.push_back_raw(upperTag, upperVal);
+        auto [arrayTag, arrayVal] = sbe::value::makeCopyArray(array);
+
+        CollatorInterface* collatorCopy = collator.clone().release();
+        ABT abt = make<FunctionCall>(
+            fnName,
+            makeSeq(make<Constant>(TypeTags::collator,
+                                   sbe::value::bitcastFrom<CollatorInterface*>(collatorCopy)),
+                    make<Constant>(arrayTag, arrayVal),
+                    Constant::null()));
+        evaluator.optimize(abt);
+
+        auto [setTag, setVal] = abt.cast<FunctionCall>()->nodes()[1].cast<Constant>()->get();
+        ASSERT_EQ(setTag, TypeTags::ArraySet) << fnName;
+        ASSERT_EQ(sbe::value::getArraySetView(setVal)->size(), 1) << fnName;
+    }
+}
+
 TEST(Optimizer, ConstFoldIf) {
     ExpressionConstEval evaluator{nullptr};
     auto tree = _if("x"_var, _cbool(true), _cbool(false))._n;
