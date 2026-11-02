@@ -27,10 +27,12 @@ value::TagValueOwned toTagValueOwned(const ScalarSpec& spec) {
                 return value::TagValueOwned::numberInt32(v);
             else if constexpr (std::is_same_v<T, int64_t>)
                 return value::TagValueOwned::numberInt64(v);
+            else if constexpr (std::is_same_v<T, double>)
+                return value::TagValueOwned::numberDouble(v);
+            else if constexpr (std::is_same_v<T, Decimal128>)
+                return value::TagValueOwned::fromRaw(value::makeCopyDecimal(v));
             else if constexpr (std::is_same_v<T, std::string>)
                 return value::TagValueOwned::fromRaw(value::makeNewString(v));
-            else
-                return value::TagValueOwned::numberDouble(v);
         },
         spec);
 }

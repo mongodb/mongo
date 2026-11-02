@@ -33,8 +33,8 @@
 
 /*
  * Fuzz test that runs SBE's hash group stage (HashAggStage) and streaming group stage
- * (StreamingAggStage) on fuzzer-generated documents and grouping keys and asserts that both produce
- * the same groups with the same accumulator outputs.
+ * (StreamingAggStage) on fuzzer-generated documents, grouping keys, and cluster keys, and asserts
+ * that both produce the same groups with the same accumulator outputs.
  */
 
 namespace mongo::sbe {
@@ -67,6 +67,7 @@ struct ScalarKey {
  */
 struct ObjectKey {
     std::vector<KeyRef> refs;
+    std::vector<bool> fillEmptyClusterKeys;
     bool operator==(const ObjectKey&) const = default;
 };
 
@@ -78,8 +79,29 @@ constexpr unsigned kMaxKeyFields = 3;
 auto keySpecDomain() {
     auto refDomain = fuzztest::InRange<KeyRef>(0, kMaxTreeBranching - 1);
     auto refsDomain = fuzztest::UniqueElementsVectorOf(refDomain).WithMaxSize(kMaxKeyFields);
-    return fuzztest::VariantOf(fuzztest::StructOf<ScalarKey>(refDomain),
-                               fuzztest::StructOf<ObjectKey>(refsDomain));
+
+    // Based on the selected key, fuzz a fillEmptyClusterKeys bitmap if the key is multi-ref
+    return fuzztest::FlatMap(
+        [](const std::variant<KeyRef, std::vector<KeyRef>>& key) {
+            auto bitsToFuzz = 0;
+            if (const auto* objectKey = std::get_if<std::vector<KeyRef>>(&key)) {
+                bitsToFuzz = objectKey->size() > 1 ? objectKey->size() : 0;
+            }
+            return fuzztest::Map(
+                [key](const std::vector<bool>& bitmap) -> KeySpec {
+                    if (auto* objectKey = std::get_if<std::vector<KeyRef>>(&key)) {
+                        if (objectKey->size() == 1) {
+                            return ObjectKey{*objectKey, {false}};
+                        } else {
+                            return ObjectKey{*objectKey, bitmap};
+                        }
+                    } else {
+                        return ScalarKey(std::get<KeyRef>(key));
+                    }
+                },
+                fuzztest::VectorOf(fuzztest::Arbitrary<bool>()).WithSize(bitsToFuzz));
+        },
+        fuzztest::VariantOf(refDomain, refsDomain));
 }
 
 /*
@@ -90,6 +112,13 @@ std::vector<KeyRef> keyRefs(const KeySpec& key) {
         return objectKey->refs;
     }
     return {std::get<ScalarKey>(key).ref};
+}
+
+std::vector<bool> fillEmptyClusterKeys(const KeySpec& key) {
+    if (const auto* objectKey = std::get_if<ObjectKey>(&key)) {
+        return objectKey->fillEmptyClusterKeys;
+    }
+    return {false};
 }
 
 // These functions are here so that ADL works properly in order to print the fuzzer-generated
@@ -110,6 +139,15 @@ void AbslStringify(Sink& sink, const ObjectKey& key) {
                      positionalName(key.refs[slot]));
     }
     absl::Format(&sink, "}");
+}
+
+template <typename Sink>
+void AbslStringify(Sink& sink, const KeySpec& key) {
+    if (std::holds_alternative<ScalarKey>(key)) {
+        AbslStringify(sink, std::get<ScalarKey>(key));
+    } else {
+        AbslStringify(sink, std::get<ObjectKey>(key));
+    }
 }
 
 /**
@@ -133,12 +171,12 @@ std::vector<std::pair<value::TypeTags, value::Value>> arrayToSortedRows(value::T
 /*
  * Builds the scan input for both group stages: one row per document, as sbe arrays holding just the
  * document itself. Returns the rows sorted by the documents' group key fields, with missing fields
- * ordered as null, so that every distinct grouping key occupies a contiguous run of rows, as
- * StreamingAggStage's run-detection requires.
+ * ordered as null where the cluster key fills missing with null, so that every distinct grouping
+ * key occupies a contiguous cluster of rows, as StreamingAggStage requires.
  */
-value::TagValueOwned makeSortedInput(const std::vector<DocumentSpec>& docs, const KeySpec& key) {
-    const auto refs = keyRefs(key);
-
+value::TagValueOwned makeSortedInput(const std::vector<DocumentSpec>& docs,
+                                     const std::vector<KeyRef>& refs,
+                                     const std::vector<bool>& fillEmptyClusterKeys) {
     struct SortRow {
         // Declare a user constructor so that a default constructor isn't implicitly declared.
         // A strange memory error is possible where stable_sort doesn't detect implicitly-deleted
@@ -159,18 +197,19 @@ value::TagValueOwned makeSortedInput(const std::vector<DocumentSpec>& docs, cons
         // Store the key field values in an array for sorting. This is only valid as long as there
         // are no Nothing values stored, since Nothing is silently dropped from SBE arrays.
         auto sortKey = std::make_unique<value::Array>();
-        for (const auto& ref : refs) {
-            auto elem = doc[positionalName(ref)];
-            // For now use a string placeholder (len > 16 to avoid collisions with scalar strings)
-            // as the sort key for Nothing, to sort missing separately from null, except in the case
-            // where nothing will be rewritten to null in runGroupStage()
-            // TODO(SERVER-136257) once null/missing disambiguation is implemented, always use
-            // value::TagValueOwned::fromRaw(value::TypeTags::Null, 0) to sort null/missing equally
+        for (size_t slot = 0; slot < refs.size(); ++slot) {
+            auto elem = doc[positionalName(refs[slot])];
+            // Sort null and missing equally where the cluster key rewrites missing into null, and
+            // in the single-ref case where missing will be rewritten to null. Otherwise use a
+            // placeholder sort key.
             auto getMissingSortKey = [&]() {
-                if (refs.size() == 1)
+                if (fillEmptyClusterKeys[slot] || refs.size() == 1) {
                     return value::TagValueOwned::fromRaw(value::TypeTags::Null, 0);
-                return value::TagValueOwned::fromRaw(
-                    value::makeNewString("$$missingmissingmissing$$"));
+                } else {
+                    // len>16 to avoid collisions with string scalars
+                    return value::TagValueOwned::fromRaw(
+                        value::makeNewString("$$missingmissingmissing$$"));
+                }
             };
             sortKey->push_back(elem.eoo() ? getMissingSortKey() : bson::convertToOwned(elem));
         }
@@ -230,13 +269,17 @@ public:
      */
     value::TagValueOwned runGroupStage(value::TagValueOwned input,
                                        const std::vector<KeyRef>& refs,
+                                       const std::vector<bool>& fillEmptyClusterKeys,
                                        bool streaming) {
         auto [scanSlots, splitScanStage] = generateVirtualScanMulti(1, std::move(input));
         const auto docSlot = scanSlots[0];
 
-        // Project the group key fields out of the document using getField
+        // Project the group key fields out of the document using getField. For keys with
+        // fillEmptyClusterKeys set, the cluster key is the key ref with fillEmpty. Otherwise the
+        // key slot is reused for the cluster key.
         SlotExprPairVector keyFields;
         value::SlotVector keySlots;
+        value::SlotVector clusterKeySlots;
         for (size_t i = 0; i < refs.size(); ++i) {
             auto keySlot = generateSlotId();
             auto keyExpr = makeFunction(EFn::kGetField,
@@ -250,6 +293,20 @@ public:
             }
             keyFields.emplace_back(keySlot, std::move(keyExpr));
             keySlots.push_back(keySlot);
+
+            if (fillEmptyClusterKeys[i] && refs.size() > 1) {
+                auto clusterSlot = generateSlotId();
+                keyFields.emplace_back(
+                    clusterSlot,
+                    makeE<EPrimBinary>(EPrimBinary::fillEmpty,
+                                       makeFunction(EFn::kGetField,
+                                                    makeE<EVariable>(docSlot),
+                                                    makeStringConstant(positionalName(refs[i]))),
+                                       makeE<EConstant>(value::TypeTags::Null, 0)));
+                clusterKeySlots.push_back(clusterSlot);
+            } else {
+                clusterKeySlots.push_back(keySlot);
+            }
         }
         auto scanStage =
             makeS<ProjectStage>(std::move(splitScanStage), std::move(keyFields), kEmptyPlanNodeId);
@@ -289,6 +346,7 @@ public:
         if (streaming) {
             stage = makeS<StreamingAggStage>(std::move(scanStage),
                                              keySlots,
+                                             clusterKeySlots,
                                              boost::none,
                                              std::move(accumulators),
                                              kEmptyPlanNodeId);
@@ -337,18 +395,22 @@ private:
 };
 
 /*
- * Fuzz property: on any generated set of documents, with a generated scalar or object grouping key,
- * the hash group stage and the streaming group stage produce identical groups with identical
- * min/max/first/last values.
+ * Fuzz property: on any generated set of documents, with a generated scalar or object grouping key
+ * and a generated fillEmpty cluster key bit per key ref (which marks the key positions whose
+ * cluster key slots coerce missing to null), the hash group stage and the streaming
+ * group stage produce identical groups with identical min/max/first/last values.
  */
 class GroupStagesFuzzAdapter : public fuzztest::PerFuzzTestFixtureAdapter<GroupStagesFuzzTest> {
 public:
     void FuzzGroupStagesAgree(std::vector<DocumentSpec> docs, KeySpec key) {
-        value::TagValueOwned input = makeSortedInput(docs, key);
         const auto refs = keyRefs(key);
+        const auto fillEmptyClusterKeyBits = fillEmptyClusterKeys(key);
 
-        auto hashResult = runGroupStage(input.copy(), refs, false /* streaming */);
-        auto streamResult = runGroupStage(std::move(input), refs, true /* streaming */);
+        value::TagValueOwned input = makeSortedInput(docs, refs, fillEmptyClusterKeyBits);
+        auto hashResult =
+            runGroupStage(input.copy(), refs, fillEmptyClusterKeyBits, false /* streaming */);
+        auto streamResult =
+            runGroupStage(std::move(input), refs, fillEmptyClusterKeyBits, true /* streaming */);
 
         auto hashRows = arrayToSortedRows(hashResult.tag(), hashResult.value());
         auto streamRows = arrayToSortedRows(streamResult.tag(), streamResult.value());
@@ -365,8 +427,19 @@ public:
             }
             return str + "]";
         };
+        auto printBits = [](const std::vector<bool>& bits) {
+            std::string str = "[";
+            for (size_t i = 0; i < bits.size(); ++i) {
+                if (i > 0) {
+                    str += ", ";
+                }
+                str += bits[i] ? "true" : "false";
+            }
+            return str + "]";
+        };
         const auto stageOutputsMsg = "\n  hash group output: " + printRows(hashRows) +
-            "\nstream group output: " + printRows(streamRows);
+            "\nstream group output: " + printRows(streamRows) +
+            "\n  fillEmptyClusterKeys: " + printBits(fillEmptyClusterKeyBits);
 
         ASSERT_EQ(hashRows.size(), streamRows.size()) << stageOutputsMsg;
         for (size_t i = 0; i < hashRows.size(); ++i) {

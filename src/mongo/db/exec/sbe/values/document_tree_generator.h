@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/platform/decimal128.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -48,7 +49,8 @@ struct NothingSpec {
     bool operator==(const NothingSpec&) const = default;
 };
 
-using ScalarSpec = std::variant<bool, int32_t, int64_t, double, std::string, NullSpec, NothingSpec>;
+using ScalarSpec =
+    std::variant<bool, int32_t, int64_t, double, Decimal128, std::string, NullSpec, NothingSpec>;
 
 struct ObjectSpec {
     unsigned childCount = 0;
@@ -93,28 +95,35 @@ inline std::string positionalName(unsigned idx, unsigned depth = 0) {
     return std::string(1, static_cast<char>('a' + depth)) + std::to_string(idx);
 }
 
+// Group keys repeat across documents only when field values repeat, so the scalar domains layer a
+// shared small range with arbitrary and extreme values (which cover the type).
+inline auto sharedNumericDomain() {
+    // -2, -1, 0, 1, 2
+    return fuzztest::InRange<int32_t>(-2, 2);
+}
+
 inline auto int32Domain() {
-    return fuzztest::OneOf(fuzztest::InRange<int32_t>(-1, 1),
-                           fuzztest::InRange<int32_t>(-3, 3),
-                           fuzztest::InRange<int32_t>(-20, 20),
+    return fuzztest::OneOf(sharedNumericDomain(),
                            fuzztest::Arbitrary<int32_t>(),
-                           fuzztest::ElementOf<int32_t>({std::numeric_limits<int32_t>::min(),
-                                                         std::numeric_limits<int32_t>::max()}));
+                           fuzztest::Just(std::numeric_limits<int32_t>::min()));
 }
 
 inline auto int64Domain() {
-    return fuzztest::OneOf(fuzztest::InRange<int64_t>(-1, 1),
-                           fuzztest::InRange<int64_t>(-3, 3),
-                           fuzztest::InRange<int64_t>(-20, 20),
+    return fuzztest::OneOf(fuzztest::ConstructorOf<int64_t>(sharedNumericDomain()),
                            fuzztest::Arbitrary<int64_t>(),
-                           fuzztest::ElementOf<int64_t>({std::numeric_limits<int64_t>::min(),
-                                                         std::numeric_limits<int64_t>::max()}));
+                           fuzztest::Just(std::numeric_limits<int64_t>::min()));
 }
 
-// Group keys repeat across documents only when field values repeat, so the scalar domains layer
-// small ranges (which collide often) with arbitrary and extreme values (which cover the type).
 inline auto doubleDomain() {
-    return fuzztest::OneOf(fuzztest::InRange<double>(-2.0, 2.0), fuzztest::Arbitrary<double>());
+    return fuzztest::OneOf(fuzztest::ConstructorOf<double>(sharedNumericDomain()),
+                           fuzztest::Arbitrary<double>());
+}
+
+inline auto decimalDomain() {
+    return fuzztest::OneOf(
+        fuzztest::ConstructorOf<Decimal128>(sharedNumericDomain()),
+        fuzztest::ConstructorOf<Decimal128>(fuzztest::StructOf<Decimal128::Value>(
+            fuzztest::Arbitrary<uint64_t>(), fuzztest::Arbitrary<uint64_t>())));
 }
 
 inline auto stringDomain() {
@@ -127,6 +136,7 @@ inline auto scalarSpecDomain() {
                                int32Domain(),
                                int64Domain(),
                                doubleDomain(),
+                               decimalDomain(),
                                stringDomain(),
                                fuzztest::Just(NullSpec{}),
                                fuzztest::Just(NothingSpec{}));
