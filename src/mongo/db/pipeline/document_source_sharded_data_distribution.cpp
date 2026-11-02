@@ -170,13 +170,9 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
             "localField": "matchingShardedCollection.uuid",
             "foreignField": "uuid",
             "pipeline" : [
-                { "$project": { "shard": 1 } },
                 {
                     "$group": {
-                        "_id": null,
-                        "shards": {
-                            "$addToSet": "$shard"
-                        }
+                        "_id": "$shard" 
                     }
                 }
             ],
@@ -197,7 +193,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
                     cond: {
                         $or: [
                             {
-                                $in: ["$$shard.shardName", {$first: "$matchingShards.shards"}]
+                                $in: ["$$shard.shardName", "$matchingShards._id"]
                             },
                             {
                                 $ne: ["$$shard.numOrphanedDocs", 0]
