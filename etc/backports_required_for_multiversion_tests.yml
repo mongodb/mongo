@@ -33,6 +33,10 @@ last-patch:
       ticket: SERVER-130139
     - test_file: jstests/auth/bulk_write_buckets_nss_confusion.js
       ticket: SERVER-131411
+    - test_file: jstests/change_streams/change_stream_all_cluster_query_settings_reject.js
+      ticket: SERVER-135301
+    - test_file: jstests/change_streams/change_stream_response_deadline.js
+      ticket: SERVER-135301
     - test_file: jstests/change_streams/update_lookup_before_ddl.js
       ticket: SERVER-134745
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
@@ -154,6 +158,8 @@ last-continuous:
       ticket: SERVER-130139
     - test_file: jstests/auth/bulk_write_buckets_nss_confusion.js
       ticket: SERVER-131411
+    - test_file: jstests/change_streams/change_stream_all_cluster_query_settings_reject.js
+      ticket: SERVER-135301
     - test_file: jstests/change_streams/change_stream_large_event_resumption.js
       ticket: SERVER-134795
     - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
@@ -162,6 +168,8 @@ last-continuous:
       ticket: SERVER-134581
     - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
       ticket: SERVER-135788
+    - test_file: jstests/change_streams/change_stream_response_deadline.js
+      ticket: SERVER-135301
     - test_file: jstests/change_streams/change_stream_update_lookup_batching.js
       ticket: SERVER-134581
     - test_file: jstests/change_streams/change_stream_update_lookup_batching.js
@@ -351,6 +359,8 @@ last-lts:
       ticket: SERVER-130139
     - test_file: jstests/auth/bulk_write_buckets_nss_confusion.js
       ticket: SERVER-131411
+    - test_file: jstests/change_streams/change_stream_all_cluster_query_settings_reject.js
+      ticket: SERVER-135301
     - test_file: jstests/change_streams/change_stream_large_event_resumption.js
       ticket: SERVER-134795
     - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
@@ -359,6 +369,8 @@ last-lts:
       ticket: SERVER-134581
     - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
       ticket: SERVER-135788
+    - test_file: jstests/change_streams/change_stream_response_deadline.js
+      ticket: SERVER-135301
     - test_file: jstests/change_streams/change_stream_update_lookup_batching.js
       ticket: SERVER-134581
     - test_file: jstests/change_streams/change_stream_update_lookup_batching.js

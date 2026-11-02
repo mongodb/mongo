@@ -26,6 +26,8 @@
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
+#include "mongo/db/query/query_shape/mock_shape.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
@@ -450,6 +452,70 @@ TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForDistinct) {
                                                /*shouldBypassQuerySettingsRejection=*/true);
         assertQuerySettingsLookup(distinctCmdBSON, deferredShape);
     }
+}
+
+TEST_F(QuerySettingsServiceTest, IsEligibleForQuerySettings) {
+    // A regular user namespace is eligible.
+    ASSERT_TRUE(QuerySettingsService::isEligibleForQuerySettings(expCtx()));
+
+    // A whole-cluster change stream runs on the 'admin' database as a collectionless aggregate
+    // (admin.$cmd.aggregate) but is a legitimate, user-facing query shape and must be eligible.
+    {
+        auto csExpCtx = makeBlankExpressionContext(
+            opCtx(),
+            NamespaceStringUtil::deserialize(
+                /* tenantId */ boost::none, "admin", "$cmd.aggregate", kSerializationContext));
+        DocumentSourceChangeStreamSpec spec;
+        spec.setAllChangesForCluster(true);
+        csExpCtx->setChangeStreamSpec(std::move(spec));
+        ASSERT_TRUE(QuerySettingsService::isEligibleForQuerySettings(csExpCtx));
+    }
+
+    // An internal namespace without an all-cluster change stream spec remains ineligible.
+    {
+        auto adminExpCtx = makeBlankExpressionContext(
+            opCtx(),
+            NamespaceStringUtil::deserialize(
+                /* tenantId */ boost::none, "admin", "system.keys", kSerializationContext));
+        ASSERT_FALSE(QuerySettingsService::isEligibleForQuerySettings(adminExpCtx));
+    }
+
+    // A collectionless aggregate on 'admin' that is not an all-cluster change stream remains
+    // ineligible.
+    {
+        auto adminAggExpCtx = makeBlankExpressionContext(
+            opCtx(),
+            NamespaceStringUtil::deserialize(
+                /* tenantId */ boost::none, "admin", "$cmd.aggregate", kSerializationContext));
+        adminAggExpCtx->setChangeStreamSpec(DocumentSourceChangeStreamSpec());
+        ASSERT_FALSE(QuerySettingsService::isEligibleForQuerySettings(adminAggExpCtx));
+    }
+}
+
+TEST_F(QuerySettingsServiceTest, ComputeQueryShapeHashForWholeClusterChangeStream) {
+    query_shape::DeferredQueryShape deferredShape =
+        query_shape::DeferredQueryShape{[]() -> StatusWith<std::unique_ptr<query_shape::Shape>> {
+            return StatusWith<std::unique_ptr<query_shape::Shape>>{
+                std::unique_ptr<query_shape::Shape>{std::make_unique<query_shape::MockShape>()}};
+        }};
+
+    // A whole-cluster change stream runs on the internal 'admin' database (admin.$cmd.aggregate)
+    // but is a legitimate, user-facing query shape, so it must be assigned a query shape hash.
+    auto csExpCtx = makeBlankExpressionContext(
+        opCtx(),
+        NamespaceStringUtil::deserialize(
+            /* tenantId */ boost::none, "admin", "$cmd.aggregate", kSerializationContext));
+    DocumentSourceChangeStreamSpec spec;
+    spec.setAllChangesForCluster(true);
+    csExpCtx->setChangeStreamSpec(std::move(spec));
+    ASSERT_TRUE(shape_helpers::computeQueryShapeHash(csExpCtx, deferredShape).has_value());
+
+    // The same namespace without an all-cluster change stream spec remains ineligible.
+    auto adminExpCtx = makeBlankExpressionContext(
+        opCtx(),
+        NamespaceStringUtil::deserialize(
+            /* tenantId */ boost::none, "admin", "system.keys", kSerializationContext));
+    ASSERT_FALSE(shape_helpers::computeQueryShapeHash(adminExpCtx, deferredShape).has_value());
 }
 
 TEST_F(QuerySettingsServiceTest, InitializeSettingsForQueryIsNoOpWhenNotStarted) {

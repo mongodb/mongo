@@ -6,6 +6,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/unittest/ensure_fcv.h"
@@ -29,6 +30,11 @@ protected:
         ShardingState::create(getServiceContext());
         expCtx = make_intrusive<ExpressionContextForTest>();
         query_settings::QuerySettingsService::initializeForTest(getServiceContext());
+        // A $changeStream representative query is only legal on a replica set (or mongos), so a
+        // replication coordinator must be present to build one.
+        repl::ReplicationCoordinator::set(
+            getServiceContext(),
+            std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
     }
 
     QuerySettingsService& service() {
@@ -103,6 +109,80 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeAppliedOnEncrypt
         {find: "enxcol_.basic.esc", $db: "testDB"}
     )");
     assertInvalidQueryWithAnyQuerySettings(expCtx->getOperationContext(), representativeQ, 7746601);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCanBeAppliedOnWholeClusterChangeStream) {
+    // A whole-cluster change stream runs on the internal 'admin' database
+    // (admin.$cmd.aggregate) but is a legitimate, user-facing query shape, so it is allowed.
+    const BSONObj representativeQ = fromjson(R"(
+        {
+            aggregate: 1,
+            $db: "admin",
+            pipeline: [{$changeStream: {allChangesForCluster: true}}],
+            cursor: {}
+        }
+    )");
+    auto representativeQueryInfo =
+        createRepresentativeInfo(expCtx->getOperationContext(), representativeQ);
+    ASSERT_TRUE(representativeQueryInfo.isAllChangesForClusterChangeStream);
+    ASSERT_DOES_NOT_THROW(
+        service().validateQueryCompatibleWithAnyQuerySettings(representativeQueryInfo));
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeAppliedOnOtherInternalDbQueries) {
+    // A query on an internal database that is not a whole-cluster change stream is still rejected.
+    const BSONObj representativeQ = fromjson("{find: 'someColl', $db: 'admin'}");
+    assertInvalidQueryWithAnyQuerySettings(expCtx->getOperationContext(), representativeQ, 8584900);
+}
+
+TEST_F(QuerySettingsValidationTestFixture,
+       QuerySettingsCannotBeAppliedOnAllChangesForClusterOnNonCollectionlessNamespace) {
+    // Setting 'allChangesForCluster' on a namespace that is not the collectionless 'admin'
+    // aggregate must not bypass the internal-database restriction.
+    const BSONObj representativeQ = fromjson(R"(
+        {
+            aggregate: "someColl",
+            $db: "admin",
+            pipeline: [{$changeStream: {allChangesForCluster: true}}],
+            cursor: {}
+        }
+    )");
+    assertInvalidQueryWithAnyQuerySettings(expCtx->getOperationContext(), representativeQ, 8584900);
+}
+
+TEST_F(QuerySettingsValidationTestFixture,
+       QuerySettingsCannotBeAppliedOnAllChangesForClusterOnConfigDb) {
+    // A whole-cluster change stream may only run on the 'admin' database, so setting the flag on
+    // the 'config' database must not bypass the internal-database restriction.
+    const BSONObj representativeQ = fromjson(R"(
+        {
+            aggregate: 1,
+            $db: "config",
+            pipeline: [{$changeStream: {allChangesForCluster: true}}],
+            cursor: {}
+        }
+    )");
+    assertInvalidQueryWithAnyQuerySettings(expCtx->getOperationContext(), representativeQ, 8584900);
+}
+
+TEST_F(QuerySettingsValidationTestFixture,
+       QuerySettingsCannotBeAppliedOnAllChangesForClusterOnSystemCollection) {
+    // Setting 'allChangesForCluster' on a system collection must not bypass the system-collection
+    // restriction.
+    const BSONObj representativeQ = fromjson(R"(
+        {
+            aggregate: "system.views",
+            $db: "testDB",
+            pipeline: [{$changeStream: {allChangesForCluster: true}}],
+            cursor: {}
+        }
+    )");
+    assertInvalidQueryWithAnyQuerySettings(expCtx->getOperationContext(), representativeQ, 8584901);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeAppliedOnSystemCollections) {
+    const BSONObj representativeQ = fromjson("{find: 'system.views', $db: 'testDB'}");
+    assertInvalidQueryWithAnyQuerySettings(expCtx->getOperationContext(), representativeQ, 8584901);
 }
 
 TEST_F(QuerySettingsValidationTestFixture,

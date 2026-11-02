@@ -341,6 +341,71 @@ describe("sharded change stream operationResponseMaxMS via query settings", () =
         }
     });
 
+    describe("whole-cluster change stream - query settings reach the data shards", () => {
+        // A whole-cluster change stream runs on the 'admin' database as a collectionless aggregate
+        // (admin.$cmd.aggregate) with 'allChangesForCluster: true'. It is a legitimate user-facing
+        // query shape, so inline query settings must be honored on every targeted data shard.
+        const collName = "whole_cluster_coll";
+        const ns = dbName + "." + collName;
+        let startTime;
+        let adminCst;
+
+        before(() => {
+            const coll = testDB.getCollection(collName);
+            coll.drop();
+
+            withBalancerEnabled(st.s, () => {
+                // Shard the collection on _id with an explicit split so that low _id values land on
+                // shard0 and high _id values land on shard1. This makes the test database exist on
+                // both shards, so the whole-cluster stream targets (and must forward the settings
+                // to) both of them.
+                assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
+                assert.commandWorked(mongos.adminCommand({split: ns, middle: {_id: 5}}));
+                assert.commandWorked(
+                    mongos.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}),
+                );
+
+                // Record T0 after sharding is set up so the change stream starts from this point.
+                startTime = getClusterTime(testDB);
+
+                // The matching document (_id: kNumDocs - 1 = 9) lands on shard1.
+                insertDocs(coll);
+            });
+        });
+
+        after(() => {
+            assert(testDB.getCollection(collName).drop());
+        });
+
+        beforeEach(() => {
+            // A whole-cluster stream must be opened on the 'admin' database.
+            adminCst = new ChangeStreamTest(mongos.getDB("admin"));
+        });
+
+        afterEach(() => {
+            if (adminCst) {
+                adminCst.cleanUp();
+            }
+            adminCst = null;
+        });
+
+        for (const [version, options] of Object.entries(changeStreamOptions)) {
+            it(`forwards operationResponseMaxMS to the data shards for a whole-cluster stream - ${version} change stream`, () => {
+                // Passing 'collection: 1' opens a collectionless aggregate on 'admin', and
+                // 'allChangesForCluster: true' makes it a whole-cluster stream. The stream targets
+                // both data shards, so the knob must reach both shard cursors.
+                runTest(
+                    adminCst,
+                    /* collName */ 1,
+                    startTime,
+                    [st.rs0.getPrimary(), st.rs1.getPrimary()],
+                    {},
+                    Object.assign({allChangesForCluster: true}, options),
+                );
+            });
+        }
+    });
+
     describe("$_passthroughToShard - change stream targets a specific shard directly", () => {
         // This exercises the kSpecificShardOnly targeting path in cluster_aggregate.cpp, which
         // forwards the command via serializeForPassthrough() -> addQuerySettingsToRequest().

@@ -42,9 +42,8 @@
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {configureFailPointForAllShardsAndMongos} from "jstests/libs/fail_point_util.js";
 import {
+    advanceClusterTime,
     ChangeStreamTest,
-    ChangeStreamWatchMode,
-    changeStreamPassthroughType,
     getClusterTime,
     getNextClusterTime,
 } from "jstests/libs/query/change_stream_util.js";
@@ -246,13 +245,12 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
 
         // Record the cluster time before creating the collection. The change stream will start
         // at T0, so the oplog scan covers the createCollection entry and all subsequent inserts.
-        //
-        // Use 'getNextClusterTime' rather than the current cluster time directly: if a previous
-        // run of this test dropped this collection, that drop is the most recent oplog entry, so
-        // the current cluster time would be equal to the drop's timestamp. Because
-        // 'startAtOperationTime' is inclusive, the change stream would then immediately observe
-        // the drop and invalidate before it can reach the createCollection and insert events.
-        startTime = getNextClusterTime(getClusterTime(db));
+        // Advance the cluster time first: otherwise 'getClusterTime' can return the timestamp of a
+        // preceding operation (e.g. a 'dropDatabase' from the suite's per-test cleanup), and the
+        // stream, which includes the entry at its start time, would observe that event and
+        // invalidate immediately.
+        advanceClusterTime(db);
+        startTime = getClusterTime(db);
 
         assert.commandWorked(db.createCollection(collName));
 
@@ -311,20 +309,6 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
         });
 
         it(`returns multiple empty batches with a postBatchResumeToken - using query settings override${testCaseSuffix}`, () => {
-            // TODO SERVER-135301: querySettings is never applied to a whole-cluster stream
-            // (admin db, allChangesForCluster) because isEligbleForQuerySettings() rejects the
-            // admin namespace outright. Remove this skip once that is fixed.
-            const isDirectToShard =
-                TestData.connectedDirectlyToShard || TestData.changeStreamCommandsDirectToShard;
-            if (
-                isDirectToShard &&
-                changeStreamPassthroughType() === ChangeStreamWatchMode.kCluster
-            ) {
-                jsTest.log.info(
-                    "Skipping case: querySettings has no effect on a whole-cluster stream when directly connected to a shard",
-                );
-                return;
-            }
             runTest(
                 {queryKnobs: {operationResponseMaxMS: NumberLong(kScanMaxMS)}},
                 restartChangeStream,

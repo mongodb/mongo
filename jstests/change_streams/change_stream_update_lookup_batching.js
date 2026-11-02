@@ -3,7 +3,9 @@
  * batching knobs is set ('internalChangeStreamUpdateLookupMaxBatchSize'/'MaxInputBytes'/
  * 'MaxOutputBytes'), and that each knob actually forces the batch count it claims to (via the
  * 'enrichBatchesStarted' serverStatus counter, since correctness alone can't tell a working knob
- * from a silently-ignored one). Also asserts the per-engine found/notFound counters accumulate
+ * from a silently-ignored one). The exact batch count is only asserted for collection-scope
+ * streams and when not connected through mongos, since a merged per-shard-cursor stream batches
+ * nondeterministically. Also asserts the per-engine found/notFound counters accumulate
  * correctly across multiple windows, not just within a single lookup: a bug that double-counts or
  * drops an increment at a window boundary would be invisible to correctness or batch-count checks
  * alone.
@@ -27,8 +29,13 @@
  *   assumes_unsharded_collection,
  * ]
  */
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {afterEach, describe, it} from "jstests/libs/mochalite.js";
-import {assertChangeStreamEventEq} from "jstests/libs/query/change_stream_util.js";
+import {
+    assertChangeStreamEventEq,
+    changeStreamPassthroughType,
+    ChangeStreamWatchMode,
+} from "jstests/libs/query/change_stream_util.js";
 import {
     expectedUpdateLookupEngine,
     ServerStatusMetrics,
@@ -77,6 +84,13 @@ describe("change stream updateLookup batching-knob invariance", function () {
     const engine = expectedUpdateLookupEngine();
     const isBatchingEligible = engine === UpdateLookupExecutor.kSBE;
 
+    // Through mongos, a db-/cluster-scope stream is a merge of per-shard cursors, so its exact
+    // enrich-batch boundaries (and thus the exact batch count) are not deterministic. Collection-
+    // scope streams, and any stream on a non-sharded fixture, still produce exact counts.
+    const skipExactBatchCount =
+        FixtureHelpers.isMongos(testDB) &&
+        changeStreamPassthroughType() !== ChangeStreamWatchMode.kCollection;
+
     // '+1' accounts for a fresh awaitData cursor's first event always forming its own batch-of-one
     // (fillBatch()'s shouldWaitForInserts check), before the remaining events batch normally.
     function expectedBatchCount(queryKnobs) {
@@ -99,10 +113,13 @@ describe("change stream updateLookup batching-knob invariance", function () {
         return (delta.changeStreams && delta.changeStreams.updateLookup) || {};
     }
 
-    // A change stream cursor never signals EOF, so drain exactly 'expectedCount' events.
+    // A change stream cursor never signals EOF, but a single getMore can still return an empty
+    // batch (for example while a mongos merges per-shard cursors), so wait for each event before
+    // reading it.
     function drainAllChanges(cursor, expectedCount) {
         const changes = [];
         for (let i = 0; i < expectedCount; i++) {
+            assert.soon(() => cursor.hasNext(), "expected another change stream event");
             changes.push(cursor.next());
         }
         return changes;
@@ -146,10 +163,12 @@ describe("change stream updateLookup batching-knob invariance", function () {
                 cursor.close();
             });
 
-            assert.eq(expectedBatchCount(queryKnobs), delta.enrichBatchesStarted, {
-                queryKnobs,
-                delta,
-            });
+            if (!skipExactBatchCount) {
+                assert.eq(expectedBatchCount(queryKnobs), delta.enrichBatchesStarted, {
+                    queryKnobs,
+                    delta,
+                });
+            }
 
             const lookup = delta[engine] || {};
             const numGone = ids.filter((id) => id % 2 === 1).length;
@@ -215,7 +234,9 @@ describe("change stream updateLookup batching-knob invariance", function () {
         // whole-db/whole-cluster stream runs Express, always batch-of-one, so every event opens
         // its own batch regardless of the byte cap.
         const expectedBatches = isBatchingEligible ? 4 : updates.length;
-        assert.eq(expectedBatches, delta.enrichBatchesStarted, {delta});
+        if (!skipExactBatchCount) {
+            assert.eq(expectedBatches, delta.enrichBatchesStarted, {delta});
+        }
 
         // Every update found its document; none removed here.
         const lookup = delta[engine] || {};

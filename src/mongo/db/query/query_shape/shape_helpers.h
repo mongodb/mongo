@@ -97,7 +97,9 @@ void appendNamespaceShape(BSONObjBuilder& bob,
  *   - Skip internal clients (unless 'skipInternalClientCheck' is true — passed by callers that
  *     want the hash recorded on the shard side of a sharded write).
  *   - Skip direct clients (DBDirectClient).
- *   - Skip queries against internal databases or system collections.
+ *   - Skip queries against internal databases or system collections. The one exception is a
+ *     whole-cluster change stream, which runs on the internal 'admin' database
+ *     (admin.$cmd.aggregate) but is a legitimate, user-facing query shape.
  *   - Return boost::none if the deferred shape failed to evaluate.
  *
  * The ExpressionContext overload additionally short-circuits for:
@@ -119,5 +121,6 @@ boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
     OperationContext* opCtx,
     const query_shape::DeferredQueryShape& deferredShape,
     const NamespaceString& nss,
-    bool skipInternalClientCheck = false);
+    bool skipInternalClientCheck = false,
+    bool isAllChangesForClusterChangeStream = false);
 }  // namespace mongo::shape_helpers

@@ -1,23 +1,39 @@
 /**
- * Loading this file overrides DB.prototype._runCommandImpl with a function that converts any
- * attempt to run $changeStream on a single collection into a whole-db $changeStream filtered by
- * that namespace. Single-collection $changeStream rules regarding internal collections and views
- * are respected. Explicit whole-db or whole-cluster $changeStreams, as well as non-$changeStream
- * commands and commands which explicitly request to be exempted from modification by setting the
- * 'noPassthrough' flag, are passed through as-is.
+ * Loading this file overrides runCommand with a function that converts any attempt to run
+ * $changeStream on a single collection into a whole-db $changeStream filtered by that namespace.
+ * Single-collection $changeStream rules regarding internal collections and views are respected.
+ * Explicit whole-db or whole-cluster $changeStreams, as well as non-$changeStream commands and
+ * commands which explicitly request to be exempted from modification by passing a truthy
+ * 'noPassthrough' flag to 'changeStreamPassthroughAwareRunCommand', are passed through as-is.
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {
     ChangeStreamWatchMode,
     getChangeStreamStage,
 } from "jstests/libs/query/change_stream_util.js";
 
+// Set while a command that must not be upconverted is in flight. Exempting a command from this
+// passthrough must not exempt it from the other runCommand overrides (in particular the transaction
+// passthrough): otherwise a change stream opened here would not have its cursor registered as a
+// non-transaction cursor, and its subsequent getMores would be wrapped in a transaction.
+let skipUpconversion = false;
+
 // Helper function which tests can call to explicitly request that the command not be modified by
 // the passthrough code. When defined, ChangeStreamTest will adopt this as its default runCommand
 // implementation to allow individual tests to exempt themselves from modification.
-globalThis.changeStreamPassthroughAwareRunCommand = (db, cmdObj, noPassthrough) =>
-    db.runCommand(cmdObj, undefined, undefined, noPassthrough);
+globalThis.changeStreamPassthroughAwareRunCommand = (db, cmdObj, noPassthrough) => {
+    if (!noPassthrough) {
+        return db.runCommand(cmdObj);
+    }
+    skipUpconversion = true;
+    try {
+        return db.runCommand(cmdObj);
+    } finally {
+        skipUpconversion = false;
+    }
+};
 
 // Defines a set of functions to validate incoming $changeStream requests and transform
 // single-collection streams into equivalent whole-db streams. Separating these functions allows the
@@ -134,30 +150,41 @@ globalThis.ChangeStreamPassthroughHelpers = {
     },
 };
 
-const originalRunCommandImpl = DB.prototype._runCommandImpl;
-const originalRunCommand = DB.prototype.runCommand;
-
 const upconvertedCursors = new Set();
 
-const passthroughRunCommandImpl = function (dbName, cmdObj, options) {
-    // Check whether this command is an upconvertable $changeStream request. If the command is an
-    // explain, we check the wrapped command object.
+function runCommandOverride(conn, dbName, _commandName, cmdObj, func, makeFuncArgs) {
+    if (typeof cmdObj !== "object" || cmdObj === null) {
+        return func.apply(conn, makeFuncArgs(cmdObj));
+    }
+
+    // Commands explicitly exempted via 'changeStreamPassthroughAwareRunCommand' are passed through
+    // untouched, but still flow through the remaining overrides.
+    if (skipUpconversion) {
+        return func.apply(conn, makeFuncArgs(cmdObj));
+    }
+
+    // Only aggregates can carry a $changeStream stage, and only getMores of an already-upconverted
+    // cursor need their collection rewritten. Everything else is passed through untouched.
     let csCmdObj = cmdObj.explain ? cmdObj.explain : cmdObj;
+    if (csCmdObj.aggregate === undefined && csCmdObj.getMore === undefined) {
+        return func.apply(conn, makeFuncArgs(cmdObj));
+    }
+
+    // The upconversion is namespace-aware, so it needs the database the command was issued on.
+    const db = conn.getDB(dbName);
+
     const upconvertCursor =
-        globalThis.ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest(
-            this,
-            csCmdObj,
-        );
+        globalThis.ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest(db, csCmdObj);
     if (upconvertCursor) {
         [dbName, csCmdObj] = globalThis.ChangeStreamPassthroughHelpers.upconvertChangeStreamRequest(
-            this,
+            db,
             csCmdObj,
         );
     }
 
     // If this is an explain, put the upconverted agg back into the explain command.
     if (cmdObj.explain) {
-        cmdObj.explain = csCmdObj;
+        cmdObj = Object.assign({}, cmdObj, {explain: csCmdObj});
     } else {
         cmdObj = csCmdObj;
     }
@@ -167,13 +194,13 @@ const passthroughRunCommandImpl = function (dbName, cmdObj, options) {
     // namespace.
     if (cmdObj && cmdObj.getMore && upconvertedCursors.has(cmdObj.getMore.toString())) {
         [dbName, cmdObj] = globalThis.ChangeStreamPassthroughHelpers.upconvertGetMoreRequest(
-            this,
+            db,
             cmdObj,
         );
     }
 
     // Pass the modified command to the original runCommand implementation.
-    const res = originalRunCommandImpl.apply(this, [dbName, cmdObj, options]);
+    const res = func.apply(conn, makeFuncArgs(cmdObj, dbName));
 
     // Record the upconverted cursor ID so that we can adjust subsequent getMores.
     if (upconvertCursor && res.cursor && res.cursor.id > 0) {
@@ -181,7 +208,7 @@ const passthroughRunCommandImpl = function (dbName, cmdObj, options) {
     }
 
     return res;
-};
+}
 
 // Redirect the Collection's 'watch' function to use the whole-DB version. Although calls to the
 // shell helpers will ultimately resolve to the overridden runCommand anyway, we need to
@@ -195,8 +222,8 @@ DBCollection.prototype.watch = function (pipeline, options) {
     return this.getDB().watch(pipeline, options);
 };
 
-// Override DB.runCommand to use the custom or original _runCommandImpl.
-DB.prototype.runCommand = function (cmdObj, extra, queryOptions, noPassthrough) {
-    this._runCommandImpl = noPassthrough ? originalRunCommandImpl : passthroughRunCommandImpl;
-    return originalRunCommand.apply(this, [cmdObj, extra, queryOptions]);
-};
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/query/implicit_whole_db_changestreams.js",
+);
+
+OverrideHelpers.overrideRunCommand(runCommandOverride);

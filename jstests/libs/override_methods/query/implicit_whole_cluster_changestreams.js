@@ -1,9 +1,9 @@
 /**
- * Loading this file overrides DB.prototype._runCommandImpl with a function that converts any
- * attempt to run $changeStream on a single collection or single database into a cluster-wide
- * $changeStream filtered by that database or namespace. Single-collection/db rules regarding
- * internal collections and views are respected. Non-$changeStream commands and commands which
- * explicitly request to be exempted from modification by setting the 'noPassthrough' flag, are
+ * Loading this file overrides runCommand with a function that converts any attempt to run
+ * $changeStream on a single collection or single database into a cluster-wide $changeStream
+ * filtered by that database or namespace. Single-collection/db rules regarding internal
+ * collections and views are respected. Non-$changeStream commands and commands which explicitly
+ * request to be exempted from modification via 'changeStreamPassthroughAwareRunCommand', are
  * passed through as-is.
  */
 
@@ -11,6 +11,7 @@
 // passthrough's ChangeStreamPassthroughHelpers.
 import "jstests/libs/override_methods/query/implicit_whole_db_changestreams.js";
 
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 
 // Any valid single-collection or single-database request is upconvertable to cluster-wide.
@@ -69,3 +70,12 @@ DB.prototype.watch = function (pipeline, options) {
     pipeline.unshift(globalThis.ChangeStreamPassthroughHelpers.nsMatchFilter(this, 1));
     return this.getMongo().watch(pipeline, options);
 };
+
+// Register this override for parallel shells as well. A parallel shell only replays the override
+// files registered via 'prependOverrideInParallelShell', not the suite's own imports. The whole-db
+// override registers itself when it is loaded (transitively from this module), but without the
+// registration below a child shell would load only that whole-db override and its change streams
+// would run at database scope instead of cluster scope.
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/query/implicit_whole_cluster_changestreams.js",
+);
