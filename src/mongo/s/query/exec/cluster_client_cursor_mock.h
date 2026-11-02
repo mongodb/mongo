@@ -116,6 +116,8 @@ public:
 
     bool usesChangeStreamV2ShardTargeting() const final;
 
+    bool requiresEndOfTransaction() const final;
+
     void setLastUseDate(Date_t now) final;
 
     boost::optional<uint32_t> getPlanCacheShapeHash() const final;

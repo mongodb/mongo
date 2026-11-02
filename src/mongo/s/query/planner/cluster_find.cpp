@@ -25,6 +25,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_in_use_info.h"
+#include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
@@ -59,6 +60,7 @@
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/collection_uuid_mismatch.h"
 #include "mongo/db/router_role/router_role.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -663,6 +665,36 @@ void ensureChangeStreamShardTargetingStillEnabled(
     }
 }
 
+/**
+ * Kill switch for the end-of-transaction change stream feature. If this cursor was opened with
+ * 'showEndOfTransaction: required' but an operator has since disabled the feature (the
+ * 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag or the 'allowEndOfTransaction'
+ * server parameter), fail it with a non-resumable error so the consumer learns that the stream can
+ * no longer emit endOfTransaction events. This is a no-op for other cursors.
+ */
+void ensureChangeStreamEndOfTransactionStillEnabled(
+    ClusterCursorManager::PinnedCursor& pinnedCursor) {
+    if (!pinnedCursor->requiresEndOfTransaction()) {
+        return;
+    }
+
+    // Read the current feature flag and server parameter values, not the snapshot taken when the
+    // cursor was opened.
+    if (feature_flags::gFeatureFlagEndOfTransactionChangeEventSynthesis.isEnabled() &&
+        isAllowEndOfTransactionEnabled()) {
+        return;
+    }
+
+    // Throw and leave 'pinnedCursor' unreturned, so its destructor kills the cursor instead of
+    // returning it to the manager as still-open.
+    uasserted(ErrorCodes::ChangeStreamFatalError,
+              "This change stream was opened with 'showEndOfTransaction: required', but the "
+              "end-of-transaction feature has since been disabled (the "
+              "'featureFlagEndOfTransactionChangeEventSynthesis' feature flag or the "
+              "'allowEndOfTransaction' server parameter was turned off), so it can no longer emit "
+              "endOfTransaction events");
+}
+
 }  // namespace
 
 
@@ -1082,6 +1114,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     }
 
     ensureChangeStreamShardTargetingStillEnabled(pinnedCursor.getValue());
+    ensureChangeStreamEndOfTransactionStillEnabled(pinnedCursor.getValue());
 
     // If the 'failGetMoreAfterCursorCheckout' failpoint is enabled, throw an exception with the
     // specified 'errorCode' value, or ErrorCodes::InternalError if 'errorCode' is omitted.

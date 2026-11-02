@@ -88,6 +88,10 @@ bool ClusterClientCursorMock::usesChangeStreamV2ShardTargeting() const {
     return false;
 }
 
+bool ClusterClientCursorMock::requiresEndOfTransaction() const {
+    return false;
+}
+
 void ClusterClientCursorMock::setLastUseDate(Date_t now) {
     _lastUseDate = std::move(now);
 }

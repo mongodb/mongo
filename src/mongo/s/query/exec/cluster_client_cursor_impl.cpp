@@ -92,7 +92,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key)),
       _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery),
       _usesChangeStreamV2ShardTargeting(
-          CurOp::get(opCtx)->debug().usesChangeStreamV2ShardTargeting) {
+          CurOp::get(opCtx)->debug().usesChangeStreamV2ShardTargeting),
+      _requiresEndOfTransaction(CurOp::get(opCtx)->debug().requiresEndOfTransaction) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -127,7 +128,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key)),
       _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery),
       _usesChangeStreamV2ShardTargeting(
-          CurOp::get(opCtx)->debug().usesChangeStreamV2ShardTargeting) {
+          CurOp::get(opCtx)->debug().usesChangeStreamV2ShardTargeting),
+      _requiresEndOfTransaction(CurOp::get(opCtx)->debug().requiresEndOfTransaction) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -379,6 +381,10 @@ bool ClusterClientCursorImpl::isChangeStreamCursor() const {
 
 bool ClusterClientCursorImpl::usesChangeStreamV2ShardTargeting() const {
     return _usesChangeStreamV2ShardTargeting;
+}
+
+bool ClusterClientCursorImpl::requiresEndOfTransaction() const {
+    return _requiresEndOfTransaction;
 }
 
 void ClusterClientCursorImpl::setLastUseDate(Date_t now) {

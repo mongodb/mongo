@@ -183,7 +183,9 @@ mongo_cc_library(
     ],
     deps = [
         "document_sources_idl",
+        "//src/mongo/db:end_of_transaction_parameter",
         "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/repl:oplog_entry",
     ],

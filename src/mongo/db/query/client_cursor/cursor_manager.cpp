@@ -378,6 +378,9 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     curOp->debug().isChangeStreamQuery = cursor->_isChangeStreamQuery;
     // Pass along 'usesOptimizedUpdateLookup' so it detects IFR flag change at runtime.
     curOp->debug().usesOptimizedUpdateLookup = cursor->_usesOptimizedUpdateLookup;
+    // Pass along 'requiresEndOfTransaction' so it detects feature flag / parameter change at
+    // runtime.
+    curOp->debug().requiresEndOfTransaction = cursor->_requiresEndOfTransaction;
 
     if (cursor->getSessionId()) {
         auto vivifyCursorStatus =

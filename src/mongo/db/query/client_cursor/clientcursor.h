@@ -184,6 +184,10 @@ public:
         return _usesOptimizedUpdateLookup;
     }
 
+    bool requiresEndOfTransaction() const {
+        return _requiresEndOfTransaction;
+    }
+
     bool mayHoldMongotTaskExecutor() const {
         return _mayHoldMongotTaskExecutor;
     }
@@ -574,6 +578,11 @@ private:
     // by the getMore precondition to kill-and-resume the cursor if the optimization flag is later
     // turned off.
     bool _usesOptimizedUpdateLookup{false};
+
+    // True iff this change stream cursor was opened with 'showEndOfTransaction: required'. Used by
+    // the getMore precondition to fail the cursor if the feature flag or the
+    // 'allowEndOfTransaction' server parameter is later turned off.
+    bool _requiresEndOfTransaction{false};
 
     // Flag to decide if diagnostic information should be omitted.
     bool _shouldOmitDiagnosticInformation{false};

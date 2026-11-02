@@ -145,9 +145,11 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     std::vector<BSONObj>& backingBsonObjs);
 
 /**
- * Returns the match filter for the classic changestream operations.
+ * Returns the match filter for the classic changestream operations. If
+ * 'includeEndOfTransaction' is set, 'endOfTransaction' is included as well, so that streams which
+ * opt in to endOfTransaction events receive them even without 'showExpandedEvents'.
  */
-BSONObj getMatchFilterForClassicOperationTypes();
+BSONObj getMatchFilterForClassicOperationTypes(bool includeEndOfTransaction = false);
 
 }  // namespace change_stream_filter
 }  // namespace mongo

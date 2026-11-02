@@ -629,6 +629,11 @@ public:
     // kill-and-resume the cursor if the optimization flag is turned off.
     bool usesOptimizedUpdateLookup{false};
 
+    // True iff this change stream cursor was opened with 'showEndOfTransaction: required'. Recorded
+    // on the ClientCursor so the getMore precondition can fail the cursor if the feature flag or
+    // the 'allowEndOfTransaction' server parameter is turned off after the stream was opened.
+    bool requiresEndOfTransaction{false};
+
     BSONObj execStats;  // Owned here.
 
     // The hash of the PlanCache key for the query being run. This may change depending on what

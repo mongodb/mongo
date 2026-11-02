@@ -108,7 +108,7 @@ Value DocumentSourceChangeStreamTransform::serialize(
         // Setting 'showEndOfTransaction' to 'off' is equivalent to leaving the option unset. Remove
         // it here so that it is neither serialized when the spec is sent to the shards nor included
         // in the query shape and query shape hash.
-        if (!DocumentSourceChangeStream::showEndOfTransactionRequested(_changeStreamSpec)) {
+        if (!change_stream::showEndOfTransactionRequested(_changeStreamSpec)) {
             serialized = serialized.removeField(
                 DocumentSourceChangeStreamSpec::kShowEndOfTransactionFieldName);
         }

@@ -4,13 +4,45 @@
 #include "mongo/db/pipeline/change_stream_helpers.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::change_stream {
+
+bool showEndOfTransactionRequested(const DocumentSourceChangeStreamSpec& spec) {
+    return spec.getShowEndOfTransaction().value_or(ShowEndOfTransactionModeEnum::kOff) !=
+        ShowEndOfTransactionModeEnum::kOff;
+}
+
+bool isEndOfTransactionRequired(const DocumentSourceChangeStreamSpec& spec) {
+    return spec.getShowEndOfTransaction().value_or(ShowEndOfTransactionModeEnum::kOff) ==
+        ShowEndOfTransactionModeEnum::kRequired;
+}
+
+EndOfTransactionBehavior determineEndOfTransactionBehavior(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& spec = expCtx->getChangeStreamSpec();
+    const bool newEndOfTransactionEnabled =
+        feature_flags::gFeatureFlagEndOfTransactionChangeEventSynthesis.isEnabled() &&
+        isAllowEndOfTransactionEnabled() && spec && showEndOfTransactionRequested(*spec);
+    if (newEndOfTransactionEnabled) {
+        return EndOfTransactionBehavior::kNew;
+    }
+
+    const bool legacyEndOfTransactionEnabled = spec && spec->getShowExpandedEvents() &&
+        feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    if (legacyEndOfTransactionEnabled) {
+        return EndOfTransactionBehavior::kLegacy;
+    }
+
+    return EndOfTransactionBehavior::kNone;
+}
 
 bool isRouterOrNonShardedReplicaSet(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (expCtx->getInRouter()) {

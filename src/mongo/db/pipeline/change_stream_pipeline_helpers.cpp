@@ -5,6 +5,8 @@
 
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
@@ -217,10 +219,13 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
         stages.push_back(DocumentSourceChangeStreamEnsureResumeTokenPresent::create(expCtx, spec));
     }
 
-    // If 'showExpandedEvents' is NOT set, add a filter that returns only classic change events.
+    // If 'showExpandedEvents' is NOT set, add a filter that returns only classic change events. If
+    // the stream opted in to endOfTransaction events, include those as well.
     if (!spec.getShowExpandedEvents()) {
         stages.push_back(DocumentSourceInternalChangeStreamMatch::create(
-            change_stream_filter::getMatchFilterForClassicOperationTypes(), expCtx));
+            change_stream_filter::getMatchFilterForClassicOperationTypes(
+                change_stream::showEndOfTransactionRequested(spec)),
+            expCtx));
     }
 
     return stages;

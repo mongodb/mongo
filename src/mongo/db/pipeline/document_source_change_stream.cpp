@@ -242,6 +242,12 @@ void configureV2Reader(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     // cursor on the v1 path if the IFR flag is later turned off.
     CurOp::get(opCtx)->debug().usesChangeStreamV2ShardTargeting = true;
 
+    // Record whether the stream requires endOfTransaction events, so the router getMore
+    // precondition can fail the cursor if the feature is turned off after the stream was opened.
+    if (change_stream::isEndOfTransactionRequired(spec)) {
+        CurOp::get(opCtx)->debug().requiresEndOfTransaction = true;
+    }
+
     ChangeStreamReaderBuilder* readerBuilder =
         ChangeStreamReaderBuilder::get(opCtx->getServiceContext());
     tassert(10743908, "expecting ChangeStreamReaderBuilder to be available", readerBuilder);
@@ -485,12 +491,6 @@ Timestamp DocumentSourceChangeStream::getStartTimeForNewStream(
     return currentTime.addTicks(1).asTimestamp();
 }
 
-bool DocumentSourceChangeStream::showEndOfTransactionRequested(
-    const DocumentSourceChangeStreamSpec& spec) {
-    return spec.getShowEndOfTransaction().value_or(ShowEndOfTransactionModeEnum::kOff) !=
-        ShowEndOfTransactionModeEnum::kOff;
-}
-
 void DocumentSourceChangeStream::LiteParsed::assertPermittedInAPIVersion(
     const APIParameters& apiParameters) const {
     if (!apiParameters.getAPIVersion() || *apiParameters.getAPIVersion() != "1" ||
@@ -570,7 +570,7 @@ ChangeStreamReaderVersionEnum DocumentSourceChangeStream::_determineChangeStream
     // On a router, requesting endOfTransaction events forces the V2 reader with precise shard
     // targeting. There is no V1 fallback for sharded-cluster streams: if the V2 reader cannot be
     // used, the feature is unavailable and the stream fails rather than silently degrading.
-    const bool requireV2 = showEndOfTransactionRequested(spec);
+    const bool requireV2 = change_stream::showEndOfTransactionRequested(spec);
     const auto assertV2ReaderAvailableForEndOfTransaction = [&] {
         uassert(ErrorCodes::InvalidOptions,
                 "The 'showEndOfTransaction' parameter to $changeStream requires the V2 change "
@@ -653,7 +653,7 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
 
     // 'showEndOfTransaction' may only be set to a value other than 'off' when the
     // end-of-transaction feature is available.
-    if (showEndOfTransactionRequested(spec)) {
+    if (change_stream::showEndOfTransactionRequested(spec)) {
         uassert(
             ErrorCodes::InvalidOptions,
             str::stream() << "The 'showEndOfTransaction' parameter to $changeStream requires the "

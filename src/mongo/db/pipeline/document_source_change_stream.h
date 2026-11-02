@@ -348,12 +348,6 @@ public:
     static Timestamp getStartTimeForNewStream(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    /**
-     * Returns whether the user requested endOfTransaction events, i.e. whether the
-     * 'showEndOfTransaction' option was set to a value other than 'off'.
-     */
-    static bool showEndOfTransactionRequested(const DocumentSourceChangeStreamSpec& spec);
-
 private:
     // Determines the change stream reader version (v1 or v2) from the user's change stream request
     // ('spec') parameter. The v2 reader version will only be selected if the feature flag for

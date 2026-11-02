@@ -12,6 +12,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <iosfwd>
 #include <string>
 #include <string_view>
@@ -22,6 +23,13 @@
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
+
+/**
+ * The reserved 'txnOpIndex' of a synthesized endOfTransaction event that is emitted from a commit
+ * entry's accounting metadata. It sorts after every real operation of the transaction, which can
+ * never exceed INT32_MAX operations.
+ */
+constexpr size_t kEndOfTransactionTxnOpIndex = INT32_MAX;
 
 struct ResumeTokenData {
     /*

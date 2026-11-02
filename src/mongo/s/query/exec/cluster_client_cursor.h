@@ -238,6 +238,11 @@ public:
     virtual bool usesChangeStreamV2ShardTargeting() const = 0;
 
     /**
+     * Returns whether this change stream cursor was opened with 'showEndOfTransaction: required'.
+     */
+    virtual bool requiresEndOfTransaction() const = 0;
+
+    /**
      * Set the last use date to the provided time.
      */
     virtual void setLastUseDate(Date_t now) = 0;

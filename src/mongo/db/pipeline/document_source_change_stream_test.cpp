@@ -1008,11 +1008,112 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
     spec->setVersion(ChangeStreamReaderVersionEnum::kV1);
     getExpCtx()->setChangeStreamSpec(spec);
 
-    std::vector<BSONObj> backingBsonObjs;
-    auto actualFilter =
-        change_stream_filter::buildTransactionFilter(getExpCtx(), nullptr, backingBsonObjs);
+    const auto checkFilter = [&](const std::string& expected) {
+        std::vector<BSONObj> backingBsonObjs;
+        auto actualFilter =
+            change_stream_filter::buildTransactionFilter(getExpCtx(), nullptr, backingBsonObjs);
+        ASSERT_BSONOBJ_EQ_AUTO(expected, actualFilter->serialize());
+    };
 
-    std::string expected = R"(
+    // The 'o2.endOfTransaction' predicate is only added on the legacy endOfTransaction path.
+    const std::string expectedWithoutEndOfTransaction = R"(
+{
+    "$or": [
+        {
+            "$and": [
+                {
+                    "$or": [
+                        {
+                            "o.applyOps": {
+                                "$elemMatch": {
+                                    "$and": [
+                                        {
+                                            "$or": [
+                                                {
+                                                    "o.create": {
+                                                        "$eq": "change_stream"
+                                                    }
+                                                },
+                                                {
+                                                    "o.createIndexes": {
+                                                        "$eq": "change_stream"
+                                                    }
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "ns": {
+                                                "$eq": "unittests.$cmd"
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "o.applyOps.ns": {
+                                "$eq": "unittests.change_stream"
+                            }
+                        },
+                        {
+                            "prevOpTime": {
+                                "$not": {
+                                    "$eq": {
+                                        "ts": {"$timestamp":{"t":0,"i":0}},
+                                        "t": -1
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "op": {
+                        "$eq": "c"
+                    }
+                },
+                {
+                    "o.partialTxn": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.prepare": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.applyOps": {
+                        "$type": [
+                            4
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "$and": [
+                {
+                    "o.commitTransaction": {
+                        "$eq": 1
+                    }
+                },
+                {
+                    "op": {
+                        "$eq": "c"
+                    }
+                }
+            ]
+        }
+    ]
+}
+    )";
+
+    const std::string expectedWithEndOfTransaction = R"(
 {
     "$or": [
         {
@@ -1123,7 +1224,31 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
 }
     )";
 
-    ASSERT_BSONOBJ_EQ_AUTO(expected, actualFilter->serialize());
+    // 'kNone': no endOfTransaction opt-in, but the 'o2.endOfTransaction' predicate is still kept so
+    // that a legacy endOfTransaction oplog entry is matched whenever one is written.
+    checkFilter(expectedWithEndOfTransaction);
+
+    // 'kLegacy': expanded events plus the old feature flag add the 'o2.endOfTransaction' predicate.
+    {
+        unittest::ServerParameterGuard legacyEotFlag("featureFlagEndOfTransactionChangeEvent",
+                                                     true);
+        spec->setShowExpandedEvents(true);
+        getExpCtx()->setChangeStreamSpec(spec);
+        checkFilter(expectedWithEndOfTransaction);
+    }
+
+    // 'kNew': the 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag, the server
+    // parameter and the 'showEndOfTransaction' opt-in do not add the 'o2.endOfTransaction'
+    // predicate.
+    {
+        spec->setShowExpandedEvents(false);
+        spec->setShowEndOfTransaction(ShowEndOfTransactionModeEnum::kWhenAvailable);
+        getExpCtx()->setChangeStreamSpec(spec);
+        unittest::ServerParameterGuard newEotFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                                  true);
+        unittest::ServerParameterGuard eotParam("allowEndOfTransaction", true);
+        checkFilter(expectedWithoutEndOfTransaction);
+    }
 }
 
 // Test that the transaction filter for v2 change streams is as expected, including the filter for
@@ -1133,14 +1258,14 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
-    BSONObj expectedFilter =
+    BSONObj expectedControlEventsFilter =
         BSON("$or" << BSON_ARRAY(BSON("a" << 1 << "b" << 2) << BSON("foo" << "bar")));
 
     ScopedChangeStreamReaderBuilderMock readerBuilder(
         std::make_unique<ChangeStreamReaderBuilderMock>(
             [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
             [&](OperationContext* opCtx, const ChangeStream& changeStream) {
-                return expectedFilter;
+                return expectedControlEventsFilter;
             }));
 
     // Set version v2 in the change stream spec of the ExpressionContext.
@@ -1149,11 +1274,173 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
     spec->setVersion(ChangeStreamReaderVersionEnum::kV2);
     getExpCtx()->setChangeStreamSpec(spec);
 
-    std::vector<BSONObj> backingBsonObjs;
-    auto actualFilter =
-        change_stream_filter::buildTransactionFilter(getExpCtx(), nullptr, backingBsonObjs);
+    const auto checkFilter = [&](const std::string& expected) {
+        std::vector<BSONObj> backingBsonObjs;
+        auto actualFilter =
+            change_stream_filter::buildTransactionFilter(getExpCtx(), nullptr, backingBsonObjs);
+        ASSERT_BSONOBJ_EQ_AUTO(expected, actualFilter->serialize());
+    };
 
-    std::string expected = R"(
+    // The 'o2.endOfTransaction' predicate is only added on the legacy endOfTransaction path.
+    const std::string expectedWithoutEndOfTransaction = R"(
+{
+    "$or": [
+        {
+            "$or": [
+                {
+                    "$and": [
+                        {
+                            "$or": [
+                                {
+                                    "o.applyOps": {
+                                        "$elemMatch": {
+                                            "$and": [
+                                                {
+                                                    "$or": [
+                                                        {
+                                                            "o.create": {
+                                                                "$eq": "change_stream"
+                                                            }
+                                                        },
+                                                        {
+                                                            "o.createIndexes": {
+                                                                "$eq": "change_stream"
+                                                            }
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "ns": {
+                                                        "$eq": "unittests.$cmd"
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    "o.applyOps.ns": {
+                                        "$eq": "unittests.change_stream"
+                                    }
+                                },
+                                {
+                                    "prevOpTime": {
+                                        "$not": {
+                                            "$eq": {
+                                                "ts": {"$timestamp":{"t":0,"i":0}},
+                                                "t": -1
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "op": {
+                                "$eq": "c"
+                            }
+                        },
+                        {
+                            "o.partialTxn": {
+                                "$not": {
+                                    "$eq": true
+                                }
+                            }
+                        },
+                        {
+                            "o.prepare": {
+                                "$not": {
+                                    "$eq": true
+                                }
+                            }
+                        },
+                        {
+                            "o.applyOps": {
+                                "$type": [
+                                    4
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "$and": [
+                        {
+                            "o.commitTransaction": {
+                                "$eq": 1
+                            }
+                        },
+                        {
+                            "op": {
+                                "$eq": "c"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "$and": [
+                {
+                    "o.applyOps": {
+                        "$elemMatch": {
+                            "$or": [
+                                {
+                                    "$and": [
+                                        {
+                                            "a": {
+                                                "$eq": 1
+                                            }
+                                        },
+                                        {
+                                            "b": {
+                                                "$eq": 2
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "foo": {
+                                        "$eq": "bar"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "op": {
+                        "$eq": "c"
+                    }
+                },
+                {
+                    "o.partialTxn": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.prepare": {
+                        "$not": {
+                            "$eq": true
+                        }
+                    }
+                },
+                {
+                    "o.applyOps": {
+                        "$type": [
+                            4
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}
+    )";
+
+    const std::string expectedWithEndOfTransaction = R"(
 {
     "$or": [
         {
@@ -1325,7 +1612,31 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
 }
     )";
 
-    ASSERT_BSONOBJ_EQ_AUTO(expected, actualFilter->serialize());
+    // 'kNone': no endOfTransaction opt-in, but the 'o2.endOfTransaction' predicate is still kept so
+    // that a legacy endOfTransaction oplog entry is matched whenever one is written.
+    checkFilter(expectedWithEndOfTransaction);
+
+    // 'kLegacy': expanded events plus the old feature flag add the 'o2.endOfTransaction' predicate.
+    {
+        unittest::ServerParameterGuard legacyEotFlag("featureFlagEndOfTransactionChangeEvent",
+                                                     true);
+        spec->setShowExpandedEvents(true);
+        getExpCtx()->setChangeStreamSpec(spec);
+        checkFilter(expectedWithEndOfTransaction);
+    }
+
+    // 'kNew': the 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag, the server
+    // parameter and the 'showEndOfTransaction' opt-in do not add the 'o2.endOfTransaction'
+    // predicate.
+    {
+        spec->setShowExpandedEvents(false);
+        spec->setShowEndOfTransaction(ShowEndOfTransactionModeEnum::kWhenAvailable);
+        getExpCtx()->setChangeStreamSpec(spec);
+        unittest::ServerParameterGuard newEotFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                                  true);
+        unittest::ServerParameterGuard eotParam("allowEndOfTransaction", true);
+        checkFilter(expectedWithoutEndOfTransaction);
+    }
 }
 
 // Test different values for 'ignoreRemovedShards' when creating a change stream.
@@ -2532,6 +2843,266 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsAppliedAtomicallyDoesNotEmitEndOf
         EXPECT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
                   DSChangeStream::kInsertOpType);
     }
+}
+
+TEST_F(ChangeStreamStageTest, TransformApplyOpsEndOfTransactionWithNewSynthesisPath) {
+    // The 'featureFlagEndOfTransactionChangeEventSynthesis' path requires the
+    // 'allowEndOfTransaction' server parameter, an explicit 'showEndOfTransaction' opt-in, and the
+    // 'allowEndOfTransaction' marker on the final applyOps entry. It emits the event with the
+    // reserved 'kEndOfTransactionTxnOpIndex'.
+    unittest::ServerParameterGuard eotFlag("featureFlagEndOfTransactionChangeEventSynthesis", true);
+    unittest::ServerParameterGuard eotParam("allowEndOfTransaction", true);
+    unittest::ServerParameterGuard v2Flag("featureFlagChangeStreamReaderV2", true);
+    unittest::ServerParameterGuard preciseShardTargeting(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    const auto spec =
+        BSON(DSChangeStream::kStageName << BSON("showEndOfTransaction" << "whenAvailable"));
+
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"sv},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}},
+         }}},
+        {"allowEndOfTransaction", true},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, spec);
+
+    ASSERT_EQ(results.size(), 2u);
+    ASSERT_EQ(results[0][DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kInsertOpType);
+
+    auto endOfTransaction = results[1];
+    ASSERT_EQ(endOfTransaction[DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kEndOfTransactionOpType);
+    ASSERT_EQ(ResumeToken::parse(endOfTransaction["_id"].getDocument()).getData().txnOpIndex,
+              kEndOfTransactionTxnOpIndex);
+}
+
+TEST_F(ChangeStreamStageTest,
+       TransformApplyOpsEndOfTransactionNewSynthesisPathRespectsNamespacePredicate) {
+    // The 'featureFlagEndOfTransactionChangeEventSynthesis' path applies the same
+    // 'o2.endOfTransaction' namespace predicate as the legacy path, so a transaction that does not
+    // touch the watched namespace yields no endOfTransaction event.
+    unittest::ServerParameterGuard eotFlag("featureFlagEndOfTransactionChangeEventSynthesis", true);
+    unittest::ServerParameterGuard eotParam("allowEndOfTransaction", true);
+
+    const auto spec =
+        BSON(DSChangeStream::kStageName << BSON("showEndOfTransaction" << "whenAvailable"));
+
+    // The transaction touches a namespace other than the one the stream watches.
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"sv},
+                      {"ns", "someotherdb.collname"sv},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}},
+         }}},
+        {"allowEndOfTransaction", true},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, spec);
+
+    // Both the insert and the endOfTransaction event are filtered out by the stream's namespace.
+    ASSERT_EQ(results.size(), 0u);
+}
+
+TEST_F(ChangeStreamStageTest, TransformApplyOpsEndOfTransactionNewSynthesisPathRequiresOptIn) {
+    // With the 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag, the server parameter
+    // and the marker all set but no 'showEndOfTransaction' opt-in, no endOfTransaction event is
+    // emitted.
+    unittest::ServerParameterGuard eotFlag("featureFlagEndOfTransactionChangeEventSynthesis", true);
+    unittest::ServerParameterGuard eotParam("allowEndOfTransaction", true);
+
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"sv},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}},
+         }}},
+        {"allowEndOfTransaction", true},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results =
+        getApplyOpsResults(applyOpsDoc, lsid, change_stream_test_helper::kDefaultSpec);
+
+    ASSERT_EQ(results.size(), 1u);
+    ASSERT_EQ(results[0][DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kInsertOpType);
+}
+
+TEST_F(ChangeStreamStageTest, TransformApplyOpsEndOfTransactionNewSynthesisPathRequiresParameter) {
+    // With the 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag, the
+    // 'showEndOfTransaction' opt-in and the marker set but the server parameter disabled, no
+    // endOfTransaction event is emitted.
+    unittest::ServerParameterGuard eotFlag("featureFlagEndOfTransactionChangeEventSynthesis", true);
+    unittest::ServerParameterGuard eotParam("allowEndOfTransaction", false);
+    unittest::ServerParameterGuard v2Flag("featureFlagChangeStreamReaderV2", true);
+    unittest::ServerParameterGuard preciseShardTargeting(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    const auto spec =
+        BSON(DSChangeStream::kStageName << BSON("showEndOfTransaction" << "whenAvailable"));
+
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"sv},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}},
+         }}},
+        {"allowEndOfTransaction", true},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, spec);
+
+    ASSERT_EQ(results.size(), 1u);
+    ASSERT_EQ(results[0][DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kInsertOpType);
+}
+
+TEST_F(ChangeStreamStageTest, TransformApplyOpsEndOfTransactionNewSynthesisPathRequiresMarker) {
+    // With the 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag, the server parameter
+    // and the 'showEndOfTransaction' opt-in all set but the 'allowEndOfTransaction' marker missing
+    // (the transaction committed while the kill switch was off), no endOfTransaction event is
+    // emitted.
+    unittest::ServerParameterGuard eotFlag("featureFlagEndOfTransactionChangeEventSynthesis", true);
+    unittest::ServerParameterGuard eotParam("allowEndOfTransaction", true);
+    unittest::ServerParameterGuard v2Flag("featureFlagChangeStreamReaderV2", true);
+    unittest::ServerParameterGuard preciseShardTargeting(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    const auto spec =
+        BSON(DSChangeStream::kStageName << BSON("showEndOfTransaction" << "whenAvailable"));
+
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"sv},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}},
+         }}},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, spec);
+
+    ASSERT_EQ(results.size(), 1u);
+    ASSERT_EQ(results[0][DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kInsertOpType);
+}
+
+TEST_F(ChangeStreamStageTest, TransformApplyOpsEndOfTransactionRequiredPathFailsOnMissingMarker) {
+    // A 'required' stream must fail when it reads a transaction that affects its watched namespace
+    // but carries no 'allowEndOfTransaction' marker, i.e. a transaction that committed while the
+    // kill switch was off.
+    unittest::ServerParameterGuard eotFlag("featureFlagEndOfTransactionChangeEventSynthesis", true);
+    unittest::ServerParameterGuard eotParam("allowEndOfTransaction", true);
+
+    const auto spec =
+        BSON(DSChangeStream::kStageName << BSON("showEndOfTransaction" << "required"));
+
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"sv},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}},
+         }}},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    ASSERT_THROWS_CODE(getApplyOpsResults(applyOpsDoc, lsid, spec),
+                       DBException,
+                       ErrorCodes::ChangeStreamFatalError);
+}
+
+TEST_F(ChangeStreamStageTest,
+       TransformApplyOpsEndOfTransactionRequiredPathIgnoresUnwatchedNamespace) {
+    // A 'required' stream must not fail for an ineligible transaction that does not touch its
+    // watched namespace.
+    unittest::ServerParameterGuard eotFlag("featureFlagEndOfTransactionChangeEventSynthesis", true);
+    unittest::ServerParameterGuard eotParam("allowEndOfTransaction", true);
+
+    const auto spec =
+        BSON(DSChangeStream::kStageName << BSON("showEndOfTransaction" << "required"));
+
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"sv},
+                      {"ns", "someotherdb.collname"sv},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}},
+         }}},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, spec);
+
+    ASSERT_EQ(results.size(), 0u);
+}
+
+TEST_F(ChangeStreamStageTest, TransformApplyOpsEndOfTransactionRequiredPathWithMarkerEmitsEvent) {
+    // A 'required' stream emits the event normally for an eligible (marked) transaction.
+    unittest::ServerParameterGuard eotFlag("featureFlagEndOfTransactionChangeEventSynthesis", true);
+    unittest::ServerParameterGuard eotParam("allowEndOfTransaction", true);
+
+    const auto spec =
+        BSON(DSChangeStream::kStageName << BSON("showEndOfTransaction" << "required"));
+
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"sv},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}},
+         }}},
+        {"allowEndOfTransaction", true},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, spec);
+
+    ASSERT_EQ(results.size(), 2u);
+    ASSERT_EQ(results[1][DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kEndOfTransactionOpType);
+}
+
+TEST_F(ChangeStreamStageTest, ClassicOperationTypeFilterIncludesEndOfTransactionOnOptIn) {
+    // A stream that opts in to endOfTransaction events must receive them even without
+    // 'showExpandedEvents', so the classic operation type filter has to include 'endOfTransaction'.
+    const auto containsEndOfTransaction = [](const BSONObj& filter) {
+        for (const auto& opType : filter["operationType"]["$in"].Array()) {
+            if (opType.String() == "endOfTransaction"sv) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    ASSERT_FALSE(
+        containsEndOfTransaction(change_stream_filter::getMatchFilterForClassicOperationTypes(
+            /*includeEndOfTransaction=*/false)));
+    ASSERT_TRUE(
+        containsEndOfTransaction(change_stream_filter::getMatchFilterForClassicOperationTypes(
+            /*includeEndOfTransaction=*/true)));
 }
 
 TEST_F(ChangeStreamStageTest, TransformApplyOpsWithEntriesOnDifferentNs) {

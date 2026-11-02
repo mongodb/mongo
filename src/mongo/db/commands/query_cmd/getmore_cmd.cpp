@@ -20,6 +20,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_in_use_info.h"
+#include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/memory_tracking/query_memory_load_shedding.h"
@@ -52,6 +53,7 @@
 #include "mongo/db/repl/repl_network_traffic_stats.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
@@ -183,6 +185,41 @@ void ensureChangeStreamOptimizedLookupStillEnabled(OperationContext* opCtx,
 }
 
 /**
+ * For change stream cursors opened with 'showEndOfTransaction: required', validates that the
+ * end-of-transaction feature is still available. If the feature flag or the
+ * 'allowEndOfTransaction' server parameter has been turned off since the cursor was opened, kills
+ * the cursor and throws a non-resumable ChangeStreamFatalError, so the consumer learns that the
+ * stream can no longer emit endOfTransaction events.
+ *
+ * This check is a no-op for cursors that were not opened with 'required'.
+ */
+void ensureChangeStreamEndOfTransactionStillEnabled(OperationContext* opCtx,
+                                                    ClientCursorPin& cursorPin) {
+    if (!cursorPin->requiresEndOfTransaction()) {
+        return;
+    }
+
+    // Read the current feature flag and server parameter values, not the snapshot taken when the
+    // cursor was opened.
+    if (feature_flags::gFeatureFlagEndOfTransactionChangeEventSynthesis.isEnabled() &&
+        isAllowEndOfTransactionEnabled()) {
+        return;
+    }
+
+    // Kill the cursor before throwing. Without this, the ClientCursorPin destructor would just
+    // unpin it back to idle in the CursorManager, leaking the cursor until timeout-based
+    // garbage collection. Inside acquireLocksAndIterateCursor, a ScopeGuard handles this, but
+    // we're before that point.
+    cursorPin.deleteUnderlying();
+    uasserted(ErrorCodes::ChangeStreamFatalError,
+              "This change stream was opened with 'showEndOfTransaction: required', but the "
+              "end-of-transaction feature has since been disabled (the "
+              "'featureFlagEndOfTransactionChangeEventSynthesis' feature flag or the "
+              "'allowEndOfTransaction' server parameter was turned off), so it can no longer emit "
+              "endOfTransaction events");
+}
+
+/**
  * The single method for all change-stream getMore preconditions.
  */
 void ensureChangeStreamGetMorePreconditions(OperationContext* opCtx, ClientCursorPin& cursorPin) {
@@ -195,6 +232,9 @@ void ensureChangeStreamGetMorePreconditions(OperationContext* opCtx, ClientCurso
 
     // Check if the updateLookup optimization flag was turned off on the updateLookup cursor.
     ensureChangeStreamOptimizedLookupStillEnabled(opCtx, cursorPin);
+
+    // Check if the end-of-transaction feature is still enabled for 'required' streams.
+    ensureChangeStreamEndOfTransactionStillEnabled(opCtx, cursorPin);
 }
 
 /**

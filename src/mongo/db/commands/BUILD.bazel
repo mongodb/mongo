@@ -921,6 +921,7 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db:curop_failpoint_helpers",
         "//src/mongo/db:dbcommands_idl",
+        "//src/mongo/db:end_of_transaction_parameter",
         "//src/mongo/db:fle_crud",
         "//src/mongo/db:fle_crud_mongod",
         "//src/mongo/db:index_key_validate",

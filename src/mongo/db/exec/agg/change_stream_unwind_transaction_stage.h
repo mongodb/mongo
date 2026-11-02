@@ -11,6 +11,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -32,6 +33,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec::agg {
+
 /**
  * This class handles the execution part of the change stream unwind transaction aggregation stage
  * and is part of the execution pipeline. Its construction is based on
@@ -77,7 +79,9 @@ private:
 
         TransactionOpIterator(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const Document& input,
-                              const MatchExpression* expression);
+                              const MatchExpression* expression,
+                              change_stream::EndOfTransactionBehavior endOfTransactionBehavior,
+                              bool requireEndOfTransaction);
 
         /**
          * Returns the index for the last operation returned by getNextTransactionOp(). It is
@@ -159,6 +163,11 @@ private:
         // all events in the transaction have been exhausted.
         boost::optional<Document> _createEndOfTransactionIfNeeded();
 
+        // Builds the artificial endOfTransaction event for the current transaction. Used both to
+        // emit the event and to test whether an ineligible transaction touches the watched
+        // namespace.
+        Document _makeEndOfTransactionDocument();
+
         // Records all namespaces affected by the transaction. Used in generating an artificial
         // endOfTransaction oplog entry.
         void _addAffectedNamespaces(const Document& op);
@@ -211,9 +220,19 @@ private:
         const MatchExpression* _expression;
         std::unique_ptr<MatchExpression> _endOfTransactionExpression;
 
-        // If lsid and txnNumber are present and the transaction is not prepared, we need to create
-        // fake endOfTransaction oplog entry
-        bool _needEndOfTransaction;
+        // Whether this transaction should produce a synthesized endOfTransaction event: it is an
+        // eligible candidate and the resolved behavior says an event must be emitted for it.
+        bool _shouldEmitEndOfTransaction;
+
+        // Set when the stream requested 'showEndOfTransaction: required' and this transaction
+        // carries no 'allowEndOfTransaction' marker: such a transaction is ineligible, so reading
+        // it at the watched namespace must fail the stream.
+        bool _requireEndOfTransaction = false;
+
+        // How this iterator synthesizes endOfTransaction events, resolved once when the stage was
+        // created. A 'kNew' event uses the reserved 'kEndOfTransactionTxnOpIndex' rather than the
+        // index after the last operation, so that the legacy path's tokens stay unchanged.
+        const change_stream::EndOfTransactionBehavior _endOfTransactionBehavior;
 
         // Set of affected namespaces. Only needed if we need endOfTransaction.
         absl::flat_hash_set<NamespaceString> _affectedNamespaces;
@@ -224,6 +243,13 @@ private:
 
     // Represents the current transaction we're unwinding, if any.
     boost::optional<TransactionOpIterator> _txnIterator;
+
+    // Resolved once when the stage is created; shared with every TransactionOpIterator.
+    const change_stream::EndOfTransactionBehavior _endOfTransactionBehavior;
+
+    // Set when the stream requested 'showEndOfTransaction: required'; shared with every
+    // TransactionOpIterator.
+    const bool _requireEndOfTransaction;
 
     // All transaction entries are filtered through this expression. This extra filtering step is
     // necessary because a transaction can contain a mix of operations from different namespaces. A

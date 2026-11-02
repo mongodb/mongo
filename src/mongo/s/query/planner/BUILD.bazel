@@ -47,7 +47,9 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:commands",
         "//src/mongo/db:curop_failpoint_helpers",
+        "//src/mongo/db:end_of_transaction_parameter",
         "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:query_common",
         "//src/mongo/db/query:shard_key_diagnostic_printer",

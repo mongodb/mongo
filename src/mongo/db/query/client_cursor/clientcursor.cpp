@@ -154,6 +154,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _isChangeStreamQuery(CurOp::get(operationUsingCursor)->debug().isChangeStreamQuery),
       _usesOptimizedUpdateLookup(
           CurOp::get(operationUsingCursor)->debug().usesOptimizedUpdateLookup),
+      _requiresEndOfTransaction(CurOp::get(operationUsingCursor)->debug().requiresEndOfTransaction),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),
       _opKey(operationUsingCursor->getOperationKey()),

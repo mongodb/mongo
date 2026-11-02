@@ -375,10 +375,19 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
     auto commitTransactionFilter = BSON("op" << "c"
                                              << "o.commitTransaction" << 1);
 
+    // The legacy endOfTransaction path writes a real 'o2.endOfTransaction' oplog entry for sharded
+    // transactions, which must be matched here so that its namespace is filtered. Only the
+    // 'featureFlagEndOfTransactionChangeEventSynthesis' path (kNew) synthesizes the event from
+    // applyOps instead, so the predicate is omitted only for that behavior.
+    // TODO SERVER-138462 Remove feature flag for legacy endOfTransaction behavior.
+    const bool legacyEndOfTransaction = change_stream::determineEndOfTransactionBehavior(expCtx) !=
+        change_stream::EndOfTransactionBehavior::kNew;
+    auto transactionFilterBson = legacyEndOfTransaction
+        ? BSON(OR(applyOpsFilter, endOfTransactionFilter, commitTransactionFilter))
+        : BSON(OR(applyOpsFilter, commitTransactionFilter));
+
     auto transactionFilter = MatchExpressionParser::parseAndNormalize(
-        backingBsonObjs.emplace_back(
-            BSON(OR(applyOpsFilter, endOfTransactionFilter, commitTransactionFilter))),
-        expCtx);
+        backingBsonObjs.emplace_back(std::move(transactionFilterBson)), expCtx);
 
     // All events in a transaction share the same clusterTime, lsid, and txNumber values. If the
     // user wishes to filter out events based on these values, it is possible to rewrite these
@@ -502,9 +511,12 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
         expCtx);
 }
 
-BSONObj getMatchFilterForClassicOperationTypes() {
-    return BSON(DocumentSourceChangeStream::kOperationTypeField
-                << BSON("$in" << change_stream::kClassicOperationTypes));
+BSONObj getMatchFilterForClassicOperationTypes(bool includeEndOfTransaction) {
+    auto operationTypes = change_stream::kClassicOperationTypes;
+    if (includeEndOfTransaction) {
+        operationTypes.insert(DocumentSourceChangeStream::kEndOfTransactionOpType);
+    }
+    return BSON(DocumentSourceChangeStream::kOperationTypeField << BSON("$in" << operationTypes));
 }
 
 }  // namespace change_stream_filter
