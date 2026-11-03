@@ -1226,6 +1226,7 @@ void checkCollectionMetadataInShardCatalog(
         if (!checkCatalogStability()) {
             return;
         }
+        scopedCsr.reset();
 
         scopedReadConcern.emplace(opCtx, [&] {
             repl::ReadConcernArgs rc = repl::ReadConcernArgs::kSnapshot;
