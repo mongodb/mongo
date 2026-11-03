@@ -180,6 +180,12 @@ public:
     const char* getWTMemoryPageMaxForOplogStrValue() const override;
 
     /**
+     * The default leaf_page_max value to set on WT for new collections in string format. Empty
+     * leaves WiredTiger's default in place.
+     */
+    const char* getWTLeafPageMaxForCollectionsStrValue() const override;
+
+    /**
      * The lowest size the oplog collection can be resized to via replSetResizeOplog.
      */
     double getMinOplogSizeMB() const override;

@@ -219,6 +219,9 @@ std::string WiredTigerRecordStore::generateCreateString(std::string_view tableNa
     // override values in the prefix, but not values in the suffix.
     str::stream ss;
     ss << "memory_page_max=" << wtTableConfig.memoryPageMax << ",";
+    if (!wtTableConfig.leafPageMax.empty()) {
+        ss << "leaf_page_max=" << wtTableConfig.leafPageMax << ",";
+    }
     // Choose a higher split percent, since most usage is append only. Allow some space
     // for workloads where updates increase the size of documents.
     ss << "split_pct=90,";

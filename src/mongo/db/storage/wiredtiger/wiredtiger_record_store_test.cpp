@@ -109,6 +109,33 @@ TEST(WiredTigerRecordStoreTest, GenerateCreateStringCustomOptionsOverrideDefault
     EXPECT_EQ("true", getConfigString(parser, "prefix_compression"));
 }
 
+TEST(WiredTigerRecordStoreTest, GenerateCreateStringLeafPageMaxDefault) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
+    EXPECT_EQ(std::string::npos,
+              WiredTigerRecordStore::generateCreateString("collection-test", wtTableConfig)
+                  .find("leaf_page_max"));
+
+    wtTableConfig.leafPageMax = "16KB";
+    const auto configString =
+        WiredTigerRecordStore::generateCreateString("collection-test", wtTableConfig);
+    WiredTigerConfigParser parser(configString);
+    EXPECT_EQ("16KB", getConfigString(parser, "leaf_page_max"));
+}
+
+TEST(WiredTigerRecordStoreTest, GenerateCreateStringCustomOptionsOverrideLeafPageMaxDefault) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
+    wtTableConfig.leafPageMax = "16KB";
+    wtTableConfig.customOptions = "leaf_page_max=128KB";
+    const auto configString =
+        WiredTigerRecordStore::generateCreateString("collection-test", wtTableConfig);
+    WiredTigerConfigParser parser(configString);
+    EXPECT_EQ("128KB", getConfigString(parser, "leaf_page_max"));
+}
+
 TEST(WiredTigerRecordStoreTest, GenerateCreateStringCustomOptionsOverrideServerParameterOptions) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
 

@@ -206,6 +206,14 @@ public:
             "StubPersistenceProvider::getWTMemoryPageMaxForOplogStrValue() method not implemented");
     }
 
+    /**
+     * This must not throw: it is read for every table created, tests that run a real storage
+     * engine on a stub provider would use the default.
+     */
+    const char* getWTLeafPageMaxForCollectionsStrValue() const override {
+        return "";
+    }
+
     double getMinOplogSizeMB() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::getMinOplogSizeMB() method not implemented");

@@ -87,6 +87,8 @@ public:
         // Setting this larger than 10m can hurt latencies and throughput degradation if this
         // is the oplog. See SERVER-16247.
         std::string memoryPageMax{"10M"};
+        // Default leaf page size. Empty leaves the WiredTiger default in place.
+        std::string leafPageMax;
         // Config string for server-wide table configuration parameters.
         std::string serverParameterOptions;
         // Config string for per-operation table configuration parameters supplied by the user.

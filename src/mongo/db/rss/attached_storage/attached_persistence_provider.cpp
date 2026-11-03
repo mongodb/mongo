@@ -183,6 +183,10 @@ const char* AttachedPersistenceProvider::getWTMemoryPageMaxForOplogStrValue() co
     return "10m";  // 10MB
 }
 
+const char* AttachedPersistenceProvider::getWTLeafPageMaxForCollectionsStrValue() const {
+    return "";
+}
+
 double AttachedPersistenceProvider::getMinOplogSizeMB() const {
     return 990;
 }
