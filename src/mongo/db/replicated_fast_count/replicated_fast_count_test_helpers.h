@@ -12,6 +12,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
 
+#include <cstdint>
 #include <functional>
 #include <list>
 #include <memory>
@@ -19,6 +20,10 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
+
+namespace mongo::otel::metrics {
+class OtelMetricsCapturer;
+}  // namespace mongo::otel::metrics
 
 namespace mongo::replicated_fast_count::test_helpers {
 /**
@@ -531,5 +536,19 @@ Timestamp waitForFlush(OperationContext* opCtx,
  * This function blocks the calling thread.
  */
 void waitForFlushFailpoint(FailPointEnableBlock& fp, std::function<void()> requestFlush);
+
+struct ValidatorMetricValues {
+    int64_t recorded;
+    int64_t evicted;
+    int64_t skipped;
+    int64_t validated;
+};
+
+/**
+ * Asserts all four counters. Does nothing when OTel metrics are unavailable, so tests that do not
+ * otherwise need OTel keep exercising the validator in such builds.
+ */
+void expectValidatorMetrics(otel::metrics::OtelMetricsCapturer& capturer,
+                            const ValidatorMetricValues& expected);
 
 }  // namespace mongo::replicated_fast_count::test_helpers

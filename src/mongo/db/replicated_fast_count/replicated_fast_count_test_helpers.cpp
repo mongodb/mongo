@@ -34,12 +34,27 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo::replicated_fast_count::test_helpers {
+namespace {
+ValidatorMetricValues readValidatorMetrics(otel::metrics::OtelMetricsCapturer& capturer) {
+    using otel::metrics::MetricNames;
+    return {
+        .recorded = capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarksRecorded),
+        .evicted = capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarksEvicted),
+        .skipped = capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointsSkipped),
+        .validated =
+            capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointsValidated),
+    };
+}
+}  // namespace
+
 using namespace std::literals::string_view_literals;
 
 bool findPersistedDocInContainer(OperationContext* opCtx, const UUID& uuid, BSONObj& outDoc) {
@@ -942,4 +957,17 @@ repl::OplogEntry makeCheckpointEntry(Timestamp validAsOf,
                                       << "o" << BSON("applyOps" << innerOps))
                                 .getOwned());
 }
+
+void expectValidatorMetrics(otel::metrics::OtelMetricsCapturer& capturer,
+                            const ValidatorMetricValues& expected) {
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    const auto actual = readValidatorMetrics(capturer);
+    EXPECT_EQ(actual.recorded, expected.recorded);
+    EXPECT_EQ(actual.evicted, expected.evicted);
+    EXPECT_EQ(actual.skipped, expected.skipped);
+    EXPECT_EQ(actual.validated, expected.validated);
+}
+
 }  // namespace mongo::replicated_fast_count::test_helpers

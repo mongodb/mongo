@@ -511,6 +511,7 @@ mongo_cc_unit_test(
 
 mongo_cc_library(
     name = "replicated_fast_count_test_helpers",
+    testonly = True,
     srcs = [
         "replicated_fast_count_test_helpers.cpp",
     ],
@@ -528,6 +529,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:oplog_entry",
         "//src/mongo/db/repl:oplog_interface_local",
         "//src/mongo/db/repl:truncate_range_oplog_entry_idl",
+        "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/unittest",
     ],
 )
