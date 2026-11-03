@@ -74,7 +74,23 @@ const indexToCreate = {
 
 jsTestLog("Creating an index: '" + tojson(indexToCreate) + "'");
 
-t.createIndex(indexToCreate);
+// Index creation may fail due to stepdowns and shutdowns, or race with the cleanup or
+// recovery of an interrupted attempt (e.g. fail with IndexBuildAlreadyInProgress or
+// IndexBuildAborted). The shell helper does not throw on command failure, so keep trying until
+// the index is actually created.
+assert.soon(() => {
+    try {
+        const res = t.createIndex(indexToCreate);
+        if (!res.ok) {
+            jsTest.log("Failed to create index: " + tojson(res));
+            return false;
+        }
+        return t.getIndexKeys().length === num;
+    } catch (e) {
+        jsTest.log("Failed to create index: " + e);
+        return false;
+    }
+});
 assert.eq(num, t.getIndexKeys().length, "Expected " + maxNumIndexesAllowed + " indexes.");
 
 // Drop all the indexes except the _id index.
