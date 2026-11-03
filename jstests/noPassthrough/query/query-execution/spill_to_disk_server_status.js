@@ -36,7 +36,7 @@ assert.commandWorked(
     setParameter(db, "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 1),
 );
 // Spilling memory threshold for $setWindowFields
-assert.commandWorked(setParameter(db, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 440));
+assert.commandWorked(setParameter(db, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 472));
 // Spilling memory threshold for $bucketAuto
 assert.commandWorked(setParameter(db, "internalDocumentSourceBucketAutoMaxMemoryBytes", 1));
 // Spilling memory threshold for $lookup and $lookup-$unwind
@@ -238,7 +238,7 @@ testSpillingMetrics({
 });
 testSpillingMetrics({
     stageName: "group",
-    expectedSpillingMetrics: {spills: 10, spilledBytes: 2160},
+    expectedSpillingMetrics: {spills: 10, spilledBytes: 2320},
     expectedSbeSpillingMetrics: {spills: 10, spilledBytes: 450},
 });
 testSpillingMetrics({

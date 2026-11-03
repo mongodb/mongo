@@ -174,8 +174,8 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
     ];
     const expectedFunctionMemUsages = {
         // 10 integer values per window, with some extra to account for the $sum accumulator and
-        // executor state.
-        runningSum: windowSize * 16 + 120,
+        // executor state, both of which embed a memory tracker.
+        runningSum: windowSize * 16 + 152,
     };
 
     let expectedTotal = windowSize * docSize;
