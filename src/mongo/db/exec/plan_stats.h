@@ -13,6 +13,7 @@
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/record_id_range_list.h"
 #include "mongo/db/query/util/named_enum.h"
+#include "mongo/db/record_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -21,6 +22,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -440,6 +443,17 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] BatchedDeleteStats : public DeleteStats {
     // removed all the documents that matched the criteria to reach completion - this is always the
     // case with the default 'BatchedDeleteStageParams'.
     bool passTargetMet = false;
+
+    struct StagedPosition {
+        RecordId recordId;
+        // Dehydrated index key when the child index scan attaches index key metadata; empty
+        // otherwise.
+        BSONObj indexKey;
+    };
+
+    // Position of the last document staged for delete. Only set when
+    // 'BatchedDeleteStageParams::recordLastStagedPosition' is set and a document was staged.
+    boost::optional<StagedPosition> lastStagedPosition;
 };
 
 struct DistinctScanStats : public SpecificStats {

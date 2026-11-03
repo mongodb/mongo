@@ -265,7 +265,18 @@ std::unique_ptr<BatchedDeleteStageParams> getBatchedDeleteStageParams(bool batch
     auto batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
     batchedDeleteParams->targetPassDocs = ttlIndexDeleteTargetDocs.load();
     batchedDeleteParams->targetPassTimeMS = Milliseconds(ttlIndexDeleteTargetTimeMS.load());
+    batchedDeleteParams->recordLastStagedPosition = true;
     return batchedDeleteParams;
+}
+
+// Index names are user-chosen, so index and collection scan resume points need distinct prefixes;
+// otherwise an index named like a scan tag would share that scan's resume point.
+std::string makeIndexResumeKey(const UUID& uuid, std::string_view indexName) {
+    return str::stream() << uuid.toString() << "/index/" << indexName;
+}
+
+std::string makeScanResumeKey(const UUID& uuid, std::string_view scanTag) {
+    return str::stream() << uuid.toString() << "/scan/" << scanTag;
 }
 
 // Generates an expiration date based on the user-configured expireAfterSeconds. Includes special
@@ -529,6 +540,10 @@ void TTLMonitor::_doTTLPass(OperationContext* opCtx, Date_t at) {
     // Increment the metric after the TTL work has been finished.
     ON_BLOCK_EXIT([&] { ttlPasses.add(1); });
 
+    // Resume points only skip ahead within one pass; each pass starts from the oldest expired
+    // entry again so documents passed over earlier (e.g. unowned then, owned now) are revisited.
+    _resumePoints.clear();
+
     // Keep the ticket metrics up to date as the pass acquires and releases execution tickets, so
     // a pass stalled on ticket admission is visible in serverStatus/FTDC while it is stalled.
     admission::execution_control::ScopedTicketAdmissionStatsRecorder ticketStatsRecorder(
@@ -767,15 +782,43 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
     // BatchedDeleteStageStats from a non-batched delete.
     const bool batchingEnabled = isBatchingEnabled(collection.getCollectionPtr());
 
+    // Continue after the last entry the previous attempt on this index staged. The scan order is
+    // oldest first in both directions, so the resume key only ever replaces the start key.
+    const auto resumeKey = makeIndexResumeKey(collection.uuid(), indexName);
+    BSONObj scanStartKey = startKey;
+    auto boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
+    auto it = _resumePoints.find(resumeKey);
+    // Only a Date key lies inside the TTL bounds. Any other start key would scan entries the
+    // canonical query excludes, and the delete stage does not recheck the query for them.
+    if (it != _resumePoints.end() &&
+        (it->second.indexKey.isEmpty() ||
+         it->second.indexKey.firstElement().type() != BSONType::date)) {
+        _resumePoints.erase(it);
+        it = _resumePoints.end();
+    }
+    if (batchingEnabled && it != _resumePoints.end()) {
+        scanStartKey = it->second.indexKey;
+        if (it->second.excludeIndexKey) {
+            boundInclusion = BoundInclusion::kIncludeEndKeyOnly;
+        }
+        LOGV2_DEBUG(9277901,
+                    2,
+                    "Resuming TTL deletion on index after previous attempt met a pass target",
+                    logAttrs(collection.nss()),
+                    "index"_attr = indexName,
+                    "resumeKey"_attr = redact(scanStartKey),
+                    "excludeResumeKey"_attr = it->second.excludeIndexKey);
+    }
+
     Timer timer;
     const auto ticketStatsBase = currentTicketStats(opCtx);
     auto exec = InternalPlanner::deleteWithIndexScan(opCtx,
                                                      collection,
                                                      std::move(params),
                                                      entry,
-                                                     startKey,
+                                                     scanStartKey,
                                                      endKey,
-                                                     BoundInclusion::kIncludeBothStartAndEndKeys,
+                                                     boundInclusion,
                                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                      direction,
                                                      getBatchedDeleteStageParams(batchingEnabled));
@@ -818,6 +861,7 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
 
         if (batchingEnabled) {
             auto batchedDeleteStats = exec->getBatchedDeleteStats();
+            _updateResumePoint(resumeKey, batchedDeleteStats);
             // A pass target met implies there may be more to delete.
             return batchedDeleteStats.passTargetMet;
         }
@@ -841,8 +885,13 @@ bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
     const auto expirationDate = safeExpirationDate(opCtx, collectionPtr, at, expireAfterSeconds);
     const auto endId = makeCollScanEndBound(collectionPtr, expirationDate);
 
-    return _performDeleteExpiredWithCollscan(
-        opCtx, collection, startId, endId, /*forward=*/true, /*filter=*/nullptr);
+    return _performDeleteExpiredWithCollscan(opCtx,
+                                             collection,
+                                             startId,
+                                             endId,
+                                             /*forward=*/true,
+                                             /*filter=*/nullptr,
+                                             /*resumeTag=*/"$clustered"sv);
 }
 
 bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
@@ -881,8 +930,13 @@ bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
             safeExpirationDate(opCtx, collectionPtr, at, expireAfterSeconds);
         const auto endId = makeCollScanEndBound(collectionPtr, expirationDate);
 
-        passTargetMet |= _performDeleteExpiredWithCollscan(
-            opCtx, collection, startId, endId, /*forward=*/true, &filter);
+        passTargetMet |= _performDeleteExpiredWithCollscan(opCtx,
+                                                           collection,
+                                                           startId,
+                                                           endId,
+                                                           /*forward=*/true,
+                                                           &filter,
+                                                           /*resumeTag=*/"$extendedRangeForward"sv);
     }
 
     // Delete from the end of the clustered _id index. In the typical case nothing should be
@@ -901,8 +955,14 @@ bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
         const auto endId = makeCollScanEndBound(
             collectionPtr, Date_t::fromMillisSinceEpoch(static_cast<long long>(0xFFFFFFFF) * 1000));
 
-        passTargetMet |= _performDeleteExpiredWithCollscan(
-            opCtx, collection, startId, endId, /*forward=*/false, &filter);
+        passTargetMet |=
+            _performDeleteExpiredWithCollscan(opCtx,
+                                              collection,
+                                              startId,
+                                              endId,
+                                              /*forward=*/false,
+                                              &filter,
+                                              /*resumeTag=*/"$extendedRangeBackward"sv);
     }
     return passTargetMet;
 }
@@ -913,7 +973,8 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
                                                    const RecordIdBound& startBound,
                                                    const RecordIdBound& endBound,
                                                    bool forward,
-                                                   const MatchExpression* filter) {
+                                                   const MatchExpression* filter,
+                                                   std::string_view resumeTag) {
     DeleteStageParams params;
     OpDebug opDebug;
     params.opDebug = &opDebug;
@@ -923,6 +984,33 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
     // parameters that can be set at runtime, and it is illegal to try to get
     // BatchedDeleteStageStats from a non-batched delete.
     const bool batchingEnabled = isBatchingEnabled(collection.getCollectionPtr());
+
+    // Continue after the last record the previous attempt on this scan staged. The scan starts at
+    // 'startBound' when forward and at 'endBound' when backward.
+    const auto resumeKey = makeScanResumeKey(collection.uuid(), resumeTag);
+    RecordIdBound minRecord = startBound;
+    RecordIdBound maxRecord = endBound;
+    auto boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords;
+    auto it = _resumePoints.find(resumeKey);
+    // This delete has no filter, so a resume RecordId outside the scan bounds would delete records
+    // that are not TTL-eligible.
+    if (it != _resumePoints.end() &&
+        (it->second.recordId < startBound.recordId() ||
+         it->second.recordId > endBound.recordId())) {
+        _resumePoints.erase(it);
+        it = _resumePoints.end();
+    }
+    if (batchingEnabled && it != _resumePoints.end()) {
+        (forward ? minRecord : maxRecord) = RecordIdBound(it->second.recordId);
+        boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
+        LOGV2_DEBUG(9277902,
+                    2,
+                    "Resuming TTL deletion on clustered collection after previous attempt met a "
+                    "pass target",
+                    logAttrs(collection.nss()),
+                    "scan"_attr = resumeTag,
+                    "resumeRecordId"_attr = it->second.recordId);
+    }
 
     // Deletes records using a bounded collection scan from the beginning of time to the
     // expiration time (inclusive).
@@ -934,9 +1022,9 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
         std::move(params),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         forward ? InternalPlanner::Direction::FORWARD : InternalPlanner::Direction::BACKWARD,
-        startBound,
-        endBound,
-        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
+        minRecord,
+        maxRecord,
+        boundInclusion,
         getBatchedDeleteStageParams(batchingEnabled),
         filter);
 
@@ -978,6 +1066,7 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
         }
         if (batchingEnabled) {
             auto batchedDeleteStats = exec->getBatchedDeleteStats();
+            _updateResumePoint(resumeKey, batchedDeleteStats);
             // A pass target met implies there may be more work to be done on the index.
             return batchedDeleteStats.passTargetMet;
         }
@@ -1066,6 +1155,29 @@ long long TTLMonitor::getTTLExaminedKeys_forTest() {
 
 long long TTLMonitor::getInvalidTTLIndexSkips_forTest() {
     return ttlInvalidTTLIndexSkips.valueForLegacyUse();
+}
+
+void TTLMonitor::_updateResumePoint(std::string_view resumeKey, const BatchedDeleteStats& stats) {
+    if (!stats.passTargetMet) {
+        _resumePoints.erase(resumeKey);
+        return;
+    }
+    if (!stats.lastStagedPosition) {
+        // Stopped on the time target before staging anything; nothing new to skip past.
+        return;
+    }
+    const auto& staged = *stats.lastStagedPosition;
+
+    auto [it, inserted] = _resumePoints.try_emplace(resumeKey);
+    auto& resumePoint = it->second;
+    // An attempt that started at an inclusive resume key, deleted nothing and staged nothing beyond
+    // that key made no progress. Starting at the same key again would stage the same entries. If
+    // it deleted something, the next attempt at the same key sees different entries.
+    resumePoint.excludeIndexKey = !inserted && !resumePoint.excludeIndexKey &&
+        stats.docsDeleted == 0 && !staged.indexKey.isEmpty() &&
+        resumePoint.indexKey.binaryEqual(staged.indexKey);
+    resumePoint.indexKey = staged.indexKey;
+    resumePoint.recordId = staged.recordId;
 }
 
 void TTLMonitor::_scheduleMetadataRecovery(OperationContext* opCtx,

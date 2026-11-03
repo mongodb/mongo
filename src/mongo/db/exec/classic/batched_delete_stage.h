@@ -75,6 +75,11 @@ struct [[MONGO_MOD_PUBLIC]] BatchedDeleteStageParams {
     // they still match the query and haven't been deleted by a concurrent operation. A value of
     // zero means unlimited.
     Milliseconds targetPassTimeMS;
+
+    // When set, BatchedDeleteStats reports the position of the last staged document, so a caller
+    // that stops on a 'pass' target can resume the next operation after it instead of rescanning
+    // documents that were staged but not deleted (e.g. unowned documents on a shard).
+    bool recordLastStagedPosition = false;
 };
 
 /**

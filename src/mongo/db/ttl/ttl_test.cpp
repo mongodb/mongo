@@ -798,6 +798,164 @@ TEST_F(TTLTest, TTLSingleSubPass) {
     EXPECT_EQ(getTTLSubPasses(), nInitialSubPasses + 1);
 }
 
+// Each batched delete resumes after the last entry the previous one staged. When more than
+// 'ttlIndexDeleteTargetDocs' documents share one expiry date, consecutive deletes stop on the same
+// index key; since they still delete documents, the sub-pass keeps resuming at that key until all
+// of them are removed.
+TEST_F(TTLTest, TTLSingleSubPassRemovesManyDocumentsWithSameExpiry) {
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlMonitorSubPassTargetSecsController(
+        "ttlMonitorSubPassTargetSecs", 60 * 60 * 24);
+    unittest::ServerParameterGuard ttlIndexDeleteTargetTimeMSController(
+        "ttlIndexDeleteTargetTimeMS", 0);
+    auto ttlIndexDeleteTargetDocs = 20;
+    unittest::ServerParameterGuard ttlIndexDeleteTargetDocsController("ttlIndexDeleteTargetDocs",
+                                                                      ttlIndexDeleteTargetDocs);
+
+    SimpleClient client(opCtx());
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll");
+    client.createColl(nss);
+    createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
+
+    const auto expiry = Date_t::now() - Seconds(10);
+    const int nDocs = ttlIndexDeleteTargetDocs * 3 + 5;
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < nDocs; i++) {
+        docs.emplace_back(BSON("x" << expiry));
+    }
+    client.insert(nss, docs);
+    ASSERT_EQ(client.count(nss), nDocs);
+
+    ASSERT_FALSE(doTTLSubPassForTest(opCtx(), Date_t::now()));
+    ASSERT_EQ(client.count(nss), 0);
+}
+
+// A resumed batched delete must stay inside the TTL bounds. Documents without the TTL field have
+// null index keys, which sort before every Date; a resume that started below the bounds would
+// delete them.
+TEST_F(TTLTest, TTLResumedDeleteKeepsDocumentsOutsideTTLBounds) {
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlMonitorSubPassTargetSecsController(
+        "ttlMonitorSubPassTargetSecs", 60 * 60 * 24);
+    unittest::ServerParameterGuard ttlIndexDeleteTargetTimeMSController(
+        "ttlIndexDeleteTargetTimeMS", 0);
+    auto ttlIndexDeleteTargetDocs = 20;
+    unittest::ServerParameterGuard ttlIndexDeleteTargetDocsController("ttlIndexDeleteTargetDocs",
+                                                                      ttlIndexDeleteTargetDocs);
+
+    SimpleClient client(opCtx());
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll");
+    client.createColl(nss);
+    createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
+
+    const int nExpiredDocs = ttlIndexDeleteTargetDocs * 3 + 5;
+    client.insertExpiredDocs(nss, "x", nExpiredDocs);
+    const int nDocsWithoutX = ttlIndexDeleteTargetDocs * 2;
+    client.insertExpiredDocs(nss, "y", nDocsWithoutX);
+
+    ASSERT_FALSE(doTTLSubPassForTest(opCtx(), Date_t::now()));
+    ASSERT_EQ(client.count(nss), nDocsWithoutX);
+}
+
+// A descending TTL index is scanned backward, still oldest first, so the resume key replaces the
+// start key the same way as for an ascending index.
+TEST_F(TTLTest, TTLSingleSubPassDescendingIndex) {
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlMonitorSubPassTargetSecsController(
+        "ttlMonitorSubPassTargetSecs", 60 * 60 * 24);
+    unittest::ServerParameterGuard ttlIndexDeleteTargetTimeMSController(
+        "ttlIndexDeleteTargetTimeMS", 0);
+    auto ttlIndexDeleteTargetDocs = 20;
+    unittest::ServerParameterGuard ttlIndexDeleteTargetDocsController("ttlIndexDeleteTargetDocs",
+                                                                      ttlIndexDeleteTargetDocs);
+
+    SimpleClient client(opCtx());
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll");
+    client.createColl(nss);
+    createIndex(nss, BSON("x" << -1), "testIndexX", Seconds(1));
+
+    const int nExpiredDocs = ttlIndexDeleteTargetDocs * 3 + 5;
+    client.insertExpiredDocs(nss, "x", nExpiredDocs);
+    // Not expired; must survive.
+    client.insert(nss, BSON("x" << Date_t::now() + Hours(1)));
+
+    ASSERT_FALSE(doTTLSubPassForTest(opCtx(), Date_t::now()));
+    ASSERT_EQ(client.count(nss), 1);
+}
+
+// Clustered collections resume each batched delete after the exact RecordId the previous one
+// staged last.
+TEST_F(TTLTest, TTLSingleSubPassClusteredCollectionResumes) {
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlMonitorSubPassTargetSecsController(
+        "ttlMonitorSubPassTargetSecs", 60 * 60 * 24);
+    unittest::ServerParameterGuard ttlIndexDeleteTargetTimeMSController(
+        "ttlIndexDeleteTargetTimeMS", 0);
+    auto ttlIndexDeleteTargetDocs = 20;
+    unittest::ServerParameterGuard ttlIndexDeleteTargetDocsController("ttlIndexDeleteTargetDocs",
+                                                                      ttlIndexDeleteTargetDocs);
+
+    SimpleClient client(opCtx());
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+    CollectionOptions options;
+    options.clusteredIndex =
+        ClusteredCollectionInfo(ClusteredIndexSpec(fromjson("{_id: 1}"), true), false);
+    options.expireAfterSeconds = 1;
+    client.createCollWithOptions(nss, options);
+
+    const int nExpiredDocs = ttlIndexDeleteTargetDocs * 3 + 5;
+    client.insertExpiredDocs(nss, "_id", nExpiredDocs);
+    // Not expired; must survive.
+    client.insert(nss, BSON("_id" << Date_t::now() + Hours(1)));
+
+    ASSERT_FALSE(doTTLSubPassForTest(opCtx(), Date_t::now()));
+    ASSERT_EQ(client.count(nss), 1);
+}
+
+// A secondary TTL index whose name matches an internal clustered scan tag must not share that
+// scan's resume point. The clustered scan would start from a RecordId the index delete staged; a
+// string _id sorts below every Date, so the unfiltered clustered delete would remove documents
+// that neither TTL index makes eligible.
+TEST_F(TTLTest, TTLIndexNamedLikeClusteredScanKeepsSeparateResumePoint) {
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlMonitorSubPassTargetSecsController(
+        "ttlMonitorSubPassTargetSecs", 60 * 60 * 24);
+    unittest::ServerParameterGuard ttlIndexDeleteTargetTimeMSController(
+        "ttlIndexDeleteTargetTimeMS", 0);
+    auto ttlIndexDeleteTargetDocs = 20;
+    unittest::ServerParameterGuard ttlIndexDeleteTargetDocsController("ttlIndexDeleteTargetDocs",
+                                                                      ttlIndexDeleteTargetDocs);
+
+    SimpleClient client(opCtx());
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+    CollectionOptions options;
+    options.clusteredIndex =
+        ClusteredCollectionInfo(ClusteredIndexSpec(fromjson("{_id: 1}"), true), false);
+    options.expireAfterSeconds = 1;
+    client.createCollWithOptions(nss, options);
+    createIndex(nss, BSON("x" << 1), "$clustered", Seconds(1));
+
+    const auto expired = Date_t::now() - Seconds(10);
+    const int nDocs = ttlIndexDeleteTargetDocs * 3 + 5;
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < nDocs; i++) {
+        // Expired through the secondary index only.
+        docs.emplace_back(BSON("_id" << fmt::format("a{:03}", i) << "x" << expired));
+        // Expired through the clustered _id only.
+        docs.emplace_back(BSON("_id" << expired - Milliseconds(i)));
+    }
+    // Not expired through either; sort after the "a..." _ids and before every Date.
+    const int nKeep = 10;
+    for (int i = 0; i < nKeep; i++) {
+        docs.emplace_back(BSON("_id" << fmt::format("b{:03}", i)));
+    }
+    client.insert(nss, docs);
+
+    while (doTTLSubPassForTest(opCtx(), Date_t::now())) {
+    }
+    ASSERT_EQ(client.count(nss), nKeep);
+}
+
 TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
     unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 

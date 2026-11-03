@@ -4,12 +4,16 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/background.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -18,6 +22,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 namespace [[MONGO_MOD_PRIVATE]] mongo {
 class TTLMonitor : public BackgroundJob {
@@ -164,7 +169,39 @@ private:
                                            const RecordIdBound& startBound,
                                            const RecordIdBound& endBound,
                                            bool forward,
-                                           const MatchExpression* filter);
+                                           const MatchExpression* filter,
+                                           std::string_view resumeTag);
+
+    /**
+     * Where the next batched TTL delete on an index or clustered scan starts, after the previous
+     * one stopped on a 'pass' target. Without it every attempt restarts at the oldest expired
+     * entry, and a run of expired documents that cannot be deleted (e.g. unowned documents on a
+     * shard) larger than a pass target blocks every newer expired document (SERVER-92779).
+     *
+     * A resume point is only written after a delete returns. If a delete throws, the previous
+     * resume point (or none) stays, so the next attempt in the pass rescans what the failed one
+     * covered. Write conflicts are retried inside the plan executor and do not reach the monitor.
+     */
+    struct ResumePoint {
+        // Dehydrated index key of the last staged document. Empty for clustered scans.
+        BSONObj indexKey;
+        // RecordId of the last staged document. Used to resume clustered scans exactly.
+        RecordId recordId;
+        // Set when a whole attempt staged only entries equal to 'indexKey' and deleted none. Index
+        // cursors cannot seek to a (key, RecordId) position, so the next attempt starts after
+        // 'indexKey'. Owned entries with that key past the skipped ones wait for a later pass.
+        // TODO(SERVER-138186): resume at the (key, RecordId) position instead.
+        bool excludeIndexKey = false;
+    };
+
+    // Records where to resume after a batched delete stopped on a 'pass' target, or clears the
+    // resume point when the delete reached the end of its range.
+    void _updateResumePoint(std::string_view resumeKey, const BatchedDeleteStats& stats);
+
+    // Keyed by collection UUID plus index name or scan tag. Cleared at the start of every TTL pass,
+    // so documents skipped in one pass are reconsidered in the next. Only accessed by the TTL
+    // monitor thread.
+    stdx::unordered_map<std::string, ResumePoint> _resumePoints;
 
     /**
      * Schedules an async task that will recover the sharding metadata. It does not wait for the

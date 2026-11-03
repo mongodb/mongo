@@ -490,6 +490,20 @@ void BatchedDeleteStage::_stageNewDelete(WorkingSetID* workingSetMemberID) {
     _stagedDeletesWatermarkBytes += memberMemFootprintBytes;
     _passTotalDocsStaged += 1;
     incrementSSSMetricNoOverflow(batchedDeletesSSS.stagedSizeBytes, memberMemFootprintBytes);
+
+    if (_batchedDeleteParams->recordLastStagedPosition) {
+        BSONObj indexKey;
+        if (member->metadata().hasIndexKey()) {
+            // Index scan bounds take dehydrated keys, so drop the field names.
+            BSONObjBuilder dehydratedKey;
+            for (auto&& elem : member->metadata().getIndexKey()) {
+                dehydratedKey.appendAs(elem, ""sv);
+            }
+            indexKey = dehydratedKey.obj();
+        }
+        _specificStats.lastStagedPosition =
+            BatchedDeleteStats::StagedPosition{member->recordId, std::move(indexKey)};
+    }
 }
 
 PlanStage::StageState BatchedDeleteStage::_tryRestoreState(WorkingSetID* out) {

@@ -778,6 +778,78 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsBasic) {
     }
 }
 
+// With 'recordLastStagedPosition', the stats report the RecordId of the last document staged
+// before the pass target stopped the operation, so a caller can resume after it.
+TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteRecordsLastStagedPosition) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
+    auto nDocs = 52;
+    prePopulateCollection(nDocs);
+
+    const auto coll = acquireCollection(
+        &_opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    ASSERT(coll.exists());
+
+    std::vector<RecordId> recordIds;
+    getRecordIds(&_opCtx, coll, CollectionScanParams::FORWARD, &recordIds);
+    ASSERT_EQ(recordIds.size(), static_cast<size_t>(nDocs));
+
+    WorkingSet ws;
+    auto batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
+    batchedDeleteParams->targetBatchTimeMS = Milliseconds(0);
+    batchedDeleteParams->targetBatchDocs = 10;
+    auto targetPassDocs = 20;
+    batchedDeleteParams->targetPassDocs = targetPassDocs;
+    batchedDeleteParams->recordLastStagedPosition = true;
+
+    auto deleteStage =
+        makeBatchedDeleteStage(&ws, coll, _expCtx.get(), std::move(batchedDeleteParams));
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
+
+    WorkingSetID id = WorkingSet::INVALID_ID;
+    while (deleteStage->work(&id) != PlanStage::IS_EOF) {
+    }
+
+    ASSERT_TRUE(stats->passTargetMet);
+    ASSERT_EQ(stats->docsDeleted, targetPassDocs);
+    ASSERT(stats->lastStagedPosition);
+    ASSERT_EQ(stats->lastStagedPosition->recordId, recordIds[targetPassDocs - 1]);
+    // The child is a collection scan, so there is no index key to report.
+    ASSERT_TRUE(stats->lastStagedPosition->indexKey.isEmpty());
+}
+
+// Without 'recordLastStagedPosition', the stage does not track the last staged position.
+TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteDoesNotRecordLastStagedPositionByDefault) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
+    prePopulateCollection(52);
+
+    const auto coll = acquireCollection(
+        &_opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(&_opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    ASSERT(coll.exists());
+
+    WorkingSet ws;
+    auto batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
+    batchedDeleteParams->targetBatchTimeMS = Milliseconds(0);
+    batchedDeleteParams->targetBatchDocs = 10;
+    batchedDeleteParams->targetPassDocs = 20;
+
+    auto deleteStage =
+        makeBatchedDeleteStage(&ws, coll, _expCtx.get(), std::move(batchedDeleteParams));
+    const BatchedDeleteStats* stats =
+        static_cast<const BatchedDeleteStats*>(deleteStage->getSpecificStats());
+
+    WorkingSetID id = WorkingSet::INVALID_ID;
+    while (deleteStage->work(&id) != PlanStage::IS_EOF) {
+    }
+
+    ASSERT_TRUE(stats->passTargetMet);
+    ASSERT_FALSE(stats->lastStagedPosition);
+}
+
 // No limits on batch targets means all deletes will be committed in a single batch, and the
 // 'targetPassDocs' will be ignored.
 TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteTargetPassDocsWithUnlimitedBatchTargets) {

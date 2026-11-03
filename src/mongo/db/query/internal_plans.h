@@ -62,6 +62,9 @@ public:
         // The client wants the fetched object and the RecordId that refers to it.  Delegating
         // the fetch to the runner allows fetching outside of a lock.
         IXSCAN_FETCH = 1,
+
+        // The index scan attaches each entry's key as index key metadata, which survives FETCH.
+        IXSCAN_ADD_KEY_METADATA = 2,
     };
 
     /**

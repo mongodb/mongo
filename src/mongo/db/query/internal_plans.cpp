@@ -337,15 +337,14 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
     auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
 
-    std::unique_ptr<PlanStage> root = _indexScan(expCtx,
-                                                 ws.get(),
-                                                 coll,
-                                                 indexEntry,
-                                                 startKey,
-                                                 endKey,
-                                                 boundInclusion,
-                                                 direction,
-                                                 InternalPlanner::IXSCAN_FETCH);
+    // FETCH drops the index key data, so the batched delete stage reads the key of the last staged
+    // document from metadata.
+    int options = InternalPlanner::IXSCAN_FETCH;
+    if (batchedDeleteParams && batchedDeleteParams->recordLastStagedPosition) {
+        options |= InternalPlanner::IXSCAN_ADD_KEY_METADATA;
+    }
+    std::unique_ptr<PlanStage> root = _indexScan(
+        expCtx, ws.get(), coll, indexEntry, startKey, endKey, boundInclusion, direction, options);
 
     root = _createAppropriateDeleteStage(
         expCtx, coll, std::move(params), std::move(batchedDeleteParams), ws.get(), root.release());
@@ -505,6 +504,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
     params.bounds.boundInclusion = boundInclusion;
     params.shouldDedup = collectionPtr->isIndexMultikey(
         expCtx->getOperationContext(), indexEntry->descriptor()->indexName(), nullptr);
+    params.addKeyMetadata = InternalPlanner::IXSCAN_ADD_KEY_METADATA & options;
 
     std::unique_ptr<PlanStage> root =
         std::make_unique<IndexScan>(expCtx.get(), coll, std::move(params), ws, nullptr);
