@@ -675,6 +675,8 @@ VersionContext getVersionContextOrDefault(const boost::optional<ForwardableOpera
 bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetadata>& fom,
                                 const FCVGatedFeatureFlag& flag);
 
+size_t getMaxConcurrentReshardings();
+
 /**
  * Returns true if 'fcv' matches the FCV snapshotted in 'metadata' when the resharding operation
  * started. Coordinator documents written before the startingFCV field existed are treated as

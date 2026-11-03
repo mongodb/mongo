@@ -1,13 +1,14 @@
 /**
  * Tests that chunk migrations, collMod, createIndexes, and dropIndexes are prohibited on a
  * collection that is undergoing a resharding operation. Also tests that concurrent resharding
- * operations are prohibited.
+ * operations on different collections are prohibited when featureFlagConcurrentResharding is off.
  *
  * @tags: [
  *   uses_atclustertime,
  * ]
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
@@ -196,10 +197,12 @@ withReshardingInBackground(
             }),
             [ErrorCodes.ConflictingOperationInProgress],
         );
-        assert.commandFailedWithCode(
-            mongos.adminCommand({reshardCollection: otherNamespace, key: {newKey: 1}}),
-            ErrorCodes.ReshardCollectionInProgress,
-        );
+        if (!FeatureFlagUtil.isPresentAndEnabled(mongos.getDB("admin"), "ConcurrentResharding")) {
+            assert.commandFailedWithCode(
+                mongos.adminCommand({reshardCollection: otherNamespace, key: {newKey: 1}}),
+                ErrorCodes.ReshardCollectionInProgress,
+            );
+        }
 
         assertCommandsFailDuringReshardingOp(sourceCollection.getDB());
     },

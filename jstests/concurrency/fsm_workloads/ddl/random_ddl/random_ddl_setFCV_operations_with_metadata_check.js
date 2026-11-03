@@ -32,7 +32,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.expectedSetFCVExecutions = 2;
     // Auxiliary helper to move a collection and capture all expected errors of the test.
     $config.data.kAcceptedMoveCollectionErrors = [
-        // Only one resharding operation is allowed to be run at a point in time.
+        // Only one resharding operation is allowed to be run at a point in time if the feature flag
+        // featureFlagConcurrentResharding is off.
         ErrorCodes.ReshardCollectionInProgress,
         ErrorCodes.ConflictingOperationInProgress,
         // A concurrent drop operation could drop the collection that is about to be resharded.

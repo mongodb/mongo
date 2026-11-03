@@ -16,6 +16,7 @@
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -1382,6 +1383,90 @@ TEST_F(ReshardingCoordinatorServiceTest, MultipleReshardingOperationsFail) {
         ErrorCodes::ConflictingOperationInProgress);
 
     runReshardingToCompletion(TransitionFunctionMap{}, std::move(stateTransitionsGuard));
+}
+
+class ReshardingCoordinatorServiceConcurrentReshardingTest
+    : public ReshardingCoordinatorServiceTest {
+public:
+    void setUp() override {
+        ReshardingCoordinatorServiceTest::setUp();
+        _concurrentReshardingFeatureFlagController.emplace("featureFlagConcurrentResharding", true);
+        _failPoint = globalFailPointRegistry().find("pauseAfterStoppingActiveMigrations");
+        _timesEntered = _failPoint->setMode(FailPoint::alwaysOn, 0);
+        _parkedCoordinators.push_back(initializeAndGetCoordinator());
+        _failPoint->waitForTimesEntered(++_timesEntered);
+    }
+
+protected:
+    std::shared_ptr<ReshardingCoordinator> startReshardingOn(
+        const NamespaceString& nss,
+        const ShardKeyPattern& oldShardKey = ShardKeyPattern(BSON("shardKeyV2" << 1))) {
+        return initializeAndGetCoordinator(UUID::gen(),
+                                           nss,
+                                           NamespaceString::createNamespaceString_forTest(
+                                               "db.system.resharding." + UUID::gen().toString()),
+                                           ShardKeyPattern(BSON("shardKeyV1" << 1)),
+                                           UUID::gen(),
+                                           oldShardKey);
+    }
+
+    void startParkedReshardingOn(const NamespaceString& nss) {
+        auto coordinator = startReshardingOn(nss);
+        _failPoint->waitForTimesEntered(++_timesEntered);
+        _parkedCoordinators.push_back(std::move(coordinator));
+    }
+
+    void abortAllParkedAndWait() {
+        for (auto& coordinator : _parkedCoordinators) {
+            coordinator->abort(
+                {resharding::kUserAbortReason, resharding::AbortType::kAbortSkipQuiesce});
+        }
+        _failPoint->setMode(FailPoint::off, 0);
+        for (auto& coordinator : _parkedCoordinators) {
+            coordinator->getCompletionFuture().wait();
+        }
+        _parkedCoordinators.clear();
+        _failPoint->setMode(FailPoint::alwaysOn, 0);
+    }
+
+private:
+    boost::optional<unittest::ServerParameterGuard> _concurrentReshardingFeatureFlagController;
+    FailPoint* _failPoint = nullptr;
+    FailPoint::EntryCountT _timesEntered = 0;
+    std::vector<std::shared_ptr<ReshardingCoordinator>> _parkedCoordinators;
+};
+
+TEST_F(ReshardingCoordinatorServiceConcurrentReshardingTest,
+       ReshardingOperationsForDifferentNamespacesDoNotConflict) {
+    startParkedReshardingOn(NamespaceString::createNamespaceString_forTest("db.moo"));
+
+    ASSERT_THROWS_CODE(startReshardingOn(_originalNss, _oldShardKey),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    abortAllParkedAndWait();
+}
+
+TEST_F(ReshardingCoordinatorServiceConcurrentReshardingTest,
+       ConcurrentReshardingOperationsAreCappedByCoordinatorThreadPoolSize) {
+    const size_t maxConcurrentReshardings = resharding::getMaxConcurrentReshardings();
+
+    auto collectionNss = [](size_t i) {
+        return NamespaceString::createNamespaceString_forTest("db.moo" + std::to_string(i));
+    };
+
+    for (size_t i = 1; i < maxConcurrentReshardings; ++i) {
+        startParkedReshardingOn(collectionNss(i));
+    }
+
+    ASSERT_THROWS_CODE(startReshardingOn(collectionNss(maxConcurrentReshardings)),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    abortAllParkedAndWait();
+
+    startParkedReshardingOn(collectionNss(maxConcurrentReshardings));
+    abortAllParkedAndWait();
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, QuiescedInstanceRebuiltOnStepUpDoesNotConflict) {

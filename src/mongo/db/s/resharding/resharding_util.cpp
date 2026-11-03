@@ -1037,6 +1037,12 @@ bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetada
                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
+// Each resharding coordinator blocks at least 3 coordinator pool threads, and 1 thread is reserved.
+size_t getMaxConcurrentReshardings() {
+    return std::max<size_t>(
+        1, (static_cast<size_t>(resharding::gReshardingCoordinatorServiceMaxThreadCount) - 1) / 3);
+}
+
 bool isFCVTheSame(const CommonReshardingMetadata& metadata,
                   const multiversion::FeatureCompatibilityVersion& fcv) {
     // (Generic FCV reference): the coordinator doc predates the startingFCV field, so it can only
