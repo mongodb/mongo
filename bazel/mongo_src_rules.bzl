@@ -1181,6 +1181,7 @@ def idl_generator_impl(ctx):
         executable = action_wrapper if use_macos_local_container else python_interpreter,
         outputs = [gen_source, gen_header],
         inputs = inputs,
+        tools = [ctx.attr._macos_cross_action_wrapper[DefaultInfo].files_to_run] if use_macos_local_container else [],
         arguments = ([python_interpreter] if use_macos_local_container else []) + idlc_arguments,
         mnemonic = "IdlcGenerator",
         env = {"PYTHONPATH": python_path_value},

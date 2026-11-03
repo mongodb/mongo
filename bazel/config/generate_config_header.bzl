@@ -1,8 +1,13 @@
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("@rules_python//python:py_info.bzl", "PyInfo")
 load("//bazel/config:configs.bzl", "sdkroot_provider")
-load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path")
+load(
+    "//bazel/config:py_action_env.bzl",
+    "py_action_env_windows_dll_path",
+    "py_linux_python_action",
+)
 load("//bazel:utils.bzl", "write_target")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
@@ -111,12 +116,35 @@ def generate_config_header_impl(ctx):
         variables = compile_variables,
     )
 
-    # Windows runtimes need the Python DLL directory or the configured host PATH.
-    # Linux execution runtimes must retain the worker's PATH.
-    action_env = py_action_env_windows_dll_path(ctx)
-    windows_cross_host_path = ctx.attr._windows_cross_host_path[BuildSettingInfo].value
-    if windows_cross_host_path and action_env:
-        action_env["PATH"] = windows_cross_host_path
+    use_windows_cross = ctx.attr._windows_cross_local_container_actions[BuildSettingInfo].value
+    if use_windows_cross:
+        # A Windows py_binary produces a .exe launcher. ConfigHeaderGen is
+        # routed to the Linux RBE container for Windows cross builds, so invoke
+        # the generator source with the Linux cross Python runtime instead.
+        python_interpreter, generator_source, python_files, action_env = py_linux_python_action(
+            ctx,
+            ctx.attr.generator_script,
+            ctx.attr._linux_x86_64_python_interpreter,
+            ctx.attr._linux_x86_64_python_files,
+        )
+        generator_executable = python_interpreter
+        generator_arguments = [generator_source.path.replace("\\", "/")]
+        generator_inputs = [
+            ctx.attr.generator_script[PyInfo].transitive_sources,
+            depset([generator_source]),
+            python_files,
+        ]
+    else:
+        # Native Windows py_binary launchers need the Python DLL directory on
+        # PATH. The host path is only meaningful when the generator itself is a
+        # Windows executable.
+        action_env = py_action_env_windows_dll_path(ctx)
+        windows_cross_host_path = ctx.attr._windows_cross_host_path[BuildSettingInfo].value
+        if windows_cross_host_path and action_env:
+            action_env["PATH"] = windows_cross_host_path
+        generator_executable = ctx.executable.generator_script
+        generator_arguments = []
+        generator_inputs = []
 
     expanded_extra_definitions = {}
     for key, val in ctx.attr.extra_definitions.items():
@@ -130,6 +158,7 @@ def generate_config_header_impl(ctx):
         "compile_variables": " ".join(compiler_flags + ctx.attr.cpp_opts),
         "linkflags": " ".join(link_flags + ctx.attr.cpp_linkflags),
         "cpp_defines": " ".join(ctx.attr.cpp_defines),
+        "COMPILER_TYPE": cc_toolchain.compiler,
     }
 
     # Config-header actions execute on the execution platform, which may differ from the
@@ -152,15 +181,15 @@ def generate_config_header_impl(ctx):
             additional_inputs.append(file.path)
 
     ctx.actions.run(
-        executable = ctx.executable.generator_script,
+        executable = generator_executable,
         outputs = [ctx.outputs.output, ctx.outputs.logfile],
         mnemonic = "ConfigHeaderGen",
         inputs = depset(transitive = [
             cc_toolchain.all_files,
             ctx.attr.template.files,
             ctx.attr.checks.files,
-        ] + additional_inputs_depsets),
-        arguments = [
+        ] + additional_inputs_depsets + generator_inputs),
+        arguments = generator_arguments + [
                         "--output-path",
                         ctx.outputs.output.path,
                         "--template-path",
@@ -231,7 +260,16 @@ generate_config_header_rule = rule(
         ),
         "_cc_toolchain": attr.label(default = "@rules_cc//cc:current_cc_toolchain"),
         "_sdkroot": attr.label(default = "//bazel/config:sdkroot"),
+        "_windows_cross_local_container_actions": attr.label(
+            default = "//bazel/config:windows_cross_local_container_actions",
+        ),
         "_windows_cross_host_path": attr.label(default = "//bazel/config:windows_cross_host_path"),
+        "_linux_x86_64_python_files": attr.label(
+            default = "@py_linux_x86_64//:files",
+        ),
+        "_linux_x86_64_python_interpreter": attr.label(
+            default = "@py_linux_x86_64//:interpreter",
+        ),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),

@@ -684,6 +684,7 @@ def _windows_cross_host_wrapper_action_args(
             "--strategy=CcGenerateIntermediateDwp=local",
             "--strategy=CcGenerateDwp=local",
             "--strategy=ConfigHeaderGen=remote",
+            "--strategy=TemplateRenderer=remote",
             "--strategy=IdlcGenerator=remote",
             # Genrules use the Linux execution platform's shell, including third-party
             # header-copy actions, so they cannot run on the Windows client.

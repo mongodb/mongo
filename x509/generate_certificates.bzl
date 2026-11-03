@@ -1,6 +1,6 @@
 load("@rules_python//python:py_info.bzl", "PyInfo")
 load("//bazel/uv:defs.bzl", "dependency")
-load("//bazel/config:py_action_env.bzl", "py_exec_import_paths")
+load("//bazel/config:py_action_env.bzl", "py_exec_import_paths", "py_runtime_pythonpath")
 load("//bazel/config:render_template.bzl", "render_template")
 load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 
@@ -85,7 +85,7 @@ def _generate_certificates(ctx):
             transitive = [python.files, depset([arg.files.to_list()[0] for arg in ctx.attr.srcs])] + python_libs,
         ),
         arguments = [args],
-        env = {"PYTHONPATH": ctx.configuration.host_path_separator.join(python_path)},
+        env = {"PYTHONPATH": py_runtime_pythonpath(python, python_path)},
         mnemonic = "CertificateGenerator",
     )
 

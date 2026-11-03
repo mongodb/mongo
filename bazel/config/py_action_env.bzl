@@ -31,6 +31,7 @@ Usage:
     )
 """
 
+load("@rules_python//python:py_executable_info.bzl", "PyExecutableInfo")
 load("@rules_python//python:py_info.bzl", "PyInfo")
 
 def py_runtime_pythonpath(python, paths):
@@ -41,6 +42,44 @@ def py_runtime_pythonpath(python, paths):
     """
     separator = ";" if python.interpreter.extension == "exe" else ":"
     return separator.join([path.replace("\\", "/") for path in paths])
+
+def py_linux_python_action(ctx, python_binary, python_interpreter_target, python_files_target):
+    """Returns the Linux Python action configuration for a cross build.
+
+    A py_binary selected for a Windows execution platform produces a Windows
+    launcher. Cross-build generator actions run in the Linux RBE container, so
+    invoke the py_binary's source with the downloaded Linux Python runtime
+    instead of passing the Windows launcher to the remote worker.
+    """
+    linux_python_interpreters = python_interpreter_target.files.to_list()
+    if len(linux_python_interpreters) != 1:
+        fail("Linux Python runtime was requested but is not available")
+
+    python_interpreter = linux_python_interpreters[0].path.replace("\\", "/")
+    python_files = python_files_target.files
+
+    # The interpreter label may resolve to a symlink such as `python3`. Use the
+    # versioned executable from the extracted distribution so the action remains
+    # runnable when Bazel materializes the Linux runtime on a Windows host.
+    for python_file in python_files.to_list():
+        if python_file.basename.startswith("python3.") and not python_file.basename.endswith("-config"):
+            python_interpreter = python_file.path.replace("\\", "/")
+            break
+
+    python_source = python_binary[PyExecutableInfo].main
+    if not python_source:
+        fail("Python generator must provide a main source")
+
+    python_path = py_exec_import_paths(ctx, [python_binary])
+    action_env = {
+        # The action executes in the Linux RBE container even though analysis is
+        # performed by a Windows host Bazel. Use Linux path syntax throughout.
+        "PYTHONPATH": ":".join(
+            [python_source.dirname.replace("\\", "/")] +
+            [path.replace("\\", "/") for path in python_path],
+        ),
+    }
+    return python_interpreter, python_source, python_files, action_env
 
 def py_action_env_windows_dll_path(ctx):
     """Returns the Windows Python DLL and standard-library environment.

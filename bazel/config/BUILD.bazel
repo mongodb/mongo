@@ -1,9 +1,11 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
 load(":toolchain_provenance.bzl", "toolchain_provenance")
 load("//bazel/toolchains/cc:mongo_compiler_flags.bzl", "MONGO_GLOBAL_LINKFLAGS")
 load(":toolchain_versions_test.bzl", "disabled_linker_features_analysis_test", "local_cross_link_inputs_analysis_test", "macos_cross_compile_flags_analysis_test", "macos_cross_local_link_runtime_analysis_test", "macos_cross_remote_link_runtime_analysis_test", "macos_cross_toolchain_versions_analysis_test", "requested_linker_features_analysis_test", "toolchain_versions_analysis_test")
+load("@py_linux_arm64//:availability.bzl", ARM64_LINUX_PYTHON_AVAILABLE = "PYTHON_RUNTIME_AVAILABLE")
+load("@py_linux_x86_64//:availability.bzl", X86_64_LINUX_PYTHON_AVAILABLE = "PYTHON_RUNTIME_AVAILABLE")
 load(
     "@bazel_skylib//rules:common_settings.bzl",
     "bool_flag",
@@ -75,7 +77,18 @@ load(
     "use_wiredtiger",
     "visibility_support",
 )
-load(":py_action_env_test.bzl", "linux_tool_path_analysis_test", "runtime_pythonpath_test", "template_renderer_python_path_analysis_test")
+load(
+    ":py_action_env_test.bzl",
+    "config_header_linux_python_analysis_test",
+    "idl_wrapper_runfiles_analysis_test",
+    "linux_tool_path_analysis_test",
+    "python_genrule_action_analysis_test",
+    "python_genrule_linux_python_analysis_test",
+    "runtime_pythonpath_test",
+    "template_renderer_linux_python_analysis_test",
+    "template_renderer_python_path_analysis_test",
+)
+load(":python_genrule.bzl", "python_genrule")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -182,8 +195,57 @@ local_cross_link_inputs_analysis_test(
 
 runtime_pythonpath_test(name = "runtime_pythonpath_test")
 
+py_library(
+    name = "runfiles_generator_data",
+    data = [
+        "testdata/helper.py",
+        "testdata/message.txt",
+    ],
+)
+
+python_genrule(
+    name = "runfiles_generator",
+    cmd = ["$(location generated_python_input.txt)"],
+    outputs = ["generated_python_input.txt"],
+    python_file = "testdata/generator/generate.py",
+    python_libs = [":runfiles_generator_data"],
+)
+
+# Cross-runtime tests are skipped when the corresponding repository is a stub.
+# To run them on another host, set --repo_env=MONGO_BAZEL_DOWNLOAD_CROSS_LINUX_PYTHON=1
+# and --repo_env=MONGO_BAZEL_CROSS_LINUX_PYTHON_ARCH=x86_64 (aarch64 for the IDL test).
+
+idl_wrapper_runfiles_analysis_test(
+    name = "idl_wrapper_runfiles_analysis_test",
+    target_compatible_with = [] if ARM64_LINUX_PYTHON_AVAILABLE else ["@platforms//:incompatible"],
+    target_under_test = "//src/mongo/idl:config_option_no_init_test_gen",
+)
+
+python_genrule_action_analysis_test(
+    name = "python_genrule_action_analysis_test",
+    target_under_test = ":runfiles_generator",
+)
+
+python_genrule_linux_python_analysis_test(
+    name = "python_genrule_linux_python_analysis_test",
+    target_compatible_with = [] if X86_64_LINUX_PYTHON_AVAILABLE else ["@platforms//:incompatible"],
+    target_under_test = ":runfiles_generator",
+)
+
 template_renderer_python_path_analysis_test(
     name = "template_renderer_python_path_analysis_test",
+    target_under_test = "//src/mongo/base:error_codes_source",
+)
+
+config_header_linux_python_analysis_test(
+    name = "config_header_linux_python_analysis_test",
+    target_compatible_with = [] if X86_64_LINUX_PYTHON_AVAILABLE else ["@platforms//:incompatible"],
+    target_under_test = "//src/mongo:mongo_config_header",
+)
+
+template_renderer_linux_python_analysis_test(
+    name = "template_renderer_linux_python_analysis_test",
+    target_compatible_with = [] if X86_64_LINUX_PYTHON_AVAILABLE else ["@platforms//:incompatible"],
     target_under_test = "//src/mongo/base:error_codes_source",
 )
 

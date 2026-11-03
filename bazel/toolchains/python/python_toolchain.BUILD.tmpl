@@ -1,5 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_runtime", "py_runtime_pair")
 
+exports_files(["availability.bzl"])
+
 filegroup(
     name = "files",
     srcs = glob(
@@ -14,7 +16,7 @@ filegroup(
         exclude=[
             "**/setuptools/**/* *",
             "**/*.pyc",
-        ],
+{cross_linux_python_excludes}        ],
     ),
     visibility = ["//visibility:public"],
 )

@@ -86,7 +86,9 @@ def load_download() -> Callable[[RepositoryContext], Any]:
 
 
 class PythonToolchainTest(unittest.TestCase):
-    def test_cross_linux_python_removes_case_colliding_terminfo_on_windows(self) -> None:
+    def test_cross_linux_python_removes_case_colliding_terminfo_on_case_insensitive_hosts(
+        self,
+    ) -> None:
         download = load_download()
         for host_os, toolchain_os in (
             ("windows", "linux"),
@@ -113,7 +115,7 @@ class PythonToolchainTest(unittest.TestCase):
                 download(ctx)
                 self.assertEqual(
                     (root / "dist/share/terminfo").exists(),
-                    host_os != "windows" or toolchain_os != "linux",
+                    host_os not in ("windows", "mac os x") or toolchain_os != "linux",
                 )
                 for file in (
                     "dist/bin/python3.13",

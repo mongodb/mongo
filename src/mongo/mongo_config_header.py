@@ -20,6 +20,7 @@ def log_check(message):
 
 class CompilerSettings:
     compiler_path: str = ""
+    compiler_type: str = ""
     compiler_args: str = ""
     env_vars: dict = {}
 
@@ -31,44 +32,39 @@ class HeaderDefinition:
 
 
 def compile_check(source_text: str) -> bool:
-    temp = None
-    if platform.system() == "Windows":
-        temp = tempfile.NamedTemporaryFile(suffix=".cpp", delete=False)
-        temp.write(source_text.encode())
-        temp.close()
-        command = [
-            CompilerSettings.compiler_path,
-            "/c",  # only compile and assemble, don't link since we don't want to have to pass in all of the libs of the dependencies
-            temp.name,
-            *CompilerSettings.compiler_args.split(" "),
-        ]
-        log_check(" ".join(command[:-1] + [source_text]))
-        try:
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                env={**os.environ.copy(), **CompilerSettings.env_vars},
-            )
-        except OSError as exc:
-            log_check(f"failed to run compiler: {exc}")
-            if temp:
-                os.unlink(temp.name)
-            raise
-    else:
-        command = [
-            CompilerSettings.compiler_path,
-            "-c",  # only compile and assemble, don't link since we don't want to have to pass in all of the libs of the dependencies
-            "-x",
-            "c++",
-            *CompilerSettings.compiler_args.split(" "),
-            "-",
-        ]
+    # The compiler driver and Python's execution OS can differ in cross builds.
+    # Compile only, and keep both the source and object in a temporary directory.
+    with tempfile.TemporaryDirectory(prefix="mongo-config-check-") as temp_dir:
+        if CompilerSettings.compiler_type in {"msvc-cl", "clang-cl"}:
+            source_path = os.path.join(temp_dir, "probe.cpp")
+            with open(source_path, "w", encoding="utf-8") as source:
+                source.write(source_text)
+            command = [
+                CompilerSettings.compiler_path,
+                "/c",
+                "/TP",
+                source_path,
+                *CompilerSettings.compiler_args.split(),
+                "/Fo" + os.path.join(temp_dir, "probe.obj"),
+            ]
+            input_text = None
+        else:
+            command = [
+                CompilerSettings.compiler_path,
+                "-c",
+                "-x",
+                "c++",
+                *CompilerSettings.compiler_args.split(),
+                "-",
+                "-o",
+                os.path.join(temp_dir, "probe.o"),
+            ]
+            input_text = source_text
         log_check(" ".join(command + [source_text]))
         try:
             result = subprocess.run(
                 command,
-                input=source_text,
+                **({"input": input_text} if input_text is not None else {}),
                 capture_output=True,
                 text=True,
                 env={**os.environ.copy(), **CompilerSettings.env_vars},
@@ -81,8 +77,6 @@ def compile_check(source_text: str) -> bool:
         log_check(f"stderr:\n{result.stderr}")
     log_check(f"Exit code:\n{result.returncode}")
     log_check("--------------------------------------------------\n\n")
-    if temp:
-        os.unlink(temp.name)
     return result.returncode == 0
 
 
@@ -131,8 +125,8 @@ def memset_s_present_flag() -> list[HeaderDefinition]:
         return []
 
 
-def strnlen_present_flag() -> list[HeaderDefinition]:
-    if platform.system() == "Windows":
+def strnlen_present_flag(target_os: str) -> list[HeaderDefinition]:
+    if target_os.lower() == "windows":
         return []
 
     log_check("[MONGO_CONFIG_HAVE_STRNLEN] Checking for strnlen...")
@@ -343,8 +337,8 @@ def altivec_vbpermq_output_flag(target_arch: str) -> list[HeaderDefinition]:
     return [HeaderDefinition("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", 1)]
 
 
-def usdt_provider_flags() -> list[HeaderDefinition]:
-    if platform.system() == "Darwin":
+def usdt_provider_flags(target_os: str) -> list[HeaderDefinition]:
+    if target_os.lower() in {"macos", "darwin"}:
         return []
 
     log_check("[MONGO_CONFIG_USDT_PROVIDER] Checking if SDT usdt provider is available...")
@@ -415,12 +409,16 @@ def generate_config_header(
     logfile_path = logpath
 
     extra_definitions_dict = json.loads(extra_definitions)
+    CompilerSettings.compiler_type = extra_definitions_dict.get("COMPILER_TYPE") or (
+        "msvc-cl" if platform.system() == "Windows" else "gcc"
+    )
+    target_os = extra_definitions_dict.get("TARGET_OS") or platform.system()
 
     definitions: list[HeaderDefinition] = []
 
     definitions += glibc_rseq_present_flag()
     definitions += memset_s_present_flag()
-    definitions += strnlen_present_flag()
+    definitions += strnlen_present_flag(target_os)
     definitions += explicit_bzero_present_flag()
     definitions += pthread_setname_np_present_flag()
     if (
@@ -436,7 +434,7 @@ def generate_config_header(
     target_arch = extra_definitions_dict.get("TARGET_ARCH") or platform.machine()
     definitions += extended_alignment_flag(target_arch)
     definitions += altivec_vbpermq_output_flag(target_arch)
-    definitions += usdt_provider_flags()
+    definitions += usdt_provider_flags(target_os)
     # New checks can be added here
 
     for key, value in extra_definitions_dict.items():

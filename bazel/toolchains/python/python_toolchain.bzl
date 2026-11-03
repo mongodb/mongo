@@ -105,6 +105,10 @@ def _py_download(ctx):
         arch == requested_cross_linux_arch
     )
 
+    # Analysis tests can inspect optional cross runtimes when downloaded and
+    # remain incompatible with the default build when the repository is a stub.
+    ctx.file("availability.bzl", "PYTHON_RUNTIME_AVAILABLE = %s\n" % (os_matches or download_cross_linux_python))
+
     # If OS or architecture doesn't match, create a minimal stub BUILD file and skip download.
     # macOS cross tests can opt in to downloading the Linux Python runtime that remote IDL
     # generation executes inside the RBE container.
@@ -117,6 +121,8 @@ def _py_download(ctx):
         ctx.file("BUILD.bazel", """
 # Stub toolchain - platform doesn't match host, not downloaded
 load("@rules_python//python:defs.bzl", "py_runtime_pair")
+
+exports_files(["availability.bzl"])
 
 filegroup(
     name = "files",
@@ -158,6 +164,12 @@ toolchain(
         sha = platform_info["sha"]
         interpreter_path = platform_info["interpreter_path"]
 
+    if "win" in ctx.os.name:
+        # Windows preserves the read-only attribute when an archive or a prior
+        # repository attempt leaves it on the extracted tree. Clear it before
+        # Bazel refreshes the distribution so a stale partial fetch is writable.
+        ctx.execute(["attrib", "-R", "dist\\*", "/S", "/D"])
+
     ctx.report_progress("downloading python")
     retry_download_and_extract(
         ctx = ctx,
@@ -168,10 +180,11 @@ toolchain(
         stripPrefix = "python",
     )
 
-    if is_host_windows and is_toolchain_linux:
-        # Linux terminfo aliases that differ only by case become symlink cycles on
-        # Windows filesystems. Build-time Python does not need this terminal database,
-        # and excluding it from glob() does not prevent traversal of the cycles.
+    if (is_host_windows or is_host_macos) and is_toolchain_linux:
+        # The archive's terminfo links are valid on case-sensitive Linux but
+        # become cyclic on Windows and case-insensitive macOS filesystems before
+        # BUILD glob exclusions are evaluated.
+        # They are not part of the Python runtime needed by remote IDL actions.
         ctx.delete("dist/share/terminfo")
 
     windows_python = False
@@ -224,9 +237,20 @@ toolchain(
     # So Starlark doesn't throw an indentation error when this gets injected.
     constraints_str = ",\n        ".join(['"%s"' % c for c in constraints])
 
+    # The Linux standalone archive contains case-sensitive terminfo symlinks. Windows and macOS
+    # can resolve their targets case-insensitively, causing cycles while Bazel globs
+    # the runtime files. The directory is not needed by the remote IDL Python runtime.
+    cross_linux_python_excludes = ""
+    if (is_host_windows or is_host_macos) and is_toolchain_linux:
+        cross_linux_python_excludes = (
+            '            "dist/share/terminfo",\n' +
+            '            "dist/share/terminfo/**",\n'
+        )
+
     # Inject our string substitutions into the BUILD file template, and drop said BUILD file in the WORKSPACE root of the repository.
     substitutions = {
         "{constraints}": constraints_str,
+        "{cross_linux_python_excludes}": cross_linux_python_excludes,
         "{interpreter_path}": interpreter_path,
     }
 

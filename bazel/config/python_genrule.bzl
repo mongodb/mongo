@@ -1,72 +1,20 @@
-load("//bazel:utils.bzl", "write_target")
-load("//bazel/config:py_action_env.bzl", "py_action_env_pythonpath", "py_action_env_windows_dll_path")
-load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
-load("@rules_python//python:defs.bzl", "py_binary")
+"""Compatibility names for Python generators with multiple outputs."""
 
-def python_genrule_impl(ctx):
-    expanded_args = [
-        ctx.expand_make_variables("render_template_expand", ctx.expand_location(arg, ctx.attr.srcs), ctx.var)
-        for arg in ctx.attr.cmd
-    ]
-
-    # Add runfiles package dir to PYTHONPATH so scripts can import python_libs (e.g. gen_helper).
-    runfiles_package_dir = ctx.executable.python_binary.path + ".runfiles/" + ctx.workspace_name + "/" + ctx.label.package
-    env = py_action_env_pythonpath(ctx, ctx.attr.python_binary, runfiles_package_dir)
-    windows_python_env = py_action_env_windows_dll_path(ctx)
-    env.update(windows_python_env)
-    windows_cross_host_path = ctx.attr._windows_cross_host_path[BuildSettingInfo].value
-    if windows_cross_host_path and windows_python_env:
-        env["PATH"] = windows_cross_host_path
-
-    ctx.actions.run(
-        executable = ctx.executable.python_binary,
-        outputs = ctx.outputs.outputs,
-        inputs = depset(transitive = [depset([arg.files.to_list()[0] for arg in ctx.attr.srcs])]),
-        arguments = expanded_args,
-        env = env,
-        mnemonic = "TemplateRenderer",
-        use_default_shell_env = True,
-    )
-
-    return [DefaultInfo(files = depset(ctx.outputs.outputs))]
-
-python_genrule_rule = rule(
-    python_genrule_impl,
-    attrs = {
-        "srcs": attr.label_list(
-            doc = "The input files of this rule.",
-            allow_files = True,
-        ),
-        "outputs": attr.output_list(
-            doc = "The outputs of this rule.",
-            mandatory = True,
-        ),
-        "cmd": attr.string_list(
-            doc = "The command line arguments to pass to python",
-        ),
-        "python_binary": attr.label(
-            executable = True,
-            cfg = "exec",
-        ),
-        "_windows_cross_host_path": attr.label(
-            default = "//bazel/config:windows_cross_host_path",
-        ),
-    },
-    toolchains = ["@rules_python//python:toolchain_type"],
-    output_to_genfiles = True,
+load(
+    "//bazel/config:render_template.bzl",
+    "render_templates",
+    _render_templates_rule = "render_templates_rule",
 )
 
+python_genrule_rule = _render_templates_rule
+
 def python_genrule(name, python_file, python_libs = [], tags = [], **kwargs):
-    py_binary(
-        name = name + "_python",
-        srcs = [python_file],
-        main = python_file,
-        tags = tags + ["gen_source"],
-        deps = python_libs,
-    )
-    python_genrule_rule(
+    render_templates(
         name = name,
-        tags = tags + ["gen_source"],
-        python_binary = name + "_python",
+        python_file = python_file,
+        python_libs = python_libs,
+        tags = tags,
+        srcs = kwargs.pop("srcs", []),
+        cmd = kwargs.pop("cmd", []),
         **kwargs
     )

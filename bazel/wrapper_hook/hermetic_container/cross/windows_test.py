@@ -248,6 +248,7 @@ class WindowsCrossExecutionTest(CrossPlanningTestCase):
         self.assertEqual(args[cross_windows._bazel_command_index(args)], "build")
         self.assertIn("--//bazel/config:windows_cross_local_container_actions=True", args)
         self.assertIn("--//bazel/config:idl_use_linux_python=True", args)
+        self.assertIn("--strategy=TemplateRenderer=remote", args)
         self.assertIn("--//bazel/config:disable_warnings_as_errors=True", args)
         self.assertIn("--repo_env=MONGO_BAZEL_DOWNLOAD_CROSS_LINUX_PYTHON=1", args)
         self.assertIn("--repo_env=MONGO_BAZEL_CROSS_LINUX_PYTHON_ARCH=x86_64", args)
