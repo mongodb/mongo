@@ -215,6 +215,25 @@ function getAfterOpTimeCounters(conn) {
     jsTest.log("Rejected for an unauthenticated connection, even for commands needing no auth");
     assertUnauthenticatedPingRejected(st.s.host, kOpTimeForRouter);
 
+    jsTest.log("Counted in the router's serverStatus");
+    {
+        // The counters are updated on the router too, so the section has to be registered for the
+        // router role. A request rejected here never reaches a shard, so a shard-only section would
+        // leave these rejections unobservable.
+        const rootConn = connectAs(st.s.host, kRootUser);
+        const before = getAfterOpTimeCounters(rootConn);
+
+        assert.commandFailedWithCode(
+            rootConn.getDB(kDbName).runCommand(
+                {find: kCollName, filter: {}, readConcern: {afterOpTime: kOpTimeForRouter}}),
+            ErrorCodes.Unauthorized);
+
+        const after = getAfterOpTimeCounters(rootConn);
+        assert.eq(after.rejected,
+                  before.rejected + 1,
+                  "the router rejection was not counted: " + tojson({before, after}));
+    }
+
     jsTest.log("With allowDeprecatedAfterOpTimeReadConcern enabled");
     {
         // The router applies the check itself, and then forwards the client's readConcern

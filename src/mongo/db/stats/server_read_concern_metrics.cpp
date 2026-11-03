@@ -211,7 +211,9 @@ public:
     }
 };
 auto readConcernCountersSSS =
-    *ServerStatusSectionBuilder<ReadConcernCountersSSS>("readConcernCounters").forShard();
+    *ServerStatusSectionBuilder<ReadConcernCountersSSS>("readConcernCounters")
+         .forShard()
+         .forRouter();
 }  // namespace
 
 }  // namespace mongo
