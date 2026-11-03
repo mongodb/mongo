@@ -109,6 +109,8 @@ parameters:
     description: "path to this file"
   - key: test_selection_strategies_array
     description: "Array of test selection strategies"
+  - key: test_selection_bypass_quarantine
+    description: "JSON array of exact test names to run despite quarantine in this patch. Suite and tag exclusions still apply. Ignored for non-patch builds."
   - key: use_tss_staging
     description: "Set to true to ask the staging test selection deployment instead of production"
   - key: runtime_params_json

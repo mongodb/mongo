@@ -6,7 +6,9 @@ load("//bazel/uv:defs.bzl", "dependency")
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
+    "prelude.sh",
     "remote_execution_containers_generate.sh",
+    "resmoke_tests_execute.sh",
     "upload_task_artifact.sh",
 ])
 

@@ -55,6 +55,11 @@ py_test(
         "__init__.py",
         "test_suite.py",
     ],
+    data = [
+        "//buildscripts:evergreen_expansions2bash.py",
+        "//evergreen:prelude.sh",
+        "//evergreen:resmoke_tests_execute.sh",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts/resmokelib",

@@ -2,6 +2,7 @@
 
 import contextlib
 import io
+import logging
 import os
 import pathlib
 import sys
@@ -17,6 +18,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from bazel.resmoke import generate_tss_test_list as under_test
 from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib.logging import loggers
+from buildscripts.resmokelib.testing.suite import Suite
 
 
 class TestDiscoverTests(unittest.TestCase):
@@ -158,6 +161,172 @@ class TestSelectTests(unittest.TestCase):
         with self._evg(result={"tests": ["b.js", "not_discovered.js"]}):
             selected = under_test.select_tests(["a.js", "b.js"], "//pkg:suite", volatile, [])
         self.assertEqual(["b.js"], selected)
+
+    def test_patch_bypass_restores_only_candidates(self):
+        for requester in ("patch_request", "github_pull_request", "github_merge_request"):
+            with self.subTest(requester=requester):
+                volatile = dict(MAINLINE, task_id="x", requester=requester)
+                with (
+                    self._evg(result={"tests": ["a.js", "outside.js"]}) as api,
+                    patch.object(
+                        under_test,
+                        "read_expansions",
+                        return_value={
+                            "test_selection_bypass_quarantine": '["b.js","b.js","outside.js"]'
+                        },
+                    ),
+                ):
+                    tests = under_test.select_tests(
+                        ["b.js", "a.js", "c.js"], "//pkg:suite", volatile, ["Optimistic"]
+                    )
+                self.assertEqual(["b.js", "a.js"], tests)
+                sent = api.select_tests.call_args.kwargs
+                self.assertEqual(["b.js", "a.js", "c.js"], sent["tests"])
+                self.assertNotIn("test_selection_bypass_quarantine", sent)
+
+    def test_non_patch_requesters_ignore_bypass(self):
+        for requester in ("gitter_request", "trigger_request", ""):
+            for raw in ('["b.js"]', "broken"):
+                with (
+                    self.subTest(requester=requester, raw=raw),
+                    self._evg(result={"tests": ["a.js"]}),
+                    patch.object(
+                        under_test,
+                        "read_expansions",
+                        return_value={"test_selection_bypass_quarantine": raw},
+                    ),
+                ):
+                    self.assertEqual(
+                        ["a.js"],
+                        under_test.select_tests(
+                            ["b.js", "a.js"],
+                            "//pkg:suite",
+                            dict(MAINLINE, requester=requester),
+                            ["Optimistic"],
+                        ),
+                    )
+
+    def test_absent_and_empty_bypass_preserve_selection(self):
+        for raw in (None, "", "[]"):
+            with self.subTest(raw=raw):
+                result, consumed, error, _, _ = self._generate_and_consume(raw)
+                self.assertEqual(
+                    {"suite": "//pkg:suite", "status": "selected", "tests": ["a.js"]}, result
+                )
+                self.assertEqual((["a.js"], ["b  b.js", "not_in_generated_file.js"]), consumed)
+                self.assertIsNone(error)
+
+    def _generate_and_consume(self, raw, *, enabled=True, side_effect=None, task_id=True):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace = pathlib.Path(tmpdir) / "src"
+            workspace.mkdir()
+            if raw is not None:
+                (pathlib.Path(tmpdir) / "expansions.yml").write_text(
+                    yaml.safe_dump({"test_selection_bypass_quarantine": raw})
+                )
+            output = os.path.join(tmpdir, "tests.yml")
+            settings = os.path.join(tmpdir, "settings.txt")
+            pathlib.Path(settings).write_text(f"{str(enabled).lower()}\nOptimistic\n")
+            suite_path = os.path.join(tmpdir, "suite.yml")
+            pathlib.Path(suite_path).write_text("test_kind: js_test\n")
+            volatile = dict(PATCH, requester="patch_request")
+            if task_id:
+                volatile["task_id"] = under_test.construct_task_id(PATCH, PATCH["task_name"])
+            argv = [
+                "generate_tss_test_list.py",
+                "--suite",
+                suite_path,
+                "--label",
+                "//pkg:suite",
+                "--output",
+                output,
+                "--selection-settings",
+                settings,
+                "--volatile-status",
+                "/nonexistent",
+            ]
+            stderr = io.StringIO()
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(
+                    under_test,
+                    "discover_tests",
+                    return_value=["b  b.js", "a.js", "c.js", "b  b.js"],
+                ),
+                patch.object(under_test, "parse_volatile_status", return_value=volatile),
+                patch.object(
+                    under_test.os.path, "realpath", return_value=str(workspace / "MODULE.bazel")
+                ),
+                self._evg(result={"tests": ["a.js", "outside.js"]}, side_effect=side_effect) as api,
+                contextlib.redirect_stderr(stderr),
+            ):
+                under_test.main()
+            with open(output) as written:
+                result = yaml.safe_load(written)
+            suite = Suite("suite_name", {"test_kind": "js_test"})
+            with (
+                patch.object(_config, "TSS_TEST_LIST", output),
+                patch.object(loggers, "ROOT_EXECUTOR_LOGGER", logging.getLogger("generated-test")),
+                patch.dict(os.environ, {"TEST_SELECTION_BYPASS_QUARANTINE": "broken"}),
+                patch.object(suite, "_apply_evergreen_api_test_selection") as api_selection,
+            ):
+                consumed = suite._apply_test_selection(
+                    ["b  b.js", "a.js", "not_in_generated_file.js"]
+                )
+                api_selection.assert_not_called()
+            return result, consumed, suite.tss_selection_error, stderr.getvalue(), api
+
+    def test_bypass_round_trips_through_generation_and_consumption(self):
+        result, consumed, error, _, _ = self._generate_and_consume(
+            '["b  b.js","b  b.js","outside.js"]'
+        )
+        self.assertEqual(
+            {"suite": "//pkg:suite", "status": "selected", "tests": ["b  b.js", "a.js", "b  b.js"]},
+            result,
+        )
+        self.assertEqual((["b  b.js", "a.js"], ["not_in_generated_file.js"]), consumed)
+        self.assertIsNone(error)
+
+    def test_bypass_and_api_errors_write_failed_file_and_mark_consumption_error(self):
+        for raw, api_error, message in (
+            ("broken", None, "test_selection_bypass_quarantine"),
+            ('["b  b.js"]', ConnectionError("503 error"), "503"),
+        ):
+            with self.subTest(raw=raw, api_error=api_error):
+                result, consumed, error, stderr, api = self._generate_and_consume(
+                    raw, side_effect=api_error
+                )
+                self.assertEqual(
+                    {
+                        "suite": "//pkg:suite",
+                        "status": "failed",
+                        "tests": ["b  b.js", "a.js", "c.js", "b  b.js"],
+                    },
+                    result,
+                )
+                self.assertEqual((["b  b.js", "a.js", "not_in_generated_file.js"], []), consumed)
+                self.assertIsNotNone(error)
+                self.assertIn(message, stderr)
+                if api_error is None:
+                    api.select_tests.assert_not_called()
+
+    def test_disabled_or_missing_identity_does_not_parse_invalid_bypass(self):
+        for enabled, task_id in ((False, True), (True, False)):
+            with self.subTest(enabled=enabled, task_id=task_id):
+                result, consumed, error, _, api = self._generate_and_consume(
+                    "broken", enabled=enabled, task_id=task_id
+                )
+                self.assertEqual(
+                    {
+                        "suite": "//pkg:suite",
+                        "status": "disabled",
+                        "tests": ["b  b.js", "a.js", "c.js", "b  b.js"],
+                    },
+                    result,
+                )
+                self.assertEqual((["b  b.js", "a.js", "not_in_generated_file.js"], []), consumed)
+                self.assertIsNone(error)
+                api.select_tests.assert_not_called()
 
     def test_sends_the_constructed_task_id_not_the_runner_one(self):
         volatile = dict(MAINLINE, task_id="the_runner_task", requester="patch_request")

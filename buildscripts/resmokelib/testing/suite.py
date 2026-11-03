@@ -18,7 +18,7 @@ from buildscripts.resmokelib import suitesconfig
 from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing import report as _report
 from buildscripts.resmokelib.testing import summary as _summary
-from buildscripts.resmokelib.utils import evergreen_conn
+from buildscripts.resmokelib.utils import evergreen_conn, test_selection
 
 # Map of error codes that could be seen. This is collected from:
 # * dbshell.cpp
@@ -244,6 +244,9 @@ class Suite(object):
 
     def _apply_evergreen_api_test_selection(self, tests: list[str]) -> tuple[list[str], list[str]]:
         """Return (tests to run, tests excluded) by asking Evergreen's select-tests endpoint."""
+        bypass = test_selection.parse_bypass_tests(
+            os.environ.get(test_selection.BYPASS_ENVIRONMENT, "")
+        )
         try:
             evg_api = evergreen_conn.get_evergreen_api()
         except RuntimeError:
@@ -296,13 +299,9 @@ class Suite(object):
                 )
                 return tests, []
 
-        evergreen_filtered_tests_set = set(result["tests"])
-        # Intersect with the tag-filtered list so that TSS can only reduce the set of tests to
-        # run, never expand it. Without this, TSS could return tests that were excluded by the
-        # resource_intensive tag split, causing the same test to run in both the
-        # resource-intensive suite and the normal suite.
-        tss_selected = [t for t in tests if t in evergreen_filtered_tests_set]
-        evergreen_excluded_tests = [t for t in tests if t not in evergreen_filtered_tests_set]
+        tss_selected, evergreen_excluded_tests = test_selection.merge_selected_tests(
+            tests, result["tests"], bypass
+        )
         loggers.ROOT_EXECUTOR_LOGGER.info(
             f"Evergreen applied the following test selection strategies: {test_selection_strategy}"
         )
