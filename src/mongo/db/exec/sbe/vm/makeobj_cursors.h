@@ -55,6 +55,9 @@ public:
     MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> value() const {
         return bson::convertToView(bsonElement());
     }
+    MONGO_COMPILER_ALWAYS_INLINE BSONElement item() const {
+        return bsonElement();
+    }
     MONGO_COMPILER_ALWAYS_INLINE void appendTo(BsonObjWriter& bob) const {
         bob.appendBsonElement(bsonElement());
     }
@@ -103,6 +106,9 @@ public:
     }
     MONGO_COMPILER_ALWAYS_INLINE value::TagValueView value() const {
         return _objRoot->getAt(_idx);
+    }
+    MONGO_COMPILER_ALWAYS_INLINE std::pair<std::string_view, value::TagValueView> item() const {
+        return {_name, value()};
     }
     MONGO_COMPILER_ALWAYS_INLINE void appendTo(BsonObjWriter& bob) const {
         auto [tag, val] = value();

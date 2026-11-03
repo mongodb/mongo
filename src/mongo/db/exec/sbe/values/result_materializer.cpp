@@ -7,8 +7,11 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/vm/makeobj_cursors.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
 
 #include <absl/container/inlined_vector.h>
 
@@ -124,7 +127,7 @@ Value convertToValue(value::TagValueView view) {
 
 namespace {
 Document convertToDocument(const value::Object& obj) {
-    MutableDocument doc;
+    MutableDocument doc(obj.size());
     for (size_t idx = 0; idx < obj.size(); ++idx) {
         doc.addField(obj.field(idx), convertToValue(obj.getAt(idx)));
     }
@@ -138,29 +141,48 @@ BSONObj encodeObject(value::Object* obj) {
 }
 
 /**
- * The object 'obj' as BSON: a view of the value's memory when it already holds BSON, which is only
- * valid until the slot's value changes. Nothing is the empty object.
+ * The object 'obj' as BSON, without copies.
  */
-BSONObj asBson(value::TagValueView obj) {
+BSONObj coerceToBson(value::TagValueView obj) {
     switch (obj.tag) {
         case value::TypeTags::bsonObject:
             return BSONObj(value::bitcastTo<const char*>(obj.value), BSONObj::LargeSizeTrait{});
-        case value::TypeTags::Object:
-            return encodeObject(value::getObjectView(obj.value));
         case value::TypeTags::Nothing:
             return BSONObj();
         default:
-            tasserted(13773200, "Expected an object or Nothing");
+            tasserted(13773200, "Expected a bsonObject or Nothing");
     }
 }
 
-BSONObj ownObject(value::SlotAccessor* accessor, value::BSONObjValueAccessor* bsonAccessor) {
+/**
+ * The object 'obj' as a view if possible, or a copy otherwise.
+ */
+BSONObj bsonViewOrCopy(value::TagValueView obj) {
+    // If we have sbe::Object, we'll have to translate this to BSON (copy).
+    if (obj.tag == value::TypeTags::Object) {
+        return encodeObject(value::getObjectView(obj.value));
+    }
+    // Other cases are easily coercible.
+    return coerceToBson(obj);
+}
+
+/**
+ * The object held in the accessor as owned BSON, which may require copies.
+ */
+BSONObj asOwnedBson(value::SlotAccessor* accessor, value::BSONObjValueAccessor* bsonAccessor) {
+    // For a BSON accessor, getting owned BSON is cheap (reference count bump).
     if (bsonAccessor) {
         return bsonAccessor->getOwnedBSONObj();
     }
-    // Copied even if the stage owns it: a stage that gave its value away by a move can still expose
-    // it again later.
-    return asBson(accessor->getViewOfValue()).getOwned();
+    value::TagValueView obj = accessor->getViewOfValue();
+    // For an sbe::Object, we'll have to iterate through the object and copy it to
+    // BSON.
+    if (obj.tag == value::TypeTags::Object) {
+        return encodeObject(value::getObjectView(obj.value)).getOwned();
+    }
+    // Otherwise, the type must be bsonObject or Nothing, which are easily owned
+    // through coercing to BSON plus .getOwned()
+    return coerceToBson(obj).getOwned();
 }
 
 StringListSet createFieldNamesListSet(const std::vector<ResultField>& fields) {
@@ -215,6 +237,20 @@ ResultMaterializer::ResultMaterializer(value::SlotAccessor* base,
     tassert(13773202, "ResultMaterializer requires a base slot", _base);
 
     _numFieldsToSearchFor = computeNumFieldsToSearchFor(closed, _fields);
+    // When building a document with `_closed=true`, we're forced to iterate through the base
+    // so we only keep the requested fields. However if we have open results, we're keeping
+    // fields by default and can potentially use a BSON _base as the underlying BSON for the
+    // Document, and apply our changes on top:
+    //    kSet  -> set the field to the given value in the Document's field cache
+    //    kDrop -> set the field to `Value()` (missing) in the field cache, same effect as actually
+    //             deleting the field.
+    // However, this does not work if we have any kAdd fields, which requires the field to be moved
+    // to the end of the object. This means we cannot just add our changes to the field cache, since
+    // that would not affect the final field order. Document reads it's base BSON to determine the
+    // field order to output, so the base needs to be changed.
+    _canShareBase = !closed && std::ranges::none_of(_fields, [](const ResultField& field) {
+        return field.action == ResultFieldAction::kAdd;
+    });
     for (const auto& field : _fields) {
         if (field.action == ResultFieldAction::kSet || field.action == ResultFieldAction::kAdd) {
             tassert(13773201, "Expected a slot for a set or added result field", field.accessor);
@@ -226,7 +262,7 @@ Value ResultMaterializer::fieldValue(size_t fieldIdx) const {
     const auto& field = _fields[fieldIdx];
     auto view = field.accessor->getViewOfValue();
     if (view.tagIn(value::TypeTags::bsonObject, value::TypeTags::Object)) {
-        return Value(Document{ownObject(field.accessor, field.bsonAccessor)});
+        return Value(Document{asOwnedBson(field.accessor, field.bsonAccessor)});
     }
     return convertToValue(view);
 }
@@ -237,8 +273,13 @@ Value ResultMaterializer::fieldValue(size_t fieldIdx) const {
 struct ResultMaterializer::BsonWriter {
     explicit BsonWriter(const ResultMaterializer& materializer) : materializer(materializer) {}
 
-    void appendElem(const BSONElement& elem) {
+    void append(const BSONElement& elem) {
         bob.append(elem);
+    }
+
+    void append(const ObjectField& field) {
+        const auto& [name, view] = field;
+        bson::appendValueToBsonObj(bob, name, view.tag, view.value);
     }
 
     void appendField(size_t fieldIdx) {
@@ -259,8 +300,13 @@ struct ResultMaterializer::DocumentWriter {
     explicit DocumentWriter(const ResultMaterializer& materializer)
         : materializer(materializer), md(materializer._fields.size()) {}
 
-    void appendElem(const BSONElement& elem) {
+    void append(const BSONElement& elem) {
         md.addField(elem.fieldNameStringData(), Value(elem));
+    }
+
+    void append(const ObjectField& field) {
+        const auto& [name, view] = field;
+        md.addField(name, convertToValue(view));
     }
 
     void appendField(size_t fieldIdx) {
@@ -275,17 +321,26 @@ struct ResultMaterializer::DocumentWriter {
 };
 
 template <ResultWriter Writer>
-void ResultMaterializer::produce(Writer& writer, const BSONObj& base) {
+void ResultMaterializer::produce(Writer& writer) {
+    auto base = _base->getViewOfValue();
+    if (base.tag == value::TypeTags::Object) {
+        produce(writer, vm::ObjectCursor(value::getObjectView(base.value)));
+    } else {
+        // `Nothing` will return an empty BSON here, and will iterate correctly.
+        produce(writer, vm::BsonObjCursor(coerceToBson(base).objdata()));
+    }
+}
+
+template <ResultWriter Writer, ResultBaseCursor Cursor>
+void ResultMaterializer::produce(Writer& writer, Cursor cursor) {
     // 'visitedSetFields' tracks which kSet fields were found in the base, so the remaining ones can
     // be appended at the end.
     absl::InlinedVector<char, 32> visitedSetFields(_fields.size(), 0);
 
     const auto defaultAction = _closed ? ResultFieldAction::kDrop : ResultFieldAction::kKeep;
-    BSONObjIterator it(base);
     size_t fieldsLeft = _numFieldsToSearchFor;
-    while (it.more() && fieldsLeft > 0) {
-        auto elem = it.next();
-        const size_t fieldIdx = _fieldNames.findPos(elem.fieldNameStringData());
+    for (; !cursor.atEnd() && fieldsLeft > 0; cursor.moveNext()) {
+        const size_t fieldIdx = _fieldNames.findPos(cursor.fieldName());
         const auto action =
             fieldIdx != StringListSet::npos ? _fields[fieldIdx].action : defaultAction;
 
@@ -296,7 +351,7 @@ void ResultMaterializer::produce(Writer& writer, const BSONObj& base) {
                 break;
             case ResultFieldAction::kKeep:
                 fieldsLeft -= _closed;
-                writer.appendElem(elem);
+                writer.append(cursor.item());
                 break;
             case ResultFieldAction::kSet:
                 --fieldsLeft;
@@ -308,8 +363,8 @@ void ResultMaterializer::produce(Writer& writer, const BSONObj& base) {
 
     // If the result is open, copy over the base fields that were not searched.
     if (!_closed) {
-        while (it.more()) {
-            writer.appendElem(it.next());
+        for (; !cursor.atEnd(); cursor.moveNext()) {
+            writer.append(cursor.item());
         }
     }
 
@@ -324,29 +379,40 @@ void ResultMaterializer::produce(Writer& writer, const BSONObj& base) {
 }
 
 BSONObj ResultMaterializer::toBson(bool mustOwn) {
-    auto base = _base->getViewOfValue();
     if (!hasChanges()) {
-        return mustOwn ? ownObject(_base, _baseBsonAccessor) : asBson(base);
+        return mustOwn ? asOwnedBson(_base, _baseBsonAccessor)
+                       : bsonViewOrCopy(_base->getViewOfValue());
     }
 
     BsonWriter writer(*this);
-    // TODO SERVER-138113 avoid sbe::Object -> BSON translation in this case. We can instead
-    // iterate the sbe::Object directly.
-    produce(writer, asBson(base));
+    produce(writer);
     return writer.bob.obj<BSONObj::LargeSizeTrait>();
 }
 
 Document ResultMaterializer::toDocument() {
     if (!hasChanges()) {
-        return Document{ownObject(_base, _baseBsonAccessor)};
+        return Document{asOwnedBson(_base, _baseBsonAccessor)};
     }
 
-    // TODO SERVER-138113 improve result materializer efficiency by detecting cases when
-    // we can reuse the bson as the base of the document and build fields in the field cache.
+    // If we have no kAdd changes and a BSON base, we can create a Document based on the BSON
+    // and cheaply add our changes on top in the field cache.
+    if (_canShareBase && _base->getViewOfValue().tag == value::TypeTags::bsonObject) {
+        MutableDocument md{Document{asOwnedBson(_base, _baseBsonAccessor)}};
+        for (size_t fieldIdx = 0; fieldIdx < _fields.size(); ++fieldIdx) {
+            const auto& field = _fields[fieldIdx];
+            if (field.action == ResultFieldAction::kDrop) {
+                md.remove(field.name);
+            } else if (field.action == ResultFieldAction::kSet) {
+                // A missing value removes the field.
+                // TODO SERVER-138519 Check for double copies in `fieldValue`
+                md.setField(field.name, fieldValue(fieldIdx));
+            }
+        }
+        return md.freeze();
+    }
+
     DocumentWriter writer(*this);
-    // TODO SERVER-138113 avoid sbe::Object -> BSON translation in this case. We can instead
-    // iterate the sbe::Object directly.
-    produce(writer, asBson(_base->getViewOfValue()));
+    produce(writer);
     return writer.md.freeze();
 }
 

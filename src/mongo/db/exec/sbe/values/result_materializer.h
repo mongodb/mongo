@@ -11,7 +11,9 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/string_listset.h"
 
+#include <concepts>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -44,11 +46,29 @@ struct ResultField {
     value::BSONObjValueAccessor* bsonAccessor;
 };
 
-template <typename Writer>
-concept ResultWriter = requires(Writer& writer, const BSONElement& elem, size_t fieldIdx) {
-    writer.appendElem(elem);
-    writer.appendField(fieldIdx);
+/**
+ * A field of an SBE Object result base.
+ */
+using ObjectField = std::pair<std::string_view, value::TagValueView>;
+
+/**
+ * Walks the fields of a result base. item() is the current field, a BSONElement or an ObjectField.
+ */
+template <typename Cursor>
+concept ResultBaseCursor = requires(Cursor& cursor) {
+    { cursor.atEnd() } -> std::same_as<bool>;
+    cursor.moveNext();
+    { cursor.fieldName() } -> std::same_as<std::string_view>;
+    cursor.item();
 };
+
+template <typename Writer>
+concept ResultWriter =
+    requires(Writer& writer, const BSONElement& elem, const ObjectField& field, size_t fieldIdx) {
+        writer.append(elem);
+        writer.append(field);
+        writer.appendField(fieldIdx);
+    };
 
 /**
  * Builds the result of an SBE plan from its root ResultInfo: a base object slot and a list of
@@ -82,10 +102,8 @@ concept ResultWriter = requires(Writer& writer, const BSONElement& elem, size_t 
  *   [c: kKeep, a: kAdd 10]  -> {c: 3, a: 10}
  *   [d: kSet 4]             -> {d: 4}
  *
- * With changes, toBson() and toDocument() build the result with the same walk over the base,
- * appending each field to a BSONObjBuilder or a MutableDocument. Without changes the result is the
- * base object itself. Object slots (the base without changes, and object-valued fields) are copied
- * at most once per result:
+ * Object slots (the base when it is not walked, and object-valued fields) are copied at most once
+ * per result:
  *  - A BSONObjValueAccessor (the record slot of a scan or fetch) shares one owned copy of the
  * record through getOwnedBSONObj(), so consecutive results over the same record don't copy it
  * again.
@@ -120,12 +138,15 @@ private:
     Value fieldValue(size_t fieldIdx) const;
 
     /**
-     * Mirrors the top-level part of vm::MakeObjImpl::produceObj() for 'base' and the changes,
-     * passing each field of the result to 'writer' in order: kept base fields to appendElem() and
-     * set or added fields to appendField(). The result may exceed the default BSON size limit.
+     * Mirrors the top-level part of vm::MakeObjImpl::produceObj() for the base and the changes,
+     * passing each field of the result to 'writer' in order: kept base fields to append() and set
+     * or added fields to appendField(). The result may exceed the default BSON size limit.
      */
     template <ResultWriter Writer>
-    void produce(Writer& writer, const BSONObj& base);
+    void produce(Writer& writer);
+
+    template <ResultWriter Writer, ResultBaseCursor Cursor>
+    void produce(Writer& writer, Cursor cursor);
 
     value::SlotAccessor* _base;
     value::BSONObjValueAccessor* _baseBsonAccessor;
@@ -135,6 +156,8 @@ private:
 
     // The number of base fields whose action is not the default one.
     size_t _numFieldsToSearchFor = 0;
+
+    bool _canShareBase = false;
 };
 
 }  // namespace mongo::sbe

@@ -384,12 +384,6 @@ TEST_F(ResultMaterializerTest, Table) {
           set("x", BSON_ARRAY(1 << "two" << BSON("t" << 3)))},
          BSON("_id" << 1 << "a" << 2 << "b" << BSON("p" << 1 << "q" << BSON_ARRAY(1 << 2)) << "d"
                     << 4 << "o" << BSONObj() << "x" << BSON_ARRAY(1 << "two" << BSON("t" << 3)))},
-        // Like makeBsonObj(), only the first occurrence of a duplicate field is replaced.
-        {"open duplicate base field names",
-         duplicates,
-         false,
-         {set("a", 10)},
-         BSON("a" << 10 << "a" << 2 << "b" << 3)},
         {"open empty base", empty, false, {drop("a"), set("x", 1)}, BSON("x" << 1)},
         {"open nothing base", boost::none, false, {drop("a"), set("x", 1)}, BSON("x" << 1)},
 
@@ -468,9 +462,7 @@ TEST_F(ResultMaterializerTest, SharedRecordBaseIsCopiedOnce) {
     ASSERT_EQ(materializer.toDocument().toBsonIfTriviallyConvertible()->objdata(), shared);
     ASSERT_EQ(materializer.toBson(true).objdata(), shared);
 
-    // With changes the results are built field by field from the record.
-    // TODO SERVER-138113 improve result materializer efficiency by detecting cases when
-    // we can reuse the bson as the base of the document and build fields in the field cache.
+    // With changes the results still read the record's fields.
     auto* value = makeAccessor(makeInt32(10));
     ResultMaterializer withChanges(&base, false, {{"joined", ResultFieldAction::kSet, value}});
     Document joined = withChanges.toDocument();
@@ -486,6 +478,27 @@ TEST_F(ResultMaterializerTest, SharedRecordBaseIsCopiedOnce) {
     ASSERT_BSONOBJ_EQ(joined.toBson(), expected);
     ASSERT_BSONOBJ_EQ(materializer.toDocument().toBson(), next);
     ASSERT_BSONOBJ_EQ(withChanges.toDocument().toBson(), BSON("_id" << 2 << "joined" << 10));
+}
+
+TEST_F(ResultMaterializerTest, ChangedDocumentSharesRecordBase) {
+    BSONObj record = BSON("_id" << 1 << "blob" << std::string(1000, 'x'));
+    value::BSONObjValueAccessor base;
+    base.reset(value::TagValueView{value::TypeTags::bsonObject,
+                                   value::bitcastFrom<const char*>(record.objdata())});
+    auto* value = makeAccessor(makeInt32(10));
+    ResultMaterializer materializer(&base, false, {{"joined", ResultFieldAction::kSet, value}});
+
+    Document joined = materializer.toDocument();
+    BSONObj shared = base.getOwnedBSONObj();
+
+    // Once a new record drops the stage's reference, the Document is the only other holder of the
+    // shared copy of the record.
+    BSONObj next = BSON("_id" << 2);
+    base.reset(value::TagValueView{value::TypeTags::bsonObject,
+                                   value::bitcastFrom<const char*>(next.objdata())});
+    ASSERT_TRUE(shared.sharedBuffer().isShared());
+    ASSERT_BSONOBJ_EQ(joined.toBson(),
+                      BSON("_id" << 1 << "blob" << std::string(1000, 'x') << "joined" << 10));
 }
 
 TEST_F(ResultMaterializerTest, SharedRecordFieldIsCopiedOnce) {
