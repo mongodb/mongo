@@ -11,162 +11,24 @@
 #include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
-#include "mongo/db/query/query_utils.h"
+#include "mongo/db/query/query_shape/write_component_serialization.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
-
-#include <string_view>
 
 #include <absl/hash/hash.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_shape {
 using namespace std::literals::string_view_literals;
-namespace {
 
-BSONObj shapifyQuery(const ParsedUpdate& parsedUpdate,
-                     const query_shape::SerializationOptions& opts) {
-    // Use the already-parsed query ('q' field) if we have it to avoid re-parsing. We won't have the
-    // parsed query in the case where the 'q' field is a simple match on _id (e.g. {_id: 1}) - in
-    // this case, we'll parse the query on-the-fly so we can shapify it.
-    if (parsedUpdate.hasParsedFindCommand()) {
-        auto matchExpr = parsedUpdate.parsedFind->filter.get();
-        return matchExpr ? matchExpr->serialize(opts) : BSONObj{};
-    }
-
-    // Fast path for simple _id queries - we construct shape directly without parsing.
-    // We know the query is something like {_id: <value>} or {_id: {$eq: <value>}} as these are the
-    // only cases where we lack a ParsedFindCommand. If that changes, this function should be
-    // updated.
-    const auto& query = parsedUpdate.getRequest()->getQuery();
-    BSONElement idElem = query["_id"];
-    tassert(11569701, "Expected simple _id query", !idElem.eoo());
-    dassert(isSimpleIdQuery(query));
-
-    // If query is {_id: {$eq: <value>}}, get <value>.
-    BSONElement valueElem = idElem;
-    if (idElem.type() == BSONType::object &&
-        idElem.Obj().firstElementFieldNameStringData() == "$eq"sv) {
-        valueElem = idElem.Obj().firstElement();
-    }
-
-    BSONObjBuilder result;
-    BSONObjBuilder idObj(result.subobjStart(opts.serializeFieldPath("_id")));
-    opts.appendLiteral(&idObj, "$eq", valueElem);
-    idObj.doneFast();
-    return result.obj();
-}
-
-/**
- * Create a no-op modifier update
- *
- * If the parsed modifier update is a no-op (e.g., {$inc: {}}), its serialized output will be an
- * empty BSONObj (i.e., {}). That is semantically incorrect because an empty BSONObj will be treated
- * as a replacement update rather than a modifier update.
- *
- * To resolve this, we reconstruct a no-op shape using the 'updateModifier' by iterating through its
- * operator fields and appending an empty object for each of them.
- *
- * NOTE: We iterate in sorted order so as to be consistent with the serialized output.
- */
-static BSONObj makeNoopModifierUpdateOpShape(const BSONObj& updateModifier) {
-    BSONObjIteratorSorted iter(updateModifier);
-    BSONObjBuilder bob;
-    while (iter.more()) {
-        auto element = iter.next();
-        tassert(11560300,
-                "An no-op modifer update is expected to have empty object for each of its update "
-                "operator.",
-                element.isABSONObj() && element.Obj().isEmpty());
-        bob.append(element);
-    }
-    return bob.obj();
-}
-
-Value shapifyUpdateOp(
-    const ParsedUpdate& parsedUpdate,
-    const query_shape::SerializationOptions& opts =
-        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
-    const auto modType = parsedUpdate.getRequest()->getUpdateModification().type();
-    const auto* executor = parsedUpdate.getDriver()->getUpdateExecutor();
-    switch (modType) {
-        case write_ops::UpdateModification::Type::kReplacement:
-            return opts.serializeLiteral(
-                parsedUpdate.getRequest()->getUpdateModification().getUpdateReplacement());
-        case write_ops::UpdateModification::Type::kPipeline:
-            return Value(static_cast<const PipelineExecutor*>(executor)->serialize(opts));
-        case write_ops::UpdateModification::Type::kModifier: {
-            query_shape::SerializationOptions modifierOpts = opts;
-            if (!(parsedUpdate.arrayFilters == nullptr || parsedUpdate.arrayFilters->empty())) {
-                // If there are array filters present, field paths need to be serialized
-                // accordingly.
-                modifierOpts.serializeForUpdateArrayFilters = true;
-            }
-
-            auto value = static_cast<const UpdateTreeExecutor*>(executor)->serialize(modifierOpts);
-            return value.getDocument().empty()
-                ? Value(makeNoopModifierUpdateOpShape(
-                      parsedUpdate.getRequest()->getUpdateModification().getUpdateModifier()))
-                : value;
-        }
-        default:
-            MONGO_UNREACHABLE_TASSERT(11034402);
-    }
-    return {};
-}
-
-boost::optional<BSONObj> shapifyUpdateConstants(const ParsedUpdate& parsedUpdate,
-                                                const query_shape::SerializationOptions& opts) {
-    if (parsedUpdate.getDriver()->type() != UpdateDriver::UpdateType::kPipeline) {
-        return boost::none;
-    }
-
-    const boost::optional<BSONObj>& constants = parsedUpdate.getRequest()->getUpdateConstants();
-    if (!constants.has_value() || constants->isEmpty()) {
-        return boost::none;
-    }
-
-    BSONObjBuilder shapifiedConstants;
-
-    // Shapify each constant value, but keep variable names unchanged.
-    for (const auto& elem : constants.value()) {
-        std::string_view varName = elem.fieldNameStringData();
-        Value shapifiedValue = opts.serializeLiteral(elem);
-        shapifiedValue.addToBsonObj(&shapifiedConstants,
-                                    opts.serializeFieldPathFromString(varName));
-    }
-
-    return shapifiedConstants.obj();
-}
-
-boost::optional<std::vector<BSONObj>> shapifyArrayFilters(
-    const ParsedUpdate& parsedUpdate, const query_shape::SerializationOptions& opts) {
-    if (parsedUpdate.getDriver()->type() != UpdateDriver::UpdateType::kOperator) {
-        return boost::none;
-    }
-
-    if (parsedUpdate.arrayFilters == nullptr || parsedUpdate.arrayFilters->empty()) {
-        return boost::none;
-    }
-
-    std::vector<BSONObj> shapifiedFilters;
-    for (const auto& filterPair : *parsedUpdate.arrayFilters) {
-        const auto& filterExpr = filterPair.second->getFilter();
-        shapifiedFilters.push_back(filterExpr->serialize(opts));
-    }
-
-    return shapifiedFilters;
-}
-
-}  // namespace
 
 UpdateCmdShapeComponents::UpdateCmdShapeComponents(const ParsedUpdate& parsedUpdate,
                                                    LetShapeComponent let,
                                                    const query_shape::SerializationOptions& opts)
-    : representativeQ(shapifyQuery(parsedUpdate, opts)),
-      _representativeUObj(shapifyUpdateOp(parsedUpdate, opts).wrap(""sv)),
-      representativeC(shapifyUpdateConstants(parsedUpdate, opts)),
-      representativeArrayFilters(shapifyArrayFilters(parsedUpdate, opts)),
+    : representativeQ(serializeWriteQuery(parsedUpdate, opts)),
+      _representativeUObj(serializeUpdate(parsedUpdate, opts).wrap(""sv)),
+      representativeC(serializeUpdateConstants(parsedUpdate, opts)),
+      representativeArrayFilters(serializeArrayFilters(parsedUpdate, opts)),
       multi(parsedUpdate.getRequest()->getMulti()),
       upsert(parsedUpdate.getRequest()->isUpsert()),
       let(let) {}

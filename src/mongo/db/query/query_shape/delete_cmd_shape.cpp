@@ -10,7 +10,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/query/query_utils.h"
+#include "mongo/db/query/query_shape/write_component_serialization.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 
@@ -18,44 +18,12 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_shape {
-namespace {
-using namespace std::literals::string_view_literals;
 
-BSONObj shapifyQuery(const ParsedDelete& parsedDelete,
-                     const query_shape::SerializationOptions& opts) {
-    // Use the already-parsed query ('q' field) if we have it to avoid re-parsing. We won't have the
-    // parsed query in the case where the 'q' field is a simple match on _id (e.g. {_id: 1}) - in
-    // this case, we'll parse the query on-the-fly so we can shapify it.
-    if (parsedDelete.hasParsedFindCommand()) {
-        auto matchExpr = parsedDelete.parsedFind->filter.get();
-        return matchExpr ? matchExpr->serialize(opts) : BSONObj{};
-    }
-
-    // Fast path for simple _id queries - we construct shape directly without parsing.
-    const auto& query = parsedDelete.getRequest()->getQuery();
-    BSONElement idElem = query["_id"];
-    tassert(12205303, "Expected simple _id query", !idElem.eoo());
-    dassert(isSimpleIdQuery(query));
-
-    BSONElement valueElem = idElem;
-    if (idElem.type() == BSONType::object &&
-        idElem.Obj().firstElementFieldNameStringData() == "$eq"sv) {
-        valueElem = idElem.Obj().firstElement();
-    }
-
-    BSONObjBuilder result;
-    BSONObjBuilder idObj(result.subobjStart(opts.serializeFieldPath("_id")));
-    opts.appendLiteral(&idObj, "$eq", valueElem);
-    idObj.doneFast();
-    return result.obj();
-}
-
-}  // namespace
 
 DeleteCmdShapeComponents::DeleteCmdShapeComponents(const ParsedDelete& parsedDelete,
                                                    LetShapeComponent let,
                                                    const query_shape::SerializationOptions& opts)
-    : representativeQ(shapifyQuery(parsedDelete, opts)),
+    : representativeQ(serializeWriteQuery(parsedDelete, opts)),
       multi(parsedDelete.getRequest()->getMulti()),
       let(let) {}
 
