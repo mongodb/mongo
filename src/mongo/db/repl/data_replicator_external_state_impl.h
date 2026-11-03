@@ -88,6 +88,8 @@ public:
 
     JournalListener* getReplicationJournalListener() override;
 
+    OpTime getLastAppliedOpTime() override;
+
 private:
     // Not owned by us.
     ReplicationCoordinator* _replicationCoordinator;

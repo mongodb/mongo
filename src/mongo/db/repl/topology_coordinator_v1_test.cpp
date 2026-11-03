@@ -5238,6 +5238,147 @@ TEST_F(HeartbeatResponseTestV1,
         now()));
 }
 
+TEST_F(
+    HeartbeatResponseTestV1,
+    ShouldChangeSyncSourceWhenSourceClaimsPrimaryChainingDisabledAndIgnoreSyncSourcePrimaryState) {
+    unittest::ServerParameterGuard ignorePrimaryState("ignoreSyncSourcePrimaryState", true);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    updateConfig(BSON("_id" << "rs0" << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host" << "host1:27017")
+                                          << BSON("_id" << 1 << "host" << "host2:27017")
+                                          << BSON("_id" << 2 << "host" << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+                 0);
+
+    OpTime oldElection = OpTime(Timestamp(1, 1), 1);
+    OpTime curElection = OpTime(Timestamp(4, 2), 2);
+    OpTime staleOpTime = OpTime(Timestamp(4, 1), 1);
+    OpTime freshOpTime = OpTime(Timestamp(5, 1), 2);
+
+    // Old host should still be up, and thinks it is primary.
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, oldElection, staleOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    getTopoCoord().updateTerm(2, now());
+
+    // Set that host3 is the new primary.
+    nextAction = receiveUpHeartbeat(
+        HostAndPort("host3"), "rs0", MemberState::RS_PRIMARY, curElection, freshOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    unittest::LogCaptureGuard logs;
+    ASSERT(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        // Indicate host2 still thinks it is primary.
+        makeReplSetMetadata(freshOpTime, /*isPrimary=*/true),
+        makeOplogQueryMetadata(
+            freshOpTime, freshOpTime, /*primaryIndex=*/1, /*syncSourceIndex=*/-1),
+        staleOpTime,  // lastOpTimeFetched so that we are behind host2 and host3.
+        now()));
+    logs.stop();
+    ASSERT_EQUALS(1, countLogLinesWithId(logs, 3962100));
+}
+
+TEST_F(
+    HeartbeatResponseTestV1,
+    ShouldNotChangeSyncSourceWhenSourceClaimsPrimaryChainingEnabledAndIgnoreSyncSourcePrimaryState) {
+    unittest::ServerParameterGuard ignorePrimaryState("ignoreSyncSourcePrimaryState", true);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    updateConfig(BSON("_id" << "rs0" << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host" << "host1:27017")
+                                          << BSON("_id" << 1 << "host" << "host2:27017")
+                                          << BSON("_id" << 2 << "host" << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << true)),
+                 0);
+
+    OpTime oldElection = OpTime(Timestamp(1, 1), 1);
+    OpTime curElection = OpTime(Timestamp(4, 2), 2);
+    OpTime staleOpTime = OpTime(Timestamp(4, 1), 1);
+    OpTime freshOpTime = OpTime(Timestamp(5, 1), 2);
+
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, oldElection, staleOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    getTopoCoord().updateTerm(2, now());
+
+    nextAction = receiveUpHeartbeat(
+        HostAndPort("host3"), "rs0", MemberState::RS_PRIMARY, curElection, freshOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(freshOpTime, /*isPrimary=*/true),
+        makeOplogQueryMetadata(
+            freshOpTime, freshOpTime, /*primaryIndex=*/1, /*syncSourceIndex=*/-1),
+        staleOpTime,
+        now()));
+}
+
+TEST_F(HeartbeatResponseTestV1,
+       ShouldNotChangeSyncSourceWhenSyncingFromRealPrimaryAndIgnoreSyncSourcePrimaryState) {
+    unittest::ServerParameterGuard ignorePrimaryState("ignoreSyncSourcePrimaryState", true);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    updateConfig(BSON("_id" << "rs0" << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host" << "host1:27017")
+                                          << BSON("_id" << 1 << "host" << "host2:27017")
+                                          << BSON("_id" << 2 << "host" << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+                 0);
+
+    OpTime curElection = OpTime(Timestamp(4, 2), 2);
+    OpTime staleOpTime = OpTime(Timestamp(4, 1), 1);
+    OpTime freshOpTime = OpTime(Timestamp(5, 1), 2);
+
+    getTopoCoord().updateTerm(2, now());
+
+    // host2 is the current primary.
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, curElection, freshOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(freshOpTime, /*isPrimary=*/true),
+        makeOplogQueryMetadata(
+            freshOpTime, freshOpTime, /*primaryIndex=*/1, /*syncSourceIndex=*/-1),
+        staleOpTime,
+        now()));
+}
+
+TEST_F(HeartbeatResponseTestV1,
+       ShouldNotChangeSyncSourceWhenWeArePrimaryChainingDisabledAndIgnoreSyncSourcePrimaryState) {
+    unittest::ServerParameterGuard ignorePrimaryState("ignoreSyncSourcePrimaryState", true);
+
+    updateConfig(BSON("_id" << "rs0" << "version" << 5 << "term" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host" << "host1:27017")
+                                          << BSON("_id" << 1 << "host" << "host2:27017")
+                                          << BSON("_id" << 2 << "host" << "host3:27017"))
+                            << "protocolVersion" << 1 << "settings"
+                            << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+                 0);
+
+    OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
+    OpTime freshOpTime = OpTime(Timestamp(5, 0), 0);
+
+    makeSelfPrimary();
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(freshOpTime, /*isPrimary=*/true),
+        makeOplogQueryMetadata(
+            freshOpTime, freshOpTime, /*primaryIndex=*/-1, /*syncSourceIndex=*/2),
+        staleOpTime,
+        now()));
+}
+
 TEST_F(HeartbeatResponseTestV1, ShouldntChangeSyncSourceWhenChainingDisabledAndWeArePrimary) {
     updateConfig(BSON("_id" << "rs0" << "version" << 5 << "term" << 1 << "members"
                             << BSON_ARRAY(BSON("_id" << 0 << "host" << "host1:27017")

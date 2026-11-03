@@ -493,6 +493,27 @@ server_parameters:
             gt: 0
         redact: false
 
+    ignoreSyncSourcePrimaryState:
+        description: >-
+            Ignore whether the current sync source thinks it's the primary when deciding
+            whether to switch sync sources if chaining is disabled.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: ignoreSyncSourcePrimaryState
+        default: false
+        redact: false
+
+    prioritizeSyncSourceSwitch:
+        description: >-
+            Check if our current sync source is still valid before processing the oplog
+            batch that was just received. Discard the batch if the sync source needs to be
+            switched to reduce the risk of a temporary split brain.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: prioritizeSyncSourceSwitch
+        default: false
+        redact: false
+
     enableOverrideClusterChainingSetting:
         description: >-
             When enabled, allows a node to override the cluster-wide chainingAllowed setting.

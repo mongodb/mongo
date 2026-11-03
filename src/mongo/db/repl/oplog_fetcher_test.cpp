@@ -354,6 +354,15 @@ protected:
                                 ChangeSyncSourceAction changeSyncSourceAction =
                                     ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch);
 
+    /**
+     * Processes one batch with 'shouldStopFetching' returning the given 'changeSyncSourceAction'.
+     * Returns the shutdown state without asserting on it.
+     */
+    std::unique_ptr<ShutdownState> processBatchWithSyncSourceAction(
+        ChangeSyncSourceAction changeSyncSourceAction,
+        CursorId cursorId = 0,
+        bool shouldShutdown = false);
+
     void validateLastBatch(bool skipFirstDoc, OplogFetcher::Documents docs, OpTime lastFetched);
 
     std::unique_ptr<DataReplicatorExternalStateMock> dataReplicatorExternalState;
@@ -412,6 +421,7 @@ void OplogFetcherTest::setUp() {
     dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
     dataReplicatorExternalState->setCurrentTerm(lastFetched.getTerm());
     dataReplicatorExternalState->setLastCommittedOpTime({{9999, 0}, lastFetched.getTerm()});
+    dataReplicatorExternalState->setLastAppliedOpTime(lastFetched);
 
     enqueueDocumentsFn = [this](OplogFetcher::Documents::const_iterator begin,
                                 OplogFetcher::Documents::const_iterator end,
@@ -555,6 +565,23 @@ void OplogFetcherTest::testSyncSourceChecking(const rpc::ReplSetMetadata& replMe
                            /*lastFetchedShouldAdvance=*/true);
 
     ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, shutdownState->getStatus());
+}
+
+std::unique_ptr<ShutdownState> OplogFetcherTest::processBatchWithSyncSourceAction(
+    ChangeSyncSourceAction changeSyncSourceAction, CursorId cursorId, bool shouldShutdown) {
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    auto thirdEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.getTerm()});
+
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+
+    dataReplicatorExternalState->setShouldStopFetchingResult(changeSyncSourceAction);
+
+    return processSingleBatch(
+        makeFirstBatch(cursorId, {firstEntry, secondEntry, thirdEntry}, metadataObj),
+        shouldShutdown,
+        /*requireFresherSyncSource=*/true,
+        /*lastFetchedShouldAdvance=*/true);
 }
 
 void OplogFetcherTest::validateLastBatch(bool skipFirstDoc,
@@ -2142,6 +2169,107 @@ TEST_F(OplogFetcherTest, FailedSyncSourceCheckReturnsStopSyncingAndDropBatch) {
     // If the 'shouldStopFetching' check returns kStopSyncingAndDropLastBatchIfPresent, we should
     // not enqueue any documents.
     ASSERT_TRUE(lastEnqueuedDocuments.empty());
+}
+
+TEST_F(OplogFetcherTest, SyncSourceCheckAfterEnqueueWhenPrioritizeSyncSourceSwitchDisabled) {
+    unittest::ServerParameterGuard prioritizeSwitch("prioritizeSyncSourceSwitch", false);
+    const OpTime lastApplied({Seconds(1000), 0}, lastFetched.getTerm());
+    dataReplicatorExternalState->setLastAppliedOpTime(lastApplied);
+
+    auto status =
+        processBatchWithSyncSourceAction(ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch)
+            ->getStatus();
+
+    // The batch is enqueued first, and the sync source is only rejected by the check that runs
+    // after enqueuing.
+    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, status);
+    ASSERT_FALSE(lastEnqueuedDocuments.empty());
+    ASSERT_STRING_CONTAINS(status.reason(), ") is no longer valid");
+    ASSERT_STRING_CONTAINS(status.reason(), "last applied optime: " + lastApplied.toString());
+}
+
+TEST_F(OplogFetcherTest, SyncSourceCheckBeforeEnqueueWhenPrioritizeSyncSourceSwitchEnabled) {
+    unittest::ServerParameterGuard prioritizeSwitch("prioritizeSyncSourceSwitch", true);
+    const OpTime lastApplied({Seconds(1000), 0}, lastFetched.getTerm());
+    dataReplicatorExternalState->setLastAppliedOpTime(lastApplied);
+
+    auto status =
+        processBatchWithSyncSourceAction(ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch)
+            ->getStatus();
+
+    // The sync source is rejected before enqueuing, so the batch must be discarded.
+    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, status);
+    ASSERT_TRUE(lastEnqueuedDocuments.empty());
+    ASSERT_STRING_CONTAINS(status.reason(), ") is no longer valid");
+    ASSERT_STRING_CONTAINS(status.reason(), "last applied optime: " + lastApplied.toString());
+    ASSERT_FALSE(dataReplicatorExternalState->getMetadataWasProcessed());
+}
+
+TEST_F(OplogFetcherTest, DropBatchCheckBeforeEnqueueRegardlessOfPrioritizeSyncSourceSwitch) {
+    for (bool prioritize : {false, true}) {
+        unittest::ServerParameterGuard prioritizeSwitch("prioritizeSyncSourceSwitch", prioritize);
+        lastEnqueuedDocuments.clear();
+
+        auto status = processBatchWithSyncSourceAction(
+                          ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent)
+                          ->getStatus();
+
+        ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, status)
+            << "prioritizeSyncSourceSwitch=" << prioritize;
+        ASSERT_TRUE(lastEnqueuedDocuments.empty()) << "prioritizeSyncSourceSwitch=" << prioritize;
+        ASSERT_STRING_CONTAINS(status.reason(), ") is no longer valid");
+    }
+}
+
+TEST_F(OplogFetcherTest, ContinueSyncingEnqueuesBatchWhenPrioritizeSyncSourceSwitchEnabled) {
+    unittest::ServerParameterGuard prioritizeSwitch("prioritizeSyncSourceSwitch", true);
+
+    auto shutdownState = processBatchWithSyncSourceAction(ChangeSyncSourceAction::kContinueSyncing,
+                                                          /*cursorId=*/22LL,
+                                                          /*shouldShutdown=*/true);
+
+    ASSERT_NOT_EQUALS(ErrorCodes::InvalidSyncSource, shutdownState->getStatus().code());
+    ASSERT_FALSE(lastEnqueuedDocuments.empty());
+}
+
+TEST_F(OplogFetcherTest, ShouldStopFetchingCalledOnceBeforeEnqueueWhenPrioritizeSwitchDisabled) {
+    unittest::ServerParameterGuard prioritizeSwitch("prioritizeSyncSourceSwitch", false);
+
+    processBatchWithSyncSourceAction(ChangeSyncSourceAction::kContinueSyncing,
+                                     /*cursorId=*/22LL,
+                                     /*shouldShutdown=*/true);
+
+    const OpTime lastDocOpTime({Seconds(789), 0}, lastFetched.getTerm());
+    ASSERT_FALSE(lastEnqueuedDocuments.empty());
+    ASSERT_EQUALS(std::vector({std::pair(lastFetched, lastDocOpTime)}),
+                  dataReplicatorExternalState->getShouldStopFetchingCalls());
+}
+
+TEST_F(OplogFetcherTest, ShouldStopFetchingCalledBeforeAndAfterEnqueueWhenPrioritizeSwitchEnabled) {
+    unittest::ServerParameterGuard prioritizeSwitch("prioritizeSyncSourceSwitch", true);
+
+    processBatchWithSyncSourceAction(ChangeSyncSourceAction::kContinueSyncing,
+                                     /*cursorId=*/22LL,
+                                     /*shouldShutdown=*/true);
+
+    const OpTime lastDocOpTime({Seconds(789), 0}, lastFetched.getTerm());
+    ASSERT_FALSE(lastEnqueuedDocuments.empty());
+    ASSERT_EQUALS(
+        std::vector({std::pair(lastFetched, lastFetched), std::pair(lastFetched, lastDocOpTime)}),
+        dataReplicatorExternalState->getShouldStopFetchingCalls());
+}
+
+TEST_F(OplogFetcherTest, ShouldStopFetchingNotCalledAgainWhenFirstCheckRejectsBeforeEnqueue) {
+    unittest::ServerParameterGuard prioritizeSwitch("prioritizeSyncSourceSwitch", true);
+
+    auto status =
+        processBatchWithSyncSourceAction(ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch)
+            ->getStatus();
+
+    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, status);
+    ASSERT_TRUE(lastEnqueuedDocuments.empty());
+    ASSERT_EQUALS(std::vector({std::pair(lastFetched, lastFetched)}),
+                  dataReplicatorExternalState->getShouldStopFetchingCalls());
 }
 
 TEST_F(OplogFetcherTest, ValidateDocumentsReturnsBadValueIfAnyOplogEntryHasWrongVersion) {

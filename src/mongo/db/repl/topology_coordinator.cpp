@@ -3427,7 +3427,10 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
         return initialDecision == ChangeSyncSourceDecision::kYes;
     }
 
-    if (!replMetadata.getIsPrimary() &&
+    // Determine if we should always check for a new primary, and ignore the fact that our sync
+    // source thinks that it's the primary.
+    bool checkForNewPrimary = ignoreSyncSourcePrimaryState.load() || !replMetadata.getIsPrimary();
+    if (checkForNewPrimary &&
         _shouldChangeSyncSourceDueToNewPrimary(currentSource, currentSourceIndex)) {
         return true;
     }

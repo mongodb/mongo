@@ -67,6 +67,16 @@ OpTimeWithTerm DataReplicatorExternalStateMock::getCurrentTermAndLastCommittedOp
     return {currentTerm, lastCommittedOpTime};
 }
 
+OpTime DataReplicatorExternalStateMock::getLastAppliedOpTime() {
+    std::lock_guard<std::mutex> lk(_mutex);
+    return lastAppliedOpTime;
+}
+
+void DataReplicatorExternalStateMock::setLastAppliedOpTime(OpTime newOpTime) {
+    std::lock_guard<std::mutex> lk(_mutex);
+    lastAppliedOpTime = newOpTime;
+}
+
 void DataReplicatorExternalStateMock::processMetadata(const rpc::ReplSetMetadata& replMetadata,
                                                       const rpc::OplogQueryMetadata& oqMetadata) {
     std::lock_guard<std::mutex> lk(_mutex);
@@ -85,6 +95,10 @@ ChangeSyncSourceAction DataReplicatorExternalStateMock::shouldStopFetching(
     lastSyncSourceChecked = source;
     syncSourceLastOpTime = oqMetadata.getLastOpApplied();
     syncSourceHasSyncSource = oqMetadata.getSyncSourceIndex() != -1;
+    shouldStopFetchingCalls.emplace_back(previousOpTimeFetched, lastOpTimeFetched);
+    if (shouldStopFetchingFn) {
+        return shouldStopFetchingFn(previousOpTimeFetched, lastOpTimeFetched);
+    }
     return shouldStopFetchingResult;
 }
 

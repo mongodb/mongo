@@ -167,5 +167,9 @@ JournalListener* DataReplicatorExternalStateImpl::getReplicationJournalListener(
     return _replicationCoordinatorExternalState->getReplicationJournalListener();
 }
 
+OpTime DataReplicatorExternalStateImpl::getLastAppliedOpTime() {
+    return _replicationCoordinator->getMyLastAppliedOpTime();
+}
+
 }  // namespace repl
 }  // namespace mongo

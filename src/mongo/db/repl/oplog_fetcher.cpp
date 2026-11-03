@@ -888,9 +888,17 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     }
     const auto& replSetMetadata = metadataResult.getValue();
 
+    // Determine if we should check for our sync source immediately after receiving the batch, but
+    // before enqueueing the batch for processing.
+    bool prioritizeSwitch = prioritizeSyncSourceSwitch.load();
+
     // Determine if we should stop syncing from our current sync source.
     auto changeSyncSourceAction = _dataReplicatorExternalState->shouldStopFetching(
-        _config.source, replSetMetadata, oqMetadata, previousOpTimeFetched, lastDocOpTime);
+        _config.source,
+        replSetMetadata,
+        oqMetadata,
+        previousOpTimeFetched,
+        prioritizeSwitch ? previousOpTimeFetched : lastDocOpTime);
 
     auto getErrMsg = [&] {
         str::stream errMsg;
@@ -902,10 +910,14 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
         errMsg << ") is no longer valid";
         errMsg << " previous batch last fetched optime: " << previousOpTimeFetched.toString();
         errMsg << " current batch last fetched optime: " << lastDocOpTime.toString();
+        errMsg << " our last applied optime: "
+               << _dataReplicatorExternalState->getLastAppliedOpTime().toString();
         return errMsg;
     };
 
-    if (changeSyncSourceAction == ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent) {
+    if (changeSyncSourceAction == ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent ||
+        (prioritizeSwitch &&
+         changeSyncSourceAction == ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch)) {
         return Status(ErrorCodes::InvalidSyncSource, getErrMsg());
     }
 
@@ -933,7 +945,12 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
         return e.toStatus().withContext("Error inserting documents into oplog buffer collection");
     }
 
-    if (changeSyncSourceAction == ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch) {
+    if (prioritizeSwitch) {
+        changeSyncSourceAction = _dataReplicatorExternalState->shouldStopFetching(
+            _config.source, replSetMetadata, oqMetadata, previousOpTimeFetched, lastDocOpTime);
+    }
+
+    if (changeSyncSourceAction != ChangeSyncSourceAction::kContinueSyncing) {
         return Status(ErrorCodes::InvalidSyncSource, getErrMsg());
     }
 

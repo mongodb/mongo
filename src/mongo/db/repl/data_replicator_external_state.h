@@ -128,6 +128,11 @@ public:
      * Returns the replication journal listener.
      */
     virtual JournalListener* getReplicationJournalListener() = 0;
+
+    /**
+     * Returns the last applied optime.
+     */
+    virtual OpTime getLastAppliedOpTime() = 0;
 };
 
 }  // namespace repl

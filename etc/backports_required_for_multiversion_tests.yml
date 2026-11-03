@@ -248,6 +248,10 @@ last-continuous:
       ticket: SERVER-125964
     - test_file: jstests/replsets/stepdown_fassert_on_explicit_overridden_rstl_timeout.js
       ticket: SERVER-137356
+    - test_file: jstests/replsets/sync_source_switch_on_failover.js
+      ticket: SERVER-95560
+    - test_file: jstests/replsets/sync_source_switch_server_params.js
+      ticket: SERVER-95560
     - test_file: jstests/sharding/chunk_migration_does_not_block_indefinitely_acquiring_strong_locks.js
       ticket: SERVER-136085
     - test_file: jstests/sharding/collection_uuid_find.js
@@ -449,6 +453,10 @@ last-lts:
       ticket: SERVER-125964
     - test_file: jstests/replsets/stepdown_fassert_on_explicit_overridden_rstl_timeout.js
       ticket: SERVER-137356
+    - test_file: jstests/replsets/sync_source_switch_on_failover.js
+      ticket: SERVER-95560
+    - test_file: jstests/replsets/sync_source_switch_server_params.js
+      ticket: SERVER-95560
     - test_file: jstests/sharding/chunk_migration_does_not_block_indefinitely_acquiring_strong_locks.js
       ticket: SERVER-136085
     - test_file: jstests/sharding/collection_uuid_find.js

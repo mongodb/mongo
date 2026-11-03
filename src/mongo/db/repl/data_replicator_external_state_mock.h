@@ -104,6 +104,22 @@ public:
         shouldStopFetchingResult = result;
     }
 
+    /**
+     * Makes shouldStopFetching compute its result from the optimes it is called with instead of
+     * returning the constant set by setShouldStopFetchingResult.
+     */
+    using ShouldStopFetchingFn = std::function<ChangeSyncSourceAction(
+        const OpTime& previousOpTimeFetched, const OpTime& lastOpTimeFetched)>;
+    void setShouldStopFetchingFn(ShouldStopFetchingFn fn) {
+        std::lock_guard<std::mutex> lk(_mutex);
+        shouldStopFetchingFn = std::move(fn);
+    }
+
+    std::vector<std::pair<OpTime, OpTime>> getShouldStopFetchingCalls() const {
+        std::lock_guard<std::mutex> lk(_mutex);
+        return shouldStopFetchingCalls;
+    }
+
     void setReplSetConfigResult(StatusWith<ReplSetConfig> config) {
         std::lock_guard<std::mutex> lk(_mutex);
         replSetConfigResult = config;
@@ -139,6 +155,10 @@ public:
         return syncSourceHasSyncSource;
     }
 
+    OpTime getLastAppliedOpTime() override;
+
+    void setLastAppliedOpTime(OpTime newOpTime);
+
     // Task executor.
     std::shared_ptr<executor::TaskExecutor> taskExecutor = nullptr;
 
@@ -153,9 +173,15 @@ private:
     // Returned by shouldStopFetching.
     ChangeSyncSourceAction shouldStopFetchingResult = ChangeSyncSourceAction::kContinueSyncing;
 
+    // If set, computes the result of shouldStopFetching instead of 'shouldStopFetchingResult'.
+    ShouldStopFetchingFn shouldStopFetchingFn;
+
     // Returned by getCurrentTermAndLastCommittedOpTime.
     long long currentTerm = OpTime::kUninitializedTerm;
     OpTime lastCommittedOpTime;
+
+    // Returned by getLastAppliedOpTime.
+    OpTime lastAppliedOpTime;
 
     // Set by processMetadata.
     rpc::ReplSetMetadata replMetadataProcessed;
@@ -166,6 +192,7 @@ private:
     mutable HostAndPort lastSyncSourceChecked;
     mutable OpTime syncSourceLastOpTime;
     mutable bool syncSourceHasSyncSource = false;
+    mutable std::vector<std::pair<OpTime, OpTime>> shouldStopFetchingCalls;
 
     StatusWith<ReplSetConfig> replSetConfigResult = ReplSetConfig();
 };
