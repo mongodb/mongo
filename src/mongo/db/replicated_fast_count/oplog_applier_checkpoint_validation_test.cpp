@@ -310,6 +310,103 @@ TEST_F(CheckpointValidationTest, CheckpointValidatesDroppedCollection) {
     }
 }
 
+class CheckpointRenameValidationTest : public CheckpointValidationTest {
+protected:
+    // Applies the creation of `colls` and a checkpoint covering them.
+    void createCollections(const std::vector<NsAndUUID>& colls) {
+        std::vector<OplogEntry> oplog;
+        for (const auto& coll : colls) {
+            oplog.push_back(makeCreateOplogEntry(nextOpTime().getTimestamp(), coll));
+        }
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        oplog.push_back(makeWatermarkEntry(watermarkTs));
+        std::vector<CheckpointWriteSpec> writes;
+        for (const auto& coll : colls) {
+            writes.push_back({.uuid = coll.uuid, .metadata = kEmpty});
+        }
+        oplog.push_back(makeCheckpointEntry(watermarkTs, writes));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+    }
+
+    // Applies `rename` followed by a checkpoint in which the primary marks `_target` dropped.
+    void applyRenameDroppingTarget(OplogEntry rename) {
+        std::vector<OplogEntry> oplog;
+        oplog.push_back(std::move(rename));
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        oplog.push_back(makeWatermarkEntry(watermarkTs));
+        // The source keeps its UUID, so the primary only writes the dropped target.
+        oplog.push_back(
+            makeCheckpointEntry(watermarkTs, {{.uuid = _target.uuid, .metadata = boost::none}}));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+    }
+
+    inline static const CollectionReplicatedMetadata kEmpty{
+        .sizeCount = CollectionSizeCount{.size = 0, .count = 0}, .hash = boost::none};
+
+    const NsAndUUID _source{
+        .nss = NamespaceString::createNamespaceString_forTest("test.checkpointRenameSource"),
+        .uuid = UUID::gen()};
+    const NsAndUUID _target{
+        .nss = NamespaceString::createNamespaceString_forTest("test.checkpointRenameTarget"),
+        .uuid = UUID::gen()};
+
+private:
+    unittest::ServerParameterGuard _enableValidation{
+        "enableContinuousInternodePerCollectionValidation", true};
+};
+
+TEST_F(CheckpointRenameValidationTest, CheckpointValidatesCollectionDroppedByRenameDropTarget) {
+    createCollections({_source, _target});
+    applyRenameDroppingTarget(makeCommandOplogEntry(
+        nextOpTime(),
+        _source.nss,
+        BSON("renameCollection" << _source.nss.ns_forTest() << "to" << _target.nss.ns_forTest()
+                                << "stayTemp" << false << "dropTarget" << _target.uuid),
+        /*object2=*/boost::none,
+        _source.uuid));
+}
+
+TEST_F(CheckpointRenameValidationTest,
+       CheckpointValidatesCollectionDroppedByRenameDropTargetInApplyOps) {
+    createCollections({_source, _target});
+    ReplOperation rename;
+    rename.setOpType(OpTypeEnum::kCommand);
+    rename.setNss(_source.nss.getCommandNS());
+    rename.setUuid(_source.uuid);
+    rename.setObject(BSON("renameCollection" << _source.nss.ns_forTest() << "to"
+                                             << _target.nss.ns_forTest() << "stayTemp" << false
+                                             << "dropTarget" << _target.uuid));
+    applyRenameDroppingTarget(makeApplyOpsOplogEntry(nextOpTime(),
+                                                     {rename},
+                                                     OperationSessionInfo{},
+                                                     Date_t::now(),
+                                                     /*stmtIds=*/{},
+                                                     /*prevWriteOpTimeInTransaction=*/boost::none));
+}
+
+TEST_F(CheckpointRenameValidationTest, RenameWithoutDropTargetRecordsNoDelta) {
+    createCollections({_source});
+
+    // A checkpoint needs a write, so it carries a collection created in the same interval. A delta
+    // recorded for the rename would be missing from the checkpoint.
+    const NsAndUUID other{
+        .nss = NamespaceString::createNamespaceString_forTest("test.checkpointRenameOther"),
+        .uuid = UUID::gen()};
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeCommandOplogEntry(nextOpTime(),
+                                          _source.nss,
+                                          BSON("renameCollection"
+                                               << _source.nss.ns_forTest() << "to"
+                                               << _target.nss.ns_forTest() << "stayTemp" << false),
+                                          /*object2=*/boost::none,
+                                          _source.uuid));
+    oplog.push_back(makeCreateOplogEntry(nextOpTime().getTimestamp(), other));
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    oplog.push_back(makeWatermarkEntry(watermarkTs));
+    oplog.push_back(makeCheckpointEntry(watermarkTs, {{.uuid = other.uuid, .metadata = kEmpty}}));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
 using CheckpointValidationDeathTest = CheckpointValidationTest;
 
 TEST_F(CheckpointValidationTest,

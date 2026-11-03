@@ -154,6 +154,27 @@ protected:
             .getOwned();
     }
 
+    // Builds a renameCollection oplog BSON of collA onto collB, dropping collB if `dropTarget`.
+    BSONObj makeRenameBson(Timestamp ts, bool dropTarget) {
+        BSONObjBuilder o;
+        o.append("renameCollection", collA.nss.ns_forTest());
+        o.append("to", collB.nss.ns_forTest());
+        o.append("stayTemp", false);
+        if (dropTarget) {
+            collB.uuid.appendToBuilder(&o, "dropTarget");
+        }
+        return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+                                           .opTime = opTimeAt(ts),
+                                           .opType = repl::OpTypeEnum::kCommand,
+                                           .nss = collA.nss.getCommandNS(),
+                                           .uuid = collA.uuid,
+                                           .oField = o.obj(),
+                                           .wallClockTime = Date_t::now(),
+                                       }}
+            .toBSON()
+            .getOwned();
+    }
+
     // Builds a container op (ci/cu/cd) oplog BSON. `containerIdent` is written to the top-level
     // `container` field that Layer 1 reads to decide whether to skip the entry.
     BSONObj makeContainerOpBson(Timestamp ts,
@@ -1187,6 +1208,22 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     // erases the oplog self-delta, leaving no deltas.
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, RenameWithDropTarget_RecordsTargetDropped) {
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw({makeRenameBson(ts, /*dropTarget=*/true)});
+    ASSERT_TRUE(result.deltas.contains(collB.uuid));
+    EXPECT_EQ(result.deltas.at(collB.uuid).state, DDLState::kDropped);
+    EXPECT_EQ(result.deltas.size(), 1u);
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, RenameWithoutDropTarget_AdvancesTimestampNoDeltas) {
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw({makeRenameBson(ts, /*dropTarget=*/false)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
 }
 
 }  // namespace

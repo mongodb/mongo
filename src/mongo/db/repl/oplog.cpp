@@ -297,9 +297,25 @@ void recordDdlDelta(const ApplierOperation& op) {
                                  .hash = boost::none},
                     .state = DDLState::kDropped});
             break;
+        case OplogEntry::CommandType::kRenameCollection:
+            // A collection can be renamed without dropping the target. If the target was dropped,
+            // the validator needs to expect the container delete in the primary's checkpoint by
+            // recording a drop here. Otherwise, the validator does not need to do anything special
+            // because the UUID of the old and new collection is the same.
+            if (auto swDropTargetUUID = UUID::parse(op->getObject().getField("dropTarget"));
+                swDropTargetUUID.isOK()) {
+                replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
+                    swDropTargetUUID.getValue(),
+                    op->getOpTime().getTimestamp(),
+                    ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                     .hash = boost::none},
+                        .state = DDLState::kDropped});
+            }
+            break;
         default:
             // We deliberately do not record other commands (truncateRange, dropDatabase,
-            // renameCollection, etc.). truncateRange is ineligible for replicated metadata
+            // etc.). truncateRange is ineligible for replicated metadata
             // tracking except for the oplog, and the SizeCountCheckpointValidator excludes the
             // oplog from validation. The primary does not use the other commands to compute its
             // replicated metadata checkpoint, so the standby does not need to record them for
