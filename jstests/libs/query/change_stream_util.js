@@ -1145,7 +1145,7 @@ export function ChangeStreamTest(_db, options) {
 export function withChangeStreamTest(db, fn) {
     const cst = new ChangeStreamTest(db);
     try {
-        fn(cst);
+        return fn(cst);
     } finally {
         cst.cleanUp();
     }
