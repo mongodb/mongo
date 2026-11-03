@@ -229,6 +229,8 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
     // up list later cannot throw an OOM exception.
     _remotesToClean.reserve(remotes.size());
 
+    _remoteCursors.reserve(remotes.size());
+
     // TODO SERVER-47261 management of the opKey should move to the ARS.
     for (const auto& remote : remotes) {
         if (_providedOpKeys.size()) {
