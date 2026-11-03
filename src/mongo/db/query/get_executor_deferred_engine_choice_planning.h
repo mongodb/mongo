@@ -27,10 +27,11 @@ namespace mongo::exec_deferred_engine_choice {
  */
 PlanRankingResult planRanking(OperationContext* opCtx,
                               const MultipleCollectionAccessor& collections,
-                              std::unique_ptr<CanonicalQuery>& canonicalQuery,
+                              CanonicalQuery* canonicalQuery,
                               PlanYieldPolicy::YieldPolicy yieldPolicy,
                               std::size_t plannerOptions,
                               Pipeline* pipeline,
+                              std::unique_ptr<QueryPlannerParams> initialPlannerParams,
                               const MakePlannerParamsFn& makeQueryPlannerParams);
 
 }  // namespace mongo::exec_deferred_engine_choice

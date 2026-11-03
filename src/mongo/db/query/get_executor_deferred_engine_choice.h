@@ -35,6 +35,7 @@ getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
                                     const MultipleCollectionAccessor& collections,
                                     std::unique_ptr<CanonicalQuery> canonicalQuery,
                                     PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                    std::unique_ptr<QueryPlannerParams> initialPlannerParams,
                                     const MakePlannerParamsFn& makeQueryPlannerParams,
                                     size_t plannerOptions = QueryPlannerParams::DEFAULT,
                                     Pipeline* pipeline = nullptr);

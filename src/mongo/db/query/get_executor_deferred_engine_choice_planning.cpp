@@ -356,53 +356,23 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
 
 PlanRankingResult planRanking(OperationContext* opCtx,
                               const MultipleCollectionAccessor& collections,
-                              std::unique_ptr<CanonicalQuery>& canonicalQuery,
+                              CanonicalQuery* canonicalQuery,
                               PlanYieldPolicy::YieldPolicy yieldPolicy,
                               std::size_t plannerOptions,
                               Pipeline* pipeline,
+                              std::unique_ptr<QueryPlannerParams> initialPlannerParams,
                               const MakePlannerParamsFn& makeQueryPlannerParams) {
-    auto expressResult =
-        tryExpress(opCtx, collections, canonicalQuery, plannerOptions, makeQueryPlannerParams);
-    if (expressResult.executor) {
-        return PlanRankingResult{.expressExecutor = std::move(expressResult.executor)};
-    }
-    // If no express executor was returned, we can reuse the planner params created by `tryExpress`
-    // for other planning logic.
-    tassert(11974306, "Expected planner params to be initialized.", expressResult.plannerParams);
-    auto paramsForSingleCollectionQuery = std::move(expressResult.plannerParams);
-
-    // Initialize path arrayness in ExpressionContext from the CollectionQueryInfo.
-    // Do not invoke if it has been already initialized.
-    // TODO SERVER-123955 Consider moving it to a different location
-    const auto& collection = collections.getMainCollection();
-    const auto& nss = canonicalQuery->getExpCtx()->getNamespaceString();
-    if (feature_flags::gFeatureFlagPathArrayness.isEnabled() &&
-        !canonicalQuery->getExpCtx()->hasPathArraynessForNss(nss) && collection) {
-        canonicalQuery->getExpCtx()->setPathArraynessForNss(
-            nss, CollectionQueryInfo::get(collection).getPathArrayness());
-    }
-
-    if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled() &&
-        !canonicalQuery->getExpCtx()->hasSchemaTypeInfoForNss(nss) && collection) {
-        canonicalQuery->getExpCtx()->setSchemaTypeInfoForNss(
-            nss, CollectionQueryInfo::get(collection).getSchemaTypeInfo());
-    }
-
     auto makePlannerHelper = [&](std::unique_ptr<QueryPlannerParams> plannerParams)
         -> std::unique_ptr<PlannerInterface> {
-        auto innerPlanner = uassertStatusOK(preparePlanner(opCtx,
-                                                           canonicalQuery.get(),
-                                                           std::move(plannerParams),
-                                                           yieldPolicy,
-                                                           collections,
-                                                           pipeline));
+        auto innerPlanner = uassertStatusOK(preparePlanner(
+            opCtx, canonicalQuery, std::move(plannerParams), yieldPolicy, collections, pipeline));
         return std::make_unique<EngineSelectionPlanner>(
-            std::move(innerPlanner), opCtx, canonicalQuery.get(), pipeline, collections);
+            std::move(innerPlanner), opCtx, canonicalQuery, pipeline, collections);
     };
-    return retryMakePlanner(std::move(paramsForSingleCollectionQuery),
+    return retryMakePlanner(std::move(initialPlannerParams),
                             makeQueryPlannerParams,
                             makePlannerHelper,
-                            canonicalQuery.get(),
+                            canonicalQuery,
                             plannerOptions,
                             pipeline)
         ->extractPlanRankingResult();

@@ -50,22 +50,18 @@ getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
                                     const MultipleCollectionAccessor& collections,
                                     std::unique_ptr<CanonicalQuery> canonicalQuery,
                                     PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                    std::unique_ptr<QueryPlannerParams> initialPlannerParams,
                                     const MakePlannerParamsFn& makeQueryPlannerParams,
                                     std::size_t plannerOptions,
                                     Pipeline* pipeline) {
     PlanRankingResult rankerResult = planRanking(opCtx,
                                                  collections,
-                                                 canonicalQuery,
+                                                 canonicalQuery.get(),
                                                  yieldPolicy,
                                                  plannerOptions,
                                                  pipeline,
+                                                 std::move(initialPlannerParams),
                                                  makeQueryPlannerParams);
-    if (rankerResult.expressExecutor) {
-        return {std::move(rankerResult.expressExecutor)};
-    }
-
-    // Past this path's own express decision; see the matching call in getExecutorFind().
-    markShedEligibleIfFindCommand(opCtx);
 
     // If we replanned and the old plan and new plan are the same, update the counter.
     const auto replanningData = rankerResult.plannerParams->replanningData;

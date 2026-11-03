@@ -99,8 +99,6 @@ private:
 };
 
 struct PlanRankingResult {
-    // For the express fast-path, planning will produce an executor.
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> expressExecutor;
     // Indicates whether an IDHACK plan was created during planning. This plan will only use the
     // classic engine.
     bool usedIdhack = false;

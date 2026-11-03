@@ -724,12 +724,42 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         // Stop the query planning timer once we have an execution plan.
         CurOp::get(opCtx)->stopQueryPlanningTimer();
     });
+
+    auto expressResult =
+        tryExpress(opCtx, collections, canonicalQuery, plannerOptions, makeQueryPlannerParams);
+    if (expressResult.executor) {
+        return std::move(expressResult.executor);
+    }
+    // If no express executor was returned, we can reuse the planner params created by `tryExpress`
+    // for other planning logic.
+    tassert(11974306, "Expected planner params to be initialized.", expressResult.plannerParams);
+
+    markShedEligibleIfFindCommand(opCtx);
+
+    // Initialize path arrayness in ExpressionContext from the CollectionQueryInfo.
+    // Do not invoke if it has been already initialized.
+    // TODO SERVER-123955 Consider moving it to a different location
+    const auto& collection = collections.getMainCollection();
+    const auto& nss = canonicalQuery->getExpCtx()->getNamespaceString();
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled() &&
+        !canonicalQuery->getExpCtx()->hasPathArraynessForNss(nss) && collection) {
+        canonicalQuery->getExpCtx()->setPathArraynessForNss(
+            nss, CollectionQueryInfo::get(collection).getPathArrayness());
+    }
+
+    if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled() &&
+        !canonicalQuery->getExpCtx()->hasSchemaTypeInfoForNss(nss) && collection) {
+        canonicalQuery->getExpCtx()->setSchemaTypeInfoForNss(
+            nss, CollectionQueryInfo::get(collection).getSchemaTypeInfo());
+    }
+
     // TODO SERVER-137028 Simplify this function after legacy executor is fully deleted.
     return exec_deferred_engine_choice::getExecutorFindDeferredEngineChoice(
         opCtx,
         collections,
         std::move(canonicalQuery),
         std::move(yieldPolicy),
+        std::move(expressResult.plannerParams),
         makeQueryPlannerParams,
         plannerOptions,
         pipeline);
