@@ -14,6 +14,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_error_source.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
@@ -67,6 +68,24 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+
+/**
+ * Per-cursor state shared by the stages that produce and convert change stream error events.
+ * Keeping these fields together avoids adding multiple change-stream-only members to the
+ * ExpressionContext parameter list.
+ */
+struct ChangeStreamErrorState {
+    // Earliest oplog timestamp, set by the scan when the resume point has rolled off.
+    boost::optional<Timestamp> oplogFloorAfterRollover;
+    // Identity of the event currently in flight above the transform, used to attribute failures.
+    boost::optional<Document> activeEvent;
+    // Source of the in-flight recoverable failure; absent means user-pipeline.
+    boost::optional<ChangeStreamErrorSource> activeErrorSource;
+    // A resume gap built below the user stages, awaiting materialization above them.
+    boost::optional<Document> pendingResumeGap;
+    // An error event awaiting release past router user stages that could not be pushed to shards.
+    boost::optional<Document> pendingRouterErrorEvent;
+};
 
 enum struct SbeCompatibility {
     // Not implemented in SBE.
@@ -857,6 +876,70 @@ public:
         _params.changeStreamSpec = std::move(changeStreamSpec);
     }
 
+    // Identity of the event in flight. Intended to be recorded by the change stream transform, and
+    // re-recorded by stages that release a held-back event. No stage sets it yet.
+    const boost::optional<Document>& getActiveChangeStreamEvent() const {
+        return _params.changeStreamErrorState.activeEvent;
+    }
+
+    void setActiveChangeStreamEvent(Document event) {
+        _params.changeStreamErrorState.activeEvent = std::move(event);
+    }
+
+    void clearActiveChangeStreamEvent() {
+        _params.changeStreamErrorState.activeEvent = boost::none;
+    }
+
+    // Source of the in-flight recoverable failure (see ChangeStreamErrorSource). Intended to be set
+    // by a producer that must rethrow an exception from below the user stages (e.g. the pre/post
+    // image stages), and consumed and cleared by the top-level conversion point. Absent means
+    // user-pipeline.
+    const boost::optional<ChangeStreamErrorSource>& getActiveChangeStreamErrorSource() const {
+        return _params.changeStreamErrorState.activeErrorSource;
+    }
+
+    void setActiveChangeStreamErrorSource(ChangeStreamErrorSource source) {
+        _params.changeStreamErrorState.activeErrorSource = source;
+    }
+
+    void clearActiveChangeStreamErrorSource() {
+        _params.changeStreamErrorState.activeErrorSource = boost::none;
+    }
+
+    // A resume gap detected below the user stages, built as an ordinary error event but not yet
+    // delivered. Intended to be set by the resumability check stage and consumed by the stage or
+    // executor that returns it above the user stages.
+    const boost::optional<Document>& getPendingChangeStreamResumeGap() const {
+        return _params.changeStreamErrorState.pendingResumeGap;
+    }
+
+    void setPendingChangeStreamResumeGap(Document gap) {
+        _params.changeStreamErrorState.pendingResumeGap = std::move(gap);
+    }
+
+    boost::optional<Document> releasePendingChangeStreamResumeGap() {
+        auto gap = std::move(_params.changeStreamErrorState.pendingResumeGap);
+        _params.changeStreamErrorState.pendingResumeGap = boost::none;
+        return gap;
+    }
+
+    // An operationType:"error" event intended to be stashed by the router's resume stage so it can
+    // be thrown past user stages that could not be pushed to the shards, and released by the
+    // router's top-level pipeline, which returns it directly.
+    const boost::optional<Document>& getPendingChangeStreamRouterErrorEvent() const {
+        return _params.changeStreamErrorState.pendingRouterErrorEvent;
+    }
+
+    void setPendingChangeStreamRouterErrorEvent(Document event) {
+        _params.changeStreamErrorState.pendingRouterErrorEvent = std::move(event);
+    }
+
+    boost::optional<Document> releasePendingChangeStreamRouterErrorEvent() {
+        auto event = std::move(_params.changeStreamErrorState.pendingRouterErrorEvent);
+        _params.changeStreamErrorState.pendingRouterErrorEvent = boost::none;
+        return event;
+    }
+
     bool isChangeStreamV2() const {
         if (const auto& spec = _params.changeStreamSpec) {
             return spec->getVersion() == ChangeStreamReaderVersionEnum::kV2;
@@ -875,6 +958,14 @@ public:
 
     void setInitialPostBatchResumeToken(BSONObj initialPostBatchResumeToken) {
         _params.initialPostBatchResumeToken = std::move(initialPostBatchResumeToken);
+    }
+
+    const boost::optional<Timestamp>& getChangeStreamOplogFloorAfterRollover() const {
+        return _params.changeStreamErrorState.oplogFloorAfterRollover;
+    }
+
+    void setChangeStreamOplogFloorAfterRollover(Timestamp earliestOplogTs) {
+        _params.changeStreamErrorState.oplogFloorAfterRollover = earliestOplogTs;
     }
 
     void setOriginalAggregateCommand(BSONObj originalAggregateCommand) {
@@ -1267,6 +1358,9 @@ protected:
         // For a changeStream aggregation, this is the starting postBatchResumeToken. Empty
         // otherwise.
         BSONObj initialPostBatchResumeToken;
+        // Per-cursor state used only by opted-in change streams. Subfield names are scoped by this
+        // member, so they do not repeat the 'ChangeStream' prefix.
+        ChangeStreamErrorState changeStreamErrorState;
         // If present, the spec associated with the current change stream pipeline.
         boost::optional<DocumentSourceChangeStreamSpec> changeStreamSpec;
         // The resume token version that should be generated by a change stream.
