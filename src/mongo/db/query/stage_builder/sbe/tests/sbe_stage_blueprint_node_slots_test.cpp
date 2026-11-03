@@ -332,6 +332,10 @@ void checkHashAgg(SlotMembershipChecker& c) {
     auto nativeOut = c.slot();
     auto nativeSpill = c.slot();
     auto [transform, transformSlot] = c.expr();
+    auto minNOut = c.slot();
+    auto minNSpill = c.slot();
+    auto [minNTransform, minNTransformSlot] = c.expr();
+    auto [maxSize, maxSizeSlot] = c.expr();
     SbBlueprintHashAgg hashAgg;
     hashAgg.groupBySlots = {groupBy};
     hashAgg.collatorSlot = collator;
@@ -344,9 +348,21 @@ void checkHashAgg(SlotMembershipChecker& c) {
         nativeSpill,
         SbHashAggSinglePurposeScalarAccumulator<sbe::AddToSetHashAggAccumulator>{
             std::move(transform)});
+    hashAgg.accumulators.emplace_back(
+        minNOut,
+        minNSpill,
+        SbHashAggMinMaxNAccumulator<sbe::MinNHashAggAccumulator>{
+            std::move(minNTransform), std::move(maxSize), 0 /* memLimit */});
     c.check(hashAgg,
-            {compiledOut, compiledSpill, nativeOut, nativeSpill},
-            {groupBy, collator, initSlot, aggSlot, mergeSlot, transformSlot});
+            {compiledOut, compiledSpill, nativeOut, nativeSpill, minNOut, minNSpill},
+            {groupBy,
+             collator,
+             initSlot,
+             aggSlot,
+             mergeSlot,
+             transformSlot,
+             minNTransformSlot,
+             maxSizeSlot});
 }
 
 void checkBlockHashAgg(SlotMembershipChecker& c) {

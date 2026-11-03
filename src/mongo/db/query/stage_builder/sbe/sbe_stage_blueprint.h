@@ -926,15 +926,20 @@ struct SbBlueprintHashAgg {
         out.add(groupBySlots);
         out.add(collatorSlot);
         for (const auto& acc : accumulators) {
-            std::visit(OverloadedVisitor{[&](const SbHashAggCompiledAccumulator& impl) {
-                                             out.add(impl.init);
-                                             out.add(impl.agg);
-                                             out.add(impl.merge);
-                                         },
-                                         [&](const auto& impl) {
-                                             out.add(impl.transform);
-                                         }},
-                       acc.implementation);
+            std::visit(
+                OverloadedVisitor{[&](const SbHashAggCompiledAccumulator& impl) {
+                                      out.add(impl.init);
+                                      out.add(impl.agg);
+                                      out.add(impl.merge);
+                                  },
+                                  [&]<class Impl>(const SbHashAggMinMaxNAccumulator<Impl>& impl) {
+                                      out.add(impl.transform);
+                                      out.add(impl.maxSizeExpr);
+                                  },
+                                  [&](const auto& impl) {
+                                      out.add(impl.transform);
+                                  }},
+                acc.implementation);
         }
     }
 
