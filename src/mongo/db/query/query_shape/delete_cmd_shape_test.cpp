@@ -56,24 +56,12 @@ public:
     }
 
     DeleteCmdShape makeOneShapeFromDelete(std::string_view deleteCmd) {
-        auto shapes = makeShapesFromDelete(fromjson(deleteCmd));
-        ASSERT_EQ(shapes.size(), 1U);
-        return shapes.front();
+        return makeOneDeleteShape(_operationContext.get(), deleteCmd);
     }
 
     std::vector<DeleteCmdShape> makeShapesFromDelete(BSONObj deleteCmd) {
-        auto deleteRequest = DeleteCommandRequest::parseOwned(std::move(deleteCmd));
-        return makeShapesFromDeleteRequest(deleteRequest);
-    }
-
-    std::vector<DeleteCmdShape> makeShapesFromDeleteRequest(
-        const DeleteCommandRequest& deleteRequest) {
-        std::vector<DeleteCmdShape> shapes;
-        for (size_t opIdx = 0; opIdx < deleteRequest.getDeletes().size(); ++opIdx) {
-            shapes.push_back(
-                *makeDeleteShape(_operationContext.get(), makeDeleteRequest(deleteRequest, opIdx)));
-        }
-        return shapes;
+        return makeDeleteShapes(_operationContext.get(),
+                                DeleteCommandRequest::parseOwned(std::move(deleteCmd)));
     }
 
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;

@@ -2,29 +2,19 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/json.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_bm_constants.h"
-#include "mongo/db/query/query_shape/delete_cmd_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/write_key.h"
-#include "mongo/db/query/write_ops/delete_request_gen.h"
+#include "mongo/db/query/query_stats/write_key_test_util.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string_view>
-
-#include <absl/hash/hash.h>
 
 namespace mongo::query_stats {
 namespace {
 using namespace std::literals::string_view_literals;
 
 using write_ops::DeleteCommandRequest;
-
-const NamespaceString kDefaultTestNss =
-    NamespaceString::createNamespaceString_forTest("testDB.testColl");
 
 class DeleteKeyTest : public ServiceContextTest {
 public:
@@ -35,43 +25,6 @@ public:
 
     OperationContext* opCtx() {
         return _opCtx.get();
-    }
-
-    std::vector<std::unique_ptr<const Key>> makeDeleteKeys(std::string_view cmd) {
-        auto dcr = DeleteCommandRequest::parseOwned(fromjson(cmd));
-
-        std::vector<std::unique_ptr<const Key>> keys;
-        for (const auto& op : dcr.getDeletes()) {
-            DeleteRequest request;
-            request.setNsString(kDefaultTestNss);
-            request.setQuery(op.getQ());
-            request.setMulti(op.getMulti());
-            if (op.getCollation()) {
-                request.setCollation(op.getCollation()->getOwned());
-            }
-            request.setHint(op.getHint().getOwned());
-            if (dcr.getLet()) {
-                request.setLet(*dcr.getLet());
-            }
-            auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), request).build();
-
-            auto parsedDelete = uassertStatusOK(parsed_delete_command::parse(
-                expCtx, &request, makeExtensionsCallback<ExtensionsCallbackNoop>()));
-            auto shape = std::make_unique<query_shape::DeleteCmdShape>(parsedDelete, expCtx);
-
-            keys.push_back(std::make_unique<DeleteKey>(expCtx,
-                                                       dcr,
-                                                       parsedDelete.getRequest()->getHint(),
-                                                       std::move(shape),
-                                                       query_benchmark_constants::kCollectionType));
-        }
-        return keys;
-    }
-
-    std::unique_ptr<const Key> makeOneDeleteKey(std::string_view cmd) {
-        auto keys = makeDeleteKeys(cmd);
-        ASSERT_EQ(keys.size(), 1U);
-        return std::move(keys.front());
     }
 
 private:
@@ -156,20 +109,20 @@ TEST_F(DeleteKeyTest, SizeOfDeleteKeyWithAndWithoutComment) {
         "$db": "testDB"
     })";
 
-    auto keyWithoutComment = makeOneDeleteKey(cmd);
+    auto keyWithoutComment = makeDeleteKey(opCtx(), cmd);
     opCtx()->setComment(BSON("comment" << "foo"));
-    auto keyWithComment = makeOneDeleteKey(cmd);
+    auto keyWithComment = makeDeleteKey(opCtx(), cmd);
     ASSERT_LT(keyWithoutComment->size(), keyWithComment->size());
 }
 
 TEST_F(DeleteKeyTest, SizeOfDeleteKeyWithAndWithoutReadConcern) {
-    auto keyWithoutReadConcern = makeOneDeleteKey(R"({
+    auto keyWithoutReadConcern = makeDeleteKey(opCtx(), R"({
         delete: "testColl",
         deletes: [ { q: { x: 1 }, limit: 0 } ],
         "$db": "testDB"
     })");
 
-    auto keyWithReadConcern = makeOneDeleteKey(R"({
+    auto keyWithReadConcern = makeDeleteKey(opCtx(), R"({
         delete: "testColl",
         deletes: [ { q: { x: 1 }, limit: 0 } ],
         "$db": "testDB",
@@ -182,13 +135,13 @@ TEST_F(DeleteKeyTest, SizeOfDeleteKeyWithAndWithoutReadConcern) {
 }
 
 TEST_F(DeleteKeyTest, SizeOfDeleteKeyWithAndWithoutHint) {
-    auto keyWithoutHint = makeOneDeleteKey(R"({
+    auto keyWithoutHint = makeDeleteKey(opCtx(), R"({
         delete: "testColl",
         deletes: [ { q: { x: 1 }, limit: 0 } ],
         "$db": "testDB"
     })");
 
-    auto keyWithHint = makeOneDeleteKey(R"({
+    auto keyWithHint = makeDeleteKey(opCtx(), R"({
         delete: "testColl",
         deletes: [ { q: { x: 1 }, limit: 0, hint: { _id: 1 } } ],
         "$db": "testDB"

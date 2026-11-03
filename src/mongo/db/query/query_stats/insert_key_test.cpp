@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/json.h"
-#include "mongo/db/query/query_bm_constants.h"
 #include "mongo/db/query/query_shape/insert_cmd_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/write_key.h"
+#include "mongo/db/query/query_stats/write_key_test_util.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
@@ -26,13 +26,6 @@ public:
 
     OperationContext* opCtx() {
         return _opCtx.get();
-    }
-
-    std::unique_ptr<InsertKey> makeInsertKey(std::string_view cmd) {
-        auto icr = InsertCommandRequest::parseOwned(fromjson(cmd));
-        auto shape = std::make_unique<query_shape::InsertCmdShape>(icr.getNamespace());
-        return std::make_unique<InsertKey>(
-            opCtx(), icr, std::move(shape), query_benchmark_constants::kCollectionType);
     }
 
 private:
@@ -88,13 +81,13 @@ TEST_F(InsertKeyTest, SizeOfInsertCmdComponents) {
 }
 
 TEST_F(InsertKeyTest, InsertKeySize) {
-    auto key1 = makeInsertKey(R"({
+    auto key1 = makeInsertKey(opCtx(), R"({
         insert: "testColl",
         documents: [ { x: 1 } ],
         "$db": "testDB"
     })");
 
-    auto key2 = makeInsertKey(R"({
+    auto key2 = makeInsertKey(opCtx(), R"({
         insert: "testColl",
         documents: [ { x: 1, y: 2, z: 3 } ],
         "$db": "testDB"

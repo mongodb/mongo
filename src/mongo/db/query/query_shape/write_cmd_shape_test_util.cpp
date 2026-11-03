@@ -3,10 +3,13 @@
 
 #include "mongo/db/query/query_shape/write_cmd_shape_test_util.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/query_shape/insert_cmd_shape.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::query_shape {
 
@@ -43,6 +46,51 @@ std::unique_ptr<DeleteCmdShape> makeDeleteShape(OperationContext* opCtx,
     auto parsedDelete = uassertStatusOK(parsed_delete_command::parse(
         expCtx, &request, makeExtensionsCallback<ExtensionsCallbackNoop>()));
     return std::make_unique<DeleteCmdShape>(parsedDelete, expCtx);
+}
+
+std::vector<UpdateCmdShape> makeUpdateShapes(OperationContext* opCtx,
+                                             const write_ops::UpdateCommandRequest& cmd) {
+    std::vector<UpdateCmdShape> shapes;
+    for (size_t opIdx = 0; opIdx < cmd.getUpdates().size(); ++opIdx) {
+        shapes.push_back(*makeUpdateShape(opCtx, makeUpdateRequest(cmd, opIdx)));
+    }
+    return shapes;
+}
+
+std::vector<DeleteCmdShape> makeDeleteShapes(OperationContext* opCtx,
+                                             const write_ops::DeleteCommandRequest& cmd) {
+    std::vector<DeleteCmdShape> shapes;
+    for (size_t opIdx = 0; opIdx < cmd.getDeletes().size(); ++opIdx) {
+        shapes.push_back(*makeDeleteShape(opCtx, makeDeleteRequest(cmd, opIdx)));
+    }
+    return shapes;
+}
+
+UpdateCmdShape makeOneUpdateShape(OperationContext* opCtx, const BSONObj& updateCmd) {
+    auto shapes =
+        makeUpdateShapes(opCtx, write_ops::UpdateCommandRequest::parseOwned(updateCmd.getOwned()));
+    ASSERT_EQ(shapes.size(), 1U);
+    return shapes.front();
+}
+
+UpdateCmdShape makeOneUpdateShape(OperationContext* opCtx, std::string_view updateCmd) {
+    return makeOneUpdateShape(opCtx, fromjson(updateCmd));
+}
+
+DeleteCmdShape makeOneDeleteShape(OperationContext* opCtx, const BSONObj& deleteCmd) {
+    auto shapes =
+        makeDeleteShapes(opCtx, write_ops::DeleteCommandRequest::parseOwned(deleteCmd.getOwned()));
+    ASSERT_EQ(shapes.size(), 1U);
+    return shapes.front();
+}
+
+DeleteCmdShape makeOneDeleteShape(OperationContext* opCtx, std::string_view deleteCmd) {
+    return makeOneDeleteShape(opCtx, fromjson(deleteCmd));
+}
+
+InsertCmdShape makeInsertShape(std::string_view insertCmd) {
+    return InsertCmdShape(
+        write_ops::InsertCommandRequest::parseOwned(fromjson(insertCmd)).getNamespace());
 }
 
 }  // namespace mongo::query_shape

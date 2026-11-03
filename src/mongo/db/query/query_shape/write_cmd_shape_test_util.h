@@ -5,6 +5,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_shape/delete_cmd_shape.h"
+#include "mongo/db/query/query_shape/insert_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/update_cmd_shape.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
@@ -13,6 +14,8 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <string_view>
+#include <vector>
 
 namespace mongo::query_shape {
 
@@ -30,5 +33,27 @@ std::unique_ptr<UpdateCmdShape> makeUpdateShape(OperationContext* opCtx,
                                                 const UpdateRequest& request);
 std::unique_ptr<DeleteCmdShape> makeDeleteShape(OperationContext* opCtx,
                                                 const DeleteRequest& request);
+
+/**
+ * Builds the shapes of all ops of a standalone update/delete command.
+ */
+std::vector<UpdateCmdShape> makeUpdateShapes(OperationContext* opCtx,
+                                             const write_ops::UpdateCommandRequest& cmd);
+std::vector<DeleteCmdShape> makeDeleteShapes(OperationContext* opCtx,
+                                             const write_ops::DeleteCommandRequest& cmd);
+
+/**
+ * Builds the shape of a standalone command that must contain exactly one op.
+ */
+UpdateCmdShape makeOneUpdateShape(OperationContext* opCtx, const BSONObj& updateCmd);
+UpdateCmdShape makeOneUpdateShape(OperationContext* opCtx, std::string_view updateCmd);
+DeleteCmdShape makeOneDeleteShape(OperationContext* opCtx, const BSONObj& deleteCmd);
+DeleteCmdShape makeOneDeleteShape(OperationContext* opCtx, std::string_view deleteCmd);
+
+/**
+ * An insert command has a single shape regardless of how many documents it inserts, so there is no
+ * plural variant.
+ */
+InsertCmdShape makeInsertShape(std::string_view insertCmd);
 
 }  // namespace mongo::query_shape

@@ -85,7 +85,9 @@ mongo_cc_library(
     hdrs = ["write_cmd_shape_test_util.h"],
     deps = [
         ":delete_cmd_shape",
+        ":insert_cmd_shape",
         ":update_cmd_shape",
+        "//src/mongo/unittest",
     ],
 )
 

@@ -26,31 +26,15 @@ public:
         _operationContext = _queryTestServiceContext->makeOperationContext();
     }
 
-    std::vector<UpdateCmdShape> makeShapesFromUpdate(BSONObj updateCmd) {
-        auto updateRequest = UpdateCommandRequest::parseOwned(std::move(updateCmd));
-        return makeShapesFromUpdateRequest(updateRequest);
-    }
-
     std::vector<UpdateCmdShape> makeShapesFromUpdate(std::string_view updateCmd) {
-        return makeShapesFromUpdate(fromjson(updateCmd));
-    }
-
-    std::vector<UpdateCmdShape> makeShapesFromUpdateRequest(
-        const write_ops::UpdateCommandRequest& updateRequest) {
-        std::vector<UpdateCmdShape> shapes;
-        for (size_t opIdx = 0; opIdx < updateRequest.getUpdates().size(); ++opIdx) {
-            shapes.push_back(
-                *makeUpdateShape(_operationContext.get(), makeUpdateRequest(updateRequest, opIdx)));
-        }
-        return shapes;
+        return makeUpdateShapes(_operationContext.get(),
+                                UpdateCommandRequest::parseOwned(fromjson(updateCmd)));
     }
 
     template <typename T>
     requires std::is_same_v<T, std::string_view> || std::is_same_v<T, BSONObj>
     UpdateCmdShape makeOneShapeFromUpdate(T updateCmd) {
-        auto shapes = makeShapesFromUpdate(updateCmd);
-        ASSERT_EQ(shapes.size(), 1);
-        return shapes.front();
+        return makeOneUpdateShape(_operationContext.get(), updateCmd);
     }
 
     void validateShapeSize(const UpdateCmdShape& shape) {
@@ -2209,7 +2193,7 @@ TEST_F(UpdateCmdShapeTest, StableQueryShapeHashValue) {
     auto verifyHash = [&](std::string_view expectedHash, const UpdateCmdBuilder& updateCmd) {
         BSONObj updateBson = updateCmd.toBSON();
         auto updateRequest = UpdateCommandRequest::parseOwned(std::move(updateBson));
-        auto shapes = makeShapesFromUpdateRequest(updateRequest);
+        auto shapes = makeUpdateShapes(_operationContext.get(), updateRequest);
         ASSERT_EQ(shapes.size(), 1);
         const auto& shape = shapes.front();
 

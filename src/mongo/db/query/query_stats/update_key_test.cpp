@@ -2,18 +2,13 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/json.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_shape/update_cmd_shape.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/write_key.h"
-#include "mongo/db/query/write_ops/update_request.h"
+#include "mongo/db/query/query_stats/write_key_test_util.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <string_view>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_stats {
 
@@ -22,11 +17,6 @@ using namespace std::literals::string_view_literals;
 
 using write_ops::UpdateCommandRequest;
 
-static const NamespaceStringOrUUID kDefaultTestNss =
-    NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("testDB.testColl")};
-
-static constexpr auto collectionType = query_shape::CollectionType::kCollection;
-
 class UpdateKeyTest : public ServiceContextTest {
 public:
     void setUp() override {
@@ -34,48 +24,11 @@ public:
         _opCtx = makeOperationContext();
     }
 
-    std::vector<std::unique_ptr<const Key>> makeUpdateKeys(
-        const boost::intrusive_ptr<ExpressionContext>&, std::string_view cmd) {
-        auto ucr = UpdateCommandRequest::parseOwned(fromjson(cmd));
-
-        std::vector<std::unique_ptr<const Key>> keys;
-        for (const auto& op : ucr.getUpdates()) {
-            UpdateRequest request(op);
-            request.setNamespaceString(kDefaultTestNss.nss());
-            if (ucr.getLet()) {
-                request.setLetParameters(*ucr.getLet());
-            }
-            auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), request).build();
-
-            auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
-                expCtx,
-                &request,
-                makeExtensionsCallback<ExtensionsCallbackReal>(expCtx->getOperationContext(),
-                                                               &request.getNsString())));
-            auto shape = std::make_unique<query_shape::UpdateCmdShape>(parsedUpdate, expCtx);
-
-            auto key = std::make_unique<UpdateKey>(expCtx,
-                                                   ucr,
-                                                   parsedUpdate.getRequest()->getHint(),
-                                                   std::move(shape),
-                                                   collectionType);
-            keys.push_back(std::move(key));
-        }
-        return keys;
-    }
-
-    std::unique_ptr<const Key> makeOneUpdateKey(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, std::string_view cmd) {
-        auto keys = makeUpdateKeys(expCtx, cmd);
-        ASSERT_EQ(keys.size(), 1);
-        return std::move(keys.front());
-    }
-
-private:
     OperationContext* opCtx() {
         return _opCtx.get();
     }
 
+private:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
@@ -165,24 +118,22 @@ TEST_F(UpdateKeyTest, SizeOfUpdateKeyWithAndWithoutComment) {
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" } } ],
         "$db": "testDB"
     })"sv;
-    auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
-    auto keyWithoutComment = makeOneUpdateKey(expCtx, cmd);
+    auto keyWithoutComment = makeUpdateKey(opCtx(), cmd);
 
-    expCtx->getOperationContext()->setComment(BSON("comment" << " foo"));
-    auto keyWithComment = makeOneUpdateKey(expCtx, cmd);
+    opCtx()->setComment(BSON("comment" << " foo"));
+    auto keyWithComment = makeUpdateKey(opCtx(), cmd);
     ASSERT_LT(keyWithoutComment->size(), keyWithComment->size());
 }
 
 // Testing item in command request that should impact key size.
 TEST_F(UpdateKeyTest, SizeOfUpdateKeyWithAndWithoutReadConcern) {
-    auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
-    auto keyWithoutReadConcern = makeOneUpdateKey(expCtx, R"({
+    auto keyWithoutReadConcern = makeUpdateKey(opCtx(), R"({
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" } } ],
         "$db": "testDB"
     })"sv);
 
-    auto keyWithReadConcern = makeOneUpdateKey(expCtx, R"({
+    auto keyWithReadConcern = makeUpdateKey(opCtx(), R"({
         update: "testColl",
         updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" } } ],
         "$db": "testDB",
