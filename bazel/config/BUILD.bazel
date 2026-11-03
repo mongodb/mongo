@@ -283,11 +283,22 @@ config_setting(
     },
 )
 
+# FuzzTest and Centipede assume a POSIX/Clang toolchain (endian.h, pthread.h, GCC builtins), so
+# they can't be compiled by MSVC. Windows does not support fuzzers, so keep them out of the Windows
+# compilation database; validate_compile_commands replays every entry with the real compiler.
+selects.config_setting_group(
+    name = "compiledb_fuzzers_enabled",
+    match_all = [
+        ":compiledb_enabled",
+        ":not_windows",
+    ],
+)
+
 selects.config_setting_group(
     name = "fsan_or_compiledb_enabled",
     match_any = [
         ":fsan_enabled",
-        ":compiledb_enabled",
+        ":compiledb_fuzzers_enabled",
     ],
 )
 

@@ -40,6 +40,11 @@ _fuzztest_compile_commands_test = analysistest.make(
     attrs = {"source": attr.string(mandatory = True)},
 )
 
+_NOT_WINDOWS = select({
+    "@platforms//os:windows": ["@platforms//:incompatible"],
+    "//conditions:default": [],
+})
+
 def fuzztest_compile_commands_test_suite(name):
     mongo_cc_fuzztest(
         name = "compiledb_fuzztest_fixture",
@@ -52,18 +57,24 @@ def fuzztest_compile_commands_test_suite(name):
         target_under_test = ":compiledb_fuzztest_fixture_with_debug",
         source = "compiledb_fuzztest.cpp",
         size = "small",
+        # Fuzzers are excluded from the Windows compilation database.
+        target_compatible_with = _NOT_WINDOWS,
     )
     _fuzztest_compile_commands_test(
         name = name + "_bson_mutator",
         target_under_test = "//src/mongo/bson/bson_mutator",
         source = "bson_mutator.cpp",
         size = "small",
+        # Fuzzers are excluded from the Windows compilation database.
+        target_compatible_with = _NOT_WINDOWS,
     )
     _fuzztest_compile_commands_test(
         name = name + "_deprecated_fuzzer",
         target_under_test = "//src/mongo/bson:bson_validate_fuzzer_with_debug",
         source = "bson_validate_fuzzer.cpp",
         size = "small",
+        # Fuzzers are excluded from the Windows compilation database.
+        target_compatible_with = _NOT_WINDOWS,
     )
     native.test_suite(
         name = name,
