@@ -156,6 +156,8 @@ public:
     BatchedDeleteStats getBatchedDeleteStats() override;
     void markAsKilled(Status killStatus) final;
     void dispose(OperationContext* opCtx) final;
+    void releaseAllAcquiredResources() final;
+    bool enforceResponseDeadline() final;
     void forceSpill(PlanYieldPolicy* yieldPolicy) final {
         _root->forceSpill(yieldPolicy);
     }
@@ -242,6 +244,14 @@ public:
      */
     ResponseDeadlineType getResponseDeadlineType_forTest() const {
         return _responseDeadlineType;
+    }
+
+    /**
+     * Returns the value of the currently installed response deadline for lengthy getNext()
+     * operations, if any.
+     */
+    boost::optional<Date_t> getResponseDeadlineValue_forTest() const {
+        return _responseDeadlineValue;
     }
 
 private:
@@ -339,6 +349,13 @@ private:
     // If the current operation was "softly" interrupted. Will be set if a configured response
     // deadline is reached. Cleared upon every 'reattachToOperationContext()' call.
     bool _interrupted = false;
+
+    // Whether the executor has attempted to do any work since the current request (getMore)
+    // started. Cleared upon every 'reattachToOperationContext()' call, i.e. at the start of each
+    // request. Used to avoid enforcing the response deadline at a batch boundary before the
+    // executor has had a chance to produce a result, which could otherwise make a getMore return
+    // an empty batch (without any progress) when 'operationResponseMaxMS' is very small.
+    bool _didWorkSinceReattach = false;
 
     // The 'operationResponseMaxMS' knob value captured at construction. The knob is fixed for the
     // query's lifetime, so it is cached here rather than re-read on every

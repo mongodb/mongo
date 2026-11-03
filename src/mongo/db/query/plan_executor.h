@@ -246,7 +246,18 @@ public:
      * Releases all storage engine resources that the plan executor has acquired. The plan will be
      * left in the "saved" state so a call to restoreState() will be necessary afterwards.
      */
-    void releaseAllAcquiredResources();
+    virtual void releaseAllAcquiredResources();
+
+    /**
+     * Evaluates the configured response deadline for lengthy operations and, if it has been
+     * reached, marks the executor as interrupted so that subsequent getNext() calls return IS_EOF.
+     * This allows callers that drive the executor in batches (e.g. DocumentSourceCursor) to
+     * enforce the deadline at a batch boundary even when no yield occurs. Returns true if the
+     * deadline has been reached.
+     */
+    virtual bool enforceResponseDeadline() {
+        return false;
+    }
 
     /**
      * Produces the next document from the query execution plan. The caller can request that the

@@ -90,7 +90,8 @@ std::unique_ptr<Notifier> getCappedInsertNotifier(
 
 void waitForInserts(OperationContext* opCtx,
                     PlanYieldPolicy* yieldPolicy,
-                    std::unique_ptr<Notifier>& notifier) {
+                    std::unique_ptr<Notifier>& notifier,
+                    const ResponseDeadlineFn& responseDeadlineFn) {
     // The notifier wait() method will not wait unless the version passed to it matches the
     // current version of the notifier.  Since the version passed to it is the current version
     // of the notifier at the time of the previous EOF, we require two EOFs in a row with no
@@ -99,8 +100,19 @@ void waitForInserts(OperationContext* opCtx,
     notifier->prepareForWait(opCtx);
     auto yieldResult = yieldPolicy->yieldOrInterrupt(
         opCtx,
-        [opCtx, &notifier] {
-            const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
+        [opCtx, &notifier, &responseDeadlineFn] {
+            auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
+
+            // Do not block past the caller's response deadline. Waiting at most until that
+            // deadline lets the caller re-evaluate it (below) and interrupt the wait if it has
+            // elapsed, instead of blocking for the full awaitData period.
+            if (responseDeadlineFn) {
+                if (auto responseDeadline = responseDeadlineFn();
+                    responseDeadline && *responseDeadline < deadline) {
+                    deadline = *responseDeadline;
+                }
+            }
+
             auto curOp = CurOp::get(opCtx);
             curOp->pauseTimer();
             ON_BLOCK_EXIT([curOp] { curOp->resumeTimer(); });
@@ -111,6 +123,12 @@ void waitForInserts(OperationContext* opCtx,
                       "enabled. "
                       "Blocking until fail point is disabled");
                 planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
+            }
+
+            // Re-evaluate the response deadline now that the wait has returned, so the caller can
+            // act on it (e.g. interrupt and return early).
+            if (responseDeadlineFn) {
+                responseDeadlineFn();
             }
         },
         RestoreContext::RestoreType::kYield);

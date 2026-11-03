@@ -200,6 +200,16 @@ void CursorStage::loadBatch() {
         // This is done in the 'catch' block below.
         _sharedState->exec->restoreState(restoreContext);
 
+        // Enforce the configured response deadline at the batch boundary. This stage releases and
+        // reacquires storage engine resources between internal batches, which resets the yield
+        // timer; a scan that produces many small batches (e.g. an awaitData change stream whose
+        // events are all rejected downstream) could therefore never yield and never observe the
+        // deadline. Checking here bounds the response even when no yield occurs.
+        if (_sharedState->exec->enforceResponseDeadline()) {
+            _sharedState->exec->releaseAllAcquiredResources();
+            return;
+        }
+
         const bool shouldDestroyExec = pullDataFromExecutor(opCtx);
 
         recordPlanSummaryStats();

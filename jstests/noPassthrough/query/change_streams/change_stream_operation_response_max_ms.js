@@ -16,11 +16,18 @@
  * resume-boundary entry before the deadline fires, so the PBRT reliably advances.
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {withFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 describe("operationResponseMaxMS parameter", () => {
     const kScanMaxMS = 1000;
+
+    // The getMore blocks until the response deadline fires and then returns. Allow generous slack
+    // for slow machines (e.g. TSAN-instrumented builds); the important property is that it returns
+    // well before 'kGetMoreMaxTimeMS', which is the fallback when the deadline does not fire.
+    const kGetMoreMaxTimeMS = 30000;
+    const kMaxGetMoreDurationMS = kGetMoreMaxTimeMS / 2;
 
     let rst;
     let primary;
@@ -50,15 +57,10 @@ describe("operationResponseMaxMS parameter", () => {
         // is already behind the stream's start position.
         assert.commandWorked(testDB.createCollection(watchedCollName));
 
-        // Use an explicit session so the change stream cursor and its getMores share one lsid.
-        const session = primary.startSession();
-        const sessionDB = session.getDatabase(jsTestName());
-
-        // Open a change stream on the watched collection. Use batchSize:0 so the initial
-        // response contains no documents; the cursor's postBatchResumeToken reflects the current
-        // oplog tail.
+        // Open a change stream on the watched collection. Use batchSize:0 so the initial response
+        // contains no documents; the cursor's postBatchResumeToken reflects the current oplog tail.
         const aggRes = assert.commandWorked(
-            sessionDB.runCommand({
+            testDB.runCommand({
                 aggregate: watchedCollName,
                 pipeline: [{$changeStream: {}}],
                 cursor: {batchSize: 0},
@@ -68,12 +70,12 @@ describe("operationResponseMaxMS parameter", () => {
         const initialPBRT = aggRes.cursor.postBatchResumeToken;
         assert(initialPBRT, "Expected initial PBRT in aggregate response", {aggRes});
 
-        let cursorId = aggRes.cursor.id;
+        const cursorId = aggRes.cursor.id;
         assert.neq(NumberLong(0), cursorId, "Expected an open change stream cursor", {aggRes});
 
         // Insert documents into an unrelated collection. These generate oplog entries with a
         // namespace that does not match the watched collection. Each getMore will scan these
-        // entries, find no matching change events, and — when interrupted by the timeout —
+        // entries, find no matching change events, and - when interrupted by the timeout -
         // return an empty batch whose PBRT has advanced past the last scanned entry.
         const kNumDocs = 500;
         assert.commandWorked(
@@ -81,24 +83,37 @@ describe("operationResponseMaxMS parameter", () => {
         );
 
         // Runs a getMore whose oplog scan is slowed by delaying every CollectionScan::doWork()
-        // call by 'kDoWorkDelayMS'. The accumulated delay drives the scan past 'kScanMaxMS', so the
-        // 'operationResponseMaxMS' deadline interrupts it after it has read several oplog entries,
-        // and the getMore returns an empty batch with an advanced PBRT. The getMore self-interrupts
-        // once the deadline is reached, so it can be issued inline without a background thread.
+        // call by 'kDoWorkDelayMS'. The accumulated delay drives the scan past 'kScanMaxMS', so
+        // the 'operationResponseMaxMS' deadline interrupts it after it has read several oplog
+        // entries, and the getMore returns an empty batch with an advanced PBRT. The getMore
+        // self-interrupts once the deadline is reached, so it can be issued inline without a
+        // background thread.
         const kDoWorkDelayMS = 50;
         const runSlowGetMore = (cId) => {
-            const fp = configureFailPoint(primary, "hangCollScanDoWork", {delay: kDoWorkDelayMS});
-            try {
-                return assert.commandWorked(
-                    sessionDB.runCommand({
-                        getMore: cId,
-                        collection: watchedCollName,
-                        maxTimeMS: 30000,
-                    }),
-                );
-            } finally {
-                fp.off();
-            }
+            return withFailPoint(
+                primary,
+                "hangCollScanDoWork",
+                () => {
+                    const start = Date.now();
+                    const res = assert.commandWorked(
+                        testDB.runCommand({
+                            getMore: cId,
+                            collection: watchedCollName,
+                            maxTimeMS: kGetMoreMaxTimeMS,
+                        }),
+                    );
+                    // The 'internalOperationResponseMaxMS' deadline must fire even while the scan is
+                    // waiting for new oplog entries, so the getMore returns close to the configured
+                    // deadline instead of blocking until 'kGetMoreMaxTimeMS'.
+                    assert.lt(
+                        Date.now() - start,
+                        kMaxGetMoreDurationMS,
+                        "getMore must return shortly after the configured response deadline",
+                    );
+                    return res;
+                },
+                {data: {delay: kDoWorkDelayMS}},
+            );
         };
 
         // First getMore: the scan is interrupted after reading several oplog entries from
@@ -168,10 +183,141 @@ describe("operationResponseMaxMS parameter", () => {
             {res2},
         );
 
-        // Clean up the change stream cursor and session.
+        // Clean up the change stream cursor.
         assert.commandWorked(
-            sessionDB.runCommand({killCursors: watchedCollName, cursors: [cursorId]}),
+            testDB.runCommand({killCursors: watchedCollName, cursors: [cursorId]}),
         );
-        session.endSession();
+    });
+
+    // This case isolates the wait-for-inserts behavior. The change stream is idle at the oplog tail
+    // (no backlog and no slow-scan failpoint), so the only thing that can bound the getMore is the
+    // response deadline applied to the awaitData wait. Without that bounding, the getMore would
+    // block for the full awaitData timeout ('kGetMoreMaxTimeMS') and this test would fail.
+    it("returns the getMore near the response deadline while waiting at an idle oplog tail", () => {
+        const watchedCollName = "watchedIdle";
+
+        // Create the watched collection before opening the stream so the DDL oplog entry is already
+        // behind the stream's start position.
+        assert.commandWorked(testDB.createCollection(watchedCollName));
+
+        // Open a change stream. batchSize:0 so the initial response contains no documents and the
+        // cursor's postBatchResumeToken reflects the current oplog tail.
+        const aggRes = assert.commandWorked(
+            testDB.runCommand({
+                aggregate: watchedCollName,
+                pipeline: [{$changeStream: {}}],
+                cursor: {batchSize: 0},
+            }),
+        );
+
+        const cursorId = aggRes.cursor.id;
+        assert.neq(NumberLong(0), cursorId, "Expected an open change stream cursor", {aggRes});
+
+        // With no pending events the scan reaches the oplog tail immediately and blocks waiting for
+        // inserts. The response deadline must bound that wait, so the getMore returns near
+        // 'kScanMaxMS' instead of the awaitData timeout.
+        const start = Date.now();
+        const res = assert.commandWorked(
+            testDB.runCommand({
+                getMore: cursorId,
+                collection: watchedCollName,
+                maxTimeMS: kGetMoreMaxTimeMS,
+            }),
+        );
+        const elapsed = Date.now() - start;
+
+        assert.eq(0, res.cursor.nextBatch.length, "Expected empty batch at the idle tail", {
+            res,
+        });
+        assert.lt(
+            elapsed,
+            kMaxGetMoreDurationMS,
+            "getMore must return near the response deadline, not the awaitData timeout",
+            {elapsed},
+        );
+
+        // Clean up the change stream cursor.
+        assert.commandWorked(
+            testDB.runCommand({killCursors: watchedCollName, cursors: [cursorId]}),
+        );
+    });
+
+    // This case exercises the interaction between the response deadline and a selective downstream
+    // filter. The watched collection has a backlog of events that pass the change stream's oplog
+    // filter (so the cursor stage produces a non-empty batch), but a downstream $match rejects every
+    // event. Once the deadline fires, the cursor stage must not keep scanning just because the
+    // rejected batch left it with no results to return.
+    it("bounds the getMore when a selective downstream filter rejects the batch", () => {
+        const watchedCollName = "watchedFiltered";
+
+        assert.commandWorked(testDB.createCollection(watchedCollName));
+
+        // The $match rejects every change event, so the pipeline produces no results even though
+        // the oplog scan reads matching entries.
+        const aggRes = assert.commandWorked(
+            testDB.runCommand({
+                aggregate: watchedCollName,
+                pipeline: [{$changeStream: {}}, {$match: {operationType: "delete"}}],
+                cursor: {batchSize: 0},
+            }),
+        );
+
+        const cursorId = aggRes.cursor.id;
+        assert.neq(NumberLong(0), cursorId, "Expected an open change stream cursor", {aggRes});
+
+        // Insert a backlog of events into the watched collection. They pass the change stream's
+        // oplog filter but are rejected by the downstream $match.
+        const kNumDocs = 500;
+        const watchedColl = testDB.getCollection(watchedCollName);
+        assert.commandWorked(
+            watchedColl.insertMany(Array.from({length: kNumDocs}, (_, i) => ({_id: i}))),
+        );
+
+        // Slow the scan so it runs past the response deadline, and disable periodic yielding so
+        // the deadline cannot be observed on a yield inside the scan: it can only be enforced at
+        // the batch boundary. This isolates the interaction the test targets.
+        const kDoWorkDelayMS = 50;
+        withFailPoint(
+            primary,
+            "hangCollScanDoWork",
+            () => {
+                runWithParamsAllNonConfigNodes(
+                    testDB,
+                    {internalQueryExecYieldPeriodMS: 100000},
+                    () => {
+                        const start = Date.now();
+                        const res = assert.commandWorked(
+                            testDB.runCommand({
+                                getMore: cursorId,
+                                collection: watchedCollName,
+                                maxTimeMS: kGetMoreMaxTimeMS,
+                            }),
+                        );
+                        const elapsed = Date.now() - start;
+
+                        // All events are rejected downstream, so the batch is empty. The deadline
+                        // must still bound the getMore instead of letting it keep scanning.
+                        assert.eq(
+                            0,
+                            res.cursor.nextBatch.length,
+                            "Expected empty batch: all events rejected",
+                            {res},
+                        );
+                        assert.lt(
+                            elapsed,
+                            kMaxGetMoreDurationMS,
+                            "getMore must return near the response deadline even when a downstream filter rejects the batch",
+                            {elapsed},
+                        );
+                    },
+                );
+            },
+            {data: {delay: kDoWorkDelayMS}},
+        );
+
+        // Clean up the change stream cursor.
+        assert.commandWorked(
+            testDB.runCommand({killCursors: watchedCollName, cursors: [cursorId]}),
+        );
     });
 });

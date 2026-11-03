@@ -148,6 +148,7 @@ TEST_F(PlanExecutorImplOplogScanNoCollectionTest, ChangeStreamQuery_KnobZero_Ret
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), kNss);
     DocumentSourceChangeStreamSpec spec;
     expCtx->setChangeStreamSpec(spec);
+    expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
 
     auto docs = {BSON("_id" << 1), BSON("_id" << 2)};
     auto [ws, mockStage] = makeMockStageWithDocuments(expCtx.get(), {docs.begin(), docs.end()});
@@ -186,6 +187,7 @@ TEST_F(PlanExecutorImplOplogScanNoCollectionTest,
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), kNss);
     DocumentSourceChangeStreamSpec spec;
     expCtx->setChangeStreamSpec(spec);
+    expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
 
     auto docs = {BSON("_id" << 1), BSON("_id" << 2)};
     auto [ws, mockStage] = makeMockStageWithDocuments(expCtx.get(), {docs.begin(), docs.end()});
@@ -232,6 +234,7 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
     DocumentSourceChangeStreamSpec spec;
     expCtx->setChangeStreamSpec(spec);
+    expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
 
     // Enqueue NEED_YIELD first so that the MockStage causes the executor to force a yield on the
     // very first getNext() call. The auto-advancing clock ensures that by the time the yield
@@ -261,6 +264,123 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
               implExec->getResponseDeadlineType_forTest());
 }
 
+// 'releaseAllAcquiredResources()' releases storage engine resources by detaching and reattaching to
+// the same operation context. DocumentSourceCursor calls it between internal batches of a single
+// getMore, so it must not reset the response deadline; otherwise a lengthy request whose downstream
+// filter rejects change events would keep restarting its deadline on every batch and never fire.
+TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
+       ChangeStreamQuery_ReleaseAllAcquiredResources_PreservesDeadline) {
+    unittest::ServerParameterGuard controller("internalOperationResponseMaxMS", 1LL);
+
+    auto opCtx = operationContext();
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
+    DocumentSourceChangeStreamSpec spec;
+    expCtx->setChangeStreamSpec(spec);
+    expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+
+    auto [ws, mockStage] = makeMockStageWithDocuments(expCtx.get(), {BSON("_id" << 1)});
+
+    auto coll = acquireTestCollection();
+    auto exec = plan_executor_factory::make(expCtx,
+                                            std::move(ws),
+                                            std::move(mockStage),
+                                            coll,
+                                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                            QueryPlannerParams::DEFAULT);
+
+    auto* implExec = dynamic_cast<PlanExecutorImpl*>(exec.get());
+    ASSERT(implExec);
+    ASSERT_EQ(PlanExecutorImpl::ResponseDeadlineType::kInterruptWork,
+              implExec->getResponseDeadlineType_forTest());
+
+    const auto deadlineBefore = implExec->getResponseDeadlineValue_forTest();
+    ASSERT(deadlineBefore.has_value());
+
+    // The auto-advancing clock moves forward on every now() call, so a recomputed deadline would
+    // differ from the original one.
+    exec->releaseAllAcquiredResources();
+
+    const auto deadlineAfter = implExec->getResponseDeadlineValue_forTest();
+    ASSERT(deadlineAfter.has_value());
+    ASSERT_EQ(deadlineBefore->toMillisSinceEpoch(), deadlineAfter->toMillisSinceEpoch());
+}
+
+// 'enforceResponseDeadline()' lets a batch-oriented driver (DocumentSourceCursor) observe the
+// response deadline at a batch boundary. This is needed because each internal batch releases and
+// reacquires resources, resetting the yield timer; a scan that produces many small batches would
+// otherwise never yield and never check the deadline until it reaches the oplog tail.
+//
+// The deadline is deliberately NOT enforced until the executor has attempted to do work in the
+// current request (getMore). Otherwise a very small 'operationResponseMaxMS' could fire before the
+// $cursor stage has produced any result, and the getMore would return an empty batch without ever
+// attempting to scan for a matching document.
+TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
+       ChangeStreamQuery_EnforceResponseDeadline_AtBatchBoundary) {
+    unittest::ServerParameterGuard controller("internalOperationResponseMaxMS", 1LL);
+
+    auto opCtx = operationContext();
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
+    DocumentSourceChangeStreamSpec spec;
+    expCtx->setChangeStreamSpec(spec);
+    expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+
+    auto [ws, mockStage] = makeMockStageWithDocuments(expCtx.get(), {BSON("_id" << 1)});
+
+    auto coll = acquireTestCollection();
+    auto exec = plan_executor_factory::make(expCtx,
+                                            std::move(ws),
+                                            std::move(mockStage),
+                                            coll,
+                                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                            QueryPlannerParams::DEFAULT);
+
+    auto* implExec = dynamic_cast<PlanExecutorImpl*>(exec.get());
+    ASSERT(implExec);
+
+    // No work has been attempted in the current request yet, so the batch boundary does not enforce
+    // the deadline even though the (auto-advancing) clock is already well past it. This guarantees
+    // that every request attempts to make progress before the deadline can fire.
+    ASSERT_FALSE(exec->enforceResponseDeadline());
+
+    // Attempt to produce a result. Whether the scan yields (and observes the deadline) or produces
+    // the document, at least one unit of work is attempted, which arms the batch-boundary check.
+    BSONObj obj;
+    exec->getNext(&obj, nullptr);
+
+    // Now that work has been attempted, the batch boundary enforces the deadline: the
+    // auto-advancing clock (5000 ms per now() call) has moved past the 1 ms deadline, so
+    // enforcement reports the executor as interrupted.
+    ASSERT_TRUE(exec->enforceResponseDeadline());
+
+    // The executor is now interrupted, so the next getNext() returns IS_EOF without scanning.
+    ASSERT_EQ(PlanExecutor::IS_EOF, exec->getNext(&obj, nullptr));
+}
+
+// A non-change-stream query has no response deadline, so batch-boundary enforcement is a no-op.
+TEST_F(PlanExecutorImplOplogScanNoCollectionTest,
+       NonChangeStreamQuery_EnforceResponseDeadline_IsNoOp) {
+    unittest::ServerParameterGuard controller("internalOperationResponseMaxMS", 1LL);
+
+    auto opCtx = makeOperationContext();
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), kNss);
+
+    auto [ws, mockStage] = makeMockStageWithDocuments(expCtx.get(), {BSON("_id" << 1)});
+
+    auto exec = plan_executor_factory::make(expCtx,
+                                            std::move(ws),
+                                            std::move(mockStage),
+                                            /*collection=*/boost::none,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                            QueryPlannerParams::DEFAULT,
+                                            kNss);
+
+    ASSERT_FALSE(exec->enforceResponseDeadline());
+
+    BSONObj obj;
+    ASSERT_EQ(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), obj);
+}
+
 // When the deadline has not yet expired the executor returns documents normally. This is an
 // end-to-end sanity-check for kInterruptWork under normal (non-expiring) conditions using a real
 // collection and YIELD_AUTO policy. The knob is set to 100 000 ms (100 s); even though the
@@ -275,6 +395,7 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
     DocumentSourceChangeStreamSpec spec;
     expCtx->setChangeStreamSpec(spec);
+    expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
 
     auto [ws, mockStage] = makeMockStageWithDocuments(
         expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, /*enqueueNeedYieldFirst=*/false);
@@ -302,6 +423,53 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
     // response deadline type shouldn't have changed.
     ASSERT_EQ(PlanExecutorImpl::ResponseDeadlineType::kInterruptWork,
               implExec->getResponseDeadlineType_forTest());
+}
+
+// Regression test for the internal 'fullDocument: "updateLookup"' query. Copying an expression
+// context propagates 'changeStreamSpec' to the derived context used for the post-image lookup, but
+// that context is not tailable (only the resumable oplog/change-collection scan is). It must
+// therefore not get a response deadline: otherwise a yield past the deadline would return a
+// synthetic IS_EOF that the lookup interprets as "no matching document", producing an incorrect
+// 'fullDocument: null' even though the document exists.
+TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
+       DerivedLookupQuery_InheritsChangeStreamSpec_NoResponseDeadline) {
+    unittest::ServerParameterGuard controller("internalOperationResponseMaxMS", 1LL);
+
+    auto opCtx = operationContext();
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
+    // 'changeStreamSpec' is inherited by derived contexts such as the updateLookup query, but the
+    // derived context is not tailable.
+    DocumentSourceChangeStreamSpec spec;
+    expCtx->setChangeStreamSpec(spec);
+
+    // Enqueue NEED_YIELD first so a yield occurs on the first getNext() call. The auto-advancing
+    // clock would move past a 1 ms deadline if one were installed, which would return a premature
+    // IS_EOF.
+    auto [ws, mockStage] = makeMockStageWithDocuments(
+        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, /*enqueueNeedYieldFirst=*/true);
+
+    auto coll = acquireTestCollection();
+    auto exec = plan_executor_factory::make(expCtx,
+                                            std::move(ws),
+                                            std::move(mockStage),
+                                            coll,
+                                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                            QueryPlannerParams::DEFAULT);
+
+    auto* implExec = dynamic_cast<PlanExecutorImpl*>(exec.get());
+    ASSERT(implExec);
+
+    // Not tailable -> no response deadline, despite 'changeStreamSpec' being present.
+    ASSERT_EQ(PlanExecutorImpl::ResponseDeadlineType::kNone,
+              implExec->getResponseDeadlineType_forTest());
+
+    // All documents are returned; no premature IS_EOF.
+    BSONObj obj;
+    ASSERT_EQ(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), obj);
+    ASSERT_EQ(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), obj);
+    ASSERT_EQ(PlanExecutor::IS_EOF, exec->getNext(&obj, nullptr));
 }
 
 // -----------------------------------------------------------------------------
@@ -349,6 +517,7 @@ TEST_F(PlanExecutorImplOplogScanLogInfoTest,
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
     DocumentSourceChangeStreamSpec spec;
     expCtx->setChangeStreamSpec(spec);
+    expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
 
     // Enqueue NEED_YIELD first so the stage forces a yield on the first getNext() call. The
     // auto-advancing precise clock (100 000 ms per now() call) guarantees the callback sees a

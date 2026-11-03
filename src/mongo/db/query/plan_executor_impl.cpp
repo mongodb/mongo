@@ -110,8 +110,13 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
       // so the value is cached and reused rather than re-read on every reattach (see header).
       _operationResponseMaxMS(QueryKnobConfiguration::get(opCtx).getOperationResponseMaxMS()),
       _responseDeadlineType([&]() -> ResponseDeadlineType {
-          // Determine response deadline type for change stream queries.
-          if (_expCtx && _expCtx->getChangeStreamSpec().has_value()) {
+          // Determine response deadline type for change stream queries. Only the resumable
+          // oplog scan is eligible for a synthetic early EOF. Derived contexts, such as the one
+          // used by the internal 'fullDocument: "updateLookup"' query, also inherit
+          // 'changeStreamSpec' in their copied expression context but are not tailable, and
+          // interrupting them early would silently drop a matching document.
+          if (_expCtx && _expCtx->getChangeStreamSpec().has_value() &&
+              _expCtx->isTailableAwaitData()) {
               if (_operationResponseMaxMS > 0) {
                   // Use the response deadline to periodically interrupt the executor after a
                   // user-configurable time period of performing work. This allows us to return
@@ -295,8 +300,42 @@ void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
     // the same plan executor instance can be used to service multiple getMore requests.
     _responseDeadlineValue = _calculateResponseDeadlineValue();
     _interrupted = false;
+    _didWorkSinceReattach = false;
 
     _currentState = kSaved;
+}
+
+void PlanExecutorImpl::releaseAllAcquiredResources() {
+    // This detaches and reattaches to the same operation context in order to release storage
+    // engine resources. Unlike reattaching at the start of a new getMore, this does not mark the
+    // end of a request, so the response deadline and its fired state must be preserved across it.
+    // Otherwise a lengthy request could repeatedly restart its deadline on every internal batch -
+    // for example when a downstream filter rejects change events and the scan keeps filling batches
+    // without ever reaching the oplog tail - and neither the configured interruption nor the
+    // diagnostic message would ever fire.
+    const auto responseDeadlineValue = _responseDeadlineValue;
+    const bool interrupted = _interrupted;
+    const bool didWorkSinceReattach = _didWorkSinceReattach;
+    PlanExecutor::releaseAllAcquiredResources();
+    _responseDeadlineValue = responseDeadlineValue;
+    _interrupted = interrupted;
+    _didWorkSinceReattach = didWorkSinceReattach;
+}
+
+bool PlanExecutorImpl::enforceResponseDeadline() {
+    // Do not enforce the deadline at a batch boundary until the executor has attempted to do work
+    // in the current request (getMore). Otherwise a very small 'operationResponseMaxMS' could fire
+    // before the $cursor stage has produced any result, making the getMore return an empty batch
+    // without ever attempting to scan for a matching document. Enforcing the deadline only after
+    // the first work attempt guarantees that every request tries to make progress.
+    if (!_didWorkSinceReattach) {
+        return false;
+    }
+
+    if (_responseDeadlineType != ResponseDeadlineType::kNone) {
+        _handleResponseDeadline();
+    }
+    return _interrupted;
 }
 
 namespace {
@@ -402,6 +441,10 @@ PlanExecutor::ExecState PlanExecutorImpl::getNextDocument(Document& objOut) {
 
 PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordId* dlOut) {
     checkFailPointPlanExecAlwaysFails(nss());
+
+    // Record that the current request has attempted to produce a result. Used to avoid enforcing
+    // the response deadline at a batch boundary before any work has been attempted.
+    _didWorkSinceReattach = true;
 
     invariant(_currentState == kUsable);
     if (isMarkedAsKilled()) {
@@ -592,11 +635,11 @@ void PlanExecutorImpl::_handleResponseDeadline() {
         LOGV2_DEBUG(10290001,
                     longCollectionScanLogSeveritySuppressor().toInt(),
                     "Long-running collection scan detected for query. This message will only be "
-                    "logged once per query. Set the value of the 'operationResponseMaxMS' "
+                    "logged once per query. Set the value of the 'internalOperationResponseMaxMS' "
                     "server parameter to periodically return updates from long-running operations "
                     "and prevent timeouts. See the documentation for more details: "
                     "https://docs.mongodb.com/manual/reference/parameters/"
-                    "#param.operationResponseMaxMS");
+                    "#mongodb-parameter-param.internalOperationResponseMaxMS");
     }
 }
 
@@ -687,14 +730,27 @@ bool PlanExecutorImpl::_handleEOFAndExit(PlanStage::StageState code,
     }
 
     invariant(notifier);
-    insert_listener::waitForInserts(_opCtx, _yieldPolicy.get(), notifier);
-    return false;
+    insert_listener::waitForInserts(
+        _opCtx, _yieldPolicy.get(), notifier, [this]() -> boost::optional<Date_t> {
+            if (_responseDeadlineType != ResponseDeadlineType::kNone) {
+                _handleResponseDeadline();
+            }
+            return _responseDeadlineValue;
+        });
+
+    // The response deadline may have been reached while waiting for inserts. In that case the
+    // executor has been marked as interrupted and the current response should be returned.
+    return _interrupted;
 }
 
 size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) {
     if (batchSize == 0) {
         return 0;
     }
+
+    // Record that the current request has attempted to produce a result. Used to avoid enforcing
+    // the response deadline at a batch boundary before any work has been attempted.
+    _didWorkSinceReattach = true;
 
     checkFailPointPlanExecAlwaysFails(nss());
     _checkIfKilled();

@@ -22,6 +22,7 @@
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 #include <boost/optional/optional.hpp>
@@ -135,14 +136,28 @@ std::unique_ptr<Notifier> getCappedInsertNotifier(
     PlanYieldPolicy* yieldPolicy);
 
 /**
+ * Returns the response deadline (if any) by which the executor must stop waiting for inserts, so
+ * that it can re-evaluate the deadline and act on it (e.g. by interrupting the wait). Invoked by
+ * waitForInserts() before it blocks, to bound the wait, and again after the wait returns, at which
+ * point it may have the side effect of marking the executor as interrupted once the deadline has
+ * been reached.
+ */
+using ResponseDeadlineFn = std::function<boost::optional<Date_t>()>;
+
+/**
  * Called for tailable and awaitData cursors in order to yield locks and waits for inserts to
  * the collection being tailed. Returns control to the caller once there has been an insertion
  * and there may be new results. If the PlanExecutor was killed during a yield, throws an
  * exception.
+ *
+ * 'responseDeadlineFn' allows the caller to enforce its own response deadline while waiting. The
+ * wait is bounded by the deadline returned by the function (if any) and the function is invoked
+ * again once the wait returns.
  */
 void waitForInserts(OperationContext* opCtx,
                     PlanYieldPolicy* yieldPolicy,
-                    std::unique_ptr<Notifier>& notifier);
+                    std::unique_ptr<Notifier>& notifier,
+                    const ResponseDeadlineFn& responseDeadlineFn = {});
 }  // namespace mongo::insert_listener
 
 #undef MONGO_LOGV2_DEFAULT_COMPONENT
