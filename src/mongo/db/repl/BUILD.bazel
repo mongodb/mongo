@@ -1440,6 +1440,7 @@ mongo_cc_library(
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/index_builds:index_build_attempts",
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/s:sharding_runtime_d",

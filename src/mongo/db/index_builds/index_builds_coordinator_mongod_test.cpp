@@ -10,6 +10,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
+#include "mongo/db/index_builds/index_build_attempts.h"
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/namespace_string.h"
@@ -33,6 +34,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -723,6 +725,92 @@ BSONObj makeFailIndexBuildWithErrorData(const UUID& buildUUID, ErrorCodes::Error
     builder.append("error", static_cast<int>(error));
     buildUUID.appendToBuilder(&builder, "buildUUID");
     return builder.obj();
+}
+
+void waitForAttempts(OperationContext* opCtx,
+                     const UUID& buildUUID,
+                     const boost::optional<int>& expected) {
+    const auto deadline = Date_t::now() + Seconds(10);
+    for (size_t attempts = 1; index_builds::build_attempts::read(opCtx, buildUUID) != expected &&
+         Date_t::now() < deadline;
+         ++attempts) {
+        logAndBackoff(13756601,
+                      logv2::LogComponent::kIndex,
+                      logv2::LogSeverity::Debug(1),
+                      attempts,
+                      "Waiting for the index build attempt count",
+                      "buildUUID"_attr = buildUUID,
+                      "expected"_attr = expected.value_or(-1));
+    }
+    ASSERT_EQ(expected, index_builds::build_attempts::read(opCtx, buildUUID));
+}
+
+// Inserts a count for 'buildUUID', simulating an earlier process that started the build and
+// crashed.
+void preseedAttempts(OperationContext* opCtx, const UUID& buildUUID) {
+    index_builds::build_attempts::createCollection(opCtx);
+    ASSERT_OK(repl::StorageInterface::get(opCtx)->insertDocument(
+        opCtx,
+        NamespaceString::kLocalIndexBuildsNamespace,
+        {BSON("_id" << buildUUID << "numAttemptsAfterUncleanShutdown" << 1), Timestamp()},
+        repl::OpTime::kUninitializedTerm));
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, AttemptCountRemovedWhenBuildCommits) {
+    const auto buildUUID = UUID::gen();
+    auto buildFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                                    _testFooNss.dbName(),
+                                                                    _testFooUUID,
+                                                                    makeSpecs({"a"}, {1}),
+                                                                    buildUUID,
+                                                                    _indexBuildOptions));
+    waitForAttempts(operationContext(), buildUUID, 0);
+
+    ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
+        operationContext(),
+        buildUUID,
+        repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
+    unittest::assertGet(buildFuture.getNoThrow());
+    EXPECT_EQ(boost::none, index_builds::build_attempts::read(operationContext(), buildUUID));
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, AttemptCountRemovedWhenBuildAborts) {
+    const auto buildUUID = UUID::gen();
+    auto buildFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                                    _testFooNss.dbName(),
+                                                                    _testFooUUID,
+                                                                    makeSpecs({"a"}, {1}),
+                                                                    buildUUID,
+                                                                    _indexBuildOptions));
+    waitForAttempts(operationContext(), buildUUID, 0);
+
+    ASSERT_TRUE(_indexBuildsCoord->abortIndexBuildByBuildUUID(
+        operationContext(),
+        buildUUID,
+        IndexBuildAction::kPrimaryAbort,
+        Status{ErrorCodes::IndexBuildAborted, "test abort"}));
+    EXPECT_EQ(boost::none, index_builds::build_attempts::read(operationContext(), buildUUID));
+    EXPECT_EQ(buildFuture.getNoThrow().getStatus(), ErrorCodes::IndexBuildAborted);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, AttemptCountKeptWhenBuildStopsForShutdown) {
+    const auto buildUUID = UUID::gen();
+    preseedAttempts(operationContext(), buildUUID);
+    FailPointEnableBlock failBuild{
+        "failIndexBuildWithError",
+        makeFailIndexBuildWithErrorData(buildUUID, ErrorCodes::InterruptedAtShutdown)};
+
+    auto buildFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                                    _testFooNss.dbName(),
+                                                                    _testFooUUID,
+                                                                    makeSpecs({"a"}, {1}),
+                                                                    buildUUID,
+                                                                    _indexBuildOptions));
+    EXPECT_EQ(buildFuture.getNoThrow().getStatus(), ErrorCodes::InterruptedAtShutdown);
+    // Join the builder thread, so a wrong delete can't land after the check.
+    _indexBuildsCoord->shutdown(operationContext());
+    _indexBuildsCoord = std::make_unique<IndexBuildsCoordinatorMongod>();
+    EXPECT_EQ(1, index_builds::build_attempts::read(operationContext(), buildUUID));
 }
 
 TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsTwoPhaseBuildAfterShutdown) {

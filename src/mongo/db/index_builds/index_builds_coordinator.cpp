@@ -45,6 +45,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -394,6 +395,36 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
  */
 bool shouldCountIndexBuildAttempts(const ReplIndexBuildState& replState) {
     return replState.protocol == IndexBuildProtocol::kTwoPhase && !replState.dbName.isConfigDB();
+}
+
+struct IndexBuildAttemptsLocks {
+    boost::optional<Lock::DBLock> dbLock;
+    boost::optional<Lock::CollectionLock> collLock;
+};
+
+/**
+ * Locks the attempt counts collection. Call before locking 'config.system.indexBuilds', so the
+ * commit or abort locks 'local' then 'config', preserving the existing lock ordering paradigm.
+ * Takes only the locks, since acquiring the collection would pin a catalog snapshot that a
+ * concurrent DDL operation can make stale.
+ */
+void lockIndexBuildAttemptsForCommitOrAbort(OperationContext* opCtx,
+                                            const ReplIndexBuildState& replState,
+                                            IndexBuildAttemptsLocks& locks) {
+    if (shouldCountIndexBuildAttempts(replState)) {
+        locks.dbLock.emplace(opCtx, DatabaseName::kLocal, MODE_IX);
+        locks.collLock.emplace(opCtx, NamespaceString::kLocalIndexBuildsNamespace, MODE_IX);
+    }
+}
+
+/**
+ * Deletes the index build's attempt count in the commit or abort's unit of work.
+ */
+void removeIndexBuildAttemptEntryOnCommitOrAbort(OperationContext* opCtx,
+                                                 const ReplIndexBuildState& replState) {
+    if (shouldCountIndexBuildAttempts(replState)) {
+        index_builds::build_attempts::removeEntry(opCtx, replState.buildUUID);
+    }
 }
 
 /**
@@ -1874,10 +1905,12 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         const auto lockOptions = makeAutoGetCollectionOptions(
             IndexBuildProtocol::kSinglePhase == replState->protocol, desiredIntent);
         boost::optional<AutoGetCollection> autoGetColl;
+        IndexBuildAttemptsLocks attemptsLocks;
         boost::optional<AutoGetCollection> indexBuildEntryColl;
         boost::optional<rss::consensus::IntentGuard> abortIntentGuard;
         try {
             autoGetColl.emplace(opCtx, dbAndUUID, MODE_X, lockOptions);
+            lockIndexBuildAttemptsForCommitOrAbort(opCtx, *replState, attemptsLocks);
             // Same options used here in order to avoid locking the RSTL after having taken the
             // Global lock.
             indexBuildEntryColl.emplace(
@@ -2011,6 +2044,7 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
                       str::stream() << "singlePhase: "
                                     << (IndexBuildProtocol::kSinglePhase == replState->protocol));
             auto onCleanUpFn = [&] {
+                removeIndexBuildAttemptEntryOnCommitOrAbort(opCtx, *replState);
                 onAbortIndexBuild(opCtx, coll->ns(), *replState, coll->isTimeseriesCollection());
             };
             _indexBuildsManager.abortIndexBuild(opCtx, coll, replState->buildUUID, onCleanUpFn);
@@ -2042,8 +2076,9 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
             invariant(IndexBuildProtocol::kTwoPhase == replState->protocol ||
                       IndexBuildProtocol::kPrimaryDriven == replState->protocol);
             replState->onOplogAbort(opCtx, nss);
-            _indexBuildsManager.abortIndexBuild(
-                opCtx, coll, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+            _indexBuildsManager.abortIndexBuild(opCtx, coll, replState->buildUUID, [&] {
+                removeIndexBuildAttemptEntryOnCommitOrAbort(opCtx, *replState);
+            });
             break;
         }
         case IndexBuildAction::kRollbackAbort: {
@@ -3635,6 +3670,8 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                                                    << replState->dbName.toStringForErrorMsg()));
                     }
 
+                    IndexBuildAttemptsLocks attemptsLocks;
+                    lockIndexBuildAttemptsForCommitOrAbort(abortCtx, *replState, attemptsLocks);
                     AutoGetCollection indexBuildEntryColl(
                         abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
                     _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl);
@@ -4242,6 +4279,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         return CommitResult::kLockTimeout;
     }
 
+    IndexBuildAttemptsLocks attemptsLocks;
     boost::optional<AutoGetCollection> indexBuildEntryColl;
 
     auto autoGetCollOptions = auto_get_collection::Options{}.globalLockOptions(
@@ -4249,6 +4287,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                                     ? rss::consensus::IntentRegistry::Intent::Write
                                     : rss::consensus::IntentRegistry::Intent::LocalWrite});
     try {
+        lockIndexBuildAttemptsForCommitOrAbort(opCtx, *replState, attemptsLocks);
         indexBuildEntryColl.emplace(
             opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX, autoGetCollOptions);
     } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
@@ -4340,6 +4379,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
             const bool shouldReplicate =
                 replState->protocol == IndexBuildProtocol::kPrimaryDriven &&
                 IndexBuildAction::kOplogCommit != action;
+            removeIndexBuildAttemptEntryOnCommitOrAbort(opCtx, *replState);
             onCommitIndexBuild(opCtx,
                                collection->ns(),
                                replState,

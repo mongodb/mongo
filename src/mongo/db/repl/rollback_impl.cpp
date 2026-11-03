@@ -16,6 +16,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
+#include "mongo/db/index_builds/index_build_attempts.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
@@ -761,6 +762,8 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
     _listener->onRecoverFromOplog();
 
+    _removeRolledBackIndexBuildAttempts(opCtx);
+
     // Sets the correct post-rollback counts on any collections whose counts changed during the
     // rollback.
     _correctRecordStoreCounts(opCtx);
@@ -770,6 +773,24 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     // collection counts, reconstruct the prepared transactions now, adding on any additional counts
     // to the now corrected record store.
     reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kStableRecovering);
+}
+
+void RollbackImpl::_removeRolledBackIndexBuildAttempts(OperationContext* opCtx) {
+    if (_rolledBackIndexBuilds.empty()) {
+        return;
+    }
+    writeConflictRetry(opCtx,
+                       "removeRolledBackIndexBuildAttempts",
+                       NamespaceString::kLocalIndexBuildsNamespace,
+                       [&] {
+                           WriteUnitOfWork wuow(opCtx);
+                           index_builds::build_attempts::removeEntries(opCtx,
+                                                                       _rolledBackIndexBuilds);
+                           wuow.commit();
+                       });
+    LOGV2(13756602,
+          "Removed the index build attempt counts of index builds whose start was rolled back",
+          "buildUUIDs"_attr = _rolledBackIndexBuilds);
 }
 
 void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
@@ -1149,6 +1170,12 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
                 }
             }
             return Status::OK();
+        } else if (oplogEntry.getCommandType() == OplogEntry::CommandType::kStartIndexBuild) {
+            auto buildUUID = UUID::parse(oplogEntry.getObject()["indexBuildUUID"]);
+            if (!buildUUID.isOK()) {
+                return buildUUID.getStatus().withContext("Error parsing 'indexBuildUUID'");
+            }
+            _rolledBackIndexBuilds.push_back(buildUUID.getValue());
         }
     }
 

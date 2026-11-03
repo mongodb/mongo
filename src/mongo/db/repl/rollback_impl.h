@@ -412,6 +412,11 @@ private:
     void _correctRecordStoreCounts(OperationContext* opCtx);
 
     /**
+     * Deletes the attempt counts of index builds whose startIndexBuild entry was rolled back.
+     */
+    void _removeRolledBackIndexBuildAttempts(OperationContext* opCtx);
+
+    /**
      * Called after we have successfully recovered to the stable timestamp and recovered from the
      * oplog. Triggers the replication rollback OpObserver method, notifying other server subsystems
      * that a rollback has occurred.
@@ -503,6 +508,9 @@ private:
     // Maintains the count of the record store pointed to by the UUID after we recover from the
     // oplog.
     stdx::unordered_map<UUID, long long, UUID::Hash> _newCounts;  // (N)
+
+    // Index builds whose startIndexBuild oplog entry is being rolled back.
+    std::vector<UUID> _rolledBackIndexBuilds;  // (N)
 };
 
 }  // namespace repl

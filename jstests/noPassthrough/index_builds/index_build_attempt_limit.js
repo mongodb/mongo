@@ -151,8 +151,6 @@ function attemptsAfterUncleanShutdown(node, buildUUID) {
 }
 
 function assertExceededLimit(node, buildUUID) {
-    // Each of the kLimit + 1 attempts ended in a crash.
-    assert.eq(kLimit + 1, attemptsAfterUncleanShutdown(node, buildUUID));
     assert.eq(
         1,
         assert.commandWorked(node.adminCommand({serverStatus: 1})).indexBuilds.exceededAttemptLimit,
@@ -191,6 +189,8 @@ describe("A node that keeps crashing during an index build's scan phase", functi
         IndexBuildTest.assertIndexesSoon(testColl(secondary), 1, ["_id_"]);
         assertExceededLimit(secondary, buildUUID);
         assert.eq(0, pausedAttempts(secondary));
+        IndexBuildTest.assertIndexBuildAttemptsRemovedSoon(primary, buildUUID);
+        IndexBuildTest.assertIndexBuildAttemptsRemovedSoon(secondary, buildUUID);
     });
 
     it("build is aborted on every node when triggered by a primary", () => {
@@ -217,6 +217,7 @@ describe("A node that keeps crashing during an index build's scan phase", functi
         for (const node of this.rst.nodes) {
             node.setSecondaryOk();
             IndexBuildTest.assertIndexesSoon(testColl(node), 1, ["_id_"]);
+            IndexBuildTest.assertIndexBuildAttemptsRemovedSoon(node, buildUUID);
         }
         assertExceededLimit(primary, buildUUID);
         assert.eq(0, pausedAttempts(primary));
@@ -259,6 +260,8 @@ describe("A node that keeps crashing during an index build's scan phase", functi
             assert.commandWorked(secondary.adminCommand({serverStatus: 1})).indexBuilds
                 .exceededAttemptLimit,
         );
+        IndexBuildTest.assertIndexBuildAttemptsRemovedSoon(primary, buildUUID);
+        IndexBuildTest.assertIndexBuildAttemptsRemovedSoon(secondary, buildUUID);
     });
 
     it("secondary skips scan when the primary already aborted the build", () => {
@@ -310,6 +313,8 @@ describe("A node that keeps crashing during an index build's scan phase", functi
         restartServerReplication(node);
         IndexBuildTest.assertIndexesSoon(testColl(node), 1, ["_id_"]);
         assert.eq(0, pausedAttempts(node));
+        IndexBuildTest.assertIndexBuildAttemptsRemovedSoon(primary, buildUUID);
+        IndexBuildTest.assertIndexBuildAttemptsRemovedSoon(node, buildUUID);
     });
 
     it("secondary finishes the build when the primary has committed it", () => {
@@ -346,5 +351,6 @@ describe("A node that keeps crashing during an index build's scan phase", functi
 
         restartServerReplication(node);
         IndexBuildTest.assertIndexesSoon(testColl(node), 2, ["_id_", "a_1"]);
+        IndexBuildTest.assertIndexBuildAttemptsRemovedSoon(node, buildUUID);
     });
 });
