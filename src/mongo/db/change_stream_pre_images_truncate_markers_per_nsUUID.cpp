@@ -142,8 +142,9 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
     uint64_t randomSamplesPerMarker) {
     std::deque<CollectionTruncateMarkers::Marker> wholeMarkers;
     const auto numSamples = samples.size();
-    invariant(numSamples > 0);
-    invariant(randomSamplesPerMarker > 0);
+    tassert(13836204, "Pre-image truncate markers require at least one sample", numSamples > 0);
+    tassert(
+        13836205, "randomSamplesPerMarker must be greater than zero", randomSamplesPerMarker > 0);
     for (size_t i = randomSamplesPerMarker - 1; i < numSamples; i = i + randomSamplesPerMarker) {
         const auto& [id, wallTime] = samples[i];
         LOGV2_DEBUG(7658602,

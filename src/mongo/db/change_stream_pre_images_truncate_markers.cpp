@@ -179,8 +179,8 @@ std::unique_ptr<pre_image_marker_initialization_internal::SamplingStrategy> make
 PreImagesTruncateMarkers::PreImagesTruncateMarkers(OperationContext* opCtx,
                                                    const CollectionAcquisition& preImagesCollection)
     : _preImagesCollectionUUID{preImagesCollection.uuid()} {
-    invariant(opCtx != nullptr);
-    invariant(preImagesCollection.exists());
+    tassert(13836206, "OperationContext must not be null", opCtx != nullptr);
+    tassert(13836207, "Pre-images collection must exist", preImagesCollection.exists());
 
     auto samplingStrategy = makeSamplingStrategy(opCtx);
     tassert(11423600,

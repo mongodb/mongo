@@ -56,9 +56,11 @@ stdx::unordered_map<UUID, RecordIdAndWallTime, UUID::Hash> sampleLastRecordPerNs
         // positions it exactly at the highest record of the previous collection UUID.
         record = cursor->seek(minRecordIdForCurrentNsUUID,
                               SeekableRecordCursor::BoundInclusion::kExclude);
-        invariant(!record ||
-                  currentNsUUID !=
-                      change_stream_pre_image_id_util::getPreImageNsUUID(record->data.toBson()));
+        tassert(13836208,
+                "Record after exclusive reverse seek must not belong to the same nsUUID",
+                !record ||
+                    currentNsUUID !=
+                        change_stream_pre_image_id_util::getPreImageNsUUID(record->data.toBson()));
     }
     return lastRecords;
 }
@@ -98,7 +100,9 @@ void SamplingStrategy::installMarkersInMapFromSamples(
         // 'ConcurrentSharedValuesMap<K, V>' does not provide 'insert()' or 'emplace()' methods.
         // Here it's guaranteed that no entry for 'nsUUID' exists in the map when calling
         // 'getOrEmplace()'.
-        invariant(markersMap.find(nsUUID) == nullptr);
+        tassert(13836209,
+                "Expecting no pre-existing truncate markers for nsUUID",
+                markersMap.find(nsUUID) == nullptr);
         markersMap.getOrEmplace(nsUUID, nsUUID, std::move(initialSetOfMarkers), minBytesPerMarker);
     }
 
@@ -150,7 +154,7 @@ void SamplingStrategy::distributeUnaccountedRecordsAndBytes(
     const auto unaccountedBytesPerNsUUID = unaccountedBytes / numNsUUIDs;
     for (const auto& nsUUID : nsUUIDs) {
         auto nsUUIDMarkers = markersMap.find(nsUUID);
-        invariant(nsUUIDMarkers);
+        tassert(13836210, "Expecting truncate markers to exist for nsUUID", nsUUIDMarkers);
         nsUUIDMarkers->updateMarkers(
             unaccountedBytesPerNsUUID, RecordId{}, Date_t{}, unaccountedRecordsPerNsUUID);
     }

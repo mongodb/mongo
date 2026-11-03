@@ -48,7 +48,7 @@ Timestamp getPreImageTimestamp(const RecordId& rid) {
     auto ridBSON = ridAsNestedBSON.getObjectField(kTopLevelFieldName);
 
     auto tsElem = ridBSON.getField(ChangeStreamPreImageId::kTsFieldName);
-    invariant(!tsElem.eoo());
+    tassert(13836200, "Pre-image RecordId must contain a 'ts' field", !tsElem.eoo());
     return tsElem.timestamp();
 }
 
@@ -61,10 +61,11 @@ std::pair<Timestamp, int64_t> getPreImageTimestampAndApplyOpsIndex(const RecordI
     auto ridBSON = ridAsNestedBSON.getObjectField(kTopLevelFieldName);
 
     auto tsElem = ridBSON.getField(ChangeStreamPreImageId::kTsFieldName);
-    invariant(!tsElem.eoo());
+    tassert(13836201, "Pre-image RecordId must contain a 'ts' field", !tsElem.eoo());
 
     auto applyOpsElem = ridBSON.getField(ChangeStreamPreImageId::kApplyOpsIndexFieldName);
-    invariant(!applyOpsElem.eoo());
+    tassert(
+        13836202, "Pre-image RecordId must contain an 'applyOpsIndex' field", !applyOpsElem.eoo());
 
     return {tsElem.timestamp(), applyOpsElem.numberLong()};
 }
@@ -77,7 +78,7 @@ uint128_t timestampAndApplyOpsIndexToNumber(const RecordId& rid) {
 uint128_t timestampAndApplyOpsIndexToNumber(Timestamp ts, int64_t applyOpsIndex) {
     // 'applyOpsIndex' cannot be negative. It is stored as an int64_t inside the records,
     // but must have a value >= 0.
-    invariant(applyOpsIndex >= 0);
+    tassert(13836203, "Pre-image applyOpsIndex must be non-negative", applyOpsIndex >= 0);
 
     // The higher 65 bits of the resulting uint128_t value are the timestamp bits. The highest bit
     // is always cleared.

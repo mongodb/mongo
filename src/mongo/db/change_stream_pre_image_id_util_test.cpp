@@ -180,8 +180,8 @@ TEST(ChangeStreamPreImageIdUtilTest, TimestampAndApplyOpsIndexNumericOverflows) 
 
 DEATH_TEST_REGEX(ChangeStreamPreImageIdUtilDeathTest,
                  TimestampAndApplyOpsNumberConversionNegativeApplyOpsIndex,
-                 "invariant.*failure") {
-    // Triggers an invariant failure.
+                 "Tripwire assertion.*13836203") {
+    // Triggers a tripwire assertion failure.
     timestampAndApplyOpsIndexToNumber(Timestamp(), -1);
 }
 

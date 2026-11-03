@@ -23,14 +23,16 @@ void sampleRangeEquallyWithCursor(SeekableRecordCursor& cursor,
                                   uint64_t numSamples,
                                   std::vector<RecordIdAndWallTime>& samples) {
     // Sample size needs at least 1.
-    invariant(numSamples >= 1);
+    tassert(13836211, "numSamples must be at least 1", numSamples >= 1);
 
     // Convert lowest and highest values into uint128_t values, for easy arithmetic.
     const auto lowest =
         change_stream_pre_image_id_util::timestampAndApplyOpsIndexToNumber(firstRidAndWall.id);
     const auto highest =
         change_stream_pre_image_id_util::timestampAndApplyOpsIndexToNumber(lastRidAndWall.id);
-    invariant(lowest <= highest);
+    tassert(13836212,
+            "Expected lowest sample value not to exceed highest sample value",
+            lowest <= highest);
 
     const auto distance = highest - lowest;
 
@@ -128,11 +130,13 @@ std::vector<RecordIdAndWallTime> EqualStepSamplingStrategy::sampleNSUUIDRangeEqu
 
         // Expect to see at least one record here for the 'nsUUID' value, as we previously have
         // gotten an entry for this 'nsUUID' value.
-        invariant(record.has_value());
+        tassert(13836213, "Expected at least one pre-image record for nsUUID", record.has_value());
         const auto firstRidAndWall =
             PreImagesTruncateMarkersPerNsUUID::getRecordIdAndWallTime(*record);
         const BSONObj preImageObj = record->data.toBson();
-        invariant(nsUUID == change_stream_pre_image_id_util::getPreImageNsUUID(preImageObj));
+        tassert(13836214,
+                "Expected record to belong to the requested nsUUID",
+                nsUUID == change_stream_pre_image_id_util::getPreImageNsUUID(preImageObj));
 
         if (firstRidAndWall.id != lastRidAndWall.id) {
             // The record we just read is not identical to the record with the highest Timestamp for
@@ -171,8 +175,10 @@ std::vector<RecordIdAndWallTime> EqualStepSamplingStrategy::sampleNSUUIDRangeEqu
             return ret;
         }());
 
-    invariant(samples.size() > 0);
-    invariant(samples.size() <= numSamples);
+    tassert(13836215, "Expected at least one sample", samples.size() > 0);
+    tassert(13836216,
+            "Expected number of samples not to exceed numSamples",
+            samples.size() <= numSamples);
 
     // Ensure sortedness of the entries in 'samples' for this 'nsUUID' value.
     dassert(std::is_sorted(
@@ -251,7 +257,7 @@ bool EqualStepSamplingStrategy::performSampling(OperationContext* opCtx,
     // Multiply the number of records by an arbitrarily-chosen average record size here to get
     // to a data size estimate.
     int64_t dataSize = numRecords * kRecordSizeEstimate;
-    invariant(dataSize > 0);
+    tassert(13836217, "Expected estimated data size to be positive", dataSize > 0);
     const auto minBytesPerMarker = _minBytesPerMarker;
     const double avgRecordSize = static_cast<double>(dataSize) / static_cast<double>(numRecords);
     const double estimatedRecordsPerMarker = std::ceil(minBytesPerMarker / avgRecordSize);
