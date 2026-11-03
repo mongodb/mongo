@@ -4,7 +4,6 @@
 #include "mongo/db/query/query_stats/rate_limiting.h"
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/util/clock_source.h"
 
 #include <climits>
@@ -89,17 +88,6 @@ bool RateLimiter::handle() {
 }
 
 CollectDecision RateLimiter::handle(OperationContext* opCtx) {
-    if (const auto* samplingRateKnob = _samplingRateKnob.load()) {
-        // A per-query sampling-rate override (via query settings) takes precedence over the
-        // cluster-wide policy; the decision is made at the overridden rate. Query stats
-        // collection remains globally enabled, so a rejected override counts as rate limited.
-        const auto& knobConfig = QueryKnobConfiguration::get(opCtx);
-        if (knobConfig.getKnobSource(samplingRateKnob->id) == KnobSource::kQuerySettings) {
-            return handle(knobConfig.get(*samplingRateKnob)) ? CollectDecision::kCollected
-                                                             : CollectDecision::kRateLimited;
-        }
-    }
-
     // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
     // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
     const auto samplingRate = getSamplingRate();

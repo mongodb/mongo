@@ -80,14 +80,6 @@ public:
     // directly are declared here.
 
     /**
-     * Returns where the value of 'id' came from for this operation. A source of
-     * KnobSource::kQuerySettings means the value was overridden via
-     * 'querySettings.queryKnobs' (or the query framework control) rather than a setParameter or
-     * the compiled-in default.
-     */
-    KnobSource getKnobSource(QueryKnobId id) const;
-
-    /**
      * Returns true if internal query framework control knob is set to 'forceClassicEngine', false
      * otherwise.
      */

@@ -130,40 +130,4 @@ TEST_F(RateLimiterOpCtxTest, HandleOpCtxWithoutKnobConsultsClusterPolicy) {
     ASSERT_EQ(rl.handle(opCtx.get()), CollectDecision::kCollected);
 }
 
-TEST_F(RateLimiterOpCtxTest, HandleOpCtxOverrideTakesPrecedenceOverClusterPolicy) {
-    auto opCtx = makeOperationContext();
-
-    RateLimiter rl;
-    rl.setSamplingRateKnob(&query_knobs::kQueryStatsSampleRate);
-    rl.configureSampleBased(0 /* 0% */, 0 /* seed */);
-
-    // No query settings: the cluster-wide policy decides (disabled at rate 0).
-    ASSERT_EQ(rl.handle(opCtx.get()), CollectDecision::kDisabled);
-
-    // A full-rate override collects even though the cluster-wide policy would disable.
-    query_settings::QuerySettingsGuardForTest collectGuard{
-        opCtx.get(), BSON("queryKnobs" << BSON("queryStatsSampleRate" << 1.0))};
-    ASSERT_EQ(rl.handle(opCtx.get()), CollectDecision::kCollected);
-
-    // A zero-rate override rejects, and counts as rate limited (collection stays enabled). The
-    // knob configuration is frozen at first resolution for an operation's lifetime, so reset it
-    // to observe the swapped guard's settings.
-    QueryKnobConfiguration::reset_forTest(opCtx.get());
-    query_settings::QuerySettingsGuardForTest limitGuard{
-        opCtx.get(), BSON("queryKnobs" << BSON("queryStatsSampleRate" << 0.0))};
-    ASSERT_EQ(rl.handle(opCtx.get()), CollectDecision::kRateLimited);
-}
-
-TEST_F(RateLimiterOpCtxTest, HandleOpCtxWithoutKnobIgnoresSamplingRateOverride) {
-    auto opCtx = makeOperationContext();
-
-    // A limiter without a knob (the write-command limiter until SERVER-134995) must not consult
-    // query settings, even when settings carry the sampling-rate knob.
-    RateLimiter rl;
-    rl.configureSampleBased(1000 /* 100% */, 0 /* seed */);
-    query_settings::QuerySettingsGuardForTest settingsGuard{
-        opCtx.get(), BSON("queryKnobs" << BSON("queryStatsSampleRate" << 0.0))};
-    ASSERT_EQ(rl.handle(opCtx.get()), CollectDecision::kCollected);
-}
-
 }  // namespace mongo
