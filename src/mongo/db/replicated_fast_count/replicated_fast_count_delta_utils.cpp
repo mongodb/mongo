@@ -79,8 +79,10 @@ int32_t computeCountDeltaForOp(repl::OpTypeEnum opType) {
     }
 }
 
-// Extracts the size and count delta from a truncateRange oplog entry.
-CollectionSizeCount extractSizeCountDeltaForTruncateRange(const repl::OplogEntry& entry) {
+// Only oplog truncation contributes to replicated metadata; other collections' truncations are
+// not tracked by replicated fast count.
+boost::optional<CollectionSizeCount> extractSizeCountDeltaForTruncateRange(
+    const repl::OplogEntry& entry) {
     invariant(entry.getCommandType() == repl::OplogEntry::CommandType::kTruncateRange);
 
     massert(12117500,
@@ -89,6 +91,9 @@ CollectionSizeCount extractSizeCountDeltaForTruncateRange(const repl::OplogEntry
             entry.getUuid().has_value());
 
     const auto truncateRangeEntry = TruncateRangeOplogEntry::parse(entry.getObject());
+    if (!truncateRangeEntry.getTruncateRange().isOplog()) {
+        return boost::none;
+    }
     return CollectionSizeCount{.size = -truncateRangeEntry.getBytesDeleted(),
                                .count = -truncateRangeEntry.getDocsDeleted()};
 }
@@ -320,8 +325,9 @@ int extractReplicatedMetadataDeltasForCommitTxn(
 }  // namespace
 
 // Processes a single oplog entry and accumulates its size/count contribution into
-// 'replicatedMetadataDeltasOut'. Handles applyOps (including nested), truncateRange,
-// commitTransaction, and CRUD operations.
+// 'replicatedMetadataDeltasOut'. Handles applyOps (including nested), commitTransaction, CRUD
+// operations, and truncateRange operations targeting the oplog. Non-oplog truncateRange operations
+// are ignored.
 int processOplogEntry(const repl::OplogEntry& entry,
                       ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction) {
@@ -344,6 +350,9 @@ int processOplogEntry(const repl::OplogEntry& entry,
         }
         case repl::OplogEntry::CommandType::kTruncateRange: {
             const auto delta = extractSizeCountDeltaForTruncateRange(entry);
+            if (!delta) {
+                return 0;
+            }
             // Truncation returns an estimate on the number of records and bytes that were removed.
             // We accept that size and count might be slightly off after performing truncation.
             //
@@ -352,7 +361,7 @@ int processOplogEntry(const repl::OplogEntry& entry,
             // persisted for this collection.
             recordCollectionReplicatedMetadataDelta(
                 *entryUuid,
-                CollectionReplicatedMetadata{.sizeCount = delta, .hash = boost::none},
+                CollectionReplicatedMetadata{.sizeCount = *delta, .hash = boost::none},
                 replicatedMetadataDeltasOut);
             return 1;
         }

@@ -62,8 +62,9 @@ int extractReplicatedMetadataDeltasForApplyOps(
 
 /**
  * Processes a single oplog entry and accumulates its size/count contribution into
- * 'replicatedMetadataDeltasOut'. Handles applyOps (including nested), truncateRange,
- * commitTransaction, and CRUD operations. Returns the number of size/count entries processed.
+ * 'replicatedMetadataDeltasOut'. Handles applyOps (including nested), commitTransaction, CRUD
+ * operations, and truncateRange operations targeting the oplog. Non-oplog truncateRange operations
+ * are ignored. Returns the number of size/count entries processed.
  */
 int processOplogEntry(const repl::OplogEntry& entry,
                       ReplicatedMetadataDeltas& replicatedMetadataDeltasOut);

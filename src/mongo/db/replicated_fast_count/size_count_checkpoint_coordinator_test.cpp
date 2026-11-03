@@ -395,6 +395,10 @@ protected:
         .nss = NamespaceString::createNamespaceString_forTest("coordinator_hash_test", "collB"),
         .uuid = UUID::gen(),
     };
+    const test_helpers::NsAndUUID _preimages{
+        .nss = NamespaceString::kChangeStreamPreImagesNamespace,
+        .uuid = UUID::gen(),
+    };
 
     OperationContext* _opCtx = nullptr;
     std::unique_ptr<SizeCountStore> _sizeCountStore;
@@ -832,23 +836,165 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, DropRemovesPersistedHashAndRecrea
     EXPECT_EQ(expectedEntry, *entry);
 }
 
-// A `truncateRange` does not carry the hashes of the records it removed, so their
-// contributions cannot be folded back out and the persisted hash is invalidated.
-TEST_F(SizeCountCheckpointCoordinatorHashTest, TruncateRangeInvalidatesPersistedHash) {
-    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 100 /*sizeDelta=*/, kHashA);
+TEST_F(SizeCountCheckpointCoordinatorHashTest, OplogTruncateRangeUpdatesPersistedMetadata) {
+    const UUID oplogId = oplogUuid();
+    test_helpers::insertSizeCountEntry(
+        _opCtx,
+        *_sizeCountStore,
+        oplogId,
+        SizeCountStore::Entry{.timestamp = nextTs(), .size = 1000, .count = 10, .hash = kHashA});
+    const auto before = readSizeCount(oplogId);
+    ASSERT_TRUE(before.has_value());
+    ASSERT_EQ(before->hash, kHashA);
+    // Seeding the metadata also logs a container write, whose physical oplog bytes are counted.
+    const auto setupSizeCount =
+        test_helpers::scanForAccurateSizeCount(_opCtx, NamespaceString::kRsOplogNamespace);
+    const auto truncate = test_helpers::makeTruncateRangeOplogEntry(
+        nextTs(),
+        {.nss = NamespaceString::kRsOplogNamespace, .uuid = oplogId},
+        /*bytesDeleted=*/120,
+        /*docsDeleted=*/3);
+    writeOplogEntry(truncate);
 
-    flush();
+    const Timestamp validAsOf = flush();
+
+    const int64_t writtenBytes = truncate.getEntry().toBSON().objsize() +
+        test_helpers::makeWatermarkOplogEntry(validAsOf).getEntry().toBSON().objsize();
+    const SizeCountStore::Entry expected{.timestamp = validAsOf,
+                                         .size = 1000 + setupSizeCount.size + writtenBytes - 120,
+                                         .count = 10 + setupSizeCount.count + 2 - 3,
+                                         .hash = boost::none};
+    const auto persisted = readSizeCount(oplogId);
+    ASSERT_TRUE(persisted.has_value());
+    EXPECT_EQ(*persisted, expected);
+}
+
+TEST_F(SizeCountCheckpointCoordinatorHashTest, PreimagesTruncateRangeDoesNotCreateCheckpointEntry) {
+    const auto setupSizeCount =
+        test_helpers::scanForAccurateSizeCount(_opCtx, NamespaceString::kRsOplogNamespace);
+    const auto truncate = test_helpers::makeTruncateRangeOplogEntry(
+        nextTs(), _preimages, /*bytesDeleted=*/40, /*docsDeleted=*/1);
+    writeOplogEntry(truncate);
+
+    const Timestamp validAsOf = flush();
+
+    EXPECT_FALSE(readSizeCount(_preimages.uuid).has_value());
+    // Only the physical truncate and watermark records count; nothing is subtracted.
+    const int64_t writtenBytes = truncate.getEntry().toBSON().objsize() +
+        test_helpers::makeWatermarkOplogEntry(validAsOf).getEntry().toBSON().objsize();
+    const auto oplogEntry = readSizeCount(oplogUuid());
+    ASSERT_TRUE(oplogEntry.has_value());
+    EXPECT_EQ(oplogEntry->size, setupSizeCount.size + writtenBytes);
+    EXPECT_EQ(oplogEntry->count, setupSizeCount.count + 2);
+    EXPECT_EQ(oplogEntry->timestamp, validAsOf);
+}
+
+TEST_F(SizeCountCheckpointCoordinatorHashTest, OplogTruncateRangeWithUserCRUD) {
+    const auto setupSizeCount =
+        test_helpers::scanForAccurateSizeCount(_opCtx, NamespaceString::kRsOplogNamespace);
+    const std::vector<repl::OplogEntry> entries{
+        test_helpers::makeOplogEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 100, kHashA),
+        test_helpers::makeOplogEntry(nextTs(), _collA, repl::OpTypeEnum::kUpdate, -20, kHashB),
+        test_helpers::makeOplogEntry(nextTs(), _collA, repl::OpTypeEnum::kDelete, -30, kHashC),
+        test_helpers::makeTruncateRangeOplogEntry(
+            nextTs(),
+            {.nss = NamespaceString::kRsOplogNamespace, .uuid = oplogUuid()},
+            /*bytesDeleted=*/120,
+            /*docsDeleted=*/3),
+    };
+    int64_t writtenBytes = 0;
+    for (const auto& entry : entries) {
+        writeOplogEntry(entry);
+        writtenBytes += entry.getEntry().toBSON().objsize();
+    }
+
+    const Timestamp validAsOf = flush();
+    writtenBytes += test_helpers::makeWatermarkOplogEntry(validAsOf).getEntry().toBSON().objsize();
+
+    const auto userEntry = readSizeCount(_collA.uuid);
+    ASSERT_TRUE(userEntry.has_value());
+    EXPECT_EQ(
+        *userEntry,
+        (SizeCountStore::Entry{
+            .timestamp = validAsOf, .size = 50, .count = 0, .hash = kHashA ^ kHashB ^ kHashC}));
+    const auto oplogEntry = readSizeCount(oplogUuid());
+    ASSERT_TRUE(oplogEntry.has_value());
+    EXPECT_EQ(oplogEntry->size, setupSizeCount.size + writtenBytes - 120);
+    EXPECT_EQ(oplogEntry->count, setupSizeCount.count + 5 - 3);
+    EXPECT_EQ(oplogEntry->timestamp, validAsOf);
+}
+
+TEST_F(SizeCountCheckpointCoordinatorHashTest, PreimagesTruncateRangeWithUserCRUD) {
+    const auto setupSizeCount =
+        test_helpers::scanForAccurateSizeCount(_opCtx, NamespaceString::kRsOplogNamespace);
+    const std::vector<repl::OplogEntry> entries{
+        test_helpers::makeOplogEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 100, kHashA),
+        test_helpers::makeOplogEntry(nextTs(), _collA, repl::OpTypeEnum::kUpdate, -20, kHashB),
+        test_helpers::makeOplogEntry(nextTs(), _collA, repl::OpTypeEnum::kDelete, -30, kHashC),
+        test_helpers::makeTruncateRangeOplogEntry(
+            nextTs(), _preimages, /*bytesDeleted=*/120, /*docsDeleted=*/3),
+    };
+    int64_t writtenBytes = 0;
+    for (const auto& entry : entries) {
+        writeOplogEntry(entry);
+        writtenBytes += entry.getEntry().toBSON().objsize();
+    }
+
+    const Timestamp validAsOf = flush();
+    writtenBytes += test_helpers::makeWatermarkOplogEntry(validAsOf).getEntry().toBSON().objsize();
+
+    const auto userEntry = readSizeCount(_collA.uuid);
+    ASSERT_TRUE(userEntry.has_value());
+    EXPECT_EQ(
+        *userEntry,
+        (SizeCountStore::Entry{
+            .timestamp = validAsOf, .size = 50, .count = 0, .hash = kHashA ^ kHashB ^ kHashC}));
+    EXPECT_FALSE(readSizeCount(_preimages.uuid).has_value());
+    const auto oplogEntry = readSizeCount(oplogUuid());
+    ASSERT_TRUE(oplogEntry.has_value());
+    EXPECT_EQ(oplogEntry->size, setupSizeCount.size + writtenBytes);
+    EXPECT_EQ(oplogEntry->count, setupSizeCount.count + 5);
+    EXPECT_EQ(oplogEntry->timestamp, validAsOf);
+}
+
+TEST_F(SizeCountCheckpointCoordinatorHashTest, OplogTruncateRangeLeavesUserMetadataUnchanged) {
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 100 /*sizeDelta=*/, kHashA);
+    const Timestamp userValidAsOf = flush();
 
     writeOplogEntry(test_helpers::makeTruncateRangeOplogEntry(
-        nextTs(), _collA, 40 /*bytesDeleted=*/, 1 /*docsDeleted=*/));
+        nextTs(),
+        {.nss = NamespaceString::kRsOplogNamespace, .uuid = oplogUuid()},
+        /*bytesDeleted=*/120,
+        /*docsDeleted=*/3));
+    const Timestamp validAsOf = flush();
 
-    const Timestamp expectedValidAsOf = flush();
+    const auto userEntry = readSizeCount(_collA.uuid);
+    ASSERT_TRUE(userEntry.has_value());
+    EXPECT_EQ(*userEntry,
+              (SizeCountStore::Entry{
+                  .timestamp = userValidAsOf, .size = 100, .count = 1, .hash = kHashA}));
+    const auto oplogEntry = readSizeCount(oplogUuid());
+    ASSERT_TRUE(oplogEntry.has_value());
+    EXPECT_EQ(oplogEntry->timestamp, validAsOf);
+}
 
-    const SizeCountStore::Entry expectedEntry{
-        .timestamp = expectedValidAsOf, .size = 60, .count = 0, .hash = boost::none};
-    const auto entry = readSizeCount(_collA.uuid);
-    ASSERT_TRUE(entry.has_value());
-    EXPECT_EQ(expectedEntry, *entry);
+TEST_F(SizeCountCheckpointCoordinatorHashTest, PreimagesTruncateRangeLeavesUserMetadataUnchanged) {
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 100 /*sizeDelta=*/, kHashA);
+    const Timestamp userValidAsOf = flush();
+
+    writeOplogEntry(test_helpers::makeTruncateRangeOplogEntry(
+        nextTs(), _preimages, /*bytesDeleted=*/120, /*docsDeleted=*/3));
+    const Timestamp validAsOf = flush();
+
+    const auto userEntry = readSizeCount(_collA.uuid);
+    ASSERT_TRUE(userEntry.has_value());
+    EXPECT_EQ(*userEntry,
+              (SizeCountStore::Entry{
+                  .timestamp = userValidAsOf, .size = 100, .count = 1, .hash = kHashA}));
+    EXPECT_FALSE(readSizeCount(_preimages.uuid).has_value());
+    const auto oplogEntry = readSizeCount(oplogUuid());
+    ASSERT_TRUE(oplogEntry.has_value());
+    EXPECT_EQ(oplogEntry->timestamp, validAsOf);
 }
 
 // An imported collection's existing documents were never hashed, so the entry it creates

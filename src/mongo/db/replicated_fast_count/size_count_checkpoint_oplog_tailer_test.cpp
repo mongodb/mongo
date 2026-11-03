@@ -47,6 +47,27 @@ protected:
         return oplogRead.getCollection()->uuid();
     }
 
+    void assertTruncateRangeDelta(const NsAndUUID& target, CollectionSizeCount expectedDelta) {
+        const auto oplogId = oplogUuid();
+        writeToOplog(_opCtx,
+                     test_helpers::makeTruncateRangeOplogEntry(
+                         Timestamp(1, 1), target, /*bytesDeleted=*/150, /*docsDeleted=*/4));
+        writeToOplog(_opCtx, makeWatermarkOplogEntry(Timestamp(1, 2)));
+
+        SizeCountCheckpointBuffer buffer(oplogId, /*lastBufferedRid=*/boost::none);
+        bufferNewOplogEntries(_opCtx, buffer);
+
+        const auto result = buffer.checkoutForFlush();
+        ASSERT_TRUE(result);
+        EXPECT_EQ(result->lastTimestamp, Timestamp(1, 2));
+        ASSERT_EQ(result->deltas.size(), 1);
+        ASSERT_TRUE(result->deltas.contains(oplogId));
+        const auto expectedSizeCount =
+            scanForAccurateSizeCount(_opCtx, NamespaceString::kRsOplogNamespace) + expectedDelta;
+        EXPECT_EQ(result->deltas.at(oplogId).metadata.sizeCount, expectedSizeCount);
+        EXPECT_FALSE(result->deltas.at(oplogId).metadata.hash);
+    }
+
     OperationContext* _opCtx = nullptr;
     const NsAndUUID _collA{
         .nss = NamespaceString::createNamespaceString_forTest("tailer_test", "collA"),
@@ -100,6 +121,17 @@ TEST_F(OplogTailerTest, ScanFromBeginningOnEmptyOplogMakesNoProgress) {
     SizeCountCheckpointBuffer buffer(oplogUuid(), /*lastBufferedRid=*/boost::none);
     bufferNewOplogEntries(_opCtx, buffer);
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());
+}
+
+TEST_F(OplogTailerTest, PreimagesTruncateRangeDoesNotContributeDeltas) {
+    const NsAndUUID preimages{.nss = NamespaceString::kChangeStreamPreImagesNamespace,
+                              .uuid = UUID::gen()};
+    assertTruncateRangeDelta(preimages, CollectionSizeCount{.size = 0, .count = 0});
+}
+
+TEST_F(OplogTailerTest, OplogTruncateRangeContributesNegativeDeltas) {
+    const NsAndUUID oplog{.nss = NamespaceString::kRsOplogNamespace, .uuid = oplogUuid()};
+    assertTruncateRangeDelta(oplog, CollectionSizeCount{.size = -150, .count = -4});
 }
 
 TEST_F(OplogTailerTest, TimestampAfterLastBufferedRidDoesNotDoubleCount) {

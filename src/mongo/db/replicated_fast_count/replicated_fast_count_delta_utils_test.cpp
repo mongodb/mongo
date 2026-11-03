@@ -469,6 +469,26 @@ TEST_F(ExtractReplicatedMetadataTest, NoMetadataForIneligibleNamespaceCarryingHa
     EXPECT_TRUE(deltas.empty());
 }
 
+TEST_F(ExtractReplicatedMetadataTest, NoMetadataForPreimagesCollectionCRUD) {
+    // The change stream pre-images collection is implicitly replicated, so even metadata-bearing
+    // CRUD on it must not opt it into tracking.
+    const auto preimagesNss = NamespaceString::kChangeStreamPreImagesNamespace;
+    ASSERT_TRUE(preimagesNss.isImplicitlyReplicated());
+    ASSERT_FALSE(isReplicatedFastCountEligible(preimagesNss));
+    const UUID preimagesUuid = UUID::gen();
+
+    ReplicatedMetadataDeltas deltas;
+    for (const auto& [opType, sizeDelta] : {std::pair{repl::OpTypeEnum::kInsert, 100},
+                                            std::pair{repl::OpTypeEnum::kUpdate, 20},
+                                            std::pair{repl::OpTypeEnum::kDelete, -120}}) {
+        const auto op = makeOplogEntryWithSizeMetadata(
+            preimagesNss, opType, sizeDelta, int64_t{0x0123456789abcdef}, preimagesUuid);
+        EXPECT_FALSE(extractReplicatedMetadataForOp(op).has_value());
+        EXPECT_EQ(0, processOplogEntry(op, deltas));
+        EXPECT_TRUE(deltas.empty());
+    }
+}
+
 TEST_F(ExtractReplicatedMetadataTest, OpWithoutHashInvalidatesAccumulatedHash) {
     // A collection accumulates a hash, then an operation that carries none arrives. The accumulated
     // hash must go absent rather than stay at a value that is now missing a contribution, while the
@@ -1544,6 +1564,9 @@ protected:
 
     UUID oplogUuid = UUID::gen();
 
+    test_helpers::NsAndUUID preimages = {.nss = NamespaceString::kChangeStreamPreImagesNamespace,
+                                         .uuid = UUID::gen()};
+
     // Runs the aggregation with the fixture's oplog UUID and drops the oplog's own self-delta,
     // leaving only the per-collection deltas the tests assert on.
     OplogScanResult aggregateCollectionReplicatedMetadataDeltas(SeekableRecordCursor& oplogCursor,
@@ -1710,121 +1733,219 @@ TEST_F(AggregateSizeCountFromOplogTest, ForwardCursorRespectsOplogVisibilityTime
     EXPECT_EQ(result.lastTimestamp.value(), ts1);
 }
 
-TEST_F(AggregateSizeCountFromOplogTest, AggregateTruncateRangeInsideApplyOps) {
-    const Timestamp ts1{1, 1};
-    const int64_t bytesDeleted = 120;
-    const int64_t docsDeleted = 3;
+TEST_F(AggregateSizeCountFromOplogTest, OplogTruncateRangeContributesNegativeDelta) {
+    const Timestamp ts(1, 1);
+    const auto truncateCommand = test_helpers::makeTruncateRangeOplogEntry(
+        ts, {.nss = NamespaceString::kRsOplogNamespace, .uuid = oplogUuid}, 120, 3);
+    const repl::OplogEntry entry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = NamespaceString::kAdminCommandNamespace,
+        .uuid = oplogUuid,
+        .oField = truncateCommand.getObject(),
+        .wallClockTime = Date_t::now(),
+    }};
+    OplogCursorMock cursor(std::list<repl::OplogEntry>{entry});
+    const auto result =
+        aggregateReplicatedMetadataDeltasInOplog(cursor, Timestamp::min(), oplogUuid);
 
-    // Build an applyOps entry with a truncateRange inner op. The 'o' field is taken from the
-    // truncateRange entry produced by the test helper.
-    const auto truncateEntry =
-        test_helpers::makeTruncateRangeOplogEntry(ts1, collA, bytesDeleted, docsDeleted);
-    const NamespaceString adminCmdNss =
-        NamespaceString::createNamespaceString_forTest("admin", "$cmd");
-    BSONObj truncateInnerOp = BSON("op" << "c"
-                                        << "ns" << collA.nss.getCommandNS().ns_forTest() << "ui"
-                                        << collA.uuid << "o" << truncateEntry.getObject());
-
-    std::list<repl::OplogEntry> entries{
-        repl::OplogEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
-            .opTime = repl::OpTime(ts1, 1),
-            .opType = repl::OpTypeEnum::kCommand,
-            .nss = adminCmdNss,
-            .oField = BSON("applyOps" << BSON_ARRAY(truncateInnerOp)),
-            .wallClockTime = Date_t::now(),
-        }}},
-    };
-    OplogCursorMock oplogCursor(std::move(entries));
-
-    assertExpectedAggregateDelta(
-        {.delta = CollectionSizeCount{.size = -bytesDeleted, .count = -docsDeleted},
-         .lastTimestamp = ts1},
-        collA.uuid,
-        Timestamp::min(),
-        oplogCursor);
+    EXPECT_EQ(result.lastTimestamp, ts);
+    ASSERT_EQ(result.deltas.size(), 1);
+    ASSERT_TRUE(result.deltas.contains(oplogUuid));
+    EXPECT_EQ(
+        result.deltas.at(oplogUuid).metadata.sizeCount,
+        (CollectionSizeCount{.size = entry.getEntry().toBSON().objsize() - 120, .count = 1 - 3}));
+    EXPECT_FALSE(result.deltas.at(oplogUuid).metadata.hash);
 }
 
-TEST_F(AggregateSizeCountFromOplogTest, AggregateTruncateRangeInsideNestedApplyOps) {
-    const Timestamp ts1{1, 1};
-    const int64_t bytesDeleted = 80;
-    const int64_t docsDeleted = 2;
+TEST_F(AggregateSizeCountFromOplogTest, PreimagesTruncateRangeContributesNoDelta) {
+    const Timestamp ts(1, 1);
+    const auto entry = test_helpers::makeTruncateRangeOplogEntry(ts, preimages, 120, 3);
+    OplogCursorMock cursor(std::list<repl::OplogEntry>{entry});
+    const auto result =
+        aggregateReplicatedMetadataDeltasInOplog(cursor, Timestamp::min(), oplogUuid);
 
-    const auto truncateEntry =
-        test_helpers::makeTruncateRangeOplogEntry(ts1, collA, bytesDeleted, docsDeleted);
-    const NamespaceString adminCmdNss =
-        NamespaceString::createNamespaceString_forTest("admin", "$cmd");
-    BSONObj truncateInnerOp = BSON("op" << "c"
-                                        << "ns" << collA.nss.getCommandNS().ns_forTest() << "ui"
-                                        << collA.uuid << "o" << truncateEntry.getObject());
-
-    // Wrap the truncateRange in an inner applyOps, then in an outer applyOps.
-    BSONObj innerApplyOpsOp = BSON("op" << "c" << "ns" << adminCmdNss.ns_forTest() << "o"
-                                        << BSON("applyOps" << BSON_ARRAY(truncateInnerOp)));
-
-    std::list<repl::OplogEntry> entries{
-        repl::OplogEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
-            .opTime = repl::OpTime(ts1, 1),
-            .opType = repl::OpTypeEnum::kCommand,
-            .nss = adminCmdNss,
-            .oField = BSON("applyOps" << BSON_ARRAY(innerApplyOpsOp)),
-            .wallClockTime = Date_t::now(),
-        }}},
-    };
-    OplogCursorMock oplogCursor(std::move(entries));
-
-    assertExpectedAggregateDelta(
-        {.delta = CollectionSizeCount{.size = -bytesDeleted, .count = -docsDeleted},
-         .lastTimestamp = ts1},
-        collA.uuid,
-        Timestamp::min(),
-        oplogCursor);
+    EXPECT_EQ(result.lastTimestamp, ts);
+    ASSERT_EQ(result.deltas.size(), 1);
+    ASSERT_TRUE(result.deltas.contains(oplogUuid));
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = entry.getEntry().toBSON().objsize(), .count = 1}));
 }
 
-TEST_F(AggregateSizeCountFromOplogTest, AggregateSingleTruncateRange) {
-    const Timestamp ts1{1, 1};
-    const int64_t bytesDeleted = 150;
-    const int64_t docsDeleted = 3;
+// These synthetic entries check recursive parsing; production truncations are standalone commands.
+TEST_F(AggregateSizeCountFromOplogTest, OplogTruncateRangeInsideApplyOpsContributesNegativeDelta) {
+    const Timestamp ts(1, 1);
+    const auto truncate = test_helpers::makeTruncateRangeOplogEntry(
+        ts, {.nss = NamespaceString::kRsOplogNamespace, .uuid = oplogUuid}, 120, 3);
+    const BSONObj innerOp =
+        BSON("op" << "c" << "ns" << NamespaceString::kAdminCommandNamespace.ns_forTest() << "ui"
+                  << oplogUuid << "o" << truncate.getObject());
+    const repl::OplogEntry entry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = NamespaceString::kAdminCommandNamespace,
+        .oField = BSON("applyOps" << BSON_ARRAY(innerOp)),
+        .wallClockTime = Date_t::now(),
+    }};
+    OplogCursorMock cursor(std::list<repl::OplogEntry>{entry});
 
-    std::list<repl::OplogEntry> entries{
-        test_helpers::makeTruncateRangeOplogEntry(ts1, collA, bytesDeleted, docsDeleted),
-    };
-    OplogCursorMock oplogCursor(std::move(entries));
+    const auto result =
+        aggregateReplicatedMetadataDeltasInOplog(cursor, Timestamp::min(), oplogUuid);
 
-    assertExpectedAggregateDelta(
-        {.delta = CollectionSizeCount{.size = -bytesDeleted, .count = -docsDeleted},
-         .lastTimestamp = ts1},
-        collA.uuid,
-        Timestamp::min(),
-        oplogCursor);
+    EXPECT_EQ(result.lastTimestamp, ts);
+    ASSERT_EQ(result.deltas.size(), 1);
+    ASSERT_TRUE(result.deltas.contains(oplogUuid));
+    EXPECT_EQ(
+        result.deltas.at(oplogUuid).metadata.sizeCount,
+        (CollectionSizeCount{.size = entry.getEntry().toBSON().objsize() - 120, .count = 1 - 3}));
 }
 
-TEST_F(AggregateSizeCountFromOplogTest, AggregateTruncateRangeMixedWithCRUD) {
-    const Timestamp ts1{1, 1};
-    const Timestamp ts2{1, 2};
-    const Timestamp ts3{1, 3};
-    const Timestamp ts4{1, 4};
-    const Timestamp ts5{1, 5};
-    const Timestamp ts6{1, 6};
+TEST_F(AggregateSizeCountFromOplogTest, PreimagesTruncateRangeInsideApplyOpsContributesNoDelta) {
+    const Timestamp ts(1, 1);
+    const auto truncate = test_helpers::makeTruncateRangeOplogEntry(ts, preimages, 120, 3);
+    const BSONObj innerOp = BSON("op" << "c" << "ns" << preimages.nss.getCommandNS().ns_forTest()
+                                      << "ui" << preimages.uuid << "o" << truncate.getObject());
+    const repl::OplogEntry entry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = NamespaceString::kAdminCommandNamespace,
+        .oField = BSON("applyOps" << BSON_ARRAY(innerOp)),
+        .wallClockTime = Date_t::now(),
+    }};
+    OplogCursorMock cursor(std::list<repl::OplogEntry>{entry});
 
-    // 3 inserts (+270 bytes, +3 docs), 1 update (-10 bytes, 0 docs), 1 delete (-90 bytes, -1 doc),
-    // 1 truncateRange (-80 bytes, -1 doc).
+    const auto result =
+        aggregateReplicatedMetadataDeltasInOplog(cursor, Timestamp::min(), oplogUuid);
+
+    EXPECT_EQ(result.lastTimestamp, ts);
+    ASSERT_EQ(result.deltas.size(), 1);
+    ASSERT_TRUE(result.deltas.contains(oplogUuid));
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = entry.getEntry().toBSON().objsize(), .count = 1}));
+}
+
+TEST_F(AggregateSizeCountFromOplogTest,
+       OplogTruncateRangeInsideNestedApplyOpsContributesNegativeDelta) {
+    const Timestamp ts(1, 1);
+    const auto truncate = test_helpers::makeTruncateRangeOplogEntry(
+        ts, {.nss = NamespaceString::kRsOplogNamespace, .uuid = oplogUuid}, 80, 2);
+    const BSONObj truncateOp =
+        BSON("op" << "c" << "ns" << NamespaceString::kAdminCommandNamespace.ns_forTest() << "ui"
+                  << oplogUuid << "o" << truncate.getObject());
+    const BSONObj innerApplyOps =
+        BSON("op" << "c" << "ns" << NamespaceString::kAdminCommandNamespace.ns_forTest() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(truncateOp)));
+    const repl::OplogEntry entry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = NamespaceString::kAdminCommandNamespace,
+        .oField = BSON("applyOps" << BSON_ARRAY(innerApplyOps)),
+        .wallClockTime = Date_t::now(),
+    }};
+    OplogCursorMock cursor(std::list<repl::OplogEntry>{entry});
+
+    const auto result =
+        aggregateReplicatedMetadataDeltasInOplog(cursor, Timestamp::min(), oplogUuid);
+
+    EXPECT_EQ(result.lastTimestamp, ts);
+    ASSERT_EQ(result.deltas.size(), 1);
+    ASSERT_TRUE(result.deltas.contains(oplogUuid));
+    EXPECT_EQ(
+        result.deltas.at(oplogUuid).metadata.sizeCount,
+        (CollectionSizeCount{.size = entry.getEntry().toBSON().objsize() - 80, .count = 1 - 2}));
+}
+
+TEST_F(AggregateSizeCountFromOplogTest,
+       PreimagesTruncateRangeInsideNestedApplyOpsContributesNoDelta) {
+    const Timestamp ts(1, 1);
+    const auto truncate = test_helpers::makeTruncateRangeOplogEntry(ts, preimages, 80, 2);
+    const BSONObj truncateOp = BSON("op" << "c" << "ns" << preimages.nss.getCommandNS().ns_forTest()
+                                         << "ui" << preimages.uuid << "o" << truncate.getObject());
+    const BSONObj innerApplyOps =
+        BSON("op" << "c" << "ns" << NamespaceString::kAdminCommandNamespace.ns_forTest() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(truncateOp)));
+    const repl::OplogEntry entry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = NamespaceString::kAdminCommandNamespace,
+        .oField = BSON("applyOps" << BSON_ARRAY(innerApplyOps)),
+        .wallClockTime = Date_t::now(),
+    }};
+    OplogCursorMock cursor(std::list<repl::OplogEntry>{entry});
+
+    const auto result =
+        aggregateReplicatedMetadataDeltasInOplog(cursor, Timestamp::min(), oplogUuid);
+
+    EXPECT_EQ(result.lastTimestamp, ts);
+    ASSERT_EQ(result.deltas.size(), 1);
+    ASSERT_TRUE(result.deltas.contains(oplogUuid));
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = entry.getEntry().toBSON().objsize(), .count = 1}));
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, OplogTruncateRangeWithCRUDTracksCRUDAndTruncation) {
+    const Timestamp truncateTs(1, 4);
     std::list<repl::OplogEntry> entries{
-        test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100),
-        test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/90),
-        test_helpers::makeOplogEntry(ts3, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/80),
-        test_helpers::makeOplogEntry(ts4, collA, repl::OpTypeEnum::kUpdate, /*sizeDelta=*/-10),
-        test_helpers::makeOplogEntry(ts5, collA, repl::OpTypeEnum::kDelete, /*sizeDelta=*/-90),
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100),
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 2), collA, repl::OpTypeEnum::kUpdate, /*sizeDelta=*/-20),
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 3), collA, repl::OpTypeEnum::kDelete, /*sizeDelta=*/-30),
         test_helpers::makeTruncateRangeOplogEntry(
-            ts6, collA, /*bytesDeleted=*/80, /*docsDeleted=*/1),
+            truncateTs,
+            {.nss = NamespaceString::kRsOplogNamespace, .uuid = oplogUuid},
+            /*bytesDeleted=*/120,
+            /*docsDeleted=*/3),
     };
-    OplogCursorMock oplogCursor(std::move(entries));
+    int64_t writtenBytes = 0;
+    for (const auto& entry : entries) {
+        writtenBytes += entry.getEntry().toBSON().objsize();
+    }
+    OplogCursorMock cursor(std::move(entries));
 
-    // Net: size = 100+90+80-10-90-80 = 90, count = 1+1+1+0-1-1 = 1.
-    assertExpectedAggregateDelta(
-        {.delta = CollectionSizeCount{.size = 90, .count = 1}, .lastTimestamp = ts6},
-        collA.uuid,
-        Timestamp::min(),
-        oplogCursor);
+    const auto result =
+        aggregateReplicatedMetadataDeltasInOplog(cursor, Timestamp::min(), oplogUuid);
+
+    EXPECT_EQ(result.lastTimestamp, truncateTs);
+    ASSERT_EQ(result.deltas.size(), 2);
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 50, .count = 0}));
+    ASSERT_TRUE(result.deltas.contains(oplogUuid));
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = writtenBytes - 120, .count = 4 - 3}));
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, PreimagesTruncateRangeWithCRUDTracksOnlyCRUD) {
+    const Timestamp truncateTs(1, 4);
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100),
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 2), collA, repl::OpTypeEnum::kUpdate, /*sizeDelta=*/-20),
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 3), collA, repl::OpTypeEnum::kDelete, /*sizeDelta=*/-30),
+        test_helpers::makeTruncateRangeOplogEntry(
+            truncateTs, preimages, /*bytesDeleted=*/120, /*docsDeleted=*/3),
+    };
+    int64_t writtenBytes = 0;
+    for (const auto& entry : entries) {
+        writtenBytes += entry.getEntry().toBSON().objsize();
+    }
+    OplogCursorMock cursor(std::move(entries));
+
+    const auto result =
+        aggregateReplicatedMetadataDeltasInOplog(cursor, Timestamp::min(), oplogUuid);
+
+    EXPECT_EQ(result.lastTimestamp, truncateTs);
+    ASSERT_EQ(result.deltas.size(), 2);
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 50, .count = 0}));
+    ASSERT_TRUE(result.deltas.contains(oplogUuid));
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = writtenBytes, .count = 4}));
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, CollectionCreationMarksStateCreated) {
@@ -1931,28 +2052,40 @@ TEST_F(AggregateSizeCountFromOplogTest, InsertThenDeleteOfSameDocumentRestoresId
     EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, kEmptyCollectionValidationHash);
 }
 
-TEST_F(AggregateSizeCountFromOplogTest, TruncateRangeInvalidatesAccumulatedHash) {
-    // Truncation removes records this node never hashed individually, so their contributions can
-    // never be XOR-ed back out. The hash must go absent rather than keep a value that still
-    // includes them.
-    const Timestamp ts1{1, 1};
-    const Timestamp ts2{1, 2};
-    const Timestamp ts3{1, 3};
-    std::list<repl::OplogEntry> entries{
-        test_helpers::makeCreateOplogEntry(ts1, collA),
-        test_helpers::makeOplogEntry(
-            ts2, collA, repl::OpTypeEnum::kInsert, 100, int64_t{0x0123456789abcdef}),
-        test_helpers::makeTruncateRangeOplogEntry(ts3,
-                                                  collA,
-                                                  /*bytesDeleted=*/100,
-                                                  /*docsDeleted=*/1),
-    };
-    OplogCursorMock oplogCursor(std::move(entries));
+TEST_F(AggregateSizeCountFromOplogTest, OplogTruncateRangeInvalidatesAccumulatedHash) {
+    // Oplog self-accounting normally has no hash. Seed one to verify that truncation clears a
+    // present hash rather than merely preserving an already absent value.
+    ReplicatedMetadataDeltas deltas{
+        {oplogUuid,
+         ReplicatedMetadataDelta{
+             .metadata = {.sizeCount = {.size = 1000, .count = 10}, .hash = int64_t{123}}}}};
+    ASSERT_TRUE(deltas.at(oplogUuid).metadata.hash.has_value());
+    const auto entry = test_helpers::makeTruncateRangeOplogEntry(
+        Timestamp(1, 1),
+        {.nss = NamespaceString::kRsOplogNamespace, .uuid = oplogUuid},
+        /*bytesDeleted=*/120,
+        /*docsDeleted=*/3);
 
-    const auto result = aggregateCollectionReplicatedMetadataDeltas(oplogCursor, Timestamp::min());
+    EXPECT_EQ(processOplogEntry(entry, deltas), 1);
 
-    ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_FALSE(result.deltas.at(collA.uuid).metadata.hash);
+    ASSERT_EQ(deltas.size(), 1);
+    EXPECT_EQ(deltas.at(oplogUuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 880, .count = 7}));
+    EXPECT_FALSE(deltas.at(oplogUuid).metadata.hash.has_value());
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, PreimagesTruncateRangeLeavesAccumulatedDeltasUnchanged) {
+    const ReplicatedMetadataDeltas before{
+        {collA.uuid,
+         ReplicatedMetadataDelta{
+             .metadata = {.sizeCount = {.size = 1000, .count = 10}, .hash = int64_t{123}}}}};
+    ReplicatedMetadataDeltas deltas = before;
+    const auto entry = test_helpers::makeTruncateRangeOplogEntry(
+        Timestamp(1, 1), preimages, /*bytesDeleted=*/120, /*docsDeleted=*/3);
+
+    EXPECT_EQ(processOplogEntry(entry, deltas), 0);
+
+    EXPECT_EQ(deltas, before);
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionLeavesHashAbsent) {
