@@ -107,11 +107,13 @@ protected:
 
     static BSONObj makeMetadata(const UUID& buildUUID,
                                 IndexBuildPhaseEnum phase,
-                                const UUID& collectionUUID) {
+                                const UUID& collectionUUID,
+                                boost::optional<int> resumesWithoutProgress = boost::none) {
         IndexBuildMetadata metadata;
         metadata.setBuildUUID(buildUUID);
         metadata.setPhase(phase);
         metadata.setCollectionUUID(collectionUUID);
+        metadata.setResumesWithoutProgress(resumesWithoutProgress);
         return metadata.toBSON();
     }
 
@@ -132,11 +134,13 @@ protected:
                                     IndexBuildPhaseEnum phase,
                                     const UUID& collectionUUID,
                                     std::vector<IndexStateInfo> indexes,
-                                    boost::optional<RecordId> collectionScanPosition) {
+                                    boost::optional<RecordId> collectionScanPosition,
+                                    boost::optional<int> resumesWithoutProgress = boost::none) {
         ResumeIndexInfo info;
         info.setBuildUUID(buildUUID);
         info.setPhase(phase);
         info.setCollectionUUID(collectionUUID);
+        info.setResumesWithoutProgress(resumesWithoutProgress);
         if (collectionScanPosition) {
             info.setCollectionScanPosition(*collectionScanPosition);
         }
@@ -166,7 +170,8 @@ TEST_F(ReadAndParseResumeIndexInfoTest, SingleRecordLayout) {
                                    collectionUUID,
                                    {makeIndexState("sideWrites-0", RecordId{10}),
                                     makeIndexState("sideWrites-1", RecordId{20})},
-                                   RecordId{99})});
+                                   RecordId{99},
+                                   0)});
 
     auto resumeInfo = read(ident);
     ASSERT_TRUE(resumeInfo);
@@ -180,6 +185,8 @@ TEST_F(ReadAndParseResumeIndexInfoTest, SingleRecordLayout) {
     EXPECT_EQ(*resumeInfo->getIndexes()[0].getLastSpilledRecordId(), RecordId{10});
     EXPECT_EQ(resumeInfo->getIndexes()[1].getSideWritesTable(), "sideWrites-1");
     EXPECT_EQ(*resumeInfo->getIndexes()[1].getLastSpilledRecordId(), RecordId{20});
+    ASSERT_TRUE(resumeInfo->getResumesWithoutProgress());
+    EXPECT_EQ(*resumeInfo->getResumesWithoutProgress(), 0);
 }
 
 TEST_F(ReadAndParseResumeIndexInfoTest, MultiRecordLayoutWithTwoRecords) {
@@ -188,7 +195,7 @@ TEST_F(ReadAndParseResumeIndexInfoTest, MultiRecordLayoutWithTwoRecords) {
     auto ident = ident::generateNewIndexBuildIdent(buildUUID);
 
     writeRecords(ident,
-                 {makeMetadata(buildUUID, IndexBuildPhaseEnum::kCollectionScan, collectionUUID),
+                 {makeMetadata(buildUUID, IndexBuildPhaseEnum::kCollectionScan, collectionUUID, 2),
                   makeIndexState("sideWrites-0", RecordId{5}).toBSON()});
 
     auto resumeInfo = read(ident);
@@ -199,6 +206,8 @@ TEST_F(ReadAndParseResumeIndexInfoTest, MultiRecordLayoutWithTwoRecords) {
     ASSERT_EQ(resumeInfo->getIndexes().size(), 1U);
     EXPECT_EQ(resumeInfo->getIndexes()[0].getSideWritesTable(), "sideWrites-0");
     EXPECT_EQ(*resumeInfo->getIndexes()[0].getLastSpilledRecordId(), RecordId{5});
+    ASSERT_TRUE(resumeInfo->getResumesWithoutProgress());
+    EXPECT_EQ(*resumeInfo->getResumesWithoutProgress(), 2);
 }
 
 TEST_F(ReadAndParseResumeIndexInfoTest, MultiRecordLayoutWithSeveralRecords) {
@@ -224,6 +233,7 @@ TEST_F(ReadAndParseResumeIndexInfoTest, MultiRecordLayoutWithSeveralRecords) {
     EXPECT_EQ(*resumeInfo->getIndexes()[1].getLastSpilledRecordId(), RecordId{20});
     EXPECT_EQ(resumeInfo->getIndexes()[2].getSideWritesTable(), "sideWrites-2");
     EXPECT_FALSE(resumeInfo->getIndexes()[2].getLastSpilledRecordId());
+    EXPECT_FALSE(resumeInfo->getResumesWithoutProgress());
 }
 
 TEST_F(ReadAndParseResumeIndexInfoTest, InvalidSingleRecord) {

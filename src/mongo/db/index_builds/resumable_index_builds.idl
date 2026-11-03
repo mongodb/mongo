@@ -119,6 +119,12 @@ structs:
                     "A UUID that uniquely identifies which collection the index is being
                     built on"
                 type: uuid
+            resumesWithoutProgress:
+                description:
+                    "The number of times this build has been resumed without subsequently recording
+                    any forward progress."
+                type: int
+                optional: true
 
     ResumeIndexInfo:
         description: "Complete information needed to resume an index build."
