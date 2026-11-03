@@ -348,6 +348,20 @@ SortAndUnpackInPipeline findUnpackAndSort(const DocumentSourceContainer& sources
 }
 }  // namespace
 
+bool PipelineD::pipelineConsumesAllOrderInsensitive(const Pipeline& pipeline) {
+    for (const auto& source : pipeline.getSources()) {
+        const auto constraints = source->constraints();
+        if (constraints.consumesAllInputInAnyOrder) {
+            return true;
+        }
+        if (!constraints.outputDependsOnSingleInput ||
+            constraints.requiredPosition != StageConstraints::PositionRequirement::kNone) {
+            return false;
+        }
+    }
+    return false;
+}
+
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRandomCursorExecutor(
     const CollectionAcquisition& coll,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1392,6 +1406,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     const bool isChangeStream =
         pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
     auto collatorStash = isChangeStream ? expCtx->temporarilyChangeCollator(nullptr) : nullptr;
+
+    // Inspect the pipeline before canonicalization and engine selection remove pushed-down stages.
+    // The bounded sort optimization requires an ordinary FETCH and may rely on index order.
+    if (!timeseriesBoundedSortOptimization &&
+        PipelineD::pipelineConsumesAllOrderInsensitive(*pipeline)) {
+        plannerOpts |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    }
 
     // See if could use DISTINCT_SCAN with the pipeline (SERVER-9507 & SERVER-84347).
     auto swExecOrCq = tryPrepareDistinctExecutor(expCtx,

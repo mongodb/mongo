@@ -11,13 +11,17 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <map>
@@ -50,6 +54,321 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp,
             CoreIndexInfo::Identifier("test_foo"),
             {},
             wcProjection};
+}
+
+class BatchedFetchConversionTest : public QueryPlannerTest {
+protected:
+    std::unique_ptr<Pipeline> pipeline(std::initializer_list<const char*> stages) {
+        std::vector<BSONObj> raw;
+        for (auto stage : stages) {
+            raw.push_back(fromjson(stage));
+        }
+        return pipeline_factory::makePipeline(
+            raw, cq->getExpCtx(), pipeline_factory::kOptionsMinimal);
+    }
+
+    void check(const QuerySolution& solution, bool allowBatching) {
+        auto scan = solution.root()->getFirstNodeByType(STAGE_IXSCAN).first;
+        auto fetch = solution.root()
+                         ->getFirstNodeByType(allowBatching ? STAGE_BATCHED_FETCH : STAGE_FETCH)
+                         .first;
+        ASSERT(scan);
+        ASSERT(fetch);
+        ASSERT_EQ(static_cast<const IndexScanNode*>(scan)->allowBatching, allowBatching);
+        ASSERT_FALSE(solution.hasNode(allowBatching ? STAGE_FETCH : STAGE_BATCHED_FETCH));
+        ASSERT_GT(fetch->nodeId(), scan->nodeId());
+        ASSERT_GT(scan->nodeId(), 0);
+    }
+
+    unittest::ServerParameterGuard _flag{"featureFlagBatchedIndexScanFetch", true};
+};
+
+TEST_F(BatchedFetchConversionTest, BlockingSortEnablesBatchingAndClonePreservesEligibility) {
+    addIndex(BSON("a" << 1));
+    runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("a" << 1));
+    ASSERT_EQ(solns.size(), 1);
+    check(*solns[0], true);
+    auto cloned = solns[0]->root()->clone();
+    ASSERT_TRUE(static_cast<const IndexScanNode*>(cloned->getFirstNodeByType(STAGE_IXSCAN).first)
+                    ->allowBatching);
+    ASSERT(cloned->getFirstNodeByType(STAGE_BATCHED_FETCH).first);
+    ASSERT_FALSE(cloned->getFirstNodeByType(STAGE_FETCH).first);
+}
+
+TEST_F(BatchedFetchConversionTest, ConsumeAllWithoutSortQualifiesDuringPlanning) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    addIndex(BSON("a" << 1));
+    runQueryHint(BSON("a" << 1), BSON("a" << 1));
+    check(*solns[0], true);
+    ASSERT_EQ(solns[0]->root()->getType(), STAGE_BATCHED_FETCH);
+}
+
+TEST_F(BatchedFetchConversionTest, IndexProvidedExplicitSortRejectsGroup) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    addIndex(BSON("a" << 1));
+    runQuerySortHint(BSON("a" << BSON("$gte" << 1)), BSON("a" << 1), BSON("a" << 1));
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest,
+       ReplacementMovesChildAndRechecksFullFilterAndPreservesScanLimit) {
+    addIndex(BSON("a" << 1));
+    runQueryHint(BSON("a" << 1 << "c" << 2), BSON("a" << 1));
+    auto root = solns[0]->root()->clone();
+    ASSERT_EQ(root->getType(), STAGE_FETCH);
+    const auto* child = root->children[0].get();
+    ASSERT(root->filter);
+    root->hitScanLimit = true;
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+
+    auto solution = QueryPlannerAnalysis::analyzeDataAccess(*cq, params, std::move(root));
+    ASSERT(solution);
+    check(*solution, true);
+    ASSERT_EQ(solution->root()->getType(), STAGE_BATCHED_FETCH);
+    ASSERT_EQ(solution->root()->children[0].get(), child);
+    ASSERT(solution->root()->filter);
+    ASSERT(solution->root()->filter->equivalent(cq->getPrimaryMatchExpression()));
+    ASSERT_TRUE(solution->root()->hitScanLimit);
+    ASSERT_EQ(static_cast<const BatchedFetchNode*>(solution->root())->nss, cq->nss());
+}
+
+TEST_F(BatchedFetchConversionTest, ConsumeAllWithBlockingSortQualifies) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    addIndex(BSON("a" << 1));
+    runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("a" << 1));
+    check(*solns[0], true);
+}
+
+TEST_F(BatchedFetchConversionTest, PipelineExtensionPreservesBatchingEligibility) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    addIndex(BSON("a" << 1));
+    runQueryHint(BSON("a" << 1), BSON("a" << 1));
+    auto pushedDown = pipeline({"{$group: {_id: null, total: {$sum: '$a'}}}"});
+    cq->setCqPipeline({pushedDown->getSources().front()}, true);
+    auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {});
+    ASSERT(solution->hasExtension());
+    check(*solution, true);
+}
+
+TEST_F(BatchedFetchConversionTest,
+       PipelineExtensionPreservesBatchingRejectionForIndexProvidedSort) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    addIndex(BSON("a" << 1));
+    runQuerySortHint(BSON("a" << BSON("$gte" << 1)), BSON("a" << 1), BSON("a" << 1));
+    auto pushedDown =
+        pipeline({"{$group: {_id: null, first: {$first: '$a'}}}", "{$sort: {first: 1}}"});
+    cq->setCqPipeline({pushedDown->getSources().begin(), pushedDown->getSources().end()}, true);
+    auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {});
+    ASSERT(solution->hasExtension());
+    ASSERT(solution->root()->getFirstNodeByType(STAGE_SORT_DEFAULT).first);
+    check(*solution, false);
+}
+
+TEST_F(BatchedFetchConversionTest, StructuralOrderingBelowBlockerRejectsBatching) {
+    addIndex(BSON("a" << 1));
+    runQueryHint(BSON("a" << 1), BSON("a" << 1));
+    auto merge = std::make_unique<MergeSortNode>();
+    merge->sort = BSON("a" << 1);
+    merge->dedup = false;
+    merge->children.push_back(solns[0]->root()->clone());
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    auto solution = QueryPlannerAnalysis::analyzeDataAccess(*cq, params, std::move(merge));
+    ASSERT(solution);
+    check(*solution, false);
+}
+
+TEST_F(BatchedFetchConversionTest, RequiresBlocker) {
+    addIndex(BSON("a" << 1));
+    runQueryHint(BSON("a" << 1), BSON("a" << 1));
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, ConsumeAllPreservesCountScanRewrite) {
+    setIsCountLike();
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    addIndex(BSON("a" << 1));
+    runQueryHint(BSON("a" << 1), BSON("a" << 1));
+    ASSERT_EQ(solns.size(), 1);
+    ASSERT_EQ(solns[0]->root()->getType(), STAGE_COUNT_SCAN);
+    ASSERT_FALSE(solns[0]->hasNode(STAGE_BATCHED_FETCH));
+}
+
+TEST_F(BatchedFetchConversionTest, RejectsMultikey) {
+    addIndex(BSON("a" << 1), true);
+    runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("a" << 1));
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, RejectsIndexKeyMetadata) {
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 1}, sort: {b: 1}, hint: {a: 1}, "
+                 "projection: {key: {$meta: 'indexKey'}}}"));
+    ASSERT_EQ(solns.size(), 1);
+    auto* scan = solns[0]->root()->getFirstNodeByType(STAGE_IXSCAN).first;
+    ASSERT(scan);
+    ASSERT_TRUE(static_cast<const IndexScanNode*>(scan)->addKeyMetadata);
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, RejectsPartialIndex) {
+    // The match expression borrows BSON elements, so keep its backing BSON alive during planning.
+    const auto partialFilterObj = fromjson("{a: {$gt: 0}}");
+    auto partialFilter = parseMatchExpression(partialFilterObj);
+    addIndex(BSON("a" << 1), partialFilter.get());
+    runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("a" << 1));
+    ASSERT_EQ(solns.size(), 1);
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, RejectsPreFetchResidualFilters) {
+    addIndex(BSON("a" << 1));
+    for (auto filter : {"{a: {$mod: [2, 0]}}", "{a: /foo/}"}) {
+        runQuerySortHint(fromjson(filter), BSON("b" << 1), BSON("a" << 1));
+        ASSERT(solns[0]->root()->getFirstNodeByType(STAGE_IXSCAN).first->filter);
+        check(*solns[0], false);
+    }
+}
+
+TEST_F(BatchedFetchConversionTest, AllowsFetchResidualFilter) {
+    addIndex(BSON("a" << 1));
+    runQuerySortHint(BSON("a" << 1 << "c" << 2), BSON("b" << 1), BSON("a" << 1));
+    auto* fetch = solns[0]->root()->getFirstNodeByType(STAGE_BATCHED_FETCH).first;
+    ASSERT(fetch);
+    ASSERT(fetch->filter);
+    ASSERT(fetch->filter->equivalent(cq->getPrimaryMatchExpression()));
+    ASSERT_EQ(static_cast<const BatchedFetchNode*>(fetch)->nss, cq->nss());
+    ASSERT_EQ(fetch->children.size(), 1);
+    ASSERT_EQ(fetch->children[0]->getType(), STAGE_IXSCAN);
+    check(*solns[0], true);
+}
+
+TEST_F(BatchedFetchConversionTest, RechecksIndexPredicateWithoutFetchResidualFilter) {
+    addIndex(BSON("a" << 1));
+    runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("a" << 1));
+    check(*solns[0], true);
+    auto* fetch = solns[0]->root()->getFirstNodeByType(STAGE_BATCHED_FETCH).first;
+    ASSERT(fetch->filter);
+    ASSERT(fetch->filter->equivalent(cq->getPrimaryMatchExpression()));
+}
+
+TEST_F(BatchedFetchConversionTest, CollapsedOrRechecksEntirePredicate) {
+    unittest::ServerParameterGuard simplifier("internalQueryEnableBooleanExpressionsSimplifier",
+                                              false);
+    addIndex(BSON("a" << 1));
+    runQuerySortHint(
+        fromjson("{$or: [{a: 1, c: 2}, {a: 1, d: 3}]}"), BSON("b" << 1), BSON("a" << 1));
+    ASSERT_EQ(solns.size(), 1);
+    check(*solns[0], true);
+    ASSERT_FALSE(solns[0]->hasNode(STAGE_OR));
+    ASSERT_EQ(solns[0]->root()->getFirstNodeByType(STAGE_IXSCAN).second, 1U);
+    const auto* fetch = solns[0]->root()->getFirstNodeByType(STAGE_BATCHED_FETCH).first;
+    ASSERT_EQ(fetch->children.size(), 1U);
+    ASSERT_EQ(fetch->children[0]->getType(), STAGE_IXSCAN);
+    ASSERT_EQ(cq->getPrimaryMatchExpression()->matchType(), MatchExpression::OR);
+    ASSERT(fetch->filter);
+    // Recheck the indexed predicate in both branches, not just the residual {$or: [{c: 2},
+    // {d: 3}]}.
+    ASSERT(fetch->filter->equivalent(cq->getPrimaryMatchExpression()));
+}
+
+TEST_F(BatchedFetchConversionTest, RemovesImpreciseExprFiltersAfterConversion) {
+    addIndex(BSON("a" << 1));
+    // Cover both an $expr that supplies index bounds and one evaluated only after fetching.
+    for (auto filter : {"{$expr: {$eq: ['$a', 123]}}", "{a: 1, $expr: {$eq: ['$c', 123]}}"}) {
+        runQuerySortHint(fromjson(filter), BSON("b" << 1), BSON("a" << 1));
+        ASSERT_EQ(solns.size(), 1);
+        check(*solns[0], true);
+        ASSERT_STRING_CONTAINS(cq->getPrimaryMatchExpression()->serialize().toString(),
+                               "$_internalExprEq");
+        auto* fetch = solns[0]->root()->getFirstNodeByType(STAGE_BATCHED_FETCH).first;
+        ASSERT(fetch->filter);
+        const auto serialized = fetch->filter->serialize().toString();
+        ASSERT_STRING_OMITS(serialized, "$_internalExprEq");
+        ASSERT_STRING_CONTAINS(serialized, "$expr");
+        ASSERT_STRING_CONTAINS(serialized, "$eq");
+    }
+}
+
+TEST_F(BatchedFetchConversionTest, PreservesImpreciseExprFiltersOnTimeseriesAfterConversion) {
+    params.mainCollectionInfo.stats.isTimeseries = true;
+    addIndex(BSON("a" << 1));
+    runQuerySortHint(fromjson("{a: 1, $expr: {$eq: ['$c', 123]}}"), BSON("b" << 1), BSON("a" << 1));
+    ASSERT_EQ(solns.size(), 1);
+    check(*solns[0], true);
+    auto* fetch = solns[0]->root()->getFirstNodeByType(STAGE_BATCHED_FETCH).first;
+    ASSERT(fetch->filter);
+    ASSERT_STRING_CONTAINS(fetch->filter->serialize().toString(), "$_internalExprEq");
+    ASSERT(fetch->filter->equivalent(cq->getPrimaryMatchExpression()));
+}
+
+TEST_F(BatchedFetchConversionTest, FlagDisabledLeavesDefaults) {
+    unittest::ServerParameterGuard flagOff("featureFlagBatchedIndexScanFetch", false);
+    addIndex(BSON("a" << 1));
+    runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("a" << 1));
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, FindLimitBeforePipelineBlockerDoesNotQualify) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    addIndex(BSON("a" << 1));
+    runQuerySortProjSkipLimitHint(BSON("a" << 1), BSONObj(), BSONObj(), 0, 1, BSON("a" << 1));
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, FindSkipBeforePipelineBlockerDoesNotQualify) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    addIndex(BSON("a" << 1));
+    runQuerySortProjSkipLimitHint(BSON("a" << 1), BSONObj(), BSONObj(), 1, 0, BSON("a" << 1));
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, TopKSortDoesNotConvert) {
+    addIndex(BSON("a" << 1));
+    runQuerySortProjSkipLimitHint(BSON("a" << 1), BSON("b" << 1), BSONObj(), 0, 1, BSON("a" << 1));
+    ASSERT_EQ(solns.size(), 1);
+    const auto* root = solns[0]->root();
+    ASSERT_EQ(root->getType(), STAGE_SORT_SIMPLE);
+    ASSERT_EQ(static_cast<const SortNode*>(root)->limit, 1U);
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, ConsumeAllDoesNotAllowTopKSortConversion) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    addIndex(BSON("a" << 1));
+    runQuerySortProjSkipLimitHint(BSON("a" << 1), BSON("b" << 1), BSONObj(), 0, 1, BSON("a" << 1));
+    ASSERT_EQ(solns.size(), 1);
+    ASSERT_EQ(solns[0]->root()->getType(), STAGE_SORT_SIMPLE);
+    ASSERT_EQ(static_cast<const SortNode*>(solns[0]->root())->limit, 1U);
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, TopKDefaultSortDoesNotConvert) {
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 1}, sort: {b: 1}, limit: 1, hint: {a: 1}, "
+                 "showRecordId: true}"));
+    ASSERT_EQ(solns.size(), 1);
+    const auto* sort = solns[0]->root()->getFirstNodeByType(STAGE_SORT_DEFAULT).first;
+    ASSERT(sort);
+    ASSERT_EQ(static_cast<const SortNode*>(sort)->limit, 1U);
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, TopKSortWithSkipDoesNotConvert) {
+    addIndex(BSON("a" << 1));
+    runQuerySortProjSkipLimitHint(BSON("a" << 1), BSON("b" << 1), BSONObj(), 1, 1, BSON("a" << 1));
+    ASSERT_EQ(solns.size(), 1);
+    ASSERT(solns[0]->hasNode(STAGE_SKIP));
+    check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, SkipAboveBlockingSortDoesNotQualify) {
+    addIndex(BSON("a" << 1));
+    runQuerySortProjSkipLimitHint(BSON("a" << 1), BSON("b" << 1), BSONObj(), 1, 0, BSON("a" << 1));
+    ASSERT(solns[0]->hasNode(STAGE_SKIP));
+    ASSERT(solns[0]->hasNode(STAGE_SORT_DEFAULT) || solns[0]->hasNode(STAGE_SORT_SIMPLE));
+    check(*solns[0], false);
 }
 
 TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {

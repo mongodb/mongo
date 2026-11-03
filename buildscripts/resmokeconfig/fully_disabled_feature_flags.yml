@@ -51,3 +51,5 @@
 # extension provides replacements. Enabling it in the all-feature-flags variants would break
 # existing legacy search passthrough tests.
 - featureFlagExtensionSearchIndexManagement
+# TODO SERVER-136310: Enable this feature flag once batched ixscan+fetch plans can run e2e.
+- featureFlagBatchedIndexScanFetch

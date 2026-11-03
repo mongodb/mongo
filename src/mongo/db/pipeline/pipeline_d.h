@@ -146,6 +146,14 @@ public:
     // Returns true if the $search pipeline is eligible for SBE execution, which it never is.
     static bool isSearchPresentAndEligibleForSbe(const Pipeline* pipeline);
 
+    /**
+     * Whether the pipeline can consume reordered scan/fetch output before a blocking stage.
+     * Stops at stages that depend on input order or select a subset of the input. Must be called
+     * before engine selection removes pushed-down stages. The query planner separately checks
+     * ordering requirements in the underlying find plan.
+     */
+    static bool pipelineConsumesAllOrderInsensitive(const Pipeline& pipeline);
+
 private:
     PipelineD() = delete;  // does not exist: prevent instantiation
 

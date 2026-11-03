@@ -6,6 +6,15 @@ global:
     mod_visibility: public
 
 feature_flags:
+    featureFlagBatchedIndexScanFetch:
+        description:
+            "Allow certain index scan + fetch plans to read index keys and fetch documents in
+            batches rather than sequentially."
+        cpp_varname: gFeatureFlagBatchedIndexScanFetch
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development
+
     featureFlagChangeStreamPreciseShardTargeting:
         description: "Feature flag to enable improved handling of cluster topology changes in change streams"
         cpp_varname: gFeatureFlagChangeStreamPreciseShardTargeting

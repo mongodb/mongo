@@ -35,6 +35,7 @@
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/max_estimated_scan_bytes_metrics.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -67,6 +68,70 @@ using std::pair;
 using std::string;
 using std::unique_ptr;
 using std::vector;
+namespace {
+
+std::unique_ptr<QuerySolutionNode> convertToBatchedFetch(std::unique_ptr<QuerySolutionNode> root,
+                                                         bool consumerIgnoresOrder,
+                                                         const MatchExpression& fullPredicate) {
+    const auto type = root->getType();
+    if (isSortStageType(type)) {
+        // Top-K sorts can select different tied documents if fetch reorders their input.
+        // TODO SERVER-138474 Investigate handling Top-K sort plans with batched ixscan+fetch
+        consumerIgnoresOrder = static_cast<const SortNode*>(root.get())->limit == 0;
+    } else if (type != STAGE_FETCH && type != STAGE_IXSCAN && type != STAGE_SHARDING_FILTER &&
+               !isProjectionStageType(type)) {
+        // In particular, merge sorts and sorted intersections require ordered inputs.
+        // Do not propagate eligibility through unfamiliar or multi-input stages.
+        consumerIgnoresOrder = false;
+    }
+    if (type == STAGE_FETCH) {
+        tassert(13611500, "FETCH must have exactly one child", root->children.size() == 1);
+        if (consumerIgnoresOrder && root->children[0]->getType() == STAGE_IXSCAN) {
+            auto* scan = static_cast<IndexScanNode*>(root->children[0].get());
+            // TODO SERVER-138141 Investigate supporting partial indexes
+            if (!scan->filter && !scan->index.multikey && !scan->addKeyMetadata &&
+                !scan->index.filterExpr) {
+                scan->allowBatching = true;
+                auto* fetch = static_cast<FetchNode*>(root.get());
+                auto batchedFetch = std::make_unique<BatchedFetchNode>(std::move(*fetch));
+                // Documents may change after the index scan yields, so recheck the entire
+                // predicate rather than just the residual filter (see SERVER-16750).
+                batchedFetch->filter = fullPredicate.clone();
+                root = std::move(batchedFetch);
+            }
+        }
+    }
+    for (auto& child : root->children) {
+        child = convertToBatchedFetch(std::move(child), consumerIgnoresOrder, fullPredicate);
+    }
+    return root;
+}
+
+std::unique_ptr<QuerySolutionNode> attemptConvertToBatchedFetch(
+    const CanonicalQuery& query,
+    const QueryPlannerParams& params,
+    std::unique_ptr<QuerySolutionNode> root) {
+    // Count and distinct plans retain ordinary FETCH nodes for specialized scan rewrites. Skip and
+    // limit nodes can make the results depend on fetch order even when there is a blocking stage
+    // elsewhere in the tree.
+    // TODO SERVER-137225: Remove isCountLike() check.
+    if (!query.getExpCtx()->getIfrContext()->getSavedFlagValue(
+            feature_flags::gFeatureFlagBatchedIndexScanFetch) ||
+        query.isCountLike() || query.getDistinct() || root->hasNode(STAGE_SKIP) ||
+        root->hasNode(STAGE_LIMIT)) {
+        return root;
+    }
+
+    // A sort absorbed into the find must retain index order unless the plan itself has a
+    // blocking sort. Later pipeline blockers cannot relax the find's ordering requirement.
+    const bool callerConsumesAllAndIgnoresOrder =
+        (params.mainCollectionInfo.options & QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE) &&
+        !query.getSortPattern();
+    return convertToBatchedFetch(
+        std::move(root), callerConsumesAllAndIgnoresOrder, *query.getPrimaryMatchExpression());
+}
+
+}  // namespace
 
 //
 // Helpers for bounds explosion AKA quick-and-dirty SERVER-1205.
@@ -1822,6 +1887,10 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     }
 
     solnRoot = tryPushdownProjectBeneathSort(std::move(solnRoot));
+
+    // Replace nodes before setRoot() assigns their IDs and before the aggregation pipeline is
+    // attached.
+    solnRoot = attemptConvertToBatchedFetch(query, params, std::move(solnRoot));
 
     QueryPlannerAnalysis::removeImpreciseInternalExprFilters(params, *solnRoot);
 

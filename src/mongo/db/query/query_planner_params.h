@@ -193,6 +193,10 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
         // causes the planner to log and count a would-be rejection instead of actually rejecting
         // the query.
         MAX_ESTIMATED_SCAN_BYTES_DRY_RUN = 1 << 16,
+
+        // The caller will consume all input and can accept results in any order.
+        // Eligible scan/fetch pairs may batch and reorder their output.
+        CONSUME_ALL_ORDER_INSENSITIVE = 1 << 17,
     };
 
     /**

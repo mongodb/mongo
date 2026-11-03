@@ -4,14 +4,17 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_geo_near_cursor.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
@@ -157,6 +160,56 @@ TEST_F(PipelineDGroupAnnotationTest, GeoNearPathLeavesClonedGroupUnannotated) {
         "{$geoNear: {near: {type: 'Point', coordinates: [0, 0]}, distanceField: 'd', key: 'loc'}}");
     ASSERT_TRUE(hasStage(*pipeline, DocumentSourceGeoNearCursor::kStageName));
     ASSERT_EQ(group->getNonArrayIdFields(), OrderedPathSet{});
+}
+
+using PipelineDTest = AggregationContextFixture;
+
+TEST_F(PipelineDTest, PipelineConsumesAllOrderInsensitive) {
+    const auto noAccsGroup = fromjson("{$group: {_id: null}}");
+    struct TestCase {
+        std::vector<BSONObj> pipeline;
+        bool expected;
+    };
+    std::vector<TestCase> testCases{
+        TestCase{{}, false},
+        // An order-insensitive blocker is required.
+        TestCase{{fromjson("{$match: {a: 1}}")}, false},
+        TestCase{{noAccsGroup}, true},
+        TestCase{{fromjson("{$_internalStreamingGroup: {_id: '$key', total: {$sum: '$value'}, "
+                           "$monotonicIdFields: ['_id']}}")},
+                 false},
+        TestCase{{fromjson("{$sort: {b: 1}}")}, true},
+        // Single-input stages can precede an order-insensitive blocker.
+        TestCase{{fromjson("{$match: {a: {$gte: 0}}}"),
+                  fromjson("{$project: {a: 1}}"),
+                  fromjson("{$unwind: '$a'}"),
+                  noAccsGroup},
+                 true},
+        // Eligibility is determined by stage constraints.
+        TestCase{{fromjson("{$lookup: {from: 'other', localField: 'a', "
+                           "foreignField: 'b', as: 'matches'}}"),
+                  noAccsGroup},
+                 true},
+        // A position requirement disqualifies even a single-input stage.
+        TestCase{{fromjson("{$geoNear: {near: [0, 0], distanceField: 'distance'}}"), noAccsGroup},
+                 false},
+        // A stage that does not depend on a single input prevents reaching a later blocker.
+        TestCase{{fromjson("{$limit: 1}"), noAccsGroup}, false},
+        // A later sort cannot make an earlier order-sensitive group safe.
+        TestCase{{fromjson("{$group: {_id: null, values: {$push: '$_id'}}}"),
+                  fromjson("{$sort: {_id: 1}}")},
+                 false},
+        // Blocking sort in front of an ineligible group ($push is not commutative).
+        TestCase{
+            {fromjson("{$sort: {_id: 1}}"), fromjson("{$group: {_id: null, v: {$push: '$_id'}}}")},
+            true},
+    };
+    for (const auto& testCase : testCases) {
+        auto pipeline = pipeline_factory::makePipeline(
+            testCase.pipeline, getExpCtx(), pipeline_factory::kOptionsMinimal);
+        ASSERT_EQ(PipelineD::pipelineConsumesAllOrderInsensitive(*pipeline), testCase.expected)
+            << BSON("pipeline" << testCase.pipeline);
+    }
 }
 
 }  // namespace

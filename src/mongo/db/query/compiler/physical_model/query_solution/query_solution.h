@@ -345,6 +345,8 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QuerySolutionNode {
     }
 
 protected:
+    QuerySolutionNode(QuerySolutionNode&&) = default;
+
     /**
      * Formatting helper used by toString().
      */
@@ -818,6 +820,7 @@ struct FetchNode : public QuerySolutionNode {
     explicit FetchNode(NamespaceString nss) : nss(std::move(nss)) {}
     FetchNode(std::unique_ptr<QuerySolutionNode> child, NamespaceString nss)
         : QuerySolutionNode(std::move(child)), nss(std::move(nss)) {}
+    FetchNode(FetchNode&&) = default;
     ~FetchNode() override {}
 
     StageType getType() const override {
@@ -846,12 +849,14 @@ struct FetchNode : public QuerySolutionNode {
 
 /**
  * A fetch that may return records in a different order from its child, allowing batched execution.
- * This is not currently generated for any query plans.
  * TODO SERVER-136309: Build batched index scan + fetch SBE plans for this node.
  * TODO SERVER-136310: Build batched index scan + fetch Classic plans for this node.
  */
 struct BatchedFetchNode : public FetchNode {
     using FetchNode::FetchNode;
+
+    // Move the entire base node so conversion preserves its fields and owns the same subtree.
+    explicit BatchedFetchNode(FetchNode&& fetch) : FetchNode(std::move(fetch)) {}
 
     StageType getType() const override {
         return STAGE_BATCHED_FETCH;

@@ -358,6 +358,9 @@ string optionString(size_t options) {
             case QueryPlannerParams::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN:
                 ss << "MAX_ESTIMATED_SCAN_BYTES_DRY_RUN ";
                 break;
+            case QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE:
+                ss << "CONSUME_ALL_ORDER_INSENSITIVE ";
+                break;
             case QueryPlannerParams::DEFAULT:
                 MONGO_UNREACHABLE;
                 break;
