@@ -35,6 +35,7 @@ mongo_cc_library(
     name = "stats_gen",
     srcs = [
         "max_diff.cpp",
+        "space_saving.cpp",
     ],
     deps = [
         ":stats_histograms",
@@ -178,6 +179,28 @@ mongo_cc_unit_test(
     deps = [
         ":stats_gen",
         ":stats_test_utils",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "space_saving_bm",
+    srcs = [
+        "space_saving_bm.cpp",
+    ],
+    deps = [
+        "stats_gen",
+        "@com_google_absl//absl/random:distributions",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "space_saving_test",
+    srcs = [
+        "space_saving_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":stats_gen",
     ],
 )
 

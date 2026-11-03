@@ -108,12 +108,20 @@ private:
 /**
  * Wrapper of zipfian distribution that is guaranteed to produces size_t values within a certain
  * range. The absl::zipf_distribution class requires as input the max value expected in the
- * distribution.
+ * distribution. The optional exponent 'q' gives P(rank) proportional to rank^-q; the default
+ * q = 2 corresponds to the classical Zipfian distribution with alpha = 2.
  */
 class ZipfianDistr : public RandomDistribution {
+private:
+    // absl::zipf_distribution requires q > 1.
+    static double validateQ(double q) {
+        tassert(7586900, "ZipfianDistr exponent must be greater than 1", q > 1.0);
+        return q;
+    }
+
 public:
-    ZipfianDistr(size_t min, size_t max)
-        : _distr{max}, _backup{min, max}, _min((double)min), _max((double)max) {}
+    ZipfianDistr(size_t min, size_t max, double q = 2.0)
+        : _distr{max, validateQ(q)}, _backup{min, max}, _min((double)min), _max((double)max) {}
 
     size_t operator()(std::mt19937_64& gen) override {
         double randNum = _distr(gen);

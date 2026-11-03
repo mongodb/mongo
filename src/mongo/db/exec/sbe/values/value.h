@@ -1249,6 +1249,10 @@ public:
         return _values.count(key);
     }
 
+    void erase(const_iterator pos) {
+        _values.erase(pos);
+    }
+
     iterator begin() {
         return _values.begin();
     }

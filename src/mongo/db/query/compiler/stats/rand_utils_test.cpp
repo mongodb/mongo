@@ -37,4 +37,30 @@ TEST(RandUtilsNewTest, ObjectIdAllPartsCanBeNonzero) {
            randValues.end());
 }
 
+TEST(RandUtilsNewTest, ZipfianDistrHonorsExponent) {
+    // With enough draws, the classical Zipfian exponent q = 2 concentrates more mass on the
+    // lowest ranks than the weaker exponent q = 1.5, and both stay within the range.
+    const size_t ndv = 1000;
+    const size_t numDraws = 100'000;
+    auto countLowRanks = [&](double q) {
+        std::mt19937_64 gen{42};
+        ZipfianDistr distr(0, ndv - 1, q);
+        size_t lowRankDraws = 0;
+        for (size_t i = 0; i < numDraws; ++i) {
+            const size_t rank = distr(gen);
+            ASSERT_LTE(rank, ndv - 1);
+            if (rank <= 9) {
+                ++lowRankDraws;
+            }
+        }
+        return lowRankDraws;
+    };
+
+    const size_t lowRankDrawsQ2 = countLowRanks(2.0);
+    const size_t lowRankDrawsQ15 = countLowRanks(1.5);
+    ASSERT_GT(lowRankDrawsQ2, lowRankDrawsQ15);
+    // And a weakly skewed distribution still spreads the mass beyond the lowest ranks.
+    ASSERT_GT(lowRankDrawsQ15, numDraws / 10);
+}
+
 }  // namespace mongo::stats
