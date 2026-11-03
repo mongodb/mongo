@@ -34,7 +34,6 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/common_types_gen.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -54,10 +53,6 @@
 namespace mongo {
 
 namespace {
-
-bool shouldUseRegistry() {
-    return resharding::gFeatureFlagReshardingRegistry.isEnabled();
-}
 
 std::shared_ptr<ReshardingCoordinatorObserver> getReshardingCoordinatorObserver(
     OperationContext* opCtx, const BSONObj& reshardingId) {
@@ -210,7 +205,7 @@ void ReshardingOpObserver::onInserts(OperationContext* opCtx,
                                      OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
 
-    if (shouldUseRegistry() && _nssToRoleMap.contains(nss)) {
+    if (_nssToRoleMap.contains(nss)) {
         const auto role = _nssToRoleMap.at(nss);
         // We should only get a single document here as each resharding participant writes a single
         // state document per operation but we loop to be defensive.
@@ -256,9 +251,7 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx,
         _doPin(opCtx);
     }
 
-    const auto& useRegistry = shouldUseRegistry();
-
-    if (useRegistry && nss == NamespaceString::kConfigReshardingOperationsNamespace) {
+    if (nss == NamespaceString::kConfigReshardingOperationsNamespace) {
         auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
             args.updateArgs->updatedDoc, IDLParserContext("ReshardingOpObserver::onUpdate"));
         if (resharding::excludeFromRegistry(coordinatorDoc)) {
@@ -272,7 +265,7 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx,
         }
     }
 
-    if (useRegistry && nss == NamespaceString::kDonorReshardingOperationsNamespace) {
+    if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {
         auto donorDoc = ReshardingDonorDocument::parse(
             args.updateArgs->updatedDoc, IDLParserContext("ReshardingOpObserver::onUpdate"));
         if (resharding::excludeFromRegistry(donorDoc)) {
@@ -286,7 +279,7 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx,
         }
     }
 
-    if (useRegistry && nss == NamespaceString::kRecipientReshardingOperationsNamespace) {
+    if (nss == NamespaceString::kRecipientReshardingOperationsNamespace) {
         auto recipientDoc = ReshardingRecipientDocument::parse(
             args.updateArgs->updatedDoc, IDLParserContext("ReshardingOpObserver::onUpdate"));
         if (resharding::excludeFromRegistry(recipientDoc)) {
@@ -348,7 +341,7 @@ void ReshardingOpObserver::onDelete(OperationContext* opCtx,
     if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {
         _doPin(opCtx);
     }
-    if (shouldUseRegistry() && _nssToRoleMap.contains(nss)) {
+    if (_nssToRoleMap.contains(nss)) {
         const auto role = _nssToRoleMap.at(nss);
         auto commonMetadata = CommonReshardingMetadata::parse(
             doc, IDLParserContext("ReshardingOpObserver::onDelete"));
@@ -366,7 +359,7 @@ repl::OpTime ReshardingOpObserver::onDropCollection(OperationContext* opCtx,
                                                     std::uint64_t numRecords,
                                                     bool markFromMigrate,
                                                     bool isTimeseries) {
-    if (shouldUseRegistry() && _nssToRoleMap.contains(collectionName)) {
+    if (_nssToRoleMap.contains(collectionName)) {
         const auto role = _nssToRoleMap.at(collectionName);
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [role](OperationContext*, boost::optional<Timestamp>) {

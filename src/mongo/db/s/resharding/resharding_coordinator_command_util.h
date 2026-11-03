@@ -29,10 +29,7 @@ void sendReshardingCommand(OperationContext* opCtx,
     if (cmd.getDbName().isEmpty()) {
         cmd.setDbName(DatabaseName::kAdmin);
     }
-    if (resharding::isEnabledWithPinnedVersion(fom,
-                                               resharding::gFeatureFlagReshardingInitNoRefresh)) {
-        generic_argument_util::setOperationSessionInfo(cmd, osi);
-    }
+    generic_argument_util::setOperationSessionInfo(cmd, osi);
     if (setWriteConcern) {
         generic_argument_util::setMajorityWriteConcern(cmd, &resharding::kMajorityWriteConcern);
     }

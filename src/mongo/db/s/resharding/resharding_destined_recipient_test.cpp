@@ -121,8 +121,7 @@ void runInTransaction(OperationContext* opCtx, Callable&& func) {
  * Integration tests for ReshardingOpObserver, ShardingWriteRouter, and
  * LocalReshardingOperationsRegistry.
  */
-class DestinedRecipientTest : public ShardServerTestFixtureWithCatalogCacheLoaderMock,
-                              public testing::WithParamInterface<bool> {
+class DestinedRecipientTest : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
 public:
     const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const std::string kShardKey = "x";
@@ -130,10 +129,6 @@ public:
                                                ShardType("shard1", "Host1:12345")};
 
     void setUp() override {
-        if (!GetParam()) {
-            _featureFlagScope.emplace("featureFlagReshardingRegistry", false);
-        }
-
         // This suite installs filtering metadata through the deprecated non-authoritative refresh
         // path (forceDatabaseMetadataRefresh_DEPRECATED /
         // forceCollectionMetadataRefresh_DEPRECATED), which is rejected once shards are
@@ -170,7 +165,6 @@ public:
 
         _authoritativeCRUDScope.reset();
         _authoritativeDDLScope.reset();
-        _featureFlagScope.reset();
     }
 
     class StaticCatalogClient final : public ShardingCatalogClientMock {
@@ -376,19 +370,11 @@ protected:
     }
 
     boost::optional<CommonReshardingMetadata> _registeredMetadata;
-    boost::optional<unittest::ServerParameterGuard> _featureFlagScope;
     boost::optional<unittest::ServerParameterGuard> _authoritativeDDLScope;
     boost::optional<unittest::ServerParameterGuard> _authoritativeCRUDScope;
 };
 
-INSTANTIATE_TEST_SUITE_P(DestinedRecipient,
-                         DestinedRecipientTest,
-                         testing::Bool(),
-                         [](const testing::TestParamInfo<bool>& info) {
-                             return info.param ? "WithRegistry" : "WithoutRegistry";
-                         });
-
-TEST_P(DestinedRecipientTest, TestGetDestinedRecipient) {
+TEST_F(DestinedRecipientTest, TestGetDestinedRecipient) {
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, true);
 
@@ -405,7 +391,7 @@ TEST_P(DestinedRecipientTest, TestGetDestinedRecipient) {
     ASSERT_EQ(*destShardId, env.destShard);
 }
 
-TEST_P(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
+TEST_F(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, false);
 
@@ -426,7 +412,7 @@ TEST_P(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
                              });
 }
 
-TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInserts) {
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInserts) {
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, true);
 
@@ -440,7 +426,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInserts) {
     ASSERT_EQ(*recipShard, env.destShard);
 }
 
-TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInsertsInTransaction) {
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInsertsInTransaction) {
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, true, true);
 
@@ -463,7 +449,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInsertsInTran
     ASSERT_EQ(*recipShard, env.destShard);
 }
 
-TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdates) {
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdates) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
@@ -481,7 +467,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdates) {
     ASSERT_EQ(*recipShard, env.destShard);
 }
 
-TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates) {
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
@@ -502,7 +488,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates)
     ASSERT_EQ(*recipShard, env.destShard);
 }
 
-TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesOutOfPlace) {
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesOutOfPlace) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
@@ -520,7 +506,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesOutOfP
     ASSERT_EQ(*recipShard, env.destShard);
 }
 
-TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesInTransaction) {
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesInTransaction) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
@@ -548,7 +534,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesInTran
     ASSERT_EQ(*recipShard, env.destShard);
 }
 
-TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletes) {
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletes) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
@@ -566,7 +552,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletes) {
     ASSERT_EQ(*recipShard, env.destShard);
 }
 
-TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTransaction) {
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTransaction) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
@@ -593,7 +579,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTran
     ASSERT_EQ(*recipShard, env.destShard);
 }
 
-TEST_P(DestinedRecipientTest, TestUpdateChangesOwningShardThrows) {
+TEST_F(DestinedRecipientTest, TestUpdateChangesOwningShardThrows) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
@@ -613,7 +599,7 @@ TEST_P(DestinedRecipientTest, TestUpdateChangesOwningShardThrows) {
                   ExceptionFor<ErrorCodes::WouldChangeOwningShard>);
 }
 
-TEST_P(DestinedRecipientTest, TestUpdateChangesOwningShardReturnsCorrectDestinedShard) {
+TEST_F(DestinedRecipientTest, TestUpdateChangesOwningShardReturnsCorrectDestinedShard) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);
@@ -637,7 +623,7 @@ TEST_P(DestinedRecipientTest, TestUpdateChangesOwningShardReturnsCorrectDestined
     }
 }
 
-TEST_P(DestinedRecipientTest, TestUpdateSameOwningShard) {
+TEST_F(DestinedRecipientTest, TestUpdateSameOwningShard) {
     auto opCtx = operationContext();
 
     DBDirectClient client(opCtx);

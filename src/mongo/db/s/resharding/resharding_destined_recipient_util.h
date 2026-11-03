@@ -1,10 +1,13 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/shard_role/post_resharding_placement.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+
+#include <boost/optional/optional.hpp>
+
 namespace mongo::resharding {
 
 /**
@@ -26,18 +29,6 @@ struct DestinedRecipients {
 boost::optional<DestinedRecipients> getDestinedRecipientsIfPossiblyDifferent(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const BSONObj& oldDoc,
-    const BSONObj& newDoc);
-
-/**
- * Computes the destined recipients for the old and new documents using the given
- * PostReshardingCollectionPlacement from a collection acquisition. Returns boost::none
- * if 'reshardingPlacement' is empty or the resharding keys for oldDoc and newDoc are
- * identical. This overload supports the legacy (non resharding registry) code path.
- */
-boost::optional<DestinedRecipients> getDestinedRecipientsIfPossiblyDifferent(
-    OperationContext* opCtx,
-    const boost::optional<PostReshardingCollectionPlacement>& reshardingPlacement,
     const BSONObj& oldDoc,
     const BSONObj& newDoc);
 

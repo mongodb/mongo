@@ -15,7 +15,6 @@
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 
 #include <string_view>
@@ -219,12 +218,8 @@ InFlightEntry ReadyRangeDeletionsProcessor::_peekFrontAndAddToInFlight() {
 }
 
 // TODO: SERVER-123812 refactor connection between range deleter and resharding
-bool ReadyRangeDeletionsProcessor::_shouldDeferRangeDeletionForResharding(NamespaceString nss,
-                                                                          OperationContext* opCtx) {
-    auto ff = resharding::gFeatureFlagReshardingRegistry.isEnabled();
-    auto rsOp = LocalReshardingOperationsRegistry::get().getOperation(nss).has_value();
-
-    return ff && rsOp;
+bool ReadyRangeDeletionsProcessor::_shouldDeferRangeDeletionForResharding(NamespaceString nss) {
+    return LocalReshardingOperationsRegistry::get().getOperation(nss).has_value();
 }
 
 void ReadyRangeDeletionsProcessor::_rescheduleRangeDeletion(const RangeDeletionTask& task,
@@ -369,7 +364,7 @@ void ReadyRangeDeletionsProcessor::_processRangeDeletion(InFlightEntry taskEntry
                 possiblyStaleNss =
                     AutoGetCollection(opCtx, NamespaceStringOrUUID{dbName, collectionUuid}, MODE_IS)
                         .getNss();
-                if (_shouldDeferRangeDeletionForResharding(possiblyStaleNss, opCtx)) {
+                if (_shouldDeferRangeDeletionForResharding(possiblyStaleNss)) {
                     LOGV2_INFO(11485100,
                                "Range deletion task paused for namespace while "
                                "resharding takes place",

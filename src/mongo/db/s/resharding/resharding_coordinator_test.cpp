@@ -272,6 +272,18 @@ protected:
         return std::vector<TagsType>{tag1, tag2};
     }
 
+    BSONObj findOriginalCollectionEntry(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+        return client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
+                              BSON("_id" << _originalNss.ns_forTest()));
+    }
+
+    BSONObj findTempCollectionEntry(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+        return client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
+                              BSON("_id" << _tempNss.ns_forTest()));
+    }
+
     ReshardingCoordinatorDocument insertStateAndCatalogEntries(
         CoordinatorStateEnum state,
         OID epoch,
@@ -284,16 +296,9 @@ protected:
         client.insert(NamespaceString::kConfigReshardingOperationsNamespace,
                       coordinatorDoc.toBSON());
 
-        TypeCollectionReshardingFields reshardingFields(coordinatorDoc.getReshardingUUID());
-        reshardingFields.setState(coordinatorDoc.getState());
-        reshardingFields.setDonorFields(TypeCollectionDonorFields(
-            coordinatorDoc.getTempReshardingNss(),
-            coordinatorDoc.getReshardingKey(),
-            extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards())));
-
         auto originalNssCatalogEntry = makeOriginalCollectionCatalogEntry(
             coordinatorDoc,
-            reshardingFields,
+            boost::none,
             std::move(epoch),
             opCtx->getServiceContext()->getPreciseClockSource()->now());
         client.insert(NamespaceString::kConfigsvrCollectionsNamespace,
@@ -401,68 +406,25 @@ protected:
         }
     }
 
-    // Reads the original collection's catalog entry from disk and validates that the
-    // reshardingFields matches the expected.
+    // Reads the original collection's catalog entry from disk.
     void assertOriginalCollectionCatalogEntryMatchesExpected(
-        OperationContext* opCtx,
-        CollectionType expectedCollType,
-        const ReshardingCoordinatorDocument& expectedCoordinatorDoc) {
+        OperationContext* opCtx, const ReshardingCoordinatorDocument& expectedCoordinatorDoc) {
         DBDirectClient client(opCtx);
         CollectionType onDiskEntry(client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
                                                   BSON("_id" << _originalNss.ns_forTest())));
 
-        auto expectedReshardingFields = expectedCollType.getReshardingFields();
         auto expectedCoordinatorState = expectedCoordinatorDoc.getState();
-        if (expectedCoordinatorState == CoordinatorStateEnum::kDone ||
-            (expectedReshardingFields &&
-             expectedReshardingFields->getState() >= CoordinatorStateEnum::kCommitting)) {
+        if (expectedCoordinatorState >= CoordinatorStateEnum::kCommitting) {
             ASSERT_EQUALS(onDiskEntry.getNss(), _originalNss);
             ASSERT(onDiskEntry.getUuid() == _reshardingUUID);
             ASSERT_EQUALS(onDiskEntry.getKeyPattern().toBSON().woCompare(_newShardKey.toBSON()), 0);
             ASSERT_NOT_EQUALS(onDiskEntry.getEpoch(), _originalEpoch);
         }
 
-        if (!expectedReshardingFields)
-            return;
-
-        ASSERT(onDiskEntry.getReshardingFields());
-        auto onDiskReshardingFields = onDiskEntry.getReshardingFields().value();
-        ASSERT(onDiskReshardingFields.getReshardingUUID() ==
-               expectedReshardingFields->getReshardingUUID());
-        ASSERT(onDiskReshardingFields.getState() == expectedReshardingFields->getState());
-
-        ASSERT(onDiskReshardingFields.getDonorFields());
-        ASSERT_EQUALS(
-            onDiskReshardingFields.getDonorFields()->getReshardingKey().toBSON().woCompare(
-                expectedReshardingFields->getDonorFields()->getReshardingKey().toBSON()),
-            0);
-
-        if (auto expectedAbortReason = expectedCoordinatorDoc.getAbortReason()) {
-            auto userCanceled = getStatusFromAbortReason(expectedCoordinatorDoc) ==
-                ErrorCodes::ReshardCollectionAborted;
-            ASSERT(onDiskReshardingFields.getUserCanceled() == userCanceled);
-        } else {
-            ASSERT(onDiskReshardingFields.getUserCanceled() == boost::none);
-        }
-
-        // Check the reshardingFields.recipientFields.
-        if (expectedCoordinatorState != CoordinatorStateEnum::kAborting) {
-            // Don't bother checking the recipientFields if the coordinator state is already
-            // kAborting.
-            if (expectedCoordinatorState < CoordinatorStateEnum::kCommitting) {
-                // Until CoordinatorStateEnum::kCommitting, recipientsFields only live on the
-                // temporaryNss entry in config.collections.
-                ASSERT(!onDiskReshardingFields.getRecipientFields());
-            } else {
-                // The entry for the temporaryNss has been removed, recipientFields are appended to
-                // the originalCollection's reshardingFields.
-                ASSERT(onDiskReshardingFields.getRecipientFields());
-            }
-        }
+        ASSERT(!onDiskEntry.getReshardingFields());
     }
 
-    // Reads the temporary collection's catalog entry from disk and validates that the
-    // reshardingFields and allowChunkOperations matches the expected.
+    // Reads the temporary collection's catalog entry from disk.
     void assertTemporaryCollectionCatalogEntryMatchesExpected(
         OperationContext* opCtx, boost::optional<CollectionType> expectedCollType) {
         DBDirectClient client(opCtx);
@@ -475,32 +437,7 @@ protected:
 
         CollectionType onDiskEntry(doc);
 
-        auto expectedReshardingFields = expectedCollType->getReshardingFields().value();
-        ASSERT(onDiskEntry.getReshardingFields());
-
-        auto onDiskReshardingFields = onDiskEntry.getReshardingFields().value();
-        ASSERT_EQUALS(onDiskReshardingFields.getReshardingUUID(),
-                      expectedReshardingFields.getReshardingUUID());
-        ASSERT(onDiskReshardingFields.getState() == expectedReshardingFields.getState());
-
-        ASSERT(onDiskReshardingFields.getRecipientFields());
-        ASSERT_EQUALS(onDiskReshardingFields.getRecipientFields()->getSourceNss(),
-                      expectedReshardingFields.getRecipientFields()->getSourceNss());
-
-        if (expectedReshardingFields.getRecipientFields()->getCloneTimestamp()) {
-            ASSERT(onDiskReshardingFields.getRecipientFields()->getCloneTimestamp());
-            ASSERT_EQUALS(
-                onDiskReshardingFields.getRecipientFields()->getCloneTimestamp().value(),
-                expectedReshardingFields.getRecipientFields()->getCloneTimestamp().value());
-        } else {
-            ASSERT(!onDiskReshardingFields.getRecipientFields()->getCloneTimestamp());
-        }
-
-        ASSERT(onDiskReshardingFields.getUserCanceled() ==
-               expectedReshardingFields.getUserCanceled());
-
-        // 'donorFields' should not exist for the temporary collection.
-        ASSERT(!onDiskReshardingFields.getDonorFields());
+        ASSERT(!onDiskEntry.getReshardingFields());
     }
 
     void readChunkCatalogEntriesAndAssertMatchExpected(OperationContext* opCtx,
@@ -560,38 +497,13 @@ protected:
     }
 
     void assertStateAndCatalogEntriesMatchExpected(
-        OperationContext* opCtx,
-        ReshardingCoordinatorDocument expectedCoordinatorDoc,
-        OID collectionEpoch) {
+        OperationContext* opCtx, ReshardingCoordinatorDocument expectedCoordinatorDoc) {
         readReshardingCoordinatorDocAndAssertMatchesExpected(opCtx, expectedCoordinatorDoc);
 
-        // Check the resharding fields and allowChunkOperations in the config.collections entry for
-        // the original collection
-        TypeCollectionReshardingFields expectedReshardingFields(
-            expectedCoordinatorDoc.getReshardingUUID());
-        expectedReshardingFields.setState(expectedCoordinatorDoc.getState());
-        TypeCollectionDonorFields donorField(
-            expectedCoordinatorDoc.getTempReshardingNss(),
-            expectedCoordinatorDoc.getReshardingKey(),
-            extractShardIdsFromParticipantEntries(expectedCoordinatorDoc.getRecipientShards()));
-        expectedReshardingFields.setDonorFields(donorField);
-        if (auto abortReason = expectedCoordinatorDoc.getAbortReason()) {
-            expectedReshardingFields.setUserCanceled(
-                getStatusFromAbortReason(expectedCoordinatorDoc) ==
-                ErrorCodes::ReshardCollectionAborted);
-        }
+        assertOriginalCollectionCatalogEntryMatchesExpected(opCtx, expectedCoordinatorDoc);
 
-        auto expectedOriginalCollType = makeOriginalCollectionCatalogEntry(
-            expectedCoordinatorDoc,
-            expectedReshardingFields,
-            std::move(collectionEpoch),
-            opCtx->getServiceContext()->getPreciseClockSource()->now());
-        assertOriginalCollectionCatalogEntryMatchesExpected(
-            opCtx, expectedOriginalCollType, expectedCoordinatorDoc);
-
-        // Check the resharding fields and allowChunkOperations in the config.collections entry for
-        // the temp collection. If the expected state is >= kCommitting, the entry for the temp
-        // collection should have been removed.
+        // Check the config.collections entry for the temp collection. If the expected state is
+        // >= kCommitting, the entry for the temp collection should have been removed.
         boost::optional<CollectionType> expectedTempCollType = boost::none;
         if (expectedCoordinatorDoc.getState() < CoordinatorStateEnum::kCommitting) {
             expectedTempCollType = createTempReshardingCollectionType(
@@ -600,17 +512,6 @@ protected:
                 ChunkVersion({OID::gen(), Timestamp(1, 2)}, {1, 1}),
                 BSONObj(),
                 boost::none);
-
-            // It's necessary to add the userCanceled field because the call into
-            // createTempReshardingCollectionType assumes that the collection entry is
-            // being created in a non-aborted state.
-            if (auto abortReason = expectedCoordinatorDoc.getAbortReason()) {
-                auto reshardingFields = expectedTempCollType->getReshardingFields();
-                reshardingFields->setUserCanceled(
-                    getStatusFromAbortReason(expectedCoordinatorDoc) ==
-                    ErrorCodes::ReshardCollectionAborted);
-                expectedTempCollType->setReshardingFields(std::move(reshardingFields));
-            }
         }
 
         assertTemporaryCollectionCatalogEntryMatchesExpected(opCtx, expectedTempCollType);
@@ -648,16 +549,9 @@ protected:
                       ShardId("shard0000"));
         DBDirectClient client(opCtx);
 
-        TypeCollectionReshardingFields reshardingFields(coordinatorDoc.getReshardingUUID());
-        reshardingFields.setState(coordinatorDoc.getState());
-        reshardingFields.setDonorFields(TypeCollectionDonorFields(
-            coordinatorDoc.getTempReshardingNss(),
-            coordinatorDoc.getReshardingKey(),
-            extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards())));
-
         auto originalNssCatalogEntry = makeOriginalCollectionCatalogEntry(
             coordinatorDoc,
-            reshardingFields,
+            boost::none,
             _originalEpoch,
             opCtx->getServiceContext()->getPreciseClockSource()->now());
         client.insert(NamespaceString::kConfigsvrCollectionsNamespace,
@@ -701,7 +595,7 @@ protected:
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
-        assertStateAndCatalogEntriesMatchExpected(opCtx, expectedCoordinatorDoc, _originalEpoch);
+        assertStateAndCatalogEntriesMatchExpected(opCtx, expectedCoordinatorDoc);
 
         // Check that chunks and tags entries have been correctly created
         readChunkCatalogEntriesAndAssertMatchExpected(
@@ -716,7 +610,7 @@ protected:
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
-        assertStateAndCatalogEntriesMatchExpected(opCtx, expectedCoordinatorDoc, _originalEpoch);
+        assertStateAndCatalogEntriesMatchExpected(opCtx, expectedCoordinatorDoc);
     }
 
     void writeDecisionPersistedStateExpectSuccess(
@@ -740,7 +634,7 @@ protected:
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
-        assertStateAndCatalogEntriesMatchExpected(opCtx, expectedCoordinatorDoc, _finalEpoch);
+        assertStateAndCatalogEntriesMatchExpected(opCtx, expectedCoordinatorDoc);
 
         // Check that chunks and tags under the temp namespace have been removed
         DBDirectClient client(opCtx);
@@ -786,14 +680,7 @@ protected:
                                   BSON("ns" << updatedCoordinatorDoc.getSourceNss().ns_forTest()));
         ASSERT(doc.isEmpty());
 
-        // Check that the resharding fields are removed from the config.collections entry.
-        auto expectedOriginalCollType = makeOriginalCollectionCatalogEntry(
-            updatedCoordinatorDoc,
-            boost::none,
-            _finalEpoch,
-            opCtx->getServiceContext()->getPreciseClockSource()->now());
-        assertOriginalCollectionCatalogEntryMatchesExpected(
-            opCtx, expectedOriginalCollType, updatedCoordinatorDoc);
+        assertOriginalCollectionCatalogEntryMatchesExpected(opCtx, updatedCoordinatorDoc);
     }
 
     void quiesceCoordinatorDocAndReshardingFieldsExpectSuccess(
@@ -810,14 +697,7 @@ protected:
         // Check that the entry is marked as quiesced in config.reshardingOperations
         readReshardingCoordinatorDocAndAssertMatchesExpected(opCtx, updatedCoordinatorDoc);
 
-        // Check that the resharding fields are removed from the config.collections entry.
-        auto expectedOriginalCollType = makeOriginalCollectionCatalogEntry(
-            updatedCoordinatorDoc,
-            boost::none,
-            _finalEpoch,
-            opCtx->getServiceContext()->getPreciseClockSource()->now());
-        assertOriginalCollectionCatalogEntryMatchesExpected(
-            opCtx, expectedOriginalCollType, updatedCoordinatorDoc);
+        assertOriginalCollectionCatalogEntryMatchesExpected(opCtx, updatedCoordinatorDoc);
     }
 
     void transitionToErrorExpectSuccess(ErrorCodes::Error errorCode) {
@@ -861,15 +741,6 @@ protected:
     ShardKeyPattern _newShardKey = ShardKeyPattern(BSON("newSK" << 1));
 
     std::unique_ptr<ReshardingMetrics> _metrics;
-
-    // The assertions in this fixture exercise the legacy contract where the coordinator
-    // writes 'reshardingFields' to both config.collections entries. Both flags are now
-    // default-on, so forcing them off is required to keep these tests covering the legacy
-    // path; the gated-off code paths are covered by ReshardingCoordinatorNoRefreshPersistenceTest
-    // below and by resharding_coordinator_service_util_test.
-    unittest::ServerParameterGuard _initNoRefreshFlag{"featureFlagReshardingInitNoRefresh", false};
-    unittest::ServerParameterGuard _noRefreshApplyingAndBlockingWritesFlag{
-        "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", false};
 
     const std::vector<ChunkRange> _oldChunkRanges = {
         ChunkRange(_oldShardKey.getKeyPattern().globalMin(), BSON("oldSK" << 12345)),
@@ -1337,44 +1208,8 @@ TEST_F(ReshardingSplitPolicySelectionTest, NonHashedPrefixKeyWithShardDistributi
     ASSERT_EQUALS(recipientShardIds(result), (std::set<ShardId>{ShardId(kShardOnZone1)}));
 }
 
-/**
- * Mirror of ReshardingCoordinatorPersistenceTest, but with the coordinator's reshardingFields
- * writes gated off via featureFlagReshardingInitNoRefresh and
- * featureFlagReshardingNoRefreshApplyingAndBlockingWrites. Verifies that the persistence helpers
- * leave the on-disk config.collections entries free of reshardingFields across pre-commit
- * transitions, complementing the BSON-shape coverage in resharding_coordinator_service_util_test.
- */
-class ReshardingCoordinatorNoRefreshPersistenceTest : public ReshardingCoordinatorPersistenceTest {
-protected:
-    ReshardingCoordinatorNoRefreshPersistenceTest()
-        : _initNoRefreshOn{"featureFlagReshardingInitNoRefresh", true},
-          _noRefreshApplyingAndBlockingWritesOn{
-              "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", true} {}
-
-    BSONObj findOriginalCollectionEntry(OperationContext* opCtx) {
-        DBDirectClient client(opCtx);
-        return client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
-                              BSON("_id" << _originalNss.ns_forTest()));
-    }
-
-    BSONObj findTempCollectionEntry(OperationContext* opCtx) {
-        DBDirectClient client(opCtx);
-        return client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
-                              BSON("_id" << _tempNss.ns_forTest()));
-    }
-
-private:
-    // Re-flip the parent's controllers back on for the test body. Destruction unwinds in
-    // reverse so the parent's off-state is restored cleanly.
-    unittest::ServerParameterGuard _initNoRefreshOn;
-    unittest::ServerParameterGuard _noRefreshApplyingAndBlockingWritesOn;
-};
-
-TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
+TEST_F(ReshardingCoordinatorPersistenceTest,
        TempCollectionEntryHasNoReshardingFieldsAfterInitialInsert) {
-    // Setting up the catalog at kPreparingToDonate inserts the temp collection entry via the
-    // production helper createTempReshardingCollectionType. With InitNoRefresh on, that entry
-    // should have no 'reshardingFields' subdocument.
     insertStateAndCatalogEntries(CoordinatorStateEnum::kPreparingToDonate, _originalEpoch);
 
     auto tempEntryBSON = findTempCollectionEntry(operationContext());
@@ -1383,10 +1218,8 @@ TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
         << tempEntryBSON;
 }
 
-TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
+TEST_F(ReshardingCoordinatorPersistenceTest,
        TempCollectionEntryUntouchedDuringTransientStateTransition) {
-    // Pre-populate at kCloning. Under InitNoRefresh, this seeds an entry without
-    // reshardingFields.
     auto coordinatorDoc =
         insertStateAndCatalogEntries(CoordinatorStateEnum::kCloning, _originalEpoch);
 
@@ -1402,10 +1235,7 @@ TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
     makeAndInsertChunksForRecipientShard(
         _reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
 
-    // Drive a transient transition (kCloning -> kBlockingWrites). Both flags are on, so the
-    // legacy reshardingFields write produced by createLegacyTempCollectionReshardingFieldsRequest
-    // must be skipped (per skipReshardingFieldsWritesForCoordinator) and no partial
-    // reshardingFields subtree may appear on the temp entry.
+    // Drive a transient transition (kCloning -> kBlockingWrites).
     auto expectedCoordinatorDoc = coordinatorDoc;
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kBlockingWrites);
 
@@ -1418,19 +1248,16 @@ TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
         << finalTempEntry;
 }
 
-TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
-       OriginalCollectionEntryReshardingFieldsAreNotReWrittenDuringTransientStateTransition) {
-    // Pre-populate at kCloning. The fixture's setup inserts an originalNss entry with
-    // reshardingFields hand-built; the gating only affects writes done by the coordinator's
-    // production helpers (updateConfigCollectionsForOriginalNss returns BSONObj() here).
+TEST_F(ReshardingCoordinatorPersistenceTest,
+       OriginalCollectionEntryHasNoReshardingFieldsAcrossTransientStateTransition) {
+    // Pre-populate at kCloning.
     auto coordinatorDoc =
         insertStateAndCatalogEntries(CoordinatorStateEnum::kCloning, _originalEpoch);
 
     auto initialOriginalEntry = findOriginalCollectionEntry(operationContext());
     ASSERT(!initialOriginalEntry.isEmpty());
-    auto initialReshardingFields =
-        initialOriginalEntry.getObjectField(CollectionType::kReshardingFieldsFieldName);
-    auto initialState = initialReshardingFields.getStringField("state");
+    ASSERT_FALSE(initialOriginalEntry.hasField(CollectionType::kReshardingFieldsFieldName))
+        << initialOriginalEntry;
 
     makeAndInsertChunksForDonorShard(
         _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
@@ -1443,26 +1270,17 @@ TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
     writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
         operationContext(), _metrics.get(), expectedCoordinatorDoc, boost::none);
 
-    // The reshardingFields.state on the original entry must be unchanged: with the no-refresh
-    // flag on, the coordinator no longer rewrites reshardingFields during transient transitions.
     auto finalOriginalEntry = findOriginalCollectionEntry(operationContext());
     ASSERT(!finalOriginalEntry.isEmpty());
-    auto finalReshardingFields =
-        finalOriginalEntry.getObjectField(CollectionType::kReshardingFieldsFieldName);
-    ASSERT_EQ(finalReshardingFields.getStringField("state"), initialState)
-        << "expected reshardingFields.state to be unchanged across transient transition; "
-        << "before=" << initialOriginalEntry << " after=" << finalOriginalEntry;
+    ASSERT_FALSE(finalOriginalEntry.hasField(CollectionType::kReshardingFieldsFieldName))
+        << finalOriginalEntry;
 }
 
-TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
+TEST_F(ReshardingCoordinatorPersistenceTest,
        TempCollectionEntryStaysFreeOfReshardingFieldsAcrossFullPreCommitLifecycle) {
     // Walk the coordinator through the full pre-commit lifecycle
     // (kPreparingToDonate -> kCloning -> kBlockingWrites) and assert at every step that the
-    // temp config.collections entry never grows a 'reshardingFields' subtree. This exercises
-    // both the initial insert path (createTempCollectionLifecycleRequest +
-    // createTempReshardingCollectionType) and the transient update path
-    // (createLegacyTempCollectionReshardingFieldsRequest), gated through
-    // writeToConfigCollectionsForTempNss when the no-refresh flag is on.
+    // temp config.collections entry never grows a 'reshardingFields' subtree.
     auto coordinatorDoc =
         insertStateAndCatalogEntries(CoordinatorStateEnum::kPreparingToDonate, _originalEpoch);
 
@@ -1480,8 +1298,7 @@ TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
     makeAndInsertChunksForRecipientShard(
         _reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
 
-    // kPreparingToDonate -> kCloning. kCloning is the path that historically wrote a
-    // partial $set against 'reshardingFields.recipientFields.*'; the gate must skip it.
+    // kPreparingToDonate -> kCloning.
     auto cloningDoc = coordinatorDoc;
     cloningDoc.setState(CoordinatorStateEnum::kCloning);
     emplaceCloneTimestampIfExists(cloningDoc, Timestamp(1, 1));
@@ -1496,9 +1313,7 @@ TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
 
     assertTempEntryHasNoReshardingFields("after kCloning transition");
 
-    // kCloning -> kBlockingWrites. This goes through the 'default' branch of
-    // createLegacyTempCollectionReshardingFieldsRequest, which is upsert: true and would
-    // otherwise create a malformed parent doc; the gate must skip it.
+    // kCloning -> kBlockingWrites.
     auto blockingDoc = cloningDoc;
     blockingDoc.setState(CoordinatorStateEnum::kBlockingWrites);
     writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
@@ -1512,7 +1327,7 @@ TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
  * placement-version bump when the coordinator doc has an authoritative metadata access level.
  */
 class ReshardingCoordinatorAuthoritativePersistenceTest
-    : public ReshardingCoordinatorNoRefreshPersistenceTest {
+    : public ReshardingCoordinatorPersistenceTest {
 public:
     ReshardingCoordinatorAuthoritativePersistenceTest()
         : _authDDLOn{"featureFlagAuthoritativeShardsDDL", true},

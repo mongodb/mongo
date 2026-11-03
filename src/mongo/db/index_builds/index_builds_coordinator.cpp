@@ -74,7 +74,6 @@
 #include "mongo/otel/metrics/server_status_options.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -3078,7 +3077,6 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     CollectionWriter collection(opCtx, autoColl);
 
     const auto& nss = collection.get()->ns();
-    const bool useRegistry = resharding::gFeatureFlagReshardingRegistry.isEnabled();
 
     {
         // This check is for optimization purposes only as since this lock is released after this,
@@ -3089,11 +3087,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
         if (opCtx->writesAreReplicated()) {
             // This check is only meaningful on primaries. Secondaries should defer to the primary's
             // decision.
-            if (useRegistry) {
-                resharding::throwIfReshardingInProgress(nss);
-            } else {
-                scopedCss->getCollectionDescription(opCtx).throwIfReshardingInProgress(nss);
-            }
+            resharding::throwIfReshardingInProgress(nss);
         }
     }
 

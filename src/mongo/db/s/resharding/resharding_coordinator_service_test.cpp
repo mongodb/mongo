@@ -383,16 +383,8 @@ public:
             stateTransitionsGuard->unset(state);
 
             if (errorState && state == *errorState) {
-                // With featureFlagReshardingInitNoRefresh enabled, the abort path skips the
-                // observer wait and races kAborting -> kDone, so polling for kAborting and
-                // advancing participants would either spin or fail.
-                if (!resharding::gFeatureFlagReshardingInitNoRefresh
-                         .isEnabledAndIgnoreFCVUnsafe()) {
-                    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kAborting);
-                    makeRecipientsProceedToDone(opCtx);
-                    makeDonorsProceedToDone(opCtx);
-                }
-
+                // The abort path skips the observer wait and races kAborting -> kDone, so polling
+                // for kAborting and advancing participants would either spin or fail.
                 ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(),
                           ErrorCodes::InternalError);
                 checkCoordinatorDocumentRemoved(opCtx);
@@ -455,33 +447,6 @@ public:
                                   /*reshardingOptions=*/boost::none,
                                   /*errorState=*/boost::none,
                                   failoverAtState);
-    }
-
-    void runReshardingWithUnrecoverableError(
-        CoordinatorStateEnum errorState,
-        ExternalStateForTest::ExternalFunction errorFunction,
-        ErrorCodes::Error expectedError = ErrorCodes::InternalError) {
-        std::vector<CoordinatorStateEnum> states;
-        const std::vector<CoordinatorStateEnum> allStates = {
-            CoordinatorStateEnum::kPreparingToDonate,
-            CoordinatorStateEnum::kCloning,
-            CoordinatorStateEnum::kApplying,
-            CoordinatorStateEnum::kBlockingWrites};
-
-        for (const auto& state : allStates) {
-            states.push_back(state);
-            if (state == errorState)
-                break;
-        }
-
-        externalState()->throwUnrecoverableErrorIn(errorState, errorFunction);
-
-        runReshardingToCompletion(
-            {},
-            std::make_unique<PauseDuringStateTransitions>(controller(), states),
-            states,
-            makeDefaultReshardingOptions(),
-            errorState);
     }
 
     int64_t getDocumentsToCopyForDonor(const ShardId& shardId) {
@@ -552,19 +517,6 @@ public:
             if (coordinatorDoc.getState() >= CoordinatorStateEnum::kCloning) {
                 ASSERT_EQ(*coordinatorDoc.getApproxBytesToCopy(), expectedApproxBytesToClone);
                 ASSERT_EQ(*coordinatorDoc.getApproxDocumentsToCopy(),
-                          expectedApproxDocumentsToClone);
-
-                // Under featureFlagReshardingInitNoRefresh the coordinator no longer writes
-                // reshardingFields to the temp collection's config.collections entry, so the
-                // recipient-side copy metrics are not persisted there.
-                if (resharding::gFeatureFlagReshardingInitNoRefresh.isEnabledAndIgnoreFCVUnsafe()) {
-                    return;
-                }
-
-                auto collectionDoc = getTemporaryCollectionCatalogEntry(opCtx, coordinatorDoc);
-                auto recipientFields = collectionDoc.getReshardingFields()->getRecipientFields();
-                ASSERT_EQ(*recipientFields->getApproxBytesToCopy(), expectedApproxBytesToClone);
-                ASSERT_EQ(*recipientFields->getApproxDocumentsToCopy(),
                           expectedApproxDocumentsToClone);
             }
         };
@@ -652,15 +604,6 @@ public:
         // Unset the failpoint to allow the coordinator to initialize the cancellation token holder
         // and start recovering the resharding operation.
         pauseBeforeCTHolderInitialization->setMode(FailPoint::off, 0);
-
-        // With featureFlagReshardingInitNoRefresh enabled, the abort path skips the
-        // observer wait and races kAborting -> kDone, so polling for kAborting and
-        // advancing participants would either spin or fail.
-        if (!resharding::gFeatureFlagReshardingInitNoRefresh.isEnabledAndIgnoreFCVUnsafe()) {
-            waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kAborting);
-            makeRecipientsProceedToDone(opCtx);
-            makeDonorsProceedToDone(opCtx);
-        }
 
         // Wait for completion and verify the original abort reason is still used.
         ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), abortReason0);
@@ -974,14 +917,6 @@ TEST_F(ReshardingCoordinatorServiceTest, VerificationRunsWhenFetchDocumentsToCop
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransitionsTokDone) {
-    runReshardingToCompletion();
-}
-
-TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfulWithRefresh) {
-    unittest::ServerParameterGuard noRefreshFeatureFlagController(
-        "featureFlagReshardingInitNoRefresh", false);
-    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
-        "featureFlagAuthoritativeShardsDDL", false);
     runReshardingToCompletion();
 }
 
@@ -1803,16 +1738,6 @@ TEST_F(ReshardingCoordinatorServiceTest, CausalityBarrierInvokedOnRecovery) {
     ASSERT_EQ(externalState()->getCausalityBarrierInvokeCount(), 1);
 }
 
-TEST_F(ReshardingCoordinatorServiceTest, CausalityBarrierSkippedOnRecoveryWithoutFeatureFlag) {
-    unittest::ServerParameterGuard noRefreshFeatureFlagController(
-        "featureFlagReshardingInitNoRefresh", false);
-    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
-        "featureFlagAuthoritativeShardsDDL", false);
-
-    runReshardingToCompletionWithFailoverAt(CoordinatorStateEnum::kPreparingToDonate);
-    ASSERT_EQ(externalState()->getCausalityBarrierInvokeCount(), 0);
-}
-
 class ReshardingCoordinatorServiceFailCloningVerificationTest
     : public ReshardingCoordinatorServiceTestBase {
 public:
@@ -2002,81 +1927,11 @@ TEST_F(ReshardingCoordinatorServiceTest,
         transitionFunctions, /*stateTransitionsGuard=*/nullptr, states, reshardingOptions);
 }
 
-TEST_F(ReshardingCoordinatorServiceTest, ReshardingSendsDonorInitCmd) {
-    // Force the legacy refresh path to throw. Successful resharding completion
-    // confirms that the new init-cmd path was used instead.
-    externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kPreparingToDonate,
-                                               kEstablishAllDonorsAsParticipants);
-
-    runReshardingToCompletion();
-}
-
-TEST_F(ReshardingCoordinatorServiceTest, ReshardingSendsRecipientInitCmd) {
-    // Force the legacy refresh path to throw. Successful resharding completion
-    // confirms that the new init-cmd path was used instead.
-    externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kPreparingToDonate,
-                                               kEstablishAllRecipientsAsParticipants);
-
-    runReshardingToCompletion();
-}
-
-TEST_F(ReshardingCoordinatorServiceTest,
-       UnrecoverableErrorWhileEstablishingDonorsDuringPreparingToDonate) {
-    // Force the legacy path so establishAllDonorsAsParticipants is called.
-    unittest::ServerParameterGuard noRefreshFeatureFlagController(
-        "featureFlagReshardingInitNoRefresh", false);
-    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
-        "featureFlagAuthoritativeShardsDDL", false);
-
-    runReshardingWithUnrecoverableError(CoordinatorStateEnum::kPreparingToDonate,
-                                        kEstablishAllDonorsAsParticipants);
-}
-
-TEST_F(ReshardingCoordinatorServiceTest,
-       UnrecoverableErrorWhileEstablishingRecipientsDuringPreparingToDonate) {
-    // Force the legacy path so kEstablishAllRecipientsAsParticipants is called.
-    unittest::ServerParameterGuard noRefreshFeatureFlagController(
-        "featureFlagReshardingInitNoRefresh", false);
-    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
-        "featureFlagAuthoritativeShardsDDL", false);
-
-    runReshardingWithUnrecoverableError(CoordinatorStateEnum::kPreparingToDonate,
-                                        kEstablishAllRecipientsAsParticipants);
-}
-
-TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringCloning) {
-    unittest::ServerParameterGuard noCloneNoRefreshFeatureFlagController(
-        "featureFlagReshardingCloneNoRefresh", false);
-    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
-        "featureFlagAuthoritativeShardsDDL", false);
-    runReshardingWithUnrecoverableError(CoordinatorStateEnum::kCloning,
-                                        kTellAllRecipientsToRefresh);
-}
-
-TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringApplying) {
-    unittest::ServerParameterGuard noRefreshFeatureFlagController(
-        "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", false);
-    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
-        "featureFlagAuthoritativeShardsDDL", false);
-    runReshardingWithUnrecoverableError(CoordinatorStateEnum::kApplying, kTellAllDonorsToRefresh);
-}
-
-TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringBlockingWrites) {
-    unittest::ServerParameterGuard noRefreshFeatureFlagController(
-        "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", false);
-    unittest::ServerParameterGuard nonAuthoritativeShardsDDLFeatureFlagController(
-        "featureFlagAuthoritativeShardsDDL", false);
-    runReshardingWithUnrecoverableError(CoordinatorStateEnum::kBlockingWrites,
-                                        kTellAllDonorsToRefresh);
-}
-
 TEST_F(ReshardingCoordinatorServiceTest, DeltaCollectorErrorDuringBlockingWritesSkipsVerification) {
     // The delta collector runs asynchronously after the coordinator enters kBlockingWrites. Its
     // error is only surfaced when _verifyFinalCollection awaits the delta future, which happens
-    // after all recipients reach strict consistency. Unlike kTellAllDonorsToRefresh (which fails
-    // synchronously before the recipients wait), we must drive recipients to strict consistency
-    // so the coordinator calls _verifyFinalCollection and observes the error. This means
-    // runReshardingWithUnrecoverableError cannot be used here.
+    // after all recipients reach strict consistency. We must drive recipients to strict
+    // consistency so the coordinator calls _verifyFinalCollection and observes the error.
     //
     // An error from a participant's change-streams monitor must not abort the resharding operation
     // as verfication is best effort.
@@ -2521,28 +2376,6 @@ TEST_F(ReshardingCoordinatorServiceTest, TransientErrorAfterCoordinatorDocRemove
     ASSERT_OK(coordinator->getCompletionFuture().getNoThrow());
 }
 
-TEST_F(ReshardingCoordinatorServiceTest, NoRefreshBlockingWritesWithFeatureFlag) {
-    unittest::ServerParameterGuard noRefreshFeatureFlagController(
-        "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", true);
-    unittest::ServerParameterGuard initNoRefreshFeatureFlagController(
-        "featureFlagReshardingInitNoRefresh", true);
-    externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kBlockingWrites,
-                                               kTellAllDonorsToRefresh);
-
-    runReshardingToCompletion();
-}
-
-TEST_F(ReshardingCoordinatorServiceTest, NoRefreshApplyingWithFeatureFlag) {
-    unittest::ServerParameterGuard noRefreshFeatureFlagController(
-        "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", true);
-    unittest::ServerParameterGuard initNoRefreshFeatureFlagController(
-        "featureFlagReshardingInitNoRefresh", true);
-    externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kApplying,
-                                               kTellAllDonorsToRefresh);
-
-    runReshardingToCompletion();
-}
-
 TEST_F(ReshardingCoordinatorServiceTest, SkipsParticipantWaitOnAbort) {
     PauseDuringStateTransitions stateTransitionsGuard{controller(),
                                                       CoordinatorStateEnum::kPreparingToDonate};
@@ -2653,26 +2486,11 @@ TEST_F(ReshardingCoordinatorServiceTest, ConflictingReshardingOpPrecedesFcvTrans
     runReshardingToCompletion(TransitionFunctionMap{}, std::move(stateTransitionsGuard));
 }
 
-using ReshardingCoordinatorServiceTestDeathTest = ReshardingCoordinatorServiceTest;
-
-DEATH_TEST_REGEX_F(ReshardingCoordinatorServiceTestDeathTest,
-                   CreatingNewCoordinatorWithInconsistentFeatureFlagsIsRejected,
-                   "Tripwire assertion.*13237401") {
-    // Disabling one no-refresh flag leaves the pinned-version flag set in an inconsistent state.
-    unittest::ServerParameterGuard initNoRefreshFlag{"featureFlagReshardingInitNoRefresh", false};
-    (void)initializeAndGetCoordinator();
-}
-
-TEST_F(ReshardingCoordinatorServiceTest,
-       ConflictingReshardingOpPrecedesInconsistentFeatureFlagCheck) {
+TEST_F(ReshardingCoordinatorServiceTest, ConflictingReshardingOpIsRejected) {
     auto stateTransitionsGuard = std::make_unique<PauseDuringStateTransitions>(
         controller(), defaultReshardingCompletionStates());
     auto coordinator = initializeAndGetCoordinator();
 
-    unittest::ServerParameterGuard initNoRefreshFlag{"featureFlagReshardingInitNoRefresh", false};
-
-    // An active resharding operation conflicts before the feature-flag consistency check is
-    // reached.
     ASSERT_THROWS_WITH_CHECK(
         initializeAndGetCoordinator(
             UUID::gen(), _originalNss, _tempNss, _newShardKey, UUID::gen(), _oldShardKey),

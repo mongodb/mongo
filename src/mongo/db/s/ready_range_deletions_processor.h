@@ -75,7 +75,7 @@ private:
      */
     void _processRangeDeletion(InFlightEntry taskEntry);
 
-    bool _shouldDeferRangeDeletionForResharding(NamespaceString nss, OperationContext* opCtx);
+    bool _shouldDeferRangeDeletionForResharding(NamespaceString nss);
 
     /**
      * Pops the current task from the queue and re-enqueues it after the given delay. If the

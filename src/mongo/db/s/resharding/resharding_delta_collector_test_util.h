@@ -58,20 +58,6 @@ public:
                                     CancellationToken) override {
         MONGO_UNREACHABLE;
     }
-    void establishAllDonorsAsParticipants(OperationContext*,
-                                          const NamespaceString&,
-                                          const std::vector<DonorShardEntry>&,
-                                          const std::shared_ptr<executor::TaskExecutor>&,
-                                          CancellationToken) override {
-        MONGO_UNREACHABLE;
-    }
-    void establishAllRecipientsAsParticipants(OperationContext*,
-                                              const NamespaceString&,
-                                              const std::vector<RecipientShardEntry>&,
-                                              const std::shared_ptr<executor::TaskExecutor>&,
-                                              CancellationToken) override {
-        MONGO_UNREACHABLE;
-    }
     std::map<ShardId, int64_t> getDocumentsToCopyFromDonors(
         OperationContext*,
         const std::shared_ptr<executor::TaskExecutor>&,

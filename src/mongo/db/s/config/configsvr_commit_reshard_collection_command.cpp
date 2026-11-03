@@ -61,7 +61,7 @@ public:
                                                           opCtx->getWriteConcern());
 
             const auto sourceNss = resharding::resolveReshardingSourceNss(opCtx, ns());
-            UUID reshardingUUID = resharding::retrieveReshardingUUID(opCtx, sourceNss);
+            UUID reshardingUUID = resharding::retrieveReshardingUUID(sourceNss);
 
             auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
                 ReshardingCoordinatorService,

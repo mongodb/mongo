@@ -553,20 +553,12 @@ private:
         boost::optional<Status> abortReason = boost::none);
 
     /**
-     * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure donor state machine creation
-     * by the time the refresh completes.
-     *
-     * If featureFlagReshardingInitNoRefresh feature flag is enabled, this function sends
-     * _shardsvrReshardDonorInitialize command to all donor shards.
+     * Sends '_shardsvrReshardDonorInitialize' to all donor shards.
      */
     void _initializeAllDonors(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
-     * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure recipient state machine
-     * creation by the time the refresh completes.
-     *
-     * If featureFlagReshardingInitNoRefresh feature flag is enabled, this function sends
-     * _shardsvrReshardRecipientInitialize command to all recipient shards.
+     * Sends '_shardsvrReshardRecipientInitialize' to all recipient shards.
      */
     void _initializeAllRecipients(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 

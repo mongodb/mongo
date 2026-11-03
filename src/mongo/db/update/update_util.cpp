@@ -32,7 +32,6 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -254,13 +253,8 @@ void ShardingChecksForUpdate::checkUpdateChangesReshardingKey(OperationContext* 
                                                               const BSONObj& newObj,
                                                               const Snapshotted<BSONObj>& oldObj) {
 
-    const bool useRegistry = resharding::gFeatureFlagReshardingRegistry.isEnabled();
-
-    auto destinedRecipients = useRegistry
-        ? resharding::getDestinedRecipientsIfPossiblyDifferent(
-              opCtx, _collAcq.nss(), oldObj.value(), newObj)
-        : resharding::getDestinedRecipientsIfPossiblyDifferent(
-              opCtx, _collAcq.getPostReshardingPlacement(), oldObj.value(), newObj);
+    auto destinedRecipients = resharding::getDestinedRecipientsIfPossiblyDifferent(
+        opCtx, _collAcq.nss(), oldObj.value(), newObj);
     if (!destinedRecipients) {
         return;
     }

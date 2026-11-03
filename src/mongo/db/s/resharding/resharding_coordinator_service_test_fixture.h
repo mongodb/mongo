@@ -69,8 +69,6 @@ public:
     enum class ExternalFunction {
         kTellAllDonorsToRefresh,
         kTellAllRecipientsToRefresh,
-        kEstablishAllDonorsAsParticipants,
-        kEstablishAllRecipientsAsParticipants,
         kGetDocumentsDeltaFromDonors,
     };
 
@@ -148,35 +146,6 @@ public:
             opCtx,
             nssToRefresh,
             reshardingUUID,
-            resharding::extractShardIdsFromParticipantEntries(recipientShards),
-            executor,
-            token);
-    }
-
-    void establishAllDonorsAsParticipants(OperationContext* opCtx,
-                                          const NamespaceString& sourceNss,
-                                          const std::vector<DonorShardEntry>& donorShards,
-                                          const std::shared_ptr<executor::TaskExecutor>& executor,
-                                          CancellationToken token) override {
-        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kEstablishAllDonorsAsParticipants);
-        resharding::sendFlushRoutingTableCacheUpdatesToShards(
-            opCtx,
-            sourceNss,
-            resharding::extractShardIdsFromParticipantEntries(donorShards),
-            executor,
-            token);
-    }
-
-    void establishAllRecipientsAsParticipants(
-        OperationContext* opCtx,
-        const NamespaceString& tempNss,
-        const std::vector<RecipientShardEntry>& recipientShards,
-        const std::shared_ptr<executor::TaskExecutor>& executor,
-        CancellationToken token) override {
-        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kEstablishAllRecipientsAsParticipants);
-        resharding::sendFlushRoutingTableCacheUpdatesToShards(
-            opCtx,
-            tempNss,
             resharding::extractShardIdsFromParticipantEntries(recipientShards),
             executor,
             token);
@@ -441,10 +410,7 @@ public:
         BatonHandle baton,
         boost::optional<UUID> clientOperationKey) final {
         auto cmdName = cmdBSON.firstElementFieldNameStringData();
-        if (!kOsiExemptCommands.count(cmdName) &&
-            resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (!kOsiExemptCommands.count(cmdName)) {
             ASSERT(cmdBSON.hasField("lsid"))
                 << "ReshardingCoordinator RPC '" << cmdName << "' missing lsid (OSI)";
             ASSERT(cmdBSON.hasField("txnNumber"))
@@ -466,9 +432,7 @@ private:
     // _flushReshardingStateChange is idempotent, so OSI-based deduplication is unnecessary.
     // One instance is also sent post-commit on a best-effort basis, after the coordinator
     // document and its associated session have already been removed, making it impossible
-    // to include OSI. This command is expected to be removed once reshardingFields are no
-    // longer written to config.collections, when shards authoritatively manage their own
-    // filtering metadata.
+    // to include OSI.
     static inline const StringSet kOsiExemptCommands{
         "_flushReshardingStateChange",
     };

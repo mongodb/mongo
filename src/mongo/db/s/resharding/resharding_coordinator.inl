@@ -400,10 +400,7 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
                        // stale OSI-stamped commands from the previous primary before re-sending
                        // them.
                        auto opCtx = _makeOperationContext();
-                       auto useOSI = resharding::isEnabledWithPinnedVersion(
-                           _forwardableOpMetadata, resharding::gFeatureFlagReshardingInitNoRefresh);
-
-                       if (useOSI && _isRecovery) {
+                       if (_isRecovery) {
                            auto barrier =
                                _reshardingCoordinatorExternalState->buildCausalityBarrier(
                                    resharding::getAllParticipantShardIds(_coordinatorDoc),
@@ -2170,14 +2167,11 @@ void ReshardingCoordinator::_generatePlacementChangeNotificationForChangeStreams
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto coordinatorDocFuture = [&]() -> ExecutorFuture<ReshardingCoordinatorDocument> {
-        if (_coordinatorDoc.getAbortReason() &&
-            resharding::isEnabledWithPinnedVersion(
-                _forwardableOpMetadata, resharding::gFeatureFlagReshardingInitNoRefresh)) {
-            // Under featureFlagReshardingInitNoRefresh, all participants are guaranteed to be done
-            // at this point. AbortReshardCollection ensures that all initialized participants have
-            // completed, and since the command carries a higher txnNumber (via OSI), no new
-            // participants can initialize after it is sent. Therefore, it is safe to skip the
-            // observer wait.
+        if (_coordinatorDoc.getAbortReason()) {
+            // All participants are guaranteed to be done at this point. AbortReshardCollection
+            // ensures that all initialized participants have completed, and since the command
+            // carries a higher txnNumber (via OSI), no new participants can initialize after it is
+            // sent. Therefore, it is safe to skip the observer wait.
             LOGV2_DEBUG(9285700,
                         1,
                         "Skipping participant observer wait: command OSI ordering guarantees "
@@ -2325,42 +2319,22 @@ void ReshardingCoordinator::_initializeAllDonors(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
     auto opCtx = _makeOperationContext();
-    if (resharding::isEnabledWithPinnedVersion(_forwardableOpMetadata,
-                                               resharding::gFeatureFlagReshardingInitNoRefresh)) {
-        resharding::tellAllDonorsToInitialize(opCtx.get(),
-                                              _getNewSession(opCtx.get()),
-                                              _coordinatorDoc,
-                                              _ctHolder->getStepdownToken(),
-                                              executor);
-    } else {
-        _reshardingCoordinatorExternalState->establishAllDonorsAsParticipants(
-            opCtx.get(),
-            _coordinatorDoc.getSourceNss(),
-            _coordinatorDoc.getDonorShards(),
-            **executor,
-            _ctHolder->getStepdownToken());
-    }
+    resharding::tellAllDonorsToInitialize(opCtx.get(),
+                                          _getNewSession(opCtx.get()),
+                                          _coordinatorDoc,
+                                          _ctHolder->getStepdownToken(),
+                                          executor);
 }
 
 void ReshardingCoordinator::_initializeAllRecipients(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
     auto opCtx = _makeOperationContext();
-    if (resharding::isEnabledWithPinnedVersion(_forwardableOpMetadata,
-                                               resharding::gFeatureFlagReshardingInitNoRefresh)) {
-        resharding::tellAllRecipientsToInitialize(opCtx.get(),
-                                                  _getNewSession(opCtx.get()),
-                                                  _coordinatorDoc,
-                                                  _ctHolder->getStepdownToken(),
-                                                  executor);
-    } else {
-        _reshardingCoordinatorExternalState->establishAllRecipientsAsParticipants(
-            opCtx.get(),
-            _coordinatorDoc.getTempReshardingNss(),
-            _coordinatorDoc.getRecipientShards(),
-            **executor,
-            _ctHolder->getStepdownToken());
-    }
+    resharding::tellAllRecipientsToInitialize(opCtx.get(),
+                                              _getNewSession(opCtx.get()),
+                                              _coordinatorDoc,
+                                              _ctHolder->getStepdownToken(),
+                                              executor);
 }
 
 void ReshardingCoordinator::_tellAllRecipientsToClone(

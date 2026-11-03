@@ -43,7 +43,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
@@ -389,13 +388,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
 
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
 
-        const bool useRegistry = resharding::gFeatureFlagReshardingRegistry.isEnabled();
-
-        if (useRegistry) {
-            resharding::throwIfReshardingInProgress(nss);
-        } else {
-            collDesc.throwIfReshardingInProgress(nss);
-        }
+        resharding::throwIfReshardingInProgress(nss);
 
         // Only collections that are not registered in the sharding catalog are affected by
         // movePrimary

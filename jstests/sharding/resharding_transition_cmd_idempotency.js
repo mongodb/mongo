@@ -4,9 +4,6 @@
  * @tags: [
  *   requires_fcv_90,
  *   uses_resharding,
- *   featureFlagReshardingInitNoRefresh,
- *   featureFlagReshardingCloneNoRefresh,
- *   featureFlagReshardingNoRefreshApplyingAndBlockingWrites,
  *   featureFlagReshardingSkipCloningAndApplyingIfApplicable,
  * ]
  */

@@ -60,20 +60,6 @@ public:
         const std::shared_ptr<executor::TaskExecutor>& executor,
         CancellationToken token) = 0;
 
-    virtual void establishAllDonorsAsParticipants(
-        OperationContext* opCtx,
-        const NamespaceString& sourceNss,
-        const std::vector<mongo::DonorShardEntry>& donorShards,
-        const std::shared_ptr<executor::TaskExecutor>& executor,
-        CancellationToken token) = 0;
-
-    virtual void establishAllRecipientsAsParticipants(
-        OperationContext* opCtx,
-        const NamespaceString& tempNss,
-        const std::vector<mongo::RecipientShardEntry>& recipientShards,
-        const std::shared_ptr<executor::TaskExecutor>& executor,
-        CancellationToken token) = 0;
-
     /**
      * Returns a map from each donor shard id to the number of documents copied from that donor
      * shard by performing at snapshot read at the clone timestamp on that shard. 'shardVersions'
@@ -187,19 +173,6 @@ public:
                                     const std::vector<mongo::RecipientShardEntry>& recipientShards,
                                     const std::shared_ptr<executor::TaskExecutor>& executor,
                                     CancellationToken token) override;
-
-    void establishAllDonorsAsParticipants(OperationContext* opCtx,
-                                          const NamespaceString& sourceNss,
-                                          const std::vector<mongo::DonorShardEntry>& donorShards,
-                                          const std::shared_ptr<executor::TaskExecutor>& executor,
-                                          CancellationToken token) override;
-
-    void establishAllRecipientsAsParticipants(
-        OperationContext* opCtx,
-        const NamespaceString& tempNss,
-        const std::vector<mongo::RecipientShardEntry>& recipientShards,
-        const std::shared_ptr<executor::TaskExecutor>& executor,
-        CancellationToken token) override;
 
     std::map<ShardId, int64_t> getDocumentsToCopyFromDonors(
         OperationContext* opCtx,

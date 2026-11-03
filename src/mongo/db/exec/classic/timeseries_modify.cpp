@@ -37,7 +37,6 @@
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_util.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/decorable.h"
 
@@ -344,12 +343,8 @@ void TimeseriesModifyStage::_checkUpdateChangesReshardingKey(const BSONObj& newB
                                                              const BSONObj& oldMeasurement) {
     const auto& collDesc = collectionAcquisition().getShardingDescription();
 
-    const bool useRegistry = resharding::gFeatureFlagReshardingRegistry.isEnabled();
-    auto destinedRecipients = useRegistry
-        ? resharding::getDestinedRecipientsIfPossiblyDifferent(
-              opCtx(), collectionAcquisition().nss(), oldBucket, newBucket)
-        : resharding::getDestinedRecipientsIfPossiblyDifferent(
-              opCtx(), collectionAcquisition().getPostReshardingPlacement(), oldBucket, newBucket);
+    auto destinedRecipients = resharding::getDestinedRecipientsIfPossiblyDifferent(
+        opCtx(), collectionAcquisition().nss(), oldBucket, newBucket);
     if (!destinedRecipients) {
         return;
     }

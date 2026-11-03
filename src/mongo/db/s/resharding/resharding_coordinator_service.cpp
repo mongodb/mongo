@@ -139,25 +139,6 @@ void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
             "Resharding is not supported during FCV changes, please wait for the FCV change to "
             "complete.",
             !isFcvTransitionInProgress(opCtx));
-
-    // Double check that the feature flags are in a consistent state. We don't have to worry about
-    // transitional FCV because of the above assertion.
-    tassert(13237401,
-            "Resharding with authoritative shards requires shard refreshes to be disabled",
-            !resharding::isEnabledWithPinnedVersion(coordinatorDoc.getForwardableOpMetadata(),
-                                                    feature_flags::gAuthoritativeShardsDDL) ||
-                (resharding::isEnabledWithPinnedVersion(
-                     coordinatorDoc.getForwardableOpMetadata(),
-                     resharding::gFeatureFlagReshardingCloneNoRefresh) &&
-                 resharding::isEnabledWithPinnedVersion(
-                     coordinatorDoc.getForwardableOpMetadata(),
-                     resharding::gFeatureFlagReshardingInitNoRefresh) &&
-                 resharding::isEnabledWithPinnedVersion(
-                     coordinatorDoc.getForwardableOpMetadata(),
-                     resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites) &&
-                 resharding::isEnabledWithPinnedVersion(
-                     coordinatorDoc.getForwardableOpMetadata(),
-                     resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable)));
 }
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService::constructInstance(

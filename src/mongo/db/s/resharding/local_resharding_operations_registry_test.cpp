@@ -14,7 +14,6 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/resharding/common_types_gen.h"
-#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -340,20 +339,6 @@ TEST_F(ReshardingReplicaSetAwareServiceTest,
     ASSERT_TRUE(op);
     ASSERT_EQ(op->metadata.getReshardingUUID(), reshardingUUID);
     ASSERT_TRUE(op->roles.count(Role::kDonor));
-}
-
-TEST_F(ReshardingReplicaSetAwareServiceTest,
-       OnConsistentDataAvailableIsNoOpWhenFeatureFlagDisabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagReshardingRegistry", false};
-
-    createCollectionAndInsert(opCtx(),
-                              NamespaceString::kDonorReshardingOperationsNamespace,
-                              {makeDonorStateDoc(kNs1, UUID::gen(), UUID::gen())});
-
-    ReshardingReplicaSetAwareService::get(getServiceContext())
-        ->onConsistentDataAvailable(opCtx(), /*isMajority=*/true, /*isRollback=*/false);
-
-    ASSERT_FALSE(LocalReshardingOperationsRegistry::get().getOperation(kNs1));
 }
 
 TEST(LocalReshardingOperationsRegistryTest, GetUnknownNamespace) {

@@ -107,7 +107,7 @@ public:
                                                           opCtx->getWriteConcern());
 
             const auto sourceNss = resharding::resolveReshardingSourceNss(opCtx, ns());
-            const auto reshardingUUID = resharding::retrieveReshardingUUID(opCtx, sourceNss);
+            const auto reshardingUUID = resharding::retrieveReshardingUUID(sourceNss);
 
             LOGV2(5403501,
                   "Aborting resharding operation",

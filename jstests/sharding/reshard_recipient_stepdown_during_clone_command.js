@@ -1,14 +1,13 @@
 /**
  * Regression test for BF-42600: deadlock between a stepdown and the session held by
- * ShardsvrReshardRecipientClone. The clone command is sent with OSI (lsid + txnNum) under
- * featureFlagReshardingInitNoRefresh, causing the command to check out the
- * session for the lifetime of the command. When the node steps down, the stepdown blocks
- * waiting for that session while the clone command blocks in .get() ignoring the opCtx kill.
+ * ShardsvrReshardRecipientClone. The clone command is sent with OSI (lsid + txnNum), causing the
+ * command to check out the session for the lifetime of the command. When the node steps down, the
+ * stepdown blocks waiting for that session while the clone command blocks in .get() ignoring the
+ * opCtx kill.
  *
  * @tags: [
  *   requires_fcv_90,
  *   uses_resharding,
- *   featureFlagReshardingInitNoRefresh,
  * ]
  */
 

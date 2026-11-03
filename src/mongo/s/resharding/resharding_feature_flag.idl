@@ -108,23 +108,6 @@ feature_flags:
         version: 9.0
         fcv_gated: true
         check_against_fcv: legacy_fcv_snapshot_only
-    featureFlagReshardingInitNoRefresh:
-        mod_visibility: public
-        description: "Feature flag to skip shard version refresh during resharding initialization."
-        cpp_varname: gFeatureFlagReshardingInitNoRefresh
-        default: true
-        version: 9.0
-        fcv_gated: true
-    featureFlagReshardingRegistry:
-        mod_visibility: public
-        description:
-            "Feature flag to enable consulting and maintaining the LocalReshardingOperationRegistry
-            instead of reshardingFields on config.collections entries. Intentionally not FCV-gated:
-            the registry is shard-local state rebuilt from replicated state documents, so it is
-            maintained and consulted on any binary that supports it, independent of FCV."
-        cpp_varname: gFeatureFlagReshardingRegistry
-        default: true
-        fcv_gated: false
     featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage:
         mod_visibility: public
         description:

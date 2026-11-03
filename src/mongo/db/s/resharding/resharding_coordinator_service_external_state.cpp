@@ -298,28 +298,6 @@ void ReshardingCoordinatorExternalStateImpl::tellAllRecipientsToRefresh(
         opCtx, nssToRefresh, reshardingUUID, recipientShardIds, executor, token);
 }
 
-void ReshardingCoordinatorExternalStateImpl::establishAllDonorsAsParticipants(
-    OperationContext* opCtx,
-    const NamespaceString& sourceNss,
-    const std::vector<mongo::DonorShardEntry>& donorShards,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    CancellationToken token) {
-    auto donorShardIds = resharding::extractShardIdsFromParticipantEntries(donorShards);
-    resharding::sendFlushRoutingTableCacheUpdatesToShards(
-        opCtx, sourceNss, donorShardIds, executor, token);
-}
-
-void ReshardingCoordinatorExternalStateImpl::establishAllRecipientsAsParticipants(
-    OperationContext* opCtx,
-    const NamespaceString& tempNss,
-    const std::vector<mongo::RecipientShardEntry>& recipientShards,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    CancellationToken token) {
-    auto recipientShardIds = resharding::extractShardIdsFromParticipantEntries(recipientShards);
-    resharding::sendFlushRoutingTableCacheUpdatesToShards(
-        opCtx, tempNss, recipientShardIds, executor, token);
-}
-
 std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsToCopyFromDonors(
     OperationContext* opCtx,
     const std::shared_ptr<executor::TaskExecutor>& executor,
