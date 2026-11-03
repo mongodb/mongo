@@ -40,6 +40,17 @@ enum class PathSemantics {
  * traversal semantics.
  */
 Type traversePath(Type inputType, const FieldPath& path, PathSemantics semantics);
+
+/**
+ * Returns 'inputType' refined by the knowledge that a 'path' evaluated to a value of 'constraint'
+ * if 'assumeTrue', and outside of it otherwise. Leaves 'inputType' unchanged if the given semantics
+ * are not modelled.
+ */
+Type narrowPath(Type inputType,
+                const FieldPath& path,
+                PathSemantics semantics,
+                Type constraint,
+                bool assumeTrue);
 }  // namespace expression
 
 }  // namespace mongo::pipeline::type_system

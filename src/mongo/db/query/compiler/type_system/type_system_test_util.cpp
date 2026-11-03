@@ -31,6 +31,10 @@ Type closedObject(const StringMap<Type>& fields) {
     return Type::object(fields, Open::kNo);
 }
 
+Type numbers(Extent extent) {
+    return Type(TypeSet::numericTypes(extent));
+}
+
 std::vector<Value> scalarRepresentatives() {
     const OID oid("0123456789abcdef01234567");
     return {

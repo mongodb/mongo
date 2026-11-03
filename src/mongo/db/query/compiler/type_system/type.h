@@ -100,6 +100,9 @@ public:
     /// Returns the extent of 'type'. A type absent from the set is covered in full.
     Extent getExtent(BSONType type) const;
 
+    /// Returns kSubset if any type is covered as a subset, and kAll otherwise.
+    Extent getExtent() const;
+
     /// Returns true if 'other' covers the same types with the same extents.
     bool operator==(const TypeSet& other) const = default;
 
@@ -216,6 +219,9 @@ public:
 
     /// Returns the extent of 'type'. A type which is not covered is covered in full.
     Extent getExtent(BSONType type) const;
+
+    /// Returns kSubset if any type is covered as a subset, and kAll otherwise.
+    Extent getExtent() const;
 
     /**
      * Returns true if 'value' is one of the values of this type.

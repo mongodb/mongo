@@ -118,6 +118,29 @@ Type traverseFieldPath(Type inputType, const FieldPath& path, size_t index) {
     }
     return result;
 }
+
+/// Returns a type describing documents where traversing 'path' following ExpressionFieldPath
+/// semantics can produce 'leaf'.
+Type documentTypeFromLeaf(const FieldPath& path, Type leaf) {
+    // Traversing a path inside an array causes the result to be wrapped in an array. Hence an array
+    // along the path prefix is only possible if the leaf can be one.
+    Type prefixTypes = intersectType(leaf, Type::anyArray());
+    // Traversing a scalar value produces missing. Hence a scalar type along the path prefix is
+    // only possible if the leaf can be missing.
+    if (leaf.hasType(BSONType::eoo)) {
+        prefixTypes = unionType(std::move(prefixTypes), Type::anyScalar());
+    }
+
+    // Build the full nested Type based on what we know about the leaf. E.g. for the path "a.b.c",
+    // the full type would be {a: prefixTypes | {b: prefixTypes | {c: leaf}}}.
+    Type result = std::move(leaf);
+    for (auto i = path.getPathLength(); i-- > 0;) {
+        Type object = Type::anyObject();
+        object.setField(path.getFieldName(i), std::move(result));
+        result = unionType(prefixTypes, std::move(object));
+    }
+    return result;
+}
 }  // namespace
 
 Type traversePath(Type inputType, const FieldPath& path, PathSemantics semantics) {
@@ -129,6 +152,29 @@ Type traversePath(Type inputType, const FieldPath& path, PathSemantics semantics
             return Type::any();
     }
     MONGO_UNREACHABLE_TASSERT(13597800);
+}
+
+Type narrowPath(Type inputType,
+                const FieldPath& path,
+                PathSemantics semantics,
+                Type constraint,
+                bool assumeTrue) {
+    // A document which cannot exist cannot be narrowed any further.
+    if (inputType.isNever()) {
+        return inputType;
+    }
+
+    switch (semantics) {
+        case PathSemantics::kFieldPath: {
+            Type leaf = assumeTrue ? std::move(constraint) : complement(std::move(constraint));
+            Type docType = documentTypeFromLeaf(path, std::move(leaf));
+            return intersectType(std::move(inputType), std::move(docType));
+        }
+        case PathSemantics::kOther:
+            // Not modelled.
+            return inputType;
+    }
+    MONGO_UNREACHABLE_TASSERT(13598100);
 }
 }  // namespace expression
 

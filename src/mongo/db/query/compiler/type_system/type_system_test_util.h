@@ -43,6 +43,9 @@ Type openObject(const StringMap<Type>& fields);
 /// Returns an object type that holds only 'fields'.
 Type closedObject(const StringMap<Type>& fields);
 
+/// Returns the type holding the values of every numeric type with the given extent.
+Type numbers(Extent extent = Extent::kAll);
+
 /**
  * Returns an array containing one value of each BSONType, except array and object.
  */

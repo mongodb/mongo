@@ -94,6 +94,16 @@ TEST(TypeSetTest, FromBSONTypeHoldingSingleValueCoveredInFull) {
     }
 }
 
+TEST(TypeSetTest, ExtentIsSubsetIfAnyTypeIsCoveredAsSubset) {
+    ASSERT_TRUE(isAll(TypeSet::any().getExtent()));
+    ASSERT_TRUE(isAll(TypeSet::never().getExtent()));
+    ASSERT_TRUE(isAll(TypeSet(BSONType::null, Extent::kSubset).getExtent()));
+    ASSERT_TRUE(isSubset(TypeSet::numericTypes(Extent::kSubset).getExtent()));
+    ASSERT_TRUE(isSubset(unionType(TypeSet(BSONType::numberInt, Extent::kAll),
+                                   TypeSet(BSONType::string, Extent::kSubset))
+                             .getExtent()));
+}
+
 TEST(TypeSetTest, AnyCoversEveryTypeInFull) {
     assertCoversEveryType(TypeSet::any());
 }
@@ -466,6 +476,13 @@ TEST(TypeTest, ClosedObjectWithoutFieldsDescribesOnlySomeObjects) {
 TEST(TypeTest, ObjectWithKnownFieldsIsASubset) {
     auto type = openObject({{"x", allValues(BSONType::string)}});
     ASSERT_TRUE(isSubset(type.getExtent(BSONType::object)));
+}
+
+TEST(TypeTest, ExtentIsSubsetIfAnyTypeIsCoveredAsSubset) {
+    ASSERT_TRUE(isAll(unionType(Type::anyObject(), Type::anyArray()).getExtent()));
+    ASSERT_TRUE(isSubset(unionType(Type::anyObject(), Type::someArray()).getExtent()));
+    ASSERT_TRUE(isSubset(
+        unionType(openObject({{"x", allValues(BSONType::string)}}), Type::anyArray()).getExtent()));
 }
 
 TEST(TypeTest, ShapeIsDroppedWhenTheObjectTypeIsNotCovered) {

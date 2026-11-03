@@ -349,6 +349,10 @@ Extent TypeSet::getExtent(BSONType type) const {
     return (_subsetTypes & typeMask(type)) ? Extent::kSubset : Extent::kAll;
 }
 
+Extent TypeSet::getExtent() const {
+    return _subsetTypes ? Extent::kSubset : Extent::kAll;
+}
+
 std::string TypeSet::toDebugString() const {
     if (*this == any()) {
         return "any";
@@ -501,6 +505,10 @@ bool Type::isNever() const {
 
 Extent Type::getExtent(BSONType type) const {
     return _typeSet.getExtent(type);
+}
+
+Extent Type::getExtent() const {
+    return _typeSet.getExtent();
 }
 
 bool Type::hasValue(const Value& value) const {
