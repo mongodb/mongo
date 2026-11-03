@@ -18,6 +18,7 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
@@ -89,6 +90,29 @@ TEST_F(FlusherTest, FlushPersistsBatch) {
     EXPECT_EQ(entry->count, 2);
 
     EXPECT_EQ(readTimestampStore(), boost::optional<Timestamp>(Timestamp(1, 2)));
+}
+
+TEST_F(FlusherTest, SplitFlushReplicatesAtomically) {
+    // Force the metadata and timestamp writes into separate applyOps entries.
+    unittest::ServerParameterGuard maxOpsPerOplogEntry{
+        "maxNumberOfBatchedOperationsInSingleOplogEntry", 1};
+
+    const OplogScanResult batch{
+        .deltas = {{collA.uuid,
+                    ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 2}}}}},
+        .lastTimestamp = Timestamp(1, 2)};
+    ASSERT_TRUE(flush(operationContext(), *sizeCountStore, *timestampStore, batch).has_value());
+
+    const auto entries = test_helpers::getOplogEntriesMatching(
+        operationContext(), [](const repl::OplogEntry& entry) {
+            return entry.getCommandType() == repl::CommandTypeEnum::kApplyOps;
+        });
+    ASSERT_EQ(entries.size(), 2);
+    EXPECT_TRUE(entries.front().isPartialTransaction());
+    EXPECT_FALSE(entries.back().isPartialTransaction());
+    EXPECT_EQ(entries.back().getPrevWriteOpTimeInTransaction(), entries.front().getOpTime());
+    EXPECT_EQ(entries.back().getObject()["count"].safeNumberLong(), 2);
 }
 
 TEST_F(FlusherTest, FlushWithNoNewWorkIsNoOp) {

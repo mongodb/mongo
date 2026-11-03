@@ -72,7 +72,7 @@ boost::optional<FlushResult> flush(OperationContext* opCtx,
 
         hangBeforePersistingNewFastCountEntries.pauseWhileSet();
 
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
         const CheckpointWriteCounts writeCounts =
             persistCheckpointSnapshot(opCtx, checkpoint, sizeCountStore, timestampStore);
         wuow.commit();

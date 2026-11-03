@@ -635,6 +635,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/storage:record_store_write_conflict_fail_points",
         "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/unittest:server_parameter_guard",
         "//src/mongo/util:fail_point",
     ],
 )
