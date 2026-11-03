@@ -115,7 +115,8 @@ DEATH_TEST_F(ExecAggStageTestDeathTest, InvalidReturnStatusCode, "11019500") {
     using ReturnStatus = exec::agg::GetNextResult::ReturnStatus;
     // Need to set this metadata, so we don't hit the dassert in makeAdvancedControlDocument(...).
     MutableDocument doc(Document{BSON("a" << 1)});
-    doc.metadata().setChangeStreamControlEvent();
+    doc.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
 
     boost::intrusive_ptr<DocumentSourceMatch> matchDocSourceStage =
         DocumentSourceMatch::create(BSON("a" << 1), make_intrusive<ExpressionContextForTest>());

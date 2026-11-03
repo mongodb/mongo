@@ -829,7 +829,8 @@ DEATH_TEST_REGEX_F(DSV2StageCursorManagementAndErrorHandlingTestDeathTest,
                              << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(23, 2))));
 
     MutableDocument docBuilder(Document::fromBsonWithMetaData(event));
-    docBuilder.metadata().setChangeStreamControlEvent();
+    docBuilder.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
     Document doc = docBuilder.freeze();
 
     // The shard targeter returns kContinue but its callback illegally opens a data shard cursor

@@ -182,7 +182,8 @@ DEATH_TEST_REGEX_F(SampleBasicsDeathTest,
 
     // Create a control event.
     MutableDocument doc(Document{{"_id", 0}});
-    doc.metadata().setChangeStreamControlEvent();
+    doc.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
     source()->push_back(DocumentSource::GetNextResult::makeAdvancedControlDocument(doc.freeze()));
 
     ASSERT_THROWS_CODE(sampleStage()->getNext(), AssertionException, 10358901);
@@ -429,7 +430,8 @@ DEATH_TEST_REGEX_F(SampleFromRandomCursorBasicsDeathTest,
 
     // Create a control event.
     MutableDocument doc(Document{{"_id", 0}});
-    doc.metadata().setChangeStreamControlEvent();
+    doc.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
     source()->push_back(DocumentSource::GetNextResult::makeAdvancedControlDocument(doc.freeze()));
 
     ASSERT_THROWS_CODE(sampleStage()->getNext(), AssertionException, 10358901);

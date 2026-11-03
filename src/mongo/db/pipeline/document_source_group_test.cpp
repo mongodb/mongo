@@ -384,7 +384,8 @@ DEATH_TEST_REGEX_F(DocumentSourceGroupTestDeathTest,
 
     // Create a control event.
     MutableDocument doc(Document{{"_id", 0}});
-    doc.metadata().setChangeStreamControlEvent();
+    doc.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
     auto mock = exec::agg::MockStage::createForTest({doc.freeze()}, expCtx);
     auto groupStage = exec::agg::buildStageAndStitch(group, mock);
 
@@ -415,7 +416,8 @@ DEATH_TEST_REGEX_F(DocumentSourceGroupTestDeathTest,
 
     // Create a control event.
     MutableDocument doc(Document{{"_id", 0}});
-    doc.metadata().setChangeStreamControlEvent();
+    doc.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
 
     auto mock = exec::agg::MockStage::createForTest({doc.freeze()}, expCtx);
     exec::agg::MockStage::setSource_forTest(stage, mock.get());

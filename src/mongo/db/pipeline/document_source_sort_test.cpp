@@ -661,7 +661,8 @@ DEATH_TEST_REGEX_F(DocumentSourceSortExecutionTestDeathTest,
                    CannotHandleControlEvent,
                    "Tripwire assertion.*10358905") {
     MutableDocument doc(Document{{"_id", 0}});
-    doc.metadata().setChangeStreamControlEvent();
+    doc.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
 
     createSort(BSON("_id" << 1));
     createSortStage();

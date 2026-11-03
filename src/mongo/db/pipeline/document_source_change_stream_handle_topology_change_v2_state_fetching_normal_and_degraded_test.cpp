@@ -361,7 +361,8 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
         BSON("operationType" << "test1" << "foo" << "bar" << "clusterTime" << Timestamp(23, 2));
 
     MutableDocument docBuilder(Document::fromBsonWithMetaData(event));
-    docBuilder.metadata().setChangeStreamControlEvent();
+    docBuilder.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
     Document doc = docBuilder.freeze();
 
     // Prepare ShardTargeterMock responses.
@@ -697,11 +698,13 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
                              << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(24, 0))));
 
     MutableDocument docBuilder(Document::fromBsonWithMetaData(event1));
-    docBuilder.metadata().setChangeStreamControlEvent();
+    docBuilder.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
     Document doc1 = docBuilder.freeze();
 
     docBuilder.reset(Document::fromBsonWithMetaData(event2));
-    docBuilder.metadata().setChangeStreamControlEvent();
+    docBuilder.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
     Document doc2 = docBuilder.freeze();
 
     // Prepare ShardTargeterMock responses.
@@ -801,7 +804,8 @@ DEATH_TEST_REGEX_F(DSV2StateFetchingNormalAndDegradedTestDeathTest,
                              << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(23, 2))));
 
     MutableDocument docBuilder(Document::fromBsonWithMetaData(event));
-    docBuilder.metadata().setChangeStreamControlEvent();
+    docBuilder.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
     Document doc = docBuilder.freeze();
 
     // Prepare ShardTargeterMock responses.

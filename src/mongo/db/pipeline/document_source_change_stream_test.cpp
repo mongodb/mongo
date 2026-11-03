@@ -5118,6 +5118,32 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesMatchingInputsCorrectly)
     ASSERT_TRUE(next.isEOF());
 }
 
+TEST_F(ChangeStreamStageTest, InjectControlEventsProduceTopologyCategory) {
+    using Type = DocumentMetadataFields::ChangeStreamControlEventType;
+    auto expCtx = getExpCtx();
+
+    auto [_, stageSpecAsBSON] =
+        buildControlEventsSpecFromBSON(BSON("eventType1" << "transformToControlEvent"));
+
+    auto injectControlEvents = DocumentSourceChangeStreamInjectControlEvents::createFromBson(
+        stageSpecAsBSON.firstElement(), expCtx);
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        Document::fromBsonWithMetaData(BSON("operationType" << "eventType1")),
+        DocumentSource::GetNextResult::makeEOF(),
+    };
+
+    auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
+    auto injectControlEventsStage = exec::agg::buildStageAndStitch(injectControlEvents, stage);
+
+    auto next = injectControlEventsStage->getNext();
+    ASSERT_TRUE(next.isAdvancedControlDocument());
+    ASSERT_TRUE(next.getDocument().metadata().isChangeStreamControlEvent());
+    ASSERT_EQ(Type::kTopology, next.getDocument().metadata().getChangeStreamControlEventType());
+
+    ASSERT_TRUE(injectControlEventsStage->getNext().isEOF());
+}
+
 // Test that a change stream control event is returned unmodified by a $match stage.
 TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByMatchStageUnmodified) {
     auto expCtx = getExpCtx();
@@ -5125,7 +5151,8 @@ TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByMatchStageUnmodified) {
     // Create a control event that does not the $match expression.
     BSONObj bson = BSON("some" << "value");
     MutableDocument doc(Document{bson});
-    doc.metadata().setChangeStreamControlEvent();
+    doc.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
 
     std::deque<DocumentSource::GetNextResult> inputDocs = {
         exec::agg::GetNextResult::makeAdvancedControlDocument(doc.freeze()),
@@ -5151,7 +5178,8 @@ TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByProjectStageUnmodified) 
     // Create a control event that does not the $match expression.
     BSONObj bson = BSON("some" << "value");
     MutableDocument doc(Document{bson});
-    doc.metadata().setChangeStreamControlEvent();
+    doc.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
 
     std::deque<DocumentSource::GetNextResult> inputDocs = {
         exec::agg::GetNextResult::makeAdvancedControlDocument(doc.freeze()),

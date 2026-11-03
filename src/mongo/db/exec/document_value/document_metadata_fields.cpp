@@ -145,6 +145,28 @@ std::string_view DocumentMetadataFields::serializeMetaType(MetaType type) {
     return nameIter->second;
 }
 
+std::string_view DocumentMetadataFields::serializeChangeStreamControlEventType(
+    ChangeStreamControlEventType type) {
+    switch (type) {
+        case ChangeStreamControlEventType::kTopology:
+            return "topology"sv;
+        case ChangeStreamControlEventType::kAccounting:
+            return "accounting"sv;
+    }
+    MONGO_UNREACHABLE_TASSERT(13766401);
+}
+
+DocumentMetadataFields::ChangeStreamControlEventType
+DocumentMetadataFields::parseChangeStreamControlEventType(std::string_view name) {
+    if (name == "topology"sv) {
+        return ChangeStreamControlEventType::kTopology;
+    }
+    if (name == "accounting"sv) {
+        return ChangeStreamControlEventType::kAccounting;
+    }
+    uasserted(13766402, str::stream() << "Unknown change stream control event type: " << name);
+}
+
 bool DocumentMetadataFields::isScoreProducingMetaType(std::string_view name) {
     return kScoreMetadataFields.contains(DocumentMetadataFields::parseMetaType(name));
 }
@@ -244,8 +266,14 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
             setStream(std::move(val));
             break;
         case DocumentMetadataFields::kChangeStreamControlEvent:
-            // The value is completely ignored here. We only set the relevant bit in the bitset.
-            setChangeStreamControlEvent();
+            // The value is ignored; only the bit matters. The category has no $meta name, so it
+            // cannot be set through $setMetadata (parseMetaType rejects the name outright), and
+            // $setMetadata itself requires the 'internal' cluster privilege. The only producer
+            // of a non-topology (accounting) control event is a server-internal shard-side
+            // stage, which calls the setter directly. So a control event created through this
+            // path is always a topology event.
+            setChangeStreamControlEvent(
+                DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
             break;
         default:
             MONGO_UNREACHABLE_TASSERT(9733902);
@@ -330,7 +358,7 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
         setStream(other.getStream());
     }
     if (!isChangeStreamControlEvent() && other.isChangeStreamControlEvent()) {
-        setChangeStreamControlEvent();
+        setChangeStreamControlEvent(other.getChangeStreamControlEventType());
     }
 }
 
@@ -390,7 +418,7 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
         setStream(other.getStream());
     }
     if (other.isChangeStreamControlEvent()) {
-        setChangeStreamControlEvent();
+        setChangeStreamControlEvent(other.getChangeStreamControlEventType());
     }
 }
 
@@ -503,9 +531,8 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         getStream().serializeForSorter(buf);
     }
     if (isChangeStreamControlEvent()) {
-        // When this metadata field is set, it is implicitly true, so we do not need to serialize
-        // any further value for it.
         buf.appendNum(static_cast<char>(MetaType::kChangeStreamControlEvent + 1));
+        buf.appendNum(static_cast<char>(getChangeStreamControlEventType()));
     }
 
     buf.appendNum(static_cast<char>(0));
@@ -564,9 +591,14 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
         } else if (marker == static_cast<char>(MetaType::kStream) + 1) {
             out->setStream(Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
         } else if (marker == static_cast<char>(MetaType::kChangeStreamControlEvent) + 1) {
-            // When this metadata field is set, it is implicitly true, so it is not followed by any
-            // further serialized value.
-            out->setChangeStreamControlEvent();
+            auto rawCategory = buf.read<char>();
+            uassert(13766403,
+                    "Unrecognized change stream control event type in sorter buffer",
+                    rawCategory == static_cast<char>(ChangeStreamControlEventType::kTopology) ||
+                        rawCategory ==
+                            static_cast<char>(ChangeStreamControlEventType::kAccounting));
+            out->setChangeStreamControlEvent(
+                static_cast<DocumentMetadataFields::ChangeStreamControlEventType>(rawCategory));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
@@ -618,7 +650,8 @@ bool DocumentMetadataFields::MetadataHolder::operator==(const MetadataHolder& ot
         searchSortValues.woCompare(other.searchSortValues) == 0 &&
         vectorSearchScore == other.vectorSearchScore &&
         equalTo(searchSequenceToken, other.searchSequenceToken) && score == other.score &&
-        equalTo(scoreDetails, other.scoreDetails) && equalTo(stream, other.stream);
+        equalTo(scoreDetails, other.scoreDetails) && equalTo(stream, other.stream) &&
+        changeStreamControlEventType == other.changeStreamControlEventType;
 }
 
 bool operator==(const DocumentMetadataFields& lhs, const DocumentMetadataFields& rhs) {

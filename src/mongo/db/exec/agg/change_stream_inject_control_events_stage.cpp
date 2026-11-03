@@ -65,7 +65,8 @@ GetNextResult ChangeStreamInjectControlEventsStage::doGetNext() {
         if (auto itAction = _actions.find(opType.getStringData()); itAction != _actions.end()) {
             // We have an action registered for the specific event type!
             MutableDocument docBuilder(nextDoc);
-            docBuilder.metadata().setChangeStreamControlEvent();
+            docBuilder.metadata().setChangeStreamControlEvent(
+                DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
             auto controlEvent =
                 DocumentSource::GetNextResult::makeAdvancedControlDocument(docBuilder.freeze());
 

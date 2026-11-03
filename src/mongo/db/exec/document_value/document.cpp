@@ -550,7 +550,18 @@ void DocumentStorage::loadLazyMetadata() const {
             } else if (fieldName == Document::metaFieldStream) {
                 _metadataFields.setStream(Value(elem));
             } else if (fieldName == Document::metaFieldChangeStreamControlEvent) {
-                _metadataFields.setChangeStreamControlEvent();
+                if (elem.type() == BSONType::string) {
+                    // New wire format: the field carries the category as a string.
+                    _metadataFields.setChangeStreamControlEvent(
+                        DocumentMetadataFields::parseChangeStreamControlEventType(
+                            elem.valueStringData()));
+                } else {
+                    // Legacy wire format: a boolean flag field without a category. Every control
+                    // event an older binary can produce is a topology event, so default to
+                    // 'topology'. The value itself has never been read.
+                    _metadataFields.setChangeStreamControlEvent(
+                        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
+                }
             }
         }
     }
@@ -702,7 +713,9 @@ void Document::toBsonWithMetaDataOnly(BSONObjBuilder* builder) const {
         metadata().getStream().addToBsonObj(builder, metaFieldStream);
     }
     if (metadata().isChangeStreamControlEvent()) {
-        builder->append(metaFieldChangeStreamControlEvent, true);
+        builder->append(metaFieldChangeStreamControlEvent,
+                        DocumentMetadataFields::serializeChangeStreamControlEventType(
+                            metadata().getChangeStreamControlEventType()));
     }
 }
 

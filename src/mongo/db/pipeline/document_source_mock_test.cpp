@@ -31,7 +31,8 @@ TEST_F(DocumentSourceMockTest, SingleControlEvent) {
     auto orig = Document{{"_id", 0}};
     // Create a control event.
     MutableDocument doc(orig);
-    doc.metadata().setChangeStreamControlEvent();
+    doc.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
 
     auto stage = exec::agg::MockStage::createForTest(doc.freeze(), getExpCtx());
     auto next = stage->getNext();
@@ -54,7 +55,8 @@ TEST_F(DocumentSourceMockTest, ControlEventsAndOtherEvents) {
     {
         auto doc = Document{{"c", 1}};
         MutableDocument docBuilder(doc);
-        docBuilder.metadata().setChangeStreamControlEvent();
+        docBuilder.metadata().setChangeStreamControlEvent(
+            DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
         docs.push_back(
             DocumentSource::GetNextResult::makeAdvancedControlDocument(docBuilder.freeze()));
     }
@@ -62,7 +64,8 @@ TEST_F(DocumentSourceMockTest, ControlEventsAndOtherEvents) {
     {
         auto doc = Document{{"c", 2}};
         MutableDocument docBuilder(doc);
-        docBuilder.metadata().setChangeStreamControlEvent();
+        docBuilder.metadata().setChangeStreamControlEvent(
+            DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
         docs.push_back(
             DocumentSource::GetNextResult::makeAdvancedControlDocument(docBuilder.freeze()));
     }

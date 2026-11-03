@@ -126,7 +126,8 @@ protected:
     static Document controlEvent(int id) {
         MutableDocument md;
         md.addField("_id", Value(id));
-        md.metadata().setChangeStreamControlEvent();
+        md.metadata().setChangeStreamControlEvent(
+            DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
         return md.freeze();
     }
 

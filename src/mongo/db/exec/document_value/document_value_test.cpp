@@ -1297,7 +1297,8 @@ TEST(MetaFields, ChangeStreamControlDocument) {
     // Explicitly setting the 'control event' flag on the document should work.
     {
         MutableDocument docBuilder;
-        docBuilder.metadata().setChangeStreamControlEvent();
+        docBuilder.metadata().setChangeStreamControlEvent(
+            DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
         Document doc = docBuilder.freeze();
         ASSERT_TRUE(doc.metadata().isChangeStreamControlEvent());
 
@@ -1797,7 +1798,8 @@ TEST_F(SerializationTest, MetaSerializationWithVals) {
     docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     docBuilder.metadata().setVectorSearchScore(40.0);
     docBuilder.metadata().setScore(60.0);
-    docBuilder.metadata().setChangeStreamControlEvent();
+    docBuilder.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
     assertRoundTrips(docBuilder.freeze());
 }
 
@@ -1821,7 +1823,8 @@ TEST(MetaFields, ToAndFromBson) {
     docBuilder.metadata().setSearchSortValues(BSON("a" << 42));
     docBuilder.metadata().setVectorSearchScore(40.0);
     docBuilder.metadata().setScore(60.0);
-    docBuilder.metadata().setChangeStreamControlEvent();
+    docBuilder.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
     Document doc = docBuilder.freeze();
     BSONObj obj = doc.toBsonWithMetaData();
     ASSERT_EQ(10.0, obj[Document::metaFieldTextScore].Double());
@@ -1834,7 +1837,7 @@ TEST(MetaFields, ToAndFromBson) {
     ASSERT_BSONOBJ_EQ(BSON("a" << 42), obj[Document::metaFieldSearchSortValues].Obj());
     ASSERT_EQ(40.0, obj[Document::metaFieldVectorSearchScore].Double());
     ASSERT_EQ(60.0, obj[Document::metaFieldScore].Double());
-    ASSERT_TRUE(obj[Document::metaFieldChangeStreamControlEvent].boolean());
+    ASSERT_EQ(std::string("topology"), obj[Document::metaFieldChangeStreamControlEvent].str());
     Document fromBson = Document::fromBsonWithMetaData(obj);
     ASSERT_TRUE(fromBson.metadata().hasTextScore());
     ASSERT_TRUE(fromBson.metadata().hasRandVal());
@@ -1847,6 +1850,117 @@ TEST(MetaFields, ToAndFromBson) {
     ASSERT_TRUE(fromBson.metadata().isChangeStreamControlEvent());
 }
 
+TEST(MetaFields, ChangeStreamControlEventTypeBasics) {
+    using Type = DocumentMetadataFields::ChangeStreamControlEventType;
+    DocumentMetadataFields metadata;
+    ASSERT_FALSE(metadata.isChangeStreamControlEvent());
+
+    metadata.setChangeStreamControlEvent(Type::kTopology);
+    ASSERT_TRUE(metadata.isChangeStreamControlEvent());
+    ASSERT_EQ(Type::kTopology, metadata.getChangeStreamControlEventType());
+
+    // Setting the other category overwrites the category; the flag stays set.
+    metadata.setChangeStreamControlEvent(Type::kAccounting);
+    ASSERT_TRUE(metadata.isChangeStreamControlEvent());
+    ASSERT_EQ(Type::kAccounting, metadata.getChangeStreamControlEventType());
+}
+
+TEST(MetaFields, MetadataEqualityDistinguishesControlEventType) {
+    using Type = DocumentMetadataFields::ChangeStreamControlEventType;
+    DocumentMetadataFields topology;
+    topology.setChangeStreamControlEvent(Type::kTopology);
+    DocumentMetadataFields accounting;
+    accounting.setChangeStreamControlEvent(Type::kAccounting);
+    ASSERT_TRUE(topology != accounting);
+
+    DocumentMetadataFields alsoTopology;
+    alsoTopology.setChangeStreamControlEvent(Type::kTopology);
+    ASSERT_TRUE(topology == alsoTopology);
+}
+
+TEST(MetaFields, ChangeStreamControlEventTypeMergeAndCopy) {
+    using Type = DocumentMetadataFields::ChangeStreamControlEventType;
+    DocumentMetadataFields source;
+    source.setChangeStreamControlEvent(Type::kAccounting);
+
+    // mergeWith: absent -> present.
+    DocumentMetadataFields merged;
+    merged.mergeWith(source);
+    ASSERT_TRUE(merged.isChangeStreamControlEvent());
+    ASSERT_EQ(Type::kAccounting, merged.getChangeStreamControlEventType());
+
+    // mergeWith: present -> kept.
+    DocumentMetadataFields present;
+    present.setChangeStreamControlEvent(Type::kTopology);
+    present.mergeWith(source);
+    ASSERT_EQ(Type::kTopology, present.getChangeStreamControlEventType());
+
+    // copyFrom: overwrites an existing category (unlike mergeWith, which keeps it).
+    DocumentMetadataFields copied;
+    copied.setChangeStreamControlEvent(Type::kTopology);
+    copied.copyFrom(source);
+    ASSERT_EQ(Type::kAccounting, copied.getChangeStreamControlEventType());
+}
+
+TEST(MetaFields, SorterRoundTripPreservesControlEventType) {
+    using Type = DocumentMetadataFields::ChangeStreamControlEventType;
+    for (auto category : {Type::kTopology, Type::kAccounting}) {
+        MutableDocument docBuilder(DOC("foo" << 10));
+        docBuilder.metadata().setChangeStreamControlEvent(category);
+        const Document doc = docBuilder.freeze();
+
+        BufBuilder bb;
+        doc.serializeForSorter(bb);
+        BufReader reader(bb.buf(), bb.len());
+        const Document roundTripped =
+            Document::deserializeForSorter(reader, Document::SorterDeserializeSettings());
+
+        ASSERT_TRUE(roundTripped.metadata().isChangeStreamControlEvent());
+        ASSERT_EQ(category, roundTripped.metadata().getChangeStreamControlEventType());
+    }
+}
+
+TEST(MetaFields, ToAndFromBsonControlEventType) {
+    using Type = DocumentMetadataFields::ChangeStreamControlEventType;
+    MutableDocument docBuilder;
+    docBuilder.metadata().setChangeStreamControlEvent(Type::kAccounting);
+    Document doc = docBuilder.freeze();
+    BSONObj obj = doc.toBsonWithMetaData();
+
+    // The control event field carries the category as a string on the wire.
+    ASSERT_EQ(std::string("accounting"), obj[Document::metaFieldChangeStreamControlEvent].str());
+
+    Document fromBson = Document::fromBsonWithMetaData(obj);
+    ASSERT_TRUE(fromBson.metadata().isChangeStreamControlEvent());
+    ASSERT_EQ(Type::kAccounting, fromBson.metadata().getChangeStreamControlEventType());
+}
+
+TEST(MetaFields, LegacyControlEventFlagParsesAsTopology) {
+    using Type = DocumentMetadataFields::ChangeStreamControlEventType;
+    // Old shard wire format: the flag field only, no category. The value itself has never been
+    // read; presence of the field sets the control event bit.
+    auto legacyDoc = Document::fromBsonWithMetaData(
+        BSON("a" << 1 << std::string{Document::metaFieldChangeStreamControlEvent} << true));
+    ASSERT_TRUE(legacyDoc.metadata().isChangeStreamControlEvent());
+    ASSERT_EQ(Type::kTopology, legacyDoc.metadata().getChangeStreamControlEventType());
+}
+
+TEST(MetaFields, UnknownControlEventTypeOnWireFailsToParse) {
+    // An unknown category string must fail the lazy parse loudly instead of silently becoming a
+    // topology event.
+    auto doc = Document::fromBsonWithMetaData(
+        BSON("a" << 1 << std::string{Document::metaFieldChangeStreamControlEvent} << "migration"));
+    ASSERT_THROWS_CODE(doc.metadata().isChangeStreamControlEvent(), AssertionException, 13766402);
+}
+
+TEST(MetaFields, CreateDocumentWithMetadataControlEventType) {
+    using Type = DocumentMetadataFields::ChangeStreamControlEventType;
+    BSONObj metadata = BSON(std::string{Document::metaFieldChangeStreamControlEvent} << "topology");
+    auto doc = Document::createDocumentWithMetadata(BSON("a" << 1), metadata);
+    ASSERT_TRUE(doc.metadata().isChangeStreamControlEvent());
+    ASSERT_EQ(Type::kTopology, doc.metadata().getChangeStreamControlEventType());
+}
+
 TEST(MetaFields, ToAndFromBsonTrivialConvertibility) {
     Value sortKey{Document{{"token"sv, "SOMENCODEDATA"sv}}};
     // Create a document with a backing BSONObj and separate metadata.
@@ -1857,7 +1971,8 @@ TEST(MetaFields, ToAndFromBsonTrivialConvertibility) {
     MutableDocument docBuilder;
     docBuilder.reset(origObjNoMetadata, false);
     docBuilder.metadata().setSortKey(sortKey, true);
-    docBuilder.metadata().setChangeStreamControlEvent();
+    docBuilder.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
     Document docWithSeparateBsonAndMetadata = docBuilder.freeze();
 
     BSONObj origObjWithMetadata = docWithSeparateBsonAndMetadata.toBsonWithMetaData();

@@ -30,7 +30,8 @@ protected:
         // Create a control event
         auto doc = Document{{"test", true}};
         MutableDocument docBuilder(doc);
-        docBuilder.metadata().setChangeStreamControlEvent();
+        docBuilder.metadata().setChangeStreamControlEvent(
+            DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
 
         auto mock = DocumentSourceMock::createForTest(docBuilder.freeze(), _expCtx);
         auto pipeline = Pipeline::create({mock}, _expCtx);

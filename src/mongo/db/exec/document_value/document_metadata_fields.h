@@ -16,6 +16,7 @@
 
 #include <bitset>
 #include <cstddef>
+#include <cstdint>
 #include <iosfwd>
 #include <memory>
 #include <string_view>
@@ -67,6 +68,19 @@ public:
     };
 
     /**
+     * Category of a change stream control event. Every control event that exists today is a
+     * 'kTopology' event; 'kAccounting' is reserved for an upcoming end-of-transaction accounting
+     * control event. The category is server-internal: it has no $meta name and cannot be set via
+     * $setMetadata.
+     */
+    enum class ChangeStreamControlEventType : std::uint8_t {
+        // Starts at 1 so that 0 is never a valid category (e.g. in a zeroed sorter buffer). The
+        // legacy wire format (flag field without a type field) parses as kTopology.
+        kTopology = 1,
+        kAccounting,
+    };
+
+    /**
      * Parses the MetaType from a given type name.
      *
      * Throws a user exception if the provided name is not a recognized name as argument to $meta.
@@ -74,6 +88,19 @@ public:
     static DocumentMetadataFields::MetaType parseMetaType(std::string_view name);
 
     static std::string_view serializeMetaType(DocumentMetadataFields::MetaType type);
+
+    /**
+     * Parses the string form of a change stream control event category. Throws if 'name' is not a
+     * recognized category.
+     */
+    static ChangeStreamControlEventType parseChangeStreamControlEventType(std::string_view name);
+
+    /**
+     * Returns the string form of a change stream control event category, used at the BSON
+     * metadata wire boundary.
+     */
+    static std::string_view serializeChangeStreamControlEventType(
+        ChangeStreamControlEventType type);
 
     /**
      * Returns true if 'name' is a recognized metadata name that can be parsed by parseMetaType().
@@ -465,8 +492,21 @@ public:
         return _holder && _holder->metaFields.test(MetaType::kChangeStreamControlEvent);
     }
 
-    void setChangeStreamControlEvent() {
+    ChangeStreamControlEventType getChangeStreamControlEventType() const {
+        tassert(13766400,
+                "change stream control event type must be present in metadata",
+                isChangeStreamControlEvent());
+        return _holder->changeStreamControlEventType;
+    }
+
+    /**
+     * Marks this metadata as belonging to a change stream control event of the given category.
+     * This is the only way to set the category; there is no default argument so that a control
+     * event without a category is unrepresentable.
+     */
+    void setChangeStreamControlEvent(ChangeStreamControlEventType type) {
         _setCommon(MetaType::kChangeStreamControlEvent);
+        _holder->changeStreamControlEventType = type;
     }
 
     void serializeForSorter(BufBuilder& buf) const;
@@ -526,6 +566,11 @@ private:
         Value scoreDetails;
         // Stream processing related metadata. Only set in Atlas Stream Processing.
         Value stream;
+
+        // Category of a change stream control event. Only meaningful when
+        // 'kChangeStreamControlEvent' is set in 'metaFields'.
+        ChangeStreamControlEventType changeStreamControlEventType{
+            ChangeStreamControlEventType::kTopology};
 
         bool operator==(const MetadataHolder& other) const;
     };
