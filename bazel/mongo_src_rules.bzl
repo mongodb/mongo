@@ -1909,12 +1909,25 @@ def mongo_rust_library(name, rustc_flags = [], target_compatible_with = [], **kw
 
 def mongo_rust_shared_library(name, rustc_flags = [], target_compatible_with = [], **kwargs):
     compile_data = kwargs.pop("compile_data", []) + LIBVOIDSTAR_INPUTS
+    features = kwargs.pop("features", [])
     rustc_flags = rustc_flags + MONGO_RUSTC_FIRST_PARTY_FLAGS
     with_debug_name = name + WITH_DEBUG_SUFFIX
     rust_shared_library(
         name = with_debug_name,
         compile_data = compile_data,
-        rustc_flags = rustc_flags,
+        # CI links stripped binaries and debug symbols separately. Use the same
+        # explicit build ID in both modes, as the C++ shared-library rule does.
+        rustc_flags = rustc_flags + select({
+            "//bazel/config:simple_build_id_enabled_linux": ["-Clink-arg=-Wl,--build-id=0x" +
+                                                             hex32(hash(name)) +
+                                                             hex32(hash(name)) +
+                                                             hex32(hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT) + str(UNSAFE_COMPILE_TASK_TYPE)))],
+            "//conditions:default": [],
+        }),
+        features = features + select({
+            "//bazel/config:simple_build_id_enabled_linux": ["-build_id"],
+            "//conditions:default": [],
+        }),
         target_compatible_with = target_compatible_with,
         **kwargs
     )

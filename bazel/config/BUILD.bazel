@@ -3695,6 +3695,14 @@ config_setting(
     },
 )
 
+selects.config_setting_group(
+    name = "simple_build_id_enabled_linux",
+    match_all = [
+        ":simple_build_id_enabled",
+        "@platforms//os:linux",
+    ],
+)
+
 # --------------------------------------
 # running_through_bazelisk
 # --------------------------------------
