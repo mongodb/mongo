@@ -22,7 +22,9 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -111,6 +113,63 @@ boost::filesystem::path canonicalizePathForLandlock(const std::string& path,
                                                     const boost::filesystem::path& base);
 
 /**
+ * A versioned MongoDB Landlock policy: the set of Landlock access rights MongoDB chooses to
+ * handle (deny by default) as of a given policy version. This is what a particular binary denies
+ * by default before any best-effort ABI negotiation with the running kernel (see
+ * LandlockRuleset::create).
+ *
+ * The policy version is a monotonically increasing integer, independent of the Landlock ABI
+ * number: it versions the rights MongoDB chooses to handle, not the rights the kernel can
+ * enforce. The two are allowed to diverge so MongoDB can lag behind the newest kernel ABI.
+ *
+ * Every released version is immutable, and a new version may only add rights, never remove any.
+ * This lets security.landlock.policyVersion pin a configuration to the rights an older release
+ * handled, so that upgrading MongoDB does not start denying access an existing
+ * additionalPathRules entry never had to ask for. The invariants are enforced by
+ * landlock_test.cpp.
+ */
+class LandlockPolicy {
+public:
+    constexpr LandlockPolicy(int version, uint64_t handledFsAccess)
+        : _version(version), _handledFsAccess(handledFsAccess) {}
+
+    /** This policy's version number, from 1 on. */
+    constexpr int version() const {
+        return _version;
+    }
+
+    /**
+     * The Landlock access rights denied by default.
+     */
+    constexpr uint64_t handledFsAccess() const {
+        return _handledFsAccess;
+    }
+
+    /** Every policy this binary implements, ordered by version: element i is version i + 1. */
+    static std::span<const LandlockPolicy> all();
+
+    /** The newest policy this binary implements, applied when no version is configured. */
+    static const LandlockPolicy& latest();
+
+    /**
+     * The policy for security.landlock.policyVersion. InvalidOptions when `version` is below
+     * 1 or newer than latest(): this binary cannot honor a policy it does not implement.
+     */
+    static StatusWith<const LandlockPolicy*> forVersion(long long version);
+
+private:
+    int _version;
+    uint64_t _handledFsAccess;
+};
+
+/**
+ * Checks a configured security.landlock.policyVersion, for the option's IDL validator, so a
+ * version this binary does not implement is rejected at option parsing whatever the sandbox
+ * mode is.
+ */
+Status validateLandlockPolicyVersion(const int& version);
+
+/**
  * A single filesystem grant: every filesystem object beneath `path` may be
  * accessed with the rights in `accessMask`. Rules are inert descriptions; they
  * take effect when passed to LandlockRuleset::addPathRule().
@@ -137,15 +196,28 @@ public:
                                             boost::optional<uint64_t> extraRights = boost::none);
 
     /**
-     * Parses one security.landlock.additionalPathRules entry, `<access>:<path>`, where
-     * <access> is "r" (readOnly) or "rw" (readWrite) and <path> is absolute. Only the
-     * first colon separates the two, so a path may contain colons of its own; entries
-     * are never split on any other character, so a path may contain commas too.
+     * Parses one security.landlock.additionalPathRules entry, `<access_grants_csv>:<path>`.
+     * <access_grants_csv> is a comma-separated list of access rights, each either a
+     * LANDLOCK_ACCESS_FS_* name from the Landlock uAPI without that prefix (READ_FILE,
+     * MAKE_DIR, ...), parsed case-insensitively, or one of the aliases:
+     *
+     *   r  - READ_FILE, READ_DIR
+     *   rw - READ_FILE, WRITE_FILE, TRUNCATE, READ_DIR, REMOVE_FILE, REMOVE_DIR, every MAKE_*
+     *
+     * The aliases name the full set; on a path that is not a directory, addPathRule() keeps
+     * only the rights that make sense on a file (r: READ_FILE; rw: READ_FILE, WRITE_FILE,
+     * TRUNCATE), so no alias needs to know the path's type here. The grants union.
+     *
+     * <path> is absolute. Only the first colon separates the two, so a path may contain
+     * colons of its own; entries are never split on any other character, so a path may
+     * contain commas too.
      *
      * The path is taken exactly as written -- the kernel resolves it when the rule is
      * added, and a path absent on this system grants nothing (see addPathRule). A
      * malformed entry is reported as InvalidOptions naming the entry, rather than
      * skipped, so that a typo cannot quietly narrow the policy an operator asked for.
+     * Rights the active policy version does not handle are accepted here and dropped when
+     * the rule is added: they are not restricted, so there is nothing to grant.
      */
     static StatusWith<LandlockFilesystemRule> fromConfigString(std::string_view entry);
 
@@ -192,6 +264,33 @@ private:
 };
 
 /**
+ * Stands in for the landlock_add_rule() syscall while a ScopedLandlockAddRuleHook is alive. It is
+ * given the ruleset descriptor and the access mask the rule would grant. Returns 0 for success,
+ * or non-zero (having set errno) for failure, like the syscall.
+ *
+ * The kernel offers no way to read a ruleset's rules back, so this is the only place a test can
+ * observe what addPathRule() decided to grant. The hook replaces the syscall only: the ruleset
+ * itself is still created by the kernel, so tests that use it still need Landlock support.
+ */
+using LandlockAddRuleHook = std::function<long(int rulesetFd, uint64_t allowedAccess)>;
+
+/**
+ * Installs `hook` for addPathRule() for the lifetime of this object. Only one may exist at a
+ * time, and it is not synchronized: use it from unit tests that add rules on a single thread.
+ */
+class ScopedLandlockAddRuleHook {
+public:
+    explicit ScopedLandlockAddRuleHook(LandlockAddRuleHook hook);
+    ~ScopedLandlockAddRuleHook();
+
+    ScopedLandlockAddRuleHook(const ScopedLandlockAddRuleHook&) = delete;
+    ScopedLandlockAddRuleHook& operator=(const ScopedLandlockAddRuleHook&) = delete;
+
+private:
+    LandlockAddRuleHook _hook;
+};
+
+/**
  * Owns one Landlock ruleset file descriptor and wraps the three Landlock
  * syscalls: landlock_create_ruleset() (in create()), landlock_add_rule() (in
  * addPathRule()) and landlock_restrict_self() (in restrictSelf()).
@@ -229,11 +328,12 @@ public:
     ~LandlockRuleset();
 
     /**
-     * Probes the Landlock ABI and creates a ruleset handling every filesystem
-     * access right this build knows about, masked to the probed ABI. Fails with a
-     * descriptive Status when the kernel lacks or has disabled Landlock.
+     * Probes the Landlock ABI and creates a ruleset handling the filesystem access rights of
+     * `policy`, masked to the probed ABI. Fails with a descriptive Status when the kernel
+     * lacks or has disabled Landlock.
      */
-    static StatusWith<std::unique_ptr<LandlockRuleset>> create();
+    static StatusWith<std::unique_ptr<LandlockRuleset>> create(
+        const LandlockPolicy& policy = LandlockPolicy::latest());
 
     /**
      * Returns the uAPI names of the filesystem rights in `mask` that
@@ -270,9 +370,15 @@ public:
      * this system (or files not created yet, which must instead be covered by
      * a rule on their parent directory) simply get no grant.
      *
+     * `internal` says the rule is one the server derived for itself, as opposed to one an
+     * operator wrote in security.landlock.additionalPathRules. The server's own rules never
+     * need certain access rights, so an internal rule that asks for either is a programming
+     * error and process-fatal; only an operator's rule can grant them, and then it is theirs
+     * to grant.
+     *
      * Must not be called once restrictSelf() has been called (process-fatal).
      */
-    Status addPathRule(const LandlockFilesystemRule& rule);
+    Status addPathRule(const LandlockFilesystemRule& rule, bool internal = true);
 
     /**
      * The point of no return: enforces the ruleset on the current process,

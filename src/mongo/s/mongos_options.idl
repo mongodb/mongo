@@ -55,18 +55,36 @@ configs:
         source: [cli, yaml]
         condition:
             preprocessor: "defined(__linux__)"
+    "security.landlock.policyVersion":
+        description: >-
+            The MongoDB Landlock policy version this configuration was written against. The
+            server handles only the filesystem access rights that version defines, so upgrading
+            MongoDB does not start denying access that an older release permitted by default.
+            Defaults to the latest version the server implements; a version newer than that
+            is refused. Required when security.landlock.additionalPathRules is set. Not the
+            Landlock ABI version. Linux only.
+        short_name: landlockPolicyVersion
+        arg_vartype: Int
+        source: [cli, yaml]
+        validator:
+            callback: validateLandlockPolicyVersion
+        condition:
+            preprocessor: "defined(__linux__)"
     "security.landlock.additionalPathRules":
         description: >-
             Additional filesystem hierarchies to permit under the Landlock sandbox, for paths
             the server cannot derive from its own configuration. Each entry is
-            '<access>:<path>', where <access> is 'r' for read or 'rw' for read and write, and
-            <path> is absolute; the grant covers everything beneath it. Give one entry per
+            '<access>[,<access>...]:<path>', where each <access> is a LANDLOCK_ACCESS_FS_* right
+            name without that prefix (case-insensitive), or the alias 'r' (read) or 'rw' (read
+            and write, including truncate, remove and make), and <path> is
+            absolute; the grant covers everything beneath it. Give one entry per
             YAML list element, or repeat this option once per rule on the command line;
             entries from both sources accumulate. Linux only.
         short_name: landlockAdditionalPathRules
         arg_vartype: StringVector
         duplicate_behavior: append
         source: [cli, yaml]
+        requires: "security.landlock.policyVersion"
         validator:
             callback: validateLandlockAdditionalPathRules
         condition:

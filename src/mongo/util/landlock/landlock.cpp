@@ -17,10 +17,14 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
+#include <algorithm>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -116,6 +120,12 @@ long landlockRestrictSelf(int rulesetFd, uint32_t flags) {
     return syscall(__NR_landlock_restrict_self, rulesetFd, flags);
 }
 
+// Installed by ScopedLandlockAddRuleHook; null outside of tests.
+const LandlockAddRuleHook* gAddRuleHook = nullptr;
+
+// Rights the server's own rules never need, so only an operator's rule may grant them.
+constexpr uint64_t kAccessOperatorOnly = LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_IOCTL_DEV;
+
 constexpr uint64_t kAccessRead = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
 
 constexpr uint64_t kAccessMutate = LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE |
@@ -125,31 +135,12 @@ constexpr uint64_t kAccessMutate = LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCE
 
 constexpr uint64_t kAccessReadWrite = kAccessRead | kAccessMutate;
 
-// Everything the ruleset handles (denies by default). Broader than the mask any
-// rule grants, so these rights are denied unless a rule asks for them
-// specifically:
-//  - EXECUTE: never granted anywhere, and stripped from every rule when it is
-//    added. mongod and mongos never execve(2) files (config-file __exec
-//    expansion runs during option parsing, before the sandbox engages). Note
-//    Landlock's EXECUTE only gates EXECUTE-style execution, not mmap'ing
-//    libraries, so dlopen() needs only READ_FILE and still works.
-//  - REFER: granted only where a rule asks for it through extraRights, i.e.
-//    only on a hierarchy the server moves files around inside. Most of the
-//    renames the server performs (log rotation, WiredTiger's turtle file,
-//    FTDC's interim file) keep a file in its directory, which REFER does not
-//    gate; file-copy-based initial sync is the exception, moving files from a
-//    staging directory up into dbpath.
-//  - IOCTL_DEV: never granted. The server needs no device ioctls; the ioctls it
-//    does issue are on sockets and pipes, which are not filesystem device
-//    files.
-constexpr uint64_t kAccessFsAll = kAccessReadWrite | LANDLOCK_ACCESS_FS_EXECUTE |
-    LANDLOCK_ACCESS_FS_REFER | LANDLOCK_ACCESS_FS_IOCTL_DEV;
-
 // Rights that make sense on a non-directory. The kernel rejects (EINVAL) a
 // path-beneath rule granting directory-shaped rights on a file, so rules for
 // files are intersected with this mask.
 constexpr uint64_t kAccessFileCompatible = LANDLOCK_ACCESS_FS_WRITE_FILE |
-    LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_TRUNCATE | LANDLOCK_ACCESS_FS_IOCTL_DEV;
+    LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_TRUNCATE | LANDLOCK_ACCESS_FS_EXECUTE |
+    LANDLOCK_ACCESS_FS_IOCTL_DEV;
 
 // Filesystem rights the probed kernel ABI knows about. Handling a right the
 // kernel does not know about makes landlock_create_ruleset() fail, so
@@ -174,7 +165,68 @@ uint64_t supportedFsAccess(long abi) {
     return supported;
 }
 
+// Every filesystem right, by bit, with its uAPI name and the name an additionalPathRules
+// entry spells it with (the uAPI name without the LANDLOCK_ACCESS_FS_ prefix).
+struct FsRightName {
+    uint64_t bit;
+    std::string_view configName;
+    std::string_view uapiName;
+};
+constexpr FsRightName kFsRights[] = {
+#define MONGO_FS_RIGHT(NAME) {LANDLOCK_ACCESS_FS_##NAME, #NAME, "LANDLOCK_ACCESS_FS_" #NAME}
+    MONGO_FS_RIGHT(EXECUTE),
+    MONGO_FS_RIGHT(WRITE_FILE),
+    MONGO_FS_RIGHT(READ_FILE),
+    MONGO_FS_RIGHT(READ_DIR),
+    MONGO_FS_RIGHT(REMOVE_DIR),
+    MONGO_FS_RIGHT(REMOVE_FILE),
+    MONGO_FS_RIGHT(MAKE_CHAR),
+    MONGO_FS_RIGHT(MAKE_DIR),
+    MONGO_FS_RIGHT(MAKE_REG),
+    MONGO_FS_RIGHT(MAKE_SOCK),
+    MONGO_FS_RIGHT(MAKE_FIFO),
+    MONGO_FS_RIGHT(MAKE_BLOCK),
+    MONGO_FS_RIGHT(MAKE_SYM),
+    MONGO_FS_RIGHT(REFER),
+    MONGO_FS_RIGHT(TRUNCATE),
+    MONGO_FS_RIGHT(IOCTL_DEV),
+#undef MONGO_FS_RIGHT
+};
+
+// The policy table. Released entries are immutable: to handle more, append a version that adds
+// rights; never edit or reorder an existing one.
+// landlock_test.cpp pins the released values and checks the monotonicity invariants.
+constexpr LandlockPolicy kPolicies[] = {
+    // v1: every right the sandbox handled when it first shipped.
+    {1,
+     kAccessReadWrite | LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_REFER |
+         LANDLOCK_ACCESS_FS_IOCTL_DEV},
+};
+
 }  // namespace
+
+std::span<const LandlockPolicy> LandlockPolicy::all() {
+    return kPolicies;
+}
+
+const LandlockPolicy& LandlockPolicy::latest() {
+    return kPolicies[std::size(kPolicies) - 1];
+}
+
+StatusWith<const LandlockPolicy*> LandlockPolicy::forVersion(long long version) {
+    if (version < 1 || version > latest().version()) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "security.landlock.policyVersion is " << version
+                                    << ", but this server implements Landlock policy versions 1 "
+                                       "through "
+                                    << latest().version());
+    }
+    return &kPolicies[version - 1];
+}
+
+Status validateLandlockPolicyVersion(const int& version) {
+    return LandlockPolicy::forVersion(version).getStatus();
+}
 
 boost::filesystem::path canonicalizePathForLandlock(const std::string& path,
                                                     const boost::filesystem::path& base) {
@@ -235,8 +287,9 @@ StatusWith<LandlockFilesystemRule> LandlockFilesystemRule::fromConfigString(
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "Invalid security.landlock.additionalPathRules entry '"
                                     << entry << "': " << detail
-                                    << ". Expected \"r:<absolute path>\" or "
-                                       "\"rw:<absolute path>\"");
+                                    << ". Expected \"<access>[,<access>...]:<absolute path>\", "
+                                       "where each <access> is r, rw, or a "
+                                       "LANDLOCK_ACCESS_FS_* name without the prefix");
     };
 
     // The first colon only: the access specifier cannot contain one, but a path can.
@@ -259,39 +312,43 @@ StatusWith<LandlockFilesystemRule> LandlockFilesystemRule::fromConfigString(
         return malformed("the path must be absolute");
     }
 
-    if (access == "r") {
-        return readOnly(std::string{path});
+    uint64_t mask = 0;
+    std::string_view remaining = access;
+    while (true) {
+        const auto comma = remaining.find(',');
+        const auto token = remaining.substr(0, comma);
+        if (token.empty()) {
+            return malformed("empty access specifier in the comma-separated list");
+        }
+
+        if (str::equalCaseInsensitive(token, "r")) {
+            mask |= kAccessRead;
+        } else if (str::equalCaseInsensitive(token, "rw")) {
+            mask |= kAccessReadWrite;
+        } else {
+            const auto right = std::find_if(
+                std::begin(kFsRights), std::end(kFsRights), [&](const FsRightName& candidate) {
+                    return str::equalCaseInsensitive(token, candidate.configName);
+                });
+            if (right == std::end(kFsRights)) {
+                return malformed(str::stream() << "unknown access specifier '" << token << "'");
+            }
+            mask |= right->bit;
+        }
+
+        if (comma == std::string_view::npos) {
+            break;
+        }
+        remaining.remove_prefix(comma + 1);
     }
-    if (access == "rw") {
-        return readWrite(std::string{path});
-    }
-    return malformed(str::stream() << "unknown access specifier '" << access << "'");
+    return LandlockFilesystemRule{std::string{path}, mask};
 }
 
 std::vector<std::string_view> LandlockRuleset::fsAccessRightNames(uint64_t mask) {
-    static constexpr std::pair<uint64_t, std::string_view> kFsRightNames[] = {
-        {LANDLOCK_ACCESS_FS_EXECUTE, "LANDLOCK_ACCESS_FS_EXECUTE"},
-        {LANDLOCK_ACCESS_FS_WRITE_FILE, "LANDLOCK_ACCESS_FS_WRITE_FILE"},
-        {LANDLOCK_ACCESS_FS_READ_FILE, "LANDLOCK_ACCESS_FS_READ_FILE"},
-        {LANDLOCK_ACCESS_FS_READ_DIR, "LANDLOCK_ACCESS_FS_READ_DIR"},
-        {LANDLOCK_ACCESS_FS_REMOVE_DIR, "LANDLOCK_ACCESS_FS_REMOVE_DIR"},
-        {LANDLOCK_ACCESS_FS_REMOVE_FILE, "LANDLOCK_ACCESS_FS_REMOVE_FILE"},
-        {LANDLOCK_ACCESS_FS_MAKE_CHAR, "LANDLOCK_ACCESS_FS_MAKE_CHAR"},
-        {LANDLOCK_ACCESS_FS_MAKE_DIR, "LANDLOCK_ACCESS_FS_MAKE_DIR"},
-        {LANDLOCK_ACCESS_FS_MAKE_REG, "LANDLOCK_ACCESS_FS_MAKE_REG"},
-        {LANDLOCK_ACCESS_FS_MAKE_SOCK, "LANDLOCK_ACCESS_FS_MAKE_SOCK"},
-        {LANDLOCK_ACCESS_FS_MAKE_FIFO, "LANDLOCK_ACCESS_FS_MAKE_FIFO"},
-        {LANDLOCK_ACCESS_FS_MAKE_BLOCK, "LANDLOCK_ACCESS_FS_MAKE_BLOCK"},
-        {LANDLOCK_ACCESS_FS_MAKE_SYM, "LANDLOCK_ACCESS_FS_MAKE_SYM"},
-        {LANDLOCK_ACCESS_FS_REFER, "LANDLOCK_ACCESS_FS_REFER"},
-        {LANDLOCK_ACCESS_FS_TRUNCATE, "LANDLOCK_ACCESS_FS_TRUNCATE"},
-        {LANDLOCK_ACCESS_FS_IOCTL_DEV, "LANDLOCK_ACCESS_FS_IOCTL_DEV"},
-    };
-
     std::vector<std::string_view> names;
-    for (auto&& [bit, name] : kFsRightNames) {
-        if (mask & bit) {
-            names.push_back(name);
+    for (const auto& right : kFsRights) {
+        if (mask & right.bit) {
+            names.push_back(right.uapiName);
         }
     }
     return names;
@@ -304,8 +361,8 @@ LandlockRuleset::~LandlockRuleset() {
     }
 }
 
-StatusWith<std::unique_ptr<LandlockRuleset>> LandlockRuleset::create() {
-    uint64_t requestedFsAccess = kAccessFsAll;
+StatusWith<std::unique_ptr<LandlockRuleset>> LandlockRuleset::create(const LandlockPolicy& policy) {
+    uint64_t requestedFsAccess = policy.handledFsAccess();
     uassert(13118813,
             "A Landlock ruleset must be asked to handle at least one filesystem access right",
             requestedFsAccess != 0);
@@ -345,6 +402,7 @@ StatusWith<std::unique_ptr<LandlockRuleset>> LandlockRuleset::create() {
     }
     LOGV2(13118802,
           "Landlock: access rights the ruleset will handle (denied by default)",
+          "policyVersion"_attr = policy.version(),
           "abiVersion"_attr = abi,
           "handledRights"_attr = fsAccessRightNames(attr.handledAccessFs));
 
@@ -358,11 +416,31 @@ StatusWith<std::unique_ptr<LandlockRuleset>> LandlockRuleset::create() {
         Passkey{}, rulesetFd, static_cast<int>(abi), requestedFsAccess, attr.handledAccessFs);
 }
 
-Status LandlockRuleset::addPathRule(const LandlockFilesystemRule& rule) {
+ScopedLandlockAddRuleHook::ScopedLandlockAddRuleHook(LandlockAddRuleHook hook)
+    : _hook(std::move(hook)) {
+    // The hook skips the kernel, so it must never be reachable in a production process.
+    // Unit tests run with testing diagnostics on; a server does only when started with
+    // --setParameter testingDiagnosticsEnabled=true, which only test infrastructure does.
+    invariant(
+        TestingProctor::instance().isInitialized() && TestingProctor::instance().isEnabled(),
+        "a Landlock add-rule hook may only be installed when testing diagnostics are enabled");
+    invariant(!gAddRuleHook, "a Landlock add-rule hook is already installed");
+    gAddRuleHook = &_hook;
+}
+
+ScopedLandlockAddRuleHook::~ScopedLandlockAddRuleHook() {
+    gAddRuleHook = nullptr;
+}
+
+Status LandlockRuleset::addPathRule(const LandlockFilesystemRule& rule, bool internal) {
     invariant(!_restricted,
               str::stream() << "Attempted to add a Landlock rule for '" << rule.path()
                             << "' after restrictSelf(); rules added after enforcement "
                                "silently never apply");
+    invariant(!internal || (rule.accessMask() & kAccessOperatorOnly) == 0,
+              str::stream() << "Internal Landlock rule for '" << rule.path()
+                            << "' requests EXECUTE or IOCTL_DEV, which only an operator's "
+                               "additionalPathRules entry may grant");
 
     // O_PATH: a location handle is all a rule needs; no read access to the
     // object itself is required.
@@ -390,10 +468,9 @@ Status LandlockRuleset::addPathRule(const LandlockFilesystemRule& rule) {
     }
 
     LandlockPathBeneathAttr attr;
-    // EXECUTE and IOCTL_DEV are stripped from every grant: the server never executes files or
-    // calls ioctl() on character or block devices.
-    attr.allowedAccess = rule.accessMask() & _handledFsAccess &
-        ~(LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_IOCTL_DEV);
+    // Internal rules were checked above to carry no EXECUTE or IOCTL_DEV; an operator's
+    // additionalPathRules entry can ask for them, and then it is theirs to grant.
+    attr.allowedAccess = rule.accessMask() & _handledFsAccess;
     if (!S_ISDIR(statbuf.st_mode)) {
         attr.allowedAccess &= kAccessFileCompatible;
     }
@@ -404,7 +481,10 @@ Status LandlockRuleset::addPathRule(const LandlockFilesystemRule& rule) {
     }
     attr.parentFd = pathFd;
 
-    if (landlockAddRule(_rulesetFd, kRulePathBeneath, &attr, 0) != 0) {
+    const long addRuleResult = MONGO_unlikely(gAddRuleHook != nullptr)
+        ? (*gAddRuleHook)(_rulesetFd, attr.allowedAccess)
+        : landlockAddRule(_rulesetFd, kRulePathBeneath, &attr, 0);
+    if (addRuleResult != 0) {
         return Status(ErrorCodes::OperationFailed,
                       str::stream() << "Failed to add Landlock rule for '" << rule.path()
                                     << "': " << errorMessage(lastSystemError()));

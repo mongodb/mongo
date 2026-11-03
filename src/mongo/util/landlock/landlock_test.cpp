@@ -9,7 +9,9 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -33,10 +35,20 @@ constexpr uint64_t kExecute = 1ULL << 0;
 constexpr uint64_t kWriteFile = 1ULL << 1;
 constexpr uint64_t kReadFile = 1ULL << 2;
 constexpr uint64_t kReadDir = 1ULL << 3;
+constexpr uint64_t kRemoveDir = 1ULL << 4;
+constexpr uint64_t kRemoveFile = 1ULL << 5;
 constexpr uint64_t kMakeReg = 1ULL << 8;
+// MAKE_CHAR, MAKE_DIR, MAKE_REG, MAKE_SOCK, MAKE_FIFO, MAKE_BLOCK, MAKE_SYM: bits 6 through 12.
+constexpr uint64_t kMakeAll = ((1ULL << 13) - 1) & ~((1ULL << 6) - 1);
 constexpr uint64_t kRefer = 1ULL << 13;
 constexpr uint64_t kTruncate = 1ULL << 14;
 constexpr uint64_t kIoctlDev = 1ULL << 15;
+
+// Every file system access right the uAPI defines as of ABI 5, the newest this binary knows about.
+constexpr uint64_t kKnownFsRights = (1ULL << 16) - 1;
+
+// Rights exclusive only to directories
+constexpr uint64_t kKnownDirOnlyFsRights = kReadDir | kRemoveDir | kRemoveFile | kMakeAll | kRefer;
 
 // Landlock is a kernel feature, so anything needing a real ruleset is conditional on
 // this host providing one. Rule construction and config parsing need no kernel and run
@@ -115,14 +127,45 @@ TEST(LandlockFilesystemRule, PathIsStoredVerbatim) {
 // The additionalPathRules DSL.
 //
 
-TEST(LandlockConfigString, ParsesBothAccessSpecifiers) {
+TEST(LandlockConfigString, ParsesBothAliases) {
     const auto readRule = parseOrFail("r:/etc/pki/ca-trust");
     ASSERT_EQ("/etc/pki/ca-trust", readRule.path());
-    ASSERT_EQ(LandlockFilesystemRule::readOnly("/x").accessMask(), readRule.accessMask());
+    ASSERT_EQ(kReadFile | kReadDir, readRule.accessMask());
 
+    // rw is READ_FILE, WRITE_FILE, TRUNCATE, READ_DIR, REMOVE_*, MAKE_*
     const auto writeRule = parseOrFail("rw:/srv/site-data");
     ASSERT_EQ("/srv/site-data", writeRule.path());
-    ASSERT_EQ(LandlockFilesystemRule::readWrite("/x").accessMask(), writeRule.accessMask());
+    ASSERT_EQ(kReadFile | kWriteFile | kTruncate | kReadDir | kRemoveFile | kRemoveDir | kMakeAll,
+              writeRule.accessMask());
+}
+
+TEST(LandlockConfigString, ParsesIndividualRightsCaseInsensitively) {
+    ASSERT_EQ(kReadFile | kReadDir, parseOrFail("read_file,read_dir:/x").accessMask());
+    ASSERT_EQ(kReadFile | kReadDir, parseOrFail("READ_FILE,Read_Dir:/x").accessMask());
+    ASSERT_EQ(kExecute, parseOrFail("execute:/x").accessMask());
+    ASSERT_EQ(kIoctlDev, parseOrFail("ioctl_dev:/x").accessMask());
+    ASSERT_EQ(kRefer, parseOrFail("refer:/x").accessMask());
+}
+
+TEST(LandlockConfigString, EveryRightNamePrintedForDiagnosticsParses) {
+    // The names a diagnostic prints are the uAPI names; with the prefix stripped, each must be
+    // accepted back, so an operator can copy a right straight from a log line.
+    constexpr std::string_view kPrefix = "LANDLOCK_ACCESS_FS_";
+    uint64_t seen = 0;
+    for (const auto name : LandlockRuleset::fsAccessRightNames(kKnownFsRights)) {
+        ASSERT_TRUE(name.starts_with(kPrefix)) << name;
+        const auto rule = parseOrFail(std::string{name.substr(kPrefix.size())} + ":/x");
+        ASSERT_EQ(1, std::popcount(rule.accessMask())) << name;
+        seen |= rule.accessMask();
+    }
+    ASSERT_EQ(kKnownFsRights, seen);
+}
+
+TEST(LandlockConfigString, GrantsUnion) {
+    ASSERT_EQ(kReadFile | kReadDir | kWriteFile | kTruncate,
+              parseOrFail("r,write_file,truncate:/x").accessMask());
+    ASSERT_EQ(parseOrFail("rw:/x").accessMask(), parseOrFail("r,rw:/x").accessMask());
+    ASSERT_EQ(kReadFile, parseOrFail("read_file,read_file:/x").accessMask());
 }
 
 // The kernel resolves the path when the rule is added, so parsing hands it over
@@ -143,6 +186,12 @@ TEST(LandlockConfigString, PathMayContainColonsAndCommas) {
     ASSERT_EQ("/var/lib/odd:name", parseOrFail("rw:/var/lib/odd:name").path());
     ASSERT_EQ("/usr/bin/foo,bar", parseOrFail("r:/usr/bin/foo,bar").path());
     ASSERT_EQ("/a,rw:/b", parseOrFail("r:/a,rw:/b").path());
+}
+
+TEST(LandlockConfigString, RejectsEmptyListElements) {
+    assertRejected("r,:/tmp");
+    assertRejected(",r:/tmp");
+    assertRejected("r,,rw:/tmp");
 }
 
 TEST(LandlockConfigString, RejectsMissingPrefix) {
@@ -173,9 +222,22 @@ TEST(LandlockConfigString, RejectsUnknownAccessSpecifier) {
     assertRejected("rwx:/tmp");
     assertRejected("read:/tmp");
     assertRejected("r :/tmp");
-    // Case-sensitive on purpose: accepting "R" would invite "RW" and "Rw" too.
-    assertRejected("R:/tmp");
-    assertRejected("RW:/tmp");
+    assertRejected("r, rw:/tmp");
+    assertRejected("landlock_access_fs_read_file:/tmp");
+    assertRejected("read_file,bogus:/tmp");
+    // "MAKE_*" in the documentation is shorthand for the individual MAKE_ rights.
+    assertRejected("make_*:/tmp");
+    assertRejected("make:/tmp");
+
+    const auto status =
+        LandlockFilesystemRule::fromConfigString("read_file,bogus:/tmp").getStatus();
+    ASSERT_STRING_CONTAINS(status.reason(), "unknown access specifier 'bogus'");
+}
+
+TEST(LandlockConfigString, AliasesAreCaseInsensitive) {
+    ASSERT_EQ(parseOrFail("r:/x").accessMask(), parseOrFail("R:/x").accessMask());
+    ASSERT_EQ(parseOrFail("rw:/x").accessMask(), parseOrFail("RW:/x").accessMask());
+    ASSERT_EQ(parseOrFail("rw:/x").accessMask(), parseOrFail("Rw:/x").accessMask());
 }
 
 // A relative path resolves against whatever directory the process is in -- "/" once
@@ -345,6 +407,74 @@ TEST(LandlockPath, TrailingElementsAreStripped) {
 }
 
 //
+// Policy versions. These need no kernel.
+//
+
+TEST(LandlockPolicy, VersionsAreContiguousFromOne) {
+    const auto policies = LandlockPolicy::all();
+    ASSERT_FALSE(policies.empty());
+    for (size_t i = 0; i < policies.size(); ++i) {
+        ASSERT_EQ(static_cast<int>(i) + 1, policies[i].version());
+    }
+    ASSERT_EQ(policies.back().version(), LandlockPolicy::latest().version());
+}
+
+TEST(LandlockPolicy, RightsNeverShrink) {
+    const auto policies = LandlockPolicy::all();
+    for (size_t i = 1; i < policies.size(); ++i) {
+        const auto& prev = policies[i - 1];
+        const auto& next = policies[i];
+        // A newer version may only add rights: the previous set must be a subset.
+        ASSERT_EQ(prev.handledFsAccess(), prev.handledFsAccess() & next.handledFsAccess())
+            << "version " << next.version() << " removes rights handled by " << prev.version();
+    }
+}
+
+TEST(LandlockPolicy, HandlesOnlyKnownRights) {
+    for (const auto& policy : LandlockPolicy::all()) {
+        ASSERT_NE(0u, policy.handledFsAccess()) << "version " << policy.version();
+        ASSERT_EQ(0u, policy.handledFsAccess() & ~kKnownFsRights) << "version " << policy.version();
+    }
+}
+
+// Released policies are immutable. If this fails because an entry was edited, add a new
+// version instead; only append a row here when a new version is added.
+TEST(LandlockPolicy, ReleasedVersionsAreImmutable) {
+    struct Released {
+        int version;
+        uint64_t handledFsAccess;
+    };
+    // v1: EXECUTE | WRITE_FILE | READ_FILE | READ_DIR | REMOVE_* | MAKE_* | REFER | TRUNCATE |
+    // IOCTL_DEV
+    constexpr Released kReleased[] = {
+        {1, 0xFFFF},
+    };
+    const auto policies = LandlockPolicy::all();
+    ASSERT_GTE(policies.size(), std::size(kReleased));
+    for (size_t i = 0; i < std::size(kReleased); ++i) {
+        ASSERT_EQ(kReleased[i].version, policies[i].version());
+        ASSERT_EQ(kReleased[i].handledFsAccess, policies[i].handledFsAccess())
+            << "version " << kReleased[i].version;
+    }
+}
+
+TEST(LandlockPolicy, ForVersionFindsEachImplementedVersion) {
+    for (const auto& policy : LandlockPolicy::all()) {
+        const auto* found = unittest::assertGet(LandlockPolicy::forVersion(policy.version()));
+        ASSERT_EQ(&policy, found);
+    }
+}
+
+TEST(LandlockPolicy, ForVersionRejectsUnimplementedVersions) {
+    for (long long version : {-1LL, 0LL, LandlockPolicy::latest().version() + 1LL, 1LL << 40}) {
+        const auto status = LandlockPolicy::forVersion(version).getStatus();
+        ASSERT_EQ(ErrorCodes::InvalidOptions, status.code()) << "version " << version;
+    }
+    ASSERT_NOT_OK(validateLandlockPolicyVersion(LandlockPolicy::latest().version() + 1));
+    ASSERT_OK(validateLandlockPolicyVersion(1));
+}
+
+//
 // Ruleset construction. These need a kernel that provides Landlock.
 //
 
@@ -363,6 +493,31 @@ TEST(LandlockRuleset, CreateReportsAbiAndHandledRights) {
     ASSERT_EQ(0u, ruleset->handledFsAccess() & ruleset->degradedFsAccess());
     // EXECUTE is handled -- denied by default -- even though no rule ever grants it.
     ASSERT_NE(0u, ruleset->handledFsAccess() & kExecute);
+}
+
+TEST(LandlockRuleset, CreateWithEmptyPolicyFails) {
+    if (!kernelHasLandlock()) {
+        return;
+    }
+    unittest::TempDir tempDir("landlock_test_grants");
+    LandlockPolicy emptyPolicy{1, 0};
+    ASSERT_THROWS_CODE(LandlockRuleset::create(emptyPolicy), DBException, 13118813);
+}
+
+TEST(LandlockRuleset, CreateHandlesNoMoreThanThePolicy) {
+    if (!kernelHasLandlock()) {
+        return;
+    }
+    LandlockPolicy smallSet{1,
+                            LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE |
+                                LANDLOCK_ACCESS_FS_EXECUTE};
+
+    for (const auto& policy : {smallSet, LandlockPolicy::latest()}) {
+        auto ruleset = unittest::assertGet(LandlockRuleset::create(policy));
+        ASSERT_EQ(0u, ruleset->handledFsAccess() & ~policy.handledFsAccess());
+        ASSERT_EQ(policy.handledFsAccess(),
+                  ruleset->handledFsAccess() | ruleset->degradedFsAccess());
+    }
 }
 
 TEST(LandlockRuleset, RightsAreNamedForDiagnostics) {
@@ -394,21 +549,91 @@ TEST(LandlockRuleset, AddPathRuleAcceptsEmptyPath) {
     ASSERT_OK(ruleset->addPathRule(LandlockFilesystemRule::readWrite("")));
 }
 
-// Directory-shaped rights are dropped for a non-directory rather than making the kernel
-// reject the rule outright (EINVAL).
-TEST(LandlockRuleset, AddPathRuleAcceptsFilesAndDirectories) {
+//
+// Hook that observes what addPathRule hands the kernel (because the kernel cannot
+// report a ruleset's rules back). Rights are compared after masking to what the running
+// kernel's ABI handles, so the expectations hold on any ABI that has Landlock.
+//
+class AddRuleRecorder {
+public:
+    AddRuleRecorder()
+        : _hook([this](int, uint64_t allowedAccess) {
+              grants.push_back(allowedAccess);
+              return 0L;
+          }) {}
+
+    std::vector<uint64_t> grants;
+
+private:
+    ScopedLandlockAddRuleHook _hook;
+};
+
+TEST(LandlockRuleset, AddPathRuleGrantsTheRulesRightsToADirectory) {
     if (!kernelHasLandlock()) {
         return;
     }
-    unittest::TempDir tempDir("landlock_test_paths");
+    unittest::TempDir tempDir("landlock_test_grants");
+    auto ruleset = unittest::assertGet(LandlockRuleset::create());
+    AddRuleRecorder recorder;
+
+    ASSERT_OK(ruleset->addPathRule(LandlockFilesystemRule::readOnly(tempDir.path())));
+    ASSERT_OK(ruleset->addPathRule(LandlockFilesystemRule::readWrite(tempDir.path())));
+
+    ASSERT_EQ(2u, recorder.grants.size());
+    ASSERT_EQ(kReadFile | kReadDir, recorder.grants[0]);
+    ASSERT_EQ(LandlockFilesystemRule::readWrite("").accessMask() & ruleset->handledFsAccess(),
+              recorder.grants[1]);
+}
+
+TEST(LandlockRuleset, AddPathRuleNarrowsAFileGrantToFileRights) {
+    if (!kernelHasLandlock()) {
+        return;
+    }
+    unittest::TempDir tempDir("landlock_test_grants");
     const std::string filePath = tempDir.path() + "/a_file";
     const int fd = ::open(filePath.c_str(), O_CREAT | O_WRONLY | O_CLOEXEC, 0600);
     ASSERT_GTE(fd, 0);
     ::close(fd);
-
     auto ruleset = unittest::assertGet(LandlockRuleset::create());
-    ASSERT_OK(ruleset->addPathRule(LandlockFilesystemRule::readWrite(tempDir.path())));
-    ASSERT_OK(ruleset->addPathRule(LandlockFilesystemRule::readWrite(filePath)));
+    AddRuleRecorder recorder;
+
+    ASSERT_OK(ruleset->addPathRule(LandlockFilesystemRule{filePath, kKnownFsRights}, false));
+
+    auto rightsHandled = kKnownFsRights & ruleset->handledFsAccess();
+    auto rightsFiltered = rightsHandled & ~kKnownDirOnlyFsRights;
+
+    ASSERT_EQ(1u, recorder.grants.size());
+    ASSERT_EQ(recorder.grants[0], rightsFiltered);
+}
+
+TEST(LandlockRuleset, AddPathRuleGrantsNothingBeyondTheRulesetsHandledRights) {
+    if (!kernelHasLandlock()) {
+        return;
+    }
+    unittest::TempDir tempDir("landlock_test_grants");
+    auto ruleset = unittest::assertGet(LandlockRuleset::create());
+    AddRuleRecorder recorder;
+
+    // Everything, including rights this ABI may not handle: the kernel would answer EINVAL.
+    ASSERT_OK(ruleset->addPathRule(LandlockFilesystemRule(tempDir.path(), ~uint64_t{0}), false));
+
+    ASSERT_EQ(1u, recorder.grants.size());
+    ASSERT_EQ(0u, recorder.grants[0] & ~ruleset->handledFsAccess());
+}
+
+TEST(LandlockRuleset, AddPathRuleReportsAFailedAddRule) {
+    if (!kernelHasLandlock()) {
+        return;
+    }
+    unittest::TempDir tempDir("landlock_test_grants");
+    auto ruleset = unittest::assertGet(LandlockRuleset::create());
+    ScopedLandlockAddRuleHook failing([](int, uint64_t) {
+        errno = EINVAL;
+        return -1L;
+    });
+
+    ASSERT_EQ(ErrorCodes::OperationFailed,
+              ruleset->addPathRule(LandlockFilesystemRule::readOnly(tempDir.path())).code());
 }
 
 //
@@ -606,6 +831,26 @@ DEATH_TEST(LandlockRulesetDeathTest, AddPathRuleAfterRestrictSelf, "after restri
     auto ruleset = unittest::assertGet(LandlockRuleset::create());
     uassertStatusOK(ruleset->restrictSelf());
     (void)ruleset->addPathRule(LandlockFilesystemRule::readOnly("/tmp"));
+}
+
+DEATH_TEST(LandlockRulesetDeathTest,
+           InternalRuleMayNotGrantExecute,
+           "requests EXECUTE or IOCTL_DEV") {
+    if (!kernelHasLandlock()) {
+        invariant(false, "requests EXECUTE or IOCTL_DEV: no Landlock on this kernel");
+    }
+    auto ruleset = unittest::assertGet(LandlockRuleset::create());
+    (void)ruleset->addPathRule(LandlockFilesystemRule("/tmp", kReadFile | kExecute));
+}
+
+DEATH_TEST(LandlockRulesetDeathTest,
+           InternalRuleMayNotGrantIoctlDev,
+           "requests EXECUTE or IOCTL_DEV") {
+    if (!kernelHasLandlock()) {
+        invariant(false, "requests EXECUTE or IOCTL_DEV: no Landlock on this kernel");
+    }
+    auto ruleset = unittest::assertGet(LandlockRuleset::create());
+    (void)ruleset->addPathRule(LandlockFilesystemRule("/tmp", kReadFile | kIoctlDev));
 }
 
 DEATH_TEST(LandlockRulesetDeathTest, RestrictSelfTwice, "restrictSelf() twice") {

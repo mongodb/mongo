@@ -48,7 +48,6 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_somap.h"
 
 #include <cstdint>
@@ -125,6 +124,9 @@ std::string_view landlockModeName(LandlockMode mode) {
 // ever moves out of single-threaded startup.
 LandlockMode gLandlockMode = LandlockMode::kDisabled;
 int gLandlockAbi = 0;
+// The policy version in effect: security.landlock.policyVersion, or the latest this binary
+// implements when unset.
+int gLandlockPolicyVersion = LandlockPolicy::latest().version();
 bool gLandlockActive = false;
 uint64_t gLandlockHandledFsAccess = 0;
 uint64_t gLandlockDegradedFsAccess = 0;
@@ -344,7 +346,7 @@ std::vector<LandlockFilesystemRule> staticFilesystemRules() {
         // Shared libraries and hosted binaries, notably glibc NSS modules
         // dlopen()'d lazily for name resolution. Landlock's EXECUTE right only
         // gates execve()-style execution, not mmap'ing a library, so read-only
-        // suffices for dlopen() (EXECUTE is never granted; see addPathRule).
+        // suffices for dlopen().
         LandlockFilesystemRule::readOnly("/usr"),
         LandlockFilesystemRule::readOnly("/lib"),
         LandlockFilesystemRule::readOnly("/lib64"),
@@ -540,15 +542,13 @@ void registerAdditionalPathRules(LandlockRuleset& ruleset) {
         // escaping this initializer would abort with no usable diagnostic.
         boost::system::error_code ec;
         if (!boost::filesystem::exists(rule.path(), ec)) {
-            LOGV2_FATAL(13214202,
-                        "The path named by a configured additional Landlock path rule does "
-                        "not exist or could not be read",
-                        "additionalPathRule"_attr = entry,
-                        "path"_attr = rule.path(),
-                        "error"_attr = ec ? ec.message() : "no such file or directory");
+            uasserted(13214202,
+                      str::stream() << "Invalid security.landlock.additionalPathRules entry: '"
+                                    << entry << "': the path specified could not be read ("
+                                    << (ec ? ec.message() : "no such file or directory") << ")");
         }
 
-        if (Status status = ruleset.addPathRule(rule); !status.isOK()) {
+        if (Status status = ruleset.addPathRule(rule, false /*internal*/); !status.isOK()) {
             LOGV2_FATAL(13214203,
                         "Failed to add a configured additional Landlock path rule",
                         "additionalPathRule"_attr = entry,
@@ -580,6 +580,15 @@ MONGO_INITIALIZER_GENERAL(BeginLandlockSandboxInitialization,
     if (auto value = params["security.landlock.mode"]; !value.isEmpty()) {
         gLandlockMode = uassertStatusOK(parseLandlockMode(value.as<std::string>()));
     }
+
+    // The version is validated at option parsing, so a failure here would mean the validator
+    // and this lookup disagree. Requesting a version newer than this binary implements is
+    // refused rather than quietly downgraded to what it has.
+    if (auto value = params["security.landlock.policyVersion"]; !value.isEmpty()) {
+        gLandlockPolicyVersion = value.as<int>();
+    }
+    const LandlockPolicy& policy =
+        *uassertStatusOK(LandlockPolicy::forVersion(gLandlockPolicyVersion));
 
     // Probed even when disabled, so monitoring can tell a host that could enforce
     // the sandbox from one that never could.
@@ -620,7 +629,7 @@ MONGO_INITIALIZER_GENERAL(BeginLandlockSandboxInitialization,
 
     // Landlock is available here. A failure from this point is the policy failing to apply,
     // which is fatal rather than something a mode gets to tolerate.
-    auto swRuleset = LandlockRuleset::create();
+    auto swRuleset = LandlockRuleset::create(policy);
     if (!swRuleset.isOK()) {
         LOGV2_FATAL(
             13118806, "Failed to create Landlock ruleset", "error"_attr = swRuleset.getStatus());
@@ -629,6 +638,7 @@ MONGO_INITIALIZER_GENERAL(BeginLandlockSandboxInitialization,
 
     LOGV2(13118808,
           "Applying Landlock filesystem sandbox",
+          "policyVersion"_attr = policy.version(),
           "abiVersion"_attr = gLandlockRuleset->abiVersion());
 
     addGlobalLandlockRules(staticFilesystemRules());
@@ -679,6 +689,7 @@ MONGO_INITIALIZER_GENERAL(EndLandlockSandboxInitialization,
     handledRights.append("scope", std::vector<std::string>{});
     LOGV2(13118812,
           "Landlock ruleset applied",
+          "policyVersion"_attr = gLandlockPolicyVersion,
           "abiVersion"_attr = ruleset.abiVersion(),
           "handledAccessRights"_attr = handledRights.obj(),
           "degradedRights"_attr = LandlockRuleset::fsAccessRightNames(ruleset.degradedFsAccess()));
@@ -689,6 +700,10 @@ MONGO_INITIALIZER_GENERAL(EndLandlockSandboxInitialization,
 //   mode:                 the security.landlock.mode option ("enforce",
 //                         "bestEffort" or "disabled")
 //   active:               whether the sandbox is actually enforced
+//   policyVersion:        the MongoDB Landlock policy version in effect
+//                         (security.landlock.policyVersion, else the latest
+//                         this binary implements), reported even when disabled
+//   latestPolicyVersion:  the newest policy version this binary implements
 //   abiVersion:           Landlock ABI probed from the running kernel (0 when
 //                         the kernel lacks Landlock or has it disabled),
 //                         reported even when the sandbox is disabled
@@ -708,6 +723,8 @@ public:
         BSONObjBuilder builder;
         builder.append("mode", landlockModeName(gLandlockMode));
         builder.append("active", gLandlockActive);
+        builder.append("policyVersion", gLandlockPolicyVersion);
+        builder.append("latestPolicyVersion", LandlockPolicy::latest().version());
         builder.append("abiVersion", gLandlockAbi);
         if (gLandlockActive) {
             {

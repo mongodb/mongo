@@ -23,6 +23,11 @@
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {
+    assertLandlockMode,
+    logEntriesWithId,
+    probeLandlockSupport,
+} from "jstests/noPassthrough/security/landlock_helpers.js";
 
 if (getBuildInfo().buildEnvironment.target_os !== "linux") {
     jsTest.log.info("Landlock is Linux-only; skipping test");
@@ -48,13 +53,6 @@ function logContains(node, id) {
     return cat(node.fullOptions.logFile).includes(`"id":${id}`);
 }
 
-function logEntries(node, id) {
-    return cat(node.fullOptions.logFile)
-        .split("\n")
-        .filter((line) => line.includes(`"id":${id}`))
-        .map((line) => JSON.parse(line));
-}
-
 /**
  * Asserts that `node` reached a clean sandboxing decision -- either full enforcement or an
  * explicit best-effort downgrade on an unsupporting kernel -- and returns whether the sandbox
@@ -72,75 +70,6 @@ function assertSandboxOutcome(node) {
         attr,
     );
     return applied;
-}
-
-/**
- * Fetches the "landlock" serverStatus section from `node` and asserts its invariants: the
- * section is present by default with a `mode` naming one of the three configured modes, an
- * `active` boolean and a numeric `abiVersion` (probed even while the sandbox is disabled, so
- * monitoring can see kernel capability: >= 1 on kernels with Landlock, 0 when the kernel
- * lacks or disables it); enforcement matches the mode and this host's Landlock support; and
- * the access-rights breakdowns describe the enforced ruleset, so they are present exactly
- * while active, with a never-empty handled set (an unenforceable ruleset means the sandbox
- * does not activate).
- */
-function getLandlockStatus(node, desc) {
-    const res = assert.commandWorked(node.adminCommand({serverStatus: 1}));
-    const landlock = res.landlock;
-    assert.neq(undefined, landlock, `missing landlock section in serverStatus on ${desc}`);
-    assert.contains(landlock.mode, ["enforce", "bestEffort", "disabled"], `bad mode on ${desc}`, {
-        landlock,
-    });
-    assert.eq("boolean", typeof landlock.active, `bad landlock.active on ${desc}`, {landlock});
-    assert.eq("number", typeof landlock.abiVersion, `bad landlock.abiVersion on ${desc}`, {
-        landlock,
-    });
-    assert.gte(landlock.abiVersion, 0, `bad probed ABI version on ${desc}`, {landlock});
-    // Enforcement is pinned down exactly in every mode. "disabled" never enforces. A node that
-    // started at all under "enforce" must be enforcing, since the alternative was refusing to
-    // start. And "bestEffort" runs unsandboxed only where Landlock is unavailable, because a
-    // policy that failed to apply on a host that does support it is fatal -- so on a live node
-    // the ABI version decides, both ways.
-    if (landlock.mode === "disabled") {
-        assert.eq(false, landlock.active, `sandbox active while disabled on ${desc}`, {landlock});
-    } else if (landlock.mode === "enforce") {
-        assert.eq(true, landlock.active, `enforce is not enforcing on ${desc}`, {landlock});
-    } else {
-        assert.eq(
-            landlock.abiVersion >= 1,
-            landlock.active,
-            `bestEffort enforcement does not match this host's Landlock support on ${desc}`,
-            {landlock},
-        );
-    }
-    if (landlock.active) {
-        assert(
-            Array.isArray(landlock.handledAccessRights.fs),
-            `bad handledAccessRights on ${desc}`,
-            {landlock},
-        );
-        assert.gt(landlock.handledAccessRights.fs.length, 0, `empty handled fs rights on ${desc}`, {
-            landlock,
-        });
-        assert(
-            Array.isArray(landlock.degradedAccessRights.fs),
-            `bad degradedAccessRights on ${desc}`,
-            {landlock},
-        );
-    } else {
-        assert(
-            !landlock.hasOwnProperty("handledAccessRights"),
-            `handledAccessRights reported while inactive on ${desc}`,
-            {landlock},
-        );
-        assert(
-            !landlock.hasOwnProperty("degradedAccessRights"),
-            `degradedAccessRights reported while inactive on ${desc}`,
-            {landlock},
-        );
-    }
-    jsTest.log.info(`landlock serverStatus on ${desc}`, {landlock});
-    return landlock;
 }
 
 function assertBasicCrud(coll) {
@@ -163,7 +92,8 @@ function assertBasicCrud(coll) {
 
 // Whether the running kernel enforces Landlock, decided by the standalone probe below; the
 // sharded cluster must then reach the same decision on every node.
-let kernelEnforces;
+const kernel = probeLandlockSupport();
+jsTest.log.info("Landlock sandbox status on this kernel", {kernel});
 
 describe("standalone mongod under the Landlock sandbox", function () {
     let conn;
@@ -171,10 +101,7 @@ describe("standalone mongod under the Landlock sandbox", function () {
     before(function () {
         conn = MongoRunner.runMongod(kNodeOpts);
         assert.neq(null, conn, "mongod failed to start with --landlockMode=bestEffort");
-        // Settled in the hook rather than in an it(), so that a failure below can never leave a
-        // later case reading it unset and quietly taking the wrong branch.
-        kernelEnforces = logContains(conn, kIdRulesetApplied);
-        jsTest.log.info("Landlock sandbox status on this kernel", {enforced: kernelEnforces});
+        assertLandlockMode(conn, "bestEffort");
     });
 
     it("reaches a clean sandboxing decision", function () {
@@ -185,18 +112,18 @@ describe("standalone mongod under the Landlock sandbox", function () {
     // the ruleset handles EXECUTE (deny by default) and no path rule may
     // re-grant it.
     it("handles but never grants EXECUTE", function () {
-        if (!kernelEnforces) {
+        if (!kernel.active) {
             jsTest.log.info("kernel does not enforce Landlock; nothing to assert");
             return;
         }
         const kExecute = "LANDLOCK_ACCESS_FS_EXECUTE";
 
-        const [ruleset] = logEntries(conn, kIdRulesetApplied);
+        const [ruleset] = logEntriesWithId(conn, kIdRulesetApplied);
         assert(ruleset.attr.handledAccessRights.fs.includes(kExecute), "EXECUTE is not handled", {
             ruleset,
         });
 
-        const rules = logEntries(conn, kIdRuleApplied);
+        const rules = logEntriesWithId(conn, kIdRuleApplied);
         assert.gt(rules.length, 0, "no Landlock path rules were logged");
         for (const rule of rules) {
             assert(!rule.attr.allowedAccess.includes(kExecute), "a rule granted EXECUTE", {rule});
@@ -204,13 +131,9 @@ describe("standalone mongod under the Landlock sandbox", function () {
     });
 
     it("reports the sandbox state in serverStatus", function () {
-        const landlock = getLandlockStatus(
-            conn,
-            "standalone mongod with --landlockMode=bestEffort",
-        );
-        assert.eq("bestEffort", landlock.mode, "landlock mode not reported", {landlock});
+        const landlock = assertLandlockMode(conn, "bestEffort");
         // The section must agree with the enforcement outcome derived from the startup log.
-        assert.eq(kernelEnforces, landlock.active, "serverStatus and the startup log disagree", {
+        assert.eq(kernel.active, landlock.active, "serverStatus and the startup log disagree", {
             landlock,
         });
     });
@@ -228,8 +151,6 @@ describe("standalone mongod under the Landlock sandbox", function () {
     });
 
     after(function () {
-        // Guarded: if the before hook failed, `conn` is unset and stopMongod would throw a
-        // TypeError that masks the real failure.
         if (conn) {
             MongoRunner.stopMongod(conn);
         }
@@ -241,11 +162,7 @@ describe("security.landlock.mode", function () {
         const conn = MongoRunner.runMongod({});
         assert.neq(null, conn, "mongod failed to start with no landlock option");
         try {
-            const landlock = getLandlockStatus(conn, "mongod with no landlock option");
-            assert.eq("disabled", landlock.mode, "landlock should default to disabled (POC)", {
-                landlock,
-            });
-            assert.eq(false, landlock.active, "sandbox active while disabled", {landlock});
+            assertLandlockMode(conn, "disabled");
         } finally {
             MongoRunner.stopMongod(conn);
         }
@@ -256,8 +173,7 @@ describe("security.landlock.mode", function () {
         const conn = MongoRunner.runMongod({landlockMode: "disabled", useLogFiles: true});
         try {
             const attr = {logFile: conn.fullOptions.logFile};
-            const landlock = getLandlockStatus(conn, "mongod with --landlockMode=disabled");
-            assert.eq("disabled", landlock.mode, "mode not reported disabled", {landlock});
+            const landlock = assertLandlockMode(conn, "disabled");
             assert(logContains(conn, kIdDisabled), "disabled mode was not logged", attr);
             assert(!logContains(conn, kIdRulesetApplied), "a ruleset was applied", attr);
             assert(!logContains(conn, kIdRuleApplied), "a path rule was applied", attr);
@@ -282,14 +198,13 @@ describe("security.landlock.mode", function () {
         if (!conn) {
             assert.neq(
                 true,
-                kernelEnforces,
+                kernel.active,
                 "enforce refused to start on a kernel that does enforce Landlock",
             );
             return;
         }
         try {
-            const landlock = getLandlockStatus(conn, "mongod with --landlockMode=enforce");
-            assert.eq("enforce", landlock.mode, "mode not reported enforce", {landlock});
+            const landlock = assertLandlockMode(conn, "enforce");
             // Starting without enforcing is the one outcome enforce exists to rule out.
             assert.eq(true, landlock.active, "enforce started without enforcing", {landlock});
         } finally {
@@ -326,11 +241,11 @@ describe("sharded cluster under the Landlock sandbox", function () {
 
     it("sandboxes every mongod and the mongos", function () {
         for (const node of [st.rs0.getPrimary(), st.rs1.getPrimary(), st.configRS.getPrimary()]) {
-            assert.eq(kernelEnforces, assertSandboxOutcome(node), "mongod outcome diverged", {
+            assert.eq(kernel.active, assertSandboxOutcome(node), "mongod outcome diverged", {
                 host: node.host,
             });
         }
-        assert.eq(kernelEnforces, assertSandboxOutcome(st.s), "mongos outcome diverged", {
+        assert.eq(kernel.active, assertSandboxOutcome(st.s), "mongos outcome diverged", {
             host: st.s.host,
         });
     });
@@ -339,15 +254,12 @@ describe("sharded cluster under the Landlock sandbox", function () {
         for (const [node, desc] of [
             [st.s, "mongos"],
             [st.rs0.getPrimary(), "shard0 primary"],
+            [st.rs1.getPrimary(), "shard1 primary"],
             [st.configRS.getPrimary(), "config server primary"],
         ]) {
-            const landlock = getLandlockStatus(node, `${desc} with --landlockMode=bestEffort`);
-            assert.eq("bestEffort", landlock.mode, "landlock mode not reported", {
-                desc,
-                landlock,
-            });
+            const landlock = assertLandlockMode(node, "bestEffort");
             assert.eq(
-                kernelEnforces,
+                kernel.active,
                 landlock.active,
                 "serverStatus and the standalone probe disagree",
                 {desc, landlock},
