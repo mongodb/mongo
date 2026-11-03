@@ -124,6 +124,9 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {currentKey: -5}, to: st.shard1.shardName}),
     );
+    // Ensure the secondary has applied the delete of the recipient range deletion task,
+    // which otherwise could temporarily inflate the numOrphanDocs metric (BF-46819).
+    st.awaitReplicationOnShards();
     res = assert.commandWorked(
         st.s.adminCommand({
             analyzeShardKey: ns,
@@ -155,6 +158,9 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(
         st.s.adminCommand({moveRange: ns, min: {currentKey: 5}, toShard: st.shard0.shardName}),
     );
+    // Ensure the secondary has applied the delete of the recipient range deletion task,
+    // which otherwise could temporarily inflate the numOrphanDocs metric (BF-46819).
+    st.awaitReplicationOnShards();
     res = assert.commandWorked(
         st.s.adminCommand({
             analyzeShardKey: ns,
