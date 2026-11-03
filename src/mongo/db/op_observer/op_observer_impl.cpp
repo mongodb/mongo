@@ -159,9 +159,13 @@ template <typename OplogEntryOrOperation>
 void setSizeMetadata(OplogEntryOrOperation& entry,
                      boost::optional<int32_t> replicatedSizeDelta,
                      boost::optional<int64_t> docHash) {
-    if (replicatedSizeDelta || docHash) {
-        entry.setSizeMetadata(makeOperationSizeMetadata(replicatedSizeDelta, docHash));
+    if (!replicatedSizeDelta && !docHash) {
+        return;
     }
+    if (!isReplicatedFastCountEligible(entry.getNss())) {
+        return;
+    }
+    entry.setSizeMetadata(makeOperationSizeMetadata(replicatedSizeDelta, docHash));
 }
 
 // Computes the per-document validation hash if needed, and, if there is any size metadata to
@@ -1237,6 +1241,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;
+        oplogEntry.setNss(nss);
         oplogEntry.setDestinedRecipient(
             shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
 
@@ -1394,6 +1399,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;
+        oplogEntry.setNss(nss);
 
         if (args.retryableFindAndModifyLocation ==
             RetryableFindAndModifyLocation::kSideCollection) {

@@ -2346,6 +2346,43 @@ TEST_F(OpObserverTest, CheckSizeAndHashExistTogetherOnDelete) {
     EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
 }
 
+TEST_F(OpObserverTest, CheckSizeMetadataDoesNotExistOnInsertToIneligibleNamespace) {
+    unittest::ServerParameterGuard fastCountScope{"featureFlagReplicatedFastCount", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(insertAndGetSizeMetadata(
+                     opCtx, NamespaceString::kSessionTransactionsTableNamespace, doc, {RecordId(1)})
+                     .has_value());
+}
+
+TEST_F(OpObserverTest, CheckSizeMetadataDoesNotExistOnUpdateToIneligibleNamespace) {
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const auto sizeMetadata =
+        updateAndGetSizeMetadata(opCtx,
+                                 NamespaceString::kSessionTransactionsTableNamespace,
+                                 kPreImageDoc,
+                                 kUpdate,
+                                 kUpdatedDoc,
+                                 RecordId(1),
+                                 /*replicatedSizeDelta=*/10);
+    EXPECT_FALSE(sizeMetadata.has_value());
+}
+
+TEST_F(OpObserverTest, CheckSizeMetadataDoesNotExistOnDeleteToIneligibleNamespace) {
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata =
+        deleteAndGetSizeMetadata(opCtx,
+                                 NamespaceString::kSessionTransactionsTableNamespace,
+                                 doc,
+                                 RecordId(1),
+                                 /*replicatedSizeDelta=*/10);
+    EXPECT_FALSE(sizeMetadata.has_value());
+}
+
 /**
  * Test fixture for testing OpObserver behavior specific to the SessionCatalog.
  */
