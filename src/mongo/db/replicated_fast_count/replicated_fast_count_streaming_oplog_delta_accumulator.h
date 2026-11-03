@@ -182,11 +182,13 @@ private:
  * The per-document hashes carried on the scanned entries are always folded into per-collection
  * validation hashes. Pass 'isCheckpoint=true' only on the checkpoint scan path to increment
  * checkpoint scan counters; leave false (the default) on read paths.
+ * If provided, scanThroughTS is an inclusive upper bound.
  */
 [[MONGO_MOD_PUBLIC]] OplogScanResult aggregateReplicatedMetadataDeltasInOplog(
     SeekableRecordCursor& oplogCursor,
     const Timestamp& seekAfterTS,
     UUID oplogUuid,
-    bool isCheckpoint = false);
+    bool isCheckpoint = false,
+    boost::optional<Timestamp> scanThroughTS = boost::none);
 
 }  // namespace mongo::replicated_fast_count

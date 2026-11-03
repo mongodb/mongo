@@ -214,7 +214,8 @@ int ReplicatedFastCountManager::_hydrateMetadataFromCollection(
     return numRecordsScanned;
 }
 
-void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
+void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx,
+                                                    boost::optional<Timestamp> recoverThrough) {
     // Accumulates size/count values per collection UUID. Entries may be inserted by the fast count
     // collection scan and/or the oplog scan.
     SizeCountAccumulator accumulator;
@@ -225,23 +226,24 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
         const auto startTime = Date_t::now();
         int numRecordsScanned = 0;
 
-        massert(12231701,
-                "_sizeCountStore should be uninitialized when initializeMetadata is called",
-                !_sizeCountStore);
-        auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        if (storageEngine->getEngine()->hasIdent(ru, ident::kFastCountMetadataStore)) {
-            // This RecordStore will be destroyed after hydrating the metadata since only one
-            // RecordStore object can exist per ident.
-            auto recordStore = storageEngine->getEngine()->getRecordStore(
-                opCtx,
-                NamespaceString::kAdminCommandNamespace,
-                ident::kFastCountMetadataStore,
-                RecordStore::Options{.keyFormat = KeyFormat::String},
-                /*uuid=*/boost::none);
-            massert(12231700, "Storage engine returned a null RecordStore", recordStore);
+        if (_sizeCountStore) {
             numRecordsScanned =
-                _hydrateMetadataFromContainer(opCtx, accumulator, recordStore->getContainer());
+                _hydrateMetadataFromContainer(opCtx, accumulator, _sizeCountStore->getContainer());
+        } else {
+            auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+            if (storageEngine->getEngine()->hasIdent(ru, ident::kFastCountMetadataStore)) {
+                // Only one RecordStore may exist per ident.
+                auto recordStore = storageEngine->getEngine()->getRecordStore(
+                    opCtx,
+                    NamespaceString::kAdminCommandNamespace,
+                    ident::kFastCountMetadataStore,
+                    RecordStore::Options{.keyFormat = KeyFormat::String},
+                    /*uuid=*/boost::none);
+                massert(12231700, "Storage engine returned a null RecordStore", recordStore);
+                numRecordsScanned =
+                    _hydrateMetadataFromContainer(opCtx, accumulator, recordStore->getContainer());
+            }
         }
 
         LOGV2(11648801,
@@ -251,10 +253,11 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
               "duration"_attr = Date_t::now() - startTime);
     }
 
-    // _timestampStore is still the collection-backed implementation because
-    // initializeContainerStores() is called after initializeMetadata(). Read directly from the
-    // storage engine like the metadata hydration above does.
+    // Startup precedes container-store initialization.
     const boost::optional<Timestamp> persistedTimestamp = [&]() -> boost::optional<Timestamp> {
+        if (_timestampStore) {
+            return _timestampStore->read(opCtx);
+        }
         auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
         if (!storageEngine->getEngine()->hasIdent(ru, ident::kFastCountMetadataStoreTimestamps)) {
@@ -274,6 +277,9 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
         return tempStore.read(opCtx);
     }();
 
+    invariant(!recoverThrough || !persistedTimestamp || *recoverThrough >= *persistedTimestamp,
+              "Recovery endpoint must not precede the persisted valid-as-of timestamp");
+
     const Date_t oplogScanStartTime = Date_t::now();
 
     // The oplog collection itself may not exist yet at cold boot.
@@ -288,7 +294,7 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
         if (!oplogExists) {
             return boost::none;
         }
-        if (MONGO_unlikely(gSkipReplicatedMetadataStartupOplogScan.load())) {
+        if (!recoverThrough && MONGO_unlikely(gSkipReplicatedMetadataStartupOplogScan.load())) {
             LOGV2(13060001,
                   "Skipping replicated metadata startup oplog scan while initializing in-memory "
                   "metadata; fast size and count may be inaccurate");
@@ -316,7 +322,8 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
             return aggregateReplicatedMetadataDeltasInOplog(*oplogCursor,
                                                             *seekAfterTimestamp,
                                                             oplogColl->uuid(),
-                                                            /*isCheckpoint=*/false);
+                                                            /*isCheckpoint=*/false,
+                                                            recoverThrough);
         }();
 
         for (const auto& [uuid, delta] : scanResult.deltas) {

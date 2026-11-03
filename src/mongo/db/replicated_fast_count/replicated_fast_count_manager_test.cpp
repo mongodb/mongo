@@ -703,6 +703,71 @@ TEST_F(ReplicatedFastCountManagerFinalizeContainerTest,
 }
 
 TEST_F(ReplicatedFastCountManagerFinalizeContainerTest,
+       InitializeMetadataThroughRecoveryTimestamp) {
+    const test_helpers::NsAndUUID collB = {
+        .nss = NamespaceString::createNamespaceString_forTest(
+            "InitializeMetadataThroughRecoveryTimestamp", "collB"),
+        .uuid = UUID::gen()};
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
+
+    auto [sizeCountStore, timestampStore] = manager->getSizeCountStores_ForTest();
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       *sizeCountStore,
+                                       collA.uuid,
+                                       {.timestamp = Timestamp(3, 3), .size = 100, .count = 5});
+    test_helpers::insertSizeCountTimestamp(operationContext(), *timestampStore, Timestamp(3, 3));
+
+    {
+        auto coll =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), collA.nss, AcquisitionPrerequisites::kRead),
+                              MODE_IS);
+        coll.getCollectionPtr()->getRecordStore()->setSizeCount(999, 99);
+    }
+
+    for (unsigned i = 3; i <= 5; ++i) {
+        test_helpers::writeToOplog(
+            operationContext(),
+            test_helpers::makeOplogEntry(
+                Timestamp(i, i), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
+    }
+
+    manager->initializeMetadata(operationContext(), Timestamp(4, 4));
+    checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 110, .count = 6});
+    checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 0, .count = 0});
+
+    manager->initializeMetadata(operationContext(), Timestamp(3, 3));
+    checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 100, .count = 5});
+}
+
+TEST_F(ReplicatedFastCountManagerFinalizeContainerTest,
+       InitializeMetadataThroughRecoveryTimestampWithoutCheckpoint) {
+    for (unsigned i = 3; i <= 5; ++i) {
+        test_helpers::writeToOplog(
+            operationContext(),
+            test_helpers::makeOplogEntry(
+                Timestamp(i, i), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
+    }
+
+    manager->initializeMetadata(operationContext(), Timestamp(4, 4));
+    checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 20, .count = 2});
+}
+
+using ReplicatedFastCountManagerInitializeMetadataDeathTest =
+    ReplicatedFastCountManagerFinalizeContainerTest;
+
+DEATH_TEST_F(ReplicatedFastCountManagerInitializeMetadataDeathTest,
+             InitializeMetadataBeforePersistedTimestampTerminates,
+             "Recovery endpoint must not precede the persisted valid-as-of timestamp") {
+    auto* timestampStore = manager->getSizeCountStores_ForTest().second;
+    test_helpers::insertSizeCountTimestamp(operationContext(), *timestampStore, Timestamp(3, 3));
+
+    manager->initializeMetadata(operationContext(), Timestamp(2, 2));
+}
+
+TEST_F(ReplicatedFastCountManagerFinalizeContainerTest,
        DerivesCollectionsWithoutPersistedEntryFromOplog) {
     // collB has no persisted checkpoint entry. A collection with no entry must have been created
     // after the checkpoint, so all of its documents arrive as post-checkpoint oplog inserts

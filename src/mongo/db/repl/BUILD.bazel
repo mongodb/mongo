@@ -1049,6 +1049,8 @@ mongo_cc_library(
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/index_builds:multi_index_block",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_manager",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
         "//src/mongo/db/shard_role/shard_catalog:catalog_control",
         "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",

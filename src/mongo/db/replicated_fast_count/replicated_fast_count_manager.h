@@ -108,10 +108,11 @@ public:
      * This function combines the persisted size/count for each collection with any additional
      * size/count updates in the oplog since the last checkpoint.
      *
-     * Should be called once per startup, after oplog recovery and `CollectionCatalog`
-     * initialization. If no replicated size/count store exists, this function does nothing.
+     * Call after catalog initialization. During rollback, recoverThrough bounds the scan
+     * inclusively.
      */
-    void initializeMetadata(OperationContext* opCtx);
+    void initializeMetadata(OperationContext* opCtx,
+                            boost::optional<Timestamp> recoverThrough = boost::none);
 
     /**
      * Derives every replicated-fast-count-eligible collection's in-memory `RecordStore` size/count

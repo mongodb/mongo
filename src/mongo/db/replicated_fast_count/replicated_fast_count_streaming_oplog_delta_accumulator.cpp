@@ -745,7 +745,8 @@ OplogScanResult StreamingOplogDeltaAccumulator::finish() {
 OplogScanResult aggregateReplicatedMetadataDeltasInOplog(SeekableRecordCursor& oplogCursor,
                                                          const Timestamp& seekAfterTS,
                                                          UUID oplogUuid,
-                                                         bool isCheckpoint) {
+                                                         bool isCheckpoint,
+                                                         boost::optional<Timestamp> scanThroughTS) {
     StreamingOplogDeltaAccumulator acc({
         .isCheckpoint = isCheckpoint,
         .oplogUuid = oplogUuid,
@@ -754,6 +755,9 @@ OplogScanResult aggregateReplicatedMetadataDeltasInOplog(SeekableRecordCursor& o
         massertStatusOK(record_id_helpers::keyForOptime(seekAfterTS, KeyFormat::Long));
     for (auto rec = oplogCursor.seek(seekRid, SeekableRecordCursor::BoundInclusion::kExclude); rec;
          rec = oplogCursor.next()) {
+        if (scanThroughTS && rec->id.getLong() > scanThroughTS->asLL()) {
+            break;
+        }
         acc.consumeRecord(*rec);
     }
     return acc.finish();

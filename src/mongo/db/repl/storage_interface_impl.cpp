@@ -46,6 +46,8 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/rollback_gen.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -1631,6 +1633,13 @@ Timestamp StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx
     }
     fassert(31049, swStableTimestamp);
     catalog::openCatalogAfterRollbackToStable(opCtx, state, swStableTimestamp.getValue());
+
+    // Restore in-memory size/count after reopening the collection catalog.
+    if (isReplicatedFastCountEnabled(opCtx)) {
+        replicated_fast_count::ReplicatedFastCountManager::get(serviceContext)
+            .initializeMetadata(opCtx, swStableTimestamp.getValue());
+    }
+
     DurableHistoryRegistry::get(opCtx)->reconcilePins(opCtx);
     serviceContext->getStorageEngine()->restartTimestampMonitor();
 

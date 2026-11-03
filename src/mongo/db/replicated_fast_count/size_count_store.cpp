@@ -74,6 +74,10 @@ RecordStore* SizeCountStore::rs_ForTest() const {
     return _recordStore.get();
 }
 
+RecordStore::RecordStoreContainer SizeCountStore::getContainer() const {
+    return _recordStore->getContainer();
+}
+
 StringKeyedContainer& SizeCountStore::_getStringKeyedContainer() const {
     auto container = _recordStore->getContainer();
     massert(12566002,
