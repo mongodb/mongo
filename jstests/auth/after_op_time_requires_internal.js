@@ -249,6 +249,29 @@ describe("readConcern.afterOpTime on mongos", function () {
         assertUnauthenticatedPingRejected(this.st.s.host, kOpTimeForRouter);
     });
 
+    it("is counted in the router's serverStatus", function () {
+        // The counters are updated on the router too, so the section has to be registered for the
+        // router role. A request rejected here never reaches a shard, so a shard-only section would
+        // leave these rejections unobservable.
+        const rootConn = connectAs(this.st.s.host, kRootUser);
+        const before = getAfterOpTimeCounters(rootConn);
+
+        assert.commandFailedWithCode(
+            rootConn.getDB(kDbName).runCommand({
+                find: kCollName,
+                filter: {},
+                readConcern: {afterOpTime: kOpTimeForRouter},
+            }),
+            ErrorCodes.Unauthorized,
+        );
+
+        const after = getAfterOpTimeCounters(rootConn);
+        assert.eq(after.rejected, before.rejected + 1, "the router rejection was not counted", {
+            before,
+            after,
+        });
+    });
+
     describe("with allowDeprecatedAfterOpTimeReadConcern enabled", function () {
         before(function () {
             // The router applies the check itself, and then forwards the client's readConcern
