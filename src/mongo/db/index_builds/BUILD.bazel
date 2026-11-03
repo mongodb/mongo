@@ -112,6 +112,7 @@ mongo_cc_library(
     name = "index_builds_coordinator",
     srcs = [
         "active_index_builds.cpp",
+        "index_build_votes.cpp",
         "index_builds_coordinator.cpp",
         "index_builds_manager.cpp",
         "rebuild_indexes.cpp",
@@ -375,6 +376,7 @@ mongo_cc_unit_test(
         "index_build_entry_helpers_test.cpp",
         "index_build_entry_test.cpp",
         "index_build_interceptor_test.cpp",
+        "index_build_votes_test.cpp",
         "index_builds_coordinator_mongod_test.cpp",
         "index_builds_coordinator_test.cpp",
         "index_builds_durations_histogram_test.cpp",
