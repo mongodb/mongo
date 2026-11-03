@@ -1,5 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load(":archive_name_test.bzl", "archive_name_test_suite")
 load(":install_rules_test.bzl", "install_rules_test_suite")
 
 package(default_visibility = ["//visibility:public"])
@@ -26,6 +27,8 @@ sh_test(
 )
 
 install_rules_test_suite(name = "install_rules_analysis_test")
+
+archive_name_test_suite(name = "archive_name_test")
 
 py_test(
     name = "install_rules_script_test",

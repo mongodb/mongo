@@ -20,6 +20,15 @@ py_library(
 )
 
 py_library(
+    name = "package_test_archive",
+    srcs = [
+        "__init__.py",
+        "package_test_archive.py",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
     name = "package_test_commands",
     srcs = [
         "__init__.py",

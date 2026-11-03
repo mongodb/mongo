@@ -518,6 +518,14 @@ py_test(
 )
 
 py_test(
+    name = "test_package_test_archive",
+    size = "small",
+    srcs = ["test_package_test_archive.py"],
+    visibility = ["//visibility:public"],
+    deps = ["//buildscripts/package_test:package_test_archive"],
+)
+
+py_test(
     name = "test_package_test_commands",
     srcs = ["test_package_test_commands.py"],
     visibility = ["//visibility:public"],

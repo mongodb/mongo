@@ -25,6 +25,7 @@ from docker.models.containers import Container
 from docker.models.images import Image
 from retry.api import retry_call
 
+from buildscripts.package_test.package_test_archive import validate_top_level_directory
 from buildscripts.package_test.package_test_commands import (
     PACKAGE_MANAGER_COMMANDS,
     build_os_setup_commands,
@@ -557,16 +558,6 @@ OS_DOCKER_LOOKUP = {
 VERSIONS_TO_SKIP: set[str] = set(["3.*", "4.*", "5.*", "6.*"])
 DISABLED_TESTS: set[tuple[str, str]] = set()
 
-VALID_TAR_DIRECTORY_ARCHITECTURES = [
-    "linux-aarch64",
-    "linux-x86_64",
-    "linux-ppc64le",
-    "linux-s390x",
-    "macos-aarch64",
-    "macos-x86_64",
-    "windows-x86_64",
-]
-
 
 @dataclasses.dataclass
 class Test:
@@ -918,16 +909,6 @@ def get_edition_alias(edition_name: str) -> str:
     return edition_name
 
 
-def validate_top_level_directory(tar_name: str):
-    command = f"tar -tf {tar_name} | head -n 1 | awk -F/ '{{print $1}}'"
-    proc = subprocess.run(command, capture_output=True, shell=True, text=True)
-    top_level_directory = proc.stdout.strip()
-    if all(os_arch not in top_level_directory for os_arch in VALID_TAR_DIRECTORY_ARCHITECTURES):
-        raise Exception(
-            f"Found an unexpected os-arch pairing as the top level directory. Top level directory: {top_level_directory}"
-        )
-
-
 def validate_enterprise(sources_text, edition, binfile):
     if edition != "enterprise" and edition != "atlas":
         if "src/mongo/db/modules/enterprise" in sources_text:
@@ -1142,6 +1123,9 @@ tests: list[Test] = []
 urls: list[str] = []
 
 if args.command == "branch":
+    if args.package_kind == "server":
+        validate_top_level_directory(DEFAULT_RELEASE_BINARY_ARCHIVE_PATH, arch)
+
     # If evg-build-id is provided, download the packages locally using the Evergreen API
     # This is required for private artifacts which need authenticated access
     download_dir = Path(__file__).parent / "downloaded_packages"
@@ -1298,7 +1282,6 @@ if args.command == "branch":
                 "Checking the source files used to build the binaries, use --skip-enterprise-check to skip this check."
             )
 
-            validate_top_level_directory("mongo-binaries.tgz")
             os.makedirs("dist-test", exist_ok=True)
 
             tar = tarfile.open("mongo-binaries.tgz", "r:gz")
