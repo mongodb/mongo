@@ -19,8 +19,8 @@ void InsertCmdShapeComponents::appendTo(BSONObjBuilder& bob,
     opts.appendLiteral(&bob, kDocumentPlaceholderBacking.firstElement());
 }
 
-InsertCmdShape::InsertCmdShape(const write_ops::InsertCommandRequest& request)
-    : Shape(request.getNamespace(), BSONObj{} /*no collation for insert*/) {}
+InsertCmdShape::InsertCmdShape(const NamespaceString& nss)
+    : Shape(nss, BSONObj{} /*no collation for insert*/) {}
 
 void InsertCmdShape::appendCmdSpecificShapeComponents(
     BSONObjBuilder& bob,

@@ -80,11 +80,11 @@ size_t DeleteCmdShapeComponents::size() const {
         sizeof(LetShapeComponent);
 }
 
-DeleteCmdShape::DeleteCmdShape(const write_ops::DeleteCommandRequest& deleteCommand,
-                               const ParsedDelete& parsedDelete,
+DeleteCmdShape::DeleteCmdShape(const ParsedDelete& parsedDelete,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : Shape(deleteCommand.getNamespace(), parsedDelete.getRequest()->getCollation().getOwned()),
-      _components(parsedDelete, LetShapeComponent(deleteCommand.getLet(), expCtx)) {}
+    : Shape(parsedDelete.getRequest()->getNsString(),
+            parsedDelete.getRequest()->getCollation().getOwned()),
+      _components(parsedDelete, LetShapeComponent(parsedDelete.getRequest()->getLet(), expCtx)) {}
 
 const CmdSpecificShapeComponents& DeleteCmdShape::specificComponents() const {
     return _components;

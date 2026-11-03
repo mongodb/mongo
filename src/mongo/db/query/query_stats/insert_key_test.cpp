@@ -30,7 +30,7 @@ public:
 
     std::unique_ptr<InsertKey> makeInsertKey(std::string_view cmd) {
         auto icr = InsertCommandRequest::parseOwned(fromjson(cmd));
-        auto shape = std::make_unique<query_shape::InsertCmdShape>(icr);
+        auto shape = std::make_unique<query_shape::InsertCmdShape>(icr.getNamespace());
         return std::make_unique<InsertKey>(
             opCtx(), icr, std::move(shape), query_benchmark_constants::kCollectionType);
     }
@@ -118,8 +118,8 @@ TEST_F(InsertKeyTest, InsertKeyShapeDocumentsIsAlwaysPlaceholder) {
         "$db": "testDB"
     })"sv));
 
-    query_shape::InsertCmdShape shape1(icr1);
-    query_shape::InsertCmdShape shape2(icr2);
+    query_shape::InsertCmdShape shape1(icr1.getNamespace());
+    query_shape::InsertCmdShape shape2(icr2.getNamespace());
 
     // Both shapes should hash to the same value since documents is always a fixed placeholder.
     ASSERT_EQ(absl::HashOf(shape1), absl::HashOf(shape2));

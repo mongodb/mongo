@@ -57,7 +57,7 @@ public:
 
             auto parsedDelete = uassertStatusOK(parsed_delete_command::parse(
                 expCtx, &request, makeExtensionsCallback<ExtensionsCallbackNoop>()));
-            auto shape = std::make_unique<query_shape::DeleteCmdShape>(dcr, parsedDelete, expCtx);
+            auto shape = std::make_unique<query_shape::DeleteCmdShape>(parsedDelete, expCtx);
 
             keys.push_back(std::make_unique<DeleteKey>(expCtx,
                                                        dcr,

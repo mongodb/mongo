@@ -218,11 +218,12 @@ size_t UpdateCmdShapeComponents::size() const {
         let.size() - sizeof(LetShapeComponent);
 }
 
-UpdateCmdShape::UpdateCmdShape(const write_ops::UpdateCommandRequest& updateCommand,
-                               const ParsedUpdate& parsedUpdate,
+UpdateCmdShape::UpdateCmdShape(const ParsedUpdate& parsedUpdate,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : Shape(updateCommand.getNamespace(), parsedUpdate.getRequest()->getCollation().getOwned()),
-      _components(parsedUpdate, LetShapeComponent(updateCommand.getLet(), expCtx)) {}
+    : Shape(parsedUpdate.getRequest()->getNamespaceString(),
+            parsedUpdate.getRequest()->getCollation().getOwned()),
+      _components(parsedUpdate,
+                  LetShapeComponent(parsedUpdate.getRequest()->getLetParameters(), expCtx)) {}
 
 const CmdSpecificShapeComponents& UpdateCmdShape::specificComponents() const {
     return _components;

@@ -10,12 +10,30 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/modules.h"
 
+#include <memory>
+#include <type_traits>
+
 namespace mongo::shape_helpers {
 
+/**
+ * Constructs T from 'request' and 'args', logging 'request' if construction throws. Shapes built
+ * from parsed components rather than the original request (e.g. write commands, so bulkWrite can
+ * build them without a per-op command request) are constructed from 'args' alone; 'request' is
+ * then only used for logging. Which form applies is chosen at compile time from T's constructors.
+ */
 template <typename T, typename Request, typename... Args>
 StatusWith<std::unique_ptr<T>> tryMakeShape(Request&& request, Args&&... args) {
+    constexpr bool kTakesRequest = std::is_constructible_v<T, Request&&, Args&&...>;
+    // Exactly one form must match, so adding a constructor overload to T can't silently change
+    // which one is used.
+    static_assert(kTakesRequest != std::is_constructible_v<T, Args&&...>,
+                  "T must be constructible either with or without 'request', but not both");
     try {
-        return std::make_unique<T>(std::forward<Request>(request), std::forward<Args>(args)...);
+        if constexpr (kTakesRequest) {
+            return std::make_unique<T>(std::forward<Request>(request), std::forward<Args>(args)...);
+        } else {
+            return std::make_unique<T>(std::forward<Args>(args)...);
+        }
     } catch (const DBException& ex) {
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
         LOGV2_WARNING(8472507,

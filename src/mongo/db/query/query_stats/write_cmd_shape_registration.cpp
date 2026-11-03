@@ -56,7 +56,8 @@ void computeInsertShapeAndRegisterQueryStats(OperationContext* opCtx,
     }
 
     query_shape::DeferredQueryShape deferredShape{[&]() {
-        return shape_helpers::tryMakeShape<query_shape::InsertCmdShape>(wholeOp);
+        return shape_helpers::tryMakeShape<query_shape::InsertCmdShape>(wholeOp,
+                                                                        wholeOp.getNamespace());
     }};
 
     std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(

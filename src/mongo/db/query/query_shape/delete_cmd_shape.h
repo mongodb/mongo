@@ -45,9 +45,7 @@ struct DeleteCmdShapeComponents : public CmdSpecificShapeComponents {
  */
 class DeleteCmdShape : public Shape {
 public:
-    DeleteCmdShape(const write_ops::DeleteCommandRequest&,
-                   const ParsedDelete&,
-                   const boost::intrusive_ptr<ExpressionContext>&);
+    DeleteCmdShape(const ParsedDelete&, const boost::intrusive_ptr<ExpressionContext>&);
 
     const CmdSpecificShapeComponents& specificComponents() const final;
 

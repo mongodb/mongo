@@ -52,7 +52,7 @@ public:
                 &request,
                 makeExtensionsCallback<ExtensionsCallbackReal>(expCtx->getOperationContext(),
                                                                &request.getNsString())));
-            auto shape = std::make_unique<query_shape::UpdateCmdShape>(ucr, parsedUpdate, expCtx);
+            auto shape = std::make_unique<query_shape::UpdateCmdShape>(parsedUpdate, expCtx);
 
             auto key = std::make_unique<UpdateKey>(expCtx,
                                                    ucr,

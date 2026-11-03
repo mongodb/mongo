@@ -249,8 +249,11 @@ void parseAndRegisterInsertOp(OperationContext* opCtx,
     if (shouldSkipWriteOpQueryStats(insertRequest.getEncryptionInformation()))
         return;
 
+    // The shape needs only the namespace, so bulkWrite can build it too; 'insertRequest' is passed
+    // just to be logged if shape construction fails.
     query_shape::DeferredQueryShape deferredShape{[&]() {
-        return shape_helpers::tryMakeShape<query_shape::InsertCmdShape>(insertRequest);
+        return shape_helpers::tryMakeShape<query_shape::InsertCmdShape>(
+            insertRequest, insertRequest.getNamespace());
     }};
 
     // QueryShapeHash(QSH) will be recorded in CurOp, but it is not being used for anything else

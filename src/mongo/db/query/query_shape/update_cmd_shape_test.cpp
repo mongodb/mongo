@@ -4,12 +4,10 @@
 #include "mongo/db/query/query_shape/update_cmd_shape.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/update_cmd_builder.h"
+#include "mongo/db/query/query_shape/write_cmd_shape_test_util.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string_view>
@@ -21,15 +19,11 @@ using namespace std::literals::string_view_literals;
 
 using write_ops::UpdateCommandRequest;
 
-static const NamespaceString kDefaultTestNss =
-    NamespaceString::createNamespaceString_forTest("testDB.testColl");
-
 class UpdateCmdShapeTest : public unittest::Test {
 public:
     void setUp() final {
         _queryTestServiceContext = std::make_unique<QueryTestServiceContext>();
         _operationContext = _queryTestServiceContext->makeOperationContext();
-        _expCtx = make_intrusive<ExpressionContextForTest>();
     }
 
     std::vector<UpdateCmdShape> makeShapesFromUpdate(BSONObj updateCmd) {
@@ -44,19 +38,9 @@ public:
     std::vector<UpdateCmdShape> makeShapesFromUpdateRequest(
         const write_ops::UpdateCommandRequest& updateRequest) {
         std::vector<UpdateCmdShape> shapes;
-        for (const auto& op : updateRequest.getUpdates()) {
-            UpdateRequest request(op);
-            request.setNamespaceString(kDefaultTestNss);
-            if (updateRequest.getLet()) {
-                request.setLetParameters(*updateRequest.getLet());
-            }
-
-            _expCtx = makeBlankExpressionContext(
-                _operationContext.get(), updateRequest.getNamespace(), updateRequest.getLet());
-
-            auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
-                _expCtx, &request, makeExtensionsCallback<ExtensionsCallbackNoop>()));
-            shapes.emplace_back(updateRequest, parsedUpdate, _expCtx);
+        for (size_t opIdx = 0; opIdx < updateRequest.getUpdates().size(); ++opIdx) {
+            shapes.push_back(
+                *makeUpdateShape(_operationContext.get(), makeUpdateRequest(updateRequest, opIdx)));
         }
         return shapes;
     }
@@ -94,7 +78,6 @@ public:
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;
 
     ServiceContext::UniqueOperationContext _operationContext;
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 TEST_F(UpdateCmdShapeTest, BasicReplacementUpdateShape) {

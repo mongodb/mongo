@@ -22,17 +22,19 @@ enum class ShapifyInsertTestType : int { kGenerateInsertKey = 0, kSHA256Hash };
 
 auto shapifyAndGenerateKey(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& insertCommandRequest) {
-    query_stats::InsertKey key(opCtx,
-                               insertCommandRequest,
-                               std::make_unique<query_shape::InsertCmdShape>(insertCommandRequest),
-                               query_benchmark_constants::kCollectionType);
+    query_stats::InsertKey key(
+        opCtx,
+        insertCommandRequest,
+        std::make_unique<query_shape::InsertCmdShape>(insertCommandRequest.getNamespace()),
+        query_benchmark_constants::kCollectionType);
 
     return absl::HashOf(key);
 }
 
 auto shapifyAndSHA256Hash(OperationContext* opCtx,
                           const write_ops::InsertCommandRequest& insertCommandRequest) {
-    auto insertQueryShape = std::make_unique<query_shape::InsertCmdShape>(insertCommandRequest);
+    auto insertQueryShape =
+        std::make_unique<query_shape::InsertCmdShape>(insertCommandRequest.getNamespace());
 
     return insertQueryShape->sha256Hash(opCtx, SerializationContext::stateDefault());
 }

@@ -73,9 +73,7 @@ struct UpdateCmdShapeComponents : public query_shape::CmdSpecificShapeComponents
  */
 class UpdateCmdShape : public Shape {
 public:
-    UpdateCmdShape(const write_ops::UpdateCommandRequest&,
-                   const ParsedUpdate&,
-                   const boost::intrusive_ptr<ExpressionContext>&);
+    UpdateCmdShape(const ParsedUpdate&, const boost::intrusive_ptr<ExpressionContext>&);
 
     const CmdSpecificShapeComponents& specificComponents() const final;
 

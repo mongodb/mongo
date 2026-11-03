@@ -29,21 +29,18 @@ enum class ShapifyUpdateTestType : int { kGenerateUpdateKey = 0, kSHA256Hash };
 auto shapifyAndGenerateKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            const ParsedUpdate& parsedUpdate,
                            const write_ops::UpdateCommandRequest& updateCommandRequest) {
-    query_stats::UpdateKey key(
-        expCtx,
-        updateCommandRequest,
-        /*hint=*/boost::none,
-        std::make_unique<query_shape::UpdateCmdShape>(updateCommandRequest, parsedUpdate, expCtx),
-        query_benchmark_constants::kCollectionType);
+    query_stats::UpdateKey key(expCtx,
+                               updateCommandRequest,
+                               /*hint=*/boost::none,
+                               std::make_unique<query_shape::UpdateCmdShape>(parsedUpdate, expCtx),
+                               query_benchmark_constants::kCollectionType);
 
     return absl::HashOf(key);
 }
 
 auto shapifyAndSHA256Hash(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const ParsedUpdate& parsedUpdate,
-                          const write_ops::UpdateCommandRequest& updateCommandRequest) {
-    auto updateQueryShape =
-        std::make_unique<query_shape::UpdateCmdShape>(updateCommandRequest, parsedUpdate, expCtx);
+                          const ParsedUpdate& parsedUpdate) {
+    auto updateQueryShape = std::make_unique<query_shape::UpdateCmdShape>(parsedUpdate, expCtx);
 
     return updateQueryShape->sha256Hash(expCtx->getOperationContext(),
                                         SerializationContext::stateDefault());
@@ -61,8 +58,6 @@ void runBenchmark(BSONObj predicate,
     auto opCtx = client->makeOperationContext();
     ClientMetadata::setFromMetadata(
         opCtx->getClient(), query_benchmark_constants::kMockClientMetadataElem, false);
-
-    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());
 
     query_shape::UpdateCmdBuilder builder;
     builder.database = "test";
@@ -82,8 +77,12 @@ void runBenchmark(BSONObj predicate,
         11400600, "UpdateCommandRequest must contain at least one update entry", !updates.empty());
     auto& updateOp = updates[0];
 
+    auto expCtx =
+        make_intrusive<ExpressionContextForTest>(opCtx.get(), updateCommandRequest.getNamespace());
+
     mongo::UpdateRequest updateRequest(updateOp);
-    updateRequest.setNamespaceString(expCtx->getNamespaceString());
+    updateRequest.setNamespaceString(updateCommandRequest.getNamespace());
+    updateRequest.setLetParameters(updateCommandRequest.getLet());
 
     auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
         expCtx,
@@ -98,8 +97,7 @@ void runBenchmark(BSONObj predicate,
                     shapifyAndGenerateKey(expCtx, parsedUpdate, updateCommandRequest));
                 break;
             case ShapifyUpdateTestType::kSHA256Hash:
-                benchmark::DoNotOptimize(
-                    shapifyAndSHA256Hash(expCtx, parsedUpdate, updateCommandRequest));
+                benchmark::DoNotOptimize(shapifyAndSHA256Hash(expCtx, parsedUpdate));
                 break;
             default:
                 MONGO_UNREACHABLE_TASSERT(11400602);

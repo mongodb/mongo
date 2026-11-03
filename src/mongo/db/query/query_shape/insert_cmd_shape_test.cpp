@@ -22,7 +22,7 @@ class InsertCmdShapeTest : public ServiceContextTest {
 public:
     InsertCmdShape makeShape(std::string_view insertCmd) {
         auto icr = InsertCommandRequest::parseOwned(fromjson(insertCmd));
-        return InsertCmdShape(icr);
+        return InsertCmdShape(icr.getNamespace());
     }
 
     QueryShapeHash makeShapeHash(std::string_view insertCmd) {
@@ -204,8 +204,8 @@ TEST_F(InsertCmdShapeTest, ShapeComponentsSizeDoesNotVaryWithDocumentSize) {
         "$db": "testdb"
     })"sv));
 
-    InsertCmdShape shape1(icr1);
-    InsertCmdShape shape2(icr2);
+    InsertCmdShape shape1(icr1.getNamespace());
+    InsertCmdShape shape2(icr2.getNamespace());
 
     ASSERT_EQ(static_cast<const InsertCmdShapeComponents&>(shape1.specificComponents()).size(),
               static_cast<const InsertCmdShapeComponents&>(shape2.specificComponents()).size());

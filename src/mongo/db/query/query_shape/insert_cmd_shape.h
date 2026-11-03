@@ -35,7 +35,7 @@ struct InsertCmdShapeComponents : public CmdSpecificShapeComponents {
  */
 class InsertCmdShape final : public Shape {
 public:
-    explicit InsertCmdShape(const write_ops::InsertCommandRequest& request);
+    explicit InsertCmdShape(const NamespaceString& nss);
 
     const CmdSpecificShapeComponents& specificComponents() const final {
         return _components;

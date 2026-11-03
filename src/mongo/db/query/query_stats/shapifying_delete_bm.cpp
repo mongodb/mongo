@@ -26,21 +26,18 @@ enum class ShapifyDeleteTestType : int { kGenerateDeleteKey = 0, kSHA256Hash };
 auto shapifyAndGenerateKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            const ParsedDelete& parsedDelete,
                            const write_ops::DeleteCommandRequest& deleteCommandRequest) {
-    query_stats::DeleteKey key(
-        expCtx,
-        deleteCommandRequest,
-        /*hint=*/boost::none,
-        std::make_unique<query_shape::DeleteCmdShape>(deleteCommandRequest, parsedDelete, expCtx),
-        query_benchmark_constants::kCollectionType);
+    query_stats::DeleteKey key(expCtx,
+                               deleteCommandRequest,
+                               /*hint=*/boost::none,
+                               std::make_unique<query_shape::DeleteCmdShape>(parsedDelete, expCtx),
+                               query_benchmark_constants::kCollectionType);
 
     return absl::HashOf(key);
 }
 
 auto shapifyAndSHA256Hash(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const ParsedDelete& parsedDelete,
-                          const write_ops::DeleteCommandRequest& deleteCommandRequest) {
-    auto deleteQueryShape =
-        std::make_unique<query_shape::DeleteCmdShape>(deleteCommandRequest, parsedDelete, expCtx);
+                          const ParsedDelete& parsedDelete) {
+    auto deleteQueryShape = std::make_unique<query_shape::DeleteCmdShape>(parsedDelete, expCtx);
 
     return deleteQueryShape->sha256Hash(expCtx->getOperationContext(),
                                         SerializationContext::stateDefault());
@@ -126,8 +123,7 @@ void runBenchmark(const query_benchmark_constants::DeleteSpec& spec,
                     shapifyAndGenerateKey(expCtx, parsedDelete, deleteCommandRequest));
                 break;
             case ShapifyDeleteTestType::kSHA256Hash:
-                benchmark::DoNotOptimize(
-                    shapifyAndSHA256Hash(expCtx, parsedDelete, deleteCommandRequest));
+                benchmark::DoNotOptimize(shapifyAndSHA256Hash(expCtx, parsedDelete));
                 break;
             default:
                 MONGO_UNREACHABLE_TASSERT(12205802);
@@ -161,8 +157,7 @@ void runMultiOpBenchmark(const ShapifyDeleteTestType& testType, benchmark::State
                         shapifyAndGenerateKey(expCtxs[i], parsedDeletes[i], deleteCommandRequest));
                     break;
                 case ShapifyDeleteTestType::kSHA256Hash:
-                    benchmark::DoNotOptimize(
-                        shapifyAndSHA256Hash(expCtxs[i], parsedDeletes[i], deleteCommandRequest));
+                    benchmark::DoNotOptimize(shapifyAndSHA256Hash(expCtxs[i], parsedDeletes[i]));
                     break;
                 default:
                     MONGO_UNREACHABLE_TASSERT(12205803);
