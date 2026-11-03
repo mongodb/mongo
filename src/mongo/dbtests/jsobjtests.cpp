@@ -6,6 +6,7 @@
  */
 
 
+#include "mongo/base/data_view.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bson_validate.h"
@@ -30,7 +31,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -44,6 +44,7 @@
 #include <iterator>
 #include <limits>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <string_view>
@@ -1788,30 +1789,23 @@ public:
 class InvalidIDFind {
 public:
     void run() {
-        BSONObj x = BSON("_id" << 5 << "t" << 2);
+        const BSONObj x = BSON("_id" << 5 << "t" << 2);
         {
-            char* crap = (char*)mongoMalloc(x.objsize());
-            memcpy(crap, x.objdata(), x.objsize());
-            BSONObj y(crap);
+            auto buffer = std::make_unique<char[]>(x.objsize());
+            memcpy(buffer.get(), x.objdata(), x.objsize());
+            BSONObj y(buffer.get());
             ASSERT_BSONOBJ_EQ(x, y);
-            free(crap);
         }
 
         {
-            char* crap = (char*)mongoMalloc(x.objsize());
-            memcpy(crap, x.objdata(), x.objsize());
-            int* foo = (int*)crap;
-            foo[0] = 1'231'231'231;
-            int state = 0;
-            try {
-                BSONObj y(crap);
-                state = 1;
-            } catch (std::exception& e) {
-                state = 2;
-                ASSERT(strstr(e.what(), "_id: 5") != nullptr);
-            }
-            free(crap);
-            ASSERT_EQUALS(2, state);
+            auto buffer = std::make_unique<char[]>(x.objsize());
+            memcpy(buffer.get(), x.objdata(), x.objsize());
+            // Overwrite the size with something very large.
+            DataView(buffer.get()).write(LittleEndian<int>(1'231'231'231));
+            ASSERT_THROWS_EXCEPTION_MATCHING(
+                BSONObj(buffer.get()),
+                ExceptionFor<ErrorCodes::BSONObjectTooLarge>,
+                unittest::match::WhatIs(::testing::HasSubstr("_id: 5")));
         }
     }
 };
