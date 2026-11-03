@@ -133,6 +133,9 @@ void OplogApplier::setMinValid(const OpTime& minValid) {
     _minValid = minValid;
 }
 
+void OplogApplier::resetCheckpointValidator() {
+    _checkpointValidator.reset();
+}
 
 namespace {
 

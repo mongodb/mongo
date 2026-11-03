@@ -1131,6 +1131,17 @@ TEST_F(SizeCountCheckpointValidatorTest, WatermarksWithoutCheckpointsAreNotEvict
     expectValidatorMetrics(capturer, {.recorded = 3, .evicted = 0, .skipped = 0, .validated = 0});
 }
 
+TEST_F(SizeCountCheckpointValidatorTest, ResetWithPendingIntervalsIncrementsWatermarksEvicted) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    applyBatch(validator, {makeWatermarkEntry(kT1), makeWatermarkEntry(kT2)}, {});
+    applyBatch(validator, {makeWatermarkEntry(kT3)}, {});
+    expectValidatorMetrics(capturer, {.recorded = 3, .evicted = 0, .skipped = 0, .validated = 0});
+
+    validator.reset();
+
+    expectValidatorMetrics(capturer, {.recorded = 3, .evicted = 3, .skipped = 0, .validated = 0});
+}
+
 TEST_F(SizeCountCheckpointValidatorTest, DeltaAfterNewestWatermarkCarriesIntoNextInterval) {
     otel::metrics::OtelMetricsCapturer capturer;
     const UUID uuid = UUID::gen();

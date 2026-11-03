@@ -12,6 +12,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -22,6 +23,7 @@ namespace repl {
 namespace {
 
 using replicated_fast_count::test_helpers::CheckpointWriteSpec;
+using replicated_fast_count::test_helpers::expectValidatorMetrics;
 using replicated_fast_count::test_helpers::makeCheckpointEntry;
 using replicated_fast_count::test_helpers::makeCreateOplogEntry;
 using replicated_fast_count::test_helpers::makeDropOplogEntry;
@@ -62,9 +64,9 @@ protected:
     }
 
     Status runThroughApplyOplogBatch(std::vector<OplogEntry> oplog) {
-        if (!_oplogApplier) {
+        if (!oplogApplier) {
             _workerPool = workerCount() ? makeReplWorkerPool(*workerCount()) : makeReplWorkerPool();
-            _oplogApplier = std::make_unique<OplogApplierImpl>(
+            oplogApplier = std::make_unique<OplogApplierImpl>(
                 /*executor=*/nullptr,
                 /*oplogBuffer=*/nullptr,
                 &noopOplogApplierObserver,
@@ -75,7 +77,7 @@ protected:
                 _workerPool.get());
         }
         const StatusWith<OpTime> applyResult =
-            _oplogApplier->applyOplogBatch(_opCtx.get(), std::move(oplog));
+            oplogApplier->applyOplogBatch(_opCtx.get(), std::move(oplog));
         if (!applyResult.isOK()) {
             return applyResult.getStatus();
         }
@@ -84,10 +86,11 @@ protected:
         return Status::OK();
     }
 
+    std::unique_ptr<OplogApplierImpl> oplogApplier;
+
 private:
     const UUID adoptUuid = UUID::gen();
     std::unique_ptr<ThreadPool> _workerPool;
-    std::unique_ptr<OplogApplierImpl> _oplogApplier;
     unittest::ServerParameterGuard _recordIdsFlag{"featureFlagRecordIdsReplicated", true};
     unittest::ServerParameterGuard _fastCountFlag{"featureFlagReplicatedFastCount", true};
     unittest::ServerParameterGuard _containerWritesFlag{"featureFlagContainerWrites", true};
@@ -726,6 +729,74 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
                   .hash = boost::none}}}));
         ASSERT_OK(runThroughApplyOplogBatch(std::move(dropOplog)));
     }
+}
+
+TEST_F(CheckpointValidationTest, CheckpointValidationAfterStepdownResetAdoptsCheckpoint) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
+        "enableContinuousInternodePerCollectionValidation", true);
+
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.checkpointAfterStepdownReset");
+    createCollection(_opCtx.get(), nss, {});
+    const UUID uuid = getCollectionUUID(_opCtx.get(), nss);
+
+    const BSONObj doc1 = BSON("_id" << 1);
+    {
+        std::vector<OplogEntry> oplog;
+        oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
+            nextOpTime(), nss, uuid, doc1, RecordId(1)));
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        oplog.push_back(makeWatermarkEntry(watermarkTs));
+        oplog.push_back(makeCheckpointEntry(
+            watermarkTs,
+            {{.uuid = uuid,
+              .metadata = CollectionReplicatedMetadata{
+                  .sizeCount = CollectionSizeCount{.size = doc1.objsize(), .count = 1},
+                  .hash = boost::none}}}));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+    }
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+
+    oplogApplier->resetCheckpointValidator();
+
+    const BSONObj doc2 = BSON("_id" << 2);
+    {
+        std::vector<OplogEntry> oplog;
+        oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
+            nextOpTime(), nss, uuid, doc2, RecordId(2)));
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        oplog.push_back(makeWatermarkEntry(watermarkTs));
+        // The validator adopts this checkpoint without validating it.
+        oplog.push_back(makeCheckpointEntry(
+            watermarkTs,
+            {{.uuid = uuid,
+              .metadata = CollectionReplicatedMetadata{
+                  .sizeCount = CollectionSizeCount{.size = doc1.objsize() + doc2.objsize() + 100,
+                                                   .count = 2},
+                  .hash = boost::none}}}));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+    }
+    expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 1, .validated = 1});
+
+    const BSONObj doc3 = BSON("_id" << 3);
+    {
+        std::vector<OplogEntry> oplog;
+        oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
+            nextOpTime(), nss, uuid, doc3, RecordId(3)));
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        oplog.push_back(makeWatermarkEntry(watermarkTs));
+        oplog.push_back(makeCheckpointEntry(
+            watermarkTs,
+            {{.uuid = uuid,
+              .metadata = CollectionReplicatedMetadata{
+                  .sizeCount = CollectionSizeCount{.size = doc1.objsize() + doc2.objsize() +
+                                                       doc3.objsize() + 100,
+                                                   .count = 3},
+                  .hash = boost::none}}}));
+        ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+    }
+    expectValidatorMetrics(capturer, {.recorded = 3, .evicted = 3, .skipped = 1, .validated = 2});
 }
 
 }  // namespace

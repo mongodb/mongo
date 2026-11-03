@@ -239,8 +239,8 @@ void incrementWatermarksRecordedCount() {
     watermarksRecordedCounter.add(1);
 }
 
-void incrementWatermarksEvictedCount() {
-    watermarksEvictedCounter.add(1);
+void incrementWatermarksEvictedCount(int64_t count) {
+    watermarksEvictedCounter.add(count);
 }
 
 void incrementCheckpointsSkippedCount(int64_t count) {

@@ -175,7 +175,7 @@ TEST(ReplicatedFastCountMetricsTest, ValidatorWatermarkCountersIncrement) {
     incrementWatermarksRecordedCount();
     incrementWatermarksRecordedCount();
     incrementWatermarksRecordedCount();
-    incrementWatermarksEvictedCount();
+    incrementWatermarksEvictedCount(1);
     incrementCheckpointsSkippedCount(1);
     incrementCheckpointsSkippedCount(4);
 

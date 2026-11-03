@@ -408,7 +408,7 @@ void SizeCountCheckpointValidator::mergeAndValidate(OperationContext* opCtx,
         // checkpoint. We would simply erase the interval once.
         while (!_intervals.empty() && _intervals.front().cutoff <= validAsOf) {
             _intervals.pop_front();
-            incrementWatermarksEvictedCount();
+            incrementWatermarksEvictedCount(1);
         }
 
         LOGV2(13380115,
@@ -418,6 +418,12 @@ void SizeCountCheckpointValidator::mergeAndValidate(OperationContext* opCtx,
     }
 
     _checkpoints.clear();
+}
+
+void SizeCountCheckpointValidator::reset() {
+    LOGV2(13840300, "Checkpoint validator state reset");
+    incrementWatermarksEvictedCount(_intervals.size());
+    *this = SizeCountCheckpointValidator();
 }
 
 void SizeCountCheckpointValidator::merge(const ValidatorBuffers& threadRecords) {
@@ -484,7 +490,7 @@ void SizeCountCheckpointValidator::adoptCheckpoint(OperationContext* opCtx) {
         _baseline = scanMetadataStore(opCtx);
         while (!_intervals.empty() && _intervals.front().cutoff <= validAsOf) {
             _intervals.pop_front();
-            incrementWatermarksEvictedCount();
+            incrementWatermarksEvictedCount(1);
         }
         LOGV2(13629501, "Checkpoint validator adopted checkpoint", "validAsOf"_attr = validAsOf);
     }

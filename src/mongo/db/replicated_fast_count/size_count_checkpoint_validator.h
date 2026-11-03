@@ -135,6 +135,14 @@ public:
                           const ValidatorBuffers& threadRecords,
                           UUID oplogUuid);
 
+    /**
+     * Assigns `this` to a new `SizeCountCheckpointValidator` instance.
+     *
+     * This functiom must be called between secondary terms to ensure the
+     * `SizeCountCheckpointValidator` does not contain stale state from a previous secondary term.
+     */
+    void reset();
+
 private:
     /**
      * Combines the provided `threadRecords` into one `ValidatorInterval` per recorded watermark. If

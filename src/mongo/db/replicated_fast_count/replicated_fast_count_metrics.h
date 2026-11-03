@@ -43,7 +43,7 @@ void incrementWatermarksWrittenCount();
 void incrementTailerWatermarksSeenCount();
 void incrementCheckpointsValidatedCount();
 void incrementWatermarksRecordedCount();
-void incrementWatermarksEvictedCount();
+void incrementWatermarksEvictedCount(int64_t count);
 void incrementCheckpointsSkippedCount(int64_t count);
 /**
  * Accumulates the time the flusher spent blocked in

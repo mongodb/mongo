@@ -171,6 +171,15 @@ public:
      */
     void setMinValid(const OpTime& minValid);
 
+    /**
+     * Assigns the `_checkpointValidator` to a new `SizeCountCheckpointValidator` instance.
+     *
+     * This function must be called while the applier is drained, before oplog application
+     * begins, to ensure the `_checkpointValidator` does not contain stale state from a previous
+     * secondary term.
+     */
+    void resetCheckpointValidator();
+
 private:
     /**
      * Called from startup() to run oplog application loop.
