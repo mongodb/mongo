@@ -262,6 +262,9 @@
     /*  Namespace used for local clean shutdown metadata. */                                       \
     X(kCleanShutdownLogNamespace, DatabaseName::kLocal, "system.cleanShutdownLog")                 \
                                                                                                    \
+    /*  Namespace for per-node, unreplicated index build state. */                                 \
+    X(kLocalIndexBuildsNamespace, DatabaseName::kLocal, "system.indexBuilds")                      \
+                                                                                                   \
     /*  Namespace used for the local oplog dollar main namespace. */                               \
     X(kLocalOplogDollarMain, DatabaseName::kLocal, "oplog.$main")                                  \
                                                                                                    \

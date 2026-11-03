@@ -43,3 +43,15 @@ server_parameters:
         cpp_vartype: Atomic<bool>
         default: true
         redact: false
+
+    maxIndexBuildAttemptsAfterUncleanShutdown:
+        description: >
+            Maximum number of times a node attempts the same index build after an unclean
+            shutdown. A further attempt will request the primary to abort the build.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<int>
+        cpp_varname: gMaxIndexBuildAttemptsAfterUncleanShutdown
+        default: 2
+        validator:
+            gte: 0
+        redact: false
