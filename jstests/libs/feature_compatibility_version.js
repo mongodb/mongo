@@ -35,6 +35,19 @@ function getMultiversionBinVersion() {
     );
 }
 
+/**
+ * Returns true when the suite uses last-patch binaries from the current release series.
+ * These suites follow the single-version FCV expectation, including the
+ * disaggregated-storage policy.
+ */
+function isLastPatchMultiversion() {
+    return getMultiversionBinVersion() === "last-patch";
+}
+
+/**
+ * Returns the FCV pinned by the multiversion mode, or undefined for single-version and
+ * same-series last-patch suites.
+ */
 function getMultiversionFCV() {
     const multiversionBinVersion = getMultiversionBinVersion();
 
@@ -77,13 +90,7 @@ function isDisaggregatedStorageEnabled(conn) {
 
 function shouldSkipSuiteFCVCheck() {
     // FCV upgrade/downgrade suites intentionally change FCV while tests are running.
-    if (TestData.isRunningFCVUpgradeDowngradeSuite) {
-        return true;
-    }
-
-    // The shell does not expose the last-patch FCV. The resmoke fixture builder sets it using the
-    // multiversion service, so it cannot be checked here without duplicating that implementation.
-    return getMultiversionBinVersion() === "last-patch";
+    return Boolean(TestData.isRunningFCVUpgradeDowngradeSuite);
 }
 
 /**
@@ -94,10 +101,14 @@ function getExpectedSuiteFCV(conn) {
     if (multiversionFCV !== undefined) {
         return multiversionFCV;
     }
-    assert(!TestData.mixedBinVersions, "Cannot determine expected FCV for a multiversion suite", {
-        multiversionBinVersion: getMultiversionBinVersion(),
-        mixedBinVersions: TestData.mixedBinVersions,
-    });
+    assert(
+        !TestData.mixedBinVersions || isLastPatchMultiversion(),
+        "Cannot determine expected FCV for a multiversion suite",
+        {
+            multiversionBinVersion: getMultiversionBinVersion(),
+            mixedBinVersions: TestData.mixedBinVersions,
+        },
+    );
 
     if (isDisaggregatedStorageEnabled(conn)) {
         return TestData.runAllFeatureFlagTests ? latestFCV : getLastStableFCV();
@@ -112,7 +123,7 @@ function getExpectedSuiteFCV(conn) {
  * FCV changes are replicated across the fixture, so it is sufficient to read the FCV from the
  * fixture's main connection.
  *
- * Returns false for suites that change FCV in the background or use last-patch binaries.
+ * Returns false for FCV upgrade/downgrade suites that change FCV in the background.
  */
 export function assertCurrentFCVMatchesSuite(conn) {
     if (shouldSkipSuiteFCVCheck()) {
