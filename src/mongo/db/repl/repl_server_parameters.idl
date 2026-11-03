@@ -888,7 +888,8 @@ server_parameters:
     enableContinuousInternodePerCollectionValidation:
         description: >-
             When true, a replicated metadata mismatch detected during per-collection continuous
-            internode validation crashes the node. When false, no validation is run.
+            internode validation crashes the node. When false, the mismatch is logged instead of
+            crashing the node.
         set_at: [startup, runtime]
         cpp_vartype: Atomic<bool>
         cpp_varname: enableContinuousInternodePerCollectionValidation

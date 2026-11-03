@@ -104,7 +104,7 @@ protected:
 
 using SingleWorkerCheckpointValidationDeathTest = SingleWorkerCheckpointValidationTest;
 
-TEST_F(CheckpointValidationTest, CheckpointValidationSkippedWhenInternodeValidationDisabled) {
+TEST_F(CheckpointValidationTest, CheckpointValidationLogsErrorsWhenInternodeValidationDisabled) {
     unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
         "enableContinuousInternodePerCollectionValidation", false);
     const Timestamp watermarkTs = nextOpTime().getTimestamp();
@@ -115,7 +115,12 @@ TEST_F(CheckpointValidationTest, CheckpointValidationSkippedWhenInternodeValidat
                             {{.uuid = UUID::gen(),
                               .metadata = CollectionReplicatedMetadata{
                                   .sizeCount = CollectionSizeCount{.size = 999, .count = 999}}}}));
+
+    unittest::LogCaptureGuard logs;
     ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+    logs.stop();
+
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626001)), 1);
 }
 
 TEST_F(CheckpointValidationTest, CheckpointValidatesCrudDeltas) {

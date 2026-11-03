@@ -1132,7 +1132,7 @@ TEST_F(SizeCountCheckpointValidatorTest, CheckpointsValidatedCounterIncrementsWh
     expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
 }
 
-TEST_F(SizeCountCheckpointValidatorTest, CheckpointsValidatedCounterNotIncrementedWhenParamOff) {
+TEST_F(SizeCountCheckpointValidatorTest, CheckpointsValidatedCounterIncrementsWhenParamOff) {
     unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation{
         "enableContinuousInternodePerCollectionValidation", false};
     otel::metrics::OtelMetricsCapturer capturer;
@@ -1151,7 +1151,7 @@ TEST_F(SizeCountCheckpointValidatorTest, CheckpointsValidatedCounterNotIncrement
                     .delta = ReplicatedMetadataDelta{
                         .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}}});
     // Eviction does not depend on the parameter, so memory is bounded even with validation off.
-    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 0});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
 }
 
 TEST_F(SizeCountCheckpointValidatorTest, WatermarksWithoutCheckpointsAreNotEvicted) {
@@ -1195,7 +1195,7 @@ TEST_F(SizeCountCheckpointValidatorTest, ValidationUsesBaselineAdvancedWhileDisa
                    {makeDelta(kT0, uuid, {.size = 10, .count = 1})});
     }
 
-    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 0});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
 
     // The expected contents are the baseline advanced while disabled plus the new delta. A baseline
     // that did not advance would not match the primary's (15, 2) and would fassert.
@@ -1204,7 +1204,7 @@ TEST_F(SizeCountCheckpointValidatorTest, ValidationUsesBaselineAdvancedWhileDisa
                 makeCheckpointEntry(kT3, {{uuid, makeSizeCount({.size = 15, .count = 2})}})},
                {makeDelta(kT2, uuid, {.size = 5, .count = 1})});
 
-    expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 0, .validated = 1});
+    expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 0, .validated = 2});
 }
 
 TEST_F(SizeCountCheckpointValidatorTest, DeltasFromMultipleWorkerBuffersAreMerged) {

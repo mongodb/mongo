@@ -395,12 +395,12 @@ void SizeCountCheckpointValidator::mergeAndValidate(OperationContext* opCtx,
         // validate it.
         primary.erase(oplogUuid);
 
-        // TODO(SERVER-136296): Validate with logging when the server parameter is off. We don't
-        // validate/log for now because it will be noisy.
         if (repl::enableContinuousInternodePerCollectionValidation.load()) {
             validateCheckpoint(standby, primary, ReportingStrategy::kFassert);
-            incrementCheckpointsValidatedCount();
+        } else {
+            validateCheckpoint(standby, primary, ReportingStrategy::kLogError);
         }
+        incrementCheckpointsValidatedCount();
 
         // After validating the checkpoint, we consider all intervals with cutoff <= validAsOf
         // validated. This includes intervals/watermarks that do not have an associated checkpoint.
