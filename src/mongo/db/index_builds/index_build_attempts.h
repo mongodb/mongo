@@ -19,6 +19,8 @@
 [[MONGO_MOD_PUBLIC]];
 namespace mongo::index_builds::build_attempts {
 
+namespace two_phase {
+
 /**
  * Records 'buildUUID' with a count of 0 if it has no entry, and waits for its count to be durable.
  * Returns true if the count is within maxIndexBuildAttemptsAfterUncleanShutdown. Call without
@@ -50,5 +52,7 @@ void removeEntries(OperationContext* opCtx, const std::vector<UUID>& buildUUIDs)
  * Returns the count for 'buildUUID', or boost::none if there is none.
  */
 boost::optional<int> read(OperationContext* opCtx, const UUID& buildUUID);
+
+}  // namespace two_phase
 
 }  // namespace mongo::index_builds::build_attempts

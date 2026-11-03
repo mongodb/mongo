@@ -731,7 +731,8 @@ void waitForAttempts(OperationContext* opCtx,
                      const UUID& buildUUID,
                      const boost::optional<int>& expected) {
     const auto deadline = Date_t::now() + Seconds(10);
-    for (size_t attempts = 1; index_builds::build_attempts::read(opCtx, buildUUID) != expected &&
+    for (size_t attempts = 1;
+         index_builds::build_attempts::two_phase::read(opCtx, buildUUID) != expected &&
          Date_t::now() < deadline;
          ++attempts) {
         logAndBackoff(13756601,
@@ -742,13 +743,13 @@ void waitForAttempts(OperationContext* opCtx,
                       "buildUUID"_attr = buildUUID,
                       "expected"_attr = expected.value_or(-1));
     }
-    ASSERT_EQ(expected, index_builds::build_attempts::read(opCtx, buildUUID));
+    ASSERT_EQ(expected, index_builds::build_attempts::two_phase::read(opCtx, buildUUID));
 }
 
 // Inserts a count for 'buildUUID', simulating an earlier process that started the build and
 // crashed.
 void preseedAttempts(OperationContext* opCtx, const UUID& buildUUID) {
-    index_builds::build_attempts::createCollection(opCtx);
+    index_builds::build_attempts::two_phase::createCollection(opCtx);
     ASSERT_OK(repl::StorageInterface::get(opCtx)->insertDocument(
         opCtx,
         NamespaceString::kLocalIndexBuildsNamespace,
@@ -771,7 +772,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AttemptCountRemovedWhenBuildCommits) {
         buildUUID,
         repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
     unittest::assertGet(buildFuture.getNoThrow());
-    EXPECT_EQ(boost::none, index_builds::build_attempts::read(operationContext(), buildUUID));
+    EXPECT_EQ(boost::none,
+              index_builds::build_attempts::two_phase::read(operationContext(), buildUUID));
 }
 
 TEST_F(IndexBuildsCoordinatorMongodTest, AttemptCountRemovedWhenBuildAborts) {
@@ -789,7 +791,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AttemptCountRemovedWhenBuildAborts) {
         buildUUID,
         IndexBuildAction::kPrimaryAbort,
         Status{ErrorCodes::IndexBuildAborted, "test abort"}));
-    EXPECT_EQ(boost::none, index_builds::build_attempts::read(operationContext(), buildUUID));
+    EXPECT_EQ(boost::none,
+              index_builds::build_attempts::two_phase::read(operationContext(), buildUUID));
     EXPECT_EQ(buildFuture.getNoThrow().getStatus(), ErrorCodes::IndexBuildAborted);
 }
 
@@ -810,7 +813,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AttemptCountKeptWhenBuildStopsForShutdo
     // Join the builder thread, so a wrong delete can't land after the check.
     _indexBuildsCoord->shutdown(operationContext());
     _indexBuildsCoord = std::make_unique<IndexBuildsCoordinatorMongod>();
-    EXPECT_EQ(1, index_builds::build_attempts::read(operationContext(), buildUUID));
+    EXPECT_EQ(1, index_builds::build_attempts::two_phase::read(operationContext(), buildUUID));
 }
 
 TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsTwoPhaseBuildAfterShutdown) {

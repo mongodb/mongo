@@ -20,7 +20,7 @@
 
 #include <functional>
 
-namespace mongo::index_builds::build_attempts {
+namespace mongo::index_builds::build_attempts::two_phase {
 namespace {
 
 const auto& kNss = NamespaceString::kLocalIndexBuildsNamespace;
@@ -163,4 +163,4 @@ TEST_F(IndexBuildAttemptsTest, RemoveEntryDeletesCountWithCallersCommit) {
 }
 
 }  // namespace
-}  // namespace mongo::index_builds::build_attempts
+}  // namespace mongo::index_builds::build_attempts::two_phase

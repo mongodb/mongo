@@ -342,7 +342,7 @@ public:
             mongo::indexbuildentryhelpers::ensureIndexBuildEntriesNamespaceExists(_opCtx);
             wuow.commit();
         }
-        index_builds::build_attempts::createCollection(_opCtx);
+        index_builds::build_attempts::two_phase::createCollection(_opCtx);
     }
 
     UUID create(NamespaceString nss) const {

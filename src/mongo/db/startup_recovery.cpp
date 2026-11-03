@@ -1132,9 +1132,9 @@ void startupRecovery(OperationContext* opCtx,
     // Creates the index build attempts collection if it doesn't exist. Increments attempt counts
     // for all in-progress index builds following an unclean shutdown.
     if (usingReplication && rss.getPersistenceProvider().supportsLocalCollections()) {
-        index_builds::build_attempts::createCollection(opCtx);
+        index_builds::build_attempts::two_phase::createCollection(opCtx);
         if (lastShutdownState == StorageEngine::LastShutdownState::kUnclean) {
-            index_builds::build_attempts::incrementAttempts(opCtx);
+            index_builds::build_attempts::two_phase::incrementAttempts(opCtx);
         }
     }
 }

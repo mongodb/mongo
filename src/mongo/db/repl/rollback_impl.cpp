@@ -784,8 +784,8 @@ void RollbackImpl::_removeRolledBackIndexBuildAttempts(OperationContext* opCtx) 
                        NamespaceString::kLocalIndexBuildsNamespace,
                        [&] {
                            WriteUnitOfWork wuow(opCtx);
-                           index_builds::build_attempts::removeEntries(opCtx,
-                                                                       _rolledBackIndexBuilds);
+                           index_builds::build_attempts::two_phase::removeEntries(
+                               opCtx, _rolledBackIndexBuilds);
                            wuow.commit();
                        });
     LOGV2(13756602,

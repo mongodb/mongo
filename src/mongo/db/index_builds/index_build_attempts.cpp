@@ -29,6 +29,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::index_builds::build_attempts {
+
+namespace two_phase {
 namespace {
 
 const auto& kNss = NamespaceString::kLocalIndexBuildsNamespace;
@@ -153,5 +155,7 @@ void removeEntries(OperationContext* opCtx, const std::vector<UUID>& buildUUIDs)
             /*opDebug=*/nullptr);
     }
 }
+
+}  // namespace two_phase
 
 }  // namespace mongo::index_builds::build_attempts

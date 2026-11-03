@@ -423,7 +423,7 @@ void lockIndexBuildAttemptsForCommitOrAbort(OperationContext* opCtx,
 void removeIndexBuildAttemptEntryOnCommitOrAbort(OperationContext* opCtx,
                                                  const ReplIndexBuildState& replState) {
     if (shouldCountIndexBuildAttempts(replState)) {
-        index_builds::build_attempts::removeEntry(opCtx, replState.buildUUID);
+        index_builds::build_attempts::two_phase::removeEntry(opCtx, replState.buildUUID);
     }
 }
 
@@ -3697,7 +3697,8 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
 
 void IndexBuildsCoordinator::_signalPrimaryForAbortIfOverAttemptLimit(
     OperationContext* opCtx, ReplIndexBuildState& replState) {
-    if (index_builds::build_attempts::checkWithinAttemptLimit(opCtx, replState.buildUUID)) {
+    if (index_builds::build_attempts::two_phase::checkWithinAttemptLimit(opCtx,
+                                                                         replState.buildUUID)) {
         return;
     }
     const auto limit = gMaxIndexBuildAttemptsAfterUncleanShutdown.load();
