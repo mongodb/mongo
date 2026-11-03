@@ -17,8 +17,8 @@ exports_files(
 filegroup(
     name = "resmoke_data",
     srcs = [
-        "aggregation_stage_fallback_parsers.json",
         "configurations.yml",
+        "extension_stub_parsers.json",
         "//src/mongo/db/extension/test_examples/test_extensions_signing_keys:test_extensions_signing_public_key.asc",
     ],
 )
@@ -208,7 +208,7 @@ filegroup(
         "parse_options_conf",
         "test_options_conf",
         "toaster_conf",
-        ":aggregation_stage_fallback_parsers.json",
+        ":extension_stub_parsers.json",
     ],
 )
 

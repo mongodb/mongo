@@ -81,7 +81,7 @@ void registerUnloadedExtensionStubParsers() {
             12773201, 2, "No stub parser file for unloaded extension - no directory provided");
         return;
     }
-    constexpr auto kFileName = "aggregation_stage_fallback_parsers.json";
+    constexpr auto kFileName = "extension_stub_parsers.json";
     const auto extensionStubParserFile = extensionStubParserDirectory / kFileName;
     if (!std::filesystem::exists(extensionStubParserFile)) {
         LOGV2_DEBUG(10918501,

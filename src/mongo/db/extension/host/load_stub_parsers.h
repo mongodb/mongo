@@ -10,7 +10,7 @@
 
 namespace mongo::extension::host {
 /**
- * The file aggregation_stage_fallback_parsers.json contains a list of aggregation stage names with
+ * The file extension_stub_parsers.json contains a list of aggregation stage names with
  * a message per stage name and an optional feature flag. registerUnloadedExtensionStubParsers()
  * reads that file and registers each stub parser via registerStubParser(). When one of these stages
  * is specified by the user and the feature flag is disabled (or no primary parser is registered),

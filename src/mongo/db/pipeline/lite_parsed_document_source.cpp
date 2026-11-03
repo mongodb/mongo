@@ -66,7 +66,7 @@ LiteParsedDocumentSource::LiteParserRegistration::getParserInfo(
     }
 
     // If no primary is set, use the fallback parser. This typically occurs when an extension has
-    // not been loaded. See aggregation_stage_fallback_parsers.json.
+    // not been loaded. See extension_stub_parsers.json.
     if (!_primaryIsSet) {
         tassert(
             11395401, "Fallback parser must be set if no primary parser exists", _fallbackIsSet);

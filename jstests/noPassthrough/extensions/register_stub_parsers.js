@@ -1,5 +1,5 @@
 /**
- * Tests that the stub aggregation stages included in aggregation_stage_fallback_parsers.json
+ * Tests that the stub aggregation stages included in extension_stub_parsers.json
  * model unloaded extensions by returning the specified error message rather than the generic
  * "unrecognized stage" error.
  *
