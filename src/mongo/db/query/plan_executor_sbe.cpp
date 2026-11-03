@@ -86,13 +86,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
-    if (!_stash.empty()) {
-        // The PlanExecutor keeps an extra reference to the last object pulled out of the PlanStage
-        // tree. This is because we want to ensure that the caller of PlanExecutor::getNext() does
-        // not free the object and leave a dangling pointer in the PlanStage tree.
-        _lastGetNext = _stash.back().first;
-    }
-
     // Clear any formerly registered plans and register '_root' to yield. This is needed because
     // multiple candidate plans may have been registered during runtime planning, before the
     // PlanExecutor was created. All but one candidate plan ('_root') have since been discarded.
@@ -144,7 +137,6 @@ void PlanExecutorSBE::saveState() {
     // method call.
     const bool discardSlotState = true;
     _root->saveState(discardSlotState);
-    _lastGetNext = BSONObj();
 }
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
@@ -293,7 +285,6 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
         if (result == sbe::PlanState::IS_EOF) {
             _root->close();
             _state = State::kClosed;
-            _lastGetNext = BSONObj();
 
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
@@ -329,23 +320,6 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
                 fmt::format("Expected 'result' to be sbe::PlanState::ADVANCED but found {}",
                             static_cast<int>(result)),
                 result == sbe::PlanState::ADVANCED);
-        if (_mustReturnOwnedBson) {
-            if constexpr (isBson) {
-                _lastGetNext = *out;
-            } else {
-                auto bson = out->toBsonIfTriviallyConvertible();
-                if (bson) {
-                    // This basically means that the 'Document' is just a wrapper around BSON
-                    // returned by the plan. In this case, 'out' must own it.
-                    tassert(11052112, "Expected out to be owned", out->isOwned());
-                    _lastGetNext = *bson;
-                } else {
-                    // 'Document' was created from 'sbe::Object' and there is no backing BSON for
-                    // it.
-                    _lastGetNext = BSONObj();
-                }
-            }
-        }
         return PlanExecutor::ExecState::ADVANCED;
     }
 }

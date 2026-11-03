@@ -209,10 +209,6 @@ private:
     // using BSON in '_stash' does not introduce any additional limitations.
     std::deque<std::pair<BSONObj, boost::optional<RecordId>>> _stash;
 
-    // If we are returning owned result (i.e. value is moved out of the result accessor) then its
-    // lifetime must extend up to the next getNext (or saveState).
-    BSONObj _lastGetNext;
-
     // If _killStatus has a non-OK value, then we have been killed and the value represents the
     // reason for the kill.
     Status _killStatus = Status::OK();
