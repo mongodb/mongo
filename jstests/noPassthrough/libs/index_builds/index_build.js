@@ -654,6 +654,18 @@ export var IndexBuildTest = class {
     }
 
     /**
+     * Returns this node's index build attempt count document for the build, or null.
+     * @param {Mongo} conn
+     * @param {string} buildUUID
+     */
+    static findIndexBuildAttempts(conn, buildUUID) {
+        return conn
+            .getDB("local")
+            .getCollection("system.indexBuilds")
+            .findOne({_id: UUID(buildUUID)});
+    }
+
+    /**
      * Restarts the node in standalone mode to build the index in a rolling fashion.
      *
      * @param {ReplSetTest} rst

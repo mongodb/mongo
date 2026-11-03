@@ -22,6 +22,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/multikey_metadata_access_stats.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index_builds/index_build_attempts.h"
 #include "mongo/db/index_builds/index_build_entry_helpers.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/index_builds/index_build_test_helpers.h"
@@ -329,14 +330,19 @@ public:
                       const_cast<const LogicalTime&>(_pastLt).addTicks(1).asTimestamp());
         setReplCoordAppliedOpTime(repl::OpTime(_presentTs, _presentTerm));
 
+        // getNewIndexIdentsAtTime() finds a build's index idents by diffing the ident list before
+        // and after the build, and asserts each new ident is an index. If the first build created
+        // these collections, their idents would show up in that diff and fail the test. So create
+        // 'config.system.indexBuilds' and 'local.system.indexBuilds' up front.
         {
-            // These tests were developed prior to needing an index build entry collection. Use an
-            // unreplicated write block to avoid changing oplog state due to collection creation.
+            // Use an unreplicated write block to avoid changing oplog state due to collection
+            // creation.
             repl::UnreplicatedWritesBlock unreplicated(_opCtx);
             WriteUnitOfWork wuow(_opCtx);
             mongo::indexbuildentryhelpers::ensureIndexBuildEntriesNamespaceExists(_opCtx);
             wuow.commit();
         }
+        index_builds::build_attempts::createCollection(_opCtx);
     }
 
     UUID create(NamespaceString nss) const {

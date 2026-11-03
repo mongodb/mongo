@@ -859,6 +859,17 @@ protected:
                                                                ReplIndexBuildState* replState) = 0;
 
     /**
+     * Signals the primary to abort the two-phase index build if this node's attempts exceeded
+     * maxIndexBuildAttemptsAfterUncleanShutdown, by sending "voteAbortIndexBuild" command request
+     * to it with write concern 'majority'. Throws IndexBuildAborted if the primary accepts. If the
+     * primary refuses, it waits for the primary's decision, and returns only if the index build was
+     * committed. Records the index build's first attempt durably, so it must be called without
+     * holding locks.
+     */
+    void _signalPrimaryForAbortIfOverAttemptLimit(OperationContext* opCtx,
+                                                  ReplIndexBuildState& replState);
+
+    /**
      * Signals the primary to commit the index build by sending "voteCommitIndexBuild" command
      * request to it with write concern 'majority', then waits for that command's response. And,
      * command gets retried on error. This function gets called after the first draining phase of

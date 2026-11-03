@@ -18,6 +18,7 @@
 #include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/index/index_constants.h"
+#include "mongo/db/index_builds/index_build_attempts.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/multi_index_block.h"
@@ -1127,6 +1128,15 @@ void startupRecovery(OperationContext* opCtx,
             clearTempCollections(opCtx, dbName);
         }
     });
+
+    // Creates the index build attempts collection if it doesn't exist. Increments attempt counts
+    // for all in-progress index builds following an unclean shutdown.
+    if (usingReplication && rss.getPersistenceProvider().supportsLocalCollections()) {
+        index_builds::build_attempts::createCollection(opCtx);
+        if (lastShutdownState == StorageEngine::LastShutdownState::kUnclean) {
+            index_builds::build_attempts::incrementAttempts(opCtx);
+        }
+    }
 }
 
 // Returns true if the oplog collection exists. Will always return false if the cached pointer to

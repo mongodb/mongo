@@ -15,10 +15,12 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
+#include "mongo/db/index_builds/index_build_attempts.h"
 #include "mongo/db/index_builds/index_build_entry_gen.h"
 #include "mongo/db/index_builds/index_build_entry_helpers.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/index_builds/index_build_knobs_gen.h"
+#include "mongo/db/index_builds/index_build_votes.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
 #include "mongo/db/index_builds/multi_index_block.h"
@@ -168,6 +170,7 @@ public:
                            failedDueToDuplicateKeyError.loadRelaxed());
         indexBuilds.append("failedDueToManualCancellation",
                            failedDueToManualCancellation.loadRelaxed());
+        indexBuilds.append("exceededAttemptLimit", exceededAttemptLimit.loadRelaxed());
         // Computed at read time so a build currently stalled on ticket admission shows its
         // in-progress wait growing in real time, not just once it is granted a ticket.
         indexBuilds.append("timeQueuedForTicketsMicros", ticketQueueTime.totalMicros());
@@ -209,6 +212,9 @@ public:
     // The number of times an index build has failed due to the user dropping the index before
     // it is committed.
     Atomic<int> failedDueToManualCancellation{0};
+
+    // Index builds that exceeded maxIndexBuildAttemptsAfterUncleanShutdown on this node.
+    Atomic<int> exceededAttemptLimit{0};
 
     //
     // Execution ticket metrics.
@@ -383,6 +389,12 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
     }
 }
 
+/**
+ * Whether the build's attempts are counted in 'local.system.indexBuilds'.
+ */
+bool shouldCountIndexBuildAttempts(const ReplIndexBuildState& replState) {
+    return replState.protocol == IndexBuildProtocol::kTwoPhase && !replState.dbName.isConfigDB();
+}
 
 /**
  * Replicates a commitIndexBuild oplog entry for two-phase builds, which signals downstream
@@ -3646,6 +3658,57 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
         });
 }
 
+void IndexBuildsCoordinator::_signalPrimaryForAbortIfOverAttemptLimit(
+    OperationContext* opCtx, ReplIndexBuildState& replState) {
+    if (index_builds::build_attempts::checkWithinAttemptLimit(opCtx, replState.buildUUID)) {
+        return;
+    }
+    const auto limit = gMaxIndexBuildAttemptsAfterUncleanShutdown.load();
+    const auto reason =
+        fmt::format("Index build exceeded maxIndexBuildAttemptsAfterUncleanShutdown ({})", limit);
+    LOGV2(13756400,
+          "Index build: exceeded the index build attempt limit, asking the primary to abort",
+          "buildUUID"_attr = replState.buildUUID,
+          "collectionUUID"_attr = replState.collectionUUID,
+          "limit"_attr = limit);
+    // Count before voting, since the primary's abort can kill this operation mid-vote.
+    indexBuildsSSS.exceededAttemptLimit.addAndFetch(1);
+
+    switch (index_builds::votes::runVoteAbortCommand(opCtx, replState, reason)) {
+        case index_builds::votes::AbortVoteResult::kAccepted:
+            // TODO SERVER-138112: The failure path votes to abort again. Skip that second vote.
+            uasserted(ErrorCodes::IndexBuildAborted, reason);
+        case index_builds::votes::AbortVoteResult::kRefused:
+            // The primary also refuses once it has aborted, so wait for its commit or abort.
+            LOGV2(13756404,
+                  "Index build: the primary refused to abort, waiting for its commit or abort",
+                  "buildUUID"_attr = replState.buildUUID,
+                  "collectionUUID"_attr = replState.collectionUUID);
+            replState.getNextActionFuture().wait(opCtx);
+            break;
+        case index_builds::votes::AbortVoteResult::kSignaled:
+            break;
+    }
+    // An abort kills this operation before signaling the build, so past this check the build has
+    // committed.
+    opCtx->checkForInterrupt();
+    const auto nextAction = replState.getNextActionNoWait();
+    tassert(13756402,
+            "Expected a commit signal before scanning past the index build attempt limit",
+            nextAction == IndexBuildAction::kOplogCommit ||
+                nextAction == IndexBuildAction::kCommitQuorumSatisfied);
+
+    // A committed build can't be aborted, so this node must do a best-effort attempt to finish it.
+    LOGV2_WARNING(
+        13756401,
+        "Index build: the primary committed or is committing this build, so scanning "
+        "despite the index build attempt limit. If this node keeps crashing during the build, "
+        "resync it",
+        "buildUUID"_attr = replState.buildUUID,
+        "collectionUUID"_attr = replState.collectionUUID,
+        "limit"_attr = limit);
+}
+
 void IndexBuildsCoordinator::_runIndexBuildInner(
     OperationContext* opCtx,
     std::shared_ptr<ReplIndexBuildState> replState,
@@ -3665,6 +3728,10 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
             [&](const BSONObj& data) {
                 return UUID::parse(data["buildUUID"]) == replState->buildUUID;
             });
+
+        if (shouldCountIndexBuildAttempts(*replState)) {
+            _signalPrimaryForAbortIfOverAttemptLimit(opCtx, *replState);
+        }
 
         // Index builds can safely ignore prepare conflicts and perform writes. On secondaries,
         // prepare operations wait for index builds to complete.

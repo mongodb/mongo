@@ -120,6 +120,7 @@ mongo_cc_library(
     ],
     deps = [
         ":commit_quorum_options",
+        ":index_build_attempts",
         ":index_build_entry_helpers",
         ":index_build_entry_idl",
         ":index_build_knobs_idl",
