@@ -71,11 +71,19 @@ void JsFunction::_init(OperationContext* opCtx, std::string code, const Database
 }
 
 bool JsFunction::runAsPredicate(const BSONObj& obj) const {
-    _scope->registerOperation(Client::getCurrent()->getOperationContext());
+    auto* opCtx = Client::getCurrent()->getOperationContext();
+    _scope->registerOperation(opCtx);
     const ScopeGuard scopeOpCtxGuard([&] { _scope->unregisterOperation(); });
 
     _scope->advanceGeneration();
-    return _scope->execPredicate(_func, obj, internalQueryJavaScriptFnTimeoutMillis.load());
+    try {
+        return _scope->execPredicate(_func, obj, internalQueryJavaScriptFnTimeoutMillis.load());
+    } catch (const DBException& ex) {
+        if (ErrorCodes::isInterruption(ex.code())) {
+            opCtx->resetInterruptCheckWindow();
+        }
+        throw;
+    }
 }
 
 size_t JsFunction::getApproximateSize() const {

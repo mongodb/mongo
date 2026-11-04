@@ -279,6 +279,12 @@ void OperationContext::updateInterruptCheckCounters() {
     }
 }
 
+void OperationContext::resetInterruptCheckWindow() {
+    if (_overdueInterruptCheckStats) {
+        _overdueInterruptCheckStats->interruptCheckWindowStartTime = tickSource().getTicks();
+    }
+}
+
 void OperationContext::_schedulePeriodicClientConnectedCheck() {
     if (!_baton) {
         return;

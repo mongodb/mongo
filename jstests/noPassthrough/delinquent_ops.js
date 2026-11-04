@@ -25,6 +25,7 @@ import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {getQueryExecMetrics, getQueryStats} from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // The failpoint will wait for this long before yielding for every iteration.
 const waitPerIterationMs = 200;
@@ -387,6 +388,48 @@ function testDelinquencyOnShard(routerDb, shardDb) {
     }
 }
 
+function testInterruptedWhereNotOverdue(db) {
+    const overdueThresholdMs = 500;
+    setOverdueThreshold(db, overdueThresholdMs);
+
+    const whereComment = "interrupted_where";
+    const maxTimeMS = overdueThresholdMs * 3;
+    runWithParamsAllNonConfigNodes(db, {scriptingEngineInterruptIntervalMS: 50}, () => {
+        assert.commandFailedWithCode(
+            db.runCommand({
+                find: "testColl",
+                filter: {
+                    $where: function () {
+                        sleep(10 * 1000);
+                        return true;
+                    },
+                },
+                maxTimeMS: maxTimeMS,
+                comment: whereComment,
+            }),
+            ErrorCodes.MaxTimeMSExpired,
+        );
+    });
+
+    const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
+    const line = findMatchingLogLine(globalLog.log, {
+        msg: "Slow query",
+        comment: whereComment,
+        "command": "find",
+    });
+    assert(line, "Slow query log line not found", {log: globalLog.log});
+
+    const attr = JSON.parse(line).attr;
+    assert.gte(attr.durationMillis, maxTimeMS, {attr});
+    assert(
+        !("delinquencyInfo" in attr) || !("overdueInterruptChecks" in attr.delinquencyInfo),
+        "Interrupted $where was marked overdue",
+        {attr},
+    );
+
+    setOverdueThreshold(db, delinquentIntervalMs * 100);
+}
+
 // routerDb is the database on the router (mongos) when the cluster is sharded, otherwise it is the
 // same as shardDb.
 function runTest(routerDb, shardDb) {
@@ -458,6 +501,7 @@ const startupParameters = {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
 
     runTest(db, db);
+    testInterruptedWhereNotOverdue(db);
     rst.stopSet();
 }
 

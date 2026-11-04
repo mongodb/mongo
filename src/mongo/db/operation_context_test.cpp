@@ -1244,6 +1244,41 @@ TEST_F(OperationTestWithMockClock, NeverChecksForInterrupt) {
     }
 }
 
+TEST_F(OperationTestWithMockClock, InterruptedWaitDoesNotCountAsOverdue) {
+    unittest::ServerParameterGuard enableTracking("featureFlagRecordDelinquentMetrics", true);
+
+    auto client = getService()->makeClient("MainClient");
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->trackOverdueInterruptChecks(mockTickSource()->getTicks());
+
+    const Milliseconds interval{gOverdueInterruptCheckIntervalMillis.load()};
+    opCtx->setDeadlineByDate(mockClock->now() + interval, ErrorCodes::ExceededTimeLimit);
+
+    std::mutex m;
+    stdx::condition_variable cv;
+    std::unique_lock<std::mutex> lk(m);
+
+    ASSERT_THROWS_CODE(opCtx->waitForConditionOrInterrupt(cv,
+                                                          lk,
+                                                          [&] {
+                                                              mockTickSource()->advance(interval *
+                                                                                        5);
+                                                              mockClock->advance(interval * 5);
+                                                              return false;
+                                                          }),
+                       DBException,
+                       ErrorCodes::ExceededTimeLimit);
+
+    opCtx->updateInterruptCheckCounters();
+
+    auto stats = opCtx->overdueInterruptCheckStats();
+    ASSERT(stats);
+    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
+    ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{0});
+    ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), Milliseconds{0});
+}
+
 TEST_F(OperationTestWithMockClock, KilledOperationWithOverdueInterruptCheck) {
     // Create an OperationContext that does not check for interrupt for awhile after creation.
     auto client = getService()->makeClient("MainClient");

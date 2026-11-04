@@ -124,7 +124,10 @@ public:
                                           Date_t deadline,
                                           PredicateT pred) {
         _isWaiting.store(true);
-        ON_BLOCK_EXIT([this] { _isWaiting.store(false); });
+        ON_BLOCK_EXIT([this] {
+            onWaitExit();
+            _isWaiting.store(false);
+        });
 
         auto checkForInterruptWithoutLockAndAssert = [&]() {
             // We drop the lock before checking for interrupt since checkForInterruptNoAssert can
@@ -319,6 +322,19 @@ public:
     [[MONGO_MOD_FILE_PRIVATE]] virtual Date_t getExpirationDateForWaitForValue(
         Milliseconds waitFor) = 0;
 
+protected:
+    /**
+     * Called by the waiting thread each time a wait ends, whether it finished, timed out, or was
+     * interrupted. It runs just before the "is waiting" flag is cleared.
+     *
+     * It runs from a scope guard during cleanup, so overrides must not throw since an exception
+     * thrown while the stack is already unwinding terminates the process.
+     *
+     * Overrides run on every wait exit, so they should do only a small, fixed amount of work, such
+     * as updating a counter or reading a clock. They shouldn't take locks, do I/O, or start
+     * another wait on this Interruptible, since that could block or recurse back into this hook.
+     */
+    virtual void onWaitExit() {}
 
 private:
     Atomic<bool> _isWaiting{false};

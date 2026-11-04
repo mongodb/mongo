@@ -221,6 +221,8 @@ public:
      */
     void updateInterruptCheckCounters();
 
+    void resetInterruptCheckWindow();
+
     /**
      * Returns the service context under which this operation context runs.
      */
@@ -919,6 +921,10 @@ private:
     Status _markKilledAndReturnDeadlineError() noexcept;
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;
+
+    void onWaitExit() override {
+        resetInterruptCheckWindow();
+    }
 
     DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
         DeadlineState ds{_deadline, _maxTime, _timeoutError, _hasArtificialDeadline};
