@@ -245,6 +245,16 @@ public:
     exec::agg::MergeCursorsStage* getSourceStage() const;
 
     /**
+     * Advances the client-visible post-batch resume token tracked by the underlying results merger
+     * to the resume token of 'event'. Used by the end-of-transaction synthesis stage, whose
+     * synthesized events are user-visible but are derived from control events that the merger would
+     * otherwise degrade to a high-water-mark token. Without this, a batch that ends with a
+     * synthesized event could expose a post-batch resume token that precedes the event, so the
+     * event could be replayed on resume.
+     */
+    void advancePostBatchResumeToken(const Document& event);
+
+    /**
      * Extracts the cluster timestamp from the input document, via the '_id' field.
      * Requires the document to contain an '_id' field with the proper contents.
      */

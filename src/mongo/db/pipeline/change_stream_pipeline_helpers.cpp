@@ -6,11 +6,13 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
+#include "mongo/db/pipeline/document_source_change_stream_end_of_transaction.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
@@ -20,8 +22,13 @@
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_redact.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
 
 #include <list>
 #include <memory>
@@ -29,6 +36,25 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::change_stream::pipeline_helpers {
+namespace {
+
+// The only stages that may be re-applied to synthesized events on the router. They are the
+// filtering stages and the single-document transformations that the user pipeline can contain.
+// Everything else (in particular shard-only stages such as '$changeStreamSplitLargeEvent', which is
+// stateful) must not be re-run on the router, because doing so could reorder or drop events.
+const StringDataSet kExpectedUserStages = {
+    DocumentSourceMatch::kStageName,
+    DocumentSourceRedact::kStageName,
+    DocumentSourceProject::kStageName,
+    DocumentSourceProject::kAliasNameUnset,
+    DocumentSourceAddFields::kStageName,
+    DocumentSourceAddFields::kAliasNameSet,
+    DocumentSourceReplaceRoot::kStageName,
+    DocumentSourceReplaceRoot::kAliasNameReplaceWith,
+};
+
+}  // namespace
+
 std::vector<BSONObj> buildPipelineForConfigServerV2(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     OperationContext* opCtx,
@@ -208,6 +234,21 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
         if (useV2ChangeStreamReader) {
             // V2 change stream reader, using the HandleTopologyChangeV2 stage.
             stages.push_back(DocumentSourceChangeStreamHandleTopologyChangeV2::create(expCtx));
+
+            // The end-of-transaction synthesis stage sits immediately after the topology stage and
+            // is the router-side consumer of the shards' accounting control events. Gate it only on
+            // the stream's opt-in: the stage must exist whenever the stream opted in, because it is
+            // the only consumer of accounting control events, and those must never reach the user.
+            // The 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag is already
+            // validated when the '$changeStream' spec is parsed (a stream cannot opt in without
+            // it), and the 'allowEndOfTransaction' server parameter is applied where it takes
+            // effect (the shard's accounting emission and the planner's user sub-pipeline
+            // population), so neither is re-checked here. Re-checking the parameter here would also
+            // risk disagreeing with the planner's later check if the parameter is changed in
+            // between.
+            if (change_stream::showEndOfTransactionRequested(spec)) {
+                stages.push_back(DocumentSourceChangeStreamEndOfTransaction::create(expCtx));
+            }
         } else {
             // V1 change stream reader, using the HandleTopologyChange stage.
             stages.push_back(DocumentSourceChangeStreamHandleTopologyChange::create(expCtx));
@@ -219,9 +260,15 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
         stages.push_back(DocumentSourceChangeStreamEnsureResumeTokenPresent::create(expCtx, spec));
     }
 
-    // If 'showExpandedEvents' is NOT set, add a filter that returns only classic change events. If
-    // the stream opted in to endOfTransaction events, include those as well.
+    // If 'showExpandedEvents' is NOT set, add a filter that returns only classic change events.
     if (!spec.getShowExpandedEvents()) {
+        // If the stream opted in to endOfTransaction events, include those as well. As with the
+        // synthesis stage above, this filter is gated only on the stream's opt-in and does not
+        // re-check the 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag or the
+        // 'allowEndOfTransaction' server parameter, which are applied where they take effect (the
+        // shard's accounting emission and the planner's user sub-pipeline population). Admitting
+        // 'endOfTransaction' here is harmless while the feature is disabled, because no such events
+        // are produced then.
         stages.push_back(DocumentSourceInternalChangeStreamMatch::create(
             change_stream_filter::getMatchFilterForClassicOperationTypes(
                 change_stream::showEndOfTransactionRequested(spec)),
@@ -229,6 +276,40 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
     }
 
     return stages;
+}
+
+DocumentSourceContainer getEndOfTransactionUserStages(
+    const Pipeline& shardsPipeline, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    DocumentSourceContainer userStages;
+    for (const auto& stage : shardsPipeline.getSources()) {
+        const auto& constraints = stage->constraints();
+        // Re-apply only the user stages that are allowlisted for change streams (e.g. $match,
+        // $redact and the single-document transformations). Skip the internal change stream
+        // stages and the change-stream-only stages such as $changeStreamSplitLargeEvent: the
+        // latter runs on the shards and is stateful, so re-running it on the router can reorder
+        // or drop synthesized events.
+        if (constraints.changeStreamRequirement !=
+            StageConstraints::ChangeStreamRequirement::kAllowlist) {
+            continue;
+        }
+        tassert(13766908,
+                str::stream() << "unexpected stage '" << stage->getSourceName()
+                              << "' would be re-applied to synthesized end-of-transaction events",
+                kExpectedUserStages.contains(stage->getSourceName()));
+        userStages.push_back(stage->clone(expCtx));
+    }
+    return userStages;
+}
+
+void setEndOfTransactionUserPipeline(const Pipeline& shardsPipeline, Pipeline& mergePipeline) {
+    for (const auto& stage : mergePipeline.getSources()) {
+        if (auto* endOfTransaction =
+                dynamic_cast<DocumentSourceChangeStreamEndOfTransaction*>(stage.get())) {
+            endOfTransaction->setUserPipeline(
+                getEndOfTransactionUserStages(shardsPipeline, mergePipeline.getContext()));
+            return;
+        }
+    }
 }
 
 }  // namespace mongo::change_stream::pipeline_helpers

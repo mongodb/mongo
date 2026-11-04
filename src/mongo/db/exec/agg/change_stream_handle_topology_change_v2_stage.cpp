@@ -857,6 +857,12 @@ exec::agg::MergeCursorsStage* ChangeStreamHandleTopologyChangeV2Stage::getSource
     return source;
 }
 
+void ChangeStreamHandleTopologyChangeV2Stage::advancePostBatchResumeToken(const Document& event) {
+    // The merger stores the high water mark as a resume token; a change event carries its resume
+    // token as its sort key, exactly like the events the merger advances the high water mark from.
+    getSourceStage()->setHighWaterMark(event.metadata().getSortKey().getDocument().toBson());
+}
+
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::runGetNextStateMachine_forTest() {
     return _runGetNextStateMachine();

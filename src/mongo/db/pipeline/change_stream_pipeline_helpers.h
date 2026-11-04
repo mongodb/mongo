@@ -43,4 +43,20 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
     const DocumentSourceChangeStreamSpec& spec,
     const ResumeTokenData& resumeToken);
 
+/**
+ * Returns a copy of the user-defined single-document transformation stages ('$match', '$redact',
+ * '$project', '$addFields', ...) that execute on the shards, in pipeline order. The returned stages
+ * are used to re-apply the user pipeline to the events synthesized by the end-of-transaction
+ * synthesis stage on the router. Returns an empty list if 'shardsPipeline' has no such stages.
+ */
+DocumentSourceContainer getEndOfTransactionUserStages(
+    const Pipeline& shardsPipeline, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+/**
+ * If 'mergePipeline' contains an end-of-transaction synthesis stage, gives it a copy of the
+ * user-defined single-document transformation stages that execute on the shards (taken from
+ * 'shardsPipeline'). Called after the router pipeline has been split.
+ */
+void setEndOfTransactionUserPipeline(const Pipeline& shardsPipeline, Pipeline& mergePipeline);
+
 }  // namespace mongo::change_stream::pipeline_helpers

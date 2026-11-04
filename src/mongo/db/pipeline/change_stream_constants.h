@@ -19,6 +19,7 @@ static constexpr std::string_view kHandleTopologyChange =
     "$_internalChangeStreamHandleTopologyChange"sv;
 static constexpr std::string_view kHandleTopologyChangeV2 =
     "$_internalChangeStreamHandleTopologyChangeV2"sv;
+static constexpr std::string_view kEndOfTransaction = "$_internalChangeStreamEndOfTransaction"sv;
 }  // namespace stage_names
 
 static const BSONObj kSortSpec = BSON("_id._data" << 1);
@@ -27,7 +28,8 @@ static const BSONObj kSortSpec = BSON("_id._data" << 1);
 static const StringDataSet kChangeStreamRouterPipelineStages = {
     stage_names::kEnsureResumeTokenPresent,
     stage_names::kHandleTopologyChange,
-    stage_names::kHandleTopologyChangeV2};
+    stage_names::kHandleTopologyChangeV2,
+    stage_names::kEndOfTransaction};
 
 }  // namespace change_stream_constants
 }  // namespace mongo

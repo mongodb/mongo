@@ -26,7 +26,9 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
+#include "mongo/db/pipeline/change_stream_pipeline_helpers.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_skip.h"
@@ -931,6 +933,16 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                                    expCtx->getExplain(),
                                                    namespaces.executionNss,
                                                    remoteMetricsToInclude);
+
+    // If the query is a v2 change stream with end-of-transaction synthesis enabled, copy the user
+    // pipeline stages from the shard into the end-of-transaction synthesis stage.
+    const auto& changeStreamSpec = expCtx->getChangeStreamSpec();
+    if (isChangeStreamV2Pipeline && shardDispatchResults.splitPipeline && changeStreamSpec &&
+        change_stream::showEndOfTransactionRequested(*changeStreamSpec)) {
+        change_stream::pipeline_helpers::setEndOfTransactionUserPipeline(
+            *shardDispatchResults.splitPipeline->shardsPipeline,
+            *shardDispatchResults.splitPipeline->mergePipeline);
+    }
 
     // Check for valid usage of SEARCH_META. We wait until after we've dispatched pipelines to the
     // shards in the event that we need to resolve any views.
