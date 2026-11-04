@@ -44,16 +44,21 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::exec_deferred_engine_choice {
+namespace {
 
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
-                                    const MultipleCollectionAccessor& collections,
-                                    std::unique_ptr<CanonicalQuery> canonicalQuery,
-                                    PlanYieldPolicy::YieldPolicy yieldPolicy,
-                                    std::unique_ptr<QueryPlannerParams> initialPlannerParams,
-                                    const MakePlannerParamsFn& makeQueryPlannerParams,
-                                    std::size_t plannerOptions,
-                                    Pipeline* pipeline) {
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDeferredEngineChoice(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    std::unique_ptr<CanonicalQuery> canonicalQuery,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    std::unique_ptr<QueryPlannerParams> initialPlannerParams,
+    const MakePlannerParamsFn& makeQueryPlannerParams,
+    std::size_t plannerOptions,
+    Pipeline* pipeline,
+    const AddClassicRootStageFn& addRootStage,
+    bool collectPlanShapeCounters) {
+    // A classic root stage can only be put on top of a classic plan.
+    const bool classicOnly = static_cast<bool>(addRootStage);
     PlanRankingResult rankerResult = planRanking(opCtx,
                                                  collections,
                                                  canonicalQuery.get(),
@@ -61,7 +66,8 @@ getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
                                                  plannerOptions,
                                                  pipeline,
                                                  std::move(initialPlannerParams),
-                                                 makeQueryPlannerParams);
+                                                 makeQueryPlannerParams,
+                                                 classicOnly);
 
     // If we replanned and the old plan and new plan are the same, update the counter.
     const auto replanningData = rankerResult.plannerParams->replanningData;
@@ -97,7 +103,53 @@ getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
                                   opCtx,
                                   collections,
                                   yieldPolicy,
-                                  pipeline);
+                                  pipeline,
+                                  addRootStage,
+                                  collectPlanShapeCounters);
+}
+
+}  // namespace
+
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
+                                    const MultipleCollectionAccessor& collections,
+                                    std::unique_ptr<CanonicalQuery> canonicalQuery,
+                                    PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                    std::unique_ptr<QueryPlannerParams> initialPlannerParams,
+                                    const MakePlannerParamsFn& makeQueryPlannerParams,
+                                    std::size_t plannerOptions,
+                                    Pipeline* pipeline) {
+    return getExecutorDeferredEngineChoice(opCtx,
+                                           collections,
+                                           std::move(canonicalQuery),
+                                           yieldPolicy,
+                                           std::move(initialPlannerParams),
+                                           makeQueryPlannerParams,
+                                           plannerOptions,
+                                           pipeline,
+                                           /*addRootStage=*/{},
+                                           /*collectPlanShapeCounters=*/true);
+}
+
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWithClassicRootStage(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    std::unique_ptr<CanonicalQuery> canonicalQuery,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    const MakePlannerParamsFn& makeQueryPlannerParams,
+    std::size_t plannerOptions,
+    const AddClassicRootStageFn& addRootStage) {
+    tassert(13847301, "Expected a root stage to add", static_cast<bool>(addRootStage));
+    return getExecutorDeferredEngineChoice(opCtx,
+                                           collections,
+                                           std::move(canonicalQuery),
+                                           yieldPolicy,
+                                           /*initialPlannerParams=*/nullptr,
+                                           makeQueryPlannerParams,
+                                           plannerOptions,
+                                           /*pipeline=*/nullptr,
+                                           addRootStage,
+                                           /*collectPlanShapeCounters=*/false);
 }
 
 }  // namespace mongo::exec_deferred_engine_choice

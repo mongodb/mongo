@@ -716,13 +716,15 @@ server_parameters:
                     min: "9.0"
 
     internalQueryEnablePlanShapeAnalysis:
-        mod_visibility: needs_replacement
         description: "Knob to control whether we collect plan shape counters for query stats."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnablePlanShapeAnalysis"
         cpp_vartype: Atomic<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enablePlanShapeAnalysis
 
     internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin:
         description: >-

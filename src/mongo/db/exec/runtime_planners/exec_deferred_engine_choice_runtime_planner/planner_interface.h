@@ -173,7 +173,8 @@ private:
  * Wrapper planner that performs engine selection after extracting the planning result from an
  * inner planner. This ensures engine selection happens in the planning phase, so that errors (e.g.
  * NoQueryExecutionPlans from invalid query settings on secondary collections) are caught by
- * retryMakePlanner's fallback mechanism.
+ * retryMakePlanner's fallback mechanism. If 'classicOnly' is set, the classic engine is always
+ * selected.
  */
 class EngineSelectionPlanner final : public PlannerInterface {
 public:
@@ -181,7 +182,8 @@ public:
                            OperationContext* opCtx,
                            CanonicalQuery* cq,
                            Pipeline* pipeline,
-                           const MultipleCollectionAccessor& collections);
+                           const MultipleCollectionAccessor& collections,
+                           bool classicOnly = false);
 
     PlanRankingResult extractPlanRankingResult() override;
 

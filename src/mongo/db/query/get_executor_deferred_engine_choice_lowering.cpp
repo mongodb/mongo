@@ -13,7 +13,7 @@
 #include "mongo/db/query/engine_selection.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counters.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
@@ -39,13 +39,17 @@ public:
                     OperationContext* opCtx,
                     const MultipleCollectionAccessor& collections,
                     PlanYieldPolicy::YieldPolicy yieldPolicy,
-                    Pipeline* pipeline)
+                    Pipeline* pipeline,
+                    const AddClassicRootStageFn& addRootStage,
+                    bool collectPlanShapeCounters)
         : _cq(std::move(cq)),
           _rankingResult(std::move(rankingResult)),
           _opCtx(opCtx),
           _collections(collections),
           _yieldPolicy(std::move(yieldPolicy)),
-          _pipeline(pipeline) {}
+          _pipeline(pipeline),
+          _addRootStage(addRootStage),
+          _collectPlanShapeCounters(collectPlanShapeCounters) {}
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> lower() {
         if (_rankingResult.usedIdhack) {
@@ -67,7 +71,8 @@ public:
         // Only collect plan shape stats for the top-level query. For example we do not collect
         // the metrics for the foreign side of a $lookup.
         const bool inTopLevelQuery = _cq->getExpCtxRaw()->getSubPipelineDepth() == 0;
-        if (internalQueryEnablePlanShapeAnalysis.load() && inTopLevelQuery) {
+        if (_collectPlanShapeCounters && inTopLevelQuery &&
+            QueryKnobConfiguration::get(_opCtx).getEnablePlanShapeAnalysis()) {
             auto& opDebug = CurOp::get(_opCtx)->debug();
             // Gate on shouldRequestRemoteMetrics, which checks if metrics are requested by
             // mongos or if the local query stats key exists.
@@ -129,6 +134,9 @@ private:
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeSbePlanExecutor(
         std::unique_ptr<QuerySolution> solution, bool fromCandidate) {
+        tassert(13847300,
+                "Expected the classic engine when adding a classic root stage",
+                !_addRootStage);
         // Remove any stages from `pipeline` that will be pushed down to SBE.
         finalizePipelineStages(_pipeline, _cq.get());
         const auto* expCtx = _cq->getExpCtxRaw();
@@ -242,6 +250,10 @@ private:
                 &_rankingResult.maybeExplainData->planStageQsnMap);
         }
 
+        if (_addRootStage) {
+            planStage = _addRootStage(std::move(planStage), workingSet.get());
+        }
+
         const auto* solutionPtr = [&]() -> const QuerySolution* {
             if (auto* mps = peekMps()) {
                 return mps->bestSolution();
@@ -327,6 +339,8 @@ private:
     const MultipleCollectionAccessor& _collections;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     Pipeline* _pipeline;
+    const AddClassicRootStageFn& _addRootStage;
+    bool _collectPlanShapeCounters;
 };
 
 }  // namespace
@@ -337,13 +351,17 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> lowerPlanRankingResult(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    Pipeline* pipeline) {
+    Pipeline* pipeline,
+    const AddClassicRootStageFn& addRootStage,
+    bool collectPlanShapeCounters) {
     return ExecConstructor(std::move(cq),
                            std::move(rankingResult),
                            opCtx,
                            collections,
                            std::move(yieldPolicy),
-                           pipeline)
+                           pipeline,
+                           addRootStage,
+                           collectPlanShapeCounters)
         .lower();
 }
 

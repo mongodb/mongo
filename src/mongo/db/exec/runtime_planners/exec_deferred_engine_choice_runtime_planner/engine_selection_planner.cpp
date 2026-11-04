@@ -45,7 +45,8 @@ EngineSelectionPlanner::EngineSelectionPlanner(std::unique_ptr<PlannerInterface>
                                                OperationContext* opCtx,
                                                CanonicalQuery* cq,
                                                Pipeline* pipeline,
-                                               const MultipleCollectionAccessor& collections) {
+                                               const MultipleCollectionAccessor& collections,
+                                               bool classicOnly) {
     _result = innerPlanner->extractPlanRankingResult();
 
     // Engine selection is only needed for non-trivial cases. ID hack and cached planners already
@@ -61,7 +62,8 @@ EngineSelectionPlanner::EngineSelectionPlanner(std::unique_ptr<PlannerInterface>
     //       has been fully answered and there's no more execution that needs to
     //       happen. In this case we return a classic executor so that we don't
     //       have to restart work using SBE.
-    if (solution->root()->getType() == STAGE_EOF || useEofOptimization(_result, cq, pipeline)) {
+    if (classicOnly || solution->root()->getType() == STAGE_EOF ||
+        useEofOptimization(_result, cq, pipeline)) {
         _result.engineSelection = EngineChoice::kClassic;
         return;
     }

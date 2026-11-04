@@ -93,6 +93,11 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
     CanonicalQuery* canonicalQuery,
     std::size_t plannerOptions,
     Pipeline* pipeline) {
+    if (!plannerParams) {
+        plannerParams =
+            makeQueryPlannerParams(*canonicalQuery, plannerOptions, /*replanningData=*/boost::none);
+    }
+
     // We create this once on replanning and then make a copy for each QueryPlannerParams to own for
     // subsequent calls.
     boost::optional<QueryPlannerParams::ReplanningData> replanningData = boost::none;

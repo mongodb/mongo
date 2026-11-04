@@ -842,22 +842,20 @@ StatusWith<std::unique_ptr<projection_ast::Projection>> makeProjection(const BSO
 
 namespace {
 /**
- * Returns a MakePlannerParamsFn to pass into 'retryMakePlanner'.
+ * Returns a MakePlannerParamsFn for a query on the single collection in 'collections'.
  */
 auto makeQueryPlannerParamsFactory(OperationContext* opCtx,
-                                   MultipleCollectionAccessor& collections,
-                                   size_t plannerOptions = QueryPlannerParams::DEFAULT) {
-    return [opCtx, &collections, plannerOptions](
-               const CanonicalQuery& cq,
-               size_t options,
-               boost::optional<QueryPlannerParams::ReplanningData> replanningData)
+                                   MultipleCollectionAccessor& collections) {
+    return [opCtx, &collections](const CanonicalQuery& cq,
+                                 size_t options,
+                                 boost::optional<QueryPlannerParams::ReplanningData> replanningData)
                -> std::unique_ptr<QueryPlannerParams> {
         auto result =
             std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForSingleCollectionQuery{
                 .opCtx = opCtx,
                 .canonicalQuery = cq,
                 .collections = collections,
-                .plannerOptions = plannerOptions,
+                .plannerOptions = options,
                 .planRanker = cq.getExpCtx()->getQueryKnobConfiguration().getPlanRanker(),
             });
         result->replanningData = std::move(replanningData);
@@ -1319,11 +1317,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     };
 
     // Invoke the lambda returned from the factory for the initial planner params.
-    auto plannerParams = makeQueryPlannerParamsFactory(opCtx, collections, plannerOptions)(
+    auto plannerParams = makeQueryPlannerParamsFactory(opCtx, collections)(
         *cq, plannerOptions, /*replanningData=*/boost::none);
     auto planner =
         retryMakePlanner(std::move(plannerParams),
-                         makeQueryPlannerParamsFactory(opCtx, collections, plannerOptions),
+                         makeQueryPlannerParamsFactory(opCtx, collections),
                          makePlannerFactory(opCtx,
                                             collections,
                                             cq.get(),

@@ -24,6 +24,8 @@ namespace mongo::exec_deferred_engine_choice {
  * Given query information, picks which plan to use to execute the query and summarizes the result
  * in `PlanRankingResult`. May use different planning approaches such as multiplanning, subplanning,
  * or cost-based ranking.
+ *
+ * If 'classicOnly' is set, the classic engine is always selected.
  */
 PlanRankingResult planRanking(OperationContext* opCtx,
                               const MultipleCollectionAccessor& collections,
@@ -32,6 +34,7 @@ PlanRankingResult planRanking(OperationContext* opCtx,
                               std::size_t plannerOptions,
                               Pipeline* pipeline,
                               std::unique_ptr<QueryPlannerParams> initialPlannerParams,
-                              const MakePlannerParamsFn& makeQueryPlannerParams);
+                              const MakePlannerParamsFn& makeQueryPlannerParams,
+                              bool classicOnly);
 
 }  // namespace mongo::exec_deferred_engine_choice

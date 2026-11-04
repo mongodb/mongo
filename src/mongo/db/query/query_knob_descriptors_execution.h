@@ -145,6 +145,10 @@
          kInternalSearchIdLookupMaxOutputBytesName,                                       \
          internalSearchIdLookupMaxOutputBytes,                                            \
          getSearchIdLookupMaxOutputBytes)                                                 \
+    KNOB(kEnablePlanShapeAnalysis,                                                        \
+         kInternalQueryEnablePlanShapeAnalysisName,                                       \
+         internalQueryEnablePlanShapeAnalysis,                                            \
+         getEnablePlanShapeAnalysis)                                                      \
     /* End MONGO_EXPAND_QUERY_KNOBS_EXECUTION */
 // clang-format on
 

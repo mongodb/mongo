@@ -66,7 +66,8 @@ std::unique_ptr<PlannerInterface> buildCachedPlan(
     Pipeline* pipeline,
     const MultipleCollectionAccessor& collections,
     std::shared_ptr<QueryPlannerParams> plannerParams,
-    std::function<PlannerData(boost::optional<size_t>)> makePlannerData) {
+    std::function<PlannerData(boost::optional<size_t>)> makePlannerData,
+    bool classicOnly) {
     if (!shouldCacheQuery(*cq)) {
         planCacheCounters.incrementClassicSkippedCounter();
         return nullptr;
@@ -81,8 +82,11 @@ std::unique_ptr<PlannerInterface> buildCachedPlan(
     planCacheCounters.incrementClassicHitsCounter();
     auto [cachedSolution, querySolution] = std::move(*cachedSolutionPair);
 
-    const auto engine = extendSolutionAndSelectEngine(
-        querySolution, opCtx, cq, pipeline, collections, *plannerParams);
+    // Classic engine may be predetermined for some types of queries.
+    const auto engine = classicOnly
+        ? EngineChoice::kClassic
+        : extendSolutionAndSelectEngine(
+              querySolution, opCtx, cq, pipeline, collections, *plannerParams);
     if (engine == EngineChoice::kClassic) {
         auto classicCachePlanner = std::make_unique<classic_runtime_planner::CachedPlanner>(
             makePlannerData(boost::none), std::move(cachedSolution), std::move(querySolution));
@@ -193,7 +197,8 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
     std::shared_ptr<QueryPlannerParams> plannerParams,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const MultipleCollectionAccessor& collections,
-    Pipeline* pipeline) {
+    Pipeline* pipeline,
+    bool classicOnly) {
     ScopedDebugInfo queryPlannerParams(
         "queryPlannerParams", diagnostic_printers::QueryPlannerParamsPrinter{*plannerParams});
 
@@ -260,8 +265,14 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
     setOpDebugPlanCacheInfo(opCtx, planCacheInfo);
 
     if (!replanning) {
-        if (auto cachedPlanner = buildCachedPlan(
-                planCacheKey, opCtx, cq, pipeline, collections, plannerParams, makePlannerData);
+        if (auto cachedPlanner = buildCachedPlan(planCacheKey,
+                                                 opCtx,
+                                                 cq,
+                                                 pipeline,
+                                                 collections,
+                                                 plannerParams,
+                                                 makePlannerData,
+                                                 classicOnly);
             cachedPlanner) {
             return {std::move(cachedPlanner)};
         }
@@ -361,13 +372,19 @@ PlanRankingResult planRanking(OperationContext* opCtx,
                               std::size_t plannerOptions,
                               Pipeline* pipeline,
                               std::unique_ptr<QueryPlannerParams> initialPlannerParams,
-                              const MakePlannerParamsFn& makeQueryPlannerParams) {
+                              const MakePlannerParamsFn& makeQueryPlannerParams,
+                              bool classicOnly) {
     auto makePlannerHelper = [&](std::unique_ptr<QueryPlannerParams> plannerParams)
         -> std::unique_ptr<PlannerInterface> {
-        auto innerPlanner = uassertStatusOK(preparePlanner(
-            opCtx, canonicalQuery, std::move(plannerParams), yieldPolicy, collections, pipeline));
+        auto innerPlanner = uassertStatusOK(preparePlanner(opCtx,
+                                                           canonicalQuery,
+                                                           std::move(plannerParams),
+                                                           yieldPolicy,
+                                                           collections,
+                                                           pipeline,
+                                                           classicOnly));
         return std::make_unique<EngineSelectionPlanner>(
-            std::move(innerPlanner), opCtx, canonicalQuery, pipeline, collections);
+            std::move(innerPlanner), opCtx, canonicalQuery, pipeline, collections, classicOnly);
     };
     return retryMakePlanner(std::move(initialPlannerParams),
                             makeQueryPlannerParams,

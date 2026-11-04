@@ -40,4 +40,18 @@ getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
                                     size_t plannerOptions = QueryPlannerParams::DEFAULT,
                                     Pipeline* pipeline = nullptr);
 
+/**
+ * Creates an executor for a command that runs a classic-only stage on top of the query plan, such
+ * as delete, update or count. Unlike getExecutorFindDeferredEngineChoice(), never uses the express
+ * path or SBE. 'addRootStage' is called exactly once, after planning has finished.
+ */
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWithClassicRootStage(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    std::unique_ptr<CanonicalQuery> canonicalQuery,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    const MakePlannerParamsFn& makeQueryPlannerParams,
+    size_t plannerOptions,
+    const AddClassicRootStageFn& addRootStage);
+
 }  // namespace mongo::exec_deferred_engine_choice

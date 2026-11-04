@@ -4,6 +4,7 @@
 #include "mongo/db/query/get_executor_deferred_engine_choice_lowering.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/classic/count.h"
 #include "mongo/db/exec/classic/idhack.h"
 #include "mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
@@ -257,6 +258,47 @@ TEST_F(DeferredEngineChoiceLoweringTest, GroupQueryUsesSbe) {
                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                pipeline.get());
     ASSERT(dynamic_cast<PlanExecutorSBE*>(exec.get()));
+}
+
+// With 'classicOnly', a query that would otherwise use SBE uses classic, and the root stage is
+// added on top of the classic plan.
+TEST_F(DeferredEngineChoiceLoweringTest, ClassicOnlyAddsRootStage) {
+    auto [cq, plannerData] = createPlannerData();
+    PlanRankingResult rankingResult{.solutions = makeEmptyVirtualScan(),
+                                    .plannerParams = plannerData.plannerParams};
+    auto pipeline = makeSbeEligiblePipeline();
+    auto preComputed =
+        std::make_unique<exec_deferred_engine_choice::PreComputedRankingResultPlanner>(
+            std::move(plannerData), std::move(rankingResult));
+    exec_deferred_engine_choice::EngineSelectionPlanner planner{std::move(preComputed),
+                                                                operationContext(),
+                                                                cq.get(),
+                                                                pipeline.get(),
+                                                                collections(),
+                                                                /*classicOnly=*/true};
+
+    // The addRoot function should be called exactly once.
+    int numCalls = 0;
+    AddClassicRootStageFn addRootStage = [&](std::unique_ptr<PlanStage> root, WorkingSet* ws) {
+        ++numCalls;
+        ASSERT(ws);
+        return std::make_unique<CountStage>(
+            expCtx().get(), /*limit=*/0, /*skip=*/0, ws, root.release());
+    };
+    auto exec = lowerPlanRankingResult(std::move(cq),
+                                       planner.extractPlanRankingResult(),
+                                       operationContext(),
+                                       collections(),
+                                       PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                       pipeline.get(),
+                                       addRootStage,
+                                       /*collectPlanShapeCounters=*/false);
+
+    auto* classicExec = dynamic_cast<PlanExecutorImpl*>(exec.get());
+    // Assert classic is used.
+    ASSERT(classicExec);
+    ASSERT_EQ(numCalls, 1);
+    ASSERT_EQ(classicExec->getRootStage()->stageType(), STAGE_COUNT);
 }
 
 // After multiplanning is complete, if a plan has reached EOF and requires no more work,

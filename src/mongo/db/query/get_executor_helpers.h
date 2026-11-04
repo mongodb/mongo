@@ -6,6 +6,8 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/classic/delete_stage.h"
+#include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
@@ -26,6 +28,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 
 #include <boost/none.hpp>
@@ -80,6 +83,12 @@ using MakePlannerParamsFn = std::function<std::unique_ptr<QueryPlannerParams>(
     const CanonicalQuery&, size_t, boost::optional<QueryPlannerParams::ReplanningData>)>;
 using MakePlannerFn =
     std::function<std::unique_ptr<PlannerInterface>(std::unique_ptr<QueryPlannerParams>)>;
+/**
+ * Builds the classic-only stages that sit above the root of the winning plan, such as DELETE,
+ * UPDATE or COUNT, and returns the new root. 'ws' is the WorkingSet the plan was built with.
+ */
+using AddClassicRootStageFn =
+    std::function<std::unique_ptr<PlanStage>(std::unique_ptr<PlanStage> root, WorkingSet* ws)>;
 /*
  * Calls `makePlanner` with five retries in case exceptions are thrown. Uses the given plannerParams
  * at first to avoid additional calls to `makeQueryPlannerParams`.
