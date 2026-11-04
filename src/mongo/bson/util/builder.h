@@ -522,7 +522,8 @@ protected:
         const size_t oldReserved = reservedBytes();
         size_t minSize = oldLen + by + oldReserved;
 
-        // Going beyond the maximum buffer size is not likely.
+        // If the requested size or the amount we're trying to grow by exceeds the limit, throw.
+        // We check both things to protect against the calculation of minSize wrapping.
         massert(13548,
                 fmt::format("BufBuilder attempted to grow() to {} bytes, past the {}MB limit. "
                             "Current size: {} bytes. Reserved: {} bytes. Requested: {} bytes.",
@@ -531,7 +532,7 @@ protected:
                             oldLen,
                             oldReserved,
                             by),
-                minSize <= BufferMaxSize);
+                by <= BufferMaxSize && minSize <= BufferMaxSize);
 
         // We add 'BufferAllocator::kBuffHolderSize' to the requested reallocation size, as it will
         // be required later in '_buf.realloc'.
