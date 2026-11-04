@@ -406,10 +406,11 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      *     CLEAN_RESTART / UNCLEAN_RESTART failover modes, where the primary is taken down before
      *     the secondary is stepped up: with only 2 nodes the surviving secondary can't form a
      *     majority, so the election would fail.
+     * @param {Object} [opts.nodeParams={}] - Parameters to pass to the mongod nodes starting up.
      * @returns {ReplSetTest} A started replica set with `_pdibMetricsDir` attached for use by
      *     `run()` / `runMultiPhase()`.
      */
-    static setUp({testName, nodes = 2} = {}) {
+    static setUp({testName, nodes = 2, nodeParams = {}} = {}) {
         const name = testName || jsTestName();
         const {metricsDir, otelParams} = otelFileExportParams(name);
 
@@ -434,6 +435,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             nodeOptions: {
                 setParameter: {
                     ...otelParams,
+                    ...nodeParams,
                     openTelemetryExportIntervalMillis: 5000,
                     // Keep pool blocks well below the ~1 MB per-index sorter budgets, otherwise
                     // sorters end up spilling once per key.
@@ -453,10 +455,34 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      * Stops the replica set started by `setUp()`.
      *
      * @param {ReplSetTest} rst
+     * @param {Object} [options={}] @see MongoRunner.stopMongod
      * @returns {void}
      */
-    static tearDown(rst) {
-        rst.stopSet();
+    static tearDown(rst, options = {}) {
+        rst.stopSet(/*signal=*/ undefined, /*forRestart=*/ false, options);
+    }
+
+    /**
+     * Runs preflight checks, validating that the necessary feature flags are on and the replica
+     * set is configured correctly. Returns false if the test should not be run.
+     *
+     * @param {ReplSetTest} rst
+     * @param {string} dbName
+     * @param {string} caller
+     * @param {Object} [params]
+     * @returns {boolean} False iff the scenario should be skipped because the primary-driven index
+     *     build feature flags are disabled. Throws if the fixture itself is misconfigured.
+     */
+    static preflightSetup(rst, dbName, caller, params) {
+        if (!PrimaryDrivenResumableIndexBuildTest._preflight(rst, dbName, caller)) {
+            return false;
+        }
+
+        if (params) {
+            PrimaryDrivenResumableIndexBuildTest._setIndexBuildSettings(rst, params);
+        }
+
+        return true;
     }
 
     /**
@@ -518,14 +544,14 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             assert.gt(sideWrites.length, 0, "drain writes phase requires at least one side write");
         }
 
-        if (!PrimaryDrivenResumableIndexBuildTest._preflight(rst, dbName, "run")) {
+        if (
+            !PrimaryDrivenResumableIndexBuildTest.preflightSetup(rst, dbName, "run", {
+                maxIndexBuildMemoryUsageMegabytes: maxMb,
+                primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys: loadIntervalKeys,
+            })
+        ) {
             return;
         }
-
-        PrimaryDrivenResumableIndexBuildTest._setIndexBuildSettings(rst, {
-            maxIndexBuildMemoryUsageMegabytes: maxMb,
-            primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys: loadIntervalKeys,
-        });
 
         for (const position of positions) {
             jsTest.log.info(
@@ -615,14 +641,14 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             "runMultiPhase requires at least one side write so that the DRAIN phase has work",
         );
 
-        if (!PrimaryDrivenResumableIndexBuildTest._preflight(rst, dbName, "runMultiPhase")) {
+        if (
+            !PrimaryDrivenResumableIndexBuildTest.preflightSetup(rst, dbName, "runMultiPhase", {
+                maxIndexBuildMemoryUsageMegabytes: maxMb,
+                primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys: loadIntervalKeys,
+            })
+        ) {
             return;
         }
-
-        PrimaryDrivenResumableIndexBuildTest._setIndexBuildSettings(rst, {
-            maxIndexBuildMemoryUsageMegabytes: maxMb,
-            primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys: loadIntervalKeys,
-        });
 
         const indexNames = Array.from(
             {length: DEFAULT_INDEX_COUNT},
@@ -828,15 +854,18 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         assert.gt(sideWrites.length, 0, "the drain phase fail point needs side writes to count");
 
         if (
-            !PrimaryDrivenResumableIndexBuildTest._preflight(rst, dbName, "runAcrossTwoFailovers")
+            !PrimaryDrivenResumableIndexBuildTest.preflightSetup(
+                rst,
+                dbName,
+                "runAcrossTwoFailovers",
+                {
+                    maxIndexBuildMemoryUsageMegabytes: maxMb,
+                    primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys: loadIntervalKeys,
+                },
+            )
         ) {
             return;
         }
-
-        PrimaryDrivenResumableIndexBuildTest._setIndexBuildSettings(rst, {
-            maxIndexBuildMemoryUsageMegabytes: maxMb,
-            primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys: loadIntervalKeys,
-        });
 
         const indexNames = Array.from(
             {length: DEFAULT_INDEX_COUNT},
@@ -1147,19 +1176,18 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         } = PrimaryDrivenResumableIndexBuildTest._normalizeOptions(options);
 
         if (
-            !PrimaryDrivenResumableIndexBuildTest._preflight(
+            !PrimaryDrivenResumableIndexBuildTest.preflightSetup(
                 rst,
                 dbName,
                 "runSynthesizedResumeState",
+                {
+                    maxIndexBuildMemoryUsageMegabytes: maxMb,
+                    primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys: loadIntervalKeys,
+                },
             )
         ) {
             return;
         }
-
-        PrimaryDrivenResumableIndexBuildTest._setIndexBuildSettings(rst, {
-            maxIndexBuildMemoryUsageMegabytes: maxMb,
-            primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys: loadIntervalKeys,
-        });
 
         const indexNames = Array.from(
             {length: DEFAULT_INDEX_COUNT},
@@ -1524,12 +1552,13 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         if (phase === PdibPhase.DRAIN) {
             assert.gt(sideWrites.length, 0, "the drain phase requires at least one side write");
         }
-        if (!PrimaryDrivenResumableIndexBuildTest._preflight(rst, dbName, "window")) {
+        if (
+            !PrimaryDrivenResumableIndexBuildTest.preflightSetup(rst, dbName, "window", {
+                maxIndexBuildMemoryUsageMegabytes: maxMb,
+            })
+        ) {
             return null;
         }
-        PrimaryDrivenResumableIndexBuildTest._setIndexBuildSettings(rst, {
-            maxIndexBuildMemoryUsageMegabytes: maxMb,
-        });
 
         // The phase is part of the name so that indexes left by an earlier scenario on the
         // same collection cannot satisfy this run's completion check.
@@ -1626,12 +1655,18 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
     static runWithoutPendingInterceptors(rst, options) {
         const {dbName, collName, indexSpecs, docTemplate, docCount, sideWrites, maxMb} =
             PrimaryDrivenResumableIndexBuildTest._normalizeOptions(options);
-        if (!PrimaryDrivenResumableIndexBuildTest._preflight(rst, dbName, "noPendingInterceptor")) {
+        if (
+            !PrimaryDrivenResumableIndexBuildTest.preflightSetup(
+                rst,
+                dbName,
+                "noPendingInterceptor",
+                {
+                    maxIndexBuildMemoryUsageMegabytes: maxMb,
+                },
+            )
+        ) {
             return null;
         }
-        PrimaryDrivenResumableIndexBuildTest._setIndexBuildSettings(rst, {
-            maxIndexBuildMemoryUsageMegabytes: maxMb,
-        });
 
         const indexNames = indexSpecs.map((_, i) => `${DEFAULT_INDEX_NAME}_nopending_${i}`);
         const {primary, awaitCreateIndexes, buildUUID, hangBeforeBuildingIndexFp} =
@@ -2034,13 +2069,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             "PrimaryDrivenResumableIndexBuildTest: killed primary; waiting for secondary to step up",
             {secondary: secondary.host, requestedUnclean: unclean},
         );
-        assert.soon(() => {
-            try {
-                return secondary.adminCommand({hello: 1}).isWritablePrimary;
-            } catch (e) {
-                return false;
-            }
-        }, `secondary ${secondary.host} did not step up after the primary was stopped`);
+        rst.waitForMyState(secondary, ReplSetTest.State.PRIMARY);
 
         // Restart the old primary so it rejoins as a secondary (keeps the set at two live nodes).
         const restartedNode = rst.start(oldPrimary, {}, /*restart=*/ true);
@@ -2151,12 +2180,12 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
     /**
      * Fails over to the replica set's secondary, returning the new primary.
      */
-    static failover(rst) {
+    static failover(rst, failoverMode = PdibFailoverMode.NO_RESTART) {
         return PrimaryDrivenResumableIndexBuildTest._failover(
             rst,
             rst.getPrimary(),
             rst.getSecondary(),
-            PdibFailoverMode.NO_RESTART,
+            failoverMode,
         );
     }
 
@@ -2268,13 +2297,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             const res = nextPrimaryNode.adminCommand({replSetStepUp: 1});
             return res.ok === 1;
         }, `replSetStepUp on ${nextPrimaryNode.host} did not succeed`);
-        assert.soon(() => {
-            try {
-                return nextPrimaryNode.adminCommand({hello: 1}).isWritablePrimary;
-            } catch (e) {
-                return false;
-            }
-        }, `${nextPrimaryNode.host} did not become writable primary`);
+        rst.waitForMyState(nextPrimaryNode, ReplSetTest.State.PRIMARY);
         const newPrimary = nextPrimaryNode;
 
         // 3. Restart the old primary; it rejoins as a secondary.

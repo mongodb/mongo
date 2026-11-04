@@ -1285,6 +1285,14 @@ BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* entry,
       _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())),
       _sorter(_makeSorter(std::move(spiller), opts, stateInfo.getRanges())),
       _containerWriteBehavior(containerWriteBehavior) {
+    if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate &&
+        stateInfo.getPreviousKey()) {
+        BufReader reader(stateInfo.getPreviousKey()->data(), stateInfo.getPreviousKey()->length());
+        _previousKey =
+            key_string::Value::deserialize(reader,
+                                           _iam->getSortedDataInterface()->getKeyStringVersion(),
+                                           _iam->getSortedDataInterface()->rsKeyFormat());
+    }
     countResumedBuildInStats();
 }
 
@@ -1644,21 +1652,31 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
 }
 
 IndexStateInfo makeIndexStateInfo(BulkBuilderImpl::Sorter::PersistedState state,
-                                  int64_t keysInserted) {
+                                  int64_t keysInserted,
+                                  const key_string::Value& previousKey) {
     IndexStateInfo stateInfo;
     stateInfo.setStorageIdentifier(std::move(state.storageIdentifier));
     stateInfo.setNumKeys(keysInserted);
     stateInfo.setRanges(std::move(state.ranges));
 
+    if (!previousKey.isEmpty()) {
+        BufBuilder buf;
+        previousKey.serialize(buf);
+
+        const auto* bufBegin = reinterpret_cast<const uint8_t*>(buf.buf());
+        const auto* bufEnd = bufBegin + buf.len();
+        stateInfo.setPreviousKey(ConstDataRange(bufBegin, bufEnd));
+    }
+
     return stateInfo;
 }
 
 IndexStateInfo BulkBuilderImpl::getPersistedState() {
-    return makeIndexStateInfo(_sorter->getPersistedState(), _keysInserted);
+    return makeIndexStateInfo(_sorter->getPersistedState(), _keysInserted, _previousKey);
 }
 
 IndexStateInfo BulkBuilderImpl::persistDataForShutdown() {
-    return makeIndexStateInfo(_sorter->persistDataForShutdown(), _keysInserted);
+    return makeIndexStateInfo(_sorter->persistDataForShutdown(), _keysInserted, _previousKey);
 }
 
 void BulkBuilderImpl::releaseSorter() {

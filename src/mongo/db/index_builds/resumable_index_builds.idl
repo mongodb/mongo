@@ -98,6 +98,10 @@ structs:
             multikeyPaths:
                 description: "The multikey paths for the index, if supported."
                 type: array<MultikeyPath>
+            previousKey:
+                description: "The most recent key loaded, needed for duplicate key checking."
+                type: bindata_generic
+                optional: true
 
     IndexBuildMetadata:
         description:
