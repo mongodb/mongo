@@ -6,8 +6,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_join_optimization_knobs_gen.h"
 #include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_knob_descriptors_integration.h"
+#include "mongo/db/query/query_knob_descriptors_join_optimization.h"
 #include "mongo/db/query/query_knob_descriptors_optimization.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
@@ -27,6 +29,7 @@ class [[MONGO_MOD_PUBLIC]] QueryKnobConfiguration
     : public query_knobs::AccessorMixinQueryOptimizationKnobs<QueryKnobConfiguration>,
       public query_knobs::AccessorMixinQueryExecutionKnobs<QueryKnobConfiguration>,
       public query_knobs::AccessorMixinQueryIntegrationKnobs<QueryKnobConfiguration>,
+      public query_knobs::AccessorMixinQueryJoinOptimizationKnobs<QueryKnobConfiguration>,
       public query_knobs::AccessorMixinQueryStageMemoryLimitKnobs<QueryKnobConfiguration> {
 public:
     /**

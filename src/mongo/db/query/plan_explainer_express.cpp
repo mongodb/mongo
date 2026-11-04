@@ -4,6 +4,7 @@
 #include "mongo/db/query/plan_explainer_express.h"
 
 #include "mongo/db/query/explain_policy.h"
+#include "mongo/db/query/query_join_optimization_knobs_gen.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;

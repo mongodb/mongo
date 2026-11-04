@@ -5,7 +5,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_join_optimization_knobs_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/synchronized_value.h"

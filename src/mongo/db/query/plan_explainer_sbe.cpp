@@ -27,7 +27,7 @@
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_join_optimization_knobs_gen.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/platform/atomic.h"

@@ -154,12 +154,18 @@ filters:
   - "query_knob_descriptors_integration*":
     approvers:
       - 10gen/query-integration
+  - "query_knob_descriptors_join_optimization*":
+    approvers:
+      - 10gen/query-optimization-join-ordering
   - "query_execution_knobs*":
     approvers:
       - 10gen/query-execution
   - "query_integration_knobs*":
     approvers:
       - 10gen/query-integration
+  - "query_join_optimization_knobs*":
+    approvers:
+      - 10gen/query-optimization-join-ordering
   - "query_optimization_knobs*":
     approvers:
       - 10gen/query-optimization

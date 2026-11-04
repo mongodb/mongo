@@ -113,14 +113,6 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQueryPlannerUseMultiplannerForSingleSolutionsName,                      \
          internalQueryPlannerUseMultiplannerForSingleSolutions,                           \
          getUseMultiplannerForSingleSolutions)                                            \
-    KNOB(kMinAllPlansEnumerationSubsetLevel,                                              \
-         kInternalMinAllPlansEnumerationSubsetLevelName,                                  \
-         internalMinAllPlansEnumerationSubsetLevel,                                       \
-         getInternalMinAllPlansEnumerationSubsetLevel)                                    \
-    KNOB(kMaxAllPlansEnumerationSubsetLevel,                                              \
-         kInternalMaxAllPlansEnumerationSubsetLevelName,                                  \
-         internalMaxAllPlansEnumerationSubsetLevel,                                       \
-         getInternalMaxAllPlansEnumerationSubsetLevel)                                    \
     /* Plan cache */                                                                      \
     KNOB(kDisablePlanCache,                                                               \
          kInternalQueryDisablePlanCacheName,                                              \
@@ -176,10 +168,6 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQueryPlannerIgnoreIndexWithCollationForRegexName,                       \
          internalQueryPlannerIgnoreIndexWithCollationForRegex,                            \
          getPlannerIgnoreIndexWithCollationForRegex)                                      \
-    KNOB(kExplainJoinCostComponents,                                                      \
-         kInternalQueryExplainJoinCostComponentsName,                                     \
-         internalQueryExplainJoinCostComponents,                                          \
-         getExplainJoinCostComponents)                                                    \
     /* Parallel query */                                                                  \
     KNOB(kEnableParallelQuery,                                                            \
          kInternalQueryEnableParallelQueryName,                                           \
@@ -189,55 +177,6 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQueryMaxDegreeOfParallelismName,                                        \
          internalQueryMaxDegreeOfParallelism,                                             \
          getMaxDegreeOfParallelism)                                                       \
-    /* Join optimization */                                                               \
-    KNOB(kEnableJoinOptimization,                                                         \
-         kInternalEnableJoinOptimizationName,                                             \
-         internalEnableJoinOptimization,                                                  \
-         isJoinOrderingEnabled)                                                           \
-    KNOB(kRandomJoinOrderSeed,                                                            \
-         kInternalRandomJoinOrderSeedName,                                                \
-         internalRandomJoinOrderSeed,                                                     \
-         getRandomJoinOrderSeed)                                                          \
-    KNOB(kMaxNodesInJoinGraph,                                                            \
-         kInternalMaxNodesInJoinGraphName,                                                \
-         internalMaxNodesInJoinGraph,                                                     \
-         getMaxNodesInJoinGraph)                                                          \
-    KNOB(kMaxEdgesInJoinGraph,                                                            \
-         kInternalMaxEdgesInJoinGraphName,                                                \
-         internalMaxEdgesInJoinGraph,                                                     \
-         getMaxEdgesInJoinGraph)                                                          \
-    KNOB(kMaxNumberNodesConsideredForImplicitEdges,                                       \
-         kInternalMaxNumberNodesConsideredForImplicitEdgesName,                           \
-         internalMaxNumberNodesConsideredForImplicitEdges,                                \
-         getMaxNumberNodesConsideredForImplicitEdges)                                     \
-    KNOB(kEnableJoinEnumerationHJOrderPruning,                                            \
-         kInternalEnableJoinEnumerationHJOrderPruningName,                                \
-         internalEnableJoinEnumerationHJOrderPruning,                                     \
-         getEnableJoinEnumerationHJOrderPruning)                                          \
-    KNOB(kEnableJoinOptimizationUseIndexUniqueness,                                       \
-         kInternalEnableJoinOptimizationUseIndexUniquenessName,                           \
-         internalEnableJoinOptimizationUseIndexUniqueness,                                \
-         getEnableJoinOptimizationUseIndexUniqueness)                                     \
-    KNOB(kJoinPlanSamplingSize,                                                           \
-         kInternalJoinPlanSamplingSizeName,                                               \
-         internalJoinPlanSamplingSize,                                                    \
-         getInternalJoinPlanSamplingSize)                                                 \
-    KNOB(kJoinEnumerateCollScanPlans,                                                     \
-         kInternalJoinEnumerateCollScanPlansName,                                         \
-         internalJoinEnumerateCollScanPlans,                                              \
-         getInternalJoinEnumerateCollScanPlans)                                           \
-    KNOB(kEnableJoinPlanCache,                                                            \
-         kInternalEnableJoinPlanCacheName,                                                \
-         internalEnableJoinPlanCache,                                                     \
-         getEnableJoinPlanCache)                                                          \
-    KNOB(kJoinPlanCacheTrialWindow, \
-         kInternalQueryJoinPlanCacheTrialWindowName, \
-         internalQueryJoinPlanCacheTrialWindow, \
-         getJoinPlanCacheTrialWindow) \
-    KNOB(kJoinPlanCacheMaxReadsAndIntermediateRows, \
-         kInternalQueryJoinPlanCacheMaxReadsAndIntermediateRowsName, \
-         internalQueryJoinPlanCacheMaxReadsAndIntermediateRows, \
-         getJoinPlanCacheMaxReadsAndIntermediateRows) \
     /* Sampling / cardinality estimation */                                               \
     KNOB(kSamplingMarginOfError,                                                          \
          kSamplingMarginOfErrorName,                                                      \
@@ -289,22 +228,6 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQuerySamplingCEMethodForPersistentSamplesName,                          \
          PersistentSampleCEMethod,                                                        \
          getInternalQuerySamplingCEMethodForPersistentSamples)                            \
-    KNOB(kJoinReorderMode,                                                                \
-         kInternalJoinReorderModeName,                                                    \
-         JoinReorderMode,                                                                 \
-         getJoinReorderMode)                                                              \
-    KNOB(kJoinPlanTreeShape,                                                              \
-         kInternalJoinPlanTreeShapeName,                                                  \
-         JoinPlanTreeShape,                                                               \
-         getJoinPlanTreeShape)                                                            \
-    KNOB(kJoinMethod,                                                                     \
-         kInternalJoinMethodName,                                                         \
-         ForcedJoinMethod,                                                                \
-         getJoinMethod)                                                                   \
-    KNOB(kJoinSamplingCEMethod,                                                           \
-         kInternalJoinOptimizationSamplingCEMethodName,                                   \
-         JoinSamplingCEMethod,                                                            \
-         getInternalJoinOptimizationSamplingCEMethod)                                     \
     /* Boolean simplification */                                                          \
     KNOB(kEnableBooleanExpressionsSimplifier,                                             \
          kInternalQueryEnableBooleanExpressionsSimplifierName,                            \

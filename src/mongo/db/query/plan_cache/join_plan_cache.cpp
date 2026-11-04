@@ -7,7 +7,7 @@
 #include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/compiler/optimizer/join/join_method.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_join_optimization_knobs_gen.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"

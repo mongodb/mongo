@@ -1,0 +1,346 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+imports:
+    - "mongo/db/query/query_optimization_knobs.idl"
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/query/query_knobs/with_on_update_util.h"
+        - "mongo/db/query/util/memory_util.h"
+        - "mongo/platform/atomic.h"
+    # Knob server parameters are implementation details of the query.knobs module: read
+    # them via QueryKnobConfiguration. Only the enums are part of the public API.
+    mod_visibility: private
+
+enums:
+    JoinReorderMode:
+        mod_visibility: public
+        description: "Enum for possible values for JoinReorderMode."
+        type: string
+        values:
+            kBottomUp: "bottomUp"
+            kRandom: "random"
+
+    JoinPlanTreeShape:
+        mod_visibility: public
+        description: "Enum for possible join plan shapes."
+        type: string
+        values:
+            kLeftDeep: "leftDeep"
+            kRightDeep: "rightDeep"
+            kZigZag: "zigZag"
+
+    ForcedJoinMethod:
+        mod_visibility: public
+        description: "Enum for forcing a specific join method."
+        type: string
+        values:
+            kAny: "any"
+            kHJ: "HJ"
+            kINLJ: "INLJ"
+            kNLJ: "NLJ"
+
+server_parameters:
+    internalEnableJoinOptimization:
+        mod_visibility: needs_replacement
+        description: "Enable cost-based reordering of $lookup-$unwind pairs producing SBE plans."
+        set_at: [startup, runtime]
+        cpp_varname: "internalEnableJoinOptimization"
+        cpp_vartype: Atomic<bool>
+        default: false
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: enableJoinOptimization
+
+    internalQueryExplainJoinCostComponents:
+        mod_visibility: needs_replacement
+        description: >-
+            When true, explain output for join embedding nodes includes a 'joinCostComponents'
+            sub-object with the detailed cost breakdown (docsProcessed, docsOutput,
+            numDocsTransmitted, sequentialIOPages, randomIOPages, localOpCost, totalCost). For
+            indexed nested loop join nodes it also includes a 'cardinalityRHSBeforeJoinPred' field
+            reporting the RHS cardinality before the join predicate is applied (i.e. after the
+            RHS's own single-table predicates). Join embedding nodes additionally include an
+            'ndvEstimates' array with the NDV estimate and its provenance ('ndv' and 'ndvSource')
+            for each join edge the node applies.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryExplainJoinCostComponents"
+        cpp_vartype: Atomic<bool>
+        default: false
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: explainJoinCostComponents
+
+    internalJoinReorderMode:
+        mod_visibility: public
+        description: "Picks which method is used to reorder joins (when enabled)."
+        set_at: [startup, runtime]
+        cpp_class:
+            name: JoinReorderMode
+            data: WithOnUpdateHook<synchronized_value<JoinReorderModeEnum>>
+        default:
+            expr: JoinReorderModeEnum::kBottomUp
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: joinReorderMode
+
+    internalJoinPlanTreeShape:
+        mod_visibility: public
+        description: "Picks which tree shape to use for bottom-up join enumeration (when enabled)."
+        set_at: [startup, runtime]
+        cpp_class:
+            name: JoinPlanTreeShape
+            data: WithOnUpdateHook<synchronized_value<JoinPlanTreeShapeEnum>>
+        default:
+            expr: JoinPlanTreeShapeEnum::kZigZag
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: joinPlanTreeShape
+
+    internalMaxNodesInJoinGraph:
+        description: >-
+            The maximum number of nodes (1 for base collection + number of $lookup-$unwind pairs)
+            allowed for join optimization. Any $lookup-$unwind pairs exceeding this limit will not
+            be included in the join optimization and will be executed in the original order as
+            specifified in the aggregation pipeline.
+        set_at: [startup, runtime]
+        cpp_varname: internalMaxNodesInJoinGraph
+        cpp_vartype: Atomic<int>
+        default: 10
+        validator:
+            gt: 1
+            lte: 64
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: maxNodesInJoinGraph
+
+    internalMaxEdgesInJoinGraph:
+        description: >-
+            The maximum number of edges considered for join optimization. Any edges exceeding this
+            limit will not be included in the join optimization and will be executed in the original
+            order as specifified in the aggregation pipeline.
+        set_at: [startup, runtime]
+        cpp_varname: internalMaxEdgesInJoinGraph
+        cpp_vartype: Atomic<int>
+        default: 256
+        validator:
+            gt: 0
+            lte: 4096
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: maxEdgesInJoinGraph
+
+    internalMaxNumberNodesConsideredForImplicitEdges:
+        description: >-
+            The maximum number of nodes allowed in a connected component to be used for
+            implicit edge finding.
+        set_at: [startup, runtime]
+        cpp_varname: internalMaxNumberNodesConsideredForImplicitEdges
+        cpp_vartype: Atomic<int>
+        default: 4
+        validator:
+            gte: 0
+            lte: 10
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: maxNumberNodesConsideredForImplicitEdges
+
+    internalRandomJoinOrderSeed:
+        description: "Select a seed for randomized join reordering."
+        set_at: [startup, runtime]
+        cpp_varname: "internalRandomJoinOrderSeed"
+        cpp_vartype: Atomic<int>
+        default: 44
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: randomJoinOrderSeed
+
+    internalEnableJoinEnumerationHJOrderPruning:
+        description: "Whether or not to prune un-promising HJ orders during join plan enumeration"
+        set_at: [startup, runtime]
+        cpp_varname: "internalEnableJoinEnumerationHJOrderPruning"
+        cpp_vartype: Atomic<bool>
+        default: true
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: enableJoinEnumerationHJOrderPruning
+
+    internalEnableJoinOptimizationUseIndexUniqueness:
+        description: "Whether or not to use index uniqueness metadata during join optimization"
+        set_at: [startup, runtime]
+        cpp_varname: "internalEnableJoinOptimizationUseIndexUniqueness"
+        cpp_vartype: Atomic<bool>
+        default: true
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: enableJoinOptimizationUseIndexUniqueness
+
+    internalJoinMethod:
+        mod_visibility: public
+        description: >-
+            Forces all joins produced by the join optimizer to use the specified method.
+            When set to "any" (default), the optimizer picks the method itself.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: ForcedJoinMethod
+            data: WithOnUpdateHook<synchronized_value<ForcedJoinMethodEnum>>
+        default:
+            expr: ForcedJoinMethodEnum::kAny
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: joinMethod
+
+    # TODO SERVER-63949: Consolidate CBRSamplingCEMethod and JoinSamplingCEMethod.
+    internalJoinOptimizationSamplingCEMethod:
+        mod_visibility: public
+        description: Control sampling CE method for the join optimization codepath.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: JoinSamplingCEMethod
+            data: WithOnUpdateHook<synchronized_value<SamplingCEMethodEnum>>
+        default:
+            expr: SamplingCEMethodEnum::kRandom
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: joinOptimizationSamplingCEMethod
+
+    internalJoinPlanSamplingSize:
+        description: For queries running through join optimization, control the sample size.
+        set_at: [startup, runtime]
+        cpp_varname: "internalJoinPlanSamplingSize"
+        cpp_vartype: Atomic<int>
+        # Derived from the Kolmogorov statistic: with critical value 1.63 (alpha = 0.01) and
+        # precision 0.05, a sample of (1.63 / 0.05)^2 ~= 1063 documents bounds the error of the
+        # sample's empirical CDF to within 5% with 99% confidence.
+        default: 1063
+        validator:
+            gt: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: joinPlanSamplingSize
+
+    internalJoinEnumerateCollScanPlans:
+        description:
+            For queries running through join optimization, control whether collection scans are enumerated
+            as potential plans for single table plan fragments.
+        set_at: [startup, runtime]
+        cpp_varname: "internalJoinEnumerateCollScanPlans"
+        cpp_vartype: Atomic<bool>
+        default: true
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: joinEnumerateCollScanPlans
+
+    internalMinAllPlansEnumerationSubsetLevel:
+        description: >-
+            For queries running through join optimization, controls the minimum subset level for
+            which all plans enumeration is enabled. Subset levels prior to this one only enumerate
+            plans if they have a lower cost than the best plan so far. Note: we can have at most
+            as many levels as nodes in the join graph.
+        set_at: [startup, runtime]
+        cpp_varname: "internalMinAllPlansEnumerationSubsetLevel"
+        cpp_vartype: Atomic<int>
+        default: 64
+        validator:
+            gte: 0
+            lte: 64
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: minAllPlansEnumerationSubsetLevel
+
+    internalMaxAllPlansEnumerationSubsetLevel:
+        description: >-
+            For queries running through join optimization, controls the maximum subset level for
+            which all plans enumeration is enabled. Subset levels including and following this one
+            only enumerate plans if they have a lower cost than the best plan so far. Note: we can
+            have at most as many levels as nodes in the join graph.
+        set_at: [startup, runtime]
+        cpp_varname: "internalMaxAllPlansEnumerationSubsetLevel"
+        cpp_vartype: Atomic<int>
+        default: 64
+        validator:
+            gte: 0
+            lte: 64
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: maxAllPlansEnumerationSubsetLevel
+
+    internalEnableJoinPlanCache:
+        description: >-
+            Enables the join plan cache. Join-eligible queries will consult the cache when this is enabled.
+        set_at: [startup, runtime]
+        cpp_varname: "internalEnableJoinPlanCache"
+        cpp_vartype: Atomic<bool>
+        default: true
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: enableJoinPlanCache
+
+    internalQueryJoinPlanCacheTrialWindow:
+        description: >-
+            Number of documents the winning join plan is driven to produce when establishing its
+            execution-statistics baseline for the join plan cache.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryJoinPlanCacheTrialWindow"
+        cpp_vartype: Atomic<int>
+        default: 101
+        validator:
+            gt: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: joinPlanCacheTrialWindow
+
+    internalQueryJoinPlanCacheMaxReadsAndIntermediateRows:
+        description: >-
+            Maximum observed work (storage engine reads plus intermediate results produced by join
+            operators) for a winning plan to be cached in the join plan cache. A plan whose first
+            execution exceeds this is never cached.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryJoinPlanCacheMaxReadsAndIntermediateRows"
+        cpp_vartype: Atomic<long long>
+        # TODO(SERVER-136738) : calibrate this default with replanning.
+        default: 10000000
+        validator:
+            gte: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: joinPlanCacheMaxReadsAndIntermediateRows
+
+    internalQueryJoinPlanCacheSize:
+        # Marked as public as this knob cannot be accessed via the QueryKnobConfiguration framework.
+        # It is accessed only during startup during global initialization of the server at which
+        # point there is no OperationContext available to access the QueryKnobConfiguration.
+        mod_visibility: public
+        description: >-
+            The maximum amount of memory that the system will allocate for the join plan cache.
+            It takes a value in one of the two formats:
+            1. <number>% indicates a percentage of the physical memory available to the process. E.g.: 15%. Capped at 25%.
+            2. <number>(GB|MB|KB|B), indicates the amount of memory in GB, MB, KB or bytes. E.g.: 1.5GB, 100MB. Capped at 500GB.
+        set_at: [startup]
+        cpp_varname: "internalQueryJoinPlanCacheSize"
+        cpp_vartype: synchronized_value<std::string>
+        default: "16MB"
+        validator:
+            callback: memory_util::validatePlanCacheSize
+        redact: false

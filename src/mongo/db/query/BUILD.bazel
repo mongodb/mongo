@@ -314,6 +314,14 @@ idl_generator(
 )
 
 idl_generator(
+    name = "query_join_optimization_knobs_gen",
+    src = "query_join_optimization_knobs.idl",
+    deps = [
+        ":query_optimization_knobs_gen",
+    ],
+)
+
+idl_generator(
     name = "query_integration_knobs_gen",
     src = "query_integration_knobs.idl",
     deps = [
@@ -415,8 +423,10 @@ mongo_cc_library(
         "query_execution_knobs_gen",
         "query_feature_flags_gen",
         "query_integration_knobs_gen",
+        "query_join_optimization_knobs_gen",
         "query_knob_descriptors_execution.cpp",
         "query_knob_descriptors_integration.cpp",
+        "query_knob_descriptors_join_optimization.cpp",
         "query_knob_descriptors_optimization.cpp",
         "query_optimization_knobs_gen",
         "sampling_ce_method.cpp",
@@ -427,6 +437,7 @@ mongo_cc_library(
     hdrs = [
         "query_knob_descriptors_execution.h",
         "query_knob_descriptors_integration.h",
+        "query_knob_descriptors_join_optimization.h",
         "query_knob_descriptors_optimization.h",
     ],
     deps = [
