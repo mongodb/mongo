@@ -106,6 +106,7 @@ constexpr size_t kNumPlanShapeCounters = static_cast<size_t>(PlanShapeCounter::k
     F(kReplaceRoot)                       \
     F(kGroup)                             \
     F(kStreamingGroup)                    \
+    F(kEligibleForStreamingGroup)         \
     F(kEqLookupNoUnwind)                  \
     F(kEqLookupWithUnwind)                \
     F(kUnpackTsBucket)                    \

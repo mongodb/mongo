@@ -61,7 +61,8 @@ protected:
 
 private:
     std::shared_ptr<PathArrayness> _pathArrayness = std::make_shared<PathArrayness>();
-    unittest::ServerParameterGuard _featureFlag{"featureFlagSbeStreamingGroup", true};
+    unittest::ServerParameterGuard _featureFlag{"featureFlagStreamingGroupEligibilityCounter",
+                                                true};
 };
 
 TEST_F(GroupRulesTest, TopLevelKey) {
@@ -112,7 +113,8 @@ TEST_F(GroupRulesTest, RecordsPathsForYieldRecheck) {
 }
 
 TEST_F(GroupRulesTest, FeatureFlagOff) {
-    unittest::ServerParameterGuard featureFlag("featureFlagSbeStreamingGroup", false);
+    unittest::ServerParameterGuard featureFlag("featureFlagStreamingGroupEligibilityCounter",
+                                               false);
     addIndexedPath("a");
     ASSERT_EQ(optimizeAndGetNonArrayIdFields({"{$group: {_id: '$a'}}"}), OrderedPathSet{});
     ASSERT_EQ(recordedNonArrayPaths(), std::vector<std::string>{});

@@ -140,7 +140,8 @@ protected:
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
 private:
-    unittest::ServerParameterGuard _featureFlag{"featureFlagSbeStreamingGroup", true};
+    unittest::ServerParameterGuard _featureFlag{"featureFlagStreamingGroupEligibilityCounter",
+                                                true};
 };
 
 TEST_F(PipelineDGroupAnnotationTest, GenericPathRecomputesAnnotationOfClonedGroup) {

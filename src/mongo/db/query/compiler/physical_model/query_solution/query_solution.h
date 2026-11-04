@@ -1781,14 +1781,16 @@ struct GroupNode : public QuerySolutionNode {
               bool merging,
               bool willBeMerged,
               bool shouldProduceBson,
-              OrderedPathSet nonArrayIdFields = {})
+              OrderedPathSet nonArrayIdFields = {},
+              bool eligibleForStreamingGroup = false)
         : QuerySolutionNode(std::move(child)),
           groupByExpression(groupByExpression),
           accumulators(std::move(accs)),
           doingMerge(merging),
           willBeMerged(willBeMerged),
           shouldProduceBson(shouldProduceBson),
-          nonArrayIdFields(std::move(nonArrayIdFields)) {
+          nonArrayIdFields(std::move(nonArrayIdFields)),
+          eligibleForStreamingGroup(eligibleForStreamingGroup) {
         // Use the DepsTracker to extract the fields that the 'groupByExpression' and accumulator
         // expressions depend on.
         DepsTracker deps;
@@ -1847,6 +1849,9 @@ struct GroupNode : public QuerySolutionNode {
     bool shouldProduceBson;
 
     OrderedPathSet nonArrayIdFields;
+
+    // TODO SERVER-138546: Remove the eligibility counter once streaming group runs.
+    const bool eligibleForStreamingGroup;
 
 protected:
     virtual void appendSpecificToString(str::stream* ss, int indent) const {}

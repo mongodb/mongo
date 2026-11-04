@@ -1920,6 +1920,10 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
         *ss << "nonArrayIdFields = [" << boost::algorithm::join(nonArrayIdFields, ", ") << "]"
             << '\n';
     }
+    if (eligibleForStreamingGroup) {
+        addIndent(ss, indent + 1);
+        *ss << "eligibleForStreamingGroup = true" << '\n';
+    }
     appendSpecificToString(ss, indent);
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
@@ -1934,7 +1938,8 @@ std::unique_ptr<QuerySolutionNode> GroupNode::clone() const {
                                             doingMerge,
                                             willBeMerged,
                                             shouldProduceBson,
-                                            nonArrayIdFields);
+                                            nonArrayIdFields,
+                                            eligibleForStreamingGroup);
     copy->physicalProps = physicalProps;
     return copy;
 }

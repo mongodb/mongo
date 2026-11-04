@@ -38,8 +38,9 @@ bool annotateNonArrayIdFields(PipelineRewriteContext& ctx) {
 
 }  // namespace
 
+// Runs only to count plans eligible for streaming group; no streaming group stage uses it yet.
 REGISTER_RULES_WITH_FEATURE_FLAG(DocumentSourceGroup,
-                                 &feature_flags::gFeatureFlagSbeStreamingGroup,
+                                 &feature_flags::gFeatureFlagStreamingGroupEligibilityCounter,
                                  {
                                      .name = "ANNOTATE_GROUP_NON_ARRAY_ID_FIELDS",
                                      .precondition = mayRunInSbe,

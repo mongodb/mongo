@@ -203,13 +203,20 @@ public:
         return node;
     }
 
-    std::unique_ptr<GroupNode> makeGroup(std::unique_ptr<QuerySolutionNode> child) {
+    std::unique_ptr<GroupNode> makeGroup(std::unique_ptr<QuerySolutionNode> child,
+                                         bool eligibleForStreamingGroup = false) {
         return std::make_unique<GroupNode>(std::move(child),
                                            ExpressionConstant::create(_expCtx.get(), Value(1)),
                                            std::vector<AccumulationStatement>{},
                                            /*merging=*/false,
                                            /*willBeMerged=*/false,
-                                           /*shouldProduceBson=*/false);
+                                           /*shouldProduceBson=*/false,
+                                           OrderedPathSet{},
+                                           eligibleForStreamingGroup);
+    }
+
+    std::unique_ptr<GroupNode> makeEligibleGroup(std::unique_ptr<QuerySolutionNode> child) {
+        return makeGroup(std::move(child), /*eligibleForStreamingGroup=*/true);
     }
 
     std::unique_ptr<StreamingGroupNode> makeStreamingGroup(
@@ -378,6 +385,16 @@ public:
         add(std::make_unique<ReplaceRootNode>(makeCollScan(), nullptr),
             {QsnNodeCounter::kReplaceRoot, QsnNodeCounter::kCollscanNoFilter});
         add(makeGroup(makeCollScan()), {QsnNodeCounter::kGroup, QsnNodeCounter::kCollscanNoFilter});
+        add(makeEligibleGroup(makeCollScan()),
+            {QsnNodeCounter::kGroup,
+             QsnNodeCounter::kEligibleForStreamingGroup,
+             QsnNodeCounter::kCollscanNoFilter});
+        addExtended(makeEligibleGroup(std::make_unique<SentinelNode>()),
+                    {QsnNodeCounter::kGroup,
+                     QsnNodeCounter::kEligibleForStreamingGroup,
+                     QsnNodeCounter::kCollscanNoFilter});
+        addExtended(makeGroup(std::make_unique<SentinelNode>()),
+                    {QsnNodeCounter::kGroup, QsnNodeCounter::kCollscanNoFilter});
         add(makeStreamingGroup(makeCollScan()),
             {QsnNodeCounter::kStreamingGroup, QsnNodeCounter::kCollscanNoFilter});
         add(makeUnpackTsBucket(makeCollScan()),

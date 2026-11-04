@@ -48,5 +48,6 @@ release:
   featureFlagSbeUpgradeBinaryTrees: {}
   featureFlagSearchExtension: {}
   featureFlagSearchOptimizedIdLookup: {}
+  featureFlagStreamingGroupEligibilityCounter: {}
   featureFlagUnifiedWriteExecutor: {}
   featureFlagVectorSearchExtension: {}

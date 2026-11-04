@@ -23,6 +23,7 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/search/search_helper.h"
@@ -52,6 +53,7 @@
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -2076,6 +2078,29 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
     return std::move(planRankingResult);
 }
 
+namespace {
+
+bool eligibleForStreamingGroup(const CanonicalQuery& query,
+                               QuerySolutionNode& input,
+                               const DocumentSourceGroup& group) {
+    auto* key = dynamic_cast<ExpressionFieldPath*>(group.getIdExpression().get());
+    if (!query.getExpCtx()->getIfrContext()->getSavedFlagValue(
+            feature_flags::gFeatureFlagStreamingGroupEligibilityCounter) ||
+        !key || key->isROOT() || key->isVariableReference() || group.doingMerge() ||
+        group.willBeMerged() || query.getCollator() ||
+        !group.getNonArrayIdFields().contains("_id")) {
+        return false;
+    }
+    input.computeProperties();
+    auto sort = input.providedSorts().getBaseSortPattern();
+    // Not contains(): it skips point-bound fields, which a projection may have overwritten.
+    return !sort.isEmpty() &&
+        sort.firstElementFieldNameStringData() ==
+        key->getFieldPathWithoutCurrentPrefix().fullPath();
+}
+
+}  // namespace
+
 /**
  * If 'query.cqPipeline()' is non-empty, it contains a prefix of the aggregation pipeline that
  * can be pushed down to SBE. For now, we plan this separately here and attach the agg portion
@@ -2104,13 +2129,15 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
 
         auto groupStage = dynamic_cast<DocumentSourceGroup*>(innerStage);
         if (groupStage) {
-            solnForAgg = std::make_unique<GroupNode>(std::move(solnForAgg),
-                                                     groupStage->getIdExpression(),
-                                                     groupStage->getAccumulationStatements(),
-                                                     groupStage->doingMerge(),
-                                                     groupStage->willBeMerged(),
-                                                     /*shouldProduceBson=*/isLastSource,
-                                                     groupStage->getNonArrayIdFields());
+            solnForAgg = std::make_unique<GroupNode>(
+                std::move(solnForAgg),
+                groupStage->getIdExpression(),
+                groupStage->getAccumulationStatements(),
+                groupStage->doingMerge(),
+                groupStage->willBeMerged(),
+                /*shouldProduceBson=*/isLastSource,
+                groupStage->getNonArrayIdFields(),
+                i == 0 && eligibleForStreamingGroup(query, *solution->root(), *groupStage));
             continue;
         }
 

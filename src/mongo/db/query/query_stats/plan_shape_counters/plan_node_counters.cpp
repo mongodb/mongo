@@ -114,6 +114,10 @@ void QsnNodeCountAnalyzer::preVisit(const QuerySolutionNode& node) {
             break;
         case STAGE_GROUP:
             _counts.set(QsnNodeCounter::kGroup);
+            // TODO SERVER-138546: Remove the eligibility counter once streaming group runs.
+            if (static_cast<const GroupNode&>(node).eligibleForStreamingGroup) {
+                _counts.set(QsnNodeCounter::kEligibleForStreamingGroup);
+            }
             break;
         case STAGE_STREAMING_GROUP:
             _counts.set(QsnNodeCounter::kStreamingGroup);

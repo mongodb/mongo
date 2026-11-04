@@ -2022,6 +2022,27 @@ TEST(QuerySolutionTest, GroupNodeToStringWithNonArrayIdFields) {
               node->nonArrayIdFields);
 }
 
+TEST(QuerySolutionTest, GroupNodeCloneKeepsEligibleForStreamingGroup) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto groupByExpression =
+        ExpressionFieldPath::parse(expCtx.get(), "$a", expCtx->variablesParseState);
+    auto node = std::make_unique<GroupNode>(std::make_unique<CollectionScanNode>(),
+                                            groupByExpression,
+                                            std::vector<AccumulationStatement>{},
+                                            /*merging=*/false,
+                                            /*willBeMerged=*/false,
+                                            /*shouldProduceBson=*/false,
+                                            OrderedPathSet{"_id"},
+                                            /*eligibleForStreamingGroup=*/true);
+
+    ASSERT_TRUE(checked_cast<const GroupNode&>(*node->clone()).eligibleForStreamingGroup);
+}
+
 TEST(QuerySolutionTest, StreamingGroupNodeWithIndexScan) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();

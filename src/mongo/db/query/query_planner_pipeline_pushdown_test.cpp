@@ -6,28 +6,43 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/index_path_projection.h"
+#include "mongo/db/exec/timeseries/bucket_unpacker.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/pipeline/sbe_pushdown.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/query/query_planner_test_lib.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry_mock.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace {
@@ -56,6 +71,53 @@ protected:
         secondaryCollMap.emplace(kSecondaryNamespace, CollectionInfo());
     }
 
+    static std::shared_ptr<const PathArrayness> makePathArrayness(
+        const BSONObj& keyPattern, const MultikeyPaths& multikeyPaths) {
+        auto pathArrayness = std::make_shared<PathArrayness>();
+        pathArrayness->addPathsFromIndexKeyPattern(keyPattern, multikeyPaths, true);
+        return pathArrayness;
+    }
+
+    // Presents the planner with a $** index over 'keyPattern', with multikey paths recorded in
+    // 'multikeyPathSet' as $** indexes do, in the keys themselves. Modeled on
+    // QueryPlannerWildcardTest::addWildcardIndex.
+    void addWildcardIndex(const BSONObj& keyPattern,
+                          const std::set<FieldRef>& multikeyPathSet = {}) {
+        wildcardProjection = WildcardKeyGenerator::createProjectionExecutor(keyPattern, BSONObj());
+
+        IndexSpec spec;
+        spec.version(1).name(kWildcardIndexName).addKeys(keyPattern);
+        auto descriptor = IndexDescriptor(IndexNames::WILDCARD, spec.toBSON());
+
+        params.mainCollectionInfo.indexes.push_back(
+            {keyPattern,
+             IndexType::INDEX_WILDCARD,
+             IndexConfig::kLatestIndexVersion,
+             !multikeyPathSet.empty(),
+             {},  // multikeyPaths
+             multikeyPathSet,
+             false,  // sparse
+             false,  // unique
+             IndexEntry::Identifier{kWildcardIndexName},
+             BSON("wildcardProjection" << BSONObj()),
+             wildcardProjection.get_ptr(),
+             std::make_shared<IndexCatalogEntryMock>(nullptr,
+                                                     nullptr,
+                                                     "" /* ident */,
+                                                     std::move(descriptor),
+                                                     false /* isFrozen */,
+                                                     nullptr,
+                                                     nullptr)});
+    }
+
+    void assertGroupRoot(const QuerySolution& solution, bool eligibleForStreamingGroup) {
+        auto* root = solution.root();
+        ASSERT_EQUALS(root->getType(), StageType::STAGE_GROUP) << root->toString();
+        ASSERT_EQUALS(static_cast<const GroupNode*>(root)->eligibleForStreamingGroup,
+                      eligibleForStreamingGroup)
+            << root->toString();
+    }
+
     std::vector<boost::intrusive_ptr<DocumentSource>> makeInnerPipelineStages(
         const Pipeline& pipeline) {
         std::vector<boost::intrusive_ptr<DocumentSource>> stages;
@@ -77,6 +139,8 @@ protected:
     const NamespaceString kSecondaryNamespace =
         NamespaceString::createNamespaceString_forTest("test.other");
     std::map<NamespaceString, CollectionInfo> secondaryCollMap;
+    const std::string kWildcardIndexName = "test_wildcard";
+    boost::optional<WildcardProjection> wildcardProjection;
 };
 
 TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleGroup) {
@@ -466,6 +530,373 @@ TEST_F(QueryPlannerPipelinePushdownTest,
         "node: {cscan: {dir: 1}}}}",
         solution->root()))
         << solution->root()->toString();
+}
+
+class StreamingGroupPlanningTest : public QueryPlannerPipelinePushdownTest {
+protected:
+    void setUp() override {
+        QueryPlannerPipelinePushdownTest::setUp();
+        params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    }
+
+    std::unique_ptr<QuerySolution> planAggregate(
+        const std::vector<BSONObj>& rawPipeline,
+        std::shared_ptr<const PathArrayness> pathArrayness,
+        std::unique_ptr<CollatorInterface> collator = nullptr) {
+        planCandidates(rawPipeline, std::move(pathArrayness), std::move(collator));
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        return QueryPlanner::extendWithAggPipeline(
+            *cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+    }
+
+    void planCandidates(const std::vector<BSONObj>& rawPipeline,
+                        std::shared_ptr<const PathArrayness> pathArrayness,
+                        std::unique_ptr<CollatorInterface> collator = nullptr) {
+        clearState();
+        expCtx = ExpressionContextBuilder{}
+                     .opCtx(opCtx.get())
+                     .ns(nss)
+                     .collator(std::move(collator))
+                     .build();
+        expCtx->setPathArraynessForNss(nss, std::move(pathArrayness));
+        auto pipeline =
+            pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+        pipeline_optimization::optimizePipeline(*pipeline);
+
+        cq = uassertStatusOK(createCanonicalQuery(expCtx, nss, *pipeline));
+        cq->setSbeCompatible(markQueriesSbeCompatible);
+        attachPipelineStages(
+            MultipleCollectionAccessor{},
+            pipeline.get(),
+            /*needsMerge=*/false,
+            cq.get(),
+            std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForTest{}));
+
+        auto statusWithSolns = QueryPlanner::plan(*cq, params);
+        ASSERT_OK(statusWithSolns.getStatus());
+        solns = std::move(statusWithSolns.getValue());
+    }
+
+    static std::shared_ptr<const PathArrayness> nonArray(const BSONObj& keyPattern) {
+        return makePathArrayness(keyPattern, MultikeyPaths(keyPattern.nFields()));
+    }
+
+    static const OrderedPathSet& rootNonArrayIdFields(const QuerySolution& solution) {
+        return checked_cast<const GroupNode&>(*solution.root()).nonArrayIdFields;
+    }
+};
+
+class StreamingGroupEligibilityTest : public StreamingGroupPlanningTest {
+protected:
+    unittest::ServerParameterGuard eligibilityCounterEnabled{
+        "featureFlagStreamingGroupEligibilityCounter", true};
+};
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForCoveredIndexSort) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, true);
+    ASSERT_EQ(rootNonArrayIdFields(*solution), OrderedPathSet({"_id"}));
+}
+
+TEST_F(StreamingGroupPlanningTest, IneligibleWithoutFeatureFlag) {
+    unittest::ServerParameterGuard eligibilityCounterDisabled{
+        "featureFlagStreamingGroupEligibilityCounter", false};
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, false);
+    ASSERT_EQ(rootNonArrayIdFields(*solution), OrderedPathSet{});
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleAfterEqualityPrefix) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution = planAggregate(
+        {fromjson("{$match: {a: 5}}"), fromjson("{$group: {_id: '$b', total: {$sum: '$b'}}}")},
+        nonArray(fromjson("{a: 1, b: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForDescendingSort) {
+    addIndex(fromjson("{a: -1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: -1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForLeadingSort) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate(
+        {fromjson("{$sort: {a: 1}}"), fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+        nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForLeadingProjection) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$project: {_id: 0, a: 1}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleWhenKeyNotCoveredBySort) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$b', total: {$sum: '$b'}}}")},
+                                  nonArray(fromjson("{a: 1, b: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibilityDependsOnCandidatePlan) {
+    addIndex(fromjson("{a: 1}"));
+    addIndex(fromjson("{b: 1}"));
+
+    planCandidates({fromjson("{$match: {a: {$gt: 0}, b: {$gt: 0}}}"),
+                    fromjson("{$group: {_id: '$a', total: {$sum: '$b'}}}")},
+                   nonArray(fromjson("{a: 1, b: 1}")));
+    ASSERT_EQUALS(getNumSolutions(), 2U);
+    const auto& group = checked_cast<const DocumentSourceGroup&>(*cq->cqPipeline().front());
+    ASSERT_EQ(group.getNonArrayIdFields(), OrderedPathSet({"_id"}));
+
+    StringMap<bool> eligibleByIndex;
+    for (auto&& candidate : solns) {
+        auto scansA = QueryPlannerTestLib::solutionMatches(
+                          "{proj: {spec: {a: 1, b: 1, _id: 0}, node: {fetch: {node: {ixscan: "
+                          "{pattern: {a: 1}}}}}}}",
+                          candidate->root())
+                          .isOK();
+        auto solution = QueryPlanner::extendWithAggPipeline(
+            *cq, std::move(candidate), {} /* secondaryCollInfos */);
+        eligibleByIndex[scansA ? "a_1" : "b_1"] =
+            checked_cast<const GroupNode&>(*solution->root()).eligibleForStreamingGroup;
+    }
+    ASSERT_EQ(eligibleByIndex.size(), 2U);
+    ASSERT_TRUE(eligibleByIndex.at("a_1"));
+    ASSERT_FALSE(eligibleByIndex.at("b_1"));
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForEqualityOnKey) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate(
+        {fromjson("{$match: {a: 5}}"), fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+        nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleWhenProjectionOverwritesEqualityKey) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: 5}}"),
+                                   fromjson("{$project: {_id: 0, a: '$c'}}"),
+                                   fromjson("{$group: {_id: '$a', n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1, c: 1}")));
+    assertGroupRoot(*solution, false);
+    ASSERT_EQ(rootNonArrayIdFields(*solution), OrderedPathSet({"_id"}));
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleWhenProjectionRenamesArrayIntoKey) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$project: {_id: 0, a: '$c'}}"),
+                                   fromjson("{$group: {_id: '$a', n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, false);
+    ASSERT_EQ(rootNonArrayIdFields(*solution), OrderedPathSet{});
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForHashedIndex) {
+    addIndex(fromjson("{a: 'hashed'}"));
+
+    auto solution = planAggregate(
+        {fromjson("{$match: {a: 5}}"), fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+        nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, false);
+    ASSERT_EQ(rootNonArrayIdFields(*solution), OrderedPathSet({"_id"}));
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForNonCoveredPlan) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution = planAggregate(
+        {fromjson("{$match: {a: 5}}"), fromjson("{$group: {_id: '$b', total: {$sum: '$c'}}}")},
+        nonArray(fromjson("{a: 1, b: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForPartialIndex) {
+    const auto partialFilterObj = fromjson("{a: {$gt: 0}}");
+    auto partialFilter = parseMatchExpression(partialFilterObj);
+    addIndex(fromjson("{a: 1}"), partialFilter.get());
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForSparseIndex) {
+    addIndex(fromjson("{a: 1}"), false /* multikey */, true /* sparse */);
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForWildcardIndex) {
+    addWildcardIndex(fromjson("{'$**': 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForWildcardMultikeyPath) {
+    addWildcardIndex(fromjson("{'$**': 1}"), {FieldRef("a")});
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, InclusionProjectionBelowEligibleGroupIsElided) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution = planAggregate(
+        {fromjson("{$match: {a: 5}}"), fromjson("{$group: {_id: '$b', total: {$sum: '$c'}}}")},
+        nonArray(fromjson("{a: 1, b: 1}")));
+    assertGroupRoot(*solution, true);
+    ASSERT_EQUALS(solution->root()->children[0]->getType(), StageType::STAGE_FETCH);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForAnyAccumulator) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$a', arr: {$push: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForObjectId) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: {x: '$a'}, total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForArrayId) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: ['$a'], total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForComputedId) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                       fromjson("{$group: {_id: {$add: ['$a', 1]}, total: {$sum: '$a'}}}")},
+                      nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleWhenKeyMayBeArray) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  makePathArrayness(fromjson("{a: 1}"), MultikeyPaths{{0}}));
+    assertGroupRoot(*solution, false);
+    ASSERT_EQ(rootNonArrayIdFields(*solution), OrderedPathSet{});
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForNonSimpleCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1}"), &collator);
+
+    auto solution = planAggregate(
+        {fromjson("{$match: {a: {$gt: 'foo'}}}"), fromjson("{$group: {_id: '$a'}}")},
+        nonArray(fromjson("{a: 1}")),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleWhenWillBeMerged) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                       fromjson("{$group: {_id: '$a', total: {$sum: '$a'}, $willBeMerged: true}}")},
+                      nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForWholeDocumentId) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gt: 0}}}"), fromjson("{$group: {_id: '$$ROOT'}}")},
+                      nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleWhenNotFirstPushedDownStage) {
+    unittest::ServerParameterGuard nonLeadingMatch{"featureFlagSbeNonLeadingMatch", true};
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$limit: 10}"),
+                                   fromjson("{$match: {b: 1}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, false);
+    ASSERT_EQ(rootNonArrayIdFields(*solution), OrderedPathSet({"_id"}));
+    ASSERT_EQUALS(solution->root()->children[0]->getType(), StageType::STAGE_MATCH);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForTimeSeries) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto unpackStage = make_intrusive<DocumentSourceInternalUnpackBucket>(
+        expCtx,
+        timeseries::BucketUnpacker{timeseries::BucketSpec(
+            "time", boost::none, {"a"}, timeseries::BucketSpec::Behavior::kInclude)},
+        3600 /* bucketMaxSpanSeconds */);
+    auto pipeline = buildTestPipeline({fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")});
+    checked_cast<DocumentSourceGroup&>(*pipeline->getSources().front())
+        .setNonArrayIdFields({"_id"});
+    auto stages = makeInnerPipelineStages(*pipeline);
+    stages.insert(stages.begin(), unpackStage);
+
+    runQueryWithPipeline(fromjson("{a: {$gt: 0}}"), std::move(stages));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+    assertGroupRoot(*solution, false);
 }
 
 }  //  namespace

@@ -55,6 +55,15 @@ feature_flags:
         fcv_gated: false
         incremental_rollout_phase: in_development
 
+    featureFlagStreamingGroupEligibilityCounter:
+        description:
+            "Feature flag to count the plans whose pushed-down $group could run as a streaming
+            $group in SBE."
+        cpp_varname: gFeatureFlagStreamingGroupEligibilityCounter
+        default: true
+        fcv_gated: false
+        incremental_rollout_phase: release
+
     featureFlagSbeCompactHashAgg:
         description: "Feature flag to enable compact hash $group in SBE."
         cpp_varname: gFeatureFlagSbeCompactHashAgg
