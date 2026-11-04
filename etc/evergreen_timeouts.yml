@@ -46,6 +46,8 @@ overrides:
       idle_timeout: 180
 
   amazon-linux2023-aubsan-all-feature-flags-extra-system-deps-replica-sets:
+    - task: ^disagg_fcv_upgrade_downgrade_replica_sets_jscore_passthrough$
+      exec_timeout: 210 # 3.5 hours
     - task: ^disagg_replica_sets_.*
       exec_timeout: 210 # 3.5 hours
     - task: ^disagg_change_streams_.*
