@@ -2280,6 +2280,9 @@ void TransactionParticipant::Participant::clearOperationsInMemory(OperationConte
     // but this is fine since the end state is the same whether the operations were available or not
     // before being cleared.
     p().transactionOperations.reset();
+    // The commit observer has already echoed the commit-time accounting metadata into the commit
+    // oplog entry, so drop it here rather than retaining it until the session is reset or removed.
+    p().endOfTransactionScopes = boost::none;
 }
 
 void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationContext* opCtx) {
@@ -3741,6 +3744,11 @@ void TransactionParticipant::Participant::setPreparedSizeMetadata(
     p().preparedSizeMetadata = std::move(metadata);
 }
 
+void TransactionParticipant::Participant::setEndOfTransactionScopes(
+    boost::optional<EndOfTransactionScopesInfo> scopes) {
+    p().endOfTransactionScopes = std::move(scopes);
+}
+
 void TransactionParticipant::Participant::onRetryableWriteCloningCompleted(
     OperationContext* opCtx,
     std::vector<StmtId> stmtIdsWritten,
@@ -3793,6 +3801,7 @@ void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
 
     p().transactionOperations.reset();
     p().preparedSizeMetadata = boost::none;
+    p().endOfTransactionScopes = boost::none;
     o(*lk).affectedNamespaces.clear();
     o(*lk).prepareOpTime = repl::OpTime();
     o(*lk).recoveryPrepareOpTime = repl::OpTime();

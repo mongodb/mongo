@@ -800,6 +800,22 @@ public:
         void setPreparedSizeMetadata(boost::optional<std::vector<MultiOpSizeMetadata>> metadata);
 
         /**
+         * Returns the commit-time accounting metadata carried by the 'commitTransaction' command,
+         * if any. The op observer writes it into the commit oplog entry.
+         */
+        const boost::optional<EndOfTransactionScopesInfo>& getEndOfTransactionScopes() const {
+            return p().endOfTransactionScopes;
+        }
+
+        /**
+         * Sets the commit-time accounting metadata carried by the 'commitTransaction' command so
+         * that the op observer can write it into the commit oplog entry. Passing boost::none clears
+         * any metadata left over from a previous attempt, so a later commit cannot persist stale
+         * metadata.
+         */
+        void setEndOfTransactionScopes(boost::optional<EndOfTransactionScopesInfo> scopes);
+
+        /**
          * Called after an entry for the specified session and transaction has been written to the
          * oplog during chunk migration, while the node is still primary. Must be called while the
          * caller is still in the oplog write's WUOW. Updates the on-disk state of the session to
@@ -1449,6 +1465,11 @@ private:
         // Caches the per-collection size and count deltas across a prepared transaction. Aligns
         // with the `sizeMetadata` persisted to the `config.transactions` entry once prepared.
         boost::optional<std::vector<MultiOpSizeMetadata>> preparedSizeMetadata;
+
+        // Commit-time accounting metadata carried by the 'commitTransaction' command, to be written
+        // into the commit oplog entry. Set by the commit command handler and consumed by the op
+        // observer.
+        boost::optional<EndOfTransactionScopesInfo> endOfTransactionScopes;
     } _p;
 };  // class TransactionParticipant
 

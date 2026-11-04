@@ -17,6 +17,7 @@
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/end_of_transaction_parameter.h"
@@ -72,6 +73,7 @@
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
@@ -3018,6 +3020,65 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
     }
 
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus());
+}
+
+TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitWritesEndOfTransactionScopesTest) {
+    const auto doc = BSON("_id" << 0 << "data"
+                                << "x");
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+
+    std::vector<InsertStatement> insert;
+    insert.emplace_back(0, doc);
+
+    OplogSlot commitSlot;
+    Timestamp prepareTimestamp;
+    {
+        AutoGetCollection autoColl(opCtx(), nss, MODE_IX);
+        opObserver().onInserts(opCtx(),
+                               *autoColl,
+                               insert.begin(),
+                               insert.end(),
+                               /*recordIds=*/{},
+                               /*fromMigrate=*/std::vector<bool>(insert.size(), false),
+                               /*defaultFromMigrate=*/false);
+
+        auto reservedSlots = prepareTransaction();
+        prepareTimestamp = reservedSlots.back().getTimestamp();
+        commitSlot = reserveOpTimeInSideTransaction(opCtx());
+    }
+
+    // The commit command handler stores the metadata the coordinator attached to the commit
+    // command on the participant. The floor for the commit entry is its commit timestamp, set on
+    // the oplog entry below rather than stored in the metadata.
+    EndOfTransactionScopesInfo scopes;
+    scopes.setCollectionParticipants(BSON("test.coll" << BSON_ARRAY("shard0" << "shard1")));
+    scopes.setDatabaseParticipants(BSON("test" << BSON_ARRAY("shard0" << "shard1")));
+    scopes.setClusterParticipants(std::vector<ShardId>{ShardId("shard0"), ShardId("shard1")});
+    scopes.setShardId(ShardId("shard0"));
+    txnParticipant.setEndOfTransactionScopes(scopes);
+
+    // Mimic committing the transaction.
+    shard_role_details::setWriteUnitOfWork(opCtx(), nullptr);
+    shard_role_details::getLocker(opCtx())->unsetMaxLockTimeout();
+
+    {
+        Lock::GlobalLock lk(opCtx(), MODE_IX);
+        opObserver().onPreparedTransactionCommit(opCtx(), commitSlot, prepareTimestamp);
+    }
+    repl::OplogInterfaceLocal oplogInterface(opCtx());
+    auto oplogIter = oplogInterface.makeIterator();
+    {
+        auto oplogEntryObj = unittest::assertGet(oplogIter->next()).first;
+        checkCommonFields(oplogEntryObj);
+        OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+        auto o = oplogEntry.getObject();
+        auto oExpected = BSON("commitTransaction" << 1 << "commitTimestamp" << prepareTimestamp
+                                                  << "endOfTransactionScopes" << scopes.toBSON());
+        ASSERT_BSONOBJ_EQ(oExpected, o);
+        ASSERT_FALSE(oplogEntry.shouldPrepare());
+    }
 }
 
 TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {

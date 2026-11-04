@@ -171,6 +171,11 @@ public:
 
             auto optionalCommitTimestamp = request().getCommitTimestamp();
             if (optionalCommitTimestamp) {
+                // The coordinator attaches the commit-time accounting metadata to the commit of a
+                // prepared (cross-shard) transaction. Store it so the op observer can echo it into
+                // the commit oplog entry. Overwrite unconditionally so that a commit without
+                // metadata cannot persist the metadata of a previous, failed attempt.
+                txnParticipant.setEndOfTransactionScopes(request().getEndOfTransactionScopes());
                 // commitPreparedTransaction will throw if the transaction is not prepared.
                 txnParticipant.commitPreparedTransaction(
                     opCtx, optionalCommitTimestamp.value(), {});

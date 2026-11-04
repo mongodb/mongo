@@ -2783,6 +2783,13 @@ void OpObserverImpl::onPreparedTransactionCommit(OperationContext* opCtx,
 
     CommitTransactionOplogObject cmdObj;
     cmdObj.setCommitTimestamp(commitTimestamp);
+    // Echo the commit-time accounting metadata the coordinator attached to the commit command, if
+    // any. The coordinator only attaches it while the end-of-transaction write path is enabled.
+    if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
+        if (const auto& scopes = txnParticipant.getEndOfTransactionScopes()) {
+            cmdObj.setEndOfTransactionScopes(*scopes);
+        }
+    }
     oplogEntry.setObject(cmdObj.toBSON());
 
     if (auto sizeMetadata = getPreparedSizeMetadataForPersistence(opCtx)) {

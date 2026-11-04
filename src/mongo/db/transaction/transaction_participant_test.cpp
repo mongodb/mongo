@@ -11,6 +11,7 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
@@ -55,6 +56,7 @@
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/stats/server_initiated_transaction.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/execution_context.h"
@@ -762,6 +764,59 @@ TEST_F(TxnParticipantTest, EmptyPreparedTransactionCommit) {
     txnParticipant.stashTransactionResources(opCtx());
 
     ASSERT_TRUE(txnParticipant.transactionIsCommitted());
+}
+
+// The commit-time accounting metadata is only needed to write the commit oplog entry. Once the
+// commit observer has consumed it, the participant must drop it so that a committed session does
+// not retain the (potentially large) participant maps until it is reset or removed.
+TEST_F(TxnParticipantTest, CommitClearsEndOfTransactionScopes) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+
+    // The transaction machinery cannot store an empty locker.
+    {
+        Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+    }
+    const auto [prepareTimestamp, namespaces] = txnParticipant.prepareTransaction(opCtx(), {});
+
+    // Simulate the commit command carrying the accounting metadata. The commit timestamp, which is
+    // the floor for the transaction's commit entries, is passed to 'commitPreparedTransaction'
+    // rather than stored in the metadata.
+    EndOfTransactionScopesInfo scopes;
+    scopes.setCollectionParticipants(BSONObj());
+    scopes.setDatabaseParticipants(BSONObj());
+    scopes.setClusterParticipants(std::vector<ShardId>{ShardId("shard0")});
+    scopes.setShardId(ShardId("shard0"));
+    txnParticipant.setEndOfTransactionScopes(scopes);
+    ASSERT_TRUE(txnParticipant.getEndOfTransactionScopes().has_value());
+
+    const auto commitTS = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
+    txnParticipant.commitPreparedTransaction(opCtx(), commitTS, {});
+    txnParticipant.stashTransactionResources(opCtx());
+
+    ASSERT_TRUE(txnParticipant.transactionIsCommitted());
+    ASSERT_FALSE(txnParticipant.getEndOfTransactionScopes().has_value());
+}
+
+// Setting no metadata (boost::none) must clear any previously stored metadata, so that a commit
+// without metadata cannot persist the metadata of an earlier, failed attempt.
+TEST_F(TxnParticipantTest, SetEndOfTransactionScopesNoneClearsStoredMetadata) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+
+    EndOfTransactionScopesInfo scopes;
+    scopes.setCollectionParticipants(BSONObj());
+    scopes.setDatabaseParticipants(BSONObj());
+    scopes.setClusterParticipants(std::vector<ShardId>{ShardId("shard0")});
+    scopes.setShardId(ShardId("shard0"));
+
+    txnParticipant.setEndOfTransactionScopes(scopes);
+    ASSERT_TRUE(txnParticipant.getEndOfTransactionScopes().has_value());
+
+    txnParticipant.setEndOfTransactionScopes(boost::none);
+    ASSERT_FALSE(txnParticipant.getEndOfTransactionScopes().has_value());
 }
 
 TEST_F(TxnParticipantTest, PrepareSucceedsWithNestedLocks) {
