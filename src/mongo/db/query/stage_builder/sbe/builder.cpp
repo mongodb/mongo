@@ -1035,6 +1035,9 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     if (_data->recordIdSlot) {
         rootUses.push_back(*_data->recordIdSlot);
     }
+    // A slot that is kept for the error it raises counts as read by the consumer.
+    auto keptSlots = _state.blueprint().takeKeptSlots();
+    rootUses.insert(rootUses.end(), keptSlots.begin(), keptSlots.end());
 
     checkSlotsDefined(stage.idx(), rootUses);
 
@@ -1659,7 +1662,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortStageAndOutpu
                                                            : sbe::value::SortDirection::Descending);
         }
 
-        if (sortKeys.parallelArraysCheckExpr) {
+        const bool hasParallelArraysCheck = static_cast<bool>(sortKeys.parallelArraysCheckExpr);
+        if (hasParallelArraysCheck) {
             auto parallelArraysError =
                 b.makeFail(ErrorCodes::BadValue, "cannot sort with keys that are parallel arrays");
 
@@ -1673,6 +1677,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortStageAndOutpu
 
         auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(projects));
         stage = std::move(outStage);
+        if (hasParallelArraysCheck) {
+            // Nothing reads the check's output. It is computed only to raise the error.
+            _state.blueprint().keepSlot(outSlots.back().getId());
+        }
 
         tassert(11051833,
                 "sortPattern length must not exceed the number of projected slots",

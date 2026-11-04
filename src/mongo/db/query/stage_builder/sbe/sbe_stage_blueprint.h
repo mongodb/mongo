@@ -1540,8 +1540,28 @@ public:
         _loweredPrefix = _nodes.size();
     }
 
+    /**
+     * Marks 'slot' as one whose definition must be kept even though nothing reads it, because
+     * computing it raises an error that the query must report.
+     */
+    void keepSlot(sbe::value::SlotId slot) {
+        _keptSlots.push_back(slot);
+    }
+
+    /**
+     * Returns the slots marked by keepSlot() since the previous call, and forgets them.
+     */
+    sbe::value::SlotVector takeKeptSlots() {
+        auto kept = std::move(_keptSlots);
+        _keptSlots.clear();
+        return kept;
+    }
+
 private:
     SbBlueprintNodeVector _nodes;
+
+    // Slots that must stay defined although nothing reads them.
+    sbe::value::SlotVector _keptSlots;
 
     // Every node before this index has been lowered.
     size_t _loweredPrefix{0};

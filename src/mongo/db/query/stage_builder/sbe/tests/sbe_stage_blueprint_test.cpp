@@ -43,6 +43,14 @@ TEST(SbBlueprintTest, AddReturnsIndexOfNewNode) {
     ASSERT_TRUE(std::holds_alternative<SbBlueprintCoScan>(blueprint[SbBlueprintNodeIdx{1}]));
 }
 
+TEST(SbBlueprintTest, TakeKeptSlotsReturnsThemOnce) {
+    SbBlueprint blueprint;
+    blueprint.keepSlot(3);
+    blueprint.keepSlot(5);
+    ASSERT_EQ(blueprint.takeKeptSlots(), sbe::makeSV(3, 5));
+    ASSERT_TRUE(blueprint.takeKeptSlots().empty());
+}
+
 TEST(SbBlueprintChildTest, LeafHasNoChildren) {
     SbBlueprintNode node = SbBlueprintCoScan{};
     ASSERT_EQ(numChildren(node), 0u);
