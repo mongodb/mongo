@@ -752,7 +752,7 @@ private:
 
     void _checkEoo(int size) const {
         // Casting mimics type extraction in BSONElement::type().
-        tassert(ErrorCodes::BSONInternalError, "BSONObj does not end with EOO", _isEooAt(size - 1));
+        bson_details::tassertBSONOverread(_isEooAt(size - 1));
     }
 
     const char* _end() const {
@@ -760,16 +760,10 @@ private:
     }
 
     int _checkSpanGetSize(std::span<const char> buffer, int maxSize) const {
-        tassert(ErrorCodes::BSONInternalError,
-                fmt::format("BSONObj buffer size is {}, smaller than the minimum object size {}",
-                            buffer.size(),
-                            kMinBSONLength),
-                buffer.size() >= static_cast<size_t>(kMinBSONLength));
+        bson_details::tassertBSONOverread(buffer.size() >= static_cast<size_t>(kMinBSONLength));
         const int size = objsize();
-        tassert(ErrorCodes::BSONInternalError,
-                "BSONObj extends past buffer",
-                size >= static_cast<int>(kMinBSONLength) &&
-                    static_cast<size_t>(size) <= buffer.size());
+        bson_details::tassertBSONOverread(size >= static_cast<int>(kMinBSONLength) &&
+                                          static_cast<size_t>(size) <= buffer.size());
         // size <= buffer.size() does not cap the object: the span can be larger than
         // BufferMaxSize. The minimum length was already checked above.
         if (MONGO_unlikely(size > maxSize)) {

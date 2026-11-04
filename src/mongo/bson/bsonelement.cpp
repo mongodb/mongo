@@ -34,7 +34,7 @@
 namespace mongo {
 namespace bson_details {
 MONGO_COMPILER_NOINLINE void tassertedBSONOverread() {
-    tasserted(ErrorCodes::BSONInternalError, "Invalid BSONElement detected");
+    tasserted(ErrorCodes::BSONInternalError, "Invalid BSONObj or BSONElement detected");
 }
 }  // namespace bson_details
 using namespace std::literals::string_view_literals;
