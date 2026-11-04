@@ -49,6 +49,11 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
         // _id: 2 >= 0 routes to shard1 (non-coordinator). Succeeds because action is "warn".
         assert.commandWorked(testDb[collName].insert({_id: 2, b: 1}));
 
+        // The upgrade is rejected before any scan runs unless prepareConstraintValidationLevel is set.
+        assert.commandWorked(
+            testDb.runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
+        );
+
         const res = assert.commandFailedWithCode(
             testDb.runCommand({
                 collMod: collName,
@@ -109,6 +114,10 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
             }),
         );
 
+        assert.commandWorked(
+            testDb.runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
+        );
+
         // _id: -2 < 0 routes to shard0, which is the coordinator (primary) shard.
         assert.commandWorked(testDb[collName].insert({_id: -2, b: 1}));
 
@@ -122,9 +131,6 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
         );
 
         assert.commandWorked(testDb[collName].deleteOne({_id: -2}));
-        assert.commandWorked(
-            testDb.runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
-        );
         assert.commandWorked(
             testDb.runCommand({
                 collMod: collName,

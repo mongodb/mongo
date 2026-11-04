@@ -33,39 +33,64 @@ CollectionAcquisition acquireForWrite(OperationContext* opCtx, const NamespaceSt
         MODE_IX);
 }
 
+Status scanForUpgrade(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      boost::optional<ValidationActionEnum> newAction = boost::none,
+                      bool hasNewValidator = false) {
+    return noDocumentsViolatingValidator(opCtx,
+                                         nss,
+                                         PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+                                         /*localOnly=*/true,
+                                         newAction,
+                                         hasNewValidator);
+}
+
+void insertDocument(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
+    auto coll = acquireForWrite(opCtx, nss);
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), doc));
+    wuow.commit();
+}
+
+CollectionOptions makeUpgradeOptions(ValidationLevelEnum level, bool prepare) {
+    CollectionOptions options;
+    options.validator = fromjson("{a: {$exists: true}}");
+    options.validationAction = ValidationActionEnum::warn;
+    options.validationLevel = level;
+    if (prepare) {
+        options.prepareConstraintValidationLevel = true;
+    }
+    options.uuid = UUID::gen();
+    return options;
+}
+
 class ConstraintValidationLevelUpgradeTest : public CatalogTestFixture {};
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKForNonExistentCollection) {
     const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
     auto* opCtx = operationContext();
-    ASSERT_OK(noDocumentsViolatingValidator(
-        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true));
+    ASSERT_OK(scanForUpgrade(opCtx, nss, ValidationActionEnum::error));
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKForCollectionWithNoValidator) {
     const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
     auto* opCtx = operationContext();
 
-    CollectionOptions options;
-    options.uuid = UUID::gen();
+    auto options = makeUpgradeOptions(ValidationLevelEnum::strict, true);
+    options.validator = BSONObj();
     ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
 
-    ASSERT_OK(noDocumentsViolatingValidator(
-        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true));
+    ASSERT_OK(scanForUpgrade(opCtx, nss, ValidationActionEnum::error));
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKForEmptyCollectionWithValidator) {
     const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
     auto* opCtx = operationContext();
 
-    CollectionOptions options;
-    options.validator = fromjson("{a: {$exists: true}}");
-    options.uuid = UUID::gen();
+    ASSERT_OK(createCollection(
+        opCtx, nss, makeUpgradeOptions(ValidationLevelEnum::strict, true), boost::none));
 
-    ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
-
-    ASSERT_OK(noDocumentsViolatingValidator(
-        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true));
+    ASSERT_OK(scanForUpgrade(opCtx, nss, ValidationActionEnum::error));
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesValidator) {
@@ -74,8 +99,10 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesVal
 
     CollectionOptions options;
     options.validator = fromjson("{a: {$exists: true}}");
+    // 'warn' lets the test insert violating documents; the upgrade request passes 'error'.
     options.validationAction = ValidationActionEnum::warn;
-    options.validationLevel = ValidationLevelEnum::moderate;
+    options.validationLevel = ValidationLevelEnum::strict;
+    options.prepareConstraintValidationLevel = true;
     options.uuid = UUID::gen();
 
     {
@@ -86,13 +113,7 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesVal
         wuow.commit();
     }
 
-    ASSERT_EQ(
-        noDocumentsViolatingValidator(opCtx,
-                                      nss,
-                                      PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                      /*localOnly=*/true)
-            .code(),
-        12370902);
+    ASSERT_EQ(scanForUpgrade(opCtx, nss, ValidationActionEnum::error).code(), 12370902);
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKWhenAllDocumentsConformToValidator) {
@@ -101,8 +122,10 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKWhenAllDocumentsConformToV
 
     CollectionOptions options;
     options.validator = fromjson("{a: {$exists: true}}");
+    // 'warn' lets the test insert violating documents; the upgrade request passes 'error'.
     options.validationAction = ValidationActionEnum::warn;
-    options.validationLevel = ValidationLevelEnum::moderate;
+    options.validationLevel = ValidationLevelEnum::strict;
+    options.prepareConstraintValidationLevel = true;
     options.uuid = UUID::gen();
 
     {
@@ -113,8 +136,7 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKWhenAllDocumentsConformToV
         wuow.commit();
     }
 
-    ASSERT_OK(noDocumentsViolatingValidator(
-        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true));
+    ASSERT_OK(scanForUpgrade(opCtx, nss, ValidationActionEnum::error));
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesJsonSchemaValidator) {
@@ -123,8 +145,10 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesJso
 
     CollectionOptions options;
     options.validator = fromjson("{$jsonSchema: {required: [\"a\"]}}");
+    // 'warn' lets the test insert violating documents; the upgrade request passes 'error'.
     options.validationAction = ValidationActionEnum::warn;
-    options.validationLevel = ValidationLevelEnum::moderate;
+    options.validationLevel = ValidationLevelEnum::strict;
+    options.prepareConstraintValidationLevel = true;
     options.uuid = UUID::gen();
 
     ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
@@ -135,13 +159,7 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesJso
         wuow.commit();
     }
 
-    ASSERT_EQ(
-        noDocumentsViolatingValidator(opCtx,
-                                      nss,
-                                      PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                      /*localOnly=*/true)
-            .code(),
-        12370902);
+    ASSERT_EQ(scanForUpgrade(opCtx, nss, ValidationActionEnum::error).code(), 12370902);
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageTruncatesLargeValidator) {
@@ -153,8 +171,10 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageTruncatesLargeValidator
     CollectionOptions options;
     options.validator =
         BSON("$jsonSchema" << BSON("title" << longTitle << "required" << BSON_ARRAY("a")));
+    // 'warn' lets the test insert violating documents; the upgrade request passes 'error'.
     options.validationAction = ValidationActionEnum::warn;
-    options.validationLevel = ValidationLevelEnum::moderate;
+    options.validationLevel = ValidationLevelEnum::strict;
+    options.prepareConstraintValidationLevel = true;
     options.uuid = UUID::gen();
 
     ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
@@ -165,8 +185,7 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageTruncatesLargeValidator
         wuow.commit();
     }
 
-    auto status = noDocumentsViolatingValidator(
-        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true);
+    auto status = scanForUpgrade(opCtx, nss, ValidationActionEnum::error);
     ASSERT_EQ(status.code(), 12370902);
     ASSERT_STRING_CONTAINS(status.reason(), "First offending document _id: 1");
     ASSERT_STRING_CONTAINS(status.reason(), "<your collection's validator>");
@@ -184,8 +203,93 @@ TEST_F(ConstraintValidationLevelUpgradeTest, SkipsScanWhenCollectionAlreadyAtCon
     ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
 
     // The aggregate must not be dispatched when the collection is already at constraint level.
-    ASSERT_OK(noDocumentsViolatingValidator(
-        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true));
+    ASSERT_OK(scanForUpgrade(opCtx, nss, ValidationActionEnum::error));
+}
+
+// Tests for 'noDocumentsViolatingValidator'. Where a test inserts a document that
+// violates the validator, the scan would return 12370902, so a BadValue proves the precondition
+// check ran first and the collection was not scanned.
+
+TEST_F(ConstraintValidationLevelUpgradeTest, UpgradeCheckReturnsOKForNonExistentCollection) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
+    ASSERT_OK(scanForUpgrade(operationContext(), nss));
+}
+
+TEST_F(ConstraintValidationLevelUpgradeTest, UpgradeCheckRejectsStrictWithoutPrepare) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
+    auto* opCtx = operationContext();
+    ASSERT_OK(createCollection(
+        opCtx, nss, makeUpgradeOptions(ValidationLevelEnum::strict, false), boost::none));
+    insertDocument(opCtx, nss, BSON("_id" << 1 << "b" << 1));
+
+    auto status = scanForUpgrade(opCtx, nss, ValidationActionEnum::error);
+    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(status.reason(), "prepareConstraintValidationLevel");
+}
+
+TEST_F(ConstraintValidationLevelUpgradeTest, UpgradeCheckRejectsModerateBeforeScanning) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
+    auto* opCtx = operationContext();
+    ASSERT_OK(createCollection(
+        opCtx, nss, makeUpgradeOptions(ValidationLevelEnum::moderate, true), boost::none));
+    insertDocument(opCtx, nss, BSON("_id" << 1 << "b" << 1));
+
+    auto status = scanForUpgrade(opCtx, nss, ValidationActionEnum::error);
+    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(status.reason(), "only be changed to 'constraint' from 'strict'");
+}
+
+TEST_F(ConstraintValidationLevelUpgradeTest, UpgradeCheckRejectsValidatorChangeBeforeScanning) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
+    auto* opCtx = operationContext();
+    ASSERT_OK(createCollection(
+        opCtx, nss, makeUpgradeOptions(ValidationLevelEnum::strict, true), boost::none));
+    insertDocument(opCtx, nss, BSON("_id" << 1 << "b" << 1));
+
+    auto status = scanForUpgrade(opCtx, nss, ValidationActionEnum::error, /*hasNewValidator=*/true);
+    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(status.reason(), "Validator cannot be changed");
+}
+
+TEST_F(ConstraintValidationLevelUpgradeTest, UpgradeCheckRejectsWarnActionBeforeScanning) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
+    auto* opCtx = operationContext();
+    ASSERT_OK(createCollection(
+        opCtx, nss, makeUpgradeOptions(ValidationLevelEnum::strict, true), boost::none));
+    insertDocument(opCtx, nss, BSON("_id" << 1 << "b" << 1));
+
+    // The collection's own action is already 'warn', so this also covers the default.
+    for (auto action : {boost::optional<ValidationActionEnum>(ValidationActionEnum::warn),
+                        boost::optional<ValidationActionEnum>()}) {
+        auto status = scanForUpgrade(opCtx, nss, action);
+        ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+        ASSERT_STRING_CONTAINS(status.reason(), "'warn' is not allowed");
+    }
+}
+
+TEST_F(ConstraintValidationLevelUpgradeTest, UpgradeCheckScansWhenPreconditionsHold) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
+    auto* opCtx = operationContext();
+    ASSERT_OK(createCollection(
+        opCtx, nss, makeUpgradeOptions(ValidationLevelEnum::strict, true), boost::none));
+    insertDocument(opCtx, nss, BSON("_id" << 1 << "a" << 1));
+
+    ASSERT_OK(scanForUpgrade(opCtx, nss, ValidationActionEnum::error));
+
+    insertDocument(opCtx, nss, BSON("_id" << 2 << "b" << 1));
+    ASSERT_EQ(scanForUpgrade(opCtx, nss, ValidationActionEnum::error).code(), 12370902);
+}
+
+TEST_F(ConstraintValidationLevelUpgradeTest, UpgradeCheckIsNoOpWhenAlreadyAtConstraint) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
+    auto* opCtx = operationContext();
+    CollectionOptions options;
+    options.validator = fromjson("{a: {$exists: true}}");
+    options.validationLevel = ValidationLevelEnum::constraint;
+    options.uuid = UUID::gen();
+    ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
+
+    ASSERT_OK(scanForUpgrade(opCtx, nss, ValidationActionEnum::error));
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageContainsValidatorAndCollectionHint) {
@@ -194,8 +298,10 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageContainsValidatorAndCol
 
     CollectionOptions options;
     options.validator = fromjson("{a: {$exists: true}}");
+    // 'warn' lets the test insert violating documents; the upgrade request passes 'error'.
     options.validationAction = ValidationActionEnum::warn;
-    options.validationLevel = ValidationLevelEnum::moderate;
+    options.validationLevel = ValidationLevelEnum::strict;
+    options.prepareConstraintValidationLevel = true;
     options.uuid = UUID::gen();
 
     ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
@@ -206,8 +312,7 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageContainsValidatorAndCol
         wuow.commit();
     }
 
-    auto status = noDocumentsViolatingValidator(
-        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true);
+    auto status = scanForUpgrade(opCtx, nss, ValidationActionEnum::error);
     ASSERT_EQ(status.code(), 12370902);
     ASSERT_STRING_CONTAINS(status.reason(), "First offending document _id: 1");
     ASSERT_STRING_CONTAINS(status.reason(), "Run db.testcoll.find({\"$nor\": [");

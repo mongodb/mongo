@@ -323,7 +323,9 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 uassertStatusOK(noDocumentsViolatingValidator(opCtx,
                                                               _collInfo->nsForTargeting,
                                                               PlacementConcern::kPretendUnsharded,
-                                                              /*localOnly=*/false));
+                                                              /*localOnly=*/false,
+                                                              _request.getValidationAction(),
+                                                              _request.getValidator().has_value()));
             }
 
             auto isGranularityUpdate = (_request.getTimeseries().has_value() &&

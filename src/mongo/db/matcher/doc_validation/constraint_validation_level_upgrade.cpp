@@ -9,6 +9,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/shard_role/shard_catalog/document_validation_helpers.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/str.h"
@@ -46,7 +47,9 @@ Status makeViolatingValidatorStatus(const BSONObj& validator,
 Status noDocumentsViolatingValidator(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      PlacementConcern placementConcern,
-                                     bool localOnly) {
+                                     bool localOnly,
+                                     boost::optional<ValidationActionEnum> newAction,
+                                     bool hasNewValidator) {
     BSONObj validator;
     {
         auto coll =
@@ -58,6 +61,12 @@ Status noDocumentsViolatingValidator(OperationContext* opCtx,
                               MODE_IS);
         if (!coll.exists()) {
             return Status::OK();
+        }
+        // Reject a request that collMod would refuse anyway before paying for the scan.
+        if (auto status = checkConstraintUpgradePreconditions(
+                coll.getCollectionPtr()->getCollectionOptions(), newAction, hasNewValidator);
+            !status.isOK()) {
+            return status;
         }
         // If the collection is already at 'constraint' level, all existing documents must already
         // conform — the constraint level rejects any write that would violate the validator — so

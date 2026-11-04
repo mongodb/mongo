@@ -92,6 +92,21 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
     return Status::OK();
 }
 
+Status checkConstraintUpgradePreconditions(const CollectionOptions& opts,
+                                           boost::optional<ValidationActionEnum> newAction,
+                                           bool hasNewValidator) {
+    // Only the presence of a new validator matters to the checks, not its contents.
+    boost::optional<Collection::Validator> newValidator;
+    if (hasNewValidator) {
+        newValidator.emplace();
+    }
+    return checkValidationOptionsCanBeUsed(opts,
+                                           ValidationLevelEnum::constraint,
+                                           newAction,
+                                           std::move(newValidator),
+                                           /*newPrepareConstraintValidationLevel=*/boost::none);
+}
+
 std::pair<bool, MatchExpressionParser::AllowedFeatureSet> mustReparseValidator(
     boost::optional<ValidationLevelEnum> newLevel,
     boost::optional<ValidationActionEnum> newAction) {

@@ -168,7 +168,9 @@ public:
                         opCtx,
                         nss,
                         PlacementConcern{oss.getDbVersion(nss.dbName()), oss.getShardVersion(nss)},
-                        /*localOnly=*/true));
+                        /*localOnly=*/true,
+                        cmd.getValidationAction(),
+                        cmd.getValidator().has_value()));
                 }
             }
 

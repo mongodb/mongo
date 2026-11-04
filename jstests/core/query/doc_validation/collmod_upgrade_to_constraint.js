@@ -60,6 +60,94 @@ describe("collMod upgrade to constraint validationLevel", function () {
         assert(res.errmsg.includes("$nor"), "expected $nor in suggested query", {res});
     });
 
+    // Upgrades that collMod would refuse whatever the data looks like. Each of these collections
+    // holds a document that violates the validator, so a BadValue (instead of the scan's 12370902)
+    // shows the request was rejected before the collection was scanned.
+    describe("rejects an invalid upgrade without scanning", () => {
+        const getValidationLevel = () =>
+            db.getCollectionInfos({name: collName})[0].options.validationLevel;
+
+        const setUp = ({level, prepare}) => {
+            assert.commandWorked(
+                db.runCommand({
+                    collMod: collName,
+                    validator: validator,
+                    validationLevel: level,
+                    validationAction: "warn",
+                }),
+            );
+            assert.commandWorked(db[collName].insert({b: 1}));
+            if (prepare) {
+                assert.commandWorked(
+                    db.runCommand({collMod: collName, prepareConstraintValidationLevel: true}),
+                );
+            }
+        };
+
+        it("when prepareConstraintValidationLevel is not set", () => {
+            setUp({level: "strict", prepare: false});
+
+            const res = assert.commandFailedWithCode(
+                db.runCommand({
+                    collMod: collName,
+                    validationLevel: "constraint",
+                    validationAction: "error",
+                }),
+                ErrorCodes.BadValue,
+            );
+            assert(res.errmsg.includes("prepareConstraintValidationLevel"), "unexpected error", {
+                res,
+            });
+            assert.eq("strict", getValidationLevel());
+        });
+
+        it("when the collection is not at validationLevel 'strict'", () => {
+            setUp({level: "moderate", prepare: false});
+
+            const res = assert.commandFailedWithCode(
+                db.runCommand({
+                    collMod: collName,
+                    validationLevel: "constraint",
+                    validationAction: "error",
+                }),
+                ErrorCodes.BadValue,
+            );
+            assert(res.errmsg.includes("from 'strict'"), "unexpected error", {res});
+            assert.eq("moderate", getValidationLevel());
+        });
+
+        it("when the same request changes the validator", () => {
+            setUp({level: "strict", prepare: true});
+
+            const res = assert.commandFailedWithCode(
+                db.runCommand({
+                    collMod: collName,
+                    validator: {c: {$exists: true}},
+                    validationLevel: "constraint",
+                    validationAction: "error",
+                }),
+                ErrorCodes.BadValue,
+            );
+            assert(res.errmsg.includes("Validator cannot be changed"), "unexpected error", {res});
+            assert.eq("strict", getValidationLevel());
+        });
+
+        it("when the request sets validationAction to 'warn'", () => {
+            setUp({level: "strict", prepare: true});
+
+            const res = assert.commandFailedWithCode(
+                db.runCommand({
+                    collMod: collName,
+                    validationLevel: "constraint",
+                    validationAction: "warn",
+                }),
+                ErrorCodes.BadValue,
+            );
+            assert(res.errmsg.includes("'warn' is not allowed"), "unexpected error", {res});
+            assert.eq("strict", getValidationLevel());
+        });
+    });
+
     it("allows upgrade when all documents conform to the validator", () => {
         assert.commandWorked(
             db.runCommand({
