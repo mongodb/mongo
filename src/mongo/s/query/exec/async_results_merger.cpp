@@ -2099,6 +2099,10 @@ SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     // with the original one.
     _drainAndLatchAdditionalTransactionParticipants(opCtx, lk);
 
+    // Shut the sub-baton down unconditionally, so no continuation scheduled from here on can run on
+    // it. A continuation the sub-baton refuses fails over to the executor.
+    _subBaton.shutdown();
+
     if (!_haveOutstandingBatchRequests(lk)) {
         _lifecycleState = kKillComplete;
 
@@ -2111,8 +2115,6 @@ SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     for (const auto& remote : _remotes) {
         remote->cancelAsyncWork(lk, _executor.get());
     }
-
-    _subBaton.shutdown();
 
     return _killCompleteInfo->getFuture();
 }

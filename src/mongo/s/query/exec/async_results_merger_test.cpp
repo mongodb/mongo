@@ -6007,9 +6007,10 @@ TEST_F(AsyncResultsMergerTest, KillAfterRetryDefersBeforeNextEventCleansUp) {
 }
 
 // Tests that a retryable error delivered while detached still backs off on the executor and that
-// the retry is dispatched after reattach. The backoff no longer runs on the sub-baton, so the
-// SERVER-123537 self-deadlock (a retry continuation running inline under '_mutex' on a dead
-// sub-baton) can no longer occur on this path.
+// the retry is dispatched after reattach. The SERVER-123537 regression (a continuation running
+// inline under '_mutex' on a dead sub-baton) is covered by
+// 'KillWithResponseQueuedOnSubBatonFailsOverToExecutor' and
+// 'DetachWithResponseQueuedOnSubBatonFailsOverToExecutor'.
 TEST_F(AsyncResultsMergerTest, RetryWithDeadSubBatonDoesNotDeadlock) {
     const auto backOffDelayMs = 1000;
     FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
@@ -6850,6 +6851,51 @@ TEST_F(AsyncResultsMergerTest, BackoffTimerSurvivesDetachAtFullLength) {
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(arm->remotesExhausted());
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+}
+
+// 'kill()' shuts down the sub-baton while holding '_mutex'. A response continuation still queued on
+// it must not run inline (it would self-deadlock re-locking '_mutex'): the executor's
+// 'GuaranteedExecutorWithFallback' wrapper hands the refused continuation back to the executor.
+TEST_F(AsyncResultsMergerTest, KillWithResponseQueuedOnSubBatonFailsOverToExecutor) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    unittest::assertGet(arm->nextEvent());
+    std::vector<CursorResponse> responses;
+    responses.emplace_back(kTestNss, CursorId(1), std::vector<BSONObj>{fromjson("{_id: 1}")});
+    scheduleNetworkResponses(std::move(responses));
+    // Pump only the executor, leaving the continuation queued on the sub-baton.
+    runReadyCallbacks();
+    assertRemoteState<AsyncResultsMerger::GetMoreInFlight>(*arm, 0);
+
+    auto killFuture = arm->kill(operationContext());
+    waitForKillFuture(killFuture);
+}
+
+// Same as above, for 'detachFromOperationContext()': the queued continuation fails over to the
+// executor and still processes the batch.
+TEST_F(AsyncResultsMergerTest, DetachWithResponseQueuedOnSubBatonFailsOverToExecutor) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    unittest::assertGet(arm->nextEvent());
+    std::vector<CursorResponse> responses;
+    responses.emplace_back(kTestNss, CursorId(0), std::vector<BSONObj>{fromjson("{_id: 1}")});
+    scheduleNetworkResponses(std::move(responses));
+    runReadyCallbacks();
+    ASSERT_FALSE(arm->ready());
+
+    arm->detachFromOperationContext();
+    runReadyCallbacks();
+    arm->reattachToOperationContext(operationContext());
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }
 
 }  // namespace

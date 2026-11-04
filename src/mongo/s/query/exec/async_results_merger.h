@@ -566,6 +566,9 @@ private:
      * (the getMore's or the backoff timer's callback handle). 'kill()' calls it for every remote
      * and 'closeShardCursors()' for each closed remote. Each cancelled continuation returns its
      * remote to 'Idle'; during a kill, the last one to do so completes the kill.
+     *
+     * 'kill()' always shuts down the sub-baton, so a getMore continuation still queued on it
+     * fails over to the executor and kill completes without the baton being pumped.
      */
     struct RemoteCursorData : public RefCountable {
         /**
