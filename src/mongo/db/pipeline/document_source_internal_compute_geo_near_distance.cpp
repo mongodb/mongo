@@ -26,9 +26,8 @@
 
 namespace mongo {
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalComputeGeoNearDistance,
-                                     InternalComputeGeoNearDistanceLiteParsed::parse,
-                                     AllowedWithApiStrict::kInternal);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalComputeGeoNearDistance,
+                                              InternalComputeGeoNearDistanceLiteParsed::parse);
 
 REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalComputeGeoNearDistance,
                                                    DocumentSourceInternalGeoNearDistance,

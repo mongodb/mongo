@@ -36,6 +36,12 @@ selector:
 
     # Multiple cluster specific exclusions
 
+    # This test opens an internalClient connection to run $_internalListCollections. The multiple
+    # cluster override re-issues commands (including the internalClient handshake) onto the extra
+    # clusters, and the internal-client protocol requires explicit writeConcern on every command
+    # (error 4569201), which the override's buffered writes do not carry.
+    - jstests/core/catalog/agg_internal_list_collections_stage.js
+
     # Don't run transaction specific tests.
     - jstests/core/txns/**/*.js
 
