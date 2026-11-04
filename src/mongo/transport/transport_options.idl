@@ -201,3 +201,15 @@ server_parameters:
         default: 20
         validator: {gt: 0, lte: 100}
         redact: false
+
+    networkMessageCompressionMinResponseSizeBytes:
+        description: >-
+            Responses smaller than this many bytes are sent uncompressed, even when the request was
+            compressed. Compressing such a response saves little or nothing on the wire and costs CPU
+            on both ends. 0 compresses every response.
+        set_at: [startup, runtime]
+        cpp_varname: gNetworkMessageCompressionMinResponseSizeBytes
+        cpp_vartype: Atomic<int32_t>
+        default: 512
+        validator: {gte: 0}
+        redact: false
