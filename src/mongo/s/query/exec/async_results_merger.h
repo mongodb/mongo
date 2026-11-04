@@ -615,6 +615,17 @@ private:
         void cancelAsyncWork(WithLock, executor::TaskExecutor* executor);
 
         /**
+         * Schedules a fire-and-forget killCursors on 'executor' for namespace 'nss' iff the remote
+         * cursor is still open (non-zero cursor id and not already known dead). Does not wait for
+         * the remote cursor to actually be closed. The request is sent with no timeout so it is
+         * still dispatched when 'opCtx' has exhausted its maxTimeMS.
+         */
+        void scheduleKillCursors(WithLock,
+                                 executor::TaskExecutor* executor,
+                                 OperationContext* opCtx,
+                                 const NamespaceString& nss);
+
+        /**
          * Internal id of the RemoteCursorData object. The id is guaranteed to be unique for
          * different 'RemoteCursorData' objects managed by the same 'AsyncResultsMerger', and can be
          * used for comparison purposes. The id is not necessarily unique across different
@@ -841,15 +852,6 @@ private:
                               const RemoteCursorPtr& remote);
 
     /**
-     * Schedules a killCursors request for the remote if the remote still has a cursor open.
-     * This is a fire-and-forget attempt to close the remote cursor. We are not blocking until
-     * the remote cursor is actually closed.
-     */
-    void _scheduleKillCursorForRemote(WithLock lk,
-                                      OperationContext* opCtx,
-                                      const RemoteCursorPtr& remote);
-
-    /**
      * Cleans up if the remote cursor was killed while waiting for a response.
      * Must only be called if '_lifecycleState' == 'kKillStarted'. Tasserts otherwise.
      */
@@ -951,11 +953,6 @@ private:
      * Schedules a killCursors command to be run on all remote hosts that have open cursors.
      */
     void _scheduleKillCursors(WithLock, OperationContext* opCtx);
-
-    /**
-     * Checks if we need to schedule a killCursor command for this remote
-     */
-    bool _shouldKillRemote(WithLock, const RemoteCursorData& remote);
 
     /**
      * Updates the given remote's metadata (e.g. the cursor id) based on information in

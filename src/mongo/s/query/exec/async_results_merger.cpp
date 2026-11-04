@@ -120,6 +120,11 @@ static constexpr std::array<ErrorCodes::Error, 3> kSafeErrorCodesForRetrying{
 static constexpr std::array<ErrorCodes::Error, 3> kCursorAlreadyDeadCodes = {
     ErrorCodes::QueryPlanKilled, ErrorCodes::CursorKilled, ErrorCodes::CursorNotFound};
 
+bool isAlreadyDead(ErrorCodes::Error code) {
+    return std::find(kCursorAlreadyDeadCodes.begin(), kCursorAlreadyDeadCodes.end(), code) !=
+        kCursorAlreadyDeadCodes.end();
+}
+
 /**
  * Returns an int less than 0 if 'leftSortKey' < 'rightSortKey', 0 if the two are equal, and an int
  * > 0 if 'leftSortKey' > 'rightSortKey' according to the pattern 'sortKeyPattern'.
@@ -464,7 +469,8 @@ void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& s
                                       // - Remove the remote from the '_remotes' vector.
                                       // - Reposition our loop iterator.
                                       remote->cancelAsyncWork(lk, _executor.get());
-                                      _scheduleKillCursorForRemote(lk, _opCtx, remote);
+                                      remote->scheduleKillCursors(
+                                          lk, _executor.get(), _opCtx, _params.getNss());
                                       _removeRemoteFromPromisedMinSortKeys(lk, remote);
                                       remote->closed = true;
 
@@ -2008,63 +2014,8 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock lk, OperationContext* opC
             _killCompleteInfo);
 
     for (const auto& remote : _remotes) {
-        _scheduleKillCursorForRemote(lk, opCtx, remote);
+        remote->scheduleKillCursors(lk, _executor.get(), opCtx, _params.getNss());
     }
-}
-
-void AsyncResultsMerger::_scheduleKillCursorForRemote(WithLock lk,
-                                                      OperationContext* opCtx,
-                                                      const RemoteCursorPtr& remote) {
-    if (!_shouldKillRemote(lk, *remote)) {
-        return;
-    }
-
-    BSONObj cmdObj = KillCursorsCommandRequest(_params.getNss(), {remote->cursorId}).toBSON();
-    executor::RemoteCommandRequest request(remote->getTargetHost(),
-                                           _params.getNss().dbName(),
-                                           cmdObj,
-                                           rpc::makeEmptyMetadata(),
-                                           opCtx,
-                                           /*fireAndForget=*/true);
-
-    // The 'RemoteCommandRequest' takes the remaining time from the 'opCtx' parameter. If the cursor
-    // was killed due to a maxTimeMs timeout, the remaining time will be 0, and the remote request
-    // will not be sent. To avoid this, we remove the timeout for the remote 'killCursor' command.
-    request.timeout = executor::RemoteCommandRequest::kNoTimeout;
-    request.deadline = executor::RemoteCommandRequest::kNoDeadline;
-
-    LOGV2_DEBUG(8456102,
-                2,
-                "scheduling killCursors command",
-                "remoteHost"_attr = remote->getTargetHost(),
-                "shardId"_attr = remote->shardId.toString());
-
-    // Send kill request; discard callback handle, if any, or failure report, if not.
-    _executor
-        ->scheduleRemoteCommand(request,
-                                [host = remote->getTargetHost()](auto const& args) {
-                                    if (args.response.isOK()) {
-                                        LOGV2_DEBUG(8928416,
-                                                    2,
-                                                    "killCursors succeeded",
-                                                    "remoteHost"_attr = host.toString());
-                                    } else {
-                                        LOGV2_DEBUG(8928417,
-                                                    2,
-                                                    "killCursors failed",
-                                                    "remoteHost"_attr = host.toString(),
-                                                    "error"_attr = args.response);
-                                    }
-                                })
-        .getStatus()
-        .ignore();
-}
-
-bool AsyncResultsMerger::_shouldKillRemote(WithLock, const RemoteCursorData& remote) {
-    return remote.cursorId && !remote.exhausted() &&
-        std::find(kCursorAlreadyDeadCodes.begin(),
-                  kCursorAlreadyDeadCodes.end(),
-                  remote.status.code()) == kCursorAlreadyDeadCodes.end();
 }
 
 SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
@@ -2176,6 +2127,55 @@ bool AsyncResultsMerger::RemoteCursorData::hasNext() const {
 
 bool AsyncResultsMerger::RemoteCursorData::exhausted() const {
     return cursorId == 0;
+}
+
+void AsyncResultsMerger::RemoteCursorData::scheduleKillCursors(WithLock,
+                                                               executor::TaskExecutor* executor,
+                                                               OperationContext* opCtx,
+                                                               const NamespaceString& nss) {
+    if (!cursorId || exhausted() || isAlreadyDead(status.code())) {
+        return;
+    }
+
+    BSONObj cmdObj = KillCursorsCommandRequest(nss, {cursorId}).toBSON();
+    executor::RemoteCommandRequest request(getTargetHost(),
+                                           nss.dbName(),
+                                           cmdObj,
+                                           rpc::makeEmptyMetadata(),
+                                           opCtx,
+                                           /*fireAndForget=*/true);
+
+    // The 'RemoteCommandRequest' takes the remaining time from the 'opCtx' parameter. If the cursor
+    // was killed due to a maxTimeMs timeout, the remaining time will be 0, and the remote request
+    // will not be sent. To avoid this, we remove the timeout for the remote 'killCursor' command.
+    request.timeout = executor::RemoteCommandRequest::kNoTimeout;
+    request.deadline = executor::RemoteCommandRequest::kNoDeadline;
+
+    LOGV2_DEBUG(8456102,
+                2,
+                "scheduling killCursors command",
+                "remoteHost"_attr = getTargetHost(),
+                "shardId"_attr = shardId.toString());
+
+    // Send kill request; discard callback handle, if any, or failure report, if not.
+    executor
+        ->scheduleRemoteCommand(request,
+                                [host = getTargetHost()](auto const& args) {
+                                    if (args.response.isOK()) {
+                                        LOGV2_DEBUG(8928416,
+                                                    2,
+                                                    "killCursors succeeded",
+                                                    "remoteHost"_attr = host.toString());
+                                    } else {
+                                        LOGV2_DEBUG(8928417,
+                                                    2,
+                                                    "killCursors failed",
+                                                    "remoteHost"_attr = host.toString(),
+                                                    "error"_attr = args.response);
+                                    }
+                                })
+        .getStatus()
+        .ignore();
 }
 
 void AsyncResultsMerger::RemoteCursorData::cancelAsyncWork(WithLock,
