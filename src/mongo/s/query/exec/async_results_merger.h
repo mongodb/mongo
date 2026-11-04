@@ -615,15 +615,15 @@ private:
         void cancelAsyncWork(WithLock, executor::TaskExecutor* executor);
 
         /**
-         * Schedules a fire-and-forget killCursors on 'executor' for namespace 'nss' iff the remote
-         * cursor is still open (non-zero cursor id and not already known dead). Does not wait for
-         * the remote cursor to actually be closed. The request is sent with no timeout so it is
-         * still dispatched when 'opCtx' has exhausted its maxTimeMS.
+         * Schedules a fire-and-forget killCursors on 'executor' for the remote cursor's own
+         * namespace ('cursorNss') iff the remote cursor is still open (non-zero cursor id and not
+         * already known dead). Does not wait for the remote cursor to actually be closed. The
+         * request is sent with no timeout so it is still dispatched when 'opCtx' has exhausted its
+         * maxTimeMS.
          */
         void scheduleKillCursors(WithLock,
                                  executor::TaskExecutor* executor,
-                                 OperationContext* opCtx,
-                                 const NamespaceString& nss);
+                                 OperationContext* opCtx);
 
         /**
          * Internal id of the RemoteCursorData object. The id is guaranteed to be unique for

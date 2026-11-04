@@ -6898,5 +6898,58 @@ TEST_F(AsyncResultsMergerTest, DetachWithResponseQueuedOnSubBatonFailsOverToExec
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }
 
+// The killCursors command must target each remote cursor's own namespace, which can differ from the
+// namespace the ARM was created with (e.g. a view or a $lookup/$unionWith sub-pipeline).
+TEST_F(AsyncResultsMergerTest, KillCursorsTargetsRemoteCursorNamespaces) {
+    const auto remoteNss0 = NamespaceString::createNamespaceString_forTest("otherdb0.othercoll0");
+    const auto remoteNss1 = NamespaceString::createNamespaceString_forTest("otherdb1.othercoll1");
+    ASSERT_NE(kTestNss.dbName(), remoteNss0.dbName());
+    ASSERT_NE(kTestNss.coll(), remoteNss0.coll());
+
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(remoteNss0, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(remoteNss1, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    auto killFuture = arm->kill(operationContext());
+    waitForKillFuture(killFuture);
+
+    ASSERT_EQ(2u, getNumPendingRequests());
+    for (size_t i = 0; i < 2u; ++i) {
+        auto request = getNthPendingRequest(i);
+        const auto cursorId = request.cmdObj["cursors"].Array()[0].numberLong();
+        ASSERT_TRUE(cursorId == 1 || cursorId == 2) << cursorId;
+        assertKillCursorsCmdTargetsNamespace(request, cursorId == 1 ? remoteNss0 : remoteNss1);
+    }
+}
+
+TEST_F(AsyncResultsMergerTest, CloseShardCursorsKillCursorsTargetsRemoteCursorNamespace) {
+    const auto remoteNss0 = NamespaceString::createNamespaceString_forTest("otherdb0.othercoll0");
+    const auto remoteNss1 = NamespaceString::createNamespaceString_forTest("otherdb1.othercoll1");
+
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(remoteNss0, 1, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(remoteNss1, 2, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    arm->closeShardCursors({kTestShardIds[0]}, ShardTag::kDefault);
+    ASSERT_EQ(1u, getNumPendingRequests());
+    auto request = getNthPendingRequest(0u);
+    assertKillCursorsCmdHasCursorId(request.cmdObj, 1);
+    assertKillCursorsCmdTargetsNamespace(request, remoteNss0);
+    blackHoleNextRequest();
+
+    auto killFuture = arm->kill(operationContext());
+    waitForKillFuture(killFuture);
+    ASSERT_EQ(1u, getNumPendingRequests());
+    request = getNthPendingRequest(0u);
+    assertKillCursorsCmdHasCursorId(request.cmdObj, 2);
+    assertKillCursorsCmdTargetsNamespace(request, remoteNss1);
+}
+
 }  // namespace
 }  // namespace mongo

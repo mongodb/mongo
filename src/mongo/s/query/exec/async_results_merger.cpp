@@ -469,8 +469,7 @@ void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& s
                                       // - Remove the remote from the '_remotes' vector.
                                       // - Reposition our loop iterator.
                                       remote->cancelAsyncWork(lk, _executor.get());
-                                      remote->scheduleKillCursors(
-                                          lk, _executor.get(), _opCtx, _params.getNss());
+                                      remote->scheduleKillCursors(lk, _executor.get(), _opCtx);
                                       _removeRemoteFromPromisedMinSortKeys(lk, remote);
                                       remote->closed = true;
 
@@ -2014,7 +2013,7 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock lk, OperationContext* opC
             _killCompleteInfo);
 
     for (const auto& remote : _remotes) {
-        remote->scheduleKillCursors(lk, _executor.get(), opCtx, _params.getNss());
+        remote->scheduleKillCursors(lk, _executor.get(), opCtx);
     }
 }
 
@@ -2131,15 +2130,14 @@ bool AsyncResultsMerger::RemoteCursorData::exhausted() const {
 
 void AsyncResultsMerger::RemoteCursorData::scheduleKillCursors(WithLock,
                                                                executor::TaskExecutor* executor,
-                                                               OperationContext* opCtx,
-                                                               const NamespaceString& nss) {
+                                                               OperationContext* opCtx) {
     if (!cursorId || exhausted() || isAlreadyDead(status.code())) {
         return;
     }
 
-    BSONObj cmdObj = KillCursorsCommandRequest(nss, {cursorId}).toBSON();
+    BSONObj cmdObj = KillCursorsCommandRequest(cursorNss, {cursorId}).toBSON();
     executor::RemoteCommandRequest request(getTargetHost(),
-                                           nss.dbName(),
+                                           cursorNss.dbName(),
                                            cmdObj,
                                            rpc::makeEmptyMetadata(),
                                            opCtx,

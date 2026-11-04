@@ -523,6 +523,12 @@ protected:
         ASSERT_EQ(numCursors, 1u);
     }
 
+    void assertKillCursorsCmdTargetsNamespace(const executor::RemoteCommandRequest& request,
+                                              const NamespaceString& nss) {
+        ASSERT_EQ(request.cmdObj["killCursors"].valueStringData(), nss.coll());
+        ASSERT_EQ(request.dbname, nss.dbName());
+    }
+
     RemoteCursor makeRemoteCursor(ShardId shardId, HostAndPort host, CursorResponse response) {
         RemoteCursor remoteCursor;
         remoteCursor.setShardId(std::move(shardId));
