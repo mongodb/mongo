@@ -197,6 +197,8 @@ conn_stats = [
     ConnStat('cond_auto_wait', 'auto adjusting condition wait calls'),
     ConnStat('cond_auto_wait_reset', 'auto adjusting condition resets'),
     ConnStat('cond_auto_wait_skipped', 'auto adjusting condition wait raced to update timeout and skipped updating'),
+    ConnStat('cond_signal_n_broadcast', 'counted condition wakes that fell back to a broadcast'),
+    ConnStat('cond_signal_n_signals', 'condition wakes done as individual signals'),
     ConnStat('cond_wait', 'pthread mutex condition wait calls'),
     ConnStat('file_open', 'files currently open', 'no_clear,no_scale'),
     ConnStat('fsync_io', 'total fsync I/Os'),
@@ -436,6 +438,7 @@ conn_stats = [
     EvictStat('eviction_queue_empty', 'eviction server candidate queue empty when topping up'),
     EvictStat('eviction_queue_not_empty', 'eviction server candidate queue not empty when topping up'),
     EvictStat('eviction_reentry_hs_eviction_milliseconds', 'total milliseconds spent inside reentrant history store evictions in a reconciliation', 'no_clear,no_scale,size'),
+    EvictStat('eviction_refill_waiters', 'threads waiting for candidates, summed over eviction server refills'),
     EvictStat('eviction_restored_pos', 'eviction walk restored position'),
     EvictStat('eviction_restored_pos_differ', 'eviction walk restored position differs from the saved one'),
     EvictStat('eviction_root_pages_skipped', 'eviction server skipped the root pages'),
@@ -443,6 +446,10 @@ conn_stats = [
     EvictStat('eviction_server_evict_fail', 'evict page failures by eviction server'),
     EvictStat('eviction_server_push_pages_failed_when_flaging', 'eviction server push pages to queue failed because of racing with setting flag'),
     # Note eviction_server_evict_attempt - eviction_server_evict_fail = evict page successes by eviction server.
+    EvictStat('eviction_server_refill_end_filled', 'eviction server refills that ended with the queue filled'),
+    EvictStat('eviction_server_refill_end_interrupted', 'eviction server refills that ended because a handle operation interrupted the walk'),
+    EvictStat('eviction_server_refill_end_lap_complete', 'eviction server refills that ended after visiting every handle'),
+    EvictStat('eviction_server_refill_end_shutdown', 'eviction server refills that ended for shutdown or cache pool reconfiguration'),
     EvictStat('eviction_server_skip_checkpointing_trees', 'eviction server skips trees that are being checkpointed'),
     EvictStat('eviction_server_skip_dirty_pages_during_checkpoint', 'eviction server skips dirty pages during a running checkpoint'),
     EvictStat('eviction_server_skip_disagg_trees_checkpointed', 'eviction server skips disaggregated trees already visited by the ongoing checkpoint'),
@@ -1510,6 +1517,8 @@ conn_dsrc_stats = [
     ##########################################
     # Layered table statistics
     ##########################################
+    LayeredStat('layered_curs_blind_remove_follower', 'Layered table cursor blind remove operations on a follower'),
+    LayeredStat('layered_curs_blind_remove_ingest_deleted', 'Layered table cursor blind remove operations on a key already removed locally'),
     LayeredStat('layered_curs_insert', 'Layered table cursor insert operations'),
     LayeredStat('layered_curs_modify', 'Layered table cursor modify operations'),
     LayeredStat('layered_curs_next', 'Layered table cursor next operations'),

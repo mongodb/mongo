@@ -67,8 +67,12 @@ typedef enum {
     WTI_CLAYERED_MODE_ITERATE,     /* next, prev */
     WTI_CLAYERED_MODE_RANDOM,      /* next_random */
     WTI_CLAYERED_MODE_LARGEST_KEY, /* largest_key */
-    WTI_CLAYERED_MODE_WRITE        /* reserve, modify, insert, update, remove */
+    WTI_CLAYERED_MODE_REMOVE,      /* remove */
+    WTI_CLAYERED_MODE_WRITE        /* reserve, modify, insert, update */
 } WTI_CLAYERED_OP_MODE;
+
+#define WTI_CLAYERED_MODE_IS_WRITE(mode) \
+    ((mode) == WTI_CLAYERED_MODE_REMOVE || (mode) == WTI_CLAYERED_MODE_WRITE)
 
 /*
  * WTI_CLAYERED_OP --
@@ -81,4 +85,5 @@ struct __wti_clayered_op {
     WT_TRUNCATE_LIST *truncate_list; /* the layered table's truncate list */
     WT_COLLATOR *collator;
     WTI_CLAYERED_WRITE_TARGET write_target;
+    bool follower_blind_remove;
 };

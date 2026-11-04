@@ -550,10 +550,22 @@ done:
     __wt_spin_unlock(session, &evict->evict_queue_lock);
     if (queued) {
         WT_STAT_CONN_INCR(session, eviction_pages_queued_urgent);
-        if (WT_EVICT_HAS_WORKERS(session))
-            __wt_cond_signal(session, S2C(session)->evict_config.threads.wait_cond);
-        else
+        /*
+         * Two kinds of threads sleep on this condition: eviction workers, and application threads
+         * that found the queue empty while helping with eviction. A worker can take an urgent page
+         * at any time; an application thread can take one only when the cache is dirty-hard.
+         *
+         * When dirty-hard is set, whichever thread a single signal wakes can take the page. When it
+         * is not, a single signal picks an arbitrary waiter, which is usually one of the many
+         * application threads, and the page would wait for a worker to time out. Keep the broadcast
+         * in that case so a sleeping worker is sure to wake.
+         */
+        if (!WT_EVICT_HAS_WORKERS(session))
             __wt_evict_server_wake(session);
+        else if (F_ISSET(evict, WT_EVICT_CACHE_DIRTY_HARD))
+            __evict_wake_waiters(session, 1);
+        else
+            __wt_cond_signal(session, S2C(session)->evict_config.threads.wait_cond);
     }
 
     return (queued);

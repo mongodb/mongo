@@ -387,12 +387,13 @@ __clayered_assert_stable_mode(WTI_CURSOR_LAYERED *clayered)
 }
 
 /* __clayered_enter() local flags. */
-#define CLAYERED_ENTER_ITERATION 0x01u   /* Cursor is performing iteration. */
-#define CLAYERED_ENTER_OPEN_INGEST 0x02u /* Open and route to the ingest constituent. */
-#define CLAYERED_ENTER_RESET 0x04u       /* Reset constituent cursors if needed. */
-#define CLAYERED_ENTER_SKIP_STABLE 0x08u /* Follower operation not reading stable up front. */
-#define CLAYERED_ENTER_STEP_DOWN 0x10u   /* Role changed leader -> follower since last access. */
-#define CLAYERED_ENTER_STEP_UP 0x20u     /* Role changed follower -> leader since last access. */
+#define CLAYERED_ENTER_FOLLOWER_BLIND_REMOVE 0x01u /* Blind remove that never reads stable. */
+#define CLAYERED_ENTER_ITERATION 0x02u             /* Cursor is performing iteration. */
+#define CLAYERED_ENTER_OPEN_INGEST 0x04u           /* Open and route to the ingest constituent. */
+#define CLAYERED_ENTER_RESET 0x08u                 /* Reset constituent cursors if needed. */
+#define CLAYERED_ENTER_SKIP_STABLE 0x10u /* Follower operation not reading stable up front. */
+#define CLAYERED_ENTER_STEP_DOWN 0x20u   /* Role changed leader -> follower since last access. */
+#define CLAYERED_ENTER_STEP_UP 0x40u     /* Role changed follower -> leader since last access. */
 /* A role change in either direction since the cursor's last access. */
 #define CLAYERED_ENTER_ROLE_CHANGE (CLAYERED_ENTER_STEP_DOWN | CLAYERED_ENTER_STEP_UP)
 
@@ -401,8 +402,8 @@ __clayered_assert_stable_mode(WTI_CURSOR_LAYERED *clayered)
  *     Return whether the operation can start without an open stable constituent.
  */
 static WT_INLINE bool
-__clayered_skip_stable(
-  WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP_MODE mode, WTI_CLAYERED_ROLE role)
+__clayered_skip_stable(WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP_MODE mode,
+  WTI_CLAYERED_ROLE role, bool follower_blind_remove)
 {
     WT_SESSION_IMPL *session = CUR2S(clayered);
 
@@ -414,6 +415,10 @@ __clayered_skip_stable(
     if (mode == WTI_CLAYERED_MODE_SEARCH)
         return (true);
 
+    /* A follower blind remove never reads stable. */
+    if (follower_blind_remove)
+        return (true);
+
     /*
      * On a follower, if a read timestamp is set, even write operations need the stable table for
      * the cross-table visibility check.
@@ -422,7 +427,7 @@ __clayered_skip_stable(
         return (false);
 
     /* Writes to the ingest table can defer opening stable to lookup time. */
-    if (mode == WTI_CLAYERED_MODE_WRITE)
+    if (WTI_CLAYERED_MODE_IS_WRITE(mode))
         return (true);
 
     /* All other cases (next, prev, search_near) still need to check the stable table. */
@@ -445,7 +450,16 @@ __clayered_enter_flags(
     if (mode == WTI_CLAYERED_MODE_ITERATE || mode == WTI_CLAYERED_MODE_RANDOM)
         LF_SET(CLAYERED_ENTER_ITERATION);
 
-    if (__clayered_skip_stable(clayered, mode, role))
+    /*
+     * A slow follower truncate only removes keys its cursor is positioned on, so it never looks up
+     * a key and the blind path gains nothing.
+     */
+    bool follower_blind_remove = mode == WTI_CLAYERED_MODE_REMOVE &&
+      role == WTI_CLAYERED_ROLE_FOLLOWER && F_ISSET(&clayered->iface, WT_CURSTD_BLIND_REMOVE);
+    if (follower_blind_remove)
+        LF_SET(CLAYERED_ENTER_FOLLOWER_BLIND_REMOVE);
+
+    if (__clayered_skip_stable(clayered, mode, role, follower_blind_remove))
         LF_SET(CLAYERED_ENTER_SKIP_STABLE);
 
     if (role != clayered->last_role)
@@ -493,7 +507,7 @@ __clayered_write_target_for_op(WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP *op
     bool is_mirroring =
       F_ISSET(&S2C(CUR2S(clayered))->disaggregated_storage, WT_DISAGG_STEPDOWN_WRITE_MIRRORING);
 
-    if (mode != WTI_CLAYERED_MODE_WRITE)
+    if (!WTI_CLAYERED_MODE_IS_WRITE(mode))
         return (WTI_CLAYERED_WRITE_NONE);
 
     if (role == WTI_CLAYERED_ROLE_FOLLOWER || step_down_created) {
@@ -527,6 +541,7 @@ __clayered_op_init(WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP *op, uint32_t f
     op->stable = LF_ISSET(CLAYERED_ENTER_SKIP_STABLE) ? NULL : clayered->stable_cursor;
     op->truncate_list = &table->truncate_list;
     op->collator = table->collator;
+    op->follower_blind_remove = LF_ISSET(CLAYERED_ENTER_FOLLOWER_BLIND_REMOVE);
 
     /*
      * Every operation needs a constituent. A transaction older than a step-down-created table,
@@ -561,7 +576,7 @@ __clayered_assert_role_change(
           "All the cursors should be left unpositioned before a step-up.");
     else if (LF_ISSET(CLAYERED_ENTER_STEP_DOWN))
         WT_ASSERT_ALWAYS(session,
-          !F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT) || mode != WTI_CLAYERED_MODE_WRITE,
+          !F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT) || !WTI_CLAYERED_MODE_IS_WRITE(mode),
           "Write cursors should be left unpositioned before a step-down.");
 
     /* Skip snapshots that recorded no role era (a checkpoint's bumped snapshot). */
@@ -600,7 +615,7 @@ __clayered_enter(WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP_MODE mode, WTI_CL
      * result does not depend on the transaction.
      */
     if (mode != WTI_CLAYERED_MODE_LARGEST_KEY)
-        WT_RET(__wt_txn_stepdown_straddler_check(session, mode == WTI_CLAYERED_MODE_WRITE));
+        WT_RET(__wt_txn_stepdown_straddler_check(session, WTI_CLAYERED_MODE_IS_WRITE(mode)));
 
     /*
      * FIXME-WT-15058: When inside a read committed isolation, the file cursor code expects to
@@ -2550,6 +2565,32 @@ err:
 }
 
 /*
+ * __clayered_lookup_blind_remove --
+ *     Look up a key for a follower blind remove without reading stable. The out parameter is set if
+ *     ingest or the truncate list already shows the key removed.
+ */
+static int
+__clayered_lookup_blind_remove(WTI_CLAYERED_OP *op, WT_ITEM *value, bool *removed_localp)
+{
+    WTI_CURSOR_LAYERED *clayered = op->clayered;
+    WT_DECL_RET;
+    bool found_local;
+
+    *removed_localp = false;
+
+    WT_ERR_NOTFOUND_OK(__clayered_lookup_ingest_and_truncate(op, value, &found_local), true);
+    if (ret == WT_NOTFOUND)
+        *removed_localp = found_local;
+    return (0);
+
+err:
+    WT_TRET(__clayered_reset_cursors(clayered, false));
+    value->data = NULL;
+    value->size = 0;
+    return (ret);
+}
+
+/*
  * __clayered_lookup_lazy_stable_open --
  *     Open the stable constituent an operation deferred at enter time, and hand it to the
  *     operation. The operation stays without a stable cursor if the follower has no checkpoint or
@@ -3301,7 +3342,8 @@ __clayered_modify_check(WTI_CLAYERED_OP *op, const WT_ITEM *key)
 
     /* Probe the ingest and stable tables. */
     WT_RET(__clayered_constituent_check(session, clayered, clayered->ingest_cursor, key));
-    WT_RET(__clayered_constituent_check(session, clayered, clayered->stable_cursor, key));
+    if (!op->follower_blind_remove)
+        WT_RET(__clayered_constituent_check(session, clayered, clayered->stable_cursor, key));
 
     return (0);
 }
@@ -3335,6 +3377,36 @@ __clayered_ingest_tombstone(WTI_CLAYERED_OP *op, const WT_ITEM *key)
 }
 
 /*
+ * __clayered_key_out_of_bounds --
+ *     Return whether a key falls outside the bounds set on the layered cursor.
+ */
+static int
+__clayered_key_out_of_bounds(WTI_CURSOR_LAYERED *clayered, const WT_ITEM *key, bool *out_of_boundsp)
+{
+    WT_COLLATOR *collator;
+    WT_CURSOR *cursor = &clayered->iface;
+    WT_SESSION_IMPL *session = CUR2S(clayered);
+    int cmp;
+
+    *out_of_boundsp = false;
+    __clayered_get_collator(clayered, &collator);
+
+    if (F_ISSET(cursor, WT_CURSTD_BOUND_LOWER)) {
+        WT_RET(__wt_compare(session, collator, key, &cursor->lower_bound, &cmp));
+        if (cmp < 0 || (cmp == 0 && !F_ISSET(cursor, WT_CURSTD_BOUND_LOWER_INCLUSIVE))) {
+            *out_of_boundsp = true;
+            return (0);
+        }
+    }
+    if (F_ISSET(cursor, WT_CURSTD_BOUND_UPPER)) {
+        WT_RET(__wt_compare(session, collator, key, &cursor->upper_bound, &cmp));
+        *out_of_boundsp =
+          cmp > 0 || (cmp == 0 && !F_ISSET(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE));
+    }
+    return (0);
+}
+
+/*
  * __clayered_remove_from_ingest --
  *     Remove an entry from the ingest table.
  */
@@ -3355,20 +3427,35 @@ __clayered_remove_from_ingest(WTI_CLAYERED_OP *op, const WT_ITEM *key, bool posi
     bool hold_value =
       clayered->current_cursor != NULL && F_ISSET(clayered->current_cursor, WT_CURSTD_VALUE_INT);
 
+    bool removed_local = false;
     if (!positioned || !hold_value) {
         /* Cached value isn't reliable (unpositioned or not holding the value ref); re-read it. */
         WT_ASSERT(session, F_ISSET(&clayered->iface, WT_CURSTD_KEY_EXT));
-        ret = __clayered_lookup(op, &value);
-        if (ret != 0) {
-            WT_TRET(__clayered_reset_cursors(clayered, false));
-            return (ret);
-        }
+        if (op->follower_blind_remove)
+            WT_RET(__clayered_lookup_blind_remove(op, &value, &removed_local));
+        else
+            WT_RET(__clayered_lookup(op, &value));
     } else if (clayered->current_cursor == c_ingest) {
         WT_ASSERT(session, F_ISSET(c_ingest, WT_CURSTD_KEY_INT));
-        /* Skip an existing tombstone: no consecutive tombstones on an update chain. */
         WT_ITEM_SET(value, c_ingest->value);
-        if (__wt_clayered_deleted(&value))
+        removed_local = __wt_clayered_deleted(&value);
+    }
+
+    /* Skip a key already removed locally: no consecutive tombstones on an update chain. */
+    if (removed_local) {
+        if (!op->follower_blind_remove)
             return (WT_NOTFOUND);
+
+        WT_STAT_CONN_DSRC_INCR(session, layered_curs_blind_remove_ingest_deleted);
+        /*
+         * Keep the position if a constituent is still on the key. If the cursor got to the key
+         * through an ingest entry that was later rolled back, nothing is left on the key and the
+         * next walk cannot continue from it, so reset the cursor.
+         */
+        if (clayered->current_cursor == NULL ||
+          !F_ISSET(clayered->current_cursor, WT_CURSTD_KEY_INT))
+            WT_RET(__clayered_reset_cursors(clayered, false));
+        return (0);
     }
 
     /*
@@ -3659,7 +3746,21 @@ __clayered_remove(WT_CURSOR *cursor)
     WT_ERR(__cursor_needkey(cursor));
     __cursor_novalue(cursor);
 
-    WT_ERR(__clayered_enter(clayered, WTI_CLAYERED_MODE_WRITE, &op));
+    /*
+     * A blind remove never reports a missing key, so a key outside the cursor bounds is a usage
+     * error on any role.
+     */
+    if (F_ISSET(cursor, WT_CURSTD_BLIND_REMOVE)) {
+        bool out_of_bounds;
+
+        WT_ERR(__clayered_key_out_of_bounds(clayered, &cursor->key, &out_of_bounds));
+        if (out_of_bounds)
+            WT_ERR_MSG(session, EINVAL,
+              "%s: blind_remove cannot remove a key outside the cursor bounds",
+              clayered->iface.internal_uri);
+    }
+
+    WT_ERR(__clayered_enter(clayered, WTI_CLAYERED_MODE_REMOVE, &op));
 
     CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
 
@@ -3672,14 +3773,17 @@ __clayered_remove(WT_CURSOR *cursor)
 
     /*
      * If the cursor was positioned, it stays positioned with a key but no value, otherwise, there's
-     * no position, key or value.
+     * no position, key or value. A blind remove that found nothing to write already dropped the
+     * constituent position.
      */
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-    if (positioned)
-        F_SET(cursor, WT_CURSTD_KEY_INT);
-    else
+    if (!positioned)
         WT_TRET(__clayered_reset_cursors(clayered, false));
+    else if (clayered->current_cursor != NULL)
+        F_SET(cursor, WT_CURSTD_KEY_INT);
     WT_STAT_CONN_DSRC_INCR(session, layered_curs_remove);
+    if (op.follower_blind_remove)
+        WT_STAT_CONN_DSRC_INCR(session, layered_curs_blind_remove_follower);
 
 err:
     if (ret != 0) {

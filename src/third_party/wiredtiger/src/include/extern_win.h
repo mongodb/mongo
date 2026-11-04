@@ -66,6 +66,7 @@ extern int __wti_win_unmap(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, 
 extern uintmax_t __wt_process_id(void) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp);
 extern void __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
+extern void __wt_cond_signal_n(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint32_t n);
 extern void __wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs,
   bool (*run_func)(WT_SESSION_IMPL *), bool *signalled);
 extern void __wt_epoch_raw(WT_SESSION_IMPL *session, struct timespec *tsp);

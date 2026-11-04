@@ -33,9 +33,9 @@ from helper import WiredTigerCursor
 # This test simulates log file corruption by manually setting
 # a log records length field to UINT32_MAX. The expected behavior is that
 # the record-length validation fails, salvage is invoked, and recovery
-# completes successfully. By repeating this recovery cycle,
-# the test also verifies that recovery does not create additional log files
-# and that disk space usage remains stable.
+# completes successfully, truncating the corrupt log at the corruption
+# offset. Without that check recovery would crash on the oversize record
+# and leave the opened log file behind on every restart.
 class test_log05(wttest.WiredTigerTestCase):
 
     uri = 'table:log05'
@@ -45,6 +45,8 @@ class test_log05(wttest.WiredTigerTestCase):
     WT_TURTLE_FILE_NAME = "WiredTiger.turtle"
     WT_LOG_FILE = "WiredTigerLog.0000000%03d"
 
+    # Recovery cycles to run. Each cycle corrupts the current log record and
+    # verifies that recovery salvages it again.
     test_round = 20
 
     def extract_key_from_turtle(self, line, key):
@@ -67,9 +69,11 @@ class test_log05(wttest.WiredTigerTestCase):
                 break
         self.assertTrue(value is not None, "Checkpoint lsn is missing in turtle file")
         _, offset = value
+        self.corrupted_file = self.WT_LOG_FILE % id
+        self.corrupted_offset = offset
         # The first four bytes of each log record are parsed as a 32-bit unsigned length.
         # To simulate corruption, overwrite these bytes to UINT32_MAX.
-        with open(self.WT_LOG_FILE % id, 'r+b') as f:
+        with open(self.corrupted_file, 'r+b') as f:
             f.seek(offset)
             f.write(struct.pack('<I', 0xFFFFFFFF))
 
@@ -87,11 +91,20 @@ class test_log05(wttest.WiredTigerTestCase):
             with self.expectedStdoutPattern("corrupted record length oversize at position"):
                 self.open_conn()
 
-        logs_count = 0
-        for i in range(self.test_round):
-            if os.path.exists(self.WT_LOG_FILE % (i+1)):
-                logs_count += 1
+            # Salvage truncates the corrupt log at the corrupt record before
+            # recovery returns. With ftruncate the file ends at the offset;
+            # without it the remainder is zero-filled. Asynchronous log removal
+            # may have deleted the file instead.
+            if os.path.exists(self.corrupted_file):
+                with open(self.corrupted_file, 'rb') as f:
+                    f.seek(self.corrupted_offset)
+                    hdr = f.read(4)
+                self.assertTrue(len(hdr) == 0 or hdr == b'\x00' * 4,
+                    f"{self.corrupted_file}: corrupt record still present at "
+                    f"{self.corrupted_offset}: {hdr.hex()}")
 
-        # This assert aims to make sure no redundant log file is generated.
-        # Due to log file rotation timing, two log files may temporarily coexist.
-        self.assertLessEqual(logs_count, 2, "We should have at most 2 log files")
+        # Every injected corruption was truncated away, so reopening the
+        # connection must not report one again. Recovery prints a notice when it
+        # salvages a corrupt log, and the harness fails on unexpected output, so
+        # a surviving corruption fails this reopen.
+        self.reopen_conn()

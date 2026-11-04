@@ -118,25 +118,36 @@ class test_layered_cursor32(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.reconfigure('blind_remove=true'), 0)
         cursor.close()
 
-    def test_cursor_cache(self):
-        # FIXME-WT-18920: Once blind remove is implemented, check that removing a missing key
-        # succeeds after the blind_remove=true open and fails after the default open.
+    # Remove a key that does not exist, in a transaction that is rolled back.
+    def remove_missing(self, cursor):
+        self.session.begin_transaction()
+        cursor.set_key('missing')
+        ret = cursor.remove()
+        self.session.rollback_transaction()
+        return ret
 
+    def test_cursor_cache(self):
         # Open and close a cursor, leaving it in the session's cursor cache.
         self.session.open_cursor(self.uri).close()
 
         # Open with the option on, reusing the cached cursor. A layered cursor takes the option from
-        # this open. A plain table rejects it, and the cursor still goes back into the cache.
-        cache_reuses = self.get_stat(stat.conn.cursor_reopen)
+        # this open, so removing a missing key succeeds. A plain table rejects it, and the cursor
+        # still goes back into the cache.
+        cursor_reopen = self.get_stat(stat.conn.cursor_reopen)
         if self.supported:
-            self.session.open_cursor(self.uri, None, 'blind_remove=true').close()
+            cursor = self.session.open_cursor(self.uri, None, 'blind_remove=true')
+            self.assertGreater(self.get_stat(stat.conn.cursor_reopen), cursor_reopen)
+            self.assertEqual(self.remove_missing(cursor), 0)
+            cursor.close()
         else:
             self.assert_enotsup(
                 lambda: self.session.open_cursor(self.uri, None, 'blind_remove=true'))
-        self.assertGreater(self.get_stat(stat.conn.cursor_reopen), cache_reuses)
+            self.assertGreater(self.get_stat(stat.conn.cursor_reopen), cursor_reopen)
 
         # Open with the default configuration, reusing the same cursor. A layered cursor must not
-        # keep the earlier option.
-        cache_reuses = self.get_stat(stat.conn.cursor_reopen)
-        self.session.open_cursor(self.uri).close()
-        self.assertGreater(self.get_stat(stat.conn.cursor_reopen), cache_reuses)
+        # keep the earlier option, so removing a missing key fails.
+        cursor_reopen = self.get_stat(stat.conn.cursor_reopen)
+        cursor = self.session.open_cursor(self.uri)
+        self.assertGreater(self.get_stat(stat.conn.cursor_reopen), cursor_reopen)
+        self.assertEqual(self.remove_missing(cursor), wiredtiger.WT_NOTFOUND)
+        cursor.close()

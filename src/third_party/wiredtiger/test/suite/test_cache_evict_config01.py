@@ -54,6 +54,8 @@ class test_cache_evict_config01(wttest.WiredTigerTestCase):
             "eviction=[incremental_app_eviction=false,prefer_scrub_eviction=false,cache_tolerance_for_app_eviction=100,skip_update_obsolete_check=true]",
             "eviction=[incremental_app_eviction=false,prefer_scrub_eviction=false,cache_tolerance_for_app_eviction=25,skip_update_obsolete_check=false]",
             "eviction=[incremental_app_eviction=false,prefer_scrub_eviction=false,cache_tolerance_for_app_eviction=20,skip_update_obsolete_check=false]",
+            "eviction=[bounded_wake=true]",
+            "eviction=[bounded_wake=false]",
         ]
 
         # Try different eviction failure reconfigurations.

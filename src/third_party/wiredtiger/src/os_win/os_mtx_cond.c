@@ -151,6 +151,45 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 }
 
 /*
+ * __wt_cond_signal_n --
+ *     Wake up to n waiting threads, or broadcast when n is most of the waiters.
+ */
+void
+__wt_cond_signal_n(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint32_t n)
+{
+    uint32_t i;
+    int cond_waiters;
+
+    __wt_verbose_debug2(session, WT_VERB_MUTEX, "signal_n %s", cond->name);
+
+    /* Same barrier as the broadcast wake. */
+    WT_FULL_BARRIER();
+
+    /*
+     * Fast path if we are in (or can enter), a state where the next waiter will return immediately
+     * as already signaled.
+     */
+    cond_waiters = cond->waiters;
+    if (cond_waiters == -1 || (cond_waiters == 0 && __wt_atomic_cas_int32(&cond->waiters, 0, -1)))
+        return;
+
+    if (n < 1)
+        n = 1;
+
+    EnterCriticalSection(&cond->mtx);
+    /* Broadcast once n reaches three quarters of the waiters, as in the POSIX version. */
+    if ((uint64_t)n * 4 >= (uint64_t)cond_waiters * 3) {
+        WT_STAT_CONN_INCR(session, cond_signal_n_broadcast);
+        WakeAllConditionVariable(&cond->cond);
+    } else {
+        WT_STAT_CONN_INCRV(session, cond_signal_n_signals, n);
+        for (i = 0; i < n; ++i)
+            WakeConditionVariable(&cond->cond);
+    }
+    LeaveCriticalSection(&cond->mtx);
+}
+
+/*
  * __wt_cond_destroy --
  *     Destroy a condition variable.
  */

@@ -181,6 +181,55 @@ err:
 }
 
 /*
+ * __wt_cond_signal_n --
+ *     Wake up to n waiting threads, or broadcast when n is most of the waiters.
+ */
+void
+__wt_cond_signal_n(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint32_t n)
+{
+    WT_DECL_RET;
+    uint32_t i;
+    int cond_waiters;
+
+    __wt_verbose_debug2(session, WT_VERB_MUTEX, "signal_n %s", cond->name);
+
+    /* Same barrier as the broadcast wake. */
+    WT_FULL_BARRIER();
+
+    /*
+     * Fast path if we are in (or can enter), a state where the next waiter will return immediately
+     * as already signaled.
+     */
+    cond_waiters = __wt_atomic_load_int32_relaxed(&cond->waiters);
+    if (cond_waiters == -1 || (cond_waiters == 0 && __wt_atomic_cas_int32(&cond->waiters, 0, -1)))
+        return;
+
+    if (n < 1)
+        n = 1;
+
+    WT_ERR(pthread_mutex_lock(&cond->mtx));
+    /*
+     * Broadcast once n reaches three quarters of the waiters, or exceeds them. Each signal costs
+     * the waker about as much as a broadcast costs per waiter, so at that point individual signals
+     * save little and a broadcast wakes everyone in one call.
+     */
+    if ((uint64_t)n * 4 >= (uint64_t)cond_waiters * 3) {
+        WT_STAT_CONN_INCR(session, cond_signal_n_broadcast);
+        ret = pthread_cond_broadcast(&cond->cond);
+    } else {
+        WT_STAT_CONN_INCRV(session, cond_signal_n_signals, n);
+        for (i = 0; i < n && ret == 0; ++i)
+            ret = pthread_cond_signal(&cond->cond);
+    }
+    WT_TRET(pthread_mutex_unlock(&cond->mtx));
+    if (ret == 0)
+        return;
+
+err:
+    WT_IGNORE_RET(__wt_panic(session, ret, "pthread_cond_signal: %s", cond->name));
+}
+
+/*
  * __wt_cond_destroy --
  *     Destroy a condition variable.
  */

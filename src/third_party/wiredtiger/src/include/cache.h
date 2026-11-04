@@ -44,6 +44,7 @@ struct __wt_cache_eviction_controls {
 #define WT_CACHE_EVICT_INCREMENTAL_APP 0x1u
 #define WT_CACHE_PREFER_SCRUB_EVICTION 0x2u
 #define WT_CACHE_SKIP_UPDATE_OBSOLETE_CHECK 0x4u
+#define WT_CACHE_BOUNDED_WAKE 0x8u
     wt_shared uint32_t flags_atomic;
 };
 

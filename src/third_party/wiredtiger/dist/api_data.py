@@ -838,6 +838,10 @@ connection_runtime_config = [
                 standard dirty or update triggers won't become active until the cache fill ratio
                 first reaches this new, higher threshold.''',
                 min='0', max='50'),
+            Config('bounded_wake', 'true', r'''
+                Wake only as many threads waiting for eviction candidates as there are candidates
+                to take, instead of waking all of them every time candidates are queued.''',
+                type='boolean'),
             Config('cache_tolerance_for_app_eviction', '0', r'''
                 This setting establishes a tolerance level for the configured
                 \c eviction_dirty_trigger and \c eviction_update_trigger.
@@ -1608,8 +1612,9 @@ cursor_runtime_config = [
         cursors with record number keys''',
         type='boolean'),
     Config('blind_remove', 'false', r'''
-        configures WT_CURSOR::remove to succeed whether or not a record with the key exists. Only
-        layered tables support this option''',
+        configures WT_CURSOR::remove to succeed whether or not a record with the key exists.
+        Removing a key outside the cursor bounds fails with \c EINVAL. On a follower, write
+        conflicts come from the ingest table alone. Only layered tables support this option''',
         type='boolean', undoc=True),
     Config('overwrite', 'true', r'''
         configures whether the cursor's insert and update methods check the existing state of

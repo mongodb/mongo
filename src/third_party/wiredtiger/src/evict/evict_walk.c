@@ -345,7 +345,7 @@ __wti_evict_walk(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue)
     uint32_t dominating_flags, evict_walk_flags, evict_walk_period;
     u_int loop_count, max_entries, retries, slot, start_slot;
     u_int total_candidates;
-    bool aggressive, covered, dhandle_list_locked, resume, try_publish;
+    bool aggressive, covered, dhandle_list_locked, resume, shutdown, try_publish;
 
     WT_TRACK_OP_INIT(session);
 
@@ -374,28 +374,38 @@ __wti_evict_walk(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue)
 
 retry:
     loop_count = 0;
+    shutdown = false;
     while (slot < max_entries && loop_count++ < conn->dhandle_count) {
         /* We're done if shutting down or reconfiguring. */
-        if (F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING))
+        if (F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING)) {
+            shutdown = true;
             break;
+        }
 
         /* Eviction server will be suspended if cache pool is reconfiguring. */
-        if (F_ISSET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_CACHE_POOL))
+        if (F_ISSET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_CACHE_POOL)) {
+            shutdown = true;
             break;
+        }
 
         /*
          * If another thread is waiting on the eviction server to clear the walk point in a tree,
          * give up.
          */
-        if (__wt_atomic_load_uint32_v_relaxed(&evict->pass_intr) != 0)
+        if (__wt_atomic_load_uint32_v_relaxed(&evict->pass_intr) != 0) {
+            WT_STAT_CONN_INCR(session, eviction_server_refill_end_interrupted);
             WT_ERR(EBUSY);
+        }
 
         /*
          * Lock the dhandle list to find the next handle and bump its reference count to keep it
          * alive while we sweep.
          */
         if (!dhandle_list_locked) {
-            WT_ERR(__wti_evict_lock_handle_list(session));
+            /* The lock attempt only gives up when the walk is interrupted. */
+            if ((ret = __wti_evict_lock_handle_list(session)) == EBUSY)
+                WT_STAT_CONN_INCR(session, eviction_server_refill_end_interrupted);
+            WT_ERR(ret);
             dhandle_list_locked = true;
         }
 
@@ -664,6 +674,14 @@ retry:
         ++retries;
         goto retry;
     }
+
+    /* Count why the last pass ended; interrupts are counted where they end the walk. */
+    if (slot >= max_entries)
+        WT_STAT_CONN_INCR(session, eviction_server_refill_end_filled);
+    else if (shutdown)
+        WT_STAT_CONN_INCR(session, eviction_server_refill_end_shutdown);
+    else
+        WT_STAT_CONN_INCR(session, eviction_server_refill_end_lap_complete);
 
 err:
     if (dhandle_list_locked)

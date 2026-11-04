@@ -9,6 +9,23 @@
 #pragma once
 
 /*
+ * __evict_wake_waiters --
+ *     Wake threads waiting for eviction candidates: n of them if bounded wake is configured, else
+ *     all of them.
+ */
+static WT_INLINE void
+__evict_wake_waiters(WT_SESSION_IMPL *session, uint32_t n)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+    if (F_ISSET_ATOMIC_32(&conn->cache->cache_eviction_controls, WT_CACHE_BOUNDED_WAKE))
+        __wt_cond_signal_n(session, conn->evict_config.threads.wait_cond, n);
+    else
+        __wt_cond_signal(session, conn->evict_config.threads.wait_cond);
+}
+
+/*
  * __evict_bounded_wait_limit_us --
  *     Return how long a bounded caller may wait.
  */
