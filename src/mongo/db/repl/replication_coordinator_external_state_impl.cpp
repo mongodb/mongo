@@ -125,6 +125,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 MONGO_FAIL_POINT_DEFINE(hangAfterJournalFlusherGetToken);
 MONGO_FAIL_POINT_DEFINE(hangAfterAcquiringLastVoteCollection);
+MONGO_FAIL_POINT_DEFINE(hangAfterWorkerPoolShutdownBeforeJoinInStopDataReplication);
+MONGO_FAIL_POINT_DEFINE(hangAfterWorkerPoolJoinInStopDataReplication);
 
 // The maximum size of the oplog write buffer is set to 256MB.
 constexpr std::size_t kOplogWriteBufferSize = 256 * 1024 * 1024;
@@ -427,7 +429,18 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication(
     // _workerPool is a const member (immutable pointer), so no lock is needed.
     LOGV2(5698300, "Stopping replication applier writer pool");
     _workerPool->shutdown();
+
+    if (MONGO_unlikely(hangAfterWorkerPoolShutdownBeforeJoinInStopDataReplication.shouldFail())) {
+        LOGV2(13690301, "Hanging after worker pool shutdown, before join, in _stopDataReplication");
+        hangAfterWorkerPoolShutdownBeforeJoinInStopDataReplication.pauseWhileSet();
+    }
+
     _workerPool->join();
+
+    if (MONGO_unlikely(hangAfterWorkerPoolJoinInStopDataReplication.shouldFail())) {
+        LOGV2(13690300, "Hanging after worker pool join in _stopDataReplication");
+        hangAfterWorkerPoolJoinInStopDataReplication.pauseWhileSet();
+    }
 
     if (oldWriterExecutor) {
         LOGV2(8569802, "Stopping replication writer executor threads");

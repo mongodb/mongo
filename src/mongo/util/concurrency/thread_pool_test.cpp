@@ -725,5 +725,74 @@ DEATH_TEST_F(ThreadPoolDeathTest, DieOnDoubleJoin, "Attempted to join pool") {
     pool.join();
 }
 
+// Regression test for SERVER-136903.
+// setMinThreads on a pool in shutdownComplete state must not loop forever.
+TEST_F(ThreadPoolTest, SetMinThreadsAfterShutdownIsNoOp) {
+    ThreadPool::Options options;
+    options.minThreads = 0;
+    options.maxThreads = 4;
+    auto& pool = makePool(options);
+    pool.startup();
+    pool.shutdown();
+    pool.join();
+
+    // If the bug is present this never returns.
+    pool.setMinThreads(1);
+    ASSERT_EQ(pool.getStats().numThreads, 0);
+}
+
+// Regression test for SERVER-136903.
+// setMinThreads between shutdown() and join() must not hang join().
+TEST_F(ThreadPoolTest, SetMinThreadsBetweenShutdownAndJoinDoesNotHangJoin) {
+    ThreadPool::Options options;
+    options.minThreads = 0;
+    options.maxThreads = 4;
+    auto& pool = makePool(options);
+    pool.startup();
+
+    pool.shutdown();
+
+    // Run setMinThreads concurrently with join(). With the bug, setMinThreads grabs
+    // _mutex and spins forever; join() then blocks waiting for _mutex and never returns.
+    stdx::thread setter([&] { pool.setMinThreads(2); });
+
+    // Give the setter time to acquire _mutex and start spinning if the bug is present.
+    sleepFor(Milliseconds(50));
+
+    // If the bug is present this never returns.
+    pool.join();
+
+    setter.join();
+    ASSERT_EQ(pool.getStats().numThreads, 0);
+}
+
+// Regression test for SERVER-136903.
+TEST_F(ThreadPoolTest, SetMinThreadsBeforeStartupDoesNotHang) {
+    ThreadPool::Options options;
+    options.minThreads = 0;
+    options.maxThreads = 4;
+    auto& pool = makePool(options);
+
+    // If the bug is present this never returns.
+    pool.setMinThreads(1);
+    pool.startup();
+    pool.shutdown();
+    pool.join();
+}
+
+// Regression test for SERVER-136903.
+TEST_F(ThreadPoolTest, SetMaxThreadsAfterShutdownIsNoOp) {
+    ThreadPool::Options options;
+    options.minThreads = 0;
+    options.maxThreads = 4;
+    auto& pool = makePool(options);
+    pool.startup();
+    pool.shutdown();
+    pool.join();
+
+    pool.setMaxThreads(8);
+    ASSERT_EQ(pool.getStats().numThreads, 0);
+}
+
 }  // namespace
 }  // namespace mongo

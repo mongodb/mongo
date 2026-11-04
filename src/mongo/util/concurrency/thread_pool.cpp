@@ -132,8 +132,9 @@ private:
     /**
      * Starts a worker thread, unless _options.maxThreads threads are already running or
      * _state is not running.
+     * Returns true if a thread was started, false otherwise.
      */
-    void _startWorkerThread_inlock();
+    bool _startWorkerThread_inlock();
 
     /**
      * This is the run loop of a worker thread, invoked by _workerThreadBody.
@@ -569,35 +570,31 @@ void ThreadPool::Impl::_doOneTask(std::unique_lock<std::mutex>* lk) noexcept {
     }
 }
 
-void ThreadPool::Impl::_startWorkerThread_inlock() {
+bool ThreadPool::Impl::_startWorkerThread_inlock() {
     switch (_state) {
         case preStart:
-            LOGV2_DEBUG(
-                23110,
-                1,
-                "Not starting new thread since the pool is still waiting for startup() call",
-                "poolName"_attr = _options.poolName);
-            return;
+            LOGV2(23110,
+                  "Not starting new thread since the pool is still waiting for startup() call",
+                  "poolName"_attr = _options.poolName);
+            return false;
         case joinRequired:
         case joining:
         case shutdownComplete:
-            LOGV2_DEBUG(23111,
-                        1,
-                        "Not starting new thread since the pool is shutting down",
-                        "poolName"_attr = _options.poolName);
-            return;
+            LOGV2(23111,
+                  "Not starting new thread since the pool is shutting down",
+                  "poolName"_attr = _options.poolName);
+            return false;
         case running:
             break;
         default:
             MONGO_UNREACHABLE;
     }
     if (_threads.size() == _options.maxThreads) {
-        LOGV2_DEBUG(23112,
-                    2,
-                    "Not starting new thread in pool since the pool is already full",
-                    "poolName"_attr = _options.poolName,
-                    "maxThreads"_attr = _options.maxThreads);
-        return;
+        LOGV2(23112,
+              "Not starting new thread in pool since the pool is already full",
+              "poolName"_attr = _options.poolName,
+              "maxThreads"_attr = _options.maxThreads);
+        return false;
     }
     invariant(_threads.size() < _options.maxThreads);
     std::string threadName = fmt::format("{}{}", _options.threadNamePrefix, _nextThreadId++);
@@ -611,7 +608,9 @@ void ThreadPool::Impl::_startWorkerThread_inlock() {
                     "numThreads"_attr = _threads.size(),
                     "poolName"_attr = _options.poolName,
                     "error"_attr = redact(ex.what()));
+        return false;
     }
+    return true;
 }
 
 void ThreadPool::Impl::_setState_inlock(const LifecycleState newState) {
@@ -644,7 +643,16 @@ void ThreadPool::Impl::setMinThreads(size_t minThreads) {
                     "numThreads"_attr = _threads.size(),
                     "minThreads"_attr = _options.minThreads,
                     "maxThreads"_attr = _options.maxThreads);
-        _startWorkerThread_inlock();
+        if (!_startWorkerThread_inlock()) {
+            LOGV2(13690303,
+                  "_startWorkerThread_inlock() could not start a new thread, exiting setMinThreads "
+                  "loop and not starting any more threads",
+                  "poolName"_attr = _options.poolName,
+                  "numThreads"_attr = _threads.size(),
+                  "minThreads"_attr = _options.minThreads,
+                  "maxThreads"_attr = _options.maxThreads);
+            break;
+        }
     }
 }
 
@@ -660,6 +668,7 @@ void ThreadPool::Impl::setMaxThreads(size_t maxThreads) {
           "minThreads"_attr = _options.minThreads,
           "maxThreads"_attr = _options.maxThreads,
           "old maxThreads"_attr = oldMaxThreads);
+
     // Reaping extra threads will automatically be done in _consumeTasks().
 }
 
