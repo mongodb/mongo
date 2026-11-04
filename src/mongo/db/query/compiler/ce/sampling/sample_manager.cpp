@@ -9,13 +9,16 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/compiler/ce/sampling/on_the_fly_sample_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id_helpers.h"
@@ -25,9 +28,11 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -40,6 +45,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
 
 namespace mongo::ce {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforePersistingSample);
 
 namespace {
 
@@ -285,17 +292,30 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
     const boost::optional<int> numChunks =
         samplingMethodToPersist == SamplingTechniqueEnum::kChunk ? spec.numChunks : boost::none;
 
-    // Create a clustered collection for persistent sample.
+    if (MONGO_unlikely(hangBeforePersistingSample.shouldFail())) {
+        hangBeforePersistingSample.pauseWhileSet();
+    }
+
+    // Check the flag and create the collection under an FCV region, so that a downgrade which drops
+    // this collection cannot land in between and leave the sample behind.
+    // TODO SERVER-124336: Remove this region once featureFlagPersistentStats is removed.
     const NamespaceString samplesNss =
         NamespaceStringUtil::deserialize(spec.nss.dbName(), kSamplesCollectionName);
-    auto createCollectionStatus = repl::StorageInterface::get(_opCtx)->createCollection(
-        _opCtx,
-        samplesNss,
-        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()});
-    // Samples collection may already exist, in which case the createCollection command
-    // was a no-op.
-    if (createCollectionStatus != ErrorCodes::NamespaceExists) {
-        uassertStatusOK(createCollectionStatus);
+    {
+        FixedFCVRegion fcvRegion(_opCtx);
+        uassert(ErrorCodes::CommandNotSupported,
+                "The analyze command with sampling mode requires featureFlagPersistentStats to be "
+                "enabled",
+                feature_flags::gFeatureFlagPersistentStats.isEnabled(
+                    VersionContext::getDecoration(_opCtx), fcvRegion->acquireFCVSnapshot()));
+
+        auto createCollectionStatus = repl::StorageInterface::get(_opCtx)->createCollection(
+            _opCtx,
+            samplesNss,
+            CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()});
+        if (createCollectionStatus != ErrorCodes::NamespaceExists) {
+            uassertStatusOK(createCollectionStatus);
+        }
     }
 
     // Serialize the sample into one or more page documents

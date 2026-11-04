@@ -140,6 +140,14 @@ export function assertSamplesCollClustered(db) {
     );
 }
 
+// Asserts that the persistent samples collection does not exist.
+export function assertNoSamplesColl(db) {
+    const collInfos = db.getCollectionInfos({name: samplesCollName});
+    assert.eq(0, collInfos.length, `Expected no ${samplesCollName} collection to exist`, {
+        collInfos,
+    });
+}
+
 /**
  * Asserts that `meta` reflects a persisted-sample hit with at least one page.
  */

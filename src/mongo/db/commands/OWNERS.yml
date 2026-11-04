@@ -102,6 +102,9 @@ filters:
   - "*fcv_step*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "persistent_stats_fcv_step*":
+    approvers:
+      - 10gen/query-optimization
   - "snapshot_management*":
     approvers:
       - 10gen/server-replication-reviewers
