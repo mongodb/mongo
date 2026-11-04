@@ -21,9 +21,11 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/rss/stub_persistence_provider.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/idl/idl_parser.h"
@@ -34,6 +36,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/scopeguard.h"
 
 #include <algorithm>
 #include <string>
@@ -532,21 +535,12 @@ TEST_F(VerifyValidationHashTest, FalseForUnsupportedCollection) {
         shouldVerify(_opCtx.get(), _plainNss, OplogApplication::Mode::kSecondary, int64_t{123}));
 }
 
-// Per-collection validation needs its own feature flag. The fixture already enables the
-// per-document one.
-TEST_F(VerifyValidationHashTest, PerCollectionDisabledWithoutItsOwnFeatureFlag) {
-    EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
+TEST_F(VerifyValidationHashTest, PerCollectionEnabledByPerDocumentFeatureFlag) {
+    unittest::ServerParameterGuard enablePerDocument(
+        "featureFlagContinuousInternodeValidationPerDocument", true);
 
-    unittest::ServerParameterGuard enablePerCollection(
-        "featureFlagContinuousInternodeValidationPerCollection", true);
     EXPECT_TRUE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
-}
 
-// The collection hash is accumulated from the per-document hashes, so it is off whenever
-// per-document validation is off, whatever its own flag says.
-TEST_F(VerifyValidationHashTest, PerCollectionDisabledWithoutPerDocument) {
-    unittest::ServerParameterGuard enablePerCollection(
-        "featureFlagContinuousInternodeValidationPerCollection", true);
     unittest::ServerParameterGuard disablePerDocument(
         "featureFlagContinuousInternodeValidationPerDocument", false);
 
@@ -649,10 +643,15 @@ TEST_F(VerifyValidationHashTest, DisabledWhenNotAReplicaSet) {
         _opCtx->getServiceContext(),
         std::make_unique<ReplicationCoordinatorMock>(_opCtx->getServiceContext(), ReplSettings{}));
 
-    unittest::ServerParameterGuard enablePerCollection(
-        "featureFlagContinuousInternodeValidationPerCollection", true);
-
     EXPECT_FALSE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
+    EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
+}
+
+TEST_F(VerifyValidationHashTest, DisabledOnShardedCluster) {
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer};
+    ON_BLOCK_EXIT([] { serverGlobalParams.clusterRole = ClusterRole::None; });
+
+    EXPECT_TRUE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
     EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
 }
 

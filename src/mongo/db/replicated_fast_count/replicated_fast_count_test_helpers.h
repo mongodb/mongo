@@ -148,6 +148,21 @@ class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistencePr
     }
 };
 
+class ContinuousInternodeValidationTestPersistenceProvider
+    : public ReplicatedFastCountTestPersistenceProvider {
+    bool shouldUseContinuousInternodeValidation() const override {
+        return true;
+    }
+
+    bool shouldDisableTransactionUpdateCoalescing() const override {
+        return false;
+    }
+
+    bool relaxContainerOplogConstraints() const override {
+        return true;
+    }
+};
+
 /**
  * Returns true if `uuid` is found in the fast count metadata container, and writes the value to
  * `outDoc`.

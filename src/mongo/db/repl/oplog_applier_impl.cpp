@@ -704,8 +704,7 @@ void OplogApplierImpl::_fillWriterVectors(
     std::vector<std::vector<ApplierOperation>>* writerVectors,
     std::vector<std::vector<OplogEntry>>* derivedOps) noexcept {
     const bool validateCheckpoints = getOptions().mode == OplogApplication::Mode::kSecondary &&
-        !serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-        isContinuousInternodeValidationPerDocumentEnabled(opCtx);
+        isContinuousInternodeValidationPerCollectionEnabled(opCtx);
     fillWriterVectors(getOptions(),
                       _disableTransactionUpdateCoalescing,
                       opCtx,
@@ -718,8 +717,7 @@ void OplogApplierImpl::_fillWriterVectors(
 boost::optional<replicated_fast_count::ValidatorBuffers> OplogApplierImpl::_initValidatorBuffers(
     OperationContext* opCtx, size_t nWorkers) {
     const bool validateCheckpoints = getOptions().mode == OplogApplication::Mode::kSecondary &&
-        !serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-        isContinuousInternodeValidationPerDocumentEnabled(opCtx);
+        isContinuousInternodeValidationPerCollectionEnabled(opCtx);
     if (!validateCheckpoints) {
         return boost::none;
     }

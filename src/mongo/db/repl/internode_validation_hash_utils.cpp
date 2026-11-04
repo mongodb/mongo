@@ -8,7 +8,9 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/version_context.h"
 
 // The //src/third_party/xxhash target is header-only and defines XXH_INLINE_ALL for its consumers,
@@ -72,19 +74,11 @@ bool isContinuousInternodeValidationPerCollectionEnabled(OperationContext* opCtx
         return false;
     }
 
-    if (providerUsesContinuousInternodeValidation(opCtx)) {
-        return true;
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+        return false;
     }
 
-    // Both flags need to be checked against the same FCV snapshot.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const auto& vCtx = VersionContext::getDecoration(opCtx);
-
-    // The collection hash is folded from the per-document hashes carried on the oplog entries, so
-    // it requires per-document validation to be enabled as well.
-    return isPerDocumentFlagEnabled(vCtx, fcvSnapshot) &&
-        gFeatureFlagContinuousInternodeValidationPerCollection
-            .isEnabledUseLatestFCVWhenUninitialized(vCtx, fcvSnapshot);
+    return isContinuousInternodeValidationPerDocumentEnabled(opCtx);
 }
 
 bool isCollectionHashEligible(const CollectionPtr& coll) {

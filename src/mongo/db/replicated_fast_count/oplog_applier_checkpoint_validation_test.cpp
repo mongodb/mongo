@@ -34,6 +34,12 @@ const Timestamp kT0{Seconds(100), 0};
 
 class CheckpointValidationTest : public OplogApplierImplTest {
 protected:
+    Options makeServiceContextOptions() override {
+        return OplogApplierImplTest::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<replicated_fast_count::test_helpers::
+                                 ContinuousInternodeValidationTestPersistenceProvider>());
+    }
+
     void setUp() override {
         OplogApplierImplTest::setUp();
         // We need to create the stores because the oplog applier actually writes the container ops
