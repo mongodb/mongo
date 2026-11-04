@@ -80,6 +80,14 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCQForJoinPipeline(
         return swCQ;
     }
 
+    // Every join node is lowered to SBE, so bail out if this CQ uses anything SBE cannot execute
+    // (e.g. $function, $getField, or a path with a numeric component).
+    if (swCQ.getValue()->getExpCtx()->getSbeCompatibility() == SbeCompatibility::notCompatible) {
+        reason = JoinFallbackReason::kSbeIncompatibleExpression;
+        return Status(ErrorCodes::QueryFeatureNotAllowed,
+                      "Encountered an expression that SBE does not support");
+    }
+
     // Mark the CQ as SBE-compatible to work around the check in 'shouldCacheQuery()' that prevents
     // caching of non-sbe collscan plans.
     swCQ.getValue()->setSbeCompatible(true);
@@ -216,8 +224,10 @@ StatusWith<Predicates> extractPredicatesFromLookup(const DocumentSourceLookUp& l
     auto pipelineForCQ =
         Pipeline::create(DocumentSourceContainer(start, lookup.getSubPipeline()->end()), cqExpCtx);
     if (singleTablePredicates) {
+        // Only the BSON constructor for DocumentSourceMatch actually computes SBE eligibility,
+        // and 'createCanonicalQuery()' copies it onto the expression context.
         pipelineForCQ->addInitialSource(
-            make_intrusive<DocumentSourceMatch>(std::move(singleTablePredicates), cqExpCtx));
+            DocumentSourceMatch::create(singleTablePredicates->serialize(), cqExpCtx));
     }
 
     auto swCq = createCQForJoinPipeline(cqExpCtx, *pipelineForCQ, reason);

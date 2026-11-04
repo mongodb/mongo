@@ -46,6 +46,7 @@ namespace mongo::join_ordering {
     F(kUnwindIncludeArrayIndex)        \
     F(kIneligibleSubPipelineStage)     \
     F(kFailedToCreateCQ)               \
+    F(kSbeIncompatibleExpression)      \
     F(kRootedOrSubplanning)            \
     F(kTooManyNodes)                   \
     F(kTooManyEdgesOrPredicates)       \

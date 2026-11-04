@@ -983,4 +983,85 @@ assertResultsStableAndJoinOptUsed(
     [],
 );
 
+// Every join node is lowered to SBE, so a $match that SBE cannot execute must end the join prefix
+// instead of being pushed into a join node.
+{
+    const collArr = conn.getDB(db1)[jsTestName() + "_arr"];
+    collArr.drop();
+    assert.commandWorked(collArr.insertOne({_id: 0, a: 1, arr: [1, 2]}));
+    assert.commandWorked(collArr.createIndex({a: 1}));
+    const lookupColl12 = {
+        $lookup: {from: coll12.getName(), localField: "a", foreignField: "a", as: "c12"},
+    };
+
+    // Unsupported expression before the first $lookup.
+    runTestCaseIneligiblePipeline({
+        pipeline: [
+            {$match: {$expr: {$eq: [{$getField: "a"}, 1]}}},
+            lookupColl12,
+            {$unwind: "$c12"},
+        ],
+        expectedCount: 1,
+        expectedFallbackReason: "sbeIncompatibleExpression",
+    });
+
+    // Unsupported match expression inside the $lookup sub-pipeline.
+    runTestCaseIneligiblePipeline({
+        pipeline: [
+            {
+                $lookup: {
+                    from: coll12.getName(),
+                    localField: "a",
+                    foreignField: "a",
+                    pipeline: [{$match: {$jsonSchema: {properties: {d: {bsonType: "string"}}}}}],
+                    as: "c12",
+                },
+            },
+            {$unwind: "$c12"},
+        ],
+        expectedCount: 1,
+        expectedFallbackReason: "sbeIncompatibleExpression",
+    });
+
+    // Numeric path component before the first $lookup.
+    runTestCaseIneligiblePipeline({
+        coll: collArr,
+        pipeline: [{$match: {"arr.0": 1}}, lookupColl12, {$unwind: "$c12"}],
+        expectedCount: 1,
+        expectedFallbackReason: "sbeIncompatibleExpression",
+    });
+
+    // Numeric path component in the $match absorbed into $lookup+$unwind.
+    runTestCaseIneligiblePipeline({
+        pipeline: [
+            {$lookup: {from: collArr.getName(), localField: "a", foreignField: "a", as: "f"}},
+            {$unwind: "$f"},
+            {$match: {"f.arr.0": 1}},
+        ],
+        expectedCount: 1,
+        expectedFallbackReason: "sbeIncompatibleExpression",
+    });
+
+    // A numeric path component in the second $lookup only ends the prefix there.
+    runTestCaseIneligibleSuffix({
+        pipeline: [
+            lookupColl12,
+            {$unwind: "$c12"},
+            {
+                $lookup: {
+                    from: collArr.getName(),
+                    localField: "a",
+                    foreignField: "a",
+                    pipeline: [{$match: {"arr.0": 1}}],
+                    as: "f",
+                },
+            },
+            {$unwind: "$f"},
+        ],
+        expectedCount: 1,
+        expectedNumJoinNodes: 1,
+        expectedFallbackReason: "sbeIncompatibleExpression",
+    });
+}
+
 MongoRunner.stopMongod(conn);

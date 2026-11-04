@@ -2955,6 +2955,96 @@ TEST_F(PipelineAnalyzerTest, SubPipelineRootedOrBailsOut) {
               toStringData(JoinFallbackReason::kRootedOrSubplanning));
 }
 
+TEST_F(PipelineAnalyzerTest, PrefixSbeIncompatibleMatchBailsOut) {
+    for (const auto* match :
+         {R"({$match: {"c.0": 1}})", R"({$match: {$expr: {$eq: [{$getField: "c"}, 1]}}})"}) {
+        const auto query = std::string{"["} + match + R"(,
+                {$lookup: {from: "A", localField: "a", foreignField: "b", as: "a"}},
+                {$unwind: "$a"}
+            ])";
+
+        auto pipeline = makePipeline(query, {"A"});
+        markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
+
+        auto swJoinModel = AggJoinModel::constructJoinModel(
+            *pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+        ASSERT_NOT_OK(swJoinModel) << match;
+        ASSERT_FALSE(getJoinOptMetrics().joinOptimizable) << match;
+        ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value()) << match;
+        ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+                  toStringData(JoinFallbackReason::kSbeIncompatibleExpression))
+            << match;
+    }
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineSbeIncompatibleMatchBailsOut) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "a", pipeline: [
+                {$match: {"c.0": 1}}
+            ]}},
+            {$unwind: "$a"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kSbeIncompatibleExpression));
+}
+
+TEST_F(PipelineAnalyzerTest, TrailingSbeIncompatibleMatchBailsOut) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$match: {"fromA.c.0": 1}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kSbeIncompatibleExpression));
+}
+
+TEST_F(PipelineAnalyzerTest, SbeIncompatibleNodePredicateIsNotInferred) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "a", foreignField: "c", as: "fromB", pipeline: [
+                {$match: {c: 1, "d.0": 1}}
+            ]}},
+            {$unwind: "$fromB"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"c"sv}}});
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kSbeIncompatibleExpression));
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    const auto& joinGraph = swJoinModel.getValue().getGraph();
+    ASSERT_EQ("{}", joinGraph.accessPathAt((NodeId)0)->getPrimaryMatchExpression()->toString());
+    ASSERT_EQ("{}", joinGraph.accessPathAt((NodeId)1)->getPrimaryMatchExpression()->toString());
+}
+
 TEST_F(PipelineAnalyzerTest, SubPipelineTooComplexForCQPushdownBails) {
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "a", pipeline: [
