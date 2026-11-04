@@ -111,6 +111,7 @@ public:
     /**
      * Adds 'node' to the blueprint and returns an owner for it. 'children' fill its child fields,
      * in the order forEachChild() visits them, and whatever the fields held before is ignored.
+     * The node is queued to be rewritten.
      */
     template <typename... Children>
     SbDetachedNode add(SbBlueprintNode node, Children... children) {
@@ -132,6 +133,13 @@ public:
     virtual ~SbBlueprintRewriteRule() = default;
 
     virtual std::string_view name() const = 0;
+
+    /**
+     * How many levels below its node the rule looks to decide whether to fire, at least 1. A rule
+     * that reads only its node and the node's children returns 1. When a node's children change,
+     * the engine rewrites the node again, and the nodes up to 'depth() - 1' levels above it.
+     */
+    virtual size_t depth() const = 0;
 
     /**
      * Attempts to rewrite 'node', which has been taken out of the tree. Returns boost::none if the

@@ -56,6 +56,10 @@ public:
         return "dropFilters";
     }
 
+    size_t depth() const override {
+        return 1;
+    }
+
     boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
                                           SbBlueprintRewriteContext& ctx) override {
         if (std::holds_alternative<SbBlueprintFilter>(*node)) {
@@ -110,6 +114,10 @@ public:
         return "wrapOnce";
     }
 
+    size_t depth() const override {
+        return 1;
+    }
+
     boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
                                           SbBlueprintRewriteContext& ctx) override {
         if (!std::holds_alternative<Node>(*node) || !_wrapped.insert(node.get().value).second) {
@@ -157,11 +165,64 @@ TEST_F(SbBlueprintRewriteTest, AddingManyNodesDuringTheWalk) {
     ASSERT_TRUE(std::holds_alternative<SbBlueprintCoScan>(node(current)));
 }
 
+// This is testing that all nodes `add()`ed during rewrites get enqueued and visited by the engine.
+// Wraps the first coscan it sees in a new filter under a new LimitSkip.
+class WrapInLimitAndFilterOnceRule : public SbBlueprintRewriteRule {
+public:
+    explicit WrapInLimitAndFilterOnceRule(StageBuilderState& state) : _state(state) {}
+
+    std::string_view name() const override {
+        return "wrapInLimitAndFilterOnce";
+    }
+
+    size_t depth() const override {
+        return 1;
+    }
+
+    boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
+                                          SbBlueprintRewriteContext& ctx) override {
+        if (!std::holds_alternative<SbBlueprintCoScan>(*node) || _fired) {
+            return boost::none;
+        }
+        _fired = true;
+        SbExprBuilder b{_state};
+        auto filter =
+            ctx.add(SbBlueprintFilter{.condition = b.makeBoolConstant(true)}, std::move(node));
+        return ctx.add(SbBlueprintLimitSkip{.limitExpr = b.makeInt64Constant(1)},
+                       std::move(filter));
+    }
+
+private:
+    StageBuilderState& _state;
+    bool _fired{false};
+};
+
+TEST_F(SbBlueprintRewriteTest, NodesAddedUnderTheReplacementAreRewritten) {
+    // The new filter is below the node that replaces the coscan, so it is rewritten only because
+    // adding it queued it.
+    auto leaf = coscan();
+    auto root = limitOne(leaf);
+
+    SbBlueprintRewriteRules rules;
+    rules.push_back(std::make_unique<WrapInLimitAndFilterOnceRule>(*_state));
+    rules.push_back(std::make_unique<DropFiltersRule>());
+    auto newRoot = rewriteSbeBlueprint(_state->opCtx, &blueprint(), root, rules, 10000);
+
+    ASSERT_EQ(newRoot, root);
+    auto wrapper = std::get<SbBlueprintLimitSkip>(node(root)).child;
+    ASSERT_EQ(std::get<SbBlueprintLimitSkip>(node(wrapper)).child, leaf);
+    lowerSbeBlueprint(blueprint(), newRoot, *_state);
+}
+
 // Replaces a union with its first child, discarding the others.
 class KeepFirstUnionChildRule : public SbBlueprintRewriteRule {
 public:
     std::string_view name() const override {
         return "keepFirstUnionChild";
+    }
+
+    size_t depth() const override {
+        return 1;
     }
 
     boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
@@ -196,6 +257,10 @@ public:
 
     std::string_view name() const override {
         return "adoptGrandchild";
+    }
+
+    size_t depth() const override {
+        return 1;
     }
 
     boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
@@ -241,6 +306,10 @@ public:
         return "swapFilterAndLimit";
     }
 
+    size_t depth() const override {
+        return 1;
+    }
+
     boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
                                           SbBlueprintRewriteContext& ctx) override {
         auto* filter = std::get_if<SbBlueprintFilter>(&*node);
@@ -271,6 +340,54 @@ TEST_F(SbBlueprintRewriteTest, RearrangedNodesAreRewrittenAgain) {
     lowerSbeBlueprint(blueprint(), newRoot, *_state);
 }
 
+// Replaces a unique over two LimitSkips with its child. It looks at its grandchild, so its depth
+// is 2.
+class DropUniqueOverTwoLimitsRule : public SbBlueprintRewriteRule {
+public:
+    std::string_view name() const override {
+        return "dropUniqueOverTwoLimits";
+    }
+
+    size_t depth() const override {
+        return 2;
+    }
+
+    boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
+                                          SbBlueprintRewriteContext& ctx) override {
+        auto* unique = std::get_if<SbBlueprintUnique>(&*node);
+        if (!unique) {
+            return boost::none;
+        }
+        auto* limit = std::get_if<SbBlueprintLimitSkip>(&ctx.node(unique->child));
+        if (!limit || !std::holds_alternative<SbBlueprintLimitSkip>(ctx.node(limit->child))) {
+            return boost::none;
+        }
+        return node.takeChild(0);
+    }
+};
+
+TEST_F(SbBlueprintRewriteTest, ChangeTwoLevelsDownRewritesTheNodeAgain) {
+    // unique -> filter -> limit -> limit -> coscan becomes limit -> limit -> filter -> coscan.
+    // The filter moves below each LimitSkip in turn.
+    auto leaf = coscan();
+    auto lower = limitOne(leaf);
+    auto upper = limitOne(lower);
+    auto filter = filterTrue(upper);
+    auto unique = blueprint().add(SbBlueprintUnique{.child = filter, .keys = {10}});
+
+    SbBlueprintRewriteRules rules;
+    rules.push_back(std::make_unique<SwapFilterAndLimitRule>());
+    rules.push_back(std::make_unique<DropUniqueOverTwoLimitsRule>());
+    auto newRoot = rewriteSbeBlueprint(_state->opCtx, &blueprint(), unique, rules, 10000);
+
+    ASSERT_EQ(newRoot, upper);
+    ASSERT_TRUE(std::holds_alternative<SbBlueprintLowered>(node(unique)));
+    ASSERT_EQ(std::get<SbBlueprintLimitSkip>(node(upper)).child, lower);
+    ASSERT_EQ(std::get<SbBlueprintLimitSkip>(node(lower)).child, filter);
+    ASSERT_EQ(std::get<SbBlueprintFilter>(node(filter)).child, leaf);
+    lowerSbeBlueprint(blueprint(), newRoot, *_state);
+}
+
 // Fires 'times' times in place, then stops.
 class FireNTimesRule : public SbBlueprintRewriteRule {
 public:
@@ -278,6 +395,10 @@ public:
 
     std::string_view name() const override {
         return "fireNTimes";
+    }
+
+    size_t depth() const override {
+        return 1;
     }
 
     boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
@@ -306,8 +427,8 @@ TEST_F(SbBlueprintRewriteTest, InPlaceRuleFiresUntilItStops) {
     ASSERT_EQ(static_cast<FireNTimesRule&>(*rules[0]).left(), 0);
 }
 
-// The rules below misuse the API to build a malformed tree. Lowering checks the tree and tasserts,
-// since checking after every rewrite would cost O(n) each time.
+// The rules below misuse the API. The driver tasserts on misuse it can detect cheaply. Checking the
+// whole tree after every rewrite would cost O(n) each time, so the rest is left to lowering.
 
 // Wraps a filter's child by writing its child field directly instead of taking it, so the child
 // is left with two parents.
@@ -317,6 +438,10 @@ public:
 
     std::string_view name() const override {
         return "shareChild";
+    }
+
+    size_t depth() const override {
+        return 1;
     }
 
     boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
@@ -349,6 +474,10 @@ public:
         return "returnMovedFromNode";
     }
 
+    size_t depth() const override {
+        return 1;
+    }
+
     boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
                                           SbBlueprintRewriteContext& ctx) override {
         if (!std::holds_alternative<SbBlueprintFilter>(*node)) {
@@ -370,6 +499,10 @@ public:
         return "addChildlessFilter";
     }
 
+    size_t depth() const override {
+        return 1;
+    }
+
     boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
                                           SbBlueprintRewriteContext& ctx) override {
         return ctx.add(SbBlueprintFilter{});
@@ -378,10 +511,9 @@ public:
 
 using SbBlueprintRewriteDeathTest = SbBlueprintRewriteTest;
 
-// The driver does not check that a rule keeps the tree well formed. Lowering does.
-DEATH_TEST_F(SbBlueprintRewriteDeathTest, SharedChildFailsLowering, "12702001") {
-    auto root = rewrite(filterTrue(coscan()), std::make_unique<ShareChildRule>(*_state));
-    lowerSbeBlueprint(blueprint(), root, *_state);
+// The coscan that the rule added is still queued, but its parent link no longer points at it.
+DEATH_TEST_F(SbBlueprintRewriteDeathTest, SharedChildFailsTheParentLinkCheck, "13627021") {
+    rewrite(filterTrue(coscan()), std::make_unique<ShareChildRule>(*_state));
 }
 
 DEATH_TEST_F(SbBlueprintRewriteDeathTest, RuleCannotUseAMovedFromNode, "13627017") {

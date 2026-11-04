@@ -54,12 +54,27 @@ private:
     // The nodes in '_queue'.
     absl::flat_hash_set<SbBlueprintNodeIdx> _inQueue;
 };
+
+/**
+ * Returns the greatest depth of 'rules', or 0 if there are none.
+ */
+size_t maxDepth(const SbBlueprintRewriteRules& rules) {
+    size_t depth = 0;
+    for (const auto& rule : rules) {
+        tassert(13821600,
+                "A blueprint rewrite rule must have a depth of at least 1",
+                rule->depth() >= 1);
+        depth = std::max(depth, rule->depth());
+    }
+    return depth;
+}
 }  // namespace
 
 /**
  * Main rewrite engine. This class owns the tree while it is rewritten and maintains a work queue,
- * which starts with every node, children before parents. Nodes are queued again when one of their
- * children changes.
+ * which starts with every node, children before parents. When a node's children change, the node
+ * is queued again, along with the nodes above it that are close enough for a rule to see the
+ * change. Nodes that rules add are queued too.
  */
 class SbBlueprintRewriter {
 public:
@@ -123,6 +138,17 @@ private:
     }
 
     /**
+     * Queues 'node', whose children changed, and the nodes above it, '_maxDepth' nodes in all. The
+     * walk stops at the root holder, which is never rewritten.
+     */
+    void enqueueWithAncestors(SbBlueprintNodeIdx node) {
+        for (size_t i = 0; i < _maxDepth && node != _rootHolder; ++i) {
+            _queue.push(node);
+            node = _parentLinks.at(node).parent;
+        }
+    }
+
+    /**
      * Applies the rules at 'node', and then at each node that replaces it, until none fires.
      */
     void applyRules(OperationContext* opCtx, SbBlueprintNodeIdx node);
@@ -152,6 +178,10 @@ private:
     const SbBlueprintNodeIdx _rootHolder;
 
     const SbBlueprintRewriteRules& _rules;
+
+    // The greatest depth of '_rules'.
+    const size_t _maxDepth;
+
     const size_t _maxFirings;
     size_t _firings{0};
 
@@ -172,6 +202,7 @@ SbBlueprintRewriter::SbBlueprintRewriter(SbBlueprint* blueprint,
       // An empty LimitSkip serves as the root holder.
       _rootHolder(blueprint->add(SbBlueprintLimitSkip{.child = root})),
       _rules(rules),
+      _maxDepth(maxDepth(rules)),
       _maxFirings(maxFirings) {
     // Record each node's parent, and queue the nodes children before parents. The root holder
     // records the root's parent but is not queued.
@@ -232,6 +263,8 @@ SbDetachedNode SbBlueprintRewriter::add(SbBlueprintNode node, std::span<SbDetach
     for (size_t childIdx = 0; childIdx < children.size(); ++childIdx) {
         link(added, childIdx, children[childIdx].release());
     }
+    // A rule adds a node's children before the node, so they are queued before it.
+    _queue.push(added);
     return SbDetachedNode{*this, added};
 }
 
@@ -282,9 +315,9 @@ void SbBlueprintRewriter::applyRules(OperationContext* opCtx, SbBlueprintNodeIdx
         opCtx->checkForInterrupt();
         node = result->get();
         put(link, std::move(*result));
-        if (link.parent != _rootHolder) {
-            _queue.push(link.parent);
-        }
+        // Queue the nodes above, up to the greatest rule depth, in case the change lets a rule
+        // that looks that many levels down fire on one of them.
+        enqueueWithAncestors(link.parent);
         // 'detached' goes out of scope here and deletes the old node unless the rule kept it.
     }
 }
