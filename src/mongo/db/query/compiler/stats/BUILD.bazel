@@ -43,6 +43,23 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "scalar_field_values",
+    srcs = ["scalar_field_values.cpp"],
+    hdrs = ["scalar_field_values.h"],
+    deps = [
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/db/pipeline:field_path",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "scalar_field_values_test",
+    srcs = ["scalar_field_values_test.cpp"],
+    tags = ["mongo_unittest_third_group"],
+    deps = [":scalar_field_values"],
+)
+
+mongo_cc_library(
     name = "collection_statistics_interface",
     deps = [
         ":stats_histograms",

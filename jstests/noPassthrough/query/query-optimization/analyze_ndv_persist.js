@@ -9,6 +9,7 @@
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {dropStatsColl} from "jstests/libs/query/persistent_samples_utils.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const kFieldStatsCollName = "system.stats.field_stats";
 const kExpectedSchemaVersion = 1;
@@ -76,7 +77,9 @@ describe("analyze mode: ndv", function () {
         assert.commandWorked(this.db.createCollection(tsColl, {timeseries: {timeField: "t"}}));
         assert.commandFailedWithCode(
             this.db.runCommand({analyze: tsColl, mode: "ndv", key: "a"}),
-            ErrorCodes.CommandNotSupported,
+            areViewlessTimeseriesEnabled(this.db)
+                ? ErrorCodes.CommandNotSupported
+                : ErrorCodes.CommandNotSupportedOnView,
         );
         this.db[tsColl].drop();
 
@@ -221,7 +224,7 @@ describe("analyze mode: ndv", function () {
             13176201,
         );
         assert.commandFailedWithCode(this.analyze({mode: "ndv", key: ["a", "a"]}), 13176202);
-        // A path prefixing another would collide in the pipeline's inclusion projection.
+        // Overlapping paths describe redundant NDV components.
         assert.commandFailedWithCode(this.analyze({mode: "ndv", key: ["a", "a.b"]}), 13176203);
         // Per-path validation applies to every tuple element.
         assert.commandFailedWithCode(this.analyze({mode: "ndv", key: ["a", ""]}), 6799703);
@@ -256,7 +259,7 @@ describe("analyze mode: ndv", function () {
         const before = this.statsDocs();
         assert.eq(before.length, 1);
 
-        // An empty collection produces no aggregation output, so the previous (now stale)
+        // An empty scan produces no new statistics, so the previous (now stale)
         // document stays. Stats invalidation is out of scope for now; the read path clamps
         // served estimates to the current collection cardinality, which covers this case.
         assert.commandWorked(this.coll.deleteMany({}));

@@ -30,14 +30,18 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/compiler/ce/ndv/field_stats.h"
-#include "mongo/db/query/compiler/ce/ndv/ndv_sketch_gen.h"
+#include "mongo/db/query/compiler/ce/ndv/field_stats_gen.h"
+#include "mongo/db/query/compiler/ce/ndv/ndv_sketch_builder.h"
 #include "mongo/db/query/compiler/ce/sampling/on_the_fly_sample_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_manager.h"
 #include "mongo/db/query/compiler/stats/ce_histogram.h"
 #include "mongo/db/query/compiler/stats/max_diff.h"
+#include "mongo/db/query/compiler/stats/scalar_field_values.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
 #include "mongo/db/query/compiler/stats/stats_catalog.h"
 #include "mongo/db/query/compiler/stats/stats_for_histograms_gen.h"
+#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -49,11 +53,12 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/version_context.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/get_status_from_command_result_write_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -74,6 +79,8 @@
 #include <boost/optional/optional.hpp>
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforePersistingNdvStats);
 
 // Total docs persisted across all analyze runs.
 auto& analyzeDocsPersisted = *MetricBuilder<Counter64>{"query.analyze.sample.docsPersisted"};
@@ -178,9 +185,8 @@ std::vector<std::string> normalizeNdvKeyPaths(
     uassert(13176202,
             "ndv mode key paths must be distinct",
             std::adjacent_find(paths.begin(), paths.end()) == paths.end());
-    // A path that prefixes another would collide in the inclusion $project of the ndv pipeline;
-    // NDV over such a pair is degenerate anyway, so reject it with a clear message. A path
-    // prefix is also a string prefix, so after the sort it can only precede its extensions.
+    // Overlapping paths describe redundant NDV components. After sorting, a path can only
+    // precede its extensions.
     for (size_t i = 0; i + 1 < paths.size(); ++i) {
         for (size_t j = i + 1; j < paths.size(); ++j) {
             uassert(13176203,
@@ -190,105 +196,6 @@ std::vector<std::string> normalizeNdvKeyPaths(
         }
     }
     return paths;
-}
-
-/**
- * Builds the ndv-mode aggregation. For the sorted key paths ["a.b", "c"] the pipeline looks
- * like this:
- *
- *      [
- *          { $project: { _id: 0, "a.b": 1, "c": 1 } },
- *          { $group: {
- *              _id: "1|<collection uuid>|a.b|c",
- *              sketches: { $_internalConstructNdvSketch: { val: "$$ROOT",
- *                                                          fields: ["a.b", "c"] } }
- *          } },
- *          { $project: {
- *              schemaVersion: {$literal: 1},
- *              collectionUuid: <UUID>,
- *              sortedFieldPaths: {$literal: ["a.b", "c"]},
- *              createdAt: "$$NOW",
- *              ndv: { sketches: "$sketches" }
- *          } },
- *          { $merge: { into: "system.stats.field_stats", on: "_id",
- *                      whenMatched: "replace", whenNotMatched: "insert" } }
- *      ]
- */
-BSONObj analyzeNdvModeAsAggregationCommand(std::string_view collection,
-                                           const std::vector<std::string>& keyPaths,
-                                           const UUID& collUuid,
-                                           const std::string& docId) {
-    BSONArrayBuilder pipelineBuilder;
-    {
-        // Narrow the stream to the analyzed fields. An inclusion projection preserves document
-        // structure and missing-ness, both of which the accumulator relies on. _id can only be
-        // excluded when it is not among the analyzed fields itself.
-        BSONObjBuilder stageBob(pipelineBuilder.subobjStart());
-        BSONObjBuilder projectBob(stageBob.subobjStart("$project"));
-        if (std::none_of(keyPaths.begin(), keyPaths.end(), [](const std::string& path) {
-                return FieldRef(path).getPart(0) == "_id";
-            })) {
-            projectBob.append("_id", 0);
-        }
-        for (const auto& path : keyPaths) {
-            projectBob.append(path, 1);
-        }
-    }
-    {
-        // The sketch-building $group.
-        InternalConstructNdvSketchAccumulatorParams sketchParams;
-        sketchParams.setVal("$$ROOT");
-        sketchParams.setFields(keyPaths);
-
-        BSONObjBuilder stageBob(pipelineBuilder.subobjStart());
-        BSONObjBuilder groupBob(stageBob.subobjStart("$group"));
-        // The id string always starts with the schema version digit, never '$', so it parses
-        // as a plain string constant.
-        groupBob.append("_id", docId);
-        groupBob.append("sketches", BSON("$_internalConstructNdvSketch" << sketchParams.toBSON()));
-    }
-    {
-        // The stamping $project. All values are constants except the sketches reference; the
-        // BinData UUID and $literal-wrapped values cannot be mistaken for inclusion flags or
-        // paths.
-        BSONObjBuilder stageBob(pipelineBuilder.subobjStart());
-        BSONObjBuilder projectBob(stageBob.subobjStart("$project"));
-        projectBob.append("schemaVersion", BSON("$literal" << ce::kFieldStatsSchemaVersion));
-        collUuid.appendToBuilder(&projectBob, "collectionUuid");
-        {
-            BSONArrayBuilder pathsBob;
-            for (const auto& path : keyPaths) {
-                pathsBob.append(path);
-            }
-            projectBob.append("sortedFieldPaths", BSON("$literal" << pathsBob.arr()));
-        }
-        projectBob.append("createdAt", "$$NOW");
-        projectBob.append("ndv", BSON("sketches" << "$sketches"));
-    }
-    {
-        // 'replace' is only safe while ndv is the sole statistic section in the document; once
-        // a second one exists this must become a $set-style pipeline update so sections written
-        // by other analyze runs survive.
-        BSONObjBuilder stageBob(pipelineBuilder.subobjStart());
-        BSONObjBuilder mergeBob(stageBob.subobjStart("$merge"));
-        mergeBob.append("into", NamespaceString::kStatsFieldStatsCollectionName);
-        mergeBob.append("on", "_id");
-        mergeBob.append("whenMatched", "replace");
-        mergeBob.append("whenNotMatched", "insert");
-    }
-
-    BSONObjBuilder aggBob;
-    aggBob.append("aggregate", collection);
-    aggBob.appendArray("pipeline", pipelineBuilder.arr());
-    // The acquisition used for validation is released by the time this command runs; the UUID
-    // check makes the aggregation fail instead of persisting stats for a dropped-and-recreated
-    // collection under the old UUID.
-    collUuid.appendToBuilder(&aggBob, "collectionUUID");
-    aggBob.append("cursor", BSONObj());
-    aggBob.append("allowDiskUse", false);
-    // TODO SERVER-132681: Consider using a covered IXSCAN instead of the collection scan.
-    aggBob.append("hint", BSON("$natural" << 1));
-    return aggBob.obj();
 }
 
 /**
@@ -336,30 +243,65 @@ void runNdvMode(OperationContext* opCtx,
     // Validated only after the feature gates above: without them the command must fail with
     // CommandNotSupported, not with key validation errors for a disabled feature.
     const std::vector<std::string> keyPaths = normalizeNdvKeyPaths(key);
+    const std::vector<FieldPath> paths(keyPaths.begin(), keyPaths.end());
 
-    boost::optional<UUID> collUuid;
+    ce::FieldStatsDoc document;
     {
-        // Shared validation deliberately mirrors sample mode, not histograms mode: capped
-        // collections are fine to read for NDV.
-        const auto coll = acquireAndValidateCollection(opCtx, nss, 13175802);
-
-        // Same restriction as histograms mode: no NDV statistics on system collections.
+        // Release the source acquisition and executor before writing statistics.
+        auto coll = acquireAndValidateCollection(opCtx, nss, 13175802);
         uassert(13175804,
                 str::stream() << nss.toStringForErrorMsg()
                               << " is not a normal or clustered collection",
                 nss.isNormalCollection() || coll.getCollectionPtr()->isClustered());
-
         // system.stats.field_stats is shard-local and invisible through mongos.
         // TODO SERVER-133119: Support NDV statistics for sharded collections.
         uassert(13175803,
                 "ndv mode is not supported on sharded collections",
                 !coll.getShardingDescription().isSharded());
 
-        collUuid = coll.getCollectionPtr()->uuid();
+        const auto collUuid = coll.uuid();
+        const auto createdAt = opCtx->getServiceContext()->getFastClockSource()->now();
+
+        // TODO SERVER-132681: Consider using a covered IXSCAN instead of the collection scan.
+        // Full scans can exceed five minutes, so periodically release the source snapshot.
+        auto exec =
+            InternalPlanner::collectionScan(opCtx, coll, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+        BSONObj doc;
+        if (exec->getNext(&doc, nullptr) == PlanExecutor::IS_EOF) {
+            // Keep previous statistics after an empty scan; the read path guards against staleness.
+            return;
+        }
+
+        ce::NdvSketchBuilder builder(paths.size());
+        do {
+            opCtx->checkForInterrupt();
+            const auto values = stats::extractScalarFieldValues(
+                {sbe::value::TypeTags::bsonObject,
+                 sbe::value::bitcastFrom<const char*>(doc.objdata())},
+                paths);
+            builder.accumulateTuple(values);
+            // TODO: integrate MCV here
+        } while (exec->getNext(&doc, nullptr) == PlanExecutor::ADVANCED);
+
+        document.set_id(ce::makeFieldStatsId(collUuid, keyPaths));
+        document.setSchemaVersion(ce::kFieldStatsSchemaVersion);
+        document.setCollectionUuid(collUuid);
+        document.setSortedFieldPaths(keyPaths);
+        document.setCreatedAt(createdAt);
+        document.setNdv(ce::NdvStats(builder.getSketches()));
     }
 
-    // The pipeline uses an internal-only accumulator and merges into a system collection, both
-    // of which require internal permissions.
+    hangBeforePersistingNdvStats.pauseWhileSet(opCtx);
+
+    // Reacquire with the scanned UUID to reject a dropped or recreated source collection.
+    acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::kRead, document.getCollectionUuid()));
+
+    const auto statsNss = NamespaceStringUtil::deserialize(
+        nss.dbName(), NamespaceString::kStatsFieldStatsCollectionName);
+
     const bool wasInternalClient = isInternalClient(opCtx->getClient());
     if (!wasInternalClient) {
         opCtx->getClient()->setIsInternalClient(true);
@@ -371,16 +313,8 @@ void runNdvMode(OperationContext* opCtx,
     });
 
     DBDirectClient client(opCtx);
-    const std::string docId = ce::makeFieldStatsId(*collUuid, keyPaths);
-
-    // Note: an empty collection produces no $group output, so a previous stats document is left
-    // in place. Stats invalidation (also after emptying or dropping a collection) is out of
-    // scope for now; the read path guards against staleness instead.
-    BSONObj result;
-    client.runCommand(nss.dbName(),
-                      analyzeNdvModeAsAggregationCommand(nss.coll(), keyPaths, *collUuid, docId),
-                      result);
-    uassertStatusOK(getStatusFromCommandResult(result));
+    uassertStatusOK(getStatusFromWriteCommandReply(client.updateAcknowledged(
+        statsNss, BSON("_id" << document.get_id()), document.toBSON(), /*upsert=*/true)));
 }
 
 void runSampleMode(OperationContext* opCtx,

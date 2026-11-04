@@ -14,7 +14,7 @@ namespace mongo::ce {
 inline constexpr int kFieldStatsSchemaVersion = 1;
 
 // Maximum number of fields a composite NDV statistic may cover. Enforced on user input by the
-// analyze command and defensively by the $_internalConstructNdvSketch accumulator.
+// analyze command and defensively by the sketch builder.
 inline constexpr size_t kNdvMaxFields = 3;
 
 /**

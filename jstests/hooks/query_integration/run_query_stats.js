@@ -33,14 +33,7 @@ function verifyQueryStats(nodeConn, queryStatsSpec) {
             assert(operation.hasOwnProperty("asOf"), "Missing 'asOf' in $queryStats result");
         }
     } catch (e) {
-        // NDV analyze pipelines still contain an internal-only accumulator (SERVER-85374).
-        const analyzeCmdReparseErr =
-            e.message.indexOf("Failed to re-parse query") !== -1 &&
-            e.message.indexOf("$_internalConstructNdvSketch") !== -1;
-        if (
-            analyzeCmdReparseErr ||
-            (allowFeatureNotSupported && kQueryStatsStoreSize0ErrCode == e.code)
-        ) {
+        if (allowFeatureNotSupported && kQueryStatsStoreSize0ErrCode == e.code) {
             jsTest.log.info(
                 "Encountered an error while running $queryStats. $queryStats will not run for this test.",
             );

@@ -125,6 +125,25 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_library(
+    name = "ndv_sketch_builder",
+    srcs = ["ndv_sketch_builder.cpp"],
+    hdrs = ["ndv_sketch_builder.h"],
+    deps = [
+        ":field_stats",
+        ":hyperloglog",
+        ":ndv_hashing",
+        ":ndv_sketch_gen_lib",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ndv_sketch_builder_test",
+    srcs = ["ndv_sketch_builder_test.cpp"],
+    tags = ["mongo_unittest_third_group"],
+    deps = [":ndv_sketch_builder"],
+)
+
 mongo_cc_fuzztest(
     name = "ndv_hashing_fuzz_test",
     srcs = ["ndv_hashing_fuzz_test.cpp"],
