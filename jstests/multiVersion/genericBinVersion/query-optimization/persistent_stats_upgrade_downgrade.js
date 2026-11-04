@@ -2,7 +2,13 @@
  * Tests that the persisted samples collection is dropped on every node when the FCV is downgraded
  * to a version where featureFlagPersistentStats is disabled, and that no other collection is.
  *
- * @tags: [featureFlagPersistentStats, future_git_tag_incompatible, uses_parallel_shell]
+ * @tags: [
+ *   # With auth, mongos hides system.* collections from authorizedCollections listings.
+ *   auth_incompatible,
+ *   featureFlagPersistentStats,
+ *   future_git_tag_incompatible,
+ *   uses_parallel_shell,
+ * ]
  **/
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
