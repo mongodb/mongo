@@ -5,10 +5,9 @@
  * @tags: [
  *   requires_replication,
  *   requires_persistence,
+ *   featureFlagReplicatedFastCount,
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -59,20 +58,6 @@ describe("fast count watermark checkpoint", function () {
         this.primary = this.rst.getPrimary();
         this.db = this.primary.getDB(jsTestName());
         this.oplog = this.primary.getDB("local").getCollection("oplog.rs");
-
-        // TODO SERVER-117454: Remove this explicit check and use the featureFlagReplicatedFastCount
-        // tag once the flag is enabled in all feature flag variants.
-        if (
-            PersistenceProviderUtil.allNodesHavePropertyWithValue(
-                this.db,
-                "shouldUseReplicatedFastCount",
-                false,
-            ) &&
-            !FeatureFlagUtil.isEnabled(this.db, "ReplicatedFastCount")
-        ) {
-            this.rst.stopSet();
-            quit();
-        }
 
         // Create a collection and insert data so the flushed checkpoint has size and count deltas
         // for a user collection, on top of the oplog collection's own delta.
