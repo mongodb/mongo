@@ -854,7 +854,10 @@ When LDAP is enabled, X.509 authorization defaults to the LDAP backend. The
 `useInternalAuthzForX509` parameter (settable at startup and runtime) routes X.509 to internal
 authorization instead, without affecting PLAIN or GSSAPI. The parameter is accepted in the Community
 edition but has no effect there since LDAP is not available and internal authorization is always
-used regardless of its value.
+used regardless of its value. The parameter (like internal authorization for MONGODB-OIDC and
+MONGODB-AWS) depends on `featureFlagUseInternalAuthzInsteadOfLDAP`, which is enabled from FCV 9.0.
+While the FCV is below 9.0 the parameter has no effect, and the server logs a message when an X.509
+user authenticates with it enabled.
 
 ### Cursors and Operations
 

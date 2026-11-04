@@ -14,6 +14,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_peer_info.h"
@@ -109,6 +110,21 @@ StatusWith<std::unique_ptr<UserRequest>> SaslX509ServerMechanism::makeUserReques
         }
         return std::make_unique<UserRequestGeneral>((*internalSecurity.getUser())->getName(),
                                                     boost::none);
+    }
+
+    if (!shouldInsertAuthenticatedMechanism && useInternalAuthzForX509.load()) {
+        // useInternalAuthzForX509 relies on the authenticated mechanism being recorded in the
+        // UserRequest, which only happens when featureFlagUseInternalAuthzInsteadOfLDAP is enabled
+        // (e.g. it is disabled while the FCV is below 9.0). Log so the setting is never silently
+        // ignored.
+        static logv2::SeveritySuppressor suppressor(
+            Seconds{60}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2));
+        LOGV2_DEBUG(13672900,
+                    suppressor().toInt(),
+                    "useInternalAuthzForX509 is enabled but has no effect because "
+                    "featureFlagUseInternalAuthzInsteadOfLDAP is not enabled for the current "
+                    "feature compatibility version; X.509 users will be authorized through the "
+                    "default authorization backend");
     }
 
     if (!allowRolesFromX509Certificates || !session) {

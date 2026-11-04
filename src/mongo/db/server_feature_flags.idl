@@ -318,7 +318,8 @@ feature_flags:
             is set to true if X.509 authentication is used and roles are not present in the client
             certificate.
         cpp_varname: gFeatureFlagUseInternalAuthzInsteadOfLDAP
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
     featureFlagQEPrefixSuffixSearch:
         description: "Queryable Encryption encrypted prefix & suffix search support"
