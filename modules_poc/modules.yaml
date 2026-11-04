@@ -661,6 +661,14 @@ observability.metrics:
     - src/mongo/db/metrics_*
     - src/mongo/otel/metrics/
 
+observability.metrics.framework:
+  meta:
+    slack: db-integration-observability
+    jira: DB Integration & Observability
+    fully_marked: true
+  files:
+    - src/mongo/observability/
+
 observability.ftdc:
   meta:
     slack: server-networking-observability
