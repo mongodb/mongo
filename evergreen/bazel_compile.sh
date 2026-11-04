@@ -159,7 +159,10 @@ fi
 RELEASE_EXECUTION_LOG_FLAGS=""
 RELEASE_LOCAL_SAFETY_FLAGS=""
 SHOULD_ENFORCE_RELEASE_LOCAL_BUILD=false
-if [[ "${is_patch:-}" != "true" || "${is_release:-false}" != "false" ]]; then
+# Nightly patches may use RBE even when exercising release settings. Published release
+# builds and explicit release patches in other projects still require local execution.
+if [[ "${is_patch:-}" != "true" ||
+    ("${is_release:-false}" != "false" && "${project:-}" != "mongodb-mongo-master-nightly") ]]; then
     SHOULD_ENFORCE_RELEASE_LOCAL_BUILD=true
 fi
 echo "Release-local build enforcement: ${SHOULD_ENFORCE_RELEASE_LOCAL_BUILD} (is_patch=${is_patch:-}, is_release=${is_release:-false})"

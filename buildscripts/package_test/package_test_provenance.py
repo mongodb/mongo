@@ -612,9 +612,14 @@ def should_create_release_binary_provenance() -> bool:
 def release_binary_provenance_skip_reason() -> str | None:
     """Return the reason to skip release binary provenance, if any."""
 
-    if os.environ.get("is_patch") == "true" and os.environ.get("is_release", "false") == "false":
+    # Nightly patches may execute release actions remotely, so they do not produce the
+    # local-execution provenance required for published release binaries.
+    if os.environ.get("is_patch") == "true" and (
+        os.environ.get("is_release", "false") == "false"
+        or os.environ.get("project") == "mongodb-mongo-master-nightly"
+    ):
         return (
-            "ordinary patch build "
+            "patch build "
             f"(is_patch={os.environ.get('is_patch')}, "
             f"is_release={os.environ.get('is_release', 'false')})"
         )

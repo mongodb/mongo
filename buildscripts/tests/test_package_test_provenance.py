@@ -1,5 +1,6 @@
 import ast
 import json
+import logging
 import os
 import tarfile
 import tempfile
@@ -1325,6 +1326,67 @@ class PackageTestProvenanceTest(unittest.TestCase):
             )
 
             self.assertFalse(output_file.exists())
+
+    def test_nightly_release_patch_skips_local_execution_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output_file = root / "release_binary_provenance.json"
+            output_file.write_text("stale provenance")
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "project": "mongodb-mongo-master-nightly",
+                    "is_patch": "true",
+                    "is_release": "true",
+                },
+            ):
+                self.assertFalse(under_test.should_create_release_binary_provenance())
+                under_test.create_provenance_file(
+                    root / "missing-command",
+                    root / "missing-archive",
+                    output_file,
+                    root / "missing-execution-log",
+                )
+            self.assertFalse(output_file.exists())
+
+    def test_release_provenance_policy_across_projects(self) -> None:
+        source = workspace_file_path("buildscripts/package_test/package_test.py").read_text()
+        validation_function = next(
+            node
+            for node in ast.parse(source).body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "should_validate_package_build_provenance"
+        )
+        namespace = {
+            "os": os,
+            "logging": logging,
+            "should_create_release_binary_provenance": under_test.should_create_release_binary_provenance,
+        }
+        exec(
+            compile(
+                ast.Module(body=[validation_function], type_ignores=[]), "package_test.py", "exec"
+            ),
+            namespace,
+        )
+        for project in ("mongodb-mongo-master-nightly", "mongodb-mongo-v9.0", "mongo-release"):
+            for is_patch in ("true", "false"):
+                for is_release in ("true", "false"):
+                    with (
+                        self.subTest(project=project, is_patch=is_patch, is_release=is_release),
+                        mock.patch.dict(
+                            os.environ,
+                            {"project": project, "is_patch": is_patch, "is_release": is_release},
+                        ),
+                    ):
+                        expected = is_patch != "true" or (
+                            is_release != "false" and project != "mongodb-mongo-master-nightly"
+                        )
+                        self.assertEqual(
+                            expected, under_test.should_create_release_binary_provenance()
+                        )
+                        self.assertEqual(
+                            expected, namespace["should_validate_package_build_provenance"]()
+                        )
 
     def test_nightly_package_creates_provenance_for_its_own_binaries(self):
         with tempfile.TemporaryDirectory() as temp_dir:

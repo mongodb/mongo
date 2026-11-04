@@ -48,6 +48,7 @@ from buildscripts.package_test.package_test_provenance import (
     is_server_release_project,
     package_test_task_chain,
     release_binary_name_from_path,
+    should_create_release_binary_provenance,
     validate_compact_execution_log_file,
     validate_release_binary_provenance_against_archive,
     validate_release_binary_provenance_identity,
@@ -301,7 +302,7 @@ def should_validate_package_build_provenance() -> bool:
 
     is_patch = os.environ.get("is_patch")
     is_release = os.environ.get("is_release", "false")
-    should_validate = is_patch != "true" or is_release != "false"
+    should_validate = should_create_release_binary_provenance()
     logging.info(
         "Release package provenance validation: %s (is_patch=%s, is_release=%s)",
         should_validate,

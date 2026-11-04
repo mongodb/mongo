@@ -25,6 +25,7 @@ class BazelCompileTest(unittest.TestCase):
         expected_capture: bool = True,
         expected_release_log: str | None = None,
         expected_reuse: bool = False,
+        expected_remote_executor: str | None = None,
         windows: bool = WINDOWS,
         **expansions: str,
     ) -> tuple[subprocess.CompletedProcess, str]:
@@ -57,6 +58,7 @@ class BazelCompileTest(unittest.TestCase):
                     "bazel_evergreen_shutils::ensure_server_and_print_pid() { :; }\n"
                     "bazel_evergreen_shutils::bazel_get_binary_path() { echo fake-bazel; }\n"
                     "bazel_evergreen_shutils::retry_bazel_cmd() {\n"
+                    '  printf "%s\\n" "$*" >> commands.log\n'
                     '  case "$*" in\n'
                     "    *//bazel/config:toolchain_provenance*)\n"
                     "      echo capture >> build.log\n"
@@ -123,6 +125,14 @@ class BazelCompileTest(unittest.TestCase):
                         self.assertIn("--remote_executor= --noremote_accept_cached", invocation)
                     else:
                         self.assertNotIn("--execution_log_compact_file=", invocation)
+                if expected_remote_executor is not None:
+                    commands = (src / "commands.log").read_text().splitlines()
+                    self.assertEqual(1 if windows else 2, len(commands))
+                    for command in commands:
+                        self.assertIn(f"--remote_executor={expected_remote_executor}", command)
+                        self.assertNotIn("--remote_executor=", command.split())
+                        self.assertNotIn("--noremote_accept_cached", command.split())
+                        self.assertNotIn("--modify_execution_info=.*=+no-cache", command.split())
             return result, log.read_text() if log.exists() else ""
 
     def test_provenance_builds_do_not_reuse_another_tasks_binaries(self) -> None:
@@ -168,7 +178,11 @@ class BazelCompileTest(unittest.TestCase):
                     with self.subTest(project=project, task=task, patch=is_patch):
                         result, log = self.run_compile(
                             distro="release-build-host",
-                            expected_release_log=execution_log,
+                            expected_release_log=(
+                                ""
+                                if project == "mongodb-mongo-master-nightly" and is_patch == "true"
+                                else execution_log
+                            ),
                             project=project,
                             task_name=task,
                             is_patch=is_patch,
@@ -177,6 +191,24 @@ class BazelCompileTest(unittest.TestCase):
                         )
                         self.assertEqual(0, result.returncode, result.stderr)
                         self.assertEqual(self.successful_build_log, log)
+
+    def test_nightly_release_patches_preserve_remote_execution(self) -> None:
+        for is_release in ("true", "false"):
+            for task in ("package", "crypt_create_lib", "archive_dist_test"):
+                with self.subTest(is_release=is_release, task=task):
+                    result, log = self.run_compile(
+                        distro="release-build-host",
+                        expected_release_log="",
+                        expected_remote_executor="grpcs://remote.example.invalid",
+                        project="mongodb-mongo-master-nightly",
+                        task_name=task,
+                        is_release=is_release,
+                        evergreen_remote_exec="on",
+                        MONGO_VERSION_OVERRIDE="9.0.0",
+                        bazel_args="--remote_executor=grpcs://remote.example.invalid",
+                    )
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertEqual(self.successful_build_log, log)
 
     def test_ordinary_nightly_patch_does_not_require_release_execution_log(self) -> None:
         result, log = self.run_compile(
