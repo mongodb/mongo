@@ -896,3 +896,51 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "sharding_lag_oplog_application_jscore_passthrough",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:suites/sharding_lag_oplog_application_jscore_passthrough.yml",
+    shard_count = 26,
+    tags = [
+        "ci-experimental",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_lag_oplog_application_jscore_passthrough_with_balancer",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:suites/sharding_lag_oplog_application_jscore_passthrough_with_balancer.yml",
+    shard_count = 20,
+    tags = [
+        "ci-experimental",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_lag_oplog_application_jscore_passthrough_with_config_transitions_and_add_remove_shard",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:suites/sharding_lag_oplog_application_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml",
+    shard_count = 35,
+    tags = [
+        "ci-experimental",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

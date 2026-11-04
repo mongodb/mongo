@@ -294,3 +294,9 @@ filters:
   - "core_explain_v3_passthrough.yml":
     approvers:
       - 10gen/query-optimization
+  - "sharding_lag_oplog_application_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_lag_oplog_application_jscore_passthrough_with_balancer.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing

@@ -1,0 +1,225 @@
+# Based on the sharding_jscore_passthrough_base suite. Runs continuous config transitions
+# from a config shard to a dedicated config server.
+config_variables:
+  - &movePrimaryComment continuousConfigShardTransitionMovePrimary
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # Operations within a transaction do not support write concern.
+    - jstests/core/txns/**/*.js
+
+    # The following tests fail because a certain command or functionality is not supported on
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/query/top/top.js # top.
+
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+
+    # transactionLifetimeLimitSeconds parameter is not available in mongos.
+    - jstests/core/txns/abort_expired_transaction.js
+    - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+    - jstests/core/txns/kill_op_on_txn_expiry.js
+
+    # Uses hangAfterCollectionInserts failpoint not available on mongos.
+    - jstests/core/txns/speculative_snapshot_includes_all_writes.js
+
+    # TODO SERVER-88275: A moveCollection command changes the UUID of the targeted collection.
+    # Any query using an auto yielding policy will likely return a QueryPlanKilled error if a moveCollection commit happens during the query execution.
+    - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
+    - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
+
+    # moveCollection and the many deleteMany commands in this test block each other and can easily cause the test to time out.
+    # This is caused by the pauseMigrationsDuringMultiUpdates cluster parameter and the random migrations failpoint both being enabled for this suite.
+    # TODO SERVER-91655: re-enable this test in this suite or potentially in a noPassthrough suite.
+    - jstests/core/timeseries/query/timeseries_predicates.js
+
+    # moveCollection will drop indexes which will reset index statistics this test asserts on.
+    - jstests/core/index/index_stats.js
+
+    # The following tests are excluded specifically for this passthrough suite.
+    # TransitionTo/FromDedicated runs remove/addShard which implicitly will set a cluster parameter, which
+    # will conflict with tests that explicitly set cluster parameters.
+    - jstests/core/query/query_settings/**/*.js
+
+    # If we get a MovePrimaryInProgress error while trying to implicitly create
+    # a collection during a movePrimary while we also set up a failCommand with
+    # a writeConcernError, we will get the writeConcernError from the failpoint
+    # along with the MovePrimaryInProgress error. Since this test sets times: n
+    # for some of the failpoints, by the time we retry, the failpoint will no
+    # longer be active and the test will fail.
+    - jstests/core/testing/failcommand_failpoint.js
+
+    # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
+    # concurrent migration fails due to the config shard transitioning to dedicated.
+    - jstests/core/administrative/cleanup_orphaned.js
+    - jstests/core/catalog/views/views_all_commands.js
+    - jstests/core/catalog/commands_namespace_parsing.js
+    # TODO SERVER-96199 Re-enable this test once FLE updates to a document's shard key work
+    - src/mongo/db/modules/enterprise/jstests/fle2/find_and_modify_replace.js
+
+    # Timeseries updates are not retryable unless the collection is tracked.
+    - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
+
+    # The resharding core tests expect the sharding topology to remain constant.
+    - jstests/core_sharding/resharding/**/*.js
+
+    # TODO SERVER-114826 Investigate the possibility to re-enable excluded tests with random_migrations
+    - jstests/core/query/run_all_plans_pbt.js
+
+    # Parallel shell is not causally consistent
+    - jstests/core/**/benchrun_pipeline_updates.js
+    - jstests/core/**/crud_ops_do_not_throw_locktimeout.js
+    - jstests/core/**/cursora.js
+    - jstests/core/**/find_and_modify_concurrent_update.js
+    - jstests/core/**/shellstartparallel.js
+    - jstests/core/**/loadserverscripts.js
+    # benchRun cannot be overridden to be causally consistent
+    - jstests/core/**/bench_test*.js
+    - jstests/core/**/benchrun_pipeline_updates.js
+    # getMore is not causal consistent because afterClusterTime has been specified
+    # by the preceding find command which establishes the cursor. Therefore,
+    # getMore cannot be guaranteed to get executed after commands in between find
+    # and getMore.
+    - jstests/core/ddl/drop_collection_cursors.js
+    - jstests/core/**/ord.js
+    - jstests/core/**/tailable_cursor_invalidation.js
+    - jstests/core/**/tailable_skip_limit.js
+    - jstests/core/**/query/collation/collation.js
+
+    # 400-run PBT; too slow under lag + balancer.
+    - jstests/core/index/index_for_sort_pbt.js
+    # 150-run PBT; too slow under lag + balancer.
+    - jstests/core/index/express_pbt.js
+
+    # TODO (SERVER-90646): Re-enable background_unique_indexes.js in config transition suites.
+    - jstests/core/ddl/background_unique_indexes.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
+    # Prepare is not a command on mongos.
+    - uses_prepare_transaction
+    - assumes_balancer_off
+    # fsync lock is not compatible with migrations since it
+    # can't be executed while DDL lock is being held.
+    - requires_fsync
+    # This suite performs balancing of unsharded collection in background
+    # using moveCollection that changes collections UUID
+    - assumes_stable_collection_uuid
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+    # The following tags are excluded specifically for this suite.
+    - config_shard_incompatible
+    # MoveCollection changes the collection uuid.
+    - assumes_stable_collection_uuid
+    - does_not_support_retryable_writes
+    - requires_non_retryable_writes
+    - assumes_stable_shard_list
+    ##
+    # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+    # override when it refuses to replace the readPreference of a particular command. Above each tag
+    # are the message(s) that cause the tag to be warranted.
+    ##
+    # "Cowardly refusing to override read preference of command: ..."
+    # "Cowardly refusing to run test with overridden read preference when it reads from a
+    #  non-replicated collection: ..."
+    - assumes_read_preference_unchanged
+    - does_not_support_causal_consistency
+    ##
+    # collStats and dbStats are not causally consistent
+    - requires_collstats
+    - requires_dbstats
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          runningWithBalancer: true
+          pauseMigrationsDuringMultiUpdates: true
+          alwaysInjectTransactionNumber: true
+          shardsAddedRemoved: true
+          hasRandomShardsAddedRemoved: true
+          sessionOptions:
+            retryWrites: true
+
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
+        await import("jstests/libs/override_methods/enable_sessions.js");
+        await import('jstests/libs/override_methods/set_read_preference_secondary.js');
+
+  hooks:
+    - class: LagOplogApplicationInBackground
+      shell_options:
+        nodb: ""
+    - class: ContinuousAddRemoveShard
+      transition_configsvr: true
+      add_remove_random_shards: true
+      move_primary_comment: *movePrimaryComment
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            shardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: true
+    - class: ValidateCollections
+    - class: CheckShardFilteringMetadata
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    config_shard: "any"
+    configsvr_options:
+      num_nodes: 3
+    num_shards: 3
+    num_mongos: 3
+    enable_balancer: true
+    random_migrations: true
+    set_cluster_parameter:
+      parameter: pauseMigrationsDuringMultiUpdates
+      value:
+        enabled: True
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagReshardingForTimeseries: true
+        reshardingMinimumOperationDurationMillis: 0
+        failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
+          data:
+            comment: *movePrimaryComment
+          mode: alwaysOn
+    num_rs_nodes_per_shard: 3

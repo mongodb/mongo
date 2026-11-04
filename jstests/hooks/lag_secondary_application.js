@@ -53,26 +53,112 @@ function turnOffFailPointWithRetry(conn) {
     );
 }
 /**
- * Enables the 'pauseBatchApplicationAfterWritingOplogEntries' failpoint on a secondary
- * node. This failpoint will pause oplog application after writing entries to the oplog
- * but before applying those changes to data collections. Therefore, we will induce lag
- * between the lastWritten and lastApplied timestamps.
+ * Enables the 'pauseBatchApplicationAfterWritingOplogEntries' failpoint on each secondary
+ * in 'secondaryConns'. This failpoint will pause oplog application after writing entries to
+ * the oplog but before applying those changes to data collections. Therefore, we will induce
+ * lag between the lastWritten and lastApplied timestamps on all of those secondaries at once.
  */
-function lagLastApplied(secondaryConn) {
+function lagLastApplied(secondaryConns) {
     const randMS = randomMSFromInterval(MIN_MS, MAX_MS);
-    jsTestLog("Pausing oplog application for " + randMS + " ms on secondary: " + secondaryConn);
-
-    assert.commandWorked(
-        secondaryConn.adminCommand({
-            configureFailPoint: "pauseBatchApplicationAfterWritingOplogEntries",
-            mode: "alwaysOn",
-        }),
-    );
-    // Induce a random millisecond lag and turn off the failpoint.
-    sleep(randMS);
-
-    turnOffFailPointWithRetry(secondaryConn);
+    const enabledConns = [];
+    let lagError;
+    let cleanupError;
+    try {
+        for (const secondaryConn of secondaryConns) {
+            jsTestLog(
+                "Pausing oplog application for " + randMS + " ms on secondary: " + secondaryConn,
+            );
+            assert.commandWorked(
+                secondaryConn.adminCommand({
+                    configureFailPoint: "pauseBatchApplicationAfterWritingOplogEntries",
+                    mode: "alwaysOn",
+                }),
+            );
+            enabledConns.push(secondaryConn);
+        }
+        // Induce a random millisecond lag.
+        sleep(randMS);
+    } catch (e) {
+        lagError = e;
+    } finally {
+        // Turn off every enabled failpoint before propagating lagError. ContinuousAddRemoveShard can
+        // shut a selected shard down during this loop; continue after that failure so the
+        // remaining secondaries are not left paused.
+        for (const secondaryConn of enabledConns) {
+            try {
+                turnOffFailPointWithRetry(secondaryConn);
+            } catch (e) {
+                // Prefer an unexpected error over an earlier shutdown error: the outer catch
+                // ignores shutdown, which would otherwise hide a real cleanup failure.
+                if (!cleanupError || (isShutdownError(cleanupError) && !isShutdownError(e))) {
+                    cleanupError = e;
+                } else {
+                    jsTestLog(
+                        "Error turning off failpoint on secondary " +
+                            secondaryConn +
+                            " during cleanup: " +
+                            tojson(e),
+                    );
+                }
+            }
+        }
+    }
+    if (lagError) {
+        if (cleanupError) {
+            jsTestLog("Failpoint cleanup also failed: " + tojson(cleanupError));
+        }
+        throw lagError;
+    }
+    if (cleanupError) {
+        throw cleanupError;
+    }
     return {ok: 1};
+}
+
+function replicaSetHasSecondary(rs) {
+    return rs.type === Topology.kReplicaSet && rs.nodes.length >= 2;
+}
+
+/**
+ * Returns a replica set topology that has at least one secondary. For a replica set, that is
+ * the cluster itself. For a sharded cluster, a random non-empty subset of shards with more than one node is
+ * chosen. Single-node shards are skipped because this hook needs a secondary to lag.
+ */
+function pickReplicaSetWithSecondary(topology) {
+    if (topology.type === Topology.kReplicaSet) {
+        if (!replicaSetHasSecondary(topology)) {
+            throw new Error("Must have at least 2 nodes in the replica set: " + tojson(topology));
+        }
+        return [topology];
+    }
+
+    const shards = Object.values(topology.shards);
+    if (shards.length < 1) {
+        throw new Error("Must have at least 1 shard in the sharded cluster: " + tojson(topology));
+    }
+
+    const shardsWithSecondary = shards.filter(replicaSetHasSecondary);
+    const csrs = topology.configsvr;
+    if (shardsWithSecondary.length === 0 && !replicaSetHasSecondary(csrs)) {
+        throw new Error(
+            "Must have at least 1 shard with 2 or more nodes in the sharded cluster: " +
+                tojson(topology),
+        );
+    }
+
+    if (replicaSetHasSecondary(csrs)) {
+        shardsWithSecondary.push(csrs);
+    }
+
+    // Pick random non-empty subset of shards
+    for (let i = shardsWithSecondary.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const swap = shardsWithSecondary[i];
+        shardsWithSecondary[i] = shardsWithSecondary[j];
+        shardsWithSecondary[j] = swap;
+    }
+    const count = Math.floor(Math.random() * shardsWithSecondary.length) + 1;
+    return shardsWithSecondary.slice(0, count);
 }
 
 // Make sure this hook is resilient to network errors and shutdown errors that may come
@@ -85,22 +171,21 @@ try {
     const conn = connect(TestData.connectionString);
     const topology = DiscoverTopology.findConnectedNodes(conn.getMongo());
 
-    // Limit this hook to replica sets.
-    if (topology.type !== Topology.kReplicaSet) {
+    // Limit this hook to replica sets and sharded clusters.
+    if (topology.type !== Topology.kReplicaSet && topology.type !== Topology.kShardedCluster) {
         throw new Error("Unsupported topology configuration: " + tojson(topology));
     }
 
-    // Ensure there is at least one secondary.
-    if (topology.nodes.length < 2) {
-        throw new Error("Must have at least 2 nodes in the replica set: " + tojson(topology));
+    const replicaSets = pickReplicaSetWithSecondary(topology);
+    const secondaryConns = [];
+    for (const rs of replicaSets) {
+        const primary = rs.primary;
+        const secondaries =
+            primary === undefined ? rs.nodes : rs.nodes.filter((node) => node !== primary);
+        const randomSecondary = secondaries[Math.floor(Math.random() * secondaries.length)];
+        secondaryConns.push(newMongoWithRetry(randomSecondary));
     }
-
-    const primary = topology.primary;
-    const secondaries =
-        primary === undefined ? topology.nodes : topology.nodes.filter((node) => node !== primary);
-    const randomSecondary = secondaries[Math.floor(Math.random() * secondaries.length)];
-    const randomSecondaryConn = newMongoWithRetry(randomSecondary);
-    res = lagLastApplied(randomSecondaryConn);
+    res = lagLastApplied(secondaryConns);
 } catch (e) {
     // If the ReplicaSetMonitor cannot find a primary because it has stepped down or
     // been killed, it may take longer than 15 seconds for a new primary to step up.
@@ -113,6 +198,7 @@ try {
     if (isNetworkError(e)) {
         jsTestLog("Ignoring network error" + tojson(e));
     } else if (
+        e.code === ErrorCodes.FailedToSatisfyReadPreference ||
         kReplicaSetMonitorErrors.some((regex) => {
             return regex.test(e.message);
         })
