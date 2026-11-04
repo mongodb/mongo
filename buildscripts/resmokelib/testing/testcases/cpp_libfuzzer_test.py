@@ -2,10 +2,29 @@
 
 import datetime
 import os
+from logging import Handler, LogRecord
 from typing import Optional
 
 from buildscripts.resmokelib import core, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
+
+# Centipede logs one of these (see centipede/runner_result.h) whenever a batch times out. It only
+# saves a crash file if the slow input times out again when rerun on its own, so for every other
+# timeout the log is the only record.
+CENTIPEDE_TIMEOUT_FAILURES = ("per-input-timeout-exceeded", "per-batch-timeout-exceeded")
+
+
+class _TimeoutDetector(Handler):
+    """Watch the fuzzer's output and remember the first timeout it reports."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.timeout: str | None = None
+
+    def emit(self, record: LogRecord) -> None:
+        if self.timeout is None:
+            message = record.getMessage()
+            self.timeout = next((f for f in CENTIPEDE_TIMEOUT_FAILURES if f in message), None)
 
 
 class CPPLibfuzzerTestCase(interface.ProcessTestCase):
@@ -54,7 +73,9 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
         interface.append_process_tracking_options(self.program_options, self._id)
 
     def run_test(self):
-        """Run the test, then fail if any crash files were recorded in the corpus."""
+        """Run the fuzzer, then fail if it reported a timeout or left crash files in the corpus."""
+        timeouts = _TimeoutDetector()
+        self.logger.addHandler(timeouts)
         try:
             self.proc = self._make_process()
             self._execute(self.proc)
@@ -65,18 +86,26 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
                 "Encountered an error running %s %s", self.test_kind, self.basename()
             )
             raise
+        finally:
+            self.logger.removeHandler(timeouts)
 
+        problems = []
         # Centipede stores findings under <corpus>/<binary>/<test>/crashing/.
         # Check every named FuzzTest as well as LLVMFuzzer.TestOneInput. Retained
         # findings do not necessarily reproduce during an interrupted run or
         # originate in the current build.
         crash_files = self._get_crash_files()
         if crash_files:
-            self.return_code = 1
-            msg = (
-                f"{self.short_description()} has {len(crash_files)} retained crash(es) "
+            problems.append(
+                f"has {len(crash_files)} retained crash(es) "
                 f"in the corpus database: {', '.join(crash_files)}"
             )
+        if timeouts.timeout:
+            problems.append(f"reported {timeouts.timeout} (see docs/fuzztest.md#timeouts)")
+
+        if problems:
+            self.return_code = 1
+            msg = f"{self.short_description()} {'; '.join(problems)}"
             self.logger.error(msg)
             raise self.failureException(msg)
 
@@ -107,6 +136,9 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
         default_args = [
             self.program_executable,
             "--fuzz_for=1h",
+            # Far longer than any input takes in the nightly runs, so only a hang or a pathologically
+            # slow input reaches it. See docs/fuzztest.md#timeouts.
+            "--time_limit_per_input=600s",
             f"--corpus_database={self.corpus_directory}",
             f"--llvm_fuzzer_wrapper_corpus_dir={self.seed_directory}",
         ]

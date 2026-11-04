@@ -47,7 +47,7 @@ Finally, your cpp file will need a bazel target. There is a method which defines
 much like how we define unittests. For example:
 
 ```python
-  mongo_cc_fuzzer_test(
+  mongo_cc_fuzzer_test_deprecated(
     name = 'op_msg_fuzzer',
     srcs = [
         'op_msg_fuzzer.cpp',
@@ -78,6 +78,10 @@ more quickly if starts off with a set of inputs which it can begin mutating. Whe
 write down any new inputs it discovered into its corpus. Re-using a corpus across executions is a
 good way to make LibFuzzer return more results in less time. Our Evergreen tasks will try to acquire
 and re-use a corpus from an earlier commit, if it can.
+
+LibFuzzer targets run on FuzzTest's engine as a fuzz test named `LLVMFuzzer.TestOneInput`, so
+Evergreen runs and fails them the same way as FuzzTest targets. See
+[FuzzTest in Evergreen](fuzztest.md#evergreen) and [Timeouts](fuzztest.md#timeouts).
 
 # References
 

@@ -176,6 +176,17 @@ Use `.WithAny()` when a key should be present but its type is unconstrained:
 fuzztest::Arbitrary<mongo::ConstSharedBuffer>().WithAny("filter");
 ```
 
+## Keeping fuzz tests fast
+
+The more inputs a fuzz test runs per second, the more code it explores. A slow target also risks
+[timeouts](#timeouts) in Evergreen.
+
+- Do expensive setup once in a fixture (`FUZZ_TEST_F`), not on every input.
+- Bound input sizes, for example with `.WithMaxSize()`, when the code under test does more than
+  linear work in the size of its input.
+- Don't block on events that never arrive. Mocked network interfaces, executors, and condition
+  variables must respond or time out quickly, or every input will time out.
+
 ## Bazel target
 
 Use `mongo_cc_fuzztest` (from `//bazel:mongo_src_rules.bzl`) to declare a fuzz test target. It links
@@ -223,20 +234,85 @@ bazel run --compiler_type=clang --config=fuzztest --fsan --opt=debug --allocator
 
 ## Evergreen
 
-Fuzz tests defined in bazel using `mongo_cc_fuzztest` will periodically run on the master branch in
-evergreen. The compiled tests and their associated corpus are saved to S3 and can be downloaded for
-debugging issues. The corpus is reused between evergreen runs in order to increase fuzzing coverage.
+Fuzz tests declared with `mongo_cc_fuzztest` run nightly in the `libfuzzertests!` task on the
+`*-debug-aubsan-lite_fuzzer-arm64` build variants. The `libfuzzer` resmoke suite runs each binary
+as:
+
+```
+<binary> --fuzz_for=1h --time_limit_per_input=600s --corpus_database=corpora --llvm_fuzzer_wrapper_corpus_dir=...
+```
+
+`--fuzz_for` applies to each `FUZZ_TEST` in turn, so a binary with five fuzz tests runs for five
+hours.
+
+A run fails in any of these cases:
+
+- The binary exits with a nonzero status.
+- The corpus database contains a crashing input for the binary, under
+  `corpora/<binary>/<Suite.Test>/crashing/`. This includes inputs saved by earlier runs that still
+  reproduce.
+- The fuzzing engine reports a timeout, even if it could not save the input that caused it. See
+  [Timeouts](#timeouts).
+
+### The shared corpus
+
+The corpus database persists between runs. Each run downloads the corpus left by the previous run on
+the same build variant, fuzzes, and uploads the result in its place. Each task also attaches its
+corpus as the "Input Corpora" artifact, along with the compiled tests.
+
+For each fuzz test, the database holds a `coverage/` corpus, which the engine distills after every
+session, and a `crashing/` directory, whose inputs are rechecked after every session and kept only
+while they still reproduce.
+
+## Timeouts
+
+Centipede runs inputs in batches of up to 1000 in a separate runner process, with two limits:
+
+- **Per input** (`--time_limit_per_input`, 600s in Evergreen). Without this flag, FuzzTest sets no
+  per-input limit.
+- **Per batch**, derived from the per-input limit and capped at the session length (`--fuzz_for`).
+  It can fire even when no single input reaches the per-input limit, if many slow inputs add up.
+
+When an input times out, the engine reruns its batch one input at a time. If the input times out
+again on its own, the engine saves it under `crashing/`. If it doesn't, for example because the
+slowdown depends on state left by earlier inputs, nothing is saved. A per-batch timeout never
+identifies an input. Resmoke fails the run in every case; search the log for `timeout-exceeded` to
+find the report.
+
+The 600s limit is far above the slowest input seen in nightly runs, so a timeout means a hang or a
+pathologically slow input. Treat it as a bug. Don't raise the limit to make a target pass, and don't
+add `ignore_timeout_reports` to `CENTIPEDE_RUNNER_FLAGS`, which hides hangs from both the engine and
+resmoke.
+
+### Investigating a timeout
+
+Fuzz the target locally with a much shorter limit, so the slow input times out quickly and is saved:
+
+```
+bazel run --compiler_type=clang --config=fuzztest --fsan --opt=debug --allocator=system +my_command_fuzztest -- \
+    --fuzz_for=30m --time_limit_per_input=10s --corpus_database=/tmp/corpora
+```
+
+To start from the corpus the nightly run used, first extract the failing task's "Input Corpora"
+archive into `/tmp/corpora`. To replay the inputs it saves, rerun the target with
+`--corpus_database=/tmp/corpora --reproduce_findings_as_separate_tests`. See
+[Reproducing crashes](#reproducing-crashes).
 
 ## Useful flags
 
-| Flag                                     | Effect                            |
-| ---------------------------------------- | --------------------------------- |
-| `--fuzz=Suite.Test`                      | Fuzz a single test indefinitely   |
-| `--fuzz_for=T`                           | Fuzz all tests for duration `T`   |
-| `--rss_limit_mb=N`                       | Abort if memory exceeds N MB      |
-| `--time_limit_per_input=T`               | Abort an input after duration `T` |
-| `--reproduce_findings_as_separate_tests` | Reruns tests with crashing inputs |
-| `--helpful`                              | Describes fuzztest's flags        |
+These are FuzzTest flags and take no prefix: `--time_limit_per_input`, not
+`--fuzztest_time_limit_per_input`. The binaries silently ignore flags they don't recognize,
+including Centipede's own flags such as `--batch_size`.
+
+| Flag                                     | Effect                                         |
+| ---------------------------------------- | ---------------------------------------------- |
+| `--fuzz=Suite.Test`                      | Fuzz a single test indefinitely                |
+| `--fuzz_for=T`                           | Fuzz each test for duration `T`                |
+| `--corpus_database=DIR`                  | Load and save corpora and findings under `DIR` |
+| `--rss_limit_mb=N`                       | Abort if memory exceeds N MB                   |
+| `--time_limit_per_input=T`               | Report an input as a timeout after `T`         |
+| `--reproduce_findings_as_separate_tests` | Reruns tests with crashing inputs              |
+| `--helpful`                              | Describes fuzztest's flags                     |
 
 # Debugging Crashes in FuzzTest
 

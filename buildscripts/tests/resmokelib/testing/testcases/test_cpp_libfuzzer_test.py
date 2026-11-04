@@ -1,6 +1,7 @@
-"""Tests for reporting crashes recorded by C++ fuzz tests."""
+"""Tests for reporting crashes and timeouts recorded by C++ fuzz tests."""
 
 import logging
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -65,6 +66,44 @@ class TestCPPLibfuzzerTestCase(unittest.TestCase):
         with self.assertRaisesRegex(self.testcase.failureException, "exit code 17"):
             self.testcase.run_test()
         self.assertEqual(self.testcase.return_code, 17)
+
+
+@unittest.skipIf(sys.platform == "win32", "Uses a shell script as a stand-in fuzzer.")
+class TestCPPLibfuzzerTimeouts(unittest.TestCase):
+    """Run the test case against a stand-in fuzzer that prints Centipede output, then exits 0."""
+
+    def setUp(self):
+        self.temp_dir = Path(self.enterContext(tempfile.TemporaryDirectory()))
+
+    def _testcase(self, engine_output: str) -> cpp_libfuzzer_test.CPPLibfuzzerTestCase:
+        fuzzer = self.temp_dir / "test_fuzzer"
+        fuzzer.write_text(f"#!/bin/sh\ncat >&2 <<'EOF'\n{engine_output}\nEOF\n")
+        fuzzer.chmod(0o755)
+        return cpp_libfuzzer_test.CPPLibfuzzerTestCase(
+            logging.getLogger(self.id()),
+            [str(fuzzer)],
+            corpus_directory_stem=str(self.temp_dir / "corpora"),
+        )
+
+    def test_reported_timeout_fails(self):
+        for failure in cpp_libfuzzer_test.CENTIPEDE_TIMEOUT_FAILURES:
+            with self.subTest(failure=failure):
+                testcase = self._testcase(f"Failure              : {failure}")
+                with self.assertRaisesRegex(testcase.failureException, f"reported {failure}"):
+                    testcase.run_test()
+                self.assertEqual(testcase.return_code, 1)
+
+    def test_passes_without_timeouts(self):
+        testcase = self._testcase("CRASH LOG: The Per-input timeout is set to 600 (sec)")
+        testcase.run_test()
+        self.assertEqual(testcase.return_code, 0)
+
+    def test_timeout_failures_match_centipede(self):
+        # If a FuzzTest upgrade renamed the needles we key off from Centipede logs,
+        # timeouts would quietly start passing again.
+        header = Path("src/third_party/fuzztest/dist/centipede/runner_result.h").read_text()
+        for failure in cpp_libfuzzer_test.CENTIPEDE_TIMEOUT_FAILURES:
+            self.assertIn(f'"{failure}"', header)
 
 
 if __name__ == "__main__":
