@@ -188,7 +188,7 @@ void BlockingResultsMerger::kill(OperationContext* opCtx) {
 
     // Wait via the opCtx rather than a plain '.wait()', so that the wait polls the opCtx's baton
     // (SERVER-123640). A pending retry backoff does not depend on that: it runs on the executor and
-    // 'kill()' cancels it through its cancellation source.
+    // 'kill()' cancels it through its callback handle.
     // Use 'runWithoutInterruptionExceptAtGlobalShutdown()' because 'kill()' is called from
     // destructors where the opCtx may already be interrupted — a plain '.get(opCtx)' would throw
     // before polling the baton, and throwing from a destructor would terminate the process.

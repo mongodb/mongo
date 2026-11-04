@@ -18,14 +18,14 @@
  *      Sending any outgoing network request will cause a router to cache egress metadata on the IFR
  *      context. This later triggers the invariant when the getMore path continues to
  *      setUpOperationContextStateForGetMore.
- *      With the fix, the callback defers — it records backoff and signals the event without
- *      dispatching a network request. The retry is dispatched later by _scheduleGetMores() on the
+ *      With the fix, the retry is never dispatched from a callback: the backoff timer only records
+ *      the backoff and signals, and the retry is dispatched later by _scheduleGetMores() on the
  *      operation thread, after the IFR context has been restored.
  *
  *   This is challenging to reproduce. To make the scenario deterministic we use two failpoints:
- *   - stallBeforeReDispatchingArmRetry (test-only): stalls the ARM retry callback at its start
- *     (without holding the ARM mutex) so we can line up a *later* getMore's opCtx before the
- *     callback fires.
+ *   - stallArmRetryBackoff (test-only): holds the remote in backoff by re-arming its backoff timer
+ *     each time it fires, so the backoff never completes and the retry stays deferred. This lets us
+ *     line up a *later* getMore's opCtx before the retry is finally dispatched.
  *   - waitAfterPinningCursorBeforeGetMoreBatch (existing): holds the victim getMore open exactly in
  *     the window after cursor checkout/reattach but before the IFR set().
  *
@@ -143,7 +143,7 @@ describe("IncrementalFeatureRollout context getMore ARM retry race", function ()
             errorLabels: kExpectedErrorLabels,
         });
 
-        const stallRetryFp = configureFailPoint(st.s, "stallBeforeReDispatchingArmRetry");
+        const stallRetryFp = configureFailPoint(st.s, "stallArmRetryBackoff");
 
         const cursorId = establishCursor();
 
@@ -152,7 +152,7 @@ describe("IncrementalFeatureRollout context getMore ARM retry race", function ()
         for (let i = 0; i < 20 && !stalled; i++) {
             runOneGetMore(testDB, cursorId, lsid);
             const res = admin.runCommand({
-                waitForFailPoint: "stallBeforeReDispatchingArmRetry",
+                waitForFailPoint: "stallArmRetryBackoff",
                 timesEntered: stallRetryFp.timesEntered + 1,
                 maxTimeMS: 500,
             });

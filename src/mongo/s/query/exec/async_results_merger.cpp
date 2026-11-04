@@ -27,7 +27,6 @@
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/overloaded_visitor.h"
@@ -49,19 +48,33 @@
 
 namespace mongo {
 
-// Test-only. When enabled, holds ('parks') a scheduled ARM getMore retry callback at the start of
-// its execution: after the owning 'AsyncResultsMerger' has been re-locked via its weak_ptr but
-// before it inspects '_opCtx' or defers. This deterministically widens the window in which the
-// callback can observe (and re-target its request at) an 'OperationContext' belonging to a *later*
-// getMore than the one that originally scheduled the retry.
-MONGO_FAIL_POINT_DEFINE(stallBeforeReDispatchingArmRetry);
+// Test-only. When enabled, holds a remote in 'InBackoff': each time its backoff timer fires, the
+// callback re-arms the timer instead of completing the backoff, so the remote never returns to
+// 'Idle' and the deferred retry is never dispatched. This lets a test keep a backoff pending while
+// it drives 'kill()'/'closeShardCursors()'/detach against it, or line up a *later* getMore's
+// OperationContext before the retry is finally dispatched. Note that the backoff timer never
+// dispatches the retry itself (see '_onArmRetryTimerFired()'); holding the backoff is what
+// holds the retry.
+//
+// Re-arming goes through '_scheduleBackoffTimer()' under '_mutex', exactly like the initial arming,
+// so 'InBackoff' always carries the handle of the live timer and 'cancelAsyncWork()' stays the only
+// way a backoff is cancelled.
+//
+// This deliberately does *not* use 'FailPoint::pauseWhileSet()'. Sharding task executors are backed
+// by a 'NetworkInterfaceThreadPool', which runs scheduled work inline on the network interface's
+// (single) reactor thread. Blocking there would stall every egress operation on the process, so
+// instead of holding the thread we re-arm the timer and return. Note that this means 'timesEntered'
+// grows once per poll rather than once per stalled backoff; tests should only rely on it becoming
+// non-zero.
+MONGO_FAIL_POINT_DEFINE(stallArmRetryBackoff);
 
-// Test-only and observation-only. Entered at the end of '_scheduleRetryCallback', after the backoff
-// sleep ('sleepFor') has been armed with a fixed deadline. Tests enable this fail point and call
-// 'waitForTimesEntered()' to deterministically learn that the retry alarm has been registered, so
-// they can advance the mock clock *after* the deadline is fixed. This replaces fixed 'sleepmillis'
-// waits that could not prove the alarm was armed and were vulnerable to a deadline-shift race.
-MONGO_FAIL_POINT_DEFINE(armRetryScheduledForTesting);
+// Test-only and observation-only. Entered at the end of '_scheduleBackoffTimer', after the backoff
+// timer ('scheduleWorkAt') has been armed with a fixed deadline. Tests enable this fail point and
+// call 'waitForTimesEntered()' to deterministically learn that the backoff timer has been
+// registered, so they can advance the mock clock *after* the deadline is fixed. This replaces fixed
+// 'sleepmillis' waits that could not prove the alarm was armed and were vulnerable to a
+// deadline-shift race.
+MONGO_FAIL_POINT_DEFINE(armRetryBackoffScheduledForTesting);
 
 // Test-only. Overrides the batchSize field used for getMore requests that the AsyncResultsMerger
 // sends to shards. The batch size normally comes from the originating command's parameters, which
@@ -72,49 +85,8 @@ MONGO_FAIL_POINT_DEFINE(overrideBatchSizeForShardGetMore);
 
 namespace {
 
-// How often 'StallableRetryCallback' re-checks 'stallBeforeReDispatchingArmRetry'.
-constexpr auto kArmRetryStallPollInterval = Milliseconds(10);
-
-/**
- * Test-only wrapper which delays invoking 'task' for as long as the
- * 'stallBeforeReDispatchingArmRetry' failpoint is enabled.
- *
- * This deliberately does *not* use 'FailPoint::pauseWhileSet()'. Sharding task executors are backed
- * by a 'NetworkInterfaceThreadPool', which runs scheduled work inline on the network interface's
- * (single) reactor thread. Blocking there would stall every egress operation on the process, so
- * instead of holding the thread we repeatedly re-post ourselves to the executor until the failpoint
- * is disabled. Note that this means 'timesEntered' grows once per poll rather than once per stalled
- * callback; tests should only rely on it becoming non-zero.
- */
-template <typename Task>
-struct StallableRetryCallback {
-    void operator()(Status status) const {
-        // 'sleeping' is set on the copy we hand to 'sleepFor()' below. If that sleep did not
-        // complete successfully - e.g. because the executor is shutting down, in which case
-        // 'sleepFor()' completes inline - stop polling. Otherwise we would recurse without bound.
-        const bool sleepFailed = sleeping && !status.isOK();
-
-        if (!sleepFailed && MONGO_unlikely(stallBeforeReDispatchingArmRetry.shouldFail())) {
-            auto reposted = *this;
-            reposted.sleeping = true;
-            executor->sleepFor(kArmRetryStallPollInterval, token).getAsync(std::move(reposted));
-            return;
-        }
-
-        task(std::move(status));
-    }
-
-    std::shared_ptr<executor::TaskExecutor> executor;
-    CancellationToken token;
-    Task task;
-    bool sleeping = false;
-};
-
-template <typename Task>
-StallableRetryCallback<Task> makeStallableRetryCallback(
-    std::shared_ptr<executor::TaskExecutor> executor, CancellationToken token, Task task) {
-    return StallableRetryCallback<Task>{std::move(executor), std::move(token), std::move(task)};
-}
+// How often a remote held in backoff re-arms its timer while 'stallArmRetryBackoff' is enabled.
+constexpr auto kArmRetryBackoffStallPollInterval = Milliseconds(10);
 
 }  // namespace
 
@@ -491,7 +463,7 @@ void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& s
                                       // queue when they arrive later.
                                       // - Remove the remote from the '_remotes' vector.
                                       // - Reposition our loop iterator.
-                                      _cancelCallbackForRemote(lk, remote);
+                                      remote->cancelAsyncWork(lk, _executor.get());
                                       _scheduleKillCursorForRemote(lk, _opCtx, remote);
                                       _removeRemoteFromPromisedMinSortKeys(lk, remote);
                                       remote->closed = true;
@@ -794,13 +766,6 @@ AsyncResultsMerger::RemoteCursorPtr AsyncResultsMerger::_buildRemote(WithLock lk
     return remote;
 }
 
-void AsyncResultsMerger::_cancelCallbackForRemote(WithLock, const RemoteCursorPtr& remote) {
-    if (auto* inFlight = std::get_if<GetMoreInFlight>(&remote->state);
-        inFlight && inFlight->cbHandle.isValid()) {
-        _executor->cancel(inFlight->cbHandle);
-    }
-}
-
 void AsyncResultsMerger::_transitionToGetMoreInFlight(
     WithLock lk, RemoteCursorData& remote, executor::TaskExecutor::CallbackHandle cbHandle) {
     tassert(13753604,
@@ -818,12 +783,14 @@ void AsyncResultsMerger::_completeGetMore(WithLock lk, RemoteCursorData& remote)
     _setRemoteState(lk, remote, Idle{});
 }
 
-void AsyncResultsMerger::_enterBackoff(WithLock lk, RemoteCursorData& remote) {
+void AsyncResultsMerger::_enterBackoff(WithLock lk,
+                                       RemoteCursorData& remote,
+                                       executor::TaskExecutor::CallbackHandle timerCallbackHandle) {
     tassert(13753607,
             str::stream() << "Cannot enter backoff for remote " << remote.shardId
                           << ": expected state Idle, found " << stateName(remote.state),
             std::holds_alternative<Idle>(remote.state));
-    _setRemoteState(lk, remote, InBackoff{});
+    _setRemoteState(lk, remote, InBackoff{std::move(timerCallbackHandle)});
 }
 
 void AsyncResultsMerger::_completeBackoff(WithLock lk, RemoteCursorData& remote) {
@@ -832,6 +799,21 @@ void AsyncResultsMerger::_completeBackoff(WithLock lk, RemoteCursorData& remote)
                           << ": expected state InBackoff, found " << stateName(remote.state),
             std::holds_alternative<InBackoff>(remote.state));
     _setRemoteState(lk, remote, Idle{});
+}
+
+void AsyncResultsMerger::_rearmBackoff(WithLock,
+                                       RemoteCursorData& remote,
+                                       executor::TaskExecutor::CallbackHandle timerCallbackHandle) {
+    tassert(13753800,
+            str::stream() << "Cannot re-arm a backoff for remote " << remote.shardId
+                          << ": expected state InBackoff, found " << stateName(remote.state),
+            std::holds_alternative<InBackoff>(remote.state));
+
+    // The only transition which replaces in-flight work with in-flight work, and so the only one
+    // which does not go through '_setRemoteState()'. It is safe here because the handle being
+    // replaced belongs to the callback which is running right now - it is that callback which is
+    // re-arming the timer - so nothing is stranded behind the dropped handle.
+    remote.state = InBackoff{std::move(timerCallbackHandle)};
 }
 
 void AsyncResultsMerger::_setRemoteState(WithLock, RemoteCursorData& remote, RemoteState newState) {
@@ -1672,23 +1654,84 @@ bool AsyncResultsMerger::_checkHighWaterMarkEligibility(WithLock,
         compareSortKeys(newMinSortKey, *remote.promisedMinSortKey, *_params.getSort()) > 0;
 }
 
-void AsyncResultsMerger::_scheduleRetryCallback(std::function<void(Status)> callback,
-                                                Milliseconds delay) {
-    // The backoff wait always runs on the executor, regardless of whether the ARM is attached: the
-    // callback runs on an executor thread either way, so detach/reattach is orthogonal to a pending
-    // backoff and the sleep survives detach at full length. The callback captures the ARM by
-    // weak_ptr, so a pending backoff does not keep the ARM alive. The ARM-wide
-    // '_cancellationSource' cancels a pending backoff when 'kill()' runs.
-    _executor->sleepFor(delay, _cancellationSource.token())
-        .getAsync(makeStallableRetryCallback(
-            _executor, _cancellationSource.token(), std::move(callback)));
+StatusWith<executor::TaskExecutor::CallbackHandle> AsyncResultsMerger::_scheduleBackoffTimer(
+    WithLock, const RemoteCursorPtr& remote, Milliseconds timerDelay, Milliseconds backoffDelay) {
+    // The backoff wait always runs on the executor ('scheduleWorkAt'), regardless of whether the
+    // ARM is attached: the callback runs on an executor thread either way, so detach/reattach is
+    // orthogonal to a pending backoff and the timer survives detach at full length. The callback
+    // captures the ARM by weak_ptr, so a pending backoff does not keep the ARM alive.
+    //
+    // 'timerDelay' is the deadline of this particular arming, while 'backoffDelay' is the delay the
+    // retry strategy asked for. The two differ only when a stalled callback re-arms itself: the
+    // re-armed timer is short ('kArmRetryBackoffStallPollInterval') but the backoff it stands in
+    // for is still the full one, which is what a fully elapsed backoff must record.
+    auto swHandle = _executor->scheduleWorkAt(
+        _executor->now() + timerDelay,
+        [weak = weak_from_this(), remote /* intrusive_ptr copy! */, backoffDelay](
+            const executor::TaskExecutor::CallbackArgs& args) {
+            auto self = weak.lock();
+            if (!self) {
+                // Do not continue here if the last shared_ptr pointing to this
+                // 'AsyncResultsMerger' instance has already gone out of scope. In this case
+                // there is no need to schedule further retries.
+                return;
+            }
 
-    // The backoff sleep is now armed with a deadline fixed relative to the current
-    // mock-clock reading. Enter the observation-only fail point so tests can synchronize on this
-    // point via 'waitForTimesEntered()' before advancing the mock clock. Behavior is unchanged.
-    if (MONGO_unlikely(armRetryScheduledForTesting.shouldFail())) {
+            std::lock_guard<std::mutex> lk(self->_mutex);
+            self->_onArmRetryTimerFired(lk, remote, backoffDelay, args);
+        });
+    if (!swHandle.isOK()) {
+        return swHandle;
+    }
+
+    // The backoff timer is now armed with a deadline fixed relative to the current mock-clock
+    // reading. Enter the observation-only fail point so tests can synchronize on this point via
+    // 'waitForTimesEntered()' before advancing the mock clock. Behavior is unchanged.
+    if (MONGO_unlikely(armRetryBackoffScheduledForTesting.shouldFail())) {
         // Intentionally empty: only the entry count is observed.
     }
+    return swHandle;
+}
+
+void AsyncResultsMerger::_onArmRetryTimerFired(WithLock lk,
+                                               const RemoteCursorPtr& remote,
+                                               Milliseconds backoffDelay,
+                                               const executor::TaskExecutor::CallbackArgs& args) {
+    // Test-only: instead of completing the backoff, keep it armed so a test can drive
+    // 'kill()'/'closeShardCursors()'/detach against a pending backoff. Re-arming goes through
+    // '_scheduleBackoffTimer()' like any other arming, so 'InBackoff' always names the live timer
+    // and 'cancelAsyncWork()' remains the only way a backoff is cancelled.
+    //
+    // The liveness check is what makes the re-arm safe. It and 'cancelAsyncWork()' both run under
+    // '_mutex', so a cancellation either lands before this point - and is observed here, so we stop
+    // polling instead of publishing a handle nobody will cancel - or after we release '_mutex', by
+    // which time 'InBackoff' names the timer we just armed and can cancel it.
+    if (args.status.isOK() && MONGO_unlikely(stallArmRetryBackoff.shouldFail()) &&
+        _lifecycleState == kAlive && _status.isOK() && !remote->closed) {
+        if (auto swHandle =
+                _scheduleBackoffTimer(lk, remote, kArmRetryBackoffStallPollInterval, backoffDelay);
+            swHandle.isOK()) {
+            _rearmBackoff(lk, *remote, std::move(swHandle.getValue()));
+            return;
+        }
+        // The executor refused the re-arm (e.g. it is shutting down): fall through and run the
+        // retry with the original, still-OK status.
+    }
+
+    _completeBackoff(lk, *remote);
+    // Unlike the getMore response, a backoff timer is not dropped for a closed remote, but is
+    // dropped once the ARM has recorded a fatal error: there is nothing left to retry.
+    if (_lifecycleState != kAlive || !_status.isOK()) {
+        _onAsyncWorkDropped(lk);
+        return;
+    }
+
+    // Record only a backoff that fully elapsed. A non-OK status means the timer was cancelled
+    // ('closeShardCursors()', 'kill()', or executor shutdown), so it contributes no backoff time.
+    if (args.status.isOK()) {
+        remote->retryStrategy.recordBackoff(backoffDelay);
+    }
+    _signalCurrentEventIfReady(lk);
 }
 
 void AsyncResultsMerger::_keepRecordOfAdditionalTxnParticipants(
@@ -1785,41 +1828,21 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
             // that the next call to 'nextEvent()' will schedule a new getMore with a fresh
             // OperationContext.
             const auto delay = retryStrategy.getNextRetryDelay();
-            // Note this is wrapped in a 'StallableRetryCallback' below, which - for tests only -
-            // can hold it back (without holding '_mutex', so detach/reattach on other threads can
-            // proceed) so that a test can line up a *different*, later getMore's OperationContext
-            // to be attached by the time the retry callback defers.
-            auto retryCallback =
-                [weak = weak_from_this(), remote /* intrusive_ptr copy! */, delay](Status s) {
-                    auto self = weak.lock();
-                    if (!self) {
-                        // Do not continue here if the last shared_ptr pointing to this
-                        // 'AsyncResultsMerger' instance has already gone out of scope. In this case
-                        // there is no need to schedule further retries.
-                        return;
-                    }
-
-                    std::lock_guard<std::mutex> lk(self->_mutex);
-
-                    self->_completeBackoff(lk, *remote);
-                    // Unlike the getMore response, a backoff timer is not dropped for a closed
-                    // remote, but is dropped once the ARM has recorded a fatal error: there is
-                    // nothing left to retry.
-                    if (self->_lifecycleState != kAlive || !self->_status.isOK()) {
-                        self->_onAsyncWorkDropped(lk);
-                        return;
-                    }
-
-                    // Record only a backoff that fully elapsed. A non-OK 's' means the sleep was
-                    // cut short (closeShardCursors(), kill(), or executor shutdown), so it
-                    // contributes no backoff time.
-                    if (s.isOK()) {
-                        remote->retryStrategy.recordBackoff(delay);
-                    }
-                    self->_signalCurrentEventIfReady(lk);
-                };
-            _enterBackoff(lk, *remote);
-            _scheduleRetryCallback(std::move(retryCallback), delay);
+            // The returned handle cancels the backoff timer; the timer itself never dispatches the
+            // retry (see '_onArmRetryTimerFired()'). The timer is armed here with 'delay' as both
+            // its deadline and the backoff it stands in for; only a stalled callback re-arming
+            // itself makes those two differ.
+            auto swHandle = _scheduleBackoffTimer(lk, remote, delay, delay);
+            if (!swHandle.isOK()) {
+                // Refused synchronously (e.g. the executor is shut down), like a refused
+                // 'scheduleRemoteCommand()': the remote stays 'Idle' and the error is recorded.
+                _cleanUpFailedBatch(lk, swHandle.getStatus(), *remote);
+                _signalCurrentEventIfReady(lk);
+                return;
+            }
+            // Entering 'InBackoff' after scheduling is safe: the callback needs '_mutex', which we
+            // hold, so it cannot observe the remote before the state is set.
+            _enterBackoff(lk, *remote, std::move(swHandle.getValue()));
             return;
         } else {
             _cleanUpFailedBatch(lk, parsedResponse.getStatus(), *remote);
@@ -2063,8 +2086,6 @@ SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     // finished running.
     _killCompleteInfo.emplace();
 
-    _cancellationSource.cancel();
-
     // Release memory for document buffers as early as possible.
     // This is ok, because once the AsyncResultsMerger has received a kill command, it does not
     // return any further results.
@@ -2088,7 +2109,7 @@ SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
 
     // Cancel all of our callbacks. Once they all complete, the event will be signaled.
     for (const auto& remote : _remotes) {
-        _cancelCallbackForRemote(lk, remote);
+        remote->cancelAsyncWork(lk, _executor.get());
     }
 
     _subBaton.shutdown();
@@ -2153,6 +2174,27 @@ bool AsyncResultsMerger::RemoteCursorData::hasNext() const {
 
 bool AsyncResultsMerger::RemoteCursorData::exhausted() const {
     return cursorId == 0;
+}
+
+void AsyncResultsMerger::RemoteCursorData::cancelAsyncWork(WithLock,
+                                                           executor::TaskExecutor* executor) {
+    std::visit(OverloadedVisitor{
+                   [&](GetMoreInFlight& inFlight) {
+                       if (inFlight.cbHandle.isValid()) {
+                           executor->cancel(inFlight.cbHandle);
+                       }
+                   },
+                   [&](InBackoff& backoff) {
+                       // The timer callback runs early and changes the remote state to 'Idle'.
+                       if (backoff.timerCallbackHandle.isValid()) {
+                           executor->cancel(backoff.timerCallbackHandle);
+                       }
+                   },
+                   [](Idle&) {
+                       // Nothing to cancel.
+                   },
+               },
+               state);
 }
 
 void AsyncResultsMerger::RemoteCursorData::cleanUpFailedBatch(Status status,

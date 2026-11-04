@@ -740,8 +740,8 @@ TEST_F(BlockingResultsMergerTestFixture,
     blockingMerger.detachFromOperationContext();
 
     // Deliver the retryable error while detached. Because the ARM has no OperationContext, the
-    // retry is scheduled via the executor's 'sleepFor' (a timer on the mock network) rather than
-    // the SubBaton, so it will not fire until the network clock is advanced below.
+    // retry is scheduled via the executor's 'scheduleWorkAt' (a timer on the mock network) rather
+    // than the SubBaton, so it will not fire until the network clock is advanced below.
     scheduleNetworkResponseObjs({retryableError});
 
     // Reattach with a fresh OperationContext. The pending retry must not be lost.
@@ -762,9 +762,9 @@ TEST_F(BlockingResultsMergerTestFixture,
     waitForFutureThenKill(std::move(future), blockingMerger);
 }
 
-// The ARM always schedules a backoff retry via '_executor->sleepFor(...)', whose timer is driven
-// by the mock *network* clock (advanced by 'advanceTime()'), regardless of whether the ARM is
-// attached to an OperationContext.
+// The ARM always schedules a backoff retry via '_executor->scheduleWorkAt(...)', whose timer is
+// driven by the mock *network* clock (advanced by 'advanceTime()'), regardless of whether the ARM
+// is attached to an OperationContext.
 //
 // The next two tests pin the "not too soon" half of that contract for the BRM: the retry getMore
 // must NOT be dispatched until the mock clock advances past the backoff deadline.
@@ -776,7 +776,7 @@ TEST_F(BlockingResultsMergerTestFixture,
     FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << kBackoffDelayMs)};
     // Observation-only: lets us deterministically wait for the retry alarm to be armed before
     // advancing the mock clock, replacing a racy fixed 'sleepmillis'.
-    FailPointEnableBlock retryScheduledFp{"armRetryScheduledForTesting"};
+    FailPointEnableBlock retryScheduledFp{"armRetryBackoffScheduledForTesting"};
 
     const BSONObj retryableError = makeResponseObjWithErrorLabels(
         ErrorCodes::HostUnreachable,
@@ -802,7 +802,7 @@ TEST_F(BlockingResultsMergerTestFixture,
     waitForGetMoreScheduled("Waiting for initial getMore to be scheduled");
     scheduleNetworkResponseObjs({retryableError});
 
-    // This fail point is entered at the end of the ARM's '_scheduleRetryCallback', once the retry
+    // This fail point is entered at the end of the ARM's '_scheduleBackoffTimer', once the backoff
     // timer is armed with a fixed deadline of (now + delay). Wait until the fail point has been
     // entered before touching the clock.
     //
@@ -842,9 +842,9 @@ TEST_F(BlockingResultsMergerTestFixture,
     unittest::ServerParameterGuard maxAttemptsGuard("defaultClientMaxRetryAttempts", 3);
     constexpr auto kBackoffDelayMs = 1000;
     FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << kBackoffDelayMs)};
-    // Observation-only: lets us deterministically wait for the 'sleepFor' timer to be armed before
-    // advancing the mock clock, replacing a racy fixed 'sleepmillis'.
-    FailPointEnableBlock retryScheduledFp{"armRetryScheduledForTesting"};
+    // Observation-only: lets us deterministically wait for the 'scheduleWorkAt' timer to be armed
+    // before advancing the mock clock, replacing a racy fixed 'sleepmillis'.
+    FailPointEnableBlock retryScheduledFp{"armRetryBackoffScheduledForTesting"};
 
     const BSONObj retryableError = makeResponseObjWithErrorLabels(
         ErrorCodes::HostUnreachable,
@@ -866,18 +866,18 @@ TEST_F(BlockingResultsMergerTestFixture,
         ASSERT_TRUE(next.isEOF());
     });
 
-    // Detach before delivering the error: the backoff timer runs on the executor ('sleepFor',
+    // Detach before delivering the error: the backoff timer runs on the executor ('scheduleWorkAt',
     // network clock) either way, so detach must be orthogonal to the pending retry. Then reattach.
     waitForGetMoreScheduled("Waiting for initial getMore to be scheduled");
     blockingMerger.detachFromOperationContext();
     scheduleNetworkResponseObjs({retryableError});
     blockingMerger.reattachToOperationContext(operationContext());
 
-    // Deterministically wait for the detached retry (scheduled via 'sleepFor' on the *network*
-    // clock) to be armed. The deadline is fixed at networkClock(0) + kBackoffDelayMs before we
-    // touch the clock below, so the negative assertion is meaningful. Wait relative to when the
-    // block enabled the fail point, since the fail point's absolute counter accumulates across
-    // tests in this binary.
+    // Deterministically wait for the detached retry (scheduled via 'scheduleWorkAt' on the
+    // *network* clock) to be armed. The deadline is fixed at networkClock(0) + kBackoffDelayMs
+    // before we touch the clock below, so the negative assertion is meaningful. Wait relative to
+    // when the block enabled the fail point, since the fail point's absolute counter accumulates
+    // across tests in this binary.
     retryScheduledFp.wait();
     ASSERT_FALSE(networkHasReadyRequests());
 
@@ -886,8 +886,8 @@ TEST_F(BlockingResultsMergerTestFixture,
     runReadyCallbacks();
     ASSERT_FALSE(networkHasReadyRequests());
 
-    // Only once the network clock passes the backoff deadline does the 'sleepFor' timer fire, the
-    // retry callback defer, and the BRM's loop re-dispatch the retry getMore.
+    // Only once the network clock passes the backoff deadline does the 'scheduleWorkAt' timer fire,
+    // the retry callback defer, and the BRM's loop re-dispatch the retry getMore.
     advanceTime(Milliseconds(kBackoffDelayMs / 2 + 1));
     runReadyCallbacks();
     waitForGetMoreScheduled("Waiting for retry getMore to be scheduled");
