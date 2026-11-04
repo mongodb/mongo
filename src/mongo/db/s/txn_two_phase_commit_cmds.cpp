@@ -15,6 +15,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -209,8 +210,12 @@ public:
                                 absl::flat_hash_set<NamespaceString> affectedNamespaces) {
             Response response;
             response.setPrepareTimestamp(std::move(prepareTimestamp));
+            // The affected namespaces are consumed by the coordinator to build the end-of-
+            // transaction accounting metadata. Include them when either the legacy end-of-
+            // transaction feature or the new synthesis write path is enabled.
             if (feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+                isEndOfTransactionWritePathEnabled()) {
                 std::vector<NamespaceString> namespaces;
                 namespaces.reserve(affectedNamespaces.size());
                 std::move(affectedNamespaces.begin(),

@@ -219,6 +219,19 @@ private:
     // decision.
     std::vector<NamespaceString> _affectedNamespaces MONGO_LOCKING_GUARDED_BY(_mutex);
 
+    // Set when the coordinator has heard back from all the participants and reached a commit
+    // decision, or recovered it from the coordinator document on failover. Holds the
+    // end-of-transaction accounting metadata that is persisted with the decision and attached to
+    // each participant's commitTransaction command.
+    boost::optional<EndOfTransactionScopesInfoBase> _endOfTransactionMetadata
+        MONGO_LOCKING_GUARDED_BY(_mutex);
+
+    // Set once the accounting metadata is known to be part of the durable commit decision (i.e. it
+    // was written to the coordinator document, either by this coordinator or recovered from it on
+    // failover). Commit scopes are only attached to the participants' commitTransaction commands
+    // when this is true, so that a recovered coordinator can always resend the same metadata.
+    bool _endOfTransactionMetadataPersisted MONGO_LOCKING_GUARDED_BY(_mutex) = false;
+
     // Set when the coordinator has durably persisted `_decision` to the `config.coordinators`
     // collection
     bool _decisionDurable MONGO_LOCKING_GUARDED_BY(_mutex) = false;

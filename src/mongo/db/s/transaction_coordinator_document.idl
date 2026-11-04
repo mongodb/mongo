@@ -9,6 +9,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/commands/txn_cmds.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/sharding_environment/sharding_types.idl"
 
@@ -70,3 +71,13 @@ structs:
                 description:
                     "The list of namespaces, affected by the transaction. Each participant
                     returns a list in response to prepareTransaction command."
+            endOfTransactionScopes:
+                optional: true
+                type: EndOfTransactionScopesInfoBase
+                description:
+                    "Commit-time accounting metadata for end-of-transaction change stream
+                    support, captured by the coordinator before the distributed commit and
+                    persisted so that commit retries and coordinator failover reuse the same
+                    values. The per-participant 'shardId' is added when the metadata is
+                    attached to each commitTransaction command. Only set while
+                    end-of-transaction accounting is enabled."

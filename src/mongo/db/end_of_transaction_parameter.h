@@ -17,11 +17,12 @@ namespace mongo {
 [[MONGO_MOD_PUBLIC]] bool isAllowEndOfTransactionEnabled();
 
 /**
- * Returns whether the end-of-transaction write-path augmentation is currently enabled. This is the
- * case only when the 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag and the
- * 'allowEndOfTransaction' server parameter are both enabled. When disabled, transaction commits do
- * not write end-of-transaction accounting metadata into the oplog, so no endOfTransaction change
- * stream events can be produced from those commits.
+ * Returns whether end-of-transaction accounting metadata should be written to the oplog. This
+ * requires the 'allowEndOfTransaction' server parameter (the operator kill switch) and the
+ * 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag (the rollout gate) to be enabled,
+ * and the cluster FCV to be at the latest version. The FCV requirement keeps the coordinator from
+ * sending the new 'endOfTransactionScopes' field on the strict 'commitTransaction' command to a
+ * shard that predates it and would reject the command.
  */
 [[MONGO_MOD_PUBLIC]] bool isEndOfTransactionWritePathEnabled();
 

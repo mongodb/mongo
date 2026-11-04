@@ -115,6 +115,7 @@ idl_generator(
     src = "transaction_coordinator_document.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/commands:txn_cmds_gen",
         "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
     ],
@@ -255,6 +256,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:end_of_transaction_parameter",
         "//src/mongo/db:internal_transactions_feature_flag",
         "//src/mongo/db:not_primary_error_tracker",
         "//src/mongo/db:rw_concern_d",
@@ -697,6 +699,7 @@ mongo_cc_library(
         "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/db:cloner",
         "//src/mongo/db:cluster_transaction_api",
+        "//src/mongo/db:end_of_transaction_parameter",
         "//src/mongo/db:fle_crud",
         "//src/mongo/db:internal_transactions_feature_flag",
         "//src/mongo/db:multitenancy",

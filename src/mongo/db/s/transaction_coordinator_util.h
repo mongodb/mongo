@@ -10,6 +10,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/api_parameters.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -22,6 +23,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/future.h"
 
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -56,6 +58,16 @@ Future<repl::OpTime> persistParticipantsList(
     const txn::ParticipantsList& participants);
 
 struct PrepareResponse;
+
+/**
+ * Returns true if the given end-of-transaction accounting metadata is consistent with the given
+ * participant list, i.e. every shard the metadata references is a participant of the transaction.
+ * Used to reject malformed metadata recovered from the coordinator document before it is attached
+ * to the participants' commitTransaction commands.
+ */
+bool isEndOfTransactionMetadataConsistentWithParticipants(
+    const EndOfTransactionScopesInfoBase& metadata, const std::vector<ShardId>& participants);
+
 class PrepareVoteConsensus {
 public:
     PrepareVoteConsensus(int numShards) : _numShards(numShards) {}
@@ -73,6 +85,13 @@ public:
         return std::move(_affectedNamespaces);
     }
 
+    /**
+     * Computes the end-of-transaction accounting metadata (participant sets) from the recorded
+     * votes. Read-only participants are excluded. `shardId` is left defaulted and must be set by
+     * the caller.
+     */
+    EndOfTransactionScopesInfoBase releaseEndOfTransactionMetadata();
+
 private:
     int _numShards;
 
@@ -82,6 +101,10 @@ private:
 
     Timestamp _maxPrepareTimestamp;
     absl::flat_hash_set<NamespaceString> _affectedNamespaces;
+
+    // Namespaces written by each write-participant shard, used to derive the participant sets.
+    std::map<ShardId, std::vector<NamespaceString>> _namespacesByShard;
+
     boost::optional<Status> _abortStatus;
 };
 
@@ -130,17 +153,26 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
  * If the update succeeds but did not update any document, throws an anonymous error, because it
  * means either no document for (lsid, txnNumber, txnRetryCounter) exists, or a document exists but
  * has a different participant list, different decision, or different commit Timestamp.
+ *
+ * The end-of-transaction accounting metadata is written into the document iff
+ * 'endOfTransactionScopes' has at least one cluster participant. The caller decides whether the
+ * metadata is part of the decision; this function does not consult the feature flag or kill switch.
  */
-Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
-                                     const LogicalSessionId& lsid,
-                                     const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-                                     const txn::ParticipantsList& participants,
-                                     const txn::CoordinatorCommitDecision& decision,
-                                     const std::vector<NamespaceString>& affectedNamespaces);
+Future<repl::OpTime> persistDecision(
+    txn::AsyncWorkScheduler& scheduler,
+    const LogicalSessionId& lsid,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+    const txn::ParticipantsList& participants,
+    const txn::CoordinatorCommitDecision& decision,
+    const std::vector<NamespaceString>& affectedNamespaces,
+    const EndOfTransactionScopesInfoBase& endOfTransactionScopes = {});
 
 /**
  * Sends commit to all shards and returns a future that will be resolved when all participants have
- * responded with success.
+ * responded with success. When 'endOfTransactionScopes' has at least one cluster participant, each
+ * participant's commitTransaction command carries the metadata with that participant's shard id.
+ * The caller decides whether the metadata is part of the decision; this function does not consult
+ * the feature flag or kill switch.
  */
 Future<void> sendCommit(ServiceContext* service,
                         txn::AsyncWorkScheduler& scheduler,
@@ -148,7 +180,8 @@ Future<void> sendCommit(ServiceContext* service,
                         const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                         const APIParameters& apiParams,
                         const txn::ParticipantsList& participants,
-                        Timestamp commitTimestamp);
+                        Timestamp commitTimestamp,
+                        const EndOfTransactionScopesInfoBase& endOfTransactionScopes = {});
 
 /**
  * Sends abort to all shards and returns a future that will be resolved when all participants have
@@ -225,6 +258,11 @@ Future<PrepareResponse> sendPrepareToShard(
  *
  * Used for sendCommit and sendAbort.
  *
+ * 'commandObjWithoutEndOfTransactionScopes' is set when 'commandObj' carries the end-of-transaction
+ * accounting metadata. If the shard rejects the command with IDLUnknownField (i.e. its binary
+ * predates the metadata field), the metadata is stripped, and the commit is retried without the
+ * metadata.
+ *
  * This method will retry until it receives a response from the remote node which can be
  * interpreted as vote abort (e.g. NoSuchTransaction), or until the scheduler under which it is
  * running is shut down. Because of this it can return only the following error code(s):
@@ -237,7 +275,8 @@ Future<void> sendDecisionToShard(
     const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
     const ShardId& shardId,
     const BSONObj& commandObj,
-    OperationContextFn operationContextFn = [](OperationContext*) {});
+    OperationContextFn operationContextFn = [](OperationContext*) {},
+    boost::optional<BSONObj> commandObjWithoutEndOfTransactionScopes = boost::none);
 
 Future<void> writeEndOfTransaction(txn::AsyncWorkScheduler& scheduler,
                                    const LogicalSessionId& lsid,
@@ -250,6 +289,13 @@ Future<void> writeEndOfTransaction(txn::AsyncWorkScheduler& scheduler,
  */
 std::string txnIdToString(const LogicalSessionId& lsid,
                           const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
+
+/**
+ * For testing only: resets the log severity suppressor used for the "shard rejected the
+ * end-of-transaction metadata" message, so the next call returns the unsuppressed (Info) severity.
+ * Pass nullptr to restore the system clock. Not thread-safe.
+ */
+void resetEndOfTransactionMetadataRejectedLogSeveritySuppressor_forTest(ClockSource* cs);
 
 }  // namespace txn
 }  // namespace mongo

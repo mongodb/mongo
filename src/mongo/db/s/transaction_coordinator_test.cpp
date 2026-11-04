@@ -64,6 +64,7 @@
 #include <cstdint>
 #include <memory>
 #include <ratio>
+#include <set>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -730,6 +731,223 @@ TEST_F(TransactionCoordinatorDriverTest,
     abortFuture.get();
 }
 
+TEST_F(TransactionCoordinatorDriverTest,
+       SendCommitAttachesEndOfTransactionScopesWhenFeatureEnabled) {
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+
+    EndOfTransactionScopesInfoBase metadata;
+    metadata.setCollectionParticipants(
+        BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2")));
+    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1" << "s2")));
+    metadata.setClusterParticipants({ShardId("s1"), ShardId("s2")});
+
+    auto commitFuture = txn::sendCommit(getServiceContext(),
+                                        aws,
+                                        _lsid,
+                                        _txnNumberAndRetryCounter,
+                                        APIParameters(),
+                                        kTwoShardIdList,
+                                        Timestamp(100, 5),
+                                        metadata);
+
+    std::set<ShardId> observedShardIds;
+    auto assertScopes = [&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(CommitTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        ASSERT_TRUE(request.cmdObj.hasField("endOfTransactionScopes"));
+        // The commit timestamp is the lower bound (floor) on the oplog timestamps of this
+        // transaction's commitTransaction entries; it is carried by the command, not the metadata.
+        ASSERT_EQUALS(Timestamp(100, 5), request.cmdObj.getField("commitTimestamp").timestamp());
+        auto scopes = request.cmdObj.getObjectField("endOfTransactionScopes");
+        ASSERT_BSONOBJ_EQ(metadata.getCollectionParticipants(),
+                          scopes.getObjectField("collectionParticipants"));
+        ASSERT_BSONOBJ_EQ(metadata.getDatabaseParticipants(),
+                          scopes.getObjectField("databaseParticipants"));
+        observedShardIds.insert(ShardId(std::string(scopes.getStringField("shardId"))));
+        return kOk;
+    };
+    onCommands({assertScopes, assertScopes});
+    commitFuture.get();
+
+    ASSERT_EQUALS(2U, observedShardIds.size());
+    ASSERT(observedShardIds.count(ShardId("s1")));
+    ASSERT(observedShardIds.count(ShardId("s2")));
+}
+
+TEST_F(TransactionCoordinatorDriverTest,
+       SendCommitAttachesEndOfTransactionScopesWhenFeatureDisabled) {
+    // The decision to attach the metadata is made once by the caller and passed in as a non-empty
+    // scopes object; 'sendCommit' must not re-read the kill switch, so a toggle after the decision
+    // cannot make the commands disagree with the persisted document.
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               false);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+
+    EndOfTransactionScopesInfoBase metadata;
+    metadata.setCollectionParticipants(
+        BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2")));
+    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1" << "s2")));
+    metadata.setClusterParticipants({ShardId("s1"), ShardId("s2")});
+
+    auto commitFuture = txn::sendCommit(getServiceContext(),
+                                        aws,
+                                        _lsid,
+                                        _txnNumberAndRetryCounter,
+                                        APIParameters(),
+                                        kTwoShardIdList,
+                                        Timestamp(100, 5),
+                                        metadata);
+
+    auto assertScopes = [](const executor::RemoteCommandRequest& request) {
+        ASSERT_TRUE(request.cmdObj.hasField("endOfTransactionScopes"));
+        return kOk;
+    };
+    onCommands({assertScopes, assertScopes});
+    commitFuture.get();
+}
+
+TEST_F(TransactionCoordinatorDriverTest,
+       SendCommitOmitsEndOfTransactionScopesForSingleReadOnlyParticipant) {
+    // A transaction whose only participant is read-only has no write participant to order, so the
+    // coordinator has no participant sets to attach. The commit command is still sent, without the
+    // metadata.
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+
+    // A read-only participant contributes no namespaces, so the coordinator builds no metadata.
+    EndOfTransactionScopesInfoBase noMetadata;
+
+    auto commitFuture = txn::sendCommit(getServiceContext(),
+                                        aws,
+                                        _lsid,
+                                        _txnNumberAndRetryCounter,
+                                        APIParameters(),
+                                        kOneShardIdList,
+                                        Timestamp(100, 5),
+                                        noMetadata);
+
+    onCommand([](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(CommitTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        ASSERT_FALSE(request.cmdObj.hasField("endOfTransactionScopes"));
+        return kOk;
+    });
+    commitFuture.get();
+}
+
+TEST_F(TransactionCoordinatorDriverTest,
+       SendCommitAttachesEndOfTransactionScopesOnlyToWriteParticipants) {
+    // A transaction with a mix of read-only and write participants: only the write participants'
+    // commit commands carry the metadata. Every participant still receives its commit command.
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+
+    EndOfTransactionScopesInfoBase metadata;
+    // 's2' and 's3' wrote transaction data; 's1' is a read-only participant.
+    metadata.setCollectionParticipants(
+        BSON("db.coll2" << BSON_ARRAY("s2") << "db.coll3" << BSON_ARRAY("s3")));
+    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s2" << "s3")));
+    metadata.setClusterParticipants({ShardId("s2"), ShardId("s3")});
+
+    auto commitFuture = txn::sendCommit(getServiceContext(),
+                                        aws,
+                                        _lsid,
+                                        _txnNumberAndRetryCounter,
+                                        APIParameters(),
+                                        kThreeShardIdList,
+                                        Timestamp(100, 5),
+                                        metadata);
+
+    std::set<ShardId> shardsWithMetadata;
+    std::set<ShardId> shardsCommitted;
+    auto assertScopes = [&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(CommitTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        shardsCommitted.insert(ShardId(request.target.host()));
+        if (request.cmdObj.hasField("endOfTransactionScopes")) {
+            shardsWithMetadata.insert(
+                ShardId(std::string(request.cmdObj.getObjectField("endOfTransactionScopes")
+                                        .getStringField("shardId"))));
+        }
+        return kOk;
+    };
+    onCommands({assertScopes, assertScopes, assertScopes});
+    commitFuture.get();
+
+    // All three participants are committed, but only the two write participants carry the metadata.
+    ASSERT_EQUALS(3U, shardsCommitted.size());
+    ASSERT_EQUALS(2U, shardsWithMetadata.size());
+    ASSERT(shardsWithMetadata.count(ShardId("s2")));
+    ASSERT(shardsWithMetadata.count(ShardId("s3")));
+    ASSERT_FALSE(shardsWithMetadata.count(ShardId("s1")));
+}
+
+TEST_F(TransactionCoordinatorDriverTest,
+       SendCommitAttachesEndOfTransactionScopesToSingleWriteParticipant) {
+    // A transaction with a single write participant: its commit command carries the metadata.
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+
+    EndOfTransactionScopesInfoBase metadata;
+    metadata.setCollectionParticipants(BSON("db.coll1" << BSON_ARRAY("s1")));
+    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1")));
+    metadata.setClusterParticipants({ShardId("s1")});
+
+    auto commitFuture = txn::sendCommit(getServiceContext(),
+                                        aws,
+                                        _lsid,
+                                        _txnNumberAndRetryCounter,
+                                        APIParameters(),
+                                        kOneShardIdList,
+                                        Timestamp(100, 5),
+                                        metadata);
+
+    onCommand([](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(CommitTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        ASSERT_TRUE(request.cmdObj.hasField("endOfTransactionScopes"));
+        ASSERT_EQUALS(ShardId("s1"),
+                      ShardId(std::string(request.cmdObj.getObjectField("endOfTransactionScopes")
+                                              .getStringField("shardId"))));
+        return kOk;
+    });
+    commitFuture.get();
+}
+
+TEST_F(TransactionCoordinatorDriverTest, SendCommitOmitsEndOfTransactionScopesWhenNoneProvided) {
+    // The metadata is only attached when the caller passes a non-empty scopes object.
+    txn::AsyncWorkScheduler aws(getServiceContext());
+
+    EndOfTransactionScopesInfoBase noMetadata;
+
+    auto commitFuture = txn::sendCommit(getServiceContext(),
+                                        aws,
+                                        _lsid,
+                                        _txnNumberAndRetryCounter,
+                                        APIParameters(),
+                                        kTwoShardIdList,
+                                        Timestamp(100, 5),
+                                        noMetadata);
+
+    auto assertNoScopes = [](const executor::RemoteCommandRequest& request) {
+        ASSERT_FALSE(request.cmdObj.hasField("endOfTransactionScopes"));
+        return kOk;
+    };
+    onCommands({assertNoScopes, assertNoScopes});
+    commitFuture.get();
+}
+
 TEST_F(TransactionCoordinatorDriverTest, SendPrepareToShardsCollectsAffectedNamespaces) {
     const auto timestamp = Timestamp(1, 1);
 
@@ -758,6 +976,165 @@ TEST_F(TransactionCoordinatorDriverTest, SendPrepareToShardsCollectsAffectedName
     ASSERT_EQUALS(txn::CommitDecision::kCommit, response.decision().getDecision());
     StringSet expectedAffectedNamespaces{"db1.coll1", "db1.coll2", "db2.coll1", "db2.coll2"};
     ASSERT_EQUALS(expectedAffectedNamespaces, toStringSet(response.releaseAffectedNamespaces()));
+}
+
+TEST_F(TransactionCoordinatorDriverTest, SendPrepareCollectsEndOfTransactionMetadata) {
+    // The accounting metadata is only collected on the new synthesis write path, which is gated by
+    // the synthesis feature flag and the kill switch; the legacy feature flag stays disabled.
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    const auto timestamp = Timestamp(1, 1);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(),
+                                   aws,
+                                   _lsid,
+                                   _txnNumberAndRetryCounter,
+                                   APIParameters(),
+                                   kTwoShardIdList);
+
+    auto respondToPrepare = [&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(PrepareTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        ASSERT_BSONOBJ_EQ(defaultMajorityWriteConcernDoNotUse().toBSON(),
+                          request.cmdObj.getObjectField(WriteConcernOptions::kWriteConcernField));
+        if (request.target.host() == "s1") {
+            return makePrepareOkResponse(
+                timestamp,
+                {NamespaceString::createNamespaceString_forTest("db1.coll1"),
+                 NamespaceString::createNamespaceString_forTest("db2.coll1")});
+        }
+        ASSERT_EQUALS("s2", request.target.host());
+        return makePrepareOkResponse(timestamp,
+                                     {NamespaceString::createNamespaceString_forTest("db1.coll2"),
+                                      NamespaceString::createNamespaceString_forTest("db1.coll1")});
+    };
+    onCommands({respondToPrepare, respondToPrepare});
+
+    auto response = future.get();
+    ASSERT_EQUALS(txn::CommitDecision::kCommit, response.decision().getDecision());
+
+    auto metadata = response.releaseEndOfTransactionMetadata();
+
+    // Both shards wrote transaction data, in sorted shard-id order.
+    ASSERT_EQUALS(2U, metadata.getClusterParticipants().size());
+    ASSERT_EQUALS(ShardId("s1"), metadata.getClusterParticipants()[0]);
+    ASSERT_EQUALS(ShardId("s2"), metadata.getClusterParticipants()[1]);
+
+    ASSERT_BSONOBJ_EQ(BSON("db1.coll1" << BSON_ARRAY("s1" << "s2") << "db1.coll2"
+                                       << BSON_ARRAY("s2") << "db2.coll1" << BSON_ARRAY("s1")),
+                      metadata.getCollectionParticipants());
+    ASSERT_BSONOBJ_EQ(BSON("db1" << BSON_ARRAY("s1" << "s2") << "db2" << BSON_ARRAY("s1")),
+                      metadata.getDatabaseParticipants());
+}
+
+TEST_F(TransactionCoordinatorDriverTest,
+       SendPrepareExcludesReadOnlyParticipantsFromEndOfTransactionMetadata) {
+    // A read-only participant (one that reports no affected namespaces) has the transaction in
+    // progress but wrote nothing, so it must not appear in any of the participant sets.
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    const auto timestamp = Timestamp(1, 1);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(),
+                                   aws,
+                                   _lsid,
+                                   _txnNumberAndRetryCounter,
+                                   APIParameters(),
+                                   kTwoShardIdList);
+
+    auto respondToPrepare = [&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(PrepareTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        if (request.target.host() == "s1") {
+            return makePrepareOkResponse(
+                timestamp, {NamespaceString::createNamespaceString_forTest("db.coll")});
+        }
+        ASSERT_EQUALS("s2", request.target.host());
+        return makePrepareOkResponse(timestamp, std::vector<NamespaceString>{});
+    };
+    onCommands({respondToPrepare, respondToPrepare});
+
+    auto response = future.get();
+    ASSERT_EQUALS(txn::CommitDecision::kCommit, response.decision().getDecision());
+
+    auto metadata = response.releaseEndOfTransactionMetadata();
+
+    // Only 's1' wrote transaction data, so only 's1' is recorded.
+    ASSERT_EQUALS(1U, metadata.getClusterParticipants().size());
+    ASSERT_EQUALS(ShardId("s1"), metadata.getClusterParticipants()[0]);
+    ASSERT_BSONOBJ_EQ(BSON("db.coll" << BSON_ARRAY("s1")), metadata.getCollectionParticipants());
+    ASSERT_BSONOBJ_EQ(BSON("db" << BSON_ARRAY("s1")), metadata.getDatabaseParticipants());
+}
+
+TEST_F(TransactionCoordinatorDriverTest,
+       SendPrepareDoesNotCollectEndOfTransactionMetadataWhenFeatureDisabled) {
+    // Disable the feature flag explicitly; the kill switch stays enabled. No per-shard namespaces
+    // are recorded even though the prepare responses contain them.
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               false);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    const auto timestamp = Timestamp(1, 1);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(),
+                                   aws,
+                                   _lsid,
+                                   _txnNumberAndRetryCounter,
+                                   APIParameters(),
+                                   kTwoShardIdList);
+
+    auto respondToPrepare = [&](const executor::RemoteCommandRequest&) {
+        return makePrepareOkResponse(timestamp,
+                                     {NamespaceString::createNamespaceString_forTest("db1.coll1")});
+    };
+    onCommands({respondToPrepare, respondToPrepare});
+
+    auto response = future.get();
+    ASSERT_EQUALS(txn::CommitDecision::kCommit, response.decision().getDecision());
+
+    auto metadata = response.releaseEndOfTransactionMetadata();
+    ASSERT(metadata.getClusterParticipants().empty());
+    ASSERT(metadata.getCollectionParticipants().isEmpty());
+    ASSERT(metadata.getDatabaseParticipants().isEmpty());
+}
+
+TEST_F(TransactionCoordinatorDriverTest, DropsOversizedEndOfTransactionMetadata) {
+    unittest::LogCaptureGuard logs;
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    txn::PrepareVoteConsensus consensus(1);
+    txn::PrepareResponse vote;
+    vote.shardId = ShardId("s1");
+    vote.vote = txn::PrepareVote::kCommit;
+    vote.prepareTimestamp = Timestamp(1, 1);
+    // Enough namespaces that the serialized participant maps exceed the metadata size cap. The
+    // collection names are deliberately long so that the cap is reached with a manageable number of
+    // namespaces.
+    const int kNumNamespaces = 100000;
+    const std::string longCollectionName(200, 'c');
+    vote.affectedNamespaces.reserve(kNumNamespaces);
+    for (int i = 0; i < kNumNamespaces; ++i) {
+        vote.affectedNamespaces.push_back(NamespaceString::createNamespaceString_forTest(
+            "db." + longCollectionName + std::to_string(i)));
+    }
+    consensus.registerVote(vote);
+
+    // The oversized metadata is dropped entirely, so neither the coordinator document nor the
+    // commit commands can grow past the BSON limit.
+    auto metadata = consensus.releaseEndOfTransactionMetadata();
+    ASSERT(metadata.getClusterParticipants().empty());
+    ASSERT(metadata.getCollectionParticipants().isEmpty());
+    ASSERT(metadata.getDatabaseParticipants().isEmpty());
+
+    // A warning is emitted so that the dropped metadata is observable.
+    ASSERT_GT(logs.countBSONContainingSubset(BSON("id" << 13790400)), 0);
 }
 
 class TransactionCoordinatorDriverPersistenceTest : public TransactionCoordinatorDriverTest {
@@ -839,6 +1216,113 @@ protected:
 
     boost::optional<txn::AsyncWorkScheduler> _aws;
 };
+
+TEST_F(TransactionCoordinatorDriverPersistenceTest,
+       PersistCommitDecisionWritesEndOfTransactionMetadataWhenFeatureEnabled) {
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    persistParticipantListExpectSuccess(
+        operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
+
+    EndOfTransactionScopesInfoBase metadata;
+    metadata.setCollectionParticipants(BSON("db.coll1" << BSON_ARRAY("shard0001")));
+    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("shard0001")));
+    metadata.setClusterParticipants({ShardId("shard0001")});
+
+    txn::persistDecision(
+        *_aws,
+        _lsid,
+        _txnNumberAndRetryCounter,
+        _participants,
+        [&] {
+            txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
+            decision.setCommitTimestamp(_commitTimestamp);
+            return decision;
+        }(),
+        kDummyAffectedNamespaces,
+        metadata)
+        .get();
+
+    auto allCoordinatorDocs = txn::readAllCoordinatorDocs(operationContext());
+    ASSERT_EQUALS(1U, allCoordinatorDocs.size());
+    const auto& doc = allCoordinatorDocs[0];
+    ASSERT(doc.getEndOfTransactionScopes());
+    const auto& scopes = *doc.getEndOfTransactionScopes();
+    // The floor is the transaction's commit timestamp, persisted with the decision rather than
+    // duplicated in the metadata.
+    ASSERT_EQUALS(_commitTimestamp, *doc.getDecision()->getCommitTimestamp());
+    ASSERT_BSONOBJ_EQ(BSON("db.coll1" << BSON_ARRAY("shard0001")),
+                      scopes.getCollectionParticipants());
+    ASSERT_BSONOBJ_EQ(BSON("db" << BSON_ARRAY("shard0001")), scopes.getDatabaseParticipants());
+    ASSERT_EQUALS(1U, scopes.getClusterParticipants().size());
+    ASSERT_EQUALS(ShardId("shard0001"), scopes.getClusterParticipants().at(0));
+}
+
+TEST_F(TransactionCoordinatorDriverPersistenceTest,
+       PersistCommitDecisionWritesEndOfTransactionMetadataWhenFeatureDisabled) {
+    // The caller decides whether the metadata is part of the decision by passing a non-empty scopes
+    // object; 'persistDecision' must not re-read the kill switch, so a toggle after the decision
+    // cannot make the persisted document disagree with the commands sent to the participants.
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               false);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    persistParticipantListExpectSuccess(
+        operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
+
+    EndOfTransactionScopesInfoBase metadata;
+    metadata.setCollectionParticipants(BSON("db.coll1" << BSON_ARRAY("shard0001")));
+    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("shard0001")));
+    metadata.setClusterParticipants({ShardId("shard0001")});
+
+    txn::persistDecision(
+        *_aws,
+        _lsid,
+        _txnNumberAndRetryCounter,
+        _participants,
+        [&] {
+            txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
+            decision.setCommitTimestamp(_commitTimestamp);
+            return decision;
+        }(),
+        kDummyAffectedNamespaces,
+        metadata)
+        .get();
+
+    auto allCoordinatorDocs = txn::readAllCoordinatorDocs(operationContext());
+    ASSERT_EQUALS(1U, allCoordinatorDocs.size());
+    ASSERT(allCoordinatorDocs[0].getEndOfTransactionScopes());
+}
+
+TEST_F(TransactionCoordinatorDriverPersistenceTest,
+       PersistCommitDecisionOmitsEndOfTransactionMetadataWhenNoneProvided) {
+    persistParticipantListExpectSuccess(
+        operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
+
+    // An empty scopes object (no cluster participants) means the metadata is not part of the
+    // decision.
+    EndOfTransactionScopesInfoBase noMetadata;
+
+    txn::persistDecision(
+        *_aws,
+        _lsid,
+        _txnNumberAndRetryCounter,
+        _participants,
+        [&] {
+            txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
+            decision.setCommitTimestamp(_commitTimestamp);
+            return decision;
+        }(),
+        kDummyAffectedNamespaces,
+        noMetadata)
+        .get();
+
+    auto allCoordinatorDocs = txn::readAllCoordinatorDocs(operationContext());
+    ASSERT_EQUALS(1U, allCoordinatorDocs.size());
+    ASSERT_FALSE(allCoordinatorDocs[0].getEndOfTransactionScopes());
+}
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
        PersistParticipantListWhenNoDocumentForTransactionExistsSucceeds) {
@@ -1539,6 +2023,233 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesEndOfTransactionOplogEntry) 
     auto o2 = oplogEntry.getField("o2");
     ASSERT_EQ(o2.type(), BSONType::object);
     ASSERT_BSONOBJ_EQ(o2.Obj(), expectedO2);
+}
+
+TEST_F(TransactionCoordinatorTest, ContinueCommitAttachesPersistedEndOfTransactionScopes) {
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    const Timestamp commitTimestamp(100, 5);
+    EndOfTransactionScopesInfoBase persistedScopes;
+    persistedScopes.setCollectionParticipants(
+        BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2")));
+    persistedScopes.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1" << "s2")));
+    persistedScopes.setClusterParticipants({ShardId("s1"), ShardId("s2")});
+
+    TransactionCoordinatorDocument coordinatorDoc;
+    coordinatorDoc.setParticipants(kTwoShardIdList);
+    {
+        txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
+        decision.setCommitTimestamp(commitTimestamp);
+        coordinatorDoc.setDecision(decision);
+    }
+    coordinatorDoc.setEndOfTransactionScopes(persistedScopes);
+
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(),
+        _lsid,
+        _txnNumberAndRetryCounter,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    coordinator->start(operationContext());
+    coordinator->continueCommit(coordinatorDoc);
+
+    // The decision was recovered from the document, so no prepare is sent. Each commit command
+    // must carry the persisted metadata with its own shard id.
+    std::set<ShardId> observedShardIds;
+    auto assertScopes = [&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(CommitTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        ASSERT_TRUE(request.cmdObj.hasField("endOfTransactionScopes"));
+        auto scopes = request.cmdObj.getObjectField("endOfTransactionScopes");
+        ASSERT_EQUALS(commitTimestamp, request.cmdObj.getField("commitTimestamp").timestamp());
+        ASSERT_BSONOBJ_EQ(persistedScopes.getCollectionParticipants(),
+                          scopes.getObjectField("collectionParticipants"));
+        ASSERT_BSONOBJ_EQ(persistedScopes.getDatabaseParticipants(),
+                          scopes.getObjectField("databaseParticipants"));
+        observedShardIds.insert(ShardId(std::string(scopes.getStringField("shardId"))));
+        return kOk;
+    };
+    onCommands({assertScopes, assertScopes});
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+    coordinator->onCompletion().get();
+    coordinator->shutdown();
+
+    ASSERT_EQUALS(2U, observedShardIds.size());
+    ASSERT(observedShardIds.count(ShardId("s1")));
+    ASSERT(observedShardIds.count(ShardId("s2")));
+}
+
+TEST_F(TransactionCoordinatorTest, ContinueCommitAttachesPersistedScopesWhenFeatureDisabled) {
+    // A recovered coordinator must honor the accounting metadata that is part of the durable
+    // decision, regardless of the current value of the kill switch. Re-reading the switch here
+    // could make the recovered coordinator send different scopes than the ones it already sent to
+    // some participants before the failover, leaving the transaction's shards inconsistent.
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               false);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    const Timestamp commitTimestamp(100, 5);
+    EndOfTransactionScopesInfoBase persistedScopes;
+    persistedScopes.setCollectionParticipants(
+        BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2")));
+    persistedScopes.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1" << "s2")));
+    persistedScopes.setClusterParticipants({ShardId("s1"), ShardId("s2")});
+
+    TransactionCoordinatorDocument coordinatorDoc;
+    coordinatorDoc.setParticipants(kTwoShardIdList);
+    {
+        txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
+        decision.setCommitTimestamp(commitTimestamp);
+        coordinatorDoc.setDecision(decision);
+    }
+    coordinatorDoc.setEndOfTransactionScopes(persistedScopes);
+
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(),
+        _lsid,
+        _txnNumberAndRetryCounter,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    coordinator->start(operationContext());
+    coordinator->continueCommit(coordinatorDoc);
+
+    std::set<ShardId> observedShardIds;
+    auto assertScopes = [&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(CommitTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        ASSERT_TRUE(request.cmdObj.hasField("endOfTransactionScopes"));
+        auto scopes = request.cmdObj.getObjectField("endOfTransactionScopes");
+        ASSERT_EQUALS(commitTimestamp, request.cmdObj.getField("commitTimestamp").timestamp());
+        observedShardIds.insert(ShardId(std::string(scopes.getStringField("shardId"))));
+        return kOk;
+    };
+    onCommands({assertScopes, assertScopes});
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+    coordinator->onCompletion().get();
+    coordinator->shutdown();
+
+    ASSERT_EQUALS(2U, observedShardIds.size());
+    ASSERT(observedShardIds.count(ShardId("s1")));
+    ASSERT(observedShardIds.count(ShardId("s2")));
+}
+
+TEST_F(TransactionCoordinatorTest, ContinueCommitWithoutPersistedScopesAttachesNoScopes) {
+    // Even with the write path enabled, a recovered coordinator that has no persisted accounting
+    // metadata must not attach any scopes to the commit commands.
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    const Timestamp commitTimestamp(100, 5);
+    TransactionCoordinatorDocument coordinatorDoc;
+    coordinatorDoc.setParticipants(kTwoShardIdList);
+    {
+        txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
+        decision.setCommitTimestamp(commitTimestamp);
+        coordinatorDoc.setDecision(decision);
+    }
+    // Note: no 'endOfTransactionScopes' is set on the document.
+
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(),
+        _lsid,
+        _txnNumberAndRetryCounter,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    coordinator->start(operationContext());
+    coordinator->continueCommit(coordinatorDoc);
+
+    auto assertNoScopes = [](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(CommitTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        ASSERT_FALSE(request.cmdObj.hasField("endOfTransactionScopes"));
+        return kOk;
+    };
+    onCommands({assertNoScopes, assertNoScopes});
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+    coordinator->onCompletion().get();
+    coordinator->shutdown();
+}
+
+TEST_F(TransactionCoordinatorTest, ContinueCommitIgnoresInconsistentEndOfTransactionScopes) {
+    unittest::LogCaptureGuard logs;
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    // The recovered metadata references a shard that is not a participant of the transaction, so it
+    // is inconsistent and must not be forwarded to the participants.
+    const Timestamp commitTimestamp(100, 5);
+    EndOfTransactionScopesInfoBase persistedScopes;
+    persistedScopes.setCollectionParticipants(BSON("db.coll1" << BSON_ARRAY("s3")));
+    persistedScopes.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s3")));
+    persistedScopes.setClusterParticipants({ShardId("s3")});
+
+    TransactionCoordinatorDocument coordinatorDoc;
+    coordinatorDoc.setParticipants(kTwoShardIdList);
+    {
+        txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
+        decision.setCommitTimestamp(commitTimestamp);
+        coordinatorDoc.setDecision(decision);
+    }
+    coordinatorDoc.setEndOfTransactionScopes(persistedScopes);
+
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(),
+        _lsid,
+        _txnNumberAndRetryCounter,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    coordinator->start(operationContext());
+    coordinator->continueCommit(coordinatorDoc);
+
+    auto assertNoScopes = [](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(CommitTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        ASSERT_FALSE(request.cmdObj.hasField("endOfTransactionScopes"));
+        return kOk;
+    };
+    onCommands({assertNoScopes, assertNoScopes});
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+    coordinator->onCompletion().get();
+    coordinator->shutdown();
+
+    // A warning is emitted so that the ignored metadata is observable.
+    ASSERT_GT(logs.countBSONContainingSubset(BSON("id" << 13790401)), 0);
+}
+
+TEST_F(TransactionCoordinatorTest,
+       RunCommitDoesNotAttachEndOfTransactionScopesWhenFeatureDisabled) {
+    // Disable the feature flag explicitly; the kill switch stays enabled. No accounting metadata is
+    // collected or attached, even though the prepare responses contain namespaces.
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               false);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(),
+        _lsid,
+        _txnNumberAndRetryCounter,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    coordinator->start(operationContext());
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
+
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithSuccess();
+
+    auto assertNoScopes = [](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(CommitTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        ASSERT_FALSE(request.cmdObj.hasField("endOfTransactionScopes"));
+        return kOk;
+    };
+    onCommands({assertNoScopes, assertNoScopes});
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+    coordinator->onCompletion().get();
+    coordinator->shutdown();
 }
 
 TEST_F(TransactionCoordinatorTest,

@@ -11,6 +11,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/api_parameters.h"
+#include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/clang_checked/mutex.h"
 #include "mongo/db/repl/optime.h"
@@ -283,6 +284,19 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
                     }
 
                     if (commitTimestamp) {
+                        // Only collect and serialize the accounting metadata when the end-of-
+                        // transaction write path is enabled; otherwise it would be discarded. This
+                        // is computed outside the lock since it builds and serializes BSON. The
+                        // commit floor for the transaction is its commit timestamp, which is
+                        // attached to every commitTransaction command and oplog entry, so the
+                        // metadata does not need to carry it.
+                        if (isEndOfTransactionWritePathEnabled()) {
+                            auto metadata = consensus.releaseEndOfTransactionMetadata();
+                            clang_checked::lock_guard<clang_checked::CheckedMutex<std::mutex>> lg(
+                                _mutex);
+                            _endOfTransactionMetadata = std::move(metadata);
+                        }
+
                         LOGV2_DEBUG(22446,
                                     3,
                                     "Advancing cluster time to the commit timestamp",
@@ -318,6 +332,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
             txn::ParticipantsList participants;
             txn::CoordinatorCommitDecision decision;
             std::vector<NamespaceString> affectedNamespaces;
+            EndOfTransactionScopesInfoBase endOfTransactionMetadata;
             {
                 clang_checked::lock_guard<clang_checked::CheckedMutex<std::mutex>> lg(_mutex);
                 invariant(_decision);
@@ -337,6 +352,15 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
                 participants = *_participants;
                 decision = *_decision;
                 affectedNamespaces = _affectedNamespaces;
+                // Whether the accounting metadata is part of the durable decision was already
+                // decided once, when the metadata was built (fresh commit) or recovered from the
+                // durable document (failover). Record that decision rather than re-reading the
+                // kill switch, so the scopes attached to the participants' commands always match
+                // what was persisted, even if the switch is toggled in between.
+                _endOfTransactionMetadataPersisted = _endOfTransactionMetadata.has_value();
+                if (_endOfTransactionMetadataPersisted) {
+                    endOfTransactionMetadata = *_endOfTransactionMetadata;
+                }
             }
 
             return txn::persistDecision(*_scheduler,
@@ -344,7 +368,8 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
                                         _txnNumberAndRetryCounter,
                                         participants,
                                         decision,
-                                        affectedNamespaces);
+                                        affectedNamespaces,
+                                        endOfTransactionMetadata);
         })
         .then([this, self = shared_from_this()](repl::OpTime opTime) {
             txn::CoordinatorCommitDecision decision;
@@ -373,6 +398,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
             //  Output: (none)
             txn::ParticipantsList participants;
             txn::CoordinatorCommitDecision decision;
+            EndOfTransactionScopesInfoBase endOfTransactionMetadata;
             {
                 clang_checked::lock_guard<clang_checked::CheckedMutex<std::mutex>> lg(_mutex);
                 invariant(_decisionDurable);
@@ -388,6 +414,13 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
                     _serviceContext->getPreciseClockSource()->now());
                 participants = *_participants;
                 decision = *_decision;
+                // Only attach the metadata that was actually persisted with the durable decision.
+                // This prevents a recovered coordinator from being unable to resend scopes that
+                // were never written, e.g. if the kill switch was toggled between writing the
+                // decision and sending the commit.
+                if (_endOfTransactionMetadataPersisted) {
+                    endOfTransactionMetadata = *_endOfTransactionMetadata;
+                }
             }
 
             switch (decision.getDecision()) {
@@ -398,7 +431,8 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
                                            _txnNumberAndRetryCounter,
                                            apiParams,
                                            participants,
-                                           *decision.getCommitTimestamp());
+                                           *decision.getCommitTimestamp(),
+                                           endOfTransactionMetadata);
                 }
                 case CommitDecision::kAbort: {
                     return txn::sendAbort(_serviceContext,
@@ -535,6 +569,24 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
         _decision = doc.getDecision();
     }
     _affectedNamespaces = doc.getAffectedNamespaces().get_value_or({});
+    if (doc.getEndOfTransactionScopes()) {
+        if (txn::isEndOfTransactionMetadataConsistentWithParticipants(
+                *doc.getEndOfTransactionScopes(), doc.getParticipants())) {
+            _endOfTransactionMetadata = *doc.getEndOfTransactionScopes();
+            // The metadata was recovered from the durable decision document, so it is already part
+            // of the durable decision.
+            _endOfTransactionMetadataPersisted = true;
+        } else {
+            // The only legitimate writer always produces consistent metadata, so this can only be
+            // reached through tampering with the stored document. Ignore the metadata rather than
+            // forwarding it to the participants.
+            LOGV2_WARNING(13790401,
+                          "Ignoring inconsistent end-of-transaction accounting metadata recovered "
+                          "from the coordinator document",
+                          "sessionId"_attr = _lsid,
+                          "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter);
+        }
+    }
 
     _kickOffCommitPromise.emplaceValue();
 }
