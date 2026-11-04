@@ -795,12 +795,177 @@ TEST_F(StreamingGroupEligibilityTest, EligibleForAnyAccumulator) {
     assertGroupRoot(*solution, true);
 }
 
-TEST_F(StreamingGroupEligibilityTest, IneligibleForObjectId) {
+TEST_F(StreamingGroupEligibilityTest, EligibleForSingleMemberObjectId) {
     addIndex(fromjson("{a: 1}"));
 
     auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
                                    fromjson("{$group: {_id: {x: '$a'}, total: {$sum: '$a'}}}")},
                                   nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForCompoundKey) {
+    addIndex(fromjson("{a: 1, b: 1, c: 1}"));
+
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                       fromjson("{$group: {_id: {x: '$a', y: '$b'}, total: {$sum: '$c'}}}")},
+                      nonArray(fromjson("{a: 1, b: 1, c: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForCompoundKeyCoveringWholeSort) {
+    addIndex(fromjson("{a: 1, b: 1, c: 1}"));
+
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                       fromjson("{$group: {_id: {x: '$a', y: '$b', z: '$c'}, n: {$sum: 1}}}")},
+                      nonArray(fromjson("{a: 1, b: 1, c: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForCompoundKeyInAnyOrder) {
+    addIndex(fromjson("{a: 1, b: 1, c: 1}"));
+
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                       fromjson("{$group: {_id: {y: '$b', x: '$a'}, total: {$sum: '$c'}}}")},
+                      nonArray(fromjson("{a: 1, b: 1, c: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForMixedDirections) {
+    addIndex(fromjson("{a: 1, b: -1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: {x: '$a', y: '$b'}, n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1, b: -1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForDottedCompoundKey) {
+    addIndex(fromjson("{'a.b': 1, c: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {'a.b': {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: {x: '$a.b', y: '$c'}, n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{'a.b': 1, c: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForRepeatedPath) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                       fromjson("{$group: {_id: {x: '$a', y: '$a'}, total: {$sum: '$b'}}}")},
+                      nonArray(fromjson("{a: 1, b: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForRepeatedPathInCompoundKey) {
+    addIndex(fromjson("{a: 1, b: 1, c: 1}"));
+
+    auto solution = planAggregate(
+        {fromjson("{$match: {a: {$gt: 0}}}"),
+         fromjson("{$group: {_id: {x: '$a', y: '$b', z: '$a'}, total: {$sum: '$c'}}}")},
+        nonArray(fromjson("{a: 1, b: 1, c: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, EligibleForCompoundKeyAfterEqualityPrefix) {
+    addIndex(fromjson("{a: 1, b: 1, c: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: 5}}"),
+                                   fromjson("{$group: {_id: {x: '$b', y: '$c'}, n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1, b: 1, c: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleWhenCompoundKeyIsNotSortPrefix) {
+    addIndex(fromjson("{a: 1, b: 1, c: 1}"));
+
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                       fromjson("{$group: {_id: {x: '$a', y: '$c'}, total: {$sum: '$b'}}}")},
+                      nonArray(fromjson("{a: 1, b: 1, c: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleWhenCompoundKeyExceedsSort) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: {x: '$a', y: '$b'}, n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1, b: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForEqualityBoundIdField) {
+    addIndex(fromjson("{a: 1, b: 1, c: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: 5}}"),
+                                   fromjson("{$group: {_id: {x: '$a', y: '$b'}, n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1, b: 1, c: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleWhenProjectionRenamesConstantIntoCompoundKey) {
+    addIndex(fromjson("{a: 1, b: 1, c: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: 5}}"),
+                                   fromjson("{$project: {_id: 0, b: '$a', c: 1}}"),
+                                   fromjson("{$group: {_id: {x: '$b', y: '$c'}, n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1, b: 1, c: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest,
+       IneligibleWhenProjectionOverwritesEqualityFieldInCompoundKey) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: 5}}"),
+                                   fromjson("{$project: {_id: 0, a: '$c', b: 1}}"),
+                                   fromjson("{$group: {_id: {x: '$a', y: '$b'}, n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1, b: 1, c: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleWhenCompoundKeyMemberMayBeArray) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: {x: '$a', y: '$c'}, n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1, b: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForComputedIdMember) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                       fromjson("{$group: {_id: {x: '$a', y: {$add: ['$b', 1]}}, n: {$sum: 1}}}")},
+                      nonArray(fromjson("{a: 1, b: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForNestedIdMember) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                       fromjson("{$group: {_id: {x: '$a', y: {z: '$b'}}, n: {$sum: 1}}}")},
+                      nonArray(fromjson("{a: 1, b: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupEligibilityTest, IneligibleForWholeDocumentIdMember) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                       fromjson("{$group: {_id: {x: '$a', y: '$$ROOT'}, n: {$sum: 1}}}")},
+                      nonArray(fromjson("{a: 1}")));
     assertGroupRoot(*solution, false);
 }
 

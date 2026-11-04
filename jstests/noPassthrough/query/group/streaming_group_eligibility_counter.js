@@ -168,6 +168,47 @@ const standaloneCases = [
         eligible: 0,
     },
 
+    eligibleCase(
+        "single-member object key",
+        [[{a: 1}]],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {k: "$a"}, ...kSum}}],
+    ),
+    eligibleCase(
+        "compound key",
+        [[{a: 1, b: 1, c: 1}]],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {x: "$a", y: "$b"}, ...kSum}}],
+    ),
+    eligibleCase(
+        "compound key over the whole sort",
+        [[{a: 1, b: 1, c: 1}]],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {x: "$a", y: "$b", z: "$c"}, n: {$sum: 1}}}],
+    ),
+    eligibleCase(
+        "compound key in a different order from the sort",
+        [[{a: 1, b: 1}]],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {y: "$b", x: "$a"}, ...kSum}}],
+    ),
+    eligibleCase(
+        "compound key with mixed directions",
+        [[{a: 1, b: -1}]],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {x: "$a", y: "$b"}, ...kSum}}],
+    ),
+    eligibleCase(
+        "compound key with a dotted path",
+        [[{"x.y": 1, a: 1}]],
+        [{$match: {"x.y": {$gte: 0}}}, {$group: {_id: {p: "$x.y", q: "$a"}, ...kSum}}],
+    ),
+    eligibleCase(
+        "compound key with a repeated path",
+        [[{a: 1, b: 1}]],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {x: "$a", y: "$a"}, ...kSum}}],
+    ),
+    eligibleCase(
+        "compound key after an equality prefix",
+        [[{a: 1, b: 1, c: 1}]],
+        [{$match: {a: 2}}, {$group: {_id: {x: "$b", y: "$c"}, n: {$sum: 1}}}],
+    ),
+
     ineligibleCase(
         "partial index, which gives no arrayness",
         [[{a: 1}, {partialFilterExpression: {a: {$gte: 0}}}]],
@@ -214,9 +255,48 @@ const standaloneCases = [
         [{$match: {a: 2}}, {$project: {_id: 0, b: "$a"}}, {$group: {_id: "$b"}}],
     ),
     ineligibleCase(
-        "object key",
+        "compound key that skips a sort field",
+        [[{a: 1, b: 1, c: 1}]],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {x: "$a", y: "$c"}}}],
+    ),
+    ineligibleCase(
+        "compound key longer than the sort",
         [[{a: 1}]],
-        [{$match: {a: {$gte: 0}}}, {$group: {_id: {k: "$a"}, ...kSum}}],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {x: "$a", y: "$b"}, ...kSum}}],
+    ),
+    ineligibleCase(
+        "compound key with an equality-bound member",
+        [[{a: 1, b: 1}]],
+        [{$match: {a: 2}}, {$group: {_id: {x: "$a", y: "$b"}, ...kSum}}],
+    ),
+    ineligibleCase(
+        "compound key with a member that may be an array",
+        [[{a: 1, b: 1}]],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {x: "$a", y: "$c"}, ...kSum}}],
+    ),
+    ineligibleCase(
+        "compound key with a computed member",
+        [[{a: 1, b: 1}]],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {x: "$a", y: {$add: ["$b", 1]}}, ...kSum}}],
+    ),
+    ineligibleCase(
+        "compound key with a nested member",
+        [[{a: 1, b: 1}]],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {x: "$a", y: {z: "$b"}}, ...kSum}}],
+    ),
+    ineligibleCase(
+        "compound key with a whole document member",
+        [[{a: 1}]],
+        [{$match: {a: {$gte: 0}}}, {$group: {_id: {x: "$a", y: "$$ROOT"}}}],
+    ),
+    ineligibleCase(
+        "projection renames a constant into a compound key",
+        [[{a: 1, b: 1, c: 1}]],
+        [
+            {$match: {a: 2}},
+            {$project: {_id: 0, b: "$a", c: 1}},
+            {$group: {_id: {x: "$b", y: "$c"}}},
+        ],
     ),
     ineligibleCase(
         "array key",

@@ -65,6 +65,7 @@
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 #include <cstring>
 #include <deque>
@@ -2083,20 +2084,33 @@ namespace {
 bool eligibleForStreamingGroup(const CanonicalQuery& query,
                                QuerySolutionNode& input,
                                const DocumentSourceGroup& group) {
-    auto* key = dynamic_cast<ExpressionFieldPath*>(group.getIdExpression().get());
     if (!query.getExpCtx()->getIfrContext()->getSavedFlagValue(
             feature_flags::gFeatureFlagStreamingGroupEligibilityCounter) ||
-        !key || key->isROOT() || key->isVariableReference() || group.doingMerge() ||
-        group.willBeMerged() || query.getCollator() ||
-        !group.getNonArrayIdFields().contains("_id")) {
+        group.doingMerge() || group.willBeMerged() || query.getCollator()) {
+        return false;
+    }
+    StringSet paths;
+    for (auto&& [field, expr] : group.getIdFields()) {
+        auto* path = dynamic_cast<ExpressionFieldPath*>(expr.get());
+        if (!path || path->isROOT() || path->isVariableReference() ||
+            !group.getNonArrayIdFields().contains(field)) {
+            return false;
+        }
+        paths.insert(path->getFieldPathWithoutCurrentPrefix().fullPath());
+    }
+    if (paths.empty()) {
         return false;
     }
     input.computeProperties();
-    auto sort = input.providedSorts().getBaseSortPattern();
+    size_t matched = 0;
     // Not contains(): it skips point-bound fields, which a projection may have overwritten.
-    return !sort.isEmpty() &&
-        sort.firstElementFieldNameStringData() ==
-        key->getFieldPathWithoutCurrentPrefix().fullPath();
+    for (auto&& sortField : input.providedSorts().getBaseSortPattern()) {
+        if (matched == paths.size() || !paths.contains(sortField.fieldNameStringData())) {
+            break;
+        }
+        ++matched;
+    }
+    return matched == paths.size();
 }
 
 }  // namespace
