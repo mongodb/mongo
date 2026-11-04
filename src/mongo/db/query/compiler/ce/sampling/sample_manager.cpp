@@ -266,6 +266,10 @@ StatusWith<PersistedSampleSummary> SampleManager::refresh(const SampleSpec& spec
             !sourceCollection.getCollectionPtr()->isTimeseriesCollection() ||
                 !sourceCollection.getCollectionPtr()->isNewTimeseriesWithoutView());
 
+    uassert(ErrorCodes::IllegalOperation,
+            "Persistent samples aren't supported on unreplicated collections",
+            spec.nss.isReplicated());
+
     const UUID collectionUuid = sourceCollection.getCollectionPtr()->uuid();
     MultipleCollectionAccessor collections(std::move(sourceCollection));
     Sample sample = load(collections, spec);

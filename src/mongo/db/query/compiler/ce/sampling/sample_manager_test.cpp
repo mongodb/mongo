@@ -288,6 +288,29 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshFailsOnTimeseriesCollection) {
         ErrorCodes::IllegalOperation);
 }
 
+TEST_F(SamplingEstimatorTest, SampleManagerRefreshFailsOnUnreplicatedCollection) {
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    const auto localNss = NamespaceString::createNamespaceString_forTest("local", "LocalColl");
+    ASSERT_FALSE(localNss.isReplicated());
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), localNss, {}));
+    insertDocuments(localNss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
+
+    SampleManager manager(operationContext(),
+                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                          nullptr /*customerQueryExpCtx*/);
+    ASSERT_THROWS_CODE(
+        manager.refresh(makeSpec(
+            localNss, 2, SamplingCEMethodEnum::kRandom, SamplingSourceEnum::kOnTheFlySample)),
+        DBException,
+        ErrorCodes::IllegalOperation);
+
+    // Nothing was persisted, so the samples collection was never created.
+    const auto samplesNss =
+        NamespaceStringUtil::deserialize(localNss.dbName(), kSamplesCollectionName);
+    ASSERT_EQUALS(countSamplesCollDocs(operationContext(), samplesNss), 0u);
+}
+
 TEST_F(SamplingEstimatorTest, SampleManagerRefreshReplacesMatchingSample) {
     // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
