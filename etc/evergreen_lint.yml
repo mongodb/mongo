@@ -174,7 +174,11 @@ rules:
         forbidden_task_tag: "experimental"
         ignored_tasks: [
             # TODO(SERVER-94572): remove this exception when resolved
-            "benchmarks_streams",
+            "benchmarks_streams_canary",
+            "benchmarks_streams_function_stage",
+            "benchmarks_streams_operator_dag",
+            "benchmarks_streams_stream_stats",
+            "benchmarks_streams_window_operator",
             "streams_0",
             "streams_1",
             "streams_2",

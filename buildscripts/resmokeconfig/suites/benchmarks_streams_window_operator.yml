@@ -1,0 +1,11 @@
+test_kind: benchmark_test
+
+selector:
+  root: bazel-bin/install/install-mongo_benchmark-stripped_test_list.txt
+  include_files:
+    - bazel-bin/**/streams_window_operator_bm*
+
+executor:
+  config: {}
+  hooks:
+    - class: GenerateAndCheckPerfResults

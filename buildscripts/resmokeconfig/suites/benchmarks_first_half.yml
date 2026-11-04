@@ -15,7 +15,8 @@ selector:
     # These benchmarks are being run as part of the benchmarks_expression*.yml
     - bazel-bin/**/expression_bm*
     - bazel-bin/**/sbe_expression_bm*
-    # These benchmarks are being run as part of the benchmarks_streams.yml test suite.
+    # These benchmarks are being run as part of the streams benchmark test suites
+    # (benchmarks_streams_operator_dag.yml and benchmarks_streams_window_operator.yml).
     - bazel-bin/**/streams_operator_dag_bm*
     - bazel-bin/**/streams_window_operator_bm*
     # These benchmarks are only run when modifying or upgrading the immutable library.
