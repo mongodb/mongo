@@ -25,7 +25,7 @@ structs:
         description: >-
             On-disk document stored in <db>.system.stats.samples for a persisted CE sample.
             Populated by the analyze command and consumed by the sampling estimator.
-        strict: true
+        strict: false
         fields:
             # A string key built by 'makePersistentSampleId' as the concatenation of the identity fields.
             _id:

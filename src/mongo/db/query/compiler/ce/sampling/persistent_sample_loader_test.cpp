@@ -551,6 +551,32 @@ TEST(ParsePersistentSample, ValidRandomSamplePopulatesAllFields) {
     ASSERT_BSONOBJ_EQ(sample.getDocs()[1], docs[1]);
 }
 
+TEST(ParsePersistentSample, IgnoresUnknownTopLevelField) {
+    // Samples written by a newer version may carry fields this version does not know about.
+    const UUID uuid = UUID::gen();
+    const std::vector<BSONObj> docs{BSON("_id" << 1 << "a" << 10), BSON("_id" << 2 << "a" << 20)};
+    const auto sampleDoc =
+        buildPersistentSampleDoc(uuid,
+                                 SamplingTechniqueEnum::kRandom,
+                                 docs.size(),
+                                 docs,
+                                 /*numChunks=*/boost::none,
+                                 /*schemaVersion=*/kPersistentSampleSchemaVersion,
+                                 /*overrides=*/BSON("unknownField" << "value"));
+    ASSERT_TRUE(sampleDoc.hasField("unknownField"));
+    auto result = parsePersistentSample(sampleDoc);
+    ASSERT_OK(result.getStatus());
+    const auto& sample = result.getValue();
+
+    ASSERT_EQUALS(sample.getCollectionUuid(), uuid.toString());
+    ASSERT_EQUALS(sample.getSamplingMethod(), SamplingTechniqueEnum::kRandom);
+    ASSERT_EQUALS(static_cast<size_t>(sample.getRequestedSampleSize()), docs.size());
+    ASSERT_EQUALS(sample.getPageNo(), 0);
+    ASSERT_EQUALS(sample.getDocs().size(), docs.size());
+    ASSERT_BSONOBJ_EQ(sample.getDocs()[0], docs[0]);
+    ASSERT_BSONOBJ_EQ(sample.getDocs()[1], docs[1]);
+}
+
 TEST(ParsePersistentSample, ChunkSamplePopulatesNumChunks) {
     const std::vector<BSONObj> docs{BSON("x" << 1), BSON("x" << 2)};
     auto result = parsePersistentSample(buildPersistentSampleDoc(
