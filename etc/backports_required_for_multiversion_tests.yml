@@ -125,6 +125,8 @@ last-patch:
       ticket: SERVER-130431
     - test_file: jstests/sharding/resharding_require_explicit_commit.js
       ticket: SERVER-138288
+    - test_file: jstests/sharding/resharding_require_explicit_commit_runtime_disable.js
+      ticket: SERVER-138288
     - test_file: jstests/sharding/timeseries/timeseries_bucket_untracked_premature_optimization.js
       ticket: SERVER-126814
     - test_file: jstests/sharding/timeseries/timeseries_bulk_write_buckets_nss_confusion.js
@@ -323,6 +325,8 @@ last-continuous:
     - test_file: jstests/sharding/reshard_collection_validation_size_estimation_timeout.js
       ticket: SERVER-133988
     - test_file: jstests/sharding/resharding_require_explicit_commit.js
+      ticket: SERVER-138288
+    - test_file: jstests/sharding/resharding_require_explicit_commit_runtime_disable.js
       ticket: SERVER-138288
     - test_file: jstests/sharding/timeseries/timeseries_bucket_untracked_premature_optimization.js
       ticket: SERVER-126814
@@ -528,6 +532,8 @@ last-lts:
     - test_file: jstests/sharding/reshard_collection_validation_size_estimation_timeout.js
       ticket: SERVER-133988
     - test_file: jstests/sharding/resharding_require_explicit_commit.js
+      ticket: SERVER-138288
+    - test_file: jstests/sharding/resharding_require_explicit_commit_runtime_disable.js
       ticket: SERVER-138288
     - test_file: jstests/sharding/timeseries/timeseries_bucket_untracked_premature_optimization.js
       ticket: SERVER-126814
