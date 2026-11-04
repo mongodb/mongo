@@ -88,6 +88,9 @@ function checkCacheInvalidation({case: testCaseName, adminDDLs, ddls, baseObject
         cursor: {},
     };
 
+    // Ensure stable on-disk sizes so the join order of the cached plan is deterministic.
+    assert.commandWorked(db.adminCommand({fsync: 1}));
+
     const {hits: hitsBeforeDDL, misses: missesBeforeDDL} = runCommandAndCheckCache(command);
     // Expect that the cache was hit on the second execution
     assert.gt(hitsBeforeDDL, 0, "expected a cache hit after first execution");
