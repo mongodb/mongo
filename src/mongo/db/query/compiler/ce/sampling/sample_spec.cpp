@@ -59,19 +59,12 @@ SamplingTechniqueEnum resolveSamplingTechnique(const SampleSpec& spec, size_t co
         return testOnlySamplingMode.value();
     }
 
-    // Persistent samples otherwise always match the method provided by the spec, since that is
-    // what they are keyed by on disk. A persisted sample that covers the whole collection is still
-    // looked up by its requested method.
-    if (spec.samplingSource == SamplingSourceEnum::kPersistentSample) {
-        return samplingMethodToTechnique(spec.persistentSamplingMethod);
-    }
-
     // If the requested sample is too large then the whole collection is sampled.
     if (spec.requestedSampleSize >= collectionCard) {
         return SamplingTechniqueEnum::kFullCollScan;
     }
 
-    return samplingMethodToTechnique(spec.onTheFlySamplingMethod);
+    return samplingMethodToTechnique(spec.sampleGenerationMethod);
 }
 
 size_t calculateSampleSize(const QueryKnobConfiguration& qkc) {

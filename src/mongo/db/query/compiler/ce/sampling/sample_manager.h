@@ -72,8 +72,8 @@ public:
     Sample load(const MultipleCollectionAccessor& collections, const SampleSpec& spec);
 
     /**
-     * Draws a new sample for 'spec' from the source collection and persists it, replacing any
-     * existing sample with the same identity. 'spec' must request an on-the-fly sample.
+     * Draws a new sample for 'spec' from the source collection and persists it, replacing the
+     * existing sample if there is one. 'spec' must request an on-the-fly sample.
      *
      * Returns summary statistics of the sample persisted if successful.
      */

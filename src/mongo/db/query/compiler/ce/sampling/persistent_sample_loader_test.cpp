@@ -14,9 +14,13 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <algorithm>
 #include <limits>
 #include <string>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo::ce {
 namespace {
@@ -30,201 +34,97 @@ const std::vector<BSONObj> kStubSampleDocs{kStubSampleDoc};
 const UUID kUuid = uassertStatusOK(UUID::parse("01234567-89ab-cdef-0123-456789abcdef"));
 
 // The layout the tests pin down. schemaVersion is part of the identity so a schema bump can never
-// match a stale document, and it follows the UUID so that every sample of one collection is
+// match a stale document, and it follows the UUID so that every page of one collection's sample is
 // contiguous in the clustered collection.
-std::string expectedId(std::string_view method, std::string_view tail) {
-    return str::stream() << kUuid.toString() << "_" << kPersistentSampleSchemaVersion << "_"
-                         << method << "_" << tail;
+std::string expectedIdPrefix() {
+    return str::stream() << kUuid.toString() << "_" << kPersistentSampleSchemaVersion << "_";
 }
 
-TEST(MakePersistentSampleId, LayoutForEachSamplingTechnique) {
-    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none),
-              expectedId("random", "384_000"));
-    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kSeqScan, 384, boost::none),
-              expectedId("seqScan", "384_000"));
-    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kStrides, 384, boost::none),
-              expectedId("strides", "384_000"));
-    // numChunks is only part of the key for the chunk technique, and sits between the sample size
-    // and the page number.
-    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10),
-              expectedId("chunk", "384_10_000"));
+std::string expectedId(uint64_t pageNo, boost::optional<uint64_t> genId = boost::none) {
+    std::string id = expectedIdPrefix();
+    if (genId) {
+        id += fmt::format("{}_", *genId);
+    }
+    return id + fmt::format("{:010}", pageNo);
 }
 
-// We may use full coll scan to generate a sample but it is never persisted under that technique.
-// We'd use the requested techinque instead.
-DEATH_TEST_REGEX(MakePersistentSampleIdDeathTest, FullCollScanIsRejected, "12832700") {
-    makePersistentSampleId(kUuid, SamplingTechniqueEnum::kFullCollScan, 384, boost::none);
-}
-
-DEATH_TEST_REGEX(MakePersistentSampleIdDeathTest, PageNoWiderThanSampleSizeIsRejected, "13321000") {
-    makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 10, boost::none, /*pageNo=*/100);
+TEST(MakePersistentSampleId, Layout) {
+    ASSERT_EQ(makePersistentSampleId(kUuid), expectedId(0));
+    ASSERT_EQ(makePersistentSampleId(kUuid, /*pageNo=*/7), expectedId(7));
 }
 
 TEST(MakePersistentSampleId, GenIdPrecedesThePageNoUnpadded) {
-    ASSERT_EQ(
-        makePersistentSampleId(
-            kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, /*pageNo=*/7, /*genId=*/0),
-        expectedId("random", "384_0_007"));
-    ASSERT_EQ(makePersistentSampleId(kUuid,
-                                     SamplingTechniqueEnum::kRandom,
-                                     384,
-                                     boost::none,
-                                     /*pageNo=*/7,
-                                     /*genId=*/145),
-              expectedId("random", "384_145_007"));
-    ASSERT_EQ(makePersistentSampleId(kUuid,
-                                     SamplingTechniqueEnum::kChunk,
-                                     384,
-                                     /*numChunks=*/10,
-                                     /*pageNo=*/0,
-                                     /*genId=*/3),
-              expectedId("chunk", "384_10_3_000"));
+    ASSERT_EQ(makePersistentSampleId(kUuid, /*pageNo=*/7, /*genId=*/0), expectedId(7, 0));
+    ASSERT_EQ(makePersistentSampleId(kUuid, /*pageNo=*/7, /*genId=*/145), expectedId(7, 145));
     // 18446744073709551615 is 2^64 - 1, the max uint64_t.
-    ASSERT_EQ(makePersistentSampleId(kUuid,
-                                     SamplingTechniqueEnum::kRandom,
-                                     384,
-                                     boost::none,
-                                     /*pageNo=*/0,
-                                     /*genId=*/std::numeric_limits<uint64_t>::max()),
-              expectedId("random", "384_18446744073709551615_000"));
+    ASSERT_EQ(
+        makePersistentSampleId(kUuid, /*pageNo=*/0, /*genId=*/std::numeric_limits<uint64_t>::max()),
+        expectedId(0, std::numeric_limits<uint64_t>::max()));
 }
 
 TEST(MakePersistentSampleId, IsDeterministic) {
-    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 1000, boost::none, 7),
-              makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 1000, boost::none, 7));
+    ASSERT_EQ(makePersistentSampleId(kUuid, 7), makePersistentSampleId(kUuid, 7));
 }
 
 TEST(MakePersistentSampleId, PageNoDefaultsToZero) {
-    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none),
-              makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, 0));
+    ASSERT_EQ(makePersistentSampleId(kUuid), makePersistentSampleId(kUuid, 0));
 }
 
-TEST(MakePersistentSampleId, PageNoIsZeroPaddedToTheWidthOfSampleSize) {
-    // A sample can hold at most one page per sampled document, so padding the page number to the
-    // width of the sample size is always enough to keep every page the same length.
-    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 5, boost::none, 4),
-              expectedId("random", "5_4"));
-    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, 7),
-              expectedId("random", "384_007"));
-    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, 383),
-              expectedId("random", "384_383"));
-    ASSERT_EQ(makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 10000, boost::none, 42),
-              expectedId("random", "10000_00042"));
-}
 
 TEST(MakePersistentSampleId, EveryIdOfASampleHasTheSameLength) {
     // Equal length is what makes lexicographic order coincide with numeric page order.
-    const size_t length =
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 1000, boost::none).size();
-    for (int pageNo : {0, 1, 9, 10, 99, 100, 999}) {
-        ASSERT_EQ(
-            makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 1000, boost::none, pageNo)
-                .size(),
-            length);
+    const size_t length = makePersistentSampleId(kUuid).size();
+    for (int pageNo : {0, 1, 9, 10, 99, 100, 999, std::numeric_limits<int>::max()}) {
+        ASSERT_EQ(makePersistentSampleId(kUuid, pageNo).size(), length);
     }
 }
 
 TEST(MakePersistentSampleId, PagesOfSameSampleSortInPageNoOrder) {
     std::string previous;
-    for (int pageNo = 0; pageNo < 384; ++pageNo) {
-        const auto id =
-            makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo);
+    for (int pageNo = 0; pageNo < 1024; ++pageNo) {
+        const auto id = makePersistentSampleId(kUuid, pageNo);
         ASSERT_LT(previous, id);
         previous = id;
     }
 }
 
 TEST(MakePersistentSampleId, EveryIdentityFieldChangesTheId) {
-    const auto baseline =
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10, 1);
-    ASSERT_NE(baseline,
-              makePersistentSampleId(
-                  UUID::gen(), SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10, 1));
-    ASSERT_NE(baseline,
-              makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, 1));
-    ASSERT_NE(
-        baseline,
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 385, /*numChunks=*/10, 1));
-    ASSERT_NE(
-        baseline,
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/20, 1));
-    ASSERT_NE(
-        baseline,
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10, 2));
+    const auto baseline = makePersistentSampleId(kUuid, 1);
+    ASSERT_NE(baseline, makePersistentSampleId(UUID::gen(), 1));
+    ASSERT_NE(baseline, makePersistentSampleId(kUuid, 2));
+    ASSERT_NE(baseline, makePersistentSampleId(kUuid, 1, /*genId=*/0));
 }
 
 // ── makePersistentSampleIdRange ───────────────────────────────────────────────────────────────
 
 TEST(MakePersistentSampleIdRange, BoundsAreThePageNumberExtremes) {
-    const auto [minId, maxId] =
-        makePersistentSampleIdRange(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
-    ASSERT_EQ(minId, expectedId("random", "384_000"));
-    ASSERT_EQ(maxId, expectedId("random", "384_999"));
-
-    const auto [chunkMin, chunkMax] =
-        makePersistentSampleIdRange(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
-    ASSERT_EQ(chunkMin, expectedId("chunk", "384_10_000"));
-    ASSERT_EQ(chunkMax, expectedId("chunk", "384_10_999"));
+    const auto [minId, maxId] = makePersistentSampleIdRange(kUuid);
+    ASSERT_EQ(minId, expectedId(0));
+    ASSERT_EQ(maxId, expectedId(9999999999));
 }
 
 TEST(MakePersistentSampleIdRange, BracketsEveryPageOfTheSample) {
-    const auto [minId, maxId] =
-        makePersistentSampleIdRange(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+    const auto [minId, maxId] = makePersistentSampleIdRange(kUuid);
     ASSERT_LTE(minId, maxId);
-    // 383 is the highest page a 384-document sample can have.
-    for (int pageNo : {0, 1, 42, 383}) {
-        const auto id =
-            makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo);
+    for (int pageNo : {0, 1, 42, 383, std::numeric_limits<int>::max()}) {
+        const auto id = makePersistentSampleId(kUuid, pageNo);
         ASSERT_LTE(minId, id);
         ASSERT_LTE(id, maxId);
     }
 }
 
-TEST(MakePersistentSampleIdRange, ExcludesOtherSamples) {
-    const auto [minId, maxId] =
-        makePersistentSampleIdRange(kUuid, SamplingTechniqueEnum::kRandom, 1, boost::none);
-
-    // A sample whose size is a numeric prefix of another's must not fall inside its range: this is
-    // the footgun that motivated moving off object-valued _ids.
-    const std::vector<std::string> outsiders{
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 10, boost::none, 9),
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 100, boost::none, 0),
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 1, /*numChunks=*/1),
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kSeqScan, 1, boost::none),
-        makePersistentSampleId(UUID::gen(), SamplingTechniqueEnum::kRandom, 1, boost::none),
-    };
-    for (const auto& id : outsiders) {
-        ASSERT_TRUE(id < minId || id > maxId) << "id unexpectedly inside range: " << id;
-    }
-}
-
-TEST(MakePersistentSampleIdRange, DifferentNumChunksYieldDisjointRanges) {
-    // The chunk count is part of the shared prefix, so a different one yields a disjoint range.
-    const auto [minId, maxId] =
-        makePersistentSampleIdRange(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
-    const auto [otherMin, otherMax] =
-        makePersistentSampleIdRange(kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/20);
-    ASSERT_TRUE(otherMin > maxId || otherMax < minId);
-}
-
 TEST(MakePersistentSampleAllGenerationsIdRange, BoundsAreTheIdentityPrefixAndItsSuccessor) {
-    const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(
-        kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
-    ASSERT_EQ(minId, expectedId("random", "384_"));
-    ASSERT_EQ(maxId, expectedId("random", "384`"));
-
-    const auto [chunkMin, chunkMax] = makePersistentSampleAllGenerationsIdRange(
-        kUuid, SamplingTechniqueEnum::kChunk, 384, /*numChunks=*/10);
-    ASSERT_EQ(chunkMin, expectedId("chunk", "384_10_"));
-    ASSERT_EQ(chunkMax, expectedId("chunk", "384_10`"));
+    const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(kUuid);
+    ASSERT_EQ(minId, expectedIdPrefix());
+    ASSERT_EQ(maxId,
+              std::string(str::stream()
+                          << kUuid.toString() << "_" << kPersistentSampleSchemaVersion << "`"));
 }
 
 TEST(MakePersistentSampleAllGenerationsIdRange, BracketsEveryPageOfEveryGeneration) {
-    const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(
-        kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+    const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(kUuid);
     for (int pageNo : {0, 1, 42, 383}) {
-        const auto idWithoutGenId =
-            makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo);
+        const auto idWithoutGenId = makePersistentSampleId(kUuid, pageNo);
         ASSERT_LTE(minId, idWithoutGenId);
         ASSERT_LT(idWithoutGenId, maxId);
         for (uint64_t genId : {uint64_t{0},
@@ -235,40 +135,26 @@ TEST(MakePersistentSampleAllGenerationsIdRange, BracketsEveryPageOfEveryGenerati
                                uint64_t{145},
                                uint64_t{2147483648},
                                std::numeric_limits<uint64_t>::max()}) {
-            const auto id = makePersistentSampleId(
-                kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo, genId);
+            const auto id = makePersistentSampleId(kUuid, pageNo, genId);
             ASSERT_LTE(minId, id);
             ASSERT_LT(id, maxId);
         }
     }
 }
 
-TEST(MakePersistentSampleAllGenerationsIdRange, ExcludesOtherSamples) {
-    const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(
-        kUuid, SamplingTechniqueEnum::kRandom, 1, boost::none);
-
-    const std::vector<std::string> outsiders{
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 10, boost::none, 9),
-        makePersistentSampleId(
-            kUuid, SamplingTechniqueEnum::kRandom, 10, boost::none, /*pageNo=*/9, /*genId=*/9),
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 100, boost::none, 0),
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kChunk, 1, /*numChunks=*/1),
-        makePersistentSampleId(kUuid, SamplingTechniqueEnum::kSeqScan, 1, boost::none),
-        makePersistentSampleId(UUID::gen(), SamplingTechniqueEnum::kRandom, 1, boost::none),
-    };
-    for (const auto& id : outsiders) {
+TEST(MakePersistentSampleAllGenerationsIdRange, ExcludesOtherCollections) {
+    const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(kUuid);
+    for (const auto& id :
+         {makePersistentSampleId(UUID::gen(), 0), makePersistentSampleId(UUID::gen(), 0, 9)}) {
         ASSERT_TRUE(id < minId || id >= maxId) << "id unexpectedly inside range: " << id;
     }
 }
 
-StatusWith<uint64_t> parseRandomGenId(std::string_view id) {
-    return parsePersistentSampleGenId(id, kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
-}
+// ── parsePersistentSampleGenId ────────────────────────────────────────────────────────────────
 
 TEST(ParsePersistentSampleGenId, IdWithoutGenIdBelongsToTheDefaultGeneration) {
     for (int pageNo : {0, 7, 383}) {
-        const auto genId = parseRandomGenId(makePersistentSampleId(
-            kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo));
+        const auto genId = parsePersistentSampleGenId(makePersistentSampleId(kUuid, pageNo), kUuid);
         ASSERT_OK(genId.getStatus());
         ASSERT_EQ(genId.getValue(), kDefaultPersistentSampleGenId);
     }
@@ -283,65 +169,45 @@ TEST(ParsePersistentSampleGenId, ParsesTheGenIdBeforeThePageNo) {
                            uint64_t{2147483648},
                            std::numeric_limits<uint64_t>::max()}) {
         for (int pageNo : {0, 7, 383}) {
-            const auto parsed = parseRandomGenId(makePersistentSampleId(
-                kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none, pageNo, genId));
+            const auto parsed =
+                parsePersistentSampleGenId(makePersistentSampleId(kUuid, pageNo, genId), kUuid);
             ASSERT_OK(parsed.getStatus());
             ASSERT_EQ(parsed.getValue(), genId);
         }
     }
-    ASSERT_EQ(parseRandomGenId(expectedId("random", "384_145_007")).getValue(), 145u);
+    ASSERT_EQ(parsePersistentSampleGenId(expectedId(7, 145), kUuid).getValue(), 145u);
 }
 
-TEST(ParsePersistentSampleGenId, ParsesTheGenIdOfAChunkSample) {
-    const auto parsed = parsePersistentSampleGenId(expectedId("chunk", "384_10_3_000"),
-                                                   kUuid,
-                                                   SamplingTechniqueEnum::kChunk,
-                                                   384,
-                                                   /*numChunks=*/10);
-    ASSERT_OK(parsed.getStatus());
-    ASSERT_EQ(parsed.getValue(), 3u);
-
-    const auto withoutGenId = parsePersistentSampleGenId(expectedId("chunk", "384_10_000"),
-                                                         kUuid,
-                                                         SamplingTechniqueEnum::kChunk,
-                                                         384,
-                                                         /*numChunks=*/10);
-    ASSERT_OK(withoutGenId.getStatus());
-    ASSERT_EQ(withoutGenId.getValue(), kDefaultPersistentSampleGenId);
-}
-
-TEST(ParsePersistentSampleGenId, RejectsIdsOfOtherSamples) {
-    for (const auto& id :
-         {makePersistentSampleId(UUID::gen(), SamplingTechniqueEnum::kRandom, 384, boost::none),
-          makePersistentSampleId(kUuid, SamplingTechniqueEnum::kSeqScan, 384, boost::none),
-          makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 385, boost::none),
-          makePersistentSampleId(kUuid, SamplingTechniqueEnum::kRandom, 38, boost::none)}) {
-        ASSERT_EQ(parseRandomGenId(id).getStatus().code(), ErrorCodes::UnsupportedFormat) << id;
-    }
+TEST(ParsePersistentSampleGenId, RejectsIdsOfOtherCollections) {
+    const auto id = makePersistentSampleId(UUID::gen());
+    ASSERT_EQ(parsePersistentSampleGenId(id, kUuid).getStatus().code(),
+              ErrorCodes::UnsupportedFormat)
+        << id;
 }
 
 TEST(ParsePersistentSampleGenId, RejectsMalformedGenIdsAndPageNos) {
     for (std::string_view genIdAndPageNo : {"",
-                                            "07",
-                                            "0007",
-                                            "_000",
-                                            "01_000",
-                                            "-1_000",
-                                            "1a_000",
-                                            "1_00a",
-                                            "1_2_000",
+                                            "000000007",
+                                            "00000000007",
+                                            "_0000000000",
+                                            "01_0000000000",
+                                            "-1_0000000000",
+                                            "1a_0000000000",
+                                            "1_000000000a",
+                                            "1_2_0000000000",
                                             // 2^64: one past the max uint64_t, so it overflows.
-                                            "18446744073709551616_000"}) {
-        const auto id = expectedId("random", std::string{"384_"} + std::string{genIdAndPageNo});
-        ASSERT_EQ(parseRandomGenId(id).getStatus().code(), ErrorCodes::UnsupportedFormat) << id;
+                                            "18446744073709551616_0000000000"}) {
+        const auto id = expectedIdPrefix() + std::string(genIdAndPageNo);
+        ASSERT_EQ(parsePersistentSampleGenId(id, kUuid).getStatus().code(),
+                  ErrorCodes::UnsupportedFormat)
+            << id;
     }
 }
 
 // ── selectHighestCompleteGeneration ───────────────────────────────────────────────────────────
 
 StatusWith<PersistentSampleGeneration> select(std::vector<BSONObj> pages) {
-    return selectHighestCompleteGeneration(
-        std::move(pages), kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+    return selectHighestCompleteGeneration(std::move(pages), kUuid);
 }
 
 void assertSelectedGeneration(const StatusWith<PersistentSampleGeneration>& selected,
@@ -355,11 +221,7 @@ void assertSelectedGeneration(const StatusWith<PersistentSampleGeneration>& sele
         const auto page = generation.page(pageNo);
         ASSERT_TRUE(page.has_value());
         ASSERT_EQ((page.value())[PersistentSampleDoc::kPageNoFieldName].Int(), pageNo);
-        const auto parsedGenId = parsePersistentSampleGenId((page.value())["_id"].String(),
-                                                            kUuid,
-                                                            SamplingTechniqueEnum::kRandom,
-                                                            384,
-                                                            boost::none);
+        const auto parsedGenId = parsePersistentSampleGenId((page.value())["_id"].String(), kUuid);
         ASSERT_OK(parsedGenId.getStatus());
         ASSERT_EQ(parsedGenId.getValue(), genId);
     }
@@ -721,6 +583,20 @@ TEST(ParsePersistentSample, RejectsChunkSampleWithoutNumChunks) {
     ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
 }
 
+TEST(ParsePersistentSample, RejectsFullCollScanSampleWithNumChunks) {
+    // A full collection scan sample requested as a chunk sample was not generated in chunks.
+    auto result = parsePersistentSample(
+        buildPersistentSampleDoc(UUID::gen(),
+                                 SamplingTechniqueEnum::kChunk,
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
+                                 /*docs=*/kStubSampleDocs,
+                                 /*numChunks=*/2,
+                                 /*schemaVersion=*/kPersistentSampleSchemaVersion,
+                                 BSON(PersistentSampleDoc::kSamplingMethodFieldName
+                                      << idlSerialize(SamplingTechniqueEnum::kFullCollScan))));
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
+}
+
 TEST(ParsePersistentSample, RejectsNonPositiveNumChunks) {
     // chunk_size of zero is invalid — chunks must contain at least one doc.
     auto zeroResult = parsePersistentSample(
@@ -823,9 +699,7 @@ TEST(ParsePersistentSample, RejectsNonDateCreatedAt) {
 TEST(ParsePersistentSample, RejectsMissingDocsField) {
     const UUID uuid = UUID::gen();
     BSONObjBuilder b;
-    b.append("_id",
-             makePersistentSampleId(
-                 uuid, SamplingTechniqueEnum::kRandom, kStubSampleDocs.size(), boost::none));
+    b.append("_id", makePersistentSampleId(uuid));
     b.append(PersistentSampleDoc::kPageNoFieldName, 0);
     b.append(PersistentSampleDoc::kCollectionUuidFieldName, uuid.toString());
     b.append(PersistentSampleDoc::kSchemaVersionFieldName, kPersistentSampleSchemaVersion);
@@ -1075,6 +949,187 @@ TEST(ReassemblePersistentSample, AcceptsAllPagesDeclaredByNumPages) {
 
 // ── PersistentSampleLoader ────────────────────────────────────────────────────────────────────
 
+TEST_F(SamplingEstimatorTest, PersistentLoaderLoadsSampleRegardlessOfGenerationMethod) {
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
+    // A collection has at most one persisted sample, so it is found whatever method the spec asks
+    // for.
+    persistSampleForTest(operationContext(),
+                         _kTestNss,
+                         SamplingTechniqueEnum::kChunk,
+                         /*requestedSampleSize=*/4,
+                         /*numDocs=*/4,
+                         /*numChunks=*/2);
+
+    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
+    MultipleCollectionAccessor colls(std::move(coll));
+    PersistentSampleLoader loader(operationContext(),
+                                  colls,
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                  nullptr /*customerQueryExpCtx*/);
+    for (const auto& spec : {makeSpec(_kTestNss, 4),
+                             makeSpec(_kTestNss,
+                                      4,
+                                      SamplingCEMethodEnum::kChunk,
+                                      SamplingSourceEnum::kPersistentSample,
+                                      /*numChunks=*/4)}) {
+        auto loaded = loader.tryLoad(spec);
+        ASSERT_OK(loaded.getStatus());
+        assertIsPersistedPrefix(loaded.getValue(), 4);
+        // The technique reported is the one the persisted sample was generated with.
+        ASSERT_TRUE(loaded.getValue().technique() == SamplingTechniqueEnum::kChunk);
+    }
+}
+
+TEST_F(SamplingEstimatorTest, PersistentLoaderIgnoresSampleSmallerThanRequested) {
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
+    persistSampleForTest(operationContext(),
+                         _kTestNss,
+                         SamplingTechniqueEnum::kRandom,
+                         /*requestedSampleSize=*/4,
+                         /*numDocs=*/4);
+
+    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
+    MultipleCollectionAccessor colls(std::move(coll));
+    PersistentSampleLoader loader(operationContext(),
+                                  colls,
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                  nullptr /*customerQueryExpCtx*/);
+    auto loaded = loader.tryLoad(makeSpec(_kTestNss, 5));
+    ASSERT_EQUALS(loaded.getStatus().code(), ErrorCodes::NoSuchKey);
+}
+
+TEST_F(SamplingEstimatorTest, PersistentLoaderUsesPrefixOfLargerSample) {
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
+    persistSampleForTest(operationContext(),
+                         _kTestNss,
+                         SamplingTechniqueEnum::kRandom,
+                         /*requestedSampleSize=*/10,
+                         /*numDocs=*/10);
+
+    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
+    MultipleCollectionAccessor colls(std::move(coll));
+    PersistentSampleLoader loader(operationContext(),
+                                  colls,
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                  nullptr /*customerQueryExpCtx*/);
+    // Requests of different sizes share the sample, each using the prefix it needs.
+    for (size_t requestedSize : {1, 4, 10}) {
+        auto loaded = loader.tryLoad(makeSpec(_kTestNss, requestedSize));
+        ASSERT_OK(loaded.getStatus());
+        assertIsPersistedPrefix(loaded.getValue(), requestedSize);
+        ASSERT_EQUALS(loaded.getValue().numPages().value_or(0), 1u);
+    }
+}
+
+TEST_F(SamplingEstimatorTest, PersistentLoaderUsesPrefixOfLargerChunkSample) {
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
+    persistSampleForTest(operationContext(),
+                         _kTestNss,
+                         SamplingTechniqueEnum::kChunk,
+                         /*requestedSampleSize=*/10,
+                         /*numDocs=*/10,
+                         /*numChunks=*/2);
+
+    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
+    MultipleCollectionAccessor colls(std::move(coll));
+    PersistentSampleLoader loader(operationContext(),
+                                  colls,
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                  nullptr /*customerQueryExpCtx*/);
+    auto loaded = loader.tryLoad(makeSpec(_kTestNss, 3));
+    ASSERT_OK(loaded.getStatus());
+    assertIsPersistedPrefix(loaded.getValue(), 3);
+    ASSERT_TRUE(loaded.getValue().technique() == SamplingTechniqueEnum::kChunk);
+}
+
+TEST_F(SamplingEstimatorTest, PersistentLoaderUsesPrefixOfFullCollScanSample) {
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
+    // A sample of a collection smaller than the requested sample size is a full collection scan,
+    // so it holds fewer docs than requested.
+    constexpr size_t kNumDocs = 5;
+    persistSampleForTest(operationContext(),
+                         _kTestNss,
+                         SamplingTechniqueEnum::kRandom,
+                         /*requestedSampleSize=*/10,
+                         kNumDocs,
+                         /*numChunks=*/boost::none,
+                         /*overrides=*/
+                         BSON(PersistentSampleDoc::kSamplingMethodFieldName
+                              << idlSerialize(SamplingTechniqueEnum::kFullCollScan)));
+
+    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
+    MultipleCollectionAccessor colls(std::move(coll));
+    PersistentSampleLoader loader(operationContext(),
+                                  colls,
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                  nullptr /*customerQueryExpCtx*/);
+    // A smaller request uses the prefix it needs; a request at least as large as the doc count
+    // uses every doc.
+    for (size_t requestedSize : {2, 5, 10}) {
+        auto loaded = loader.tryLoad(makeSpec(_kTestNss, requestedSize));
+        ASSERT_OK(loaded.getStatus());
+        assertIsPersistedPrefix(loaded.getValue(), std::min(requestedSize, kNumDocs));
+        ASSERT_TRUE(loaded.getValue().technique() == SamplingTechniqueEnum::kFullCollScan);
+    }
+    // The sample's requested size still bounds which requests it can serve.
+    ASSERT_EQUALS(loader.tryLoad(makeSpec(_kTestNss, 11)).getStatus().code(),
+                  ErrorCodes::NoSuchKey);
+}
+
+TEST_F(SamplingEstimatorTest, PersistentLoaderReportsNumChunksOfChunkSample) {
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
+    persistSampleForTest(operationContext(),
+                         _kTestNss,
+                         SamplingTechniqueEnum::kChunk,
+                         /*requestedSampleSize=*/4,
+                         /*numDocs=*/4,
+                         /*numChunks=*/2);
+
+    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
+    MultipleCollectionAccessor colls(std::move(coll));
+    PersistentSampleLoader loader(operationContext(),
+                                  colls,
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                  nullptr /*customerQueryExpCtx*/);
+    // The sample reports the number of chunks it was generated with, not the requested one.
+    auto loaded = loader.tryLoad(makeSpec(_kTestNss,
+                                          4,
+                                          SamplingCEMethodEnum::kChunk,
+                                          SamplingSourceEnum::kPersistentSample,
+                                          /*numChunks=*/7));
+    ASSERT_OK(loaded.getStatus());
+    assertIsPersistedPrefix(loaded.getValue(), 4);
+    ASSERT_EQ(loaded.getValue().numChunks(), boost::optional<int>(2));
+}
+
+TEST_F(SamplingEstimatorTest, PersistentLoaderUsesSampleWithFewerDocsThanItsRequestedSize) {
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
+    // A sample may hold fewer docs than it was requested with (e.g. docs too large to persist were
+    // discarded). Whether it can serve a request depends on its requested size, not its doc count.
+    persistSampleForTest(operationContext(),
+                         _kTestNss,
+                         SamplingTechniqueEnum::kRandom,
+                         /*requestedSampleSize=*/10,
+                         /*numDocs=*/8);
+
+    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
+    MultipleCollectionAccessor colls(std::move(coll));
+    PersistentSampleLoader loader(operationContext(),
+                                  colls,
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                  nullptr /*customerQueryExpCtx*/);
+    auto loaded = loader.tryLoad(makeSpec(_kTestNss, 10));
+    ASSERT_OK(loaded.getStatus());
+    assertIsPersistedPrefix(loaded.getValue(), 8);
+}
+
 TEST_F(SamplingEstimatorTest, PersistentLoaderRejectsNonClusteredSamplesCollection) {
     // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
@@ -1287,17 +1342,14 @@ TEST_F(SamplingEstimatorTest, PersistentLoaderRejectsMalformedHighestCompleteGen
     ASSERT_EQUALS(loaded.getStatus().code(), ErrorCodes::UnsupportedFormat);
 }
 
-TEST_F(SamplingEstimatorTest, PersistentLoaderIgnoresSamplesOfOtherSizes) {
+TEST_F(SamplingEstimatorTest, PersistentLoaderIgnoresSamplesOfOtherCollections) {
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
-    const UUID uuid = [&] {
-        auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
-        return srcColl.getCollectionPtr()->uuid();
-    }();
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
-        {buildPage(uuid, {.requestedSampleSize = 10, .genId = 0, .docs = {BSON("_id" << 10)}})},
+        {buildPersistentSampleDoc(
+            UUID::gen(), SamplingTechniqueEnum::kRandom, 1, {BSON("_id" << 10)})},
         /*clustered=*/true);
 
     auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);

@@ -110,12 +110,7 @@ insertDocs(20);
     };
     runAnalyze(analyzeCmd);
     const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
-    const expectedId = PersistentSamplesUtils.getExpectedId(
-        uuid,
-        "random",
-        10,
-        expectedSchemaVersion,
-    );
+    const expectedId = PersistentSamplesUtils.getExpectedId(uuid, expectedSchemaVersion);
     const firstCreatedAt = PersistentSamplesUtils.getSampleDoc(samplesColl, expectedId)[
         PersistentSamplesUtils.sampleDocFieldNames.createdAtField
     ];
@@ -184,7 +179,7 @@ insertDocs(500);
 }
 
 // Small collection (< default): the actual sample size is clamped to numRecords, but the
-// requestedSampleSize and _id fields will encode the requested size
+// requested size is recorded in the persistent sample.
 cleanup();
 insertDocs(50);
 {

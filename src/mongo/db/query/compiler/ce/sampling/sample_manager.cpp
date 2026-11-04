@@ -88,8 +88,7 @@ void appendSamplePageMetadata(BSONObjBuilder& builder,
                               boost::optional<int> numChunks,
                               int pageNo,
                               Date_t createdAt) {
-    const std::string id =
-        makePersistentSampleId(collectionUuid, method, requestedSampleSize, numChunks, pageNo);
+    const std::string id = makePersistentSampleId(collectionUuid, pageNo);
 
     builder.append(PersistentSampleDoc::k_idFieldName, id);
     builder.append(PersistentSampleDoc::kPageNoFieldName, pageNo);
@@ -100,7 +99,7 @@ void appendSamplePageMetadata(BSONObjBuilder& builder,
                    static_cast<long long>(requestedSampleSize));
     builder.append(PersistentSampleDoc::kSamplingMethodFieldName, idlSerialize(actualMethod));
     builder.append(PersistentSampleDoc::kRequestedSamplingMethodFieldName, idlSerialize(method));
-    if (method == SamplingTechniqueEnum::kChunk) {
+    if (actualMethod == SamplingTechniqueEnum::kChunk) {
         builder.append(PersistentSampleDoc::kNumChunksFieldName, *numChunks);
     }
 }
@@ -286,11 +285,11 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
     // TODO SERVER-129240
     const SamplingTechniqueEnum samplingMethodToPersist =
         actualSamplingMethod == SamplingTechniqueEnum::kFullCollScan
-        ? samplingMethodToTechnique(spec.onTheFlySamplingMethod)
+        ? samplingMethodToTechnique(spec.sampleGenerationMethod)
         : actualSamplingMethod;
 
     const boost::optional<int> numChunks =
-        samplingMethodToPersist == SamplingTechniqueEnum::kChunk ? spec.numChunks : boost::none;
+        actualSamplingMethod == SamplingTechniqueEnum::kChunk ? spec.numChunks : boost::none;
 
     if (MONGO_unlikely(hangBeforePersistingSample.shouldFail())) {
         hangBeforePersistingSample.pauseWhileSet();
@@ -344,8 +343,7 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
         inserts.emplace_back(std::move(pageDoc));
     }
 
-    const auto [minId, maxId] = makePersistentSampleIdRange(
-        collectionUuid, samplingMethodToPersist, spec.requestedSampleSize, numChunks);
+    const auto [minId, maxId] = makePersistentSampleIdRange(collectionUuid);
 
     // Atomically insert the sample docs/replace the existing sample if one exists.
     writeConflictRetry(_opCtx, "analyzePersistSample", samplesNss, [&] {
@@ -365,7 +363,7 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
 
         WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::atomicGroup);
 
-        // Remove all existing pages of any prior sample.
+        // Remove all existing pages of the existing sample, if any.
         const auto recordIdForId = [](std::string_view id) {
             return RecordIdBound(
                 record_id_helpers::keyForObj(BSON(PersistentSampleDoc::k_idFieldName << id)));

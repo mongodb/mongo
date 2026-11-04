@@ -539,12 +539,10 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
     boost::optional<int> numChunks,
     CardinalityEstimate collectionCard,
     boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
-    SamplingSourceEnum samplingSource,
-    SamplingCEMethodEnum persistentSamplingMethod)
+    SamplingSourceEnum samplingSource)
     : _spec{.nss = nss,
             .requestedSampleSize = sampleSize,
-            .onTheFlySamplingMethod = onTheFlySamplingMethod,
-            .persistentSamplingMethod = persistentSamplingMethod,
+            .sampleGenerationMethod = onTheFlySamplingMethod,
             .numChunks = numChunks,
             .samplingSource = samplingSource,
             .topLevelSampleFieldNames = {}},
@@ -611,9 +609,7 @@ SamplingMetadata SamplingEstimatorImpl::getSamplingMetadata() const {
     meta.requestedDocCount = _spec.requestedSampleSize;
     meta.memorySizeBytes = memorySizeBytes;
     meta.technique = _sample->technique();
-    if (_sample->technique() == SamplingTechniqueEnum::kChunk) {
-        meta.numChunks = _spec.numChunks;
-    }
+    meta.numChunks = _sample->numChunks();
     meta.createdAt = _sample->createdAt();
     meta.numPages = _sample->numPages();
     return meta;
@@ -1007,8 +1003,7 @@ std::unique_ptr<SamplingEstimator> SamplingEstimatorImpl::makeDefaultSamplingEst
                                       qkc.getNumChunksForChunkBasedSampling(),
                                       collCard,
                                       cq.getExpCtx(),
-                                      samplingSource,
-                                      qkc.getInternalQuerySamplingCEMethodForPersistentSamples()));
+                                      samplingSource));
 }
 
 }  // namespace mongo::ce

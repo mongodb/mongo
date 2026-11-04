@@ -1020,8 +1020,7 @@ server_parameters:
     internalQuerySamplingCEMethodForPersistentSamples:
         mod_visibility: public
         description: >-
-            Control which sampling method the persistent-sample read path attempts to load before
-            falling back to on-the-fly sampling.
+            Controls which sampling method the persistent samples are generated with by default.
         set_at: [startup, runtime]
         cpp_class:
             name: PersistentSampleCEMethod

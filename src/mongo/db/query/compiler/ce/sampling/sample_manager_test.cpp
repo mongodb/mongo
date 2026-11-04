@@ -93,92 +93,49 @@ TEST_F(SamplingEstimatorTest, SampleManagerLoadsPersistedSample) {
                     {BSON("_id" << 1 << "tag" << "live"),
                      BSON("_id" << 2 << "tag" << "live"),
                      BSON("_id" << 3 << "tag" << "live")});
-    // Read the source collection UUID in a scope so its IS lock on the db is released before
-    // we create the samples collection (which needs MODE_X on the same db).
-    const UUID uuid = [&] {
-        auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
-        return srcColl.getCollectionPtr()->uuid();
-    }();
-    const std::vector<BSONObj> persistedDocs{BSON("_id" << 10 << "tag" << "persisted"),
-                                             BSON("_id" << 11 << "tag" << "persisted")};
-    createCollAndInsertDocuments(
-        operationContext(),
-        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
-        {buildPage(
-            uuid,
-            {.requestedSampleSize = persistedDocs.size(), .numPages = 1, .docs = persistedDocs})},
-        /*clustered=*/true);
+    persistSampleForTest(operationContext(),
+                         _kTestNss,
+                         SamplingTechniqueEnum::kRandom,
+                         /*requestedSampleSize=*/2,
+                         /*numDocs=*/2);
 
     auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
     MultipleCollectionAccessor colls(std::move(coll));
     SampleManager manager(operationContext(),
                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                           nullptr /*customerQueryExpCtx*/);
-    auto sample = manager.load(colls, makeSpec(_kTestNss, persistedDocs.size()));
-    ASSERT_EQUALS(sample.size(), persistedDocs.size());
-    for (const auto& doc : sample.docs()) {
-        ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
-    }
-    ASSERT_TRUE(sample.isPersisted());
+    auto sample = manager.load(colls, makeSpec(_kTestNss, 2));
+    assertIsPersistedPrefix(sample, 2);
     ASSERT_EQUALS(sample.numPages().value_or(0), 1u);
     ASSERT_TRUE(sample.technique() == SamplingTechniqueEnum::kRandom);
 }
 
-TEST_F(SamplingEstimatorTest, PersistedFullCollScanSampleIsKeyedByRequestedMethod) {
+TEST_F(SamplingEstimatorTest, PersistedFullCollScanSampleReportsFullCollScan) {
     // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
-    const UUID uuid = [&] {
-        auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
-        return srcColl.getCollectionPtr()->uuid();
-    }();
-    const std::vector<BSONObj> persistedDocs{BSON("_id" << 10 << "tag" << "persisted"),
-                                             BSON("_id" << 11 << "tag" << "persisted")};
-    // The sample is keyed on disk by the requested method, so it must still be looked up by
-    // kRandom even though the requested size covers the whole collection.
-    const BSONObj sampleDoc =
-        buildPersistentSampleDoc(uuid,
-                                 SamplingTechniqueEnum::kRandom,
-                                 persistedDocs.size(),
-                                 persistedDocs,
-                                 /*numChunks=*/boost::none,
-                                 /*schemaVersion=*/kPersistentSampleSchemaVersion,
-                                 /*overrides=*/
-                                 BSON(PersistentSampleDoc::kSamplingMethodFieldName
-                                      << idlSerialize(SamplingTechniqueEnum::kFullCollScan)),
-                                 /*pageNo=*/0,
-                                 /*numDocsDiscarded=*/0,
-                                 /*genId=*/boost::none,
-                                 /*numPages=*/1);
-    // The _id should be keyed by the requested method, not the actual fullCollScan method.
-    ASSERT_EQ(sampleDoc[PersistentSampleDoc::k_idFieldName].String(),
-              makePersistentSampleId(
-                  uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), boost::none));
-    createCollAndInsertDocuments(
-        operationContext(),
-        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
-        {sampleDoc},
-        /*clustered=*/true);
+    persistSampleForTest(operationContext(),
+                         _kTestNss,
+                         SamplingTechniqueEnum::kRandom,
+                         /*requestedSampleSize=*/2,
+                         /*numDocs=*/2,
+                         /*numChunks=*/boost::none,
+                         /*overrides=*/
+                         BSON(PersistentSampleDoc::kSamplingMethodFieldName
+                              << idlSerialize(SamplingTechniqueEnum::kFullCollScan)));
 
     auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
     MultipleCollectionAccessor colls(std::move(coll));
-    // The source collection is smaller than the requested sample size, which puts this on the
-    // full-collection-scan path.
+    // The source collection is smaller than the requested sample size, so a full coll scan sample
+    // is taken.
     SampleManager manager(operationContext(),
                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                           nullptr /*customerQueryExpCtx*/);
-    auto sample = manager.load(colls,
-                               makeSpec(_kTestNss,
-                                        persistedDocs.size(),
-                                        SamplingCEMethodEnum::kRandom,
-                                        SamplingSourceEnum::kPersistentSample));
-    // The persisted sample was found...
-    ASSERT_TRUE(sample.isPersisted());
-    ASSERT_EQUALS(sample.size(), persistedDocs.size());
-    for (const auto& doc : sample.docs()) {
-        ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
-    }
-    // ...but it is reported as a full collection scan, since that is how its contents were built.
+    auto sample = manager.load(
+        colls,
+        makeSpec(
+            _kTestNss, 2, SamplingCEMethodEnum::kRandom, SamplingSourceEnum::kPersistentSample));
+    assertIsPersistedPrefix(sample, 2);
     ASSERT_TRUE(sample.technique() == SamplingTechniqueEnum::kFullCollScan);
 }
 
@@ -186,35 +143,26 @@ TEST_F(SamplingEstimatorTest, SampleManagerSkipsPersistedSampleForOnTheFlySource
     // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
-    const UUID uuid = [&] {
-        auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
-        return srcColl.getCollectionPtr()->uuid();
-    }();
-    const std::vector<BSONObj> persistedDocs{BSON("_id" << 10 << "tag" << "persisted")};
-    createCollAndInsertDocuments(
-        operationContext(),
-        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
-        {buildPage(
-            uuid,
-            {.requestedSampleSize = persistedDocs.size(), .numPages = 1, .docs = persistedDocs})},
-        /*clustered=*/true);
+    persistSampleForTest(operationContext(),
+                         _kTestNss,
+                         SamplingTechniqueEnum::kRandom,
+                         /*requestedSampleSize=*/1,
+                         /*numDocs=*/1);
 
     auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
     MultipleCollectionAccessor colls(std::move(coll));
     SampleManager manager(operationContext(),
                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                           nullptr /*customerQueryExpCtx*/);
-    auto sample = manager.load(colls,
-                               makeSpec(_kTestNss,
-                                        persistedDocs.size(),
-                                        SamplingCEMethodEnum::kRandom,
-                                        SamplingSourceEnum::kOnTheFlySample));
+    auto sample = manager.load(
+        colls,
+        makeSpec(_kTestNss, 1, SamplingCEMethodEnum::kRandom, SamplingSourceEnum::kOnTheFlySample));
     ASSERT_EQUALS(sample.size(), 1u);
     ASSERT_EQUALS(sample.docs()[0].getStringField("tag"), "live");
     ASSERT_FALSE(sample.isPersisted());
 }
 
-TEST_F(SamplingEstimatorTest, SampleManagerLoadIsNotMemoized) {
+TEST_F(SamplingEstimatorTest, SampleManagerLoadIsReusable) {
     // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(_kTestNss,
@@ -223,14 +171,14 @@ TEST_F(SamplingEstimatorTest, SampleManagerLoadIsNotMemoized) {
         auto srcColl = acquireCollectionForSampling(operationContext(), _kTestNss);
         return srcColl.getCollectionPtr()->uuid();
     }();
-    // Create the samples collection up front with a page that does not match the spec; the
-    // matching page is inserted only after the first tryLoad(), which must have missed.
+    // Create the samples collection up front without a sample for this collection; the sample is
+    // inserted only after the first tryLoad(), which must miss.
     const NamespaceString samplesNss =
         NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
     createCollAndInsertDocuments(operationContext(),
                                  samplesNss,
-                                 {buildPage(uuid,
-                                            {.requestedSampleSize = 7,
+                                 {buildPage(UUID::gen(),
+                                            {.requestedSampleSize = 2,
                                              .numPages = 1,
                                              .docs = {BSON("_id" << 100 << "tag" << "other")}})},
                                  /*clustered=*/true);
@@ -244,20 +192,16 @@ TEST_F(SamplingEstimatorTest, SampleManagerLoadIsNotMemoized) {
     auto first = manager.load(colls, spec);
     ASSERT_FALSE(first.isPersisted());
 
-    // Persist a sample matching the spec, then load again. The second load finds the newly
+    // Persist a sample for the collection, then load again. The second load finds the newly
     // persisted one.
     insertDocuments(samplesNss,
                     {buildPage(uuid,
                                {.requestedSampleSize = 2,
                                 .numPages = 1,
-                                .docs = {BSON("_id" << 10 << "tag" << "persisted"),
-                                         BSON("_id" << 11 << "tag" << "persisted")}})});
+                                .docs = {BSON("_id" << 0 << "tag" << "persisted"),
+                                         BSON("_id" << 1 << "tag" << "persisted")}})});
     auto second = manager.load(colls, spec);
-    ASSERT_TRUE(second.isPersisted());
-    ASSERT_EQUALS(second.size(), 2u);
-    for (const auto& doc : second.docs()) {
-        ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
-    }
+    assertIsPersistedPrefix(second, 2);
 }
 
 TEST_F(SamplingEstimatorTest, SampleManagerUsesFullCollScanWhenSampleSizeCoversCollection) {
@@ -393,21 +337,31 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshReplacesMatchingSample) {
     }
 }
 
-TEST_F(SamplingEstimatorTest, SampleManagerRefreshUsesRequestedMethodForFullCollScan) {
+TEST_F(SamplingEstimatorTest, SampleManagerRefreshPersistsNoNumChunksForFullCollScan) {
     // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(_kTestNss,
                     {BSON("_id" << 1 << "tag" << "live"), BSON("_id" << 2 << "tag" << "live")});
 
-    // Requesting more documents than the collection holds yields a full collection scan, but the
-    // persisted sample must still be keyed by the requested method so a read can find it.
+    // Requesting a chunk sample larger than the collection yields a full collection scan, which
+    // was not generated in chunks.
     SampleManager manager(operationContext(),
                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                           nullptr /*customerQueryExpCtx*/);
-    const auto summary = manager.refresh(
-        makeSpec(_kTestNss, 5, SamplingCEMethodEnum::kRandom, SamplingSourceEnum::kOnTheFlySample));
+    const auto summary = manager.refresh(makeSpec(_kTestNss,
+                                                  5,
+                                                  SamplingCEMethodEnum::kChunk,
+                                                  SamplingSourceEnum::kOnTheFlySample,
+                                                  /*numChunks=*/2));
     ASSERT_OK(summary);
     ASSERT_TRUE(summary.getValue().samplingMethod == SamplingTechniqueEnum::kFullCollScan);
+
+    DBDirectClient client(operationContext());
+    const BSONObj page = client.findOne(
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName), BSONObj{});
+    ASSERT_EQ(page[PersistentSampleDoc::kRequestedSamplingMethodFieldName].String(),
+              idlSerialize(SamplingTechniqueEnum::kChunk));
+    ASSERT_FALSE(page.hasField(PersistentSampleDoc::kNumChunksFieldName));
 
     auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
     MultipleCollectionAccessor colls(std::move(coll));
@@ -415,10 +369,10 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshUsesRequestedMethodForFullColl
                                   colls,
                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                   nullptr /*customerQueryExpCtx*/);
-    auto loaded = loader.tryLoad(makeSpec(
-        _kTestNss, 5, SamplingCEMethodEnum::kRandom, SamplingSourceEnum::kPersistentSample));
+    auto loaded = loader.tryLoad(makeSpec(_kTestNss, 5));
     ASSERT_OK(loaded.getStatus());
-    ASSERT_EQUALS(loaded.getValue().size(), 2u);
+    ASSERT_TRUE(loaded.getValue().technique() == SamplingTechniqueEnum::kFullCollScan);
+    ASSERT_FALSE(loaded.getValue().numChunks().has_value());
 }
 
 TEST_F(SamplingEstimatorTest, SampleManagerFallsBackToOnTheFlyWhenNoGenerationIsComplete) {
@@ -448,6 +402,42 @@ TEST_F(SamplingEstimatorTest, SampleManagerFallsBackToOnTheFlyWhenNoGenerationIs
     for (const auto& doc : sample.docs()) {
         ASSERT_EQUALS(doc.getStringField("tag"), "live");
     }
+}
+
+TEST_F(SamplingEstimatorTest, SampleManagerRefreshReplacesSampleOfDifferentSizeAndMethod) {
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    std::vector<BSONObj> sourceDocs;
+    for (int i = 0; i < 20; ++i) {
+        sourceDocs.push_back(BSON("_id" << i));
+    }
+    insertDocuments(_kTestNss, sourceDocs);
+    const NamespaceString samplesNss =
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
+
+    SampleManager manager(operationContext(),
+                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                          nullptr /*customerQueryExpCtx*/);
+    ASSERT_OK(manager.refresh(makeSpec(
+        _kTestNss, 2, SamplingCEMethodEnum::kRandom, SamplingSourceEnum::kOnTheFlySample)));
+    ASSERT_EQUALS(countSamplesCollDocs(operationContext(), samplesNss), 1u);
+
+    // A refresh with a different size and method replaces the existing sample
+    ASSERT_OK(manager.refresh(makeSpec(_kTestNss,
+                                       10,
+                                       SamplingCEMethodEnum::kChunk,
+                                       SamplingSourceEnum::kOnTheFlySample,
+                                       /*numChunks=*/2)));
+    ASSERT_EQUALS(countSamplesCollDocs(operationContext(), samplesNss), 1u);
+
+    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
+    MultipleCollectionAccessor colls(std::move(coll));
+    auto loaded = manager.load(colls, makeSpec(_kTestNss, 10));
+    ASSERT_TRUE(loaded.isPersisted());
+    ASSERT_TRUE(loaded.technique() == SamplingTechniqueEnum::kChunk);
+    // Chunk samples may contain fewer docs than requested depending on cursor placement
+    ASSERT_GTE(loaded.size(), 2u);
+    ASSERT_LTE(loaded.size(), 10u);
 }
 
 // ── makePersistentSamplePageDocs ──────────────────────────────────────────────────────────────
@@ -666,7 +656,7 @@ TEST(MakePersistentSamplePageDocs, NumDocsDiscardedReservationDefersADocToANewPa
     // Begin the sample with one large document and then enough tiny filler documents so that
     // exactly one page is filled as much as possible (including the space reserved for the
     // `numDocsDiscarded` field).
-    std::vector<BSONObj> sample{makeSizedDoc(0, BSONObjMaxUserSize - 2084)};
+    std::vector<BSONObj> sample{makeSizedDoc(0, BSONObjMaxUserSize - 2080)};
     for (int i = 1; i <= 98; ++i) {
         sample.push_back(BSON("_id" << i));
     }

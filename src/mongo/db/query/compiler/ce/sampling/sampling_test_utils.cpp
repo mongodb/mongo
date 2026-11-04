@@ -5,6 +5,7 @@
 
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
@@ -204,30 +205,6 @@ void createCollAndInsertDocuments(OperationContext* opCtx,
     WriteUnitOfWork wuow{opCtx};
     ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), docs));
     wuow.commit();
-}
-
-SampleSpec makeSpec(const NamespaceString& nss,
-                    size_t sampleSize,
-                    SamplingCEMethodEnum method,
-                    SamplingSourceEnum source,
-                    boost::optional<int> numChunks) {
-    return SampleSpec{
-        .nss = nss,
-        .requestedSampleSize = sampleSize,
-        .onTheFlySamplingMethod = method,
-        .persistentSamplingMethod = method,
-        .numChunks = numChunks,
-        .samplingSource = source,
-        .topLevelSampleFieldNames = {},
-    };
-}
-
-CollectionOrViewAcquisition acquireCollectionForSampling(OperationContext* opCtx,
-                                                         const NamespaceString& nss) {
-    return acquireCollectionOrView(
-        opCtx,
-        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
-        LockMode::MODE_IX);
 }
 
 int evaluateMatchExpressionAgainstDataWithLimit(const std::unique_ptr<MatchExpression> expr,
@@ -628,24 +605,7 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  boost::optional<uint64_t> genId,
                                  boost::optional<int> numPages) {
     BSONObjBuilder builder;
-    // _id is required by the IDL schema. For intentionally-malformed docs (e.g. kChunk without
-    // numChunks, or requestedSampleSize=0, used in parse-rejection tests) we can't build a valid
-    // key, so use a stand-in random _id string so the doc still has a well-formed key.
-    const bool validForKey = requestedSampleSize > 0 &&
-        (method != SamplingTechniqueEnum::kChunk || (numChunks.has_value() && *numChunks > 0));
-    if (validForKey) {
-        builder.append("_id",
-                       makePersistentSampleId(
-                           collUuid, method, requestedSampleSize, numChunks, pageNo, genId));
-    } else {
-        builder.append("_id",
-                       makePersistentSampleId(collUuid,
-                                              SamplingTechniqueEnum::kRandom,
-                                              requestedSampleSize > 0 ? requestedSampleSize : 1,
-                                              boost::none,
-                                              0,
-                                              genId));
-    }
+    builder.append("_id", makePersistentSampleId(collUuid, pageNo, genId));
     builder.append(PersistentSampleDoc::kPageNoFieldName, pageNo);
     if (numPages.has_value()) {
         builder.append(PersistentSampleDoc::kNumPagesFieldName, numPages.value());
@@ -711,6 +671,71 @@ BSONObj makeSizedDoc(int id, size_t sizeBytes) {
     const size_t overhead = static_cast<size_t>(BSON("_id" << id << "pad" << "").objsize());
     const size_t padLen = sizeBytes > overhead ? sizeBytes - overhead : 0;
     return BSON("_id" << id << "pad" << std::string(padLen, 'x'));
+}
+
+
+SampleSpec makeSpec(const NamespaceString& nss,
+                    size_t sampleSize,
+                    SamplingCEMethodEnum method,
+                    SamplingSourceEnum source,
+                    boost::optional<int> numChunks) {
+    return SampleSpec{
+        .nss = nss,
+        .requestedSampleSize = sampleSize,
+        .sampleGenerationMethod = method,
+        .numChunks = numChunks,
+        .samplingSource = source,
+        .topLevelSampleFieldNames = {},
+    };
+}
+
+CollectionOrViewAcquisition acquireCollectionForSampling(OperationContext* opCtx,
+                                                         const NamespaceString& nss) {
+    return acquireCollectionOrView(
+        opCtx,
+        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        LockMode::MODE_IX);
+}
+
+void persistSampleForTest(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          SamplingTechniqueEnum method,
+                          size_t requestedSampleSize,
+                          int numDocs,
+                          boost::optional<int> numChunks,
+                          BSONObj overrides) {
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollectionForSampling(opCtx, nss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < numDocs; ++i) {
+        docs.push_back(BSON("_id" << i << "tag" << "persisted"));
+    }
+    createCollAndInsertDocuments(
+        opCtx,
+        NamespaceStringUtil::deserialize(nss.dbName(), kSamplesCollectionName),
+        {buildPersistentSampleDoc(uuid,
+                                  method,
+                                  requestedSampleSize,
+                                  docs,
+                                  numChunks,
+                                  kPersistentSampleSchemaVersion,
+                                  std::move(overrides),
+                                  /*pageNo=*/0,
+                                  /*numDocsDiscarded=*/0,
+                                  /*genId=*/boost::none,
+                                  /*numPages=*/1)},
+        /*clustered=*/true);
+}
+
+void assertIsPersistedPrefix(const Sample& sample, size_t expectedSize) {
+    ASSERT_TRUE(sample.isPersisted());
+    ASSERT_EQUALS(sample.size(), expectedSize);
+    for (size_t i = 0; i < expectedSize; ++i) {
+        ASSERT_EQUALS(sample.docs()[i]["_id"].numberInt(), static_cast<int>(i));
+        ASSERT_EQUALS(sample.docs()[i].getStringField("tag"), "persisted");
+    }
 }
 
 }  // namespace mongo::ce

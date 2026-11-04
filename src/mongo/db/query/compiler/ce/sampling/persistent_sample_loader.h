@@ -33,46 +33,34 @@ inline constexpr int kPersistentSampleSchemaVersion = 1;
 // gen_ids are uint64_t: at one refresh per second they would take ~584 billion years to overflow.
 inline constexpr uint64_t kDefaultPersistentSampleGenId = 0;
 
+// Number of digits the page number is zero-padded to (max num digits in unsigned 32 bit int).
+inline constexpr size_t kPersistentSamplePageNoWidth = 10;
+
 /**
  * Builds the `_id` string for a persisted sample page document:
  *
- *     <collectionUuid>_<schemaVersion>_<requestedSamplingMethod>_<requestedSampleSize>[_<numChunks>]_<pageNo>
+ *     <collectionUuid>_<schemaVersion>_<pageNo>
  *
  * All pages of a given sample share an identical prefix up to (and including) the separator that
  * precedes the page number, so the pages of one sample - and only that sample - form a contiguous
- * run in lexicographic `_id` order. `pageNo` is zero-padded to the width of `requestedSampleSize`
- * so that lexicographic order matches numeric order. This is enough padding because a sample can
- * never have more pages than it has documents, and it can never have more documents than
- * `requestedSampleSize`.
+ * run in lexicographic `_id` order. `pageNo` is zero-padded to so that lexicographic order matches
+ * numeric order.
  */
 std::string makePersistentSampleId(const UUID& collectionUuid,
-                                   SamplingTechniqueEnum method,
-                                   size_t requestedSampleSize,
-                                   boost::optional<int> numChunks,
                                    int pageNo = 0,
                                    // TODO SERVER-135416: Make non optional.
                                    boost::optional<uint64_t> genId = boost::none);
 
 /**
- * Returns the inclusive [min, max] `_id` bounds spanning every page a sample with the given
- * identity values could have, for `_id`s without a gen_id.
+ * Returns the inclusive [min, max] `_id` bounds spanning every page the collection's sample could
+ * have, for `_id`s without a gen_id.
  */
-std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& collectionUuid,
-                                                                SamplingTechniqueEnum method,
-                                                                size_t requestedSampleSize,
-                                                                boost::optional<int> numChunks);
+std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& collectionUuid);
 
 std::pair<std::string, std::string> makePersistentSampleAllGenerationsIdRange(
-    const UUID& collectionUuid,
-    SamplingTechniqueEnum method,
-    size_t requestedSampleSize,
-    boost::optional<int> numChunks);
+    const UUID& collectionUuid);
 
-StatusWith<uint64_t> parsePersistentSampleGenId(std::string_view id,
-                                                const UUID& collectionUuid,
-                                                SamplingTechniqueEnum method,
-                                                size_t requestedSampleSize,
-                                                boost::optional<int> numChunks);
+StatusWith<uint64_t> parsePersistentSampleGenId(std::string_view id, const UUID& collectionUuid);
 
 /**
  * One generation of a persisted sample.
@@ -129,12 +117,8 @@ private:
 /**
  * Groups `pages`, in any order, by gen_id and returns the highest complete generation.
  */
-StatusWith<PersistentSampleGeneration> selectHighestCompleteGeneration(
-    std::vector<BSONObj> pages,
-    const UUID& collectionUuid,
-    SamplingTechniqueEnum method,
-    size_t requestedSampleSize,
-    boost::optional<int> numChunks);
+StatusWith<PersistentSampleGeneration> selectHighestCompleteGeneration(std::vector<BSONObj> pages,
+                                                                       const UUID& collectionUuid);
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
 
@@ -156,22 +140,11 @@ public:
      *
      * Possible error codes:
      * - `NoSuchKey` if persistent samples are not usable (the feature flag is disabled, the spec
-     *   forces on-the-fly sampling, the collection does not exist) or no generation is complete.
+     *   forces on-the-fly sampling, the collection does not exist), no sample is persisted for the
+     *   collection or no generation is complete, or the persisted sample is smaller than requested.
      * - `UnsupportedFormat` if the samples collection or the documents found in it are malformed.
      */
     StatusWith<Sample> tryLoad(const SampleSpec& spec) override;
-
-protected:
-    /**
-     * Reports the sampling technique used.
-     */
-    SamplingTechniqueEnum technique(const SampleSpec& spec) const override {
-        const size_t collectionCard =
-            static_cast<size_t>(_collections.lookupCollection(spec.nss)->numRecords(_opCtx));
-        return spec.requestedSampleSize >= collectionCard
-            ? SamplingTechniqueEnum::kFullCollScan
-            : resolveSamplingTechnique(spec, collectionCard);
-    }
 };
 
 std::unique_ptr<PersistentSampleLoader> makePersistentSampleLoader(

@@ -189,7 +189,7 @@ describe("analyze sample paging", function () {
         // Check that nothing was persisted for the failed analyze.
         const samplesColl = PersistentSamplesUtils.getSamplesColl(db);
         const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
-        const filter = PersistentSamplesUtils.getSampleLookupFilter(uuid, "random", 10);
+        const filter = PersistentSamplesUtils.getSampleLookupFilter(uuid);
         assert.eq(
             0,
             samplesColl.find(filter).itcount(),
@@ -210,7 +210,7 @@ describe("analyze sample paging", function () {
 
         const samplesColl = PersistentSamplesUtils.getSamplesColl(db);
         const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
-        const filter = PersistentSamplesUtils.getSampleLookupFilter(uuid, "random", 1);
+        const filter = PersistentSamplesUtils.getSampleLookupFilter(uuid);
         assert.eq(
             0,
             samplesColl.find(filter).itcount(),

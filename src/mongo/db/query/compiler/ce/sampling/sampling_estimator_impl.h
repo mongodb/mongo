@@ -174,8 +174,7 @@ public:
         boost::optional<int> numChunks,
         CardinalityEstimate collectionCard,
         boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
-        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample,
-        SamplingCEMethodEnum persistentSamplingMethod = PersistentSampleCEMethod::kDataDefault);
+        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
     /*
      * Convenience constructor that accepts a raw record count instead of a CardinalityEstimate,

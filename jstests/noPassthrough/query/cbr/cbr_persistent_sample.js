@@ -174,13 +174,7 @@ try {
         // request size.
         const storedDocCount = (() => {
             const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
-            const id = PersistentSamplesUtils.getExpectedId(
-                uuid,
-                "chunk",
-                kSampleSize,
-                1,
-                kNumChunks,
-            );
+            const id = PersistentSamplesUtils.getExpectedId(uuid);
             const doc = PersistentSamplesUtils.getSampleDoc(
                 PersistentSamplesUtils.getSamplesColl(db),
                 id,
@@ -207,6 +201,43 @@ try {
         PersistentSamplesUtils.assertPersistedSampleMetadataPresent(meta);
     }
 
+    // TODO SERVER-138209: Remove
+    {
+        jsTest.log.info(
+            "Testing a persisted chunk sample reports the numChunks it was generated with",
+        );
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySamplingCEMethod: "chunk",
+                internalQuerySamplingCEMethodForPersistentSamples: "chunk",
+            }),
+        );
+        resetCollections();
+
+        const persistedNumChunks = kNumChunks + 1;
+        assert.commandWorked(
+            db.runCommand({
+                analyze: collName,
+                mode: "sample",
+                samplingMethod: "chunk",
+                sampleSize: kSampleSize,
+                numChunks: persistedNumChunks,
+            }),
+        );
+
+        // The query requests the default number of chunks, which differs from the persisted one.
+        const meta = getWinningPlanMetadata({a: {$gte: 0}});
+        assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
+        assert.eq(meta.sampleTechnique, "chunk", "expected chunk technique", {meta});
+        assert.eq(
+            meta.sampleNumChunks,
+            persistedNumChunks,
+            "expected the numChunks the persisted sample was generated with",
+            {meta},
+        );
+    }
+
     {
         jsTest.log.info("Testing chunk sampling technique with a persistent sample miss");
         assert.commandWorked(
@@ -229,6 +260,40 @@ try {
             {meta},
         );
         PersistentSamplesUtils.assertPersistedSampleMetadataAbsent(meta);
+    }
+
+    // A persisted sample is used regardless of the on-the-fly sampling method, and reports the
+    // technique it was generated with.
+    for (const {onTheFlyMethod, persistedMethod} of [
+        {onTheFlyMethod: "chunk", persistedMethod: "random"},
+        {onTheFlyMethod: "random", persistedMethod: "chunk"},
+    ]) {
+        jsTest.log.info(
+            `Testing a persisted ${persistedMethod} sample hit when the on-the-fly method is ${onTheFlyMethod}`,
+        );
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: onTheFlyMethod}),
+        );
+        resetCollections();
+
+        assert.commandWorked(
+            db.runCommand({
+                analyze: collName,
+                mode: "sample",
+                samplingMethod: persistedMethod,
+                sampleSize: kSampleSize,
+            }),
+        );
+
+        const meta = getWinningPlanMetadata({a: {$gte: 0}});
+        assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
+        assert.eq(
+            meta.sampleTechnique,
+            persistedMethod,
+            "expected the technique the persisted sample was generated with",
+            {meta},
+        );
+        PersistentSamplesUtils.assertPersistedSampleMetadataPresent(meta);
     }
 
     // When the collection is smaller than the requested sample size, the generated sample is a full

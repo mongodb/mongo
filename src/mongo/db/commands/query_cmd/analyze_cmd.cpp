@@ -332,8 +332,8 @@ void runSampleMode(OperationContext* opCtx,
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
-    // 'samplingMethod' is optional on the command. Default to the
-    // persistent-sample read path's method (internalQuerySamplingCEMethodForPersistentSamples).
+    // 'samplingMethod' is optional on the command. Default to
+    // internalQuerySamplingCEMethodForPersistentSamples.
     QueryKnobConfiguration qkc(query_settings::QuerySettings{});
     const SamplingCEMethodEnum requestedSamplingMethod = requestedSamplingMethodOpt.value_or(
         qkc.getInternalQuerySamplingCEMethodForPersistentSamples());
@@ -354,8 +354,7 @@ void runSampleMode(OperationContext* opCtx,
     const ce::SampleSpec spec{
         .nss = nss,
         .requestedSampleSize = requestedSampleSize,
-        .onTheFlySamplingMethod = requestedSamplingMethod,
-        .persistentSamplingMethod = requestedSamplingMethod,
+        .sampleGenerationMethod = requestedSamplingMethod,
         .numChunks = numChunksOpt,
         .samplingSource = SamplingSourceEnum::kOnTheFlySample,
         .topLevelSampleFieldNames = {},

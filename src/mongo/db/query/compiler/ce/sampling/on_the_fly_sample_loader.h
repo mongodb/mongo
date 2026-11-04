@@ -29,11 +29,6 @@ public:
 
     StatusWith<Sample> tryLoad(const SampleSpec& spec) override;
 
-protected:
-    SamplingTechniqueEnum technique(const SampleSpec&) const override {
-        return _technique;
-    }
-
 private:
     const SamplingTechniqueEnum _technique;
 };

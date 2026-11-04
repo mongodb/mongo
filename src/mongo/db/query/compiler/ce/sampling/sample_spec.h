@@ -29,10 +29,8 @@ struct SampleSpec {
     // Collection the sample is drawn from.
     NamespaceString nss;
     size_t requestedSampleSize;
-    // Technique to use when the sample is generated on the fly.
-    SamplingCEMethodEnum onTheFlySamplingMethod;
-    // Technique to use when looking up the persisted sample or persisting one.
-    SamplingCEMethodEnum persistentSamplingMethod;
+    // Method to generate the sample with
+    SamplingCEMethodEnum sampleGenerationMethod;
     // Required for a chunk sample, ignored otherwise.
     boost::optional<int> numChunks;
     // OTF or persisted. When generating a new persistent sample this must be OTF.
@@ -57,9 +55,9 @@ inline SamplingTechniqueEnum samplingMethodToTechnique(SamplingCEMethodEnum samp
 }
 
 /**
- * The sampling technique a loader for the given spec will use, accounting for test-only overrides
- * and samples that cover the whole collection. 'collectionCard' is the cardinality of the
- * collection the sample is drawn from.
+ * The sampling technique a sample with the given spec should be generated with, accounting for
+ * test-only overrides and samples that cover the whole collection. 'collectionCard' is the
+ * cardinality of the collection the sample is drawn from.
  */
 SamplingTechniqueEnum resolveSamplingTechnique(const SampleSpec& spec, size_t collectionCard);
 

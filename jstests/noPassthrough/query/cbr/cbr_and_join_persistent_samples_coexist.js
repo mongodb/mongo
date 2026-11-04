@@ -76,17 +76,6 @@ function setSampleSizeKnobs(cbrSampleSize, joinSampleSize) {
     );
 }
 
-// Returns how many persisted sample pages exist for 'collName' at the given requested size. Zero
-// means no sample of that size was ever persisted.
-function numPersistedSamplePages(collName, requestedSampleSize) {
-    const filter = PersistentSamplesUtils.getSampleLookupFilter(
-        PersistentSamplesUtils.getCollUUID(db, collName),
-        kRandomSamplingMethod,
-        requestedSampleSize,
-    );
-    return PersistentSamplesUtils.getSamplesColl(db).find(filter).itcount();
-}
-
 // Asserts that a single ceSamplingMetadata entry key reports a sample of 'expectedSize' obtained from
 // 'expectedSource' ("persisted" or "onTheFly").
 function assertSampleMetadata(meta, {expectedSource, expectedSize}) {
@@ -194,9 +183,10 @@ describe("persisted sample sizes used by CBR and by join optimization", () => {
         PersistentSamplesUtils.dropSamplesColl(db);
     });
 
-    it("persists at the CBR size when analyze is not given a sampleSize", () => {
+    it("does not use a persisted sample smaller than the requested size", () => {
         setSampleSizeKnobs(kCbrSampleSize, kJoinSampleSize);
 
+        // By default analyze persists CBR's sample size.
         analyzeColl(ordersName);
         analyzeColl(productsName);
 
@@ -207,14 +197,6 @@ describe("persisted sample sizes used by CBR and by join optimization", () => {
                 requestedSampleSize: kCbrSampleSize,
                 actualSampleSize: kCbrSampleSize,
             });
-            // analyze never consults 'internalJoinPlanSamplingSize', so nothing was persisted at
-            // the size join optimization asks for.
-            assert.eq(
-                0,
-                numPersistedSamplePages(collName, kJoinSampleSize),
-                "analyze should not persist a sample sized for join optimization",
-                {collName},
-            );
         }
 
         // CBR asks for the size it just persisted, so it loads the sample.
@@ -223,7 +205,7 @@ describe("persisted sample sizes used by CBR and by join optimization", () => {
             expectedSize: kCbrSampleSize,
         });
 
-        // Join optimization asks for a different size and falls back to sampling on the fly.
+        // Join optimization asks for a larger size and falls back to sampling on the fly.
         const ceSamplingMetadata = getJoinSamplingMetadata();
         for (const coll of [orders, products]) {
             const ns = coll.getFullName();
@@ -235,7 +217,7 @@ describe("persisted sample sizes used by CBR and by join optimization", () => {
         }
     });
 
-    it("persists a join-usable sample when analyze is given an explicit sampleSize", () => {
+    it("satisfies both join and CBR with one larger sample, using a prefix of the sample for the smaller request", () => {
         setSampleSizeKnobs(kCbrSampleSize, kJoinSampleSize);
 
         analyzeColl(ordersName, kJoinSampleSize);
@@ -248,48 +230,31 @@ describe("persisted sample sizes used by CBR and by join optimization", () => {
                 requestedSampleSize: kJoinSampleSize,
                 actualSampleSize: kJoinSampleSize,
             });
-
-            assert.eq(
-                0,
-                numPersistedSamplePages(collName, kCbrSampleSize),
-                "analyze should not persist a sample sized for CBR",
-                {collName},
-            );
         }
 
         const ceSamplingMetadata = getJoinSamplingMetadata();
         for (const coll of [orders, products]) {
-            const ns = coll.getFullName();
-            const meta = ceSamplingMetadata[ns];
-            assertSampleMetadata(meta, {
+            assertSampleMetadata(ceSamplingMetadata[coll.getFullName()], {
                 expectedSource: "persisted",
                 expectedSize: kJoinSampleSize,
             });
         }
 
-        // The mirror image of the previous case: only a join-sized sample exists, so CBR misses.
+        // CBR asks for a smaller size and uses only the prefix of the persisted sample it needs.
         assertSampleMetadata(getCbrSamplingMetadata(), {
-            expectedSource: "onTheFly",
+            expectedSource: "persisted",
             expectedSize: kCbrSampleSize,
         });
     });
 
-    it("loads the sample matching its own knob when both sizes are persisted", () => {
+    it("replaces the persisted sample when analyze runs again with a different size", () => {
         setSampleSizeKnobs(kCbrSampleSize, kJoinSampleSize);
 
         for (const collName of [ordersName, productsName]) {
-            // The CBR-sized sample comes from 'internalSamplingSizeOverride'; the join-sized one
-            // can only be requested explicitly.
-            analyzeColl(collName);
             analyzeColl(collName, kJoinSampleSize);
+            analyzeColl(collName);
 
-            // Samples of different sizes are stored side by side rather than replacing each other.
-            PersistentSamplesUtils.validatePersistentSample(db, {
-                sampledCollName: collName,
-                samplingMethod: kRandomSamplingMethod,
-                requestedSampleSize: kJoinSampleSize,
-                actualSampleSize: kJoinSampleSize,
-            });
+            // Only the most recently persisted sample remains
             PersistentSamplesUtils.validatePersistentSample(db, {
                 sampledCollName: collName,
                 samplingMethod: kRandomSamplingMethod,
@@ -303,52 +268,12 @@ describe("persisted sample sizes used by CBR and by join optimization", () => {
             expectedSize: kCbrSampleSize,
         });
 
+        // The larger join-sized sample was replaced, so join optimization falls back to sampling
+        // on the fly.
         const ceSamplingMetadata = getJoinSamplingMetadata();
         for (const coll of [orders, products]) {
-            const ns = coll.getFullName();
-            const meta = ceSamplingMetadata[ns];
-            assertSampleMetadata(meta, {
-                expectedSource: "persisted",
-                expectedSize: kJoinSampleSize,
-            });
-        }
-    });
-
-    it("shares one persisted sample when both knobs request the same size", () => {
-        setSampleSizeKnobs(kJoinSampleSize, kJoinSampleSize);
-
-        // With the two knobs aligned, an analyze that does not specify a sampleSize produces a
-        // sample that both read paths can load.
-        analyzeColl(ordersName);
-        analyzeColl(productsName);
-
-        for (const collName of [ordersName, productsName]) {
-            PersistentSamplesUtils.validatePersistentSample(db, {
-                sampledCollName: collName,
-                samplingMethod: kRandomSamplingMethod,
-                requestedSampleSize: kJoinSampleSize,
-                actualSampleSize: kJoinSampleSize,
-            });
-
-            assert.eq(
-                0,
-                numPersistedSamplePages(collName, kCbrSampleSize),
-                "analyze should not persist a sample at any other size",
-                {collName},
-            );
-        }
-
-        assertSampleMetadata(getCbrSamplingMetadata(), {
-            expectedSource: "persisted",
-            expectedSize: kJoinSampleSize,
-        });
-
-        const ceSamplingMetadata = getJoinSamplingMetadata();
-        for (const coll of [orders, products]) {
-            const ns = coll.getFullName();
-            const meta = ceSamplingMetadata[ns];
-            assertSampleMetadata(meta, {
-                expectedSource: "persisted",
+            assertSampleMetadata(ceSamplingMetadata[coll.getFullName()], {
+                expectedSource: "onTheFly",
                 expectedSize: kJoinSampleSize,
             });
         }

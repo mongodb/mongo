@@ -9,6 +9,9 @@ export const samplesCollName = "system.stats.samples";
 // Mirrors ce::kPersistentSampleSchemaVersion.
 export const kPersistentSampleSchemaVersion = 1;
 
+// Mirrors ce::kPersistentSamplePageNoWidth.
+const kPageNoWidth = 10;
+
 // Field names mirroring persistent_sample.idl — update here if the IDL field names change.
 export const sampleDocFieldNames = {
     idField: "_id",
@@ -192,28 +195,15 @@ export function makeDocsOfTotalSize(numDocs, totalBytes) {
 
 // Returns the expected _id string for a sample page document. This must mirror
 // ce::makePersistentSampleId() in persistent_sample_loader.cpp:
-//     <collectionUuid>_<schemaVersion>_<samplingMethod>_<requestedSampleSize>[_<numChunks>]_<pageNo>
-// samplingType is "random" or "chunk"; requestedSampleSize is the sample count encoded in the _id.
-// numChunks is included in the _id only for chunk mode.
-// pageNo defaults to 0 (expected when only 1 page exists) and is zero-padded to the width of
-// requestedSampleSize so that lexicographic _id order matches page order.
+//     <collectionUuid>_<schemaVersion>_<pageNo>
+// pageNo defaults to 0 (expected when only 1 page exists) and is zero-padded to a fixed width so
+// that lexicographic _id order matches page order.
 export function getExpectedId(
     uuid,
-    samplingType,
-    requestedSampleSize,
     expectedSchemaVersion = kPersistentSampleSchemaVersion,
-    numChunks = null,
     pageNo = 0,
 ) {
-    return (
-        getExpectedIdPrefix(
-            uuid,
-            samplingType,
-            requestedSampleSize,
-            expectedSchemaVersion,
-            numChunks,
-        ) + padPageNo(pageNo, requestedSampleSize)
-    );
+    return getExpectedIdPrefix(uuid, expectedSchemaVersion) + padPageNo(pageNo);
 }
 
 // Returns the single sample page document matching the given _id.
@@ -232,23 +222,13 @@ export function getSampleDoc(samplesColl, expectedId) {
 // range rather than a set of equalities on sub-fields of an object.
 export function getSampleLookupFilter(
     uuid,
-    samplingType,
-    requestedSampleSize,
     expectedSchemaVersion = kPersistentSampleSchemaVersion,
-    numChunks = null,
 ) {
-    const prefix = getExpectedIdPrefix(
-        uuid,
-        samplingType,
-        requestedSampleSize,
-        expectedSchemaVersion,
-        numChunks,
-    );
-    const width = String(requestedSampleSize).length;
+    const prefix = getExpectedIdPrefix(uuid, expectedSchemaVersion);
     return {
         [sampleDocFieldNames.idField]: {
-            $gte: prefix + "0".repeat(width),
-            $lte: prefix + "9".repeat(width),
+            $gte: prefix + padPageNo(0),
+            $lte: prefix + "9".repeat(kPageNoWidth),
         },
     };
 }
@@ -274,13 +254,7 @@ export function validatePersistentSample(
     const samplesColl = getSamplesColl(db);
     const sampledCollUuid = getCollUUID(db, sampledCollName);
 
-    const filter = getSampleLookupFilter(
-        sampledCollUuid,
-        samplingMethod,
-        requestedSampleSize,
-        expectedSchemaVersion,
-        numChunks,
-    );
+    const filter = getSampleLookupFilter(sampledCollUuid, expectedSchemaVersion);
 
     const pages = samplesColl.find(filter).toArray();
 
@@ -320,37 +294,15 @@ export function validatePersistentSample(
 
 // Returns the part of the _id shared by every page of a sample, up to and including the separator
 // preceding the page number.
-function getExpectedIdPrefix(
-    uuid,
-    samplingType,
-    requestedSampleSize,
-    expectedSchemaVersion = kPersistentSampleSchemaVersion,
-    numChunks = null,
-) {
-    let prefix = `${uuid}_${expectedSchemaVersion}_${samplingType}_${requestedSampleSize}_`;
-    if (numChunks !== null) {
-        assert.eq(
-            "chunk",
-            samplingType,
-            `numChunks should only be passed for chunk sampling; got ${samplingType}`,
-        );
-        prefix += `${numChunks}_`;
-    }
-    return prefix;
+function getExpectedIdPrefix(uuid, expectedSchemaVersion = kPersistentSampleSchemaVersion) {
+    return `${uuid}_${expectedSchemaVersion}_`;
 }
 
-// Zero-pads `pageNo` to the width of `requestedSampleSize`, mirroring
-// ce::makePersistentSampleId().
-function padPageNo(pageNo, requestedSampleSize) {
-    const width = String(requestedSampleSize).length;
+// Zero-pads `pageNo` to kPageNoWidth, mirroring ce::makePersistentSampleId().
+function padPageNo(pageNo) {
     const page = String(pageNo);
-    assert.lte(
-        page.length,
-        width,
-        "pageNo does not fit the padding width implied by requestedSampleSize",
-        {pageNo, requestedSampleSize},
-    );
-    return page.padStart(width, "0");
+    assert.lte(page.length, kPageNoWidth, "pageNo does not fit the padding width", {pageNo});
+    return page.padStart(kPageNoWidth, "0");
 }
 
 function validateSamplePage(
@@ -370,14 +322,7 @@ function validateSamplePage(
 ) {
     assert.neq(null, page, "Expected to find a sample page, got null");
 
-    const expectedId = getExpectedId(
-        sampledCollUuid,
-        samplingMethod,
-        requestedSampleSize,
-        expectedSchemaVersion,
-        numChunks,
-        pageNo,
-    );
+    const expectedId = getExpectedId(sampledCollUuid, expectedSchemaVersion, pageNo);
     const sampleId = page[sampleDocFieldNames.idField];
 
     assert.eq(expectedId, sampleId, `Unexpected ${sampleDocFieldNames.idField}`, {expectedId});
@@ -509,14 +454,14 @@ function assertPagesShareMetadata(pages) {
     ].filter((field) => pages[0][field] !== undefined);
 
     const firstId = pages[0][sampleDocFieldNames.idField];
-    const firstIdSansPageNo = idWithoutPageNo(firstId, pages[0]);
+    const firstIdSansPageNo = idWithoutPageNo(firstId);
     for (let i = 1; i < pages.length; ++i) {
         const page = pages[i];
         const pageId = page[sampleDocFieldNames.idField];
 
         assert.eq(
             firstIdSansPageNo,
-            idWithoutPageNo(pageId, page),
+            idWithoutPageNo(pageId),
             "page _id differs across pages (ignoring pageNo)",
             {firstId, pageId},
         );
@@ -532,12 +477,8 @@ function assertPagesShareMetadata(pages) {
 }
 
 // Strips the trailing zero-padded page number from an _id, leaving the sample's identity prefix.
-function idWithoutPageNo(id, page) {
-    const width = padPageNo(
-        page[sampleDocFieldNames.pageNoField],
-        page[sampleDocFieldNames.requestedSampleSizeField],
-    ).length;
-    return id.slice(0, id.length - width);
+function idWithoutPageNo(id) {
+    return id.slice(0, id.length - kPageNoWidth);
 }
 
 // Mirror of C++ getZScore() in sampling_estimator_impl.cpp.

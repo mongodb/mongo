@@ -36,12 +36,6 @@ public:
     virtual StatusWith<Sample> tryLoad(const SampleSpec& spec) = 0;
 
 protected:
-    /**
-     * The technique this loader produces samples with. Stamped onto every sample it returns, so
-     * that callers never have to infer after the fact how a sample was obtained.
-     */
-    virtual SamplingTechniqueEnum technique(const SampleSpec& spec) const = 0;
-
     OperationContext* _opCtx;
     const MultipleCollectionAccessor& _collections;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;

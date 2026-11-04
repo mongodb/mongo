@@ -118,7 +118,7 @@ describe("analyze sample on replica sets", function () {
             rst.awaitReplication();
 
             const uuid = PersistentSamplesUtils.getCollUUID(primaryDB, kCollName);
-            const expectedId = PersistentSamplesUtils.getExpectedId(uuid, "random", kSampleSize);
+            const expectedId = PersistentSamplesUtils.getExpectedId(uuid);
 
             assertSampleDocReplicatedExactly(expectedId);
         });
@@ -137,13 +137,7 @@ describe("analyze sample on replica sets", function () {
             rst.awaitReplication();
 
             const uuid = PersistentSamplesUtils.getCollUUID(primaryDB, kCollName);
-            const expectedId = PersistentSamplesUtils.getExpectedId(
-                uuid,
-                "chunk",
-                kSampleSize,
-                1 /* schemaVersion */,
-                kNumChunks,
-            );
+            const expectedId = PersistentSamplesUtils.getExpectedId(uuid);
 
             assertSampleDocReplicatedExactly(expectedId);
         });
@@ -161,7 +155,7 @@ describe("analyze sample on replica sets", function () {
             rst.awaitReplication();
 
             const uuid = PersistentSamplesUtils.getCollUUID(primaryDB, kCollName);
-            const expectedId = PersistentSamplesUtils.getExpectedId(uuid, "random", kSampleSize);
+            const expectedId = PersistentSamplesUtils.getExpectedId(uuid);
             const secondarySamplesColl = secondaryDB[PersistentSamplesUtils.samplesCollName];
             const firstDoc = secondarySamplesColl.findOne({_id: expectedId});
             assert(firstDoc, "Expected sample doc on secondary after first analyze", {expectedId});
@@ -194,7 +188,7 @@ describe("analyze sample on replica sets", function () {
     describe("CE on secondary uses persisted sample", function () {
         it("uses on-the-fly sampling when no persisted sample exists", function () {
             const uuid = PersistentSamplesUtils.getCollUUID(primaryDB, kCollName);
-            const expectedId = PersistentSamplesUtils.getExpectedId(uuid, "random", kSampleSize);
+            const expectedId = PersistentSamplesUtils.getExpectedId(uuid);
             const secondarySamplesColl = secondaryDB[PersistentSamplesUtils.samplesCollName];
             const firstDoc = secondarySamplesColl.findOne({_id: expectedId});
             assert(firstDoc == null, "Expected sample doc on secondary not to exist", {expectedId});

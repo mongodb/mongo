@@ -9,6 +9,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/ce/ce_test_utils.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
+#include "mongo/db/query/compiler/ce/sampling/sample.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
@@ -59,13 +60,6 @@ public:
                                                        /*numPages=*/1)
                                : Sample::makeOnTheFly(std::move(sample), sampleTechnique);
         _uniqueDocCount = boost::none;
-    }
-
-    /**
-     * Overrides the persisted-sample method independently of the on-the-fly sampling style.
-     */
-    void setPersistentSamplingMethodForTesting(SamplingCEMethodEnum method) {
-        _spec.persistentSamplingMethod = method;
     }
 
     static bool matches(const OrderedIntervalList& oil, BSONElement val) {
@@ -274,21 +268,6 @@ void createCollAndInsertDocuments(OperationContext* opCtx,
                                   bool clustered = false);
 
 /**
- * Builds a SampleSpec for `nss` that uses `method` both for on-the-fly and persistent sampling.
- */
-SampleSpec makeSpec(const NamespaceString& nss,
-                    size_t sampleSize,
-                    SamplingCEMethodEnum method = SamplingCEMethodEnum::kRandom,
-                    SamplingSourceEnum source = SamplingSourceEnum::kPersistentSample,
-                    boost::optional<int> numChunks = boost::none);
-
-/**
- * Acquires `nss` the way the sample loaders expect to find it in a MultipleCollectionAccessor.
- */
-CollectionOrViewAcquisition acquireCollectionForSampling(OperationContext* opCtx,
-                                                         const NamespaceString& nss);
-
-/**
  * Given a MatchExpression and a vector of BSONObj, evaluate the MatchExpression against all the
  * BSONObjs and return the number of matching documents.
  * This function also takes an optional argument to limit the number of documents to evaluate, if it
@@ -390,4 +369,37 @@ PersistentSampleGeneration generationOf(std::vector<BSONObj> pages);
  * field names if `sizeBytes` is less than that.
  */
 BSONObj makeSizedDoc(int id, size_t sizeBytes);
+
+/**
+ * Builds a SampleSpec for 'nss' that samples whole documents.
+ */
+SampleSpec makeSpec(const NamespaceString& nss,
+                    size_t sampleSize,
+                    SamplingCEMethodEnum method = SamplingCEMethodEnum::kRandom,
+                    SamplingSourceEnum source = SamplingSourceEnum::kPersistentSample,
+                    boost::optional<int> numChunks = boost::none);
+
+/**
+ * Acquires 'nss' for writing, as the sample loaders and SampleManager expect.
+ */
+CollectionOrViewAcquisition acquireCollectionForSampling(OperationContext* opCtx,
+                                                         const NamespaceString& nss);
+
+/**
+ * Persists a single-page sample for 'nss' with docs {_id: 0, tag: "persisted"}, ..., {_id: numDocs
+ * - 1, tag: "persisted"}. Any field in 'overrides' replaces the one built for the sample doc.
+ */
+void persistSampleForTest(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          SamplingTechniqueEnum method,
+                          size_t requestedSampleSize,
+                          int numDocs,
+                          boost::optional<int> numChunks = boost::none,
+                          BSONObj overrides = BSONObj());
+
+/**
+ * Asserts that 'sample' holds the docs persisted by persistSampleForTest(), {_id: 0}, ...,
+ * {_id: expectedSize - 1}, in order.
+ */
+void assertIsPersistedPrefix(const Sample& sample, size_t expectedSize);
 }  // namespace mongo::ce

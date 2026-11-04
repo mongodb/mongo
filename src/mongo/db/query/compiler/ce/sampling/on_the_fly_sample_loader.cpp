@@ -191,14 +191,13 @@ std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(
 /**
  * Builds the sampling plan and returns the sample.
  */
-Sample executeSamplingQueryAndSample(
+std::vector<BSONObj> executeSamplingQueryAndSample(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     const NamespaceString& nss,
     std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>& plan,
     std::unique_ptr<CanonicalQuery> cq,
-    std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
-    SamplingTechniqueEnum technique) {
+    std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy) {
     if (logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(5))) {
         sbe::DebugPrintInfo debugPrintInfo{};
         LOGV2_DEBUG(10670302,
@@ -234,7 +233,7 @@ Sample executeSamplingQueryAndSample(
     while (PlanExecutor::ADVANCED == exec->getNext(&obj, nullptr)) {
         docs.push_back(obj.getOwned());
     }
-    return Sample::makeOnTheFly(std::move(docs), technique);
+    return docs;
 }
 
 /**
@@ -493,8 +492,12 @@ StatusWith<Sample> OnTheFlySampleLoader::tryLoad(const SampleSpec& spec) {
     auto plan = makeSamplingPlan(
         spec, _collections.lookupCollection(spec.nss), _opCtx, _technique, sbeYieldPolicy.get());
 
-    return executeSamplingQueryAndSample(
-        _opCtx, _collections, spec.nss, plan, std::move(cq), std::move(sbeYieldPolicy), _technique);
+    std::vector<BSONObj> docs = executeSamplingQueryAndSample(
+        _opCtx, _collections, spec.nss, plan, std::move(cq), std::move(sbeYieldPolicy));
+    return Sample::makeOnTheFly(std::move(docs),
+                                _technique,
+                                _technique == SamplingTechniqueEnum::kChunk ? spec.numChunks
+                                                                            : boost::none);
 }
 
 }  // namespace mongo::ce

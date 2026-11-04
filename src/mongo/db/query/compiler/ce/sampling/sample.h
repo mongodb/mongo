@@ -23,17 +23,25 @@ namespace mongo::ce {
 class Sample {
 public:
     // Factory for OTF sample
-    static Sample makeOnTheFly(std::vector<BSONObj> docs, SamplingTechniqueEnum technique) {
-        return Sample(
-            std::move(docs), technique, /*isPersisted=*/false, Date_t::now(), boost::none);
+    static Sample makeOnTheFly(std::vector<BSONObj> docs,
+                               SamplingTechniqueEnum technique,
+                               boost::optional<int> numChunks = boost::none) {
+        return Sample(std::move(docs),
+                      technique,
+                      /*isPersisted=*/false,
+                      /*createdAt=*/Date_t::now(),
+                      /*numPages=*/boost::none,
+                      numChunks);
     }
 
     // Factory for persistent sample
     static Sample makePersisted(std::vector<BSONObj> docs,
                                 SamplingTechniqueEnum technique,
                                 Date_t createdAt,
-                                size_t numPages) {
-        return Sample(std::move(docs), technique, /*isPersisted=*/true, createdAt, numPages);
+                                size_t numPages,
+                                boost::optional<int> numChunks = boost::none) {
+        return Sample(
+            std::move(docs), technique, /*isPersisted=*/true, createdAt, numPages, numChunks);
     }
 
     const std::vector<BSONObj>& docs() const {
@@ -70,23 +78,33 @@ public:
         return _numPages;
     }
 
+    /**
+     * Number of chunks a chunk sample was generated with. Unset for samples of other techniques.
+     */
+    const boost::optional<int>& numChunks() const {
+        return _numChunks;
+    }
+
 private:
     Sample(std::vector<BSONObj> docs,
            SamplingTechniqueEnum technique,
            bool isPersisted,
            Date_t createdAt,
-           boost::optional<size_t> numPages)
+           boost::optional<size_t> numPages,
+           boost::optional<int> numChunks = boost::none)
         : _docs(std::move(docs)),
           _techniqueUsed(technique),
           _isPersisted(isPersisted),
           _createdAt(createdAt),
-          _numPages(numPages) {}
+          _numPages(numPages),
+          _numChunks(numChunks) {}
 
     std::vector<BSONObj> _docs;
     SamplingTechniqueEnum _techniqueUsed;
     bool _isPersisted;
     Date_t _createdAt;
     boost::optional<size_t> _numPages;
+    boost::optional<int> _numChunks;
 };
 
 }  // namespace mongo::ce
