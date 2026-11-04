@@ -431,6 +431,14 @@ std::vector<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext
     return IndexCatalog::normalizeIndexSpecsFromListIndexes(indexes);
 }
 
+boost::optional<long long> ShardServerProcessInterface::getCollectionDataSize(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    // A local acquisition would not declare a placement version and would only see this shard's
+    // data, so the base implementation is not valid on a sharded cluster.
+    uasserted(ErrorCodes::NotImplemented,
+              "getCollectionDataSize is not implemented for sharded clusters");
+}
+
 std::vector<DatabaseName> ShardServerProcessInterface::getAllDatabases(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
     return _getAllDatabasesOnAShardedCluster(opCtx, tenantId);

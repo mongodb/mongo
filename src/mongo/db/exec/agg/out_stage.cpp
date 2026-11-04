@@ -118,7 +118,7 @@ void OutStage::doDispose() {
     }
 }
 
-void OutStage::retrieveOriginalOutCollInfo() {
+void OutStage::retrieveOriginalOutCollInfo(bool shouldGetCollectionSize) {
     try {
         // Save the original collection options and index specs so we can check they didn't change
         // during computation.
@@ -188,6 +188,26 @@ void OutStage::retrieveOriginalOutCollInfo() {
             // since it reads _originalOutCollInfo->options.
             _originalOutCollInfo.emplace(OriginalCollectionInfo{
                 std::move(originalOptions), std::move(originalIndexes), isLegacyTimeseries});
+
+            // Record the size of the documents in the collection being overwritten so that it can
+            // be credited back against the remaining quota. Views have no data of their own.
+            if (shouldGetCollectionSize) {
+                try {
+                    if (auto dataSize = pExpCtx->getMongoProcessInterface()->getCollectionDataSize(
+                            pExpCtx->getOperationContext(), _outputNs)) {
+                        _originalCollectionSize = *dataSize;
+                    }
+                } catch (ExceptionFor<ErrorCodes::NotImplemented>&) {
+                    // If we got here, it is because someone used the quota option on a sharded
+                    // cluster which is not its intended use case.  Getting the existing collection
+                    // size is not implemented.  Log the error and ignore it.
+                    LOGV2_DEBUG(13655100,
+                                5,
+                                "$out was invoked with quota on a sharded cluster. "
+                                "Quota is not intended to be used for sharded deployments "
+                                "and is not fully supported.");
+                }
+            }
         }
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         LOGV2_DEBUG(7585601,
@@ -429,11 +449,20 @@ void OutStage::initialize() {
     // target collection if it exists. We will write all results into a temporary collection, then
     // rename the temporary collection to be the target collection once we are done.
 
-    if (pExpCtx->getRemainingQuota() >= 0) {
+    bool quotaSet = (pExpCtx->getRemainingQuota() >= 0);
+    if (quotaSet) {
         outInvokedWithQuota.increment();
-        setEffectiveQuota(pExpCtx->getRemainingQuota());
     }
-    retrieveOriginalOutCollInfo();
+
+    retrieveOriginalOutCollInfo(quotaSet);
+
+    if (quotaSet) {
+        // If this overflows and becomes negative, that means the quota is so high that
+        // it may as well be unset because we can't have a write that large,
+        // so just let it happen.
+        int64_t effectiveQuota = pExpCtx->getRemainingQuota() + _originalCollectionSize;
+        setEffectiveQuota(effectiveQuota);
+    }
 
     _timeseries = validateTimeseries();
 

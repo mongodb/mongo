@@ -108,6 +108,9 @@ public:
     query_shape::CollectionType getCollectionType(OperationContext* opCtx,
                                                   const NamespaceString& nss) override;
 
+    boost::optional<long long> getCollectionDataSize(OperationContext* opCtx,
+                                                     const NamespaceString& nss) override;
+
     std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalReadWithCatalog(
         std::unique_ptr<Pipeline> pipeline,
         const MultipleCollectionAccessor& collections,

@@ -119,6 +119,13 @@ public:
     std::vector<BSONObj> getIndexSpecs(OperationContext* opCtx,
                                        const NamespaceString& ns,
                                        bool includeBuildUUIDs) final;
+
+    /**
+     * Not implemented for sharded clusters: always throws NotImplemented.
+     */
+    boost::optional<long long> getCollectionDataSize(OperationContext* opCtx,
+                                                     const NamespaceString& nss) final;
+
     void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                  const NamespaceString& sourceNs,
                                                  const NamespaceString& targetNs,

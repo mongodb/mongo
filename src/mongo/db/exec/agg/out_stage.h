@@ -92,8 +92,10 @@ private:
     /**
      * Retrieves and stores the original output collection's options, indexes, and UUID. Must be
      * called before validateTimeseries() since it populates '_originalOutCollInfo'.
+     * If shouldGetCollectionSize is true, it will also retrieve the size of the original collection
+     * and store it in '_originalCollectionSize'.
      */
-    void retrieveOriginalOutCollInfo();
+    void retrieveOriginalOutCollInfo(bool shouldGetCollectionSize);
 
     void initialize() override;
 
@@ -169,6 +171,11 @@ private:
     // TODO SERVER-111600: Remove this variable and all references to it once
     // 9.0 becomes last LTS and all timeseries collections are viewless
     bool _outIsLegacyTimeseries = false;
+
+    // If the out stage is overwriting an existing collection, this will be used
+    // to hold the size of the collection being overwritten. Used for calculating
+    // remaining quota when quota is set.
+    int64_t _originalCollectionSize = 0;
 };
 
 }  // namespace mongo::exec::agg

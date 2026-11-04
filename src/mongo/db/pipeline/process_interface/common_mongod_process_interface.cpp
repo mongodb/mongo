@@ -774,6 +774,21 @@ query_shape::CollectionType CommonMongodProcessInterface::getCollectionType(
     return getCollectionTypeLocally(opCtx, nss);
 }
 
+boost::optional<long long> CommonMongodProcessInterface::getCollectionDataSize(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    const auto acquisition =
+        acquireCollectionOrViewMaybeLockFree(opCtx,
+                                             CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                                 opCtx,
+                                                 nss,
+                                                 AcquisitionPrerequisites::OperationType::kRead,
+                                                 AcquisitionPrerequisites::ViewMode::kCanBeView));
+    if (!acquisition.collectionExists() || acquisition.isView()) {
+        return boost::none;
+    }
+    return acquisition.getCollectionPtr()->latestSizeCount(opCtx).size;
+}
+
 std::unique_ptr<Pipeline>
 CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

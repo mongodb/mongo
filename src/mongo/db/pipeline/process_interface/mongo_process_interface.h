@@ -352,6 +352,14 @@ public:
                                                           const NamespaceString& nss) = 0;
 
     /**
+     * Returns the last persisted uncompressed size in bytes of the documents in the collection
+     * 'nss', or boost::none if 'nss' does not exist or is a view. The value is approximate: it may
+     * lag recent writes.
+     */
+    virtual boost::optional<long long> getCollectionDataSize(OperationContext* opCtx,
+                                                             const NamespaceString& nss) = 0;
+
+    /**
      * Performs the given rename command if the collection given by 'targetNs' has the same options
      * as specified in 'originalCollectionOptions', and has the same indexes as 'originalIndexes'.
      *

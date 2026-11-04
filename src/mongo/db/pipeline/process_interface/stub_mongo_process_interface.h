@@ -176,6 +176,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    boost::optional<long long> getCollectionDataSize(OperationContext* opCtx,
+                                                     const NamespaceString& nss) final {
+        MONGO_UNREACHABLE;
+    }
+
     void renameIfOptionsAndIndexesHaveNotChanged(
         OperationContext* opCtx,
         const NamespaceString& sourceNs,
