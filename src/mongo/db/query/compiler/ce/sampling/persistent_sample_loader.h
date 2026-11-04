@@ -16,6 +16,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -74,29 +75,74 @@ StatusWith<uint64_t> parsePersistentSampleGenId(std::string_view id,
                                                 boost::optional<int> numChunks);
 
 /**
- * Groups `pages`, in any order, by gen_id and returns the pages, sorted by pageNo, of the highest
- * generation whose pages 0 to numPages-1 are all present.
- *
- * Possible error codes:
- * - `NoSuchKey` if no generation is complete.
- * - `UnsupportedFormat` if any page is malformed.
+ * One generation of a persisted sample.
  */
-StatusWith<std::vector<BSONObj>> selectHighestCompleteGeneration(std::vector<BSONObj> pages,
-                                                                 const UUID& collectionUuid,
-                                                                 SamplingTechniqueEnum method,
-                                                                 size_t requestedSampleSize,
-                                                                 boost::optional<int> numChunks);
+class PersistentSampleGeneration {
+public:
+    PersistentSampleGeneration(uint64_t genId, int numPages);
+
+    /**
+     * Adds `page` to the generation.
+     */
+    Status addPage(BSONObj page);
+
+    /**
+     * Whether every page from 0 to numPages-1 is present.
+     */
+    bool isComplete() const {
+        for (int i = 0; i < _expectedNumPages; ++i) {
+            if (!_pages.contains(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    uint64_t genId() const {
+        return _genId;
+    }
+
+    /**
+     * The page with the given pageNo, if it has been added.
+     */
+    boost::optional<BSONObj> page(int pageNo) const {
+        auto it = _pages.find(pageNo);
+        if (it == _pages.end()) {
+            return boost::none;
+        }
+        return it->second;
+    }
+
+    /**
+     * The number of pages added so far.
+     */
+    size_t numPages() const {
+        return _pages.size();
+    }
+
+private:
+    uint64_t _genId;
+    int _expectedNumPages;
+    std::map<int, BSONObj> _pages;
+};
+
+/**
+ * Groups `pages`, in any order, by gen_id and returns the highest complete generation.
+ */
+StatusWith<PersistentSampleGeneration> selectHighestCompleteGeneration(
+    std::vector<BSONObj> pages,
+    const UUID& collectionUuid,
+    SamplingTechniqueEnum method,
+    size_t requestedSampleSize,
+    boost::optional<int> numChunks);
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
 
 /**
- * Reassembles a full persistent sample from individual page documents.
-
- * Possible error codes:
- * - `NoSuchKey` if `pages` is empty.
- * - `UnsupportedFormat` if any page/the group of pages is malformed
+ * Reassembles a full persistent sample from a complete generation.
  */
-StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> pages);
+StatusWith<PersistentSampleDoc> reassemblePersistentSample(
+    const PersistentSampleGeneration& generation);
 
 /**
  * Loads a previously persisted sample matching the provided spec.

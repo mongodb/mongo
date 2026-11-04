@@ -505,10 +505,12 @@ void assertOversizedDocsAbsent(const std::vector<BSONObj>& pages,
 TEST(ReassemblePersistentSample, PagesWithMismatchedDiscardCountRejected) {
     const UUID uuid = UUID::gen();
     // page 0 declares numDocsDiscarded 1, page 1 declares numDocsDiscarded 2.
-    auto result = reassemblePersistentSample({
-        buildPage(uuid, {.requestedSampleSize = 4, .pageNo = 0, .numDocsDiscarded = 1}),
-        buildPage(uuid, {.requestedSampleSize = 4, .pageNo = 1, .numDocsDiscarded = 2}),
-    });
+    auto result = reassemblePersistentSample(generationOf({
+        buildPage(uuid,
+                  {.requestedSampleSize = 4, .pageNo = 0, .numPages = 2, .numDocsDiscarded = 1}),
+        buildPage(uuid,
+                  {.requestedSampleSize = 4, .pageNo = 1, .numPages = 2, .numDocsDiscarded = 2}),
+    }));
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_STRING_CONTAINS(result.getStatus().reason(),
                            "persistent sample pages disagree on their identity fields");
@@ -622,7 +624,7 @@ TEST(MakePersistentSamplePageDocs, DiscardsAcrossMultiplePagesRoundTrip) {
         ASSERT_GTE(swParsed.getValue().getDocs().size(), 1u);
     }
 
-    auto swReassembled = reassemblePersistentSample(pages);
+    auto swReassembled = reassemblePersistentSample(generationOf(pages));
     ASSERT_OK(swReassembled.getStatus());
     ASSERT_EQ(swReassembled.getValue().getDocs().size(), static_cast<size_t>(kNumDocs) - 2);
     ASSERT_EQ(swReassembled.getValue().getNumDocsDiscarded(), 2);
@@ -744,7 +746,7 @@ TEST(MakePersistentSamplePageDocs, RoundTripsAllDocsAcrossPages) {
     const auto pages = makeRandomSamplePageDocs(sample, kNumDocs);
     ASSERT_GTE(pages.size(), 2u);
 
-    auto swReassembled = reassemblePersistentSample(pages);
+    auto swReassembled = reassemblePersistentSample(generationOf(pages));
     ASSERT_OK(swReassembled.getStatus());
     ASSERT_EQ(swReassembled.getValue().getDocs().size(), static_cast<size_t>(kNumDocs));
 }

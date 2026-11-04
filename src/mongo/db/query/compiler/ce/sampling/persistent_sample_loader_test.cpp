@@ -339,21 +339,27 @@ TEST(ParsePersistentSampleGenId, RejectsMalformedGenIdsAndPageNos) {
 
 // ── selectHighestCompleteGeneration ───────────────────────────────────────────────────────────
 
-StatusWith<std::vector<BSONObj>> select(std::vector<BSONObj> pages) {
+StatusWith<PersistentSampleGeneration> select(std::vector<BSONObj> pages) {
     return selectHighestCompleteGeneration(
         std::move(pages), kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
 }
 
-void assertSelectedGeneration(const StatusWith<std::vector<BSONObj>>& selected,
+void assertSelectedGeneration(const StatusWith<PersistentSampleGeneration>& selected,
                               uint64_t genId,
                               int numPages) {
     ASSERT_OK(selected.getStatus());
-    ASSERT_EQ(selected.getValue().size(), static_cast<size_t>(numPages));
+    const auto& generation = selected.getValue();
+    ASSERT_EQ(generation.genId(), genId);
+    ASSERT_EQ(generation.numPages(), numPages);
     for (int pageNo = 0; pageNo < numPages; ++pageNo) {
-        const BSONObj& page = selected.getValue()[pageNo];
-        ASSERT_EQ(page[PersistentSampleDoc::kPageNoFieldName].Int(), pageNo);
-        const auto parsedGenId = parsePersistentSampleGenId(
-            page["_id"].String(), kUuid, SamplingTechniqueEnum::kRandom, 384, boost::none);
+        const auto page = generation.page(pageNo);
+        ASSERT_TRUE(page.has_value());
+        ASSERT_EQ((page.value())[PersistentSampleDoc::kPageNoFieldName].Int(), pageNo);
+        const auto parsedGenId = parsePersistentSampleGenId((page.value())["_id"].String(),
+                                                            kUuid,
+                                                            SamplingTechniqueEnum::kRandom,
+                                                            384,
+                                                            boost::none);
         ASSERT_OK(parsedGenId.getStatus());
         ASSERT_EQ(parsedGenId.getValue(), genId);
     }
@@ -445,12 +451,13 @@ TEST(SelectHighestCompleteGeneration, IdsWithoutGenIdBelongToGenerationZero) {
 }
 
 TEST(SelectHighestCompleteGeneration, MissingOrNonPositiveNumPagesIsUnsupportedFormat) {
-    ASSERT_EQ(select({buildPage(kUuid, {.pageNo = 0})}).getStatus().code(),
-              ErrorCodes::UnsupportedFormat);
-    ASSERT_EQ(select({buildPage(kUuid, {.pageNo = 0, .numPages = 0})}).getStatus().code(),
-              ErrorCodes::UnsupportedFormat);
-    ASSERT_EQ(select({buildPage(kUuid, {.pageNo = 0, .numPages = -1})}).getStatus().code(),
-              ErrorCodes::UnsupportedFormat);
+    for (auto&& page : {buildPage(kUuid, {.pageNo = 0}),
+                        buildPage(kUuid, {.pageNo = 0, .numPages = 0}),
+                        buildPage(kUuid, {.pageNo = 0, .numPages = -1})}) {
+        const auto status = select({page}).getStatus();
+        ASSERT_EQ(status.code(), ErrorCodes::UnsupportedFormat);
+        ASSERT_STRING_CONTAINS(status.reason(), "missing or non-positive numPages");
+    }
 }
 
 TEST(SelectHighestCompleteGeneration, HugeNumPagesMakesAGenerationIncomplete) {
@@ -847,19 +854,86 @@ TEST(ParsePersistentSample, RejectsNegativeNumDocsDiscarded) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+// ── PersistentSampleGeneration ────────────────────────────────────────────────────────────────
+
+TEST(PersistentSampleGeneration, PagesAreFoundByPageNoWhateverTheirArrivalOrder) {
+    PersistentSampleGeneration generation(/*genId=*/1, /*numPages=*/3);
+    for (int pageNo : {2, 0, 1}) {
+        ASSERT_FALSE(generation.isComplete());
+        ASSERT_OK(
+            generation.addPage(buildPage(kUuid, {.genId = 1, .pageNo = pageNo, .numPages = 3})));
+    }
+    ASSERT_TRUE(generation.isComplete());
+    for (int pageNo = 0; pageNo < 3; ++pageNo) {
+        const auto page = generation.page(pageNo);
+        ASSERT_TRUE(page.has_value());
+        ASSERT_EQ((page.value())[PersistentSampleDoc::kPageNoFieldName].Int(), pageNo);
+    }
+    ASSERT_FALSE(generation.page(3).has_value());
+}
+
+TEST(PersistentSampleGeneration, IsCompleteOnlyOnceEveryPageIsAdded) {
+    PersistentSampleGeneration generation(/*genId=*/1, /*numPages=*/2);
+    ASSERT_FALSE(generation.isComplete());
+    ASSERT_OK(generation.addPage(buildPage(kUuid, {.genId = 1, .pageNo = 1, .numPages = 2})));
+    ASSERT_FALSE(generation.isComplete());
+    ASSERT_OK(generation.addPage(buildPage(kUuid, {.genId = 1, .pageNo = 0, .numPages = 2})));
+    ASSERT_TRUE(generation.isComplete());
+}
+
+DEATH_TEST_REGEX(PersistentSampleGenerationDeathTest, NonPositiveNumPagesIsRejected, "13541500") {
+    PersistentSampleGeneration(/*genId=*/1, /*numPages=*/0);
+}
+
+TEST(PersistentSampleGeneration, RejectsPageDisagreeingOnNumPages) {
+    PersistentSampleGeneration generation(/*genId=*/1, /*numPages=*/2);
+    for (auto&& page : {buildPage(kUuid, {.genId = 1, .pageNo = 1, .numPages = 3}),
+                        buildPage(kUuid, {.genId = 1, .pageNo = 1}),
+                        buildPage(kUuid, {.genId = 1, .pageNo = 1, .numPages = 0}),
+                        buildPage(kUuid, {.genId = 1, .pageNo = 2, .numPages = 2})}) {
+        ASSERT_EQ(generation.addPage(page).code(), ErrorCodes::UnsupportedFormat);
+    }
+    ASSERT_EQ(generation.numPages(), 0u);
+}
+
+TEST(PersistentSampleGeneration, RejectsDuplicatePageNo) {
+    PersistentSampleGeneration generation(/*genId=*/1, /*numPages=*/2);
+    ASSERT_OK(generation.addPage(
+        buildPage(kUuid, {.genId = 1, .pageNo = 0, .numPages = 2, .docs = {BSON("a" << 0)}})));
+    ASSERT_EQ(generation
+                  .addPage(buildPage(
+                      kUuid, {.genId = 1, .pageNo = 0, .numPages = 2, .docs = {BSON("a" << 1)}}))
+                  .code(),
+              ErrorCodes::UnsupportedFormat);
+    ASSERT_EQ(generation.numPages(), 1u);
+    ASSERT_BSONOBJ_EQ((generation.page(0).value())["docs"].Array()[0].Obj(), BSON("a" << 0));
+}
+
 // ── reassemblePersistentSample ────────────────────────────────────────────────────────────────
 
-TEST(ReassemblePersistentSample, EmptyPagesReturnsNoSuchKey) {
-    auto result = reassemblePersistentSample({});
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::NoSuchKey);
+DEATH_TEST_REGEX(ReassemblePersistentSampleDeathTest, EmptyGenerationIsRejected, "13541501") {
+    reassemblePersistentSample(PersistentSampleGeneration(/*genId=*/1, /*numPages=*/1))
+        .getStatus()
+        .ignore();
+}
+
+DEATH_TEST_REGEX(ReassemblePersistentSampleDeathTest, IncompleteGenerationIsRejected, "13541501") {
+    const UUID uuid = UUID::gen();
+    const std::vector<BSONObj> pages({buildPage(uuid, {.pageNo = 0, .numPages = 3}),
+                                      buildPage(uuid, {.pageNo = 2, .numPages = 3})});
+    PersistentSampleGeneration generation(kDefaultPersistentSampleGenId, 3);
+    for (auto& page : pages) {
+        ASSERT_OK(generation.addPage(std::move(page)));
+    }
+    ASSERT_FALSE(generation.isComplete());
+    reassemblePersistentSample(generation).getStatus().ignore();
 }
 
 TEST(ReassemblePersistentSample, SinglePageRoundTrips) {
     const UUID uuid = UUID::gen();
     const std::vector<BSONObj> docs{BSON("_id" << 1), BSON("_id" << 2)};
-    auto result = reassemblePersistentSample(
-        {buildPage(uuid, {.requestedSampleSize = docs.size(), .docs = docs})});
+    auto result = reassemblePersistentSample(generationOf(
+        {buildPage(uuid, {.requestedSampleSize = docs.size(), .numPages = 1, .docs = docs})}));
     ASSERT_OK(result.getStatus());
     const auto& sample = result.getValue();
     ASSERT_EQUALS(sample.getDocs().size(), docs.size());
@@ -869,79 +943,34 @@ TEST(ReassemblePersistentSample, SinglePageRoundTrips) {
 
 TEST(ReassemblePersistentSample, MultiplePagesConcatenatedInPageNoOrder) {
     const UUID uuid = UUID::gen();
-    const BSONObj d0 = BSON("_id" << 0);
-    const BSONObj d1 = BSON("_id" << 1);
-    const BSONObj d2 = BSON("_id" << 2);
-    const BSONObj d3 = BSON("_id" << 3);
-    const size_t requestedSampleSize = 4;
+    const std::vector<BSONObj> docs{BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)};
+    const auto pageOf = [&](int pageNo) {
+        return buildPage(uuid,
+                         {.requestedSampleSize = docs.size(),
+                          .pageNo = pageNo,
+                          .numPages = 3,
+                          .docs = {docs[pageNo]}});
+    };
 
-    // selectHighestCompleteGeneration hands over pages already ordered by pageNo, so reassembly
-    // relies on that ordering rather than sorting.
-    auto result = reassemblePersistentSample({
-        buildPage(uuid,
-                  {.requestedSampleSize = requestedSampleSize, .pageNo = 0, .docs = {d0, d1}}),
-        buildPage(uuid,
-                  {.requestedSampleSize = requestedSampleSize, .pageNo = 1, .docs = {d2, d3}}),
-    });
+    // Pages are added out of order; reassembly still concatenates them in pageNo order.
+    auto result = reassemblePersistentSample(generationOf({pageOf(2), pageOf(0), pageOf(1)}));
     ASSERT_OK(result.getStatus());
     const auto& sample = result.getValue();
-    ASSERT_EQUALS(sample.getDocs().size(), 4u);
-    ASSERT_BSONOBJ_EQ(sample.getDocs()[0], d0);
-    ASSERT_BSONOBJ_EQ(sample.getDocs()[1], d1);
-    ASSERT_BSONOBJ_EQ(sample.getDocs()[2], d2);
-    ASSERT_BSONOBJ_EQ(sample.getDocs()[3], d3);
-}
-
-TEST(ReassemblePersistentSample, OutOfOrderPagesRejected) {
-    const UUID uuid = UUID::gen();
-    // reassembly requires pages in pageNo order (guaranteed by selectHighestCompleteGeneration); an
-    // out-of-order sequence is treated as an incorrectly written sample.
-    auto result = reassemblePersistentSample({
-        buildPage(uuid, {.requestedSampleSize = 2, .pageNo = 1, .docs = {BSON("a" << 1)}}),
-        buildPage(uuid, {.requestedSampleSize = 2, .pageNo = 0, .docs = {BSON("a" << 0)}}),
-    });
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
-}
-
-TEST(ReassemblePersistentSample, MissingMiddlePageRejected) {
-    const UUID uuid = UUID::gen();
-    // pages 0 and 2 present, 1 missing
-    auto result = reassemblePersistentSample({
-        buildPage(uuid, {.requestedSampleSize = 3, .pageNo = 0, .docs = {BSON("a" << 0)}}),
-        buildPage(uuid, {.requestedSampleSize = 3, .pageNo = 2, .docs = {BSON("a" << 2)}}),
-    });
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
-}
-
-TEST(ReassemblePersistentSample, FirstPageNotZeroRejected) {
-    const UUID uuid = UUID::gen();
-    auto result = reassemblePersistentSample({
-        buildPage(uuid, {.requestedSampleSize = 2, .pageNo = 1, .docs = {BSON("a" << 1)}}),
-        buildPage(uuid, {.requestedSampleSize = 2, .pageNo = 2, .docs = {BSON("a" << 2)}}),
-    });
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
-}
-
-TEST(ReassemblePersistentSample, DuplicatePageNoRejected) {
-    const UUID uuid = UUID::gen();
-    auto result = reassemblePersistentSample({
-        buildPage(uuid, {.requestedSampleSize = 2, .pageNo = 0, .docs = {BSON("a" << 0)}}),
-        buildPage(uuid, {.requestedSampleSize = 2, .pageNo = 0, .docs = {BSON("a" << 1)}}),
-    });
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
+    ASSERT_EQUALS(sample.getDocs().size(), docs.size());
+    for (size_t i = 0; i < docs.size(); ++i) {
+        ASSERT_BSONOBJ_EQ(sample.getDocs()[i], docs[i]);
+    }
 }
 
 TEST(ReassemblePersistentSample, IdentityMismatchAcrossPagesRejected) {
     const UUID uuid = UUID::gen();
     // page 0 declares requestedSampleSize 4, page 1 declares 5 — inconsistent identity.
-    auto result = reassemblePersistentSample({
-        buildPage(uuid, {.requestedSampleSize = 4, .pageNo = 0, .docs = {BSON("a" << 0)}}),
-        buildPage(uuid, {.requestedSampleSize = 5, .pageNo = 1, .docs = {BSON("a" << 1)}}),
-    });
+    auto result = reassemblePersistentSample(generationOf({
+        buildPage(uuid,
+                  {.requestedSampleSize = 4, .pageNo = 0, .numPages = 2, .docs = {BSON("a" << 0)}}),
+        buildPage(uuid,
+                  {.requestedSampleSize = 5, .pageNo = 1, .numPages = 2, .docs = {BSON("a" << 1)}}),
+    }));
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
 }
@@ -949,39 +978,58 @@ TEST(ReassemblePersistentSample, IdentityMismatchAcrossPagesRejected) {
 TEST(ReassemblePersistentSample, ReassembledDocsExceedingRequestedSampleSizeRejected) {
     const UUID uuid = UUID::gen();
     // Each page is individually within requestedSampleSize=2, but combined they hold 3 docs.
-    auto result = reassemblePersistentSample({
-        buildPage(
-            uuid,
-            {.requestedSampleSize = 2, .pageNo = 0, .docs = {BSON("a" << 0), BSON("a" << 1)}}),
-        buildPage(uuid, {.requestedSampleSize = 2, .pageNo = 1, .docs = {BSON("a" << 2)}}),
-    });
+    auto result = reassemblePersistentSample(generationOf({
+        buildPage(uuid,
+                  {.requestedSampleSize = 2,
+                   .pageNo = 0,
+                   .numPages = 2,
+                   .docs = {BSON("a" << 0), BSON("a" << 1)}}),
+        buildPage(uuid,
+                  {.requestedSampleSize = 2, .pageNo = 1, .numPages = 2, .docs = {BSON("a" << 2)}}),
+    }));
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
 }
 
 TEST(ReassemblePersistentSample, MalformedPagePropagatesError) {
     const UUID uuid = UUID::gen();
-    auto result = reassemblePersistentSample({
-        buildPage(uuid, {.requestedSampleSize = 2, .docs = {BSON("a" << 0)}}),
-        BSONObj{},  // empty/malformed page.
-    });
+    // Page 1 belongs to the generation but its `docs` is not an array, so it fails to parse.
+    const BSONObj malformed =
+        buildPersistentSampleDoc(uuid,
+                                 SamplingTechniqueEnum::kRandom,
+                                 /*requestedSampleSize=*/2,
+                                 /*docs=*/{BSON("a" << 1)},
+                                 /*numChunks=*/boost::none,
+                                 kPersistentSampleSchemaVersion,
+                                 BSON(PersistentSampleDoc::kDocsFieldName << "not-an-array"),
+                                 /*pageNo=*/1,
+                                 /*numDocsDiscarded=*/0,
+                                 /*genId=*/boost::none,
+                                 /*numPages=*/2);
+    auto result = reassemblePersistentSample(generationOf({
+        buildPage(uuid,
+                  {.requestedSampleSize = 2, .pageNo = 0, .numPages = 2, .docs = {BSON("a" << 0)}}),
+        malformed,
+    }));
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(ReassemblePersistentSample, PreservesChunkNumChunks) {
     const UUID uuid = UUID::gen();
-    auto result = reassemblePersistentSample({
+    auto result = reassemblePersistentSample(generationOf({
         buildPage(uuid,
                   {.method = SamplingTechniqueEnum::kChunk,
                    .numChunks = 1,
                    .pageNo = 0,
+                   .numPages = 2,
                    .docs = {BSON("a" << 0)}}),
         buildPage(uuid,
                   {.method = SamplingTechniqueEnum::kChunk,
                    .numChunks = 1,
                    .pageNo = 1,
+                   .numPages = 2,
                    .docs = {BSON("a" << 1)}}),
-    });
+    }));
     ASSERT_OK(result.getStatus());
     const auto& sample = result.getValue();
     ASSERT_EQUALS(sample.getSamplingMethod(), SamplingTechniqueEnum::kChunk);
@@ -993,40 +1041,10 @@ TEST(ReassemblePersistentSample, PreservesChunkNumChunks) {
 TEST(ReassemblePersistentSample, AcceptsAllPagesDeclaredByNumPages) {
     const UUID uuid = UUID::gen();
     auto result = reassemblePersistentSample(
-        {buildPage(uuid, {.pageNo = 0, .numPages = 2, .docs = {BSON("a" << 0)}}),
-         buildPage(uuid, {.pageNo = 1, .numPages = 2, .docs = {BSON("a" << 1)}})});
+        generationOf({buildPage(uuid, {.pageNo = 0, .numPages = 2, .docs = {BSON("a" << 0)}}),
+                      buildPage(uuid, {.pageNo = 1, .numPages = 2, .docs = {BSON("a" << 1)}})}));
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(result.getValue().getDocs().size(), 2u);
-}
-
-TEST(ReassemblePersistentSample, FewerPagesThanNumPagesRejected) {
-    const UUID uuid = UUID::gen();
-    auto result = reassemblePersistentSample({buildPage(uuid, {.pageNo = 0, .numPages = 3}),
-                                              buildPage(uuid, {.pageNo = 1, .numPages = 3})});
-    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
-}
-
-TEST(ReassemblePersistentSample, MorePagesThanNumPagesRejected) {
-    const UUID uuid = UUID::gen();
-    auto result = reassemblePersistentSample({buildPage(uuid, {.pageNo = 0, .numPages = 1}),
-                                              buildPage(uuid, {.pageNo = 1, .numPages = 1})});
-    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
-}
-
-TEST(ReassemblePersistentSample, MissingNumPagesIsNotChecked) {
-    const UUID uuid = UUID::gen();
-    auto result = reassemblePersistentSample(
-        {buildPage(uuid, {.requestedSampleSize = 2, .pageNo = 0, .docs = {BSON("a" << 0)}}),
-         buildPage(uuid, {.requestedSampleSize = 2, .pageNo = 1, .docs = {BSON("a" << 1)}})});
-    ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(result.getValue().getDocs().size(), 2u);
-}
-
-TEST(ReassemblePersistentSample, PagesDisagreeingOnNumPagesRejected) {
-    const UUID uuid = UUID::gen();
-    auto result = reassemblePersistentSample({buildPage(uuid, {.pageNo = 0, .numPages = 2}),
-                                              buildPage(uuid, {.pageNo = 1, .numPages = 3})});
-    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
 }
 
 // ── PersistentSampleLoader ────────────────────────────────────────────────────────────────────

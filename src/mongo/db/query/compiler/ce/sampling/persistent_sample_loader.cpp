@@ -283,19 +283,43 @@ StatusWith<uint64_t> parsePersistentSampleGenId(std::string_view id,
     return genId;
 }
 
-StatusWith<std::vector<BSONObj>> selectHighestCompleteGeneration(std::vector<BSONObj> pages,
-                                                                 const UUID& collectionUuid,
-                                                                 SamplingTechniqueEnum method,
-                                                                 size_t requestedSampleSize,
-                                                                 boost::optional<int> numChunks) {
-    // TODO SERVER-138297. Refactor this as a separate class.
-    struct Generation {
-        int numPages;
-        std::map<int, BSONObj> pagesByPageNo;
-    };
+PersistentSampleGeneration::PersistentSampleGeneration(uint64_t genId, int numPages)
+    : _genId(genId), _expectedNumPages(numPages) {
+    tassert(13541500, "A persistent sample generation must have at least one page", numPages > 0);
+}
+
+Status PersistentSampleGeneration::addPage(BSONObj page) {
+    const BSONElement idElem = page[PersistentSampleDoc::k_idFieldName];
+    const int numPages = page[PersistentSampleDoc::kNumPagesFieldName].safeNumberInt();
+    if (numPages != _expectedNumPages) {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      str::stream() << "persistent sample generation " << _genId
+                                    << " has pages declaring both " << _expectedNumPages << " and "
+                                    << numPages << " numPages");
+    }
+    const int pageNo = page[PersistentSampleDoc::kPageNoFieldName].safeNumberInt();
+    if (pageNo < 0 || pageNo >= _expectedNumPages) {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      str::stream() << "persistent sample page with _id: " << idElem.toString(false)
+                                    << " has out of range pageNo: " << pageNo);
+    }
+    if (!_pages.emplace(pageNo, std::move(page)).second) {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      str::stream() << "persistent sample generation " << _genId
+                                    << " has more than one page with pageNo: " << pageNo);
+    }
+    return Status::OK();
+}
+
+StatusWith<PersistentSampleGeneration> selectHighestCompleteGeneration(
+    std::vector<BSONObj> pages,
+    const UUID& collectionUuid,
+    SamplingTechniqueEnum method,
+    size_t requestedSampleSize,
+    boost::optional<int> numChunks) {
     // Using a map sorted by std::greater so we can find the highest generations first in the loop
     // below.
-    std::map<uint64_t, Generation, std::greater<>> generations;
+    std::map<uint64_t, PersistentSampleGeneration, std::greater<>> generations;
     for (BSONObj& page : pages) {
         const BSONElement idElem = page[PersistentSampleDoc::k_idFieldName];
         if (idElem.type() != BSONType::string) {
@@ -306,47 +330,28 @@ StatusWith<std::vector<BSONObj>> selectHighestCompleteGeneration(std::vector<BSO
         if (!genId.isOK()) {
             return genId.getStatus();
         }
-        const int numPages = page[PersistentSampleDoc::kNumPagesFieldName].safeNumberInt();
-        if (numPages <= 0) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          str::stream()
-                              << "persistent sample page with _id: " << idElem.valueStringData()
-                              << " has missing or non-positive numPages: " << numPages);
+        auto generationIt = generations.find(genId.getValue());
+        if (generationIt == generations.end()) {
+            // The first page read of a generation sizes it.
+            const int numPages = page[PersistentSampleDoc::kNumPagesFieldName].safeNumberInt();
+            if (numPages <= 0) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              str::stream()
+                                  << "persistent sample page with _id: " << idElem.valueStringData()
+                                  << " has missing or non-positive numPages: " << numPages);
+            }
+            generationIt =
+                generations.try_emplace(genId.getValue(), genId.getValue(), numPages).first;
         }
-        auto& generation =
-            generations.try_emplace(genId.getValue(), Generation{numPages, {}}).first->second;
-        if (numPages != generation.numPages) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          str::stream() << "persistent sample generation " << genId.getValue()
-                                        << " has pages declaring both " << generation.numPages
-                                        << " and " << numPages << " numPages");
-        }
-        const int pageNo = page[PersistentSampleDoc::kPageNoFieldName].safeNumberInt();
-        if (pageNo < 0 || pageNo >= numPages) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          str::stream()
-                              << "persistent sample page with _id: " << idElem.valueStringData()
-                              << " has out of range pageNo: " << pageNo);
-        }
-        if (!generation.pagesByPageNo.emplace(pageNo, std::move(page)).second) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          str::stream() << "persistent sample generation " << genId.getValue()
-                                        << " has more than one page with pageNo: " << pageNo);
+        if (auto status = generationIt->second.addPage(std::move(page)); !status.isOK()) {
+            return status;
         }
     }
 
     for (auto& [genId, generation] : generations) {
-        // Every pageNo is unique and in [0, numPages), so holding numPages pages means none is
-        // missing.
-        if (generation.pagesByPageNo.size() != static_cast<size_t>(generation.numPages)) {
-            continue;
+        if (generation.isComplete()) {
+            return std::move(generation);
         }
-        std::vector<BSONObj> ordered;
-        ordered.reserve(generation.pagesByPageNo.size());
-        for (auto& [pageNo, page] : generation.pagesByPageNo) {
-            ordered.push_back(std::move(page));
-        }
-        return ordered;
     }
     return Status(ErrorCodes::NoSuchKey, "no complete persistent sample generation found");
 }
@@ -413,13 +418,14 @@ StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
     return parsed;
 }
 
-StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> pages) {
-    if (pages.empty()) {
-        return Status(ErrorCodes::NoSuchKey, "no persistent sample pages found");
-    }
+StatusWith<PersistentSampleDoc> reassemblePersistentSample(
+    const PersistentSampleGeneration& generation) {
+    tassert(13541501,
+            str::stream() << "Incomplete persistent sample generation " << generation.genId(),
+            generation.isComplete());
 
     // Use the first page to set metadata for the full sample
-    auto firstPage = parsePersistentSample(pages[0]);
+    auto firstPage = parsePersistentSample(*generation.page(0));
     if (!firstPage.isOK()) {
         return firstPage.getStatus();
     }
@@ -440,22 +446,12 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
     PersistentSampleDoc reassembled = std::move(firstPage.getValue());
 
     // Parse and validate the rest of the pages, collecting their documents into the full sample.
-    for (size_t i = 1; i < pages.size(); ++i) {
-        auto parsed = parsePersistentSample(pages[i]);
+    for (int pageNo = 1; pageNo < static_cast<int>(generation.numPages()); ++pageNo) {
+        auto parsed = parsePersistentSample(*generation.page(pageNo));
         if (!parsed.isOK()) {
             return parsed.getStatus();
         }
         PersistentSampleDoc page = std::move(parsed.getValue());
-
-        // The pages of a sample must form a contiguous run 0..N-1 arriving in pageNo order.
-        if (page.getPageNo() != static_cast<int>(i)) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          str::stream()
-                              << "persistent sample pages must be a contiguous "
-                                 "run 0.."
-                              << (pages.size() - 1) << " in order. Run is broken by page with _id: "
-                              << page.get_id() << ", expected pageNo: " << i);
-        }
 
         // All pages must agree on the sample's identity.
         if (page.getSchemaVersion() != reassembled.getSchemaVersion() ||
@@ -464,8 +460,7 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
             page.getRequestedSamplingMethod() != reassembled.getRequestedSamplingMethod() ||
             page.getRequestedSampleSize() != reassembled.getRequestedSampleSize() ||
             page.getNumChunks() != reassembled.getNumChunks() ||
-            page.getNumDocsDiscarded() != reassembled.getNumDocsDiscarded() ||
-            page.getNumPages() != reassembled.getNumPages()) {
+            page.getNumDocsDiscarded() != reassembled.getNumDocsDiscarded()) {
             return Status(ErrorCodes::UnsupportedFormat,
                           "persistent sample pages disagree on their identity fields");
         }
@@ -482,15 +477,6 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
                               << allDocs.size() << ") exceeds declared 'requestedSampleSize' ("
                               << totalMaxSampleSize << ")");
         }
-    }
-
-    // TODO SERVER-135416: Refuse as UnsupportedFormat when numPages is missing.
-    if (reassembled.getNumPages().has_value() &&
-        static_cast<size_t>(reassembled.getNumPages().value()) != pages.size()) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      str::stream()
-                          << "persistent sample declares " << reassembled.getNumPages().value()
-                          << " pages but " << pages.size() << " were found");
     }
 
     reassembled.setDocs(std::move(allDocs));
@@ -614,8 +600,8 @@ StatusWith<Sample> PersistentSampleLoader::tryLoad(const SampleSpec& spec) {
         return generation.getStatus();
     }
 
-    const size_t numPages = generation.getValue().size();
-    auto reassembled = reassemblePersistentSample(std::move(generation.getValue()));
+    const size_t numPages = generation.getValue().numPages();
+    auto reassembled = reassemblePersistentSample(generation.getValue());
 
     if (!reassembled.isOK()) {
         recordPersistentSampleFailure(reassembled.getStatus());

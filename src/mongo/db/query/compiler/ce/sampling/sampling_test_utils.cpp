@@ -697,6 +697,16 @@ BSONObj buildPage(const UUID& uuid, const PageParams& params) {
                                     params.numPages);
 }
 
+PersistentSampleGeneration generationOf(std::vector<BSONObj> pages) {
+    ASSERT_FALSE(pages.empty());
+    PersistentSampleGeneration generation(kDefaultPersistentSampleGenId,
+                                          static_cast<int>(pages.size()));
+    for (auto& page : pages) {
+        ASSERT_OK(generation.addPage(std::move(page)));
+    }
+    return generation;
+}
+
 BSONObj makeSizedDoc(int id, size_t sizeBytes) {
     const size_t overhead = static_cast<size_t>(BSON("_id" << id << "pad" << "").objsize());
     const size_t padLen = sizeBytes > overhead ? sizeBytes - overhead : 0;

@@ -381,6 +381,11 @@ struct PageParams {
 BSONObj buildPage(const UUID& uuid, const PageParams& params = {});
 
 /**
+ * Builds a generation from `pages`.
+ */
+PersistentSampleGeneration generationOf(std::vector<BSONObj> pages);
+
+/**
  * Build a BSON document of size `sizeBytes`, or at minimum the size of the BSON overhead of the
  * field names if `sizeBytes` is less than that.
  */
