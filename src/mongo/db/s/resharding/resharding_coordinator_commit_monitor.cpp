@@ -13,7 +13,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/database_name_util.h"
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_runtime_server_parameters_gen.h"
 #include "mongo/db/shard_role/resource_yielder.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/executor/remote_command_response.h"

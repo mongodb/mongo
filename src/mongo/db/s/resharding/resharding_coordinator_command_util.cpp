@@ -4,7 +4,7 @@
 #include "mongo/db/s/resharding/resharding_coordinator_command_util.h"
 
 #include "mongo/db/global_catalog/ddl/shardsvr_join_migrations_request_gen.h"
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_runtime_server_parameters_gen.h"
 #include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"

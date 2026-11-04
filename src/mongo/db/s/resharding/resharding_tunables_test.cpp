@@ -3,7 +3,7 @@
 
 #include "mongo/db/s/resharding/resharding_tunables.h"
 
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_runtime_server_parameters_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -58,11 +58,6 @@ std::string tunableNameFor(const std::string& serverParameterName) {
 }
 
 TEST(ReshardingTunablesTest, TunablesMatchReshardingServerParameters) {
-    // Startup-only thread pool sizes cannot vary per operation, so they are not tunables.
-    const std::set<std::string> notTunable{"reshardingCoordinatorServiceMaxThreadCount",
-                                           "reshardingDonorServiceMaxThreadCount",
-                                           "reshardingRecipientServiceMaxThreadCount"};
-
     std::set<std::string> expected;
     for (const auto& [name, parameter] : ServerParameterSet::getNodeParameterSet()->getMap()) {
         if (dynamic_cast<IDLServerParameterDeprecatedAlias*>(parameter.get())) {
@@ -71,7 +66,7 @@ TEST(ReshardingTunablesTest, TunablesMatchReshardingServerParameters) {
         }
         const std::string_view sd{name};
         if ((sd.starts_with("resharding") || sd.starts_with("remainingResharding")) &&
-            !notTunable.contains(name)) {
+            parameter->allowedToChangeAtRuntime()) {
             expected.insert(tunableNameFor(name));
         }
     }

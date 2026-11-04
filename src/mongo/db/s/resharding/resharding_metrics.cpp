@@ -11,7 +11,7 @@
 #include "mongo/db/s/resharding/resharding_metrics_common.h"
 #include "mongo/db/s/resharding/resharding_metrics_field_names.h"
 #include "mongo/db/s/resharding/resharding_metrics_observer_impl.h"
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_runtime_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"

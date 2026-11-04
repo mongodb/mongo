@@ -25,7 +25,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_runtime_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"

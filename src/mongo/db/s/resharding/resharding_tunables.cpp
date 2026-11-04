@@ -3,7 +3,7 @@
 
 #include "mongo/db/s/resharding/resharding_tunables.h"
 
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_runtime_server_parameters_gen.h"
 
 // Sets the tunable `Name` to the current value of the server parameter `param`, unless it was
 // explicitly specified. Operates on the `tunables` argument of the enclosing function.

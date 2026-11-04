@@ -157,8 +157,17 @@ idl_generator(
 )
 
 idl_generator(
-    name = "resharding_server_parameters_gen",
-    src = "resharding_server_parameters.idl",
+    name = "resharding_runtime_server_parameters_gen",
+    src = "resharding_runtime_server_parameters.idl",
+    deps = [
+        ":resharding_startup_server_parameters_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "resharding_startup_server_parameters_gen",
+    src = "resharding_startup_server_parameters.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],

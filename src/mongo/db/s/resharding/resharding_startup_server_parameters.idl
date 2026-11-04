@@ -1,0 +1,48 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+# Server parameters for resharding that are fixed at startup.
+
+global:
+    mod_visibility: private
+    cpp_namespace: "mongo::resharding"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+server_parameters:
+    reshardingCoordinatorServiceMaxThreadCount:
+        description: The max number of threads in the resharding coordinator's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gReshardingCoordinatorServiceMaxThreadCount
+        # Each concurrent resharding blocks at least 2 threads on delta collectors for the duration of the critical section and 1 on a participant command, so up to 10 reshardings fit comfortably in 31 threads leaving 1 thread for non-blocking work.
+        default: 31
+        validator:
+            gte: 1
+            lte: 256
+        redact: false
+
+    reshardingDonorServiceMaxThreadCount:
+        description: The max number of threads in the resharding donor's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gReshardingDonorServiceMaxThreadCount
+        # Each concurrent resharding blocks 1 thread on its change streams monitor, so 10 reshardings leave 2 threads for non-blocking work.
+        default: 12
+        validator:
+            gte: 1
+            lte: 256
+        redact: false
+
+    reshardingRecipientServiceMaxThreadCount:
+        description: The max number of threads in the resharding recipient's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gReshardingRecipientServiceMaxThreadCount
+        # Each concurrent resharding blocks 1 thread on its change streams monitor and at least 1 on its batch applier, so 10 reshardings leave 4 threads for txn cloning and non-blocking work.
+        default: 24
+        validator:
+            gte: 1
+            lte: 256
+        redact: false

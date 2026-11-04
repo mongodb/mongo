@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: SSPL-1.0
 
 # This file defines the per-operation resharding settings (tunables) that mirror the resharding
-# server parameters in mongo/db/s/resharding/resharding_server_parameters.idl.
+# server parameters in mongo/db/s/resharding/resharding_runtime_server_parameters.idl.
 
 global:
     cpp_namespace: "mongo"

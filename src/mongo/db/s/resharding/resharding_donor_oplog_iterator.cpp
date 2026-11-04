@@ -5,7 +5,7 @@
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 
 #include "mongo/db/s/resharding/resharding_future_util.h"
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_runtime_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"

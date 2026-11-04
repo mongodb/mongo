@@ -178,8 +178,17 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "resharding_server_parameters_idl",
-    srcs = ["//src/mongo/db/s/resharding:resharding_server_parameters_gen"],
+    name = "resharding_runtime_server_parameters_idl",
+    srcs = ["//src/mongo/db/s/resharding:resharding_runtime_server_parameters_gen"],
+    deps = [
+        ":resharding_startup_server_parameters_idl",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "resharding_startup_server_parameters_idl",
+    srcs = ["//src/mongo/db/s/resharding:resharding_startup_server_parameters_gen"],
     deps = ["//src/mongo/db:server_base"],
 )
 
@@ -305,7 +314,8 @@ mongo_cc_library(
         ":query_analysis_writer",
         ":range_deleter_service_impl",
         ":resharding_replica_set_aware_service",
-        ":resharding_server_parameters_idl",
+        ":resharding_runtime_server_parameters_idl",
+        ":resharding_startup_server_parameters_idl",
         ":transaction_coordinator",
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/client:remote_command_targeter",
@@ -517,7 +527,8 @@ mongo_cc_library(
         ":forwardable_operation_metadata",
         ":local_resharding_operations_registry",
         ":query_analysis_writer",
-        ":resharding_server_parameters_idl",
+        ":resharding_runtime_server_parameters_idl",
+        ":resharding_startup_server_parameters_idl",
         ":sharding_coord_d",
         ":transaction_coordinator",
         "//src/mongo/client:clientdriver_minimal",
