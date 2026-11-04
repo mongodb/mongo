@@ -656,6 +656,13 @@ void MultiPlanStage::switchToBackupPlan() {
 }
 
 void MultiPlanStage::rejectPlan(size_t planIdx) {
+    // Release the buffered results, which can hold owned copies of documents.
+    auto& candidate = _candidates[planIdx];
+    for (auto id : candidate.results) {
+        candidate.data->free(id);
+    }
+    candidate.results.clear();
+
     auto rejectedPlan = std::move(_children[planIdx]);
     if (opCtx() != nullptr) {
         rejectedPlan->saveState();

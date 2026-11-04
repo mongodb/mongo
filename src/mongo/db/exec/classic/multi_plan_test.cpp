@@ -92,6 +92,11 @@ using std::vector;
 static const NamespaceString nss =
     NamespaceString::createNamespaceString_forTest("unittests.multi_plan_test");
 
+std::vector<WorkingSetID> getBufferedResults(const MultiPlanStage& mps, size_t candidateIdx) {
+    const auto& results = mps.getCandidate(candidateIdx).results;
+    return {results.begin(), results.end()};
+}
+
 std::unique_ptr<QuerySolution> createQuerySolution() {
     auto soln = std::make_unique<QuerySolution>();
     soln->setRoot(std::make_unique<CollectionScanNode>());
@@ -473,6 +478,13 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     ASSERT(mps->bestPlanChosen());
     ASSERT(mps->hasBackupPlan());
 
+    // The backup plan is moved to index 1 and keeps its buffered results.
+    auto backupResults = getBufferedResults(*mps, 1);
+    ASSERT_FALSE(backupResults.empty());
+    for (auto id : backupResults) {
+        ASSERT_FALSE(ws->isFree(id));
+    }
+
     // We should have picked the index intersection plan due to forcing ixisect.
     auto soln = static_cast<const MultiPlanStage*>(mps.get())->bestSolution();
     ASSERT(QueryPlannerTestLib::solutionMatches("{sort: {pattern: {b: 1}, limit: 0, node:"
@@ -498,6 +510,9 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     // The blocking plan became unblocked, so we should no longer have a backup plan,
     // and the winning plan should still be the index intersection one.
     ASSERT(!mps->hasBackupPlan());
+    for (auto id : backupResults) {
+        ASSERT_TRUE(ws->isFree(id));
+    }
     soln = static_cast<const MultiPlanStage*>(mps.get())->bestSolution();
     ASSERT(QueryPlannerTestLib::solutionMatches("{sort: {pattern: {b: 1}, limit: 0, node:"
                                                 "{fetch: {node: {andSorted: {nodes: ["
@@ -1096,8 +1111,22 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansSimple) {
                                                   static_cast<PlanStage*>(mps.get()),
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
+    auto ixScanResults = getBufferedResults(*mps, 0);
+    auto collScanResults = getBufferedResults(*mps, 1);
+    ASSERT_FALSE(ixScanResults.empty());
+    ASSERT_FALSE(collScanResults.empty());
+
     ASSERT_OK(mps->pickBestPlan());
     ASSERT_TRUE(mps->bestPlanChosen());
+
+    // The winner keeps its buffered results while the rejected plan's results are freed.
+    for (auto id : ixScanResults) {
+        ASSERT_FALSE(sharedWs->isFree(id));
+    }
+    for (auto id : collScanResults) {
+        ASSERT_TRUE(sharedWs->isFree(id));
+    }
+    ASSERT_TRUE(mps->getCandidate(1).results.empty());
 
     auto planExplainerData = mps->extractPlanExplainerData();
     auto& rejectedPlansWithStages = planExplainerData.rejectedPlansWithStages;
@@ -1256,7 +1285,7 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansWhenBackupPlanIsNotLast) {
 TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansAfterAbandonTrials) {
     const int N = 100;
     for (int i = 0; i < N; ++i) {
-        insert(BSON("foo" << (i % 10)));
+        insert(BSON("foo" << (i % 10) << "a" << 1 << "b" << 1 << "c" << 1));
     }
 
     addIndex(BSON("a" << 1));
@@ -1307,9 +1336,31 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansAfterAbandonTrials) {
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
     ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
+    std::map<size_t, std::vector<WorkingSetID>> resultsByHash;
+    for (size_t i = 0; i < mps->numCandidatePlans(); i++) {
+        auto results = getBufferedResults(*mps, i);
+        ASSERT_FALSE(results.empty());
+        resultsByHash[mps->getCandidate(i).solution->hash()] = std::move(results);
+    }
+
     // Abandon all except the second index scan
     mps->abandonTrialsExceptHashes({solution1Hash, solution2Hash});
     ASSERT_FALSE(mps->bestPlanChosen());
+
+    // Results of the abandoned plan are freed, the remaining candidates keep theirs.
+    for (auto&& [hash, results] : resultsByHash) {
+        const bool abandoned = hash != solution1Hash && hash != solution2Hash;
+        for (auto id : results) {
+            ASSERT_EQ(sharedWs->isFree(id), abandoned);
+        }
+    }
+
+    // Candidates [0, getChildren().size()) are the plans still in the trial. The abandoned plans
+    // are moved after them, at indices [getChildren().size(), numCandidatePlans()), and their
+    // buffered results should have been cleared.
+    for (size_t i = mps->getChildren().size(); i < mps->numCandidatePlans(); i++) {
+        ASSERT_TRUE(mps->getCandidate(i).results.empty());
+    }
 
     ASSERT_OK(mps->pickBestPlan());
     ASSERT(mps->bestPlanChosen());
