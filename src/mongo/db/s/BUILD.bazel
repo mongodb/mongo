@@ -239,6 +239,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "transaction_coordinator",
     srcs = [
+        "end_of_transaction_metadata_shard_cache.cpp",
         "server_transaction_coordinators_metrics.cpp",
         "single_transaction_coordinator_stats.cpp",
         "transaction_coordinator.cpp",
@@ -1096,6 +1097,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "db_s_shard_server_part3_test",
     srcs = [
+        "end_of_transaction_metadata_shard_cache_test.cpp",
         "transaction_coordinator_catalog_test.cpp",
         "transaction_coordinator_futures_util_test.cpp",
         "transaction_coordinator_service_test.cpp",

@@ -260,8 +260,8 @@ Future<PrepareResponse> sendPrepareToShard(
  *
  * 'commandObjWithoutEndOfTransactionScopes' is set when 'commandObj' carries the end-of-transaction
  * accounting metadata. If the shard rejects the command with IDLUnknownField (i.e. its binary
- * predates the metadata field), the metadata is stripped, and the commit is retried without the
- * metadata.
+ * predates the metadata field), the metadata is stripped, the shard is recorded as ineligible in
+ * 'EndOfTransactionMetadataShardCache', and the commit is retried without the metadata.
  *
  * This method will retry until it receives a response from the remote node which can be
  * interpreted as vote abort (e.g. NoSuchTransaction), or until the scheduler under which it is

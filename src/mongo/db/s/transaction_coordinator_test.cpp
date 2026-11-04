@@ -23,6 +23,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/s/end_of_transaction_metadata_shard_cache.h"
 #include "mongo/db/s/server_transaction_coordinators_metrics.h"
 #include "mongo/db/s/single_transaction_coordinator_stats.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
@@ -946,6 +947,152 @@ TEST_F(TransactionCoordinatorDriverTest, SendCommitOmitsEndOfTransactionScopesWh
     };
     onCommands({assertNoScopes, assertNoScopes});
     commitFuture.get();
+}
+
+TEST_F(TransactionCoordinatorDriverTest, SendCommitRetriesWithoutMetadataWhenShardRejectsIt) {
+    // Reset the shared log suppressor so this test's log expectations do not depend on whether an
+    // earlier test already triggered the message.
+    txn::resetEndOfTransactionMetadataRejectedLogSeveritySuppressor_forTest(nullptr);
+    unittest::LogCaptureGuard logs;
+
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+
+    EndOfTransactionScopesInfoBase metadata;
+    metadata.setCollectionParticipants(BSON("db.coll1" << BSON_ARRAY("s1")));
+    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1")));
+    metadata.setClusterParticipants({ShardId("s1")});
+
+    auto& shardCache = EndOfTransactionMetadataShardCache::get(getServiceContext());
+    ASSERT_TRUE(shardCache.isShardDefinitelyEligible(ShardId("s1")));
+
+    auto commitFuture = txn::sendCommit(getServiceContext(),
+                                        aws,
+                                        _lsid,
+                                        _txnNumberAndRetryCounter,
+                                        APIParameters(),
+                                        kOneShardIdList,
+                                        Timestamp(100, 5),
+                                        metadata);
+    ASSERT(!commitFuture.isReady());
+
+    // The shard's binary predates the metadata field, so it rejects the command.
+    onCommand([](const executor::RemoteCommandRequest& request) {
+        ASSERT_TRUE(request.cmdObj.hasField("endOfTransactionScopes"));
+        // The commit timestamp, which is the floor for the transaction's commit entries, is
+        // carried by the command rather than the metadata.
+        ASSERT_EQUALS(Timestamp(100, 5), request.cmdObj.getField("commitTimestamp").timestamp());
+        return StatusWith<BSONObj>(
+            BSON("ok" << 0.0 << "code" << static_cast<int>(ErrorCodes::IDLUnknownField) << "errmsg"
+                      << "BSON field 'commitTransaction.endOfTransactionScopes'"
+                         " is an unknown field"));
+    });
+    advanceClockAndExecuteScheduledTasks();
+
+    // The coordinator retries the commit without the metadata.
+    onCommand([](const executor::RemoteCommandRequest& request) {
+        ASSERT_FALSE(request.cmdObj.hasField("endOfTransactionScopes"));
+        return kOk;
+    });
+    commitFuture.get();
+
+    // The shard is remembered as ineligible so later commits skip the probe.
+    ASSERT_FALSE(shardCache.isShardDefinitelyEligible(ShardId("s1")));
+
+    // The rejection is logged (at Info the first time).
+    ASSERT_GT(logs.countBSONContainingSubset(BSON("id" << 13790402)), 0);
+}
+
+TEST_F(TransactionCoordinatorDriverTest, SendCommitSkipsMetadataForIneligibleShard) {
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+
+    EndOfTransactionScopesInfoBase metadata;
+    metadata.setClusterParticipants({ShardId("s1")});
+
+    // Simulate a previous commit having discovered that the shard rejects the metadata.
+    EndOfTransactionMetadataShardCache::get(getServiceContext()).markShardIneligible(ShardId("s1"));
+
+    auto commitFuture = txn::sendCommit(getServiceContext(),
+                                        aws,
+                                        _lsid,
+                                        _txnNumberAndRetryCounter,
+                                        APIParameters(),
+                                        kOneShardIdList,
+                                        Timestamp(100, 5),
+                                        metadata);
+
+    // The metadata is skipped without paying for another probe round trip.
+    onCommand([](const executor::RemoteCommandRequest& request) {
+        ASSERT_FALSE(request.cmdObj.hasField("endOfTransactionScopes"));
+        // The commit timestamp (the floor) is still carried even when the metadata is skipped.
+        ASSERT_EQUALS(Timestamp(100, 5), request.cmdObj.getField("commitTimestamp").timestamp());
+        return kOk;
+    });
+    commitFuture.get();
+}
+
+TEST_F(TransactionCoordinatorDriverTest, MetadataRejectionLogIsSuppressedWithinThePeriod) {
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    // Reset the shared suppressor so this test does not depend on whether an earlier test case
+    // already triggered the message.
+    txn::resetEndOfTransactionMetadataRejectedLogSeveritySuppressor_forTest(nullptr);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+
+    auto commitToShardThatRejectsMetadata = [&](const ShardId& shardId) {
+        EndOfTransactionScopesInfoBase metadata;
+        metadata.setCollectionParticipants(BSON("db.coll" << BSON_ARRAY(shardId.toString())));
+        metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY(shardId.toString())));
+        metadata.setClusterParticipants({shardId});
+
+        auto commitFuture = txn::sendCommit(getServiceContext(),
+                                            aws,
+                                            _lsid,
+                                            _txnNumberAndRetryCounter,
+                                            APIParameters(),
+                                            {shardId},
+                                            Timestamp(100, 5),
+                                            metadata);
+        onCommand([](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQUALS(Timestamp(100, 5),
+                          request.cmdObj.getField("commitTimestamp").timestamp());
+            return StatusWith<BSONObj>(BSON("ok" << 0.0 << "code"
+                                                 << static_cast<int>(ErrorCodes::IDLUnknownField)
+                                                 << "errmsg" << "unknown field"));
+        });
+        advanceClockAndExecuteScheduledTasks();
+        onCommand([](const executor::RemoteCommandRequest& request) { return kOk; });
+        commitFuture.get();
+    };
+
+    // The first rejection is logged at Info.
+    {
+        unittest::LogCaptureGuard logs;
+        commitToShardThatRejectsMetadata(ShardId("s1"));
+        ASSERT_EQUALS(1,
+                      logs.countBSONContainingSubset(BSON("id" << 13790402 << "s"
+                                                               << "I")));
+    }
+
+    // A second rejection within the suppression period is downgraded below Info. The period is much
+    // longer than this test takes, so the outcome does not depend on wall-clock timing.
+    {
+        unittest::LogCaptureGuard logs;
+        commitToShardThatRejectsMetadata(ShardId("s2"));
+        ASSERT_EQUALS(0,
+                      logs.countBSONContainingSubset(BSON("id" << 13790402 << "s"
+                                                               << "I")));
+    }
 }
 
 TEST_F(TransactionCoordinatorDriverTest, SendPrepareToShardsCollectsAffectedNamespaces) {
@@ -2250,6 +2397,53 @@ TEST_F(TransactionCoordinatorTest,
     executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
     coordinator->onCompletion().get();
     coordinator->shutdown();
+}
+
+TEST_F(TransactionCoordinatorTest, RunCommitSkipsMetadataForIneligibleShards) {
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    // Simulate that an earlier commit discovered that 's2' does not understand the metadata.
+    EndOfTransactionMetadataShardCache::get(getServiceContext()).markShardIneligible(ShardId("s2"));
+
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(),
+        _lsid,
+        _txnNumberAndRetryCounter,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    coordinator->start(operationContext());
+    coordinator->runCommit(operationContext(), kThreeShardIdList);
+
+    // The prepare responses carry affected namespaces, so the coordinator computes the metadata.
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithSuccess();
+
+    // Only the eligible shards' commit commands may carry the metadata. The ineligible shard's
+    // command carries no 'endOfTransactionScopes' and therefore no 'shardId', so it cannot be
+    // recorded here.
+    std::set<ShardId> shardsWithMetadata;
+    auto assertScopes = [&shardsWithMetadata](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQUALS(CommitTransaction::kCommandName, request.cmdObj.firstElementFieldName());
+        if (request.cmdObj.hasField("endOfTransactionScopes")) {
+            shardsWithMetadata.insert(
+                ShardId(std::string(request.cmdObj.getObjectField("endOfTransactionScopes")
+                                        .getStringField("shardId"))));
+        }
+        return kOk;
+    };
+    onCommands({assertScopes, assertScopes, assertScopes});
+
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+    coordinator->onCompletion().get();
+    coordinator->shutdown();
+
+    ASSERT_EQUALS(2U, shardsWithMetadata.size());
+    ASSERT(shardsWithMetadata.count(ShardId("s1")));
+    ASSERT(shardsWithMetadata.count(ShardId("s3")));
+    ASSERT_FALSE(shardsWithMetadata.count(ShardId("s2")));
 }
 
 TEST_F(TransactionCoordinatorTest,

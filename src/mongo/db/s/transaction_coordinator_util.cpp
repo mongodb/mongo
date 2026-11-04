@@ -29,6 +29,7 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/end_of_transaction_metadata_shard_cache.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -85,6 +86,9 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeSendingAbort);
 MONGO_FAIL_POINT_DEFINE(hangBeforeWritingEndOfTransaction);
 MONGO_FAIL_POINT_DEFINE(hangBeforeDeletingCoordinatorDoc);
 MONGO_FAIL_POINT_DEFINE(hangAfterDeletingCoordinatorDoc);
+
+logv2::SeveritySuppressor endOfTransactionMetadataRejectedLogSeveritySuppressor{
+    Seconds(60), logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(1)};
 
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
 using CoordinatorAction = TransactionCoordinatorWorkerCurOpRepository::CoordinatorAction;
@@ -650,6 +654,7 @@ Future<void> sendCommit(ServiceContext* service,
     // participants always match the persisted decision.
     const bool haveEndOfTransactionScopes =
         !endOfTransactionScopes.getClusterParticipants().empty();
+    auto& metadataShardCache = EndOfTransactionMetadataShardCache::get(service);
 
     // The metadata is attached only to write participants. Read-only participants (which prepare
     // and commit an empty transaction) have no transaction changes to order, so their commit
@@ -679,8 +684,13 @@ Future<void> sendCommit(ServiceContext* service,
         BSONObj commandObj = commitObj;
         boost::optional<BSONObj> commandObjWithoutEndOfTransactionScopes;
 
-        // Attach the metadata only to write participants.
-        if (haveEndOfTransactionScopes && writeParticipantSet.contains(participant)) {
+        // Attach the metadata only to write participants. Skip shards that are known to reject it,
+        // so the extra probe round trip is only paid once per shard (per cache TTL) instead of once
+        // per commit.
+        // TODO SERVER-138031: Remove reliance on shard eligibity cache once 10.0 is the latest
+        // reachable version.
+        if (haveEndOfTransactionScopes && writeParticipantSet.contains(participant) &&
+            metadataShardCache.isShardDefinitelyEligible(participant)) {
             EndOfTransactionScopesInfo scopes;
             scopes.setBase(endOfTransactionScopes);
             scopes.setShardId(participant);
@@ -688,6 +698,8 @@ Future<void> sendCommit(ServiceContext* service,
             BSONObjBuilder builder;
             builder.appendElements(commitObj);
             {
+                // Serialize directly into the sub-object to avoid materializing an intermediate
+                // BSONObj for 'endOfTransactionScopes'.
                 BSONObjBuilder scopesBuilder(
                     builder.subobjStart(CommitTransaction::kEndOfTransactionScopesFieldName));
                 scopes.serialize(&scopesBuilder);
@@ -1098,6 +1110,28 @@ Future<void> sendDecisionToShard(ServiceContext* service,
                                 "command"_attr = *currentCommand,
                                 "shardId"_attr = shardId);
 
+                    // The shard does not understand the end-of-transaction metadata field. Strip
+                    // it, remember that this shard cannot accept it, and retry without it.
+                    // TODO SERVER-138031: Remove this if condition if 10.0 is the latest reachable
+                    // version.
+                    if (status.code() == ErrorCodes::IDLUnknownField &&
+                        commandWithoutMetadata->has_value()) {
+                        // Expected during a rolling upgrade, so logged at Info and rate-limited so
+                        // that a burst of ineligible shards does not flood the log.
+                        LOGV2_DEBUG(13790402,
+                                    endOfTransactionMetadataRejectedLogSeveritySuppressor().toInt(),
+                                    "Shard rejected the end-of-transaction metadata; retrying "
+                                    "the commit without it and marking the shard ineligible",
+                                    "sessionId"_attr = lsid,
+                                    "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
+                                    "shardId"_attr = shardId);
+                        *currentCommand = **commandWithoutMetadata;
+                        *commandWithoutMetadata = boost::none;
+                        EndOfTransactionMetadataShardCache::get(service).markShardIneligible(
+                            shardId);
+                        return status;
+                    }
+
                     if (ErrorCodes::isTwoPhaseDecisionAckError(status.code())) {
                         // Interpret these errors as a successful ack.
                         LOGV2_DEBUG(
@@ -1155,6 +1189,10 @@ std::string txnIdToString(const LogicalSessionId& lsid,
         ss << ':' << *retryCounter;
     }
     return ss;
+}
+
+void resetEndOfTransactionMetadataRejectedLogSeveritySuppressor_forTest(ClockSource* cs) {
+    endOfTransactionMetadataRejectedLogSeveritySuppressor.resetWithClockSource_forTest(cs);
 }
 
 }  // namespace txn
