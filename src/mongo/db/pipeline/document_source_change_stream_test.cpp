@@ -28,7 +28,6 @@
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
-#include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_inject_control_events.h"
@@ -825,7 +824,6 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersSupportedEvents) {
                                       DocumentSourceChangeStream::kMigrateLastChunkFromShardOpType,
                                       DocumentSourceChangeStream::kRefineCollectionShardKeyOpType,
                                       DocumentSourceChangeStream::kReshardCollectionOpType,
-                                      DocumentSourceChangeStream::kNewShardDetectedOpType,
                                       DocumentSourceChangeStream::kReshardBeginOpType,
                                       DocumentSourceChangeStream::kReshardBlockingWritesOpType,
                                       DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
@@ -2472,11 +2470,6 @@ TEST_F(ChangeStreamStageTest, TransformShardingEvents) {
             {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
             {DSChangeStream::kOperationDescriptionField, opDesc},
         };
-
-        if (eventType == DSChangeStream::kNewShardDetectedOpType) {
-            // Need to set this because the event is only emitted on the router.
-            getExpCtx()->setNeedsMerge(true);
-        }
 
         // Using 'show...Events' here in order to see all relevant events.
         checkTransformation(
@@ -7642,19 +7635,6 @@ TEST_F(ChangeStreamStageTestNoSetup,
                 }
             }
         })",
-        docSource->serialize().getDocument().toBson());
-
-    auto opts = query_shape::SerializationOptions{
-        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    ASSERT(docSource->serialize(opts).missing());
-}
-
-TEST_F(ChangeStreamStageTestNoSetup,
-       DocumentSourceChangeStreamCheckTopologyChangeEmptyForQueryStats) {
-    auto docSource = DocumentSourceChangeStreamCheckTopologyChange::create(getExpCtx());
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$_internalChangeStreamCheckTopologyChange":{}})",
         docSource->serialize().getDocument().toBson());
 
     auto opts = query_shape::SerializationOptions{

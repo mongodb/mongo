@@ -159,19 +159,29 @@ describe("$changeStream", function () {
         }
 
         it("Test that a projection which fakes a 'migrateChunkToNewShard' event is swallowed but has no effect", function () {
-            assertChangeStreamBehaviour(
+            const testProjection = {operationType: "migrateChunkToNewShard"};
+            const expectedEvents = [
                 {operationType: "migrateChunkToNewShard"},
-                {
-                    v1: [],
-                    v2: [
-                        {operationType: "migrateChunkToNewShard"},
-                        {operationType: "migrateChunkToNewShard"},
-                        {operationType: "migrateChunkToNewShard"},
-                        {operationType: "migrateChunkToNewShard"},
-                        {operationType: "migrateChunkToNewShard"},
-                    ],
-                },
-            );
+                {operationType: "migrateChunkToNewShard"},
+                {operationType: "migrateChunkToNewShard"},
+                {operationType: "migrateChunkToNewShard"},
+                {operationType: "migrateChunkToNewShard"},
+            ];
+            // The v1 ChangeStreamHandleTopologyChange stage on mongos filtered out faked
+            // 'migrateChunkToNewShard' events up to and including 9.0, and lets them through
+            // starting with 9.1. The behavior is therefore tied to the mongos binary version, so
+            // derive the expected v1 events from the actual mongos version rather than from the
+            // suite's multiversion settings (which would incorrectly treat a pinned 9.1+ mongos as
+            // filtering the events). When mongos does filter them, the v1 and v2 expectations
+            // differ, which causes 'assertChangeStreamBehaviour' to skip this case in multiversion
+            // clusters.
+            const mongosVersion = assert.commandWorked(
+                st.s.getDB("admin").runCommand({buildInfo: 1}),
+            ).version;
+            const mongosFiltersMigrateEvents =
+                MongoRunner.compareBinVersions(mongosVersion, "9.1") < 0;
+            const expectedV1Events = mongosFiltersMigrateEvents ? [] : expectedEvents;
+            assertChangeStreamBehaviour(testProjection, {v1: expectedV1Events, v2: expectedEvents});
         });
 
         it("Test that a projection which fakes an event on config.shards with a non-string operationType is allowed to pass through", function () {

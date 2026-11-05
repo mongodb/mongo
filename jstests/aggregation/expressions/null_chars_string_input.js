@@ -387,11 +387,18 @@ for (const nullStr of nullByteStrs) {
     }
 }
 
+// The stages in this array are ignored by the check. Insert outdated or fully obsolete stages
+// here that may still be present in an older release but not in latest.
+const obsoleteStages = ["$_internalChangeStreamCheckTopologyChange"];
+
+const obsoleteStageFilter = (obj) => !obsoleteStages.includes(obj.name);
+
 // Use $listMqlEntities to confirm that all aggregation stages have been tested for null byte input.
 const aggStages = db
     .getSiblingDB("admin")
     .aggregate([{$listMqlEntities: {entityType: "aggregationStages"}}])
     .toArray()
+    .filter(obsoleteStageFilter)
     .map((obj) => obj.name);
 
 // The following pipeline stages do not need to be tested for null byte input. Unless noted
@@ -407,9 +414,6 @@ const skips = new Set([
     "$_internalChangeStreamAddPreImage",
     "$_internalChangeStreamCheckInvalidate",
     "$_internalChangeStreamCheckResumability",
-    // TODO SERVER-112325: Remove this stage once all mongos versions are guaranteed to not
-    // generate this stage in a change stream pipeline anymore.
-    "$_internalChangeStreamCheckTopologyChange",
     "$_internalChangeStreamHandleTopologyChange",
     "$_internalChangeStreamInjectControlEvents",
     "$_internalChangeStreamOplogMatch",

@@ -8,7 +8,6 @@
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
-#include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_inject_control_events.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
@@ -119,7 +118,6 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceChangeStreamAddPreImage,
                        DocumentSourceChangeStreamCheckInvalidate,
                        DocumentSourceChangeStreamCheckResumability,
-                       DocumentSourceChangeStreamCheckTopologyChange,
                        DocumentSourceChangeStreamHandleTopologyChange,
                        DocumentSourceChangeStreamInjectControlEvents,
                        DocumentSourceChangeStreamTransform,

@@ -450,8 +450,7 @@ describe("sharded change stream operationResponseMaxMS via query settings", () =
 
     describe("dynamic shard addition - new cursor receives operationResponseMaxMS", () => {
         // This exercises createUpdatedCommandForNewShard(), which is called by
-        // ChangeStreamHandleTopologyChangeStage when a newShardDetected (migrateChunkToNewShard)
-        // event causes the change stream to open a cursor on a shard that was not targeted at
+        // ChangeStreamHandleTopologyChangeStage when a newShardDetected event causes the change stream to open a cursor on a shard that was not targeted at
         // stream-open time.
         const collName = "dynamic_shard_coll";
         const ns = dbName + "." + collName;
@@ -496,8 +495,7 @@ describe("sharded change stream operationResponseMaxMS via query settings", () =
                 });
 
                 // Split [MinKey, MaxKey) at _id: 5 and move the upper half to shard1. This generates
-                // a newShardDetected (migrateChunkToNewShard) event that the change stream processes on
-                // the next getMore, causing it to call createUpdatedCommandForNewShard() and open a
+                // a placement change event that the change stream processes on the next getMore, causing it to call createUpdatedCommandForNewShard() and open a
                 // cursor on shard1 with the operationResponseMaxMS knob forwarded.
                 assert.commandWorked(mongos.adminCommand({split: ns, middle: {_id: 5}}));
                 assert.commandWorked(

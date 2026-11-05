@@ -105,6 +105,5 @@ static const std::set<std::string_view> kClassicOperationTypes =
                                DocumentSourceChangeStream::kInvalidateOpType,
                                DocumentSourceChangeStream::kReshardBeginOpType,
                                DocumentSourceChangeStream::kReshardBlockingWritesOpType,
-                               DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
-                               DocumentSourceChangeStream::kNewShardDetectedOpType};
+                               DocumentSourceChangeStream::kReshardDoneCatchUpOpType};
 }  // namespace mongo::change_stream

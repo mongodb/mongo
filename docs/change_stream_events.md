@@ -239,7 +239,7 @@ Fields:
 - Triggered by: An internal noop oplog entry written when a chunk is migrated to a new shard, to
   signal mongos to open change stream cursors on that shard. Contains o2.migrateChunkToNewShard.
 - Topologies: Sharded cluster, mongos-level streams only. This is an internal control event not
-  meaningful to end users and may be removed in a future version (see TODO SERVER-112325).
+  meaningful to end users and is not handled anymore since SERVER-112325 (9.1).
 
 Fields:
 

@@ -96,7 +96,6 @@ const kInternalClientTypeStages = new Set([
     "$_internalChangeStreamAddPreImage",
     "$_internalChangeStreamCheckInvalidate",
     "$_internalChangeStreamCheckResumability",
-    "$_internalChangeStreamCheckTopologyChange",
     "$_internalChangeStreamHandleTopologyChange",
     "$_internalChangeStreamInjectControlEvents",
     "$_internalChangeStreamOplogMatch",

@@ -228,9 +228,6 @@ public:
     static constexpr std::string_view kReshardBlockingWritesOpType{"reshardBlockingWrites"};
     static constexpr std::string_view kReshardDoneCatchUpOpType{"reshardDoneCatchUp"};
 
-    // Internal op type to signal mongos to open cursors on new shards.
-    static constexpr std::string_view kNewShardDetectedOpType{"migrateChunkToNewShard"};
-
     // Internal control event signalling a change in the placement of a namespace. These events are
     // not exposed to users, and a stream may not be resumed from one of their resume tokens.
     static constexpr std::string_view kNamespacePlacementChangedOpType{"namespacePlacementChanged"};

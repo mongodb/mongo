@@ -9274,27 +9274,6 @@ export const authCommandsLib = {
                 },
             ],
         },
-        // TODO SERVER-112325: Remove this stage once all mongos versions are guaranteed to not
-        // generate this stage in a change stream pipeline anymore.
-        {
-            testname: "aggregate_$_internalChangeStreamCheckTopologyChange",
-            command: {
-                aggregate: 1,
-                pipeline: [{$_internalChangeStreamCheckTopologyChange: {}}],
-                cursor: {},
-            },
-            testcases: [
-                {
-                    runOnDb: firstDbName,
-                    roles: {__system: 1},
-                    privileges: [
-                        {resource: {db: firstDbName, collection: ""}, actions: ["find"]},
-                        {resource: {cluster: true}, actions: ["internal"]},
-                    ],
-                    expectFail: true,
-                },
-            ],
-        },
         {
             testname: "aggregate_$_internalChangeStreamHandleTopologyChange",
             command: {

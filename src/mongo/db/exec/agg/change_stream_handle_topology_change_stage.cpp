@@ -41,24 +41,12 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamHandleTopologyChange,
 namespace {
 // Returns true if the change stream document is an event in 'config.shards'.
 bool isShardConfigEvent(const Document& eventDoc) {
-    // TODO SERVER-44039: we continue to generate 'kNewShardDetected' events for compatibility
-    // with 4.2, even though we no longer rely on them to detect new shards. We swallow the event
-    // here. We may wish to remove this mechanism entirely in 4.7+, or retain it for future cases
-    // where a change stream is targeted to a subset of shards. See SERVER-44039 for details.
-
     auto opType = eventDoc[DocumentSourceChangeStream::kOperationTypeField];
 
     // If opType isn't a string, then this document has been manipulated. This means it cannot have
-    // been produced by the internal shard-monitoring cursor that we opened on the config servers,
-    // or by the kNewShardDetectedOpType mechanism, which bypasses filtering and projection stages.
+    // been produced by the internal shard-monitoring cursor that we opened on the config servers.
     if (opType.getType() != BSONType::string) {
         return false;
-    }
-
-    // TODO SERVER-112325: Remove this check once no MongoDB version generates
-    // 'migrateChunkToNewShard' events.
-    if (opType.getStringData() == DocumentSourceChangeStream::kNewShardDetectedOpType) {
-        return true;
     }
 
     using namespace std::literals::string_view_literals;
@@ -123,7 +111,7 @@ GetNextResult ChangeStreamHandleTopologyChangeStage::doGetNext() {
         if (opType.getStringData() == DocumentSourceChangeStream::kInsertOpType) {
             addNewShardCursors(childResult.getDocument());
         }
-        // For shard removal or update, we do nothing. We also swallow kNewShardDetectedOpType.
+        // For shard removal or update, we do nothing.
         childResult = pSource->getNext();
     }
     return childResult;

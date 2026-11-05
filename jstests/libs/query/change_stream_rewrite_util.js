@@ -227,7 +227,6 @@ export function assertNumChangeStreamDocsReturnedFromShard(
     stats,
     shardName,
     expectedTotalReturned,
-    expectedMigrateChunkToNewShardEvents,
 ) {
     // TODO SERVER-119944: the following checks rely on the shards property to be set in the explain plan,
     // but for change streams v2 that field is unset, which causes the asserts to fail. Skip the check when
@@ -242,18 +241,9 @@ export function assertNumChangeStreamDocsReturnedFromShard(
 
     const buildErrorMsg = () =>
         `Expected ${expectedTotalReturned} events on shard ${shardName} but got ` +
-        `${lastStage.nReturned}. Stages:\n${tojson(stages)}\n` +
-        `ExpectedMigrateChunkToNewShardEvents ${tojson(expectedMigrateChunkToNewShardEvents)}`;
+        `${lastStage.nReturned}. Stages:\n${tojson(stages)}`;
 
-    // In multiversion tests, it is possible that change streams on older mongods still emit the
-    // 'migrateChunkToNewShard' events, which is filtered out in newer versions. This is a known
-    // results difference, which we need to account for here.
-    // TODO SERVER-112325: Remove the special handling.
-    assert(
-        lastStage.nReturned == expectedTotalReturned ||
-            lastStage.nReturned == expectedTotalReturned - expectedMigrateChunkToNewShardEvents,
-        buildErrorMsg,
-    );
+    assert.eq(lastStage.nReturned, expectedTotalReturned, buildErrorMsg);
 }
 
 export function getExecutionStatsForShard(stats, shardName) {
@@ -270,12 +260,7 @@ export function getUnwindStageForShard(stats, shardName) {
 }
 
 // Verifies the number of oplog events read by a particular shard.
-export function assertNumMatchingOplogEventsForShard(
-    stats,
-    shardName,
-    expectedTotalReturned,
-    expectedMigrateChunkToNewShardEvents,
-) {
+export function assertNumMatchingOplogEventsForShard(stats, shardName, expectedTotalReturned) {
     // TODO SERVER-119944: the following checks rely on the shards property to be set in the explain plan,
     // but for change streams v2 that field is unset, which causes the asserts to fail. Skip the check when
     // running change streams v2.
@@ -291,18 +276,9 @@ export function assertNumMatchingOplogEventsForShard(
     const buildErrorMsg = () =>
         `Expected ${expectedTotalReturned} events on shard ${shardName} but got ` +
         `${unwindStage.nReturned}. Execution stats:\n${tojson(executionStats)}\n` +
-        `Unwind stage:\n${tojson(unwindStage)}\nExpectedMigrateChunkToNewShardEvents ` +
-        `${tojson(expectedMigrateChunkToNewShardEvents)}`;
+        `Unwind stage:\n${tojson(unwindStage)}`;
 
-    // In multiversion tests, it is possible that change streams on older mongods still emit the
-    // 'migrateChunkToNewShard' events, which is filtered out in newer versions. This is a known
-    // results difference, which we need to account for here.
-    // TODO SERVER-112325: Remove the special handling.
-    assert(
-        unwindStage.nReturned == expectedTotalReturned ||
-            unwindStage.nReturned == expectedTotalReturned - expectedMigrateChunkToNewShardEvents,
-        buildErrorMsg,
-    );
+    assert.eq(unwindStage.nReturned, expectedTotalReturned, buildErrorMsg);
 }
 
 // Returns a newly created sharded collection sharded by caller provided shard key.
@@ -347,7 +323,6 @@ export function verifyChangeStreamOnWholeCluster({
     expectedResult,
     expectedOplogNReturnedPerShard,
     expectedChangeStreamDocsReturnedPerShard,
-    expectedMigrateChunkToNewShardEventsForEachShard = [0, 0],
 }) {
     changeStreamSpec["allChangesForCluster"] = true;
     const adminDB = st.s.getDB("admin");
@@ -423,13 +398,11 @@ export function verifyChangeStreamOnWholeCluster({
         stats,
         st.shard0.shardName,
         expectedOplogNReturnedPerShard[0],
-        expectedMigrateChunkToNewShardEventsForEachShard[0],
     );
     assertNumMatchingOplogEventsForShard(
         stats,
         st.shard1.shardName,
         expectedOplogNReturnedPerShard[1],
-        expectedMigrateChunkToNewShardEventsForEachShard[1],
     );
 
     if (expectedChangeStreamDocsReturnedPerShard !== undefined) {
@@ -437,13 +410,11 @@ export function verifyChangeStreamOnWholeCluster({
             stats,
             st.shard0.shardName,
             expectedChangeStreamDocsReturnedPerShard[0],
-            expectedMigrateChunkToNewShardEventsForEachShard[0],
         );
         assertNumChangeStreamDocsReturnedFromShard(
             stats,
             st.shard1.shardName,
             expectedChangeStreamDocsReturnedPerShard[1],
-            expectedMigrateChunkToNewShardEventsForEachShard[1],
         );
     }
 }

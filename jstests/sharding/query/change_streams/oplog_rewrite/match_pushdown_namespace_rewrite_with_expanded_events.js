@@ -51,7 +51,6 @@ function verifyOnWholeCluster(
     userMatchExpr,
     expectedResult,
     expectedOplogRetDocsForEachShard,
-    expectedMigrateChunkToNewShardEventsForEachShard = [0, 0],
 ) {
     verifyChangeStreamOnWholeCluster({
         st,
@@ -59,7 +58,6 @@ function verifyOnWholeCluster(
         userMatchExpr,
         expectedResult,
         expectedOplogNReturnedPerShard: expectedOplogRetDocsForEachShard,
-        expectedMigrateChunkToNewShardEventsForEachShard,
     });
 }
 
@@ -869,9 +867,10 @@ const secondResumeToken = db
     .watch([], {allChangesForCluster: true})
     .getResumeToken();
 
-// The shardCollection command may produce an additional no-op oplog entries like
-// 'migrateChunkToNewShard' which is always read by the change stream. So each of the 'shardColl'
-// would add two no-op oplog entries, in addition to the 'create' operation.
+// The shardCollection command may produce an additional no-op oplog entry like
+// 'migrateChunkToNewShard' which is always filtered out by the change stream. So each of the
+// 'shardColl' calls below adds a 'shardCollection' no-op oplog entry, in addition to the 'create'
+// operation.
 st.shardColl(
     collName,
     {_id: 1} /* shard key */,
@@ -917,46 +916,41 @@ assert.commandWorked(db.createView("view2", coll2Name, [{$project: {a: 1}}]));
 assert.commandWorked(db.runCommand({drop: "view2"}));
 
 // Ensure that the '$match' on the namespace with only db component should not emit any document. We
-// should always see the 8 documents (4 from views + 2 for each shardCollection + 2 for each
-// migrateChunkToNewShard) on shard0, and 2 documents on shard1. The 'create' operations that do
-// undergo pushdown optimization and should only be returned when the match filter matches.
+// should always see the 6 documents (4 from views + 2 from shardCollection) on shard0, and 1
+// document on shard1. The 'create' operations that do undergo pushdown optimization and should only
+// be returned when the match filter matches.
 verifyOnWholeCluster(
     secondResumeToken,
     {$match: {ns: {db: dbName}}},
     {},
-    [8, 2] /* expectedOplogRetDocsForEachShard */,
-    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
+    [6, 1] /* expectedOplogRetDocsForEachShard */,
 );
 verifyOnWholeCluster(
     secondResumeToken,
     {$match: {$expr: {$eq: ["$ns", {db: dbName}]}}},
     {},
-    [8, 2] /* expectedOplogRetDocsForEachShard */,
-    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
+    [6, 1] /* expectedOplogRetDocsForEachShard */,
 );
 
 verifyOnWholeCluster(
     secondResumeToken,
     {$match: {ns: {db: dbName, coll: collName}}},
     {[collName]: {create: [collName], shardCollection: [collName]}},
-    [9, 2] /* expectedOplogRetDocsForEachShard */,
-    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
+    [7, 1] /* expectedOplogRetDocsForEachShard */,
 );
 
 verifyOnWholeCluster(
     secondResumeToken,
     {$match: {$expr: {$eq: ["$ns", {db: dbName, coll: collName}]}}},
     {[collName]: {create: [collName], shardCollection: [collName]}},
-    [9, 2] /* expectedOplogRetDocsForEachShard */,
-    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
+    [7, 1] /* expectedOplogRetDocsForEachShard */,
 );
 
 verifyOnWholeCluster(
     secondResumeToken,
     {$match: {$expr: {$eq: ["$ns", {db: dbName, coll: coll2Name}]}}},
     {[coll2Name]: {create: [coll2Name], shardCollection: [coll2Name]}},
-    [9, 2] /* expectedOplogRetDocsForEachShard */,
-    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
+    [7, 1] /* expectedOplogRetDocsForEachShard */,
 );
 
 verifyOnWholeCluster(
@@ -968,8 +962,7 @@ verifyOnWholeCluster(
         "view1": {create: ["view1"], modify: ["view1"]},
         "view2": {create: ["view2"], drop: ["view2"]},
     },
-    [9, 3] /* expectedOplogRetDocsForEachShard */,
-    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
+    [7, 2] /* expectedOplogRetDocsForEachShard */,
 );
 
 // Create a new change stream and resume token for replaying the stream after this point.
@@ -1011,10 +1004,10 @@ assert.commandWorked(
 assert.commandWorked(collWithUnderscore.runCommand({dropIndexes: "foo_bar", index: {x: 1}}));
 
 // Ensure that a regex match properly respects escaped characters (here, testing that the escaped
-// "." character is treated as a literal dot). Note that we expect 5 extra oplog entries on shard0:
+// "." character is treated as a literal dot). Note that we expect 3 extra oplog entries on shard0:
 //  - 1 from the "create" event (which only appears on shard0)
-//  - 4 no-op entries from sharding the two collections that are not affected by the filter pushdown
-//    (2 "shardCollection" + 2 "migrateChunkToNewShard")
+//  - 2 no-op entries from sharding the two collections that are not affected by the filter pushdown
+//    (2 "shardCollection")
 verifyOnWholeCluster(
     thirdResumeAfterToken,
     {$match: {"ns.coll": {$nin: [/^foo\./]}}},
@@ -1028,8 +1021,7 @@ verifyOnWholeCluster(
             dropIndexes: ["foo_bar", "foo_bar"],
         },
     },
-    [9, 4] /* expectedOplogRetDocsForEachShard */,
-    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
+    [7, 4] /* expectedOplogRetDocsForEachShard */,
 );
 
 st.stop();
