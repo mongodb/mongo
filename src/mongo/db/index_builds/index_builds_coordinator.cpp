@@ -4166,6 +4166,11 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
                     RecoveryUnit::ReadSource::kNoTimestamp);
         invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
 
+        ScopeGuard resetReadSourceOnExit([opCtx] {
+            shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kNoTimestamp);
+        });
+
         // Primary-driven index builds need to replicate container writes.
         auto operationType =
             index_builds::primary_driven::enabled(
