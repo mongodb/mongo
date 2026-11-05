@@ -14,6 +14,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {reconfig} from "jstests/replsets/rslib.js";
+import {makeTempReshardingCollName} from "jstests/sharding/libs/reshard_collection_util.js";
 
 function runMoveCollection(host, ns, toShard) {
     const mongos = new Mongo(host);
@@ -49,8 +50,11 @@ assert.commandWorked(
 assert.commandWorked(testColl0.insert([{x: -1}, {x: 0}, {x: 1}]));
 assert.commandWorked(testColl0.createIndex({x: 1}));
 const collUuid0 = getUUIDFromListCollections(st.s.getDB(dbName0), collName0);
-const temporaryReshardingNs0 = `${dbName0}.system.resharding.${extractUUIDFromObject(collUuid0)}`;
-const temporaryReshardingTestColl0 = st.s.getCollection(temporaryReshardingNs0);
+const temporaryReshardingTestColl0 = st.s
+    .getDB(dbName0)
+    .getCollection(
+        makeTempReshardingCollName(st.s, dbName0, collName0, extractUUIDFromObject(collUuid0)),
+    );
 
 // Set up the collection to write to in order to introduce replication lag on
 // the recipient shard.
@@ -115,7 +119,11 @@ jsTest.log(
         "the replication lag on one of the secondaries is above the configured threshold",
 );
 sleep(100);
-// Verify that the index has not been created yet.
+// Verify the collection exists and that the index has not been created yet.
+assert(
+    temporaryReshardingTestColl0.exists(),
+    "Temporary resharding collection does not exist: " + temporaryReshardingTestColl0.getFullName(),
+);
 assert(!indexExists(temporaryReshardingTestColl0, {x: 1}));
 
 st.rs1.remove(2);

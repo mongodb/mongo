@@ -52,10 +52,12 @@ ReshardingOwnershipMatchStage::ReshardingOwnershipMatchStage(
 GetNextResult ReshardingOwnershipMatchStage::doGetNext() {
     if (!_tempReshardingChunkMgr) {
         auto* catalogCache = Grid::get(pExpCtx->getOperationContext())->catalogCache();
+        // The namespace is absent ONLY when the relaxed mode is disabled, i.e. at FCV < 8.1,
+        // which predates the new source name format. TODO SERVER-138025: Remove this fallback.
         auto tempNss = _temporaryReshardingNamespace
             ? _temporaryReshardingNamespace.value()
-            : resharding::constructTemporaryReshardingNss(pExpCtx->getNamespaceString(),
-                                                          *pExpCtx->getUUID());
+            : resharding::constructLegacyTemporaryReshardingNss(pExpCtx->getNamespaceString(),
+                                                                *pExpCtx->getUUID());
         _tempReshardingChunkMgr =
             uassertStatusOK(catalogCache->getCollectionPlacementInfoWithRefresh(
                 pExpCtx->getOperationContext(), tempNss));

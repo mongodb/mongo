@@ -177,6 +177,68 @@ TEST(SimpleReshardingUtilTest,
     ASSERT_EQ(Timestamp(10, 3), highestMinFetchTimestamp);
 }
 
+// Temporary resharding namespace construction tests.
+
+TEST(SimpleReshardingUtilTest, ConstructLegacyTemporaryReshardingNssExcludesSourceName) {
+    const auto sourceNss = NamespaceString::createNamespaceString_forTest("test.orders");
+    const auto sourceUuid = UUID::gen();
+
+    const auto tempNss = resharding::constructLegacyTemporaryReshardingNss(sourceNss, sourceUuid);
+
+    ASSERT_EQ(tempNss,
+              NamespaceString::createNamespaceString_forTest(
+                  "test", "system.resharding." + sourceUuid.toString()));
+    ASSERT_EQ(tempNss.coll().find("orders"), std::string::npos);
+}
+
+TEST(SimpleReshardingUtilTest, ConstructTemporaryReshardingNssIncludesSourceName) {
+    const auto sourceNss = NamespaceString::createNamespaceString_forTest("test.foo");
+    const auto sourceUuid = UUID::gen();
+
+    const auto tempNss = resharding::constructTemporaryReshardingNss(sourceNss, sourceUuid);
+
+    ASSERT_EQ(tempNss,
+              NamespaceString::createNamespaceString_forTest(
+                  "test", "system.resharding.foo." + sourceUuid.toString()));
+    ASSERT_TRUE(tempNss.isTemporaryReshardingCollection());
+}
+
+TEST(SimpleReshardingUtilTest, ConstructTemporaryReshardingNssTruncatesLongSourceName) {
+    const auto sourceNss = NamespaceString::createNamespaceString_forTest(
+        "test", "orders_2024_q1" + std::string(200, 'x'));
+    const auto sourceUuid = UUID::gen();
+
+    const auto tempNss = resharding::constructTemporaryReshardingNss(sourceNss, sourceUuid);
+
+    // The name keeps its leading characters, and the truncated namespace fills the remaining limit
+    // exactly.
+    ASSERT_EQ(tempNss.size(), NamespaceString::MaxUserNsShardedCollectionLen);
+    ASSERT_TRUE(tempNss.coll().starts_with("system.resharding.orders_2024_q1"));
+    ASSERT_TRUE(tempNss.coll().ends_with("." + sourceUuid.toString()));
+}
+
+TEST(SimpleReshardingUtilTest, ConstructTemporaryReshardingNssTruncatesMultibyteSourceName) {
+    // "é" is two bytes in UTF-8, and the 175 byte name budget is not a multiple of that, so the
+    // name has to be cut on a character boundary rather than at the budget.
+    const auto repeated = [](const char* str, int count) {
+        std::string result;
+        for (int i = 0; i < count; ++i) {
+            result += str;
+        }
+        return result;
+    };
+
+    const auto sourceNss =
+        NamespaceString::createNamespaceString_forTest("test", repeated("\xc3\xa9", 100));
+    const auto sourceUuid = UUID::gen();
+
+    const auto tempNss = resharding::constructTemporaryReshardingNss(sourceNss, sourceUuid);
+
+    ASSERT_EQ(tempNss.coll(),
+              "system.resharding." + repeated("\xc3\xa9", 87) + "." + sourceUuid.toString());
+    ASSERT_LE(tempNss.size(), NamespaceString::MaxUserNsShardedCollectionLen);
+}
+
 // Validate resharded chunks tests.
 
 TEST_F(ReshardingUtilTest, SuccessfulValidateReshardedChunkCase) {
@@ -1061,6 +1123,50 @@ TEST_F(ReshardingUtilTest, CalculateExponentialMovingAverageBasic) {
     auto val3 = 0;
     auto avg3 = calculateExponentialMovingAverage(avg2, val3, smoothFactor);
     ASSERT_EQ(avg3, (1 - smoothFactor) * avg2 + smoothFactor * val3);
+}
+
+TEST_F(ReshardingUtilTest, CoordinatorDocTempNssIncludesSourceNameWhenFlagEnabledAtPinnedVersion) {
+    // (Generic FCV reference): used for testing.
+    VersionContext::ScopedSetDecoration scopedVersionContext(
+        operationContext(), VersionContext{multiversion::GenericFCV::kLatest});
+
+    const CollectionType collEntry(nss(),
+                                   OID::gen(),
+                                   Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
+                                   Date_t::now(),
+                                   UUID::gen(),
+                                   keyPattern());
+    ConfigsvrReshardCollection request(nss(), BSON(shardKey() << 1));
+    request.setDbName(nss().dbName());
+
+    auto doc = createReshardingCoordinatorDoc(
+        operationContext(), request, collEntry, primaryShardId(), nss(), true);
+
+    ASSERT_EQ(doc.getTempReshardingNss(),
+              constructTemporaryReshardingNss(nss(), collEntry.getUuid()));
+}
+
+TEST_F(ReshardingUtilTest, CoordinatorDocTempNssExcludesSourceNameWhenFlagDisabledAtPinnedVersion) {
+    // featureFlagReshardingTempNssContainsSourceName is enabled from FCV 9.1, so an operation
+    // pinned to 9.0 uses the legacy name.
+    VersionContext::ScopedSetDecoration scopedVersionContext(
+        operationContext(),
+        VersionContext{multiversion::FeatureCompatibilityVersion::kVersion_9_0});
+
+    const CollectionType collEntry(nss(),
+                                   OID::gen(),
+                                   Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
+                                   Date_t::now(),
+                                   UUID::gen(),
+                                   keyPattern());
+    ConfigsvrReshardCollection request(nss(), BSON(shardKey() << 1));
+    request.setDbName(nss().dbName());
+
+    auto doc = createReshardingCoordinatorDoc(
+        operationContext(), request, collEntry, primaryShardId(), nss(), true);
+
+    ASSERT_EQ(doc.getTempReshardingNss(),
+              constructLegacyTemporaryReshardingNss(nss(), collEntry.getUuid()));
 }
 
 class ReshardingTxnCloningPipelineTest : public AggregationContextFixture {

@@ -1,11 +1,50 @@
 /**
- * Util class for testing reshardCollection cmd.
+ * Util class for testing reshardCollection cmd, and helpers shared by resharding tests.
  */
 
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
+
+// Same as NamespaceString::MaxUserNsShardedCollectionLen.
+const kMaxShardedCollectionNsLength = 235;
+
+// Returns the number of bytes needed to encode 'str' as UTF-8.
+function utf8Length(str) {
+    return encodeURIComponent(str).replace(/%[0-9A-F]{2}/g, "x").length;
+}
+
+// Returns the longest prefix of 'str' that fits in 'maxBytes' bytes of UTF-8, like the server's
+// UTF8SafeTruncation().
+function truncateIfNeeded(str, maxBytes) {
+    let result = "";
+    for (const char of str) {
+        if (utf8Length(result + char) > maxBytes) {
+            break;
+        }
+        result += char;
+    }
+    return result;
+}
+
+/**
+ * Returns the name of the temporary resharding collection, without the database. The name includes
+ * the source collection name when featureFlagReshardingTempNssContainsSourceName is enabled.
+ *
+ * The server truncates the source collection name when the namespace would exceed
+ * kMaxShardedCollectionNsLength bytes, and this does too.
+ */
+export function makeTempReshardingCollName(conn, dbName, collName, uuid) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(conn, "ReshardingTempNssContainsSourceName")) {
+        return `system.resharding.${uuid}`;
+    }
+
+    // The db, the prefix, the uuid and the dots between the db, the source name and the uuid.
+    const fixedLength = utf8Length(dbName) + "system.resharding.".length + uuid.length + 2;
+    const sourceName = truncateIfNeeded(collName, kMaxShardedCollectionNsLength - fixedLength);
+    return `system.resharding.${sourceName}.${uuid}`;
+}
 
 /**
  * Returns whether resharding document verification is actually usable on this cluster.
@@ -70,7 +109,7 @@ export class ReshardCollectionCmdTest {
 
     _constructTemporaryReshardingCollName(dbName, collName) {
         const existingUUID = this._getUUIDFromCollectionInfo(dbName, collName);
-        return "system.resharding." + existingUUID;
+        return makeTempReshardingCollName(this._mongos, dbName, collName, existingUUID);
     }
 
     _getAllShardIdsFromExpectedChunks(expectedChunks) {

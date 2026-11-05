@@ -182,6 +182,30 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
 
 NamespaceString constructTemporaryReshardingNss(const NamespaceString& nss,
                                                 const UUID& sourceUuid) {
+    const auto tempCollPrefix = NamespaceString::kTemporaryReshardingCollectionPrefix;
+    const auto sourceUuidString = sourceUuid.toString();
+
+    // The db, the prefix, the UUID and two dots: between the db and the collection name, and
+    // between the source name and the UUID. The prefix already ends with its own dot.
+    const size_t fixedLen =
+        nss.db_forSharding().size() + tempCollPrefix.size() + sourceUuidString.size() + 2;
+
+    std::string collName;
+    if (fixedLen >= NamespaceString::MaxUserNsShardedCollectionLen) {
+        collName = fmt::format("{}{}", tempCollPrefix, sourceUuidString);
+    } else {
+        // The source name is truncated to whatever the sharded collection limit allows.
+        const auto sourceName = str::UTF8SafeTruncation(
+            nss.coll(), NamespaceString::MaxUserNsShardedCollectionLen - fixedLen);
+        collName = fmt::format("{}{}.{}", tempCollPrefix, sourceName, sourceUuidString);
+    }
+
+    return NamespaceStringUtil::deserialize(
+        boost::none, nss.db_forSharding(), collName, SerializationContext::stateDefault());
+}
+
+NamespaceString constructLegacyTemporaryReshardingNss(const NamespaceString& nss,
+                                                      const UUID& sourceUuid) {
     auto tempCollPrefix = nss.isTimeseriesBucketsCollection()
         ? NamespaceString::kTemporaryTimeseriesReshardingCollectionPrefix
         : NamespaceString::kTemporaryReshardingCollectionPrefix;
@@ -704,7 +728,22 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
         }
     }
 
-    auto tempReshardingNss = resharding::constructTemporaryReshardingNss(nss, collEntry.getUuid());
+    // Snapshot the FCV at operation start so that feature flags are evaluated consistently for the
+    // entire operation lifetime, even across FCV transitions. If the opCtx already carries an OFCV,
+    // capture that; otherwise fall back to the global snapshot.
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+
+    ForwardableOperationMetadata fom(opCtx);
+    if (!fom.getVersionContext() &&
+        feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(kVersionContextIgnored_UNSAFE,
+                                                               fcv)) {
+        fom.setVersionContext(VersionContext{fcv});
+    }
+
+    auto tempReshardingNss = resharding::isEnabledWithPinnedVersion(
+                                 fom, resharding::gFeatureFlagReshardingTempNssContainsSourceName)
+        ? resharding::constructTemporaryReshardingNss(nss, collEntry.getUuid())
+        : resharding::constructLegacyTemporaryReshardingNss(nss, collEntry.getUuid());
 
     auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
                                                    nss,
@@ -720,11 +759,6 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
         commonMetadata.setProvenance(*request.getProvenance());
     }
 
-    // Snapshot the FCV at operation start so that feature flags are evaluated consistently for the
-    // entire operation lifetime, even across FCV transitions. If the opCtx already carries an OFCV,
-    // capture that; otherwise fall back to the global snapshot.
-    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-
     // (Generic FCV reference): upgrading/downgrading FCV is represented as multi field object,
     // trying to store this will cause an invariant later, so don't try to store it here.
     // Don't throw here as well as it won't allow new reshardCollection command requests from
@@ -733,16 +767,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     if (!fcv.isUpgradingOrDowngrading()) {
         commonMetadata.setStartingFCV(fcv.getVersion());
     }
-
-    {
-        ForwardableOperationMetadata fom(opCtx);
-        if (!fom.getVersionContext() &&
-            feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(kVersionContextIgnored_UNSAFE,
-                                                                   fcv)) {
-            fom.setVersionContext(VersionContext{fcv});
-        }
-        commonMetadata.setForwardableOpMetadata(std::move(fom));
-    }
+    commonMetadata.setForwardableOpMetadata(std::move(fom));
 
     coordinatorDoc.setSourceKey(collEntry.getKeyPattern().toBSON());
     coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));

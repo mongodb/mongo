@@ -285,13 +285,26 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
                                        boost::optional<Status> abortReason = boost::none);
 
 /**
- * Assembles the namespace string for the temporary resharding collection based on the source
- * namespace components.
+ * Assembles the namespace string for the temporary resharding collection, including the
+ * source collection name so the namespace is identifiable:
+ *      <db>.system.resharding.<source name>.<source collection's UUID>
  *
- *      <db>.system.resharding.<existing collection's UUID>
- * or   <db>.system.buckets.resharding.<existing collection's UUID> for a timeseries source ns.
+ * This must only be called when creating the coordinator document, and only when
+ * gFeatureFlagReshardingTempNssContainsSourceName is enabled for the operation's pinned version.
+ * All other callers must use the value persisted in that document instead of computing the name.
+ *
+ * The source collection's UUID is the identity of the namespace. The source collection name in it
+ * can be truncated, so do not use the namespace to identify the source collection.
  */
 [[MONGO_MOD_NEEDS_REPLACEMENT]] NamespaceString constructTemporaryReshardingNss(
+    const NamespaceString& nss, const UUID& sourceUuid);
+
+/**
+ * The resharding temporary namespace without the source collection name:
+ *      <db>.system.resharding.<source collection's UUID>
+ * or   <db>.system.buckets.resharding.<source collection's UUID> for a timeseries collection.
+ */
+[[MONGO_MOD_NEEDS_REPLACEMENT]] NamespaceString constructLegacyTemporaryReshardingNss(
     const NamespaceString& nss, const UUID& sourceUuid);
 
 /**

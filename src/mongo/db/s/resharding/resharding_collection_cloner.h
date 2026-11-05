@@ -114,6 +114,7 @@ private:
     const UUID _sourceUUID;
     const ShardId _recipientShard;
     const Timestamp _atClusterTime;
+    // The namespace for the temporary resharding collection.
     const NamespaceString _outputNss;
     const bool _storeProgress;
     const bool _relaxed;

@@ -19,6 +19,7 @@ import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js"
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {makeTempReshardingCollName} from "jstests/sharding/libs/reshard_collection_util.js";
 
 describe("Authoritative collection metadata vs DDLs", function () {
     const kShardCatalogCollNs = "shard.catalog.collections";
@@ -284,10 +285,13 @@ describe("Authoritative collection metadata vs DDLs", function () {
         });
     }
     // The temporary resharding collection lives in the same database as the source collection and
-    // is named `system.resharding.<source collection UUID>`.
+    // is named `system.resharding.<source collection name>.<source collection UUID>`, or just
+    // `system.resharding.<source collection UUID>` when the source name is not included.
     function tempReshardingNss(ns, sourceUuid) {
         const dbName = ns.substring(0, ns.indexOf("."));
-        return `${dbName}.system.resharding.${extractUUIDFromObject(sourceUuid)}`;
+        const collName = ns.substring(ns.indexOf(".") + 1);
+        const uuid = extractUUIDFromObject(sourceUuid);
+        return `${dbName}.${makeTempReshardingCollName(st.s, dbName, collName, uuid)}`;
     }
 
     // Shared assertions for the family of resharding-backed DDLs (reshardCollection, moveCollection,

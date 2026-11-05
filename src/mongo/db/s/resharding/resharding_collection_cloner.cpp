@@ -128,7 +128,7 @@ ReshardingCollectionCloner::makeRawNaturalOrderPipeline(
     resolvedNamespaces[_sourceNss] = {_sourceNss, std::vector<BSONObj>{}};
 
     // Assume that the config.cache.chunks collection isn't a view either.
-    auto tempNss = resharding::constructTemporaryReshardingNss(_sourceNss, _sourceUUID);
+    const auto& tempNss = _outputNss;
     auto tempCacheChunksNss = NamespaceString::makeGlobalConfigCollection(
         "cache.chunks." +
         NamespaceStringUtil::serialize(tempNss, SerializationContext::stateDefault()));

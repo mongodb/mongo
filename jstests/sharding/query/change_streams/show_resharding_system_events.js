@@ -14,6 +14,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {assertChangeStreamEventEq} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {makeTempReshardingCollName} from "jstests/sharding/libs/reshard_collection_util.js";
 
 // Create a single-shard cluster for this test.
 const st = new ShardingTest({
@@ -67,7 +68,13 @@ const newUUID = getCollectionUuid(testColl);
 assert.commandWorked(testColl.insert({_id: 2, a: 2}));
 
 // Now confirm the sequence of events that we expect to see in the change stream.
-const reshardingCollName = `system.resharding.${oldUUID.toString().match(/\"([^\"]+)\"/)[1]}`;
+const oldUUIDString = oldUUID.toString().match(/\"([^\"]+)\"/)[1];
+const reshardingCollName = makeTempReshardingCollName(
+    st.s,
+    testDB.getName(),
+    testColl.getName(),
+    oldUUIDString,
+);
 const reshardingNs = {
     db: testDB.getName(),
     coll: reshardingCollName,

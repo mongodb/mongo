@@ -150,3 +150,10 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingPrePostConditionsValidations
         default: false
         fcv_gated: true
+    featureFlagReshardingTempNssContainsSourceName:
+        mod_visibility: public
+        description: "Feature flag to include the source collection name in the temporary resharding namespace."
+        cpp_varname: gFeatureFlagReshardingTempNssContainsSourceName
+        default: true
+        version: 9.1
+        fcv_gated: true
