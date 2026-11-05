@@ -124,6 +124,12 @@ function startCluster() {
     // primary, so the coordinator's commit reaches an old binary. The mongos runs last-LTS so its
     // wire version is compatible with the last-LTS primary.
     //
+    // A shard-only node running the last-LTS binary starts at the previous release's FCV by default
+    // (8.0), and 'ReplSetTest.initiate' raises the set to last-LTS (9.0) before the latest node is
+    // added. The latest node's initial sync can then observe the transient 8.0 -> 9.0 FCV and reject
+    // it, which never completes the initial sync. Start the shard's nodes directly at the last-LTS
+    // FCV so the set never enters the transient state.
+    //
     // The last-LTS binary cannot be configured to report the namespaces it wrote: it knows neither
     // the new feature flag nor the new server parameter, and the legacy feature flag that would make
     // it report them is going to be removed and is not enabled on production 9.0 nodes. The
@@ -143,6 +149,7 @@ function startCluster() {
                         setParameter: enableEndOfTransactionParams,
                     },
                 ],
+                setParameter: {defaultStartupFCV: lastLTSFCV},
             },
         },
         mongos: 1,
