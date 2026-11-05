@@ -6,6 +6,9 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/validate/key_string_index_consistency.h"
 #include "mongo/db/validate/validate_adaptor_factory.h"
@@ -175,6 +178,67 @@ TEST_P(ValidateAdaptorTest, InvalidUTF8InCollatedPartialIndexFieldDoesNotThrow) 
         validateRecord(toBuffer(withInvalidUTF8("a")), ValidateMode::kForegroundCheckBSON);
     EXPECT_OK(result.record.status);
     EXPECT_FALSE(result.record.compliantDocument);
+}
+
+TEST_P(ValidateAdaptorTest, GatherIndexEntryErrorsMeterTotalExcludesSkippedIndexes) {
+    createCollection({},
+                     {BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1)),
+                      BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1))});
+
+    auto opCtx = operationContext();
+    constexpr int kNumDocs = 5;
+    for (int i = 1; i <= kNumDocs; ++i) {
+        ASSERT_OK(storageInterface()->insertDocument(
+            opCtx,
+            kNss,
+            {BSON("_id" << i << "a" << i << "b" << i), Timestamp()},
+            repl::OpTime::kUninitializedTerm));
+    }
+
+    const boost::optional<int64_t> targetRecordsPerSlice =
+        GetParam() == AdaptorKind::kParallel ? boost::optional<int64_t>(10) : boost::none;
+    ValidateState validateState(opCtx,
+                                kNss,
+                                ValidationOptions(ValidateMode::kForeground,
+                                                  RepairMode::kNone,
+                                                  /*logDiagnostics=*/false,
+                                                  currentValidationVersion,
+                                                  /*verifyConfigurationOverride=*/boost::none,
+                                                  /*readTimestamp=*/boost::none,
+                                                  /*hashPrefixes=*/boost::none,
+                                                  /*revealHashedIds=*/boost::none,
+                                                  targetRecordsPerSlice));
+    ASSERT_OK(validateState.initializeCollection(opCtx));
+    validateState.initializeCursors(opCtx);
+
+    ValidateResults results;
+    const auto& coll = validateState.getCollection();
+    for (const auto& indexIdent : validateState.getIndexIdents()) {
+        results.getIndexValidateResult(coll->getIndexCatalog()
+                                           ->findIndexByIdent(opCtx, indexIdent)
+                                           ->descriptor()
+                                           ->indexName());
+    }
+
+    auto adaptor = ValidateAdaptorFactory::create(opCtx, validateState);
+    adaptor->traverseRecordStore(opCtx, results, validateState.validationVersion());
+    adaptor->validateIndexes(opCtx, results);
+
+    // A structural error in the first phase makes the second phase skip the index.
+    results.getIndexValidateResult("a_1").addError("skipped in the second phase");
+
+    adaptor->gatherIndexEntryErrors(opCtx, results);
+    adaptor->getProgress().finished();
+
+    // The _id and b_1 indexes are traversed and a_1 is not, each holding one key per document.
+    ProgressMeter* meter = nullptr;
+    {
+        std::unique_lock<Client> lk(*opCtx->getClient());
+        meter = adaptor->getProgress().get(lk);
+        ASSERT_TRUE(meter);
+        EXPECT_EQ(meter->total(), 2 * kNumDocs);
+        EXPECT_EQ(meter->done(), 2 * kNumDocs);
+    }
 }
 
 INSTANTIATE_TEST_SUITE_P(,

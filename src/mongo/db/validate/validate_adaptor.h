@@ -198,6 +198,25 @@ public:
      **/
     void hashDrillDown(OperationContext* opCtx, ValidateResults& results);
 
+
+    /**
+     * Validates each index in the Index Catalog using the cursors in 'indexCursors'.
+     *
+     * If 'level' is kValidateFull, then we will compare new index entry counts with a previously
+     * taken count saved in 'numIndexKeysPerIndex'.
+     */
+    void validateIndexes(OperationContext* opCtx, ValidateResults& results);
+
+    ConcurrentProgressMeterHolder& getProgress() {
+        return _progress;
+    }
+
+    /**
+     * Executes the second phase of validation for improved error reporting. This is only done if
+     * any index inconsistencies are found during the first phase of validation.
+     */
+    void gatherIndexEntryErrors(OperationContext* opCtx, ValidateResults& results);
+
     /**
      * Traverses the index getting index entries to validate them and keep track of the index keys
      * for index consistency. Returns number of traversed keys.
@@ -292,10 +311,6 @@ protected:
 
     KeyStringIndexConsistency& getKeyBasedIndexConsistency() {
         return _keyBasedIndexConsistency;
-    }
-
-    ConcurrentProgressMeterHolder& getProgress() {
-        return _progress;
     }
 
 private:

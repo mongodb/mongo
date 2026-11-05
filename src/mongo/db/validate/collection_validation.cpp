@@ -128,122 +128,6 @@ void _validateIndexesInternalStructure(OperationContext* opCtx,
     }
 }
 
-/**
- * Validates each index in the Index Catalog using the cursors in 'indexCursors'.
- *
- * If 'level' is kValidateFull, then we will compare new index entry counts with a previously taken
- * count saved in 'numIndexKeysPerIndex'.
- */
-void _validateIndexes(OperationContext* opCtx,
-                      ValidateState& validateState,
-                      ValidateAdaptor& indexValidator,
-                      ValidateResults& results) {
-    // Validate Indexes, checking for mismatch between index entries and collection records.
-    for (const auto& indexIdent : validateState.getIndexIdents()) {
-        opCtx->checkForInterrupt();
-
-        const auto* indexEntry =
-            validateState.getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
-        invariant(indexEntry, "getIndexIdents returned an ident that was not found");
-
-        // Make a copy of the index name. The `traverseIndex()` function below will yield
-        // periodically, so it's unsafe to hold a pointer to the index here.
-        const std::string indexName = indexEntry->descriptor()->indexName();
-        const IndexType indexType = indexEntry->descriptor()->getIndexType();
-
-        LOGV2_PROD_ONLY_OPTIONS(20296,
-                                {LogComponent::kIndex},
-                                "Validating index consistency",
-                                "indexName"_attr = indexName,
-                                "indexType"_attr = indexType,
-                                logAttrs(validateState.nss()));
-
-        const int64_t numTraversedKeys = indexValidator.traverseIndex(opCtx, *indexEntry, results);
-
-        auto& curIndexResults = results.getIndexValidateResult(indexName);
-        curIndexResults.addKeysTraversed(numTraversedKeys);
-
-        const BSONObj infoObj = indexEntry->descriptor()->infoObj();
-        curIndexResults.setSpec(std::move(infoObj));
-
-        const bool isMultiKey = indexEntry->isMultikey(opCtx, validateState.getCollection());
-        curIndexResults.setIsMultikey(isMultiKey);
-    }
-}
-
-/**
- * Executes the second phase of validation for improved error reporting. This is only done if
- * any index inconsistencies are found during the first phase of validation.
- */
-void _gatherIndexEntryErrors(OperationContext* opCtx,
-                             ValidateState& validateState,
-                             ValidateAdaptor& indexValidator,
-                             ValidateResults& results) {
-    indexValidator.setSecondPhase();
-    // Second-phase results record missing and extra index entries, which have ordering
-    // dependencies that prevent merging slices, so this traversal is always serial.
-    if (!indexValidator.limitMemoryUsageForSecondPhase(results)) {
-        return;
-    }
-
-    LOGV2_OPTIONS(
-        20297, {LogComponent::kIndex}, "Starting to traverse through all the document key sets");
-
-    // During the second phase of validation, iterate through each documents key set and only record
-    // the keys that were inconsistent during the first phase of validation.
-    {
-        ValidateResults tempValidateResults;
-        // Second phase doesn't report errors, but needs to know which indexes are structurally
-        // sound enough to validate
-        tempValidateResults.getIndexResultsMap() = results.getIndexResultsMap();
-        indexValidator.traverseRecordStoreSerial(
-            opCtx, tempValidateResults, validateState.validationVersion());
-    }
-
-    LOGV2_OPTIONS(
-        20298, {LogComponent::kIndex}, "Finished traversing through all the document key sets");
-    LOGV2_OPTIONS(20299, {LogComponent::kIndex}, "Starting to traverse through all the indexes");
-
-    // Iterate through all the indexes in the collection and only record the index entry keys that
-    // had inconsistencies during the first phase.
-    for (const auto& indexIdent : validateState.getIndexIdents()) {
-        opCtx->checkForInterrupt();
-
-        const auto indexEntry =
-            validateState.getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
-        invariant(indexEntry, "getIndexIdents returned an ident that was not found");
-
-        const auto& indexValidateResult =
-            results.getIndexValidateResult(indexEntry->descriptor()->indexName());
-        if (!indexValidateResult.continueValidation()) {
-            LOGV2(7697700,
-                  "Skipping validation of index due to existing errors",
-                  "indexName"_attr = indexEntry->descriptor()->indexName());
-            continue;
-        }
-
-        LOGV2_OPTIONS(20300,
-                      {LogComponent::kIndex},
-                      "Traversing through the index entries",
-                      "index"_attr = indexEntry->descriptor()->indexName());
-
-        indexValidator.traverseIndex(opCtx, *indexEntry, results);
-    }
-
-    if (results.getNumRemovedExtraIndexEntries() > 0) {
-        results.addWarning(str::stream() << "Removed " << results.getNumRemovedExtraIndexEntries()
-                                         << " extra index entries.");
-    }
-
-    if (validateState.fixErrors()) {
-        indexValidator.repairIndexEntries(opCtx, results);
-    }
-
-    LOGV2_OPTIONS(20301, {LogComponent::kIndex}, "Finished traversing through all the indexes");
-
-    indexValidator.addIndexEntryErrors(opCtx, results);
-}
-
 void _validateIndexKeyCount(OperationContext* opCtx,
                             ValidateState& validateState,
                             ValidateAdaptor& indexValidator,
@@ -1376,7 +1260,7 @@ Status validate(OperationContext* opCtx,
         // Validate indexes and check for mismatches.
         {
             Timer timer;
-            _validateIndexes(opCtx, validateState, indexValidator, results);
+            indexValidator.validateIndexes(opCtx, results);
             metrics.indexTraversalDuration = timer.elapsed();
         }
         metrics.phase1Duration = phase1Timer.elapsed();
@@ -1388,7 +1272,7 @@ Status validate(OperationContext* opCtx,
                           "Starting the second phase of index validation to gather concise errors",
                           logAttrs(validateState.nss()));
             Timer phase2Timer;
-            _gatherIndexEntryErrors(opCtx, validateState, indexValidator, results);
+            indexValidator.gatherIndexEntryErrors(opCtx, results);
             metrics.phase2Duration = phase2Timer.elapsed();
         }
 
