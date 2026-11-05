@@ -12,6 +12,7 @@ class CompileCheckTest(unittest.TestCase):
     def setUp(self) -> None:
         mongo_config_header.CompilerSettings.compiler_path = "compiler"
         mongo_config_header.CompilerSettings.compiler_type = "gcc"
+        mongo_config_header.CompilerSettings.target_os = "linux"
         mongo_config_header.CompilerSettings.compiler_args = ""
         mongo_config_header.CompilerSettings.env_vars = {}
 
@@ -70,8 +71,121 @@ class CompileCheckTest(unittest.TestCase):
                     with self.assertRaisesRegex(OSError, "compiler not found"):
                         mongo_config_header.compile_check("int main() { return 0; }")
 
+    def test_linux_invokes_windows_wrapper_through_posix_shell(self) -> None:
+        mongo_config_header.CompilerSettings.target_os = "windows"
+        mongo_config_header.CompilerSettings.compiler_type = "clang-cl"
+        mongo_config_header.CompilerSettings.compiler_args = "/nologo"
+        source_text = "int main() { return 0; }"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            wrapper = pathlib.Path(temp_dir) / "clang-cl.cmd"
+            wrapper.write_text(":; exit 0\n", encoding="utf-8")
+            mongo_config_header.CompilerSettings.compiler_path = str(wrapper)
+            mongo_config_header.logfile_path = str(pathlib.Path(temp_dir) / "checks.log")
+
+            def run(command: list[str], **kwargs) -> mock.Mock:
+                self.assertEqual(command[:4], ["/bin/sh", str(wrapper), "/c", "/TP"])
+                source_path = pathlib.Path(command[4])
+                self.assertEqual(source_path.read_text(), source_text)
+                self.assertEqual(
+                    command[5:], ["/nologo", "/Fo" + str(source_path.with_suffix(".obj"))]
+                )
+                self.assertNotIn("input", kwargs)
+                return mock.Mock(returncode=0)
+
+            with (
+                mock.patch.object(mongo_config_header.platform, "system", return_value="Linux"),
+                mock.patch.object(
+                    mongo_config_header.subprocess, "run", side_effect=run
+                ) as mock_run,
+            ):
+                self.assertTrue(mongo_config_header.compile_check(source_text))
+            mock_run.assert_called_once()
+
+    def test_missing_windows_wrapper_is_not_treated_as_missing_feature(self) -> None:
+        mongo_config_header.CompilerSettings.target_os = "windows"
+        for extension in (".cmd", ".bat"):
+            with self.subTest(extension=extension), tempfile.TemporaryDirectory() as temp_dir:
+                wrapper = pathlib.Path(temp_dir) / f"missing{extension}"
+                mongo_config_header.CompilerSettings.compiler_path = str(wrapper)
+                mongo_config_header.logfile_path = str(pathlib.Path(temp_dir) / "checks.log")
+                with (
+                    mock.patch.object(mongo_config_header.platform, "system", return_value="Linux"),
+                    mock.patch.object(
+                        mongo_config_header.subprocess,
+                        "run",
+                        return_value=mock.Mock(returncode=2, stdout="", stderr="wrapper not found"),
+                    ) as mock_run,
+                ):
+                    with self.assertRaises(FileNotFoundError) as error:
+                        mongo_config_header.compile_check("int main() { return 0; }")
+
+                    self.assertEqual(error.exception.filename, str(wrapper))
+                    mock_run.assert_not_called()
+
+    def test_compiler_command_preserves_native_invocation(self) -> None:
+        for system, target_os, compiler in (
+            ("Windows", "windows", "wrappers/clang-cl.cmd"),
+            ("Linux", "windows", "tools/clang-cl"),
+            ("Linux", "linux", "tools/clang"),
+            ("Darwin", "macOS", "tools/clang"),
+            ("Linux", "linux", "wrappers/compiler.cmd"),
+            ("Linux", "macOS", "wrappers/compiler.bat"),
+            ("Darwin", "macOS", "wrappers/compiler.cmd"),
+        ):
+            with self.subTest(system=system, target_os=target_os, compiler=compiler):
+                mongo_config_header.CompilerSettings.compiler_path = compiler
+                mongo_config_header.CompilerSettings.target_os = target_os
+                with mock.patch.object(mongo_config_header.platform, "system", return_value=system):
+                    self.assertEqual(mongo_config_header._compiler_command(), [compiler])
+
+    @unittest.skipIf(os.name == "nt", "Requires a POSIX shell")
+    def test_polyglot_compiler_wrapper_executes_on_posix(self) -> None:
+        mongo_config_header.CompilerSettings.target_os = "windows"
+        with tempfile.TemporaryDirectory(prefix="config header ") as temp_dir:
+            wrapper = pathlib.Path(temp_dir) / "compiler.CMD"
+            wrapper.write_text(":; exit 0\n@echo off\nexit /b 0\n", encoding="utf-8")
+            wrapper.chmod(0o755)
+            mongo_config_header.CompilerSettings.compiler_path = str(wrapper)
+            mongo_config_header.logfile_path = str(pathlib.Path(temp_dir) / "checks.log")
+            self.assertTrue(mongo_config_header.compile_check("int main() { return 0; }"))
+
 
 class TargetOperatingSystemCheckTest(unittest.TestCase):
+    def test_generator_scopes_shell_wrapper_to_windows_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            wrapper = pathlib.Path(temp_dir) / "clang-cl.cmd"
+            wrapper.write_text(":; exit 0\n", encoding="utf-8")
+            for target_os in ("windows", "linux", "macOS"):
+                with self.subTest(target_os=target_os):
+                    commands: list[list[str]] = []
+
+                    def compile_check(_source_text: str) -> bool:
+                        commands.append(mongo_config_header._compiler_command())
+                        return True
+
+                    with (
+                        mock.patch.object(
+                            mongo_config_header.platform, "system", return_value="Linux"
+                        ),
+                        mock.patch.object(
+                            mongo_config_header, "compile_check", side_effect=compile_check
+                        ),
+                    ):
+                        mongo_config_header.generate_config_header(
+                            str(wrapper),
+                            "",
+                            "{}",
+                            os.devnull,
+                            extra_definitions=json.dumps({"TARGET_OS": target_os}),
+                        )
+                    expected = (
+                        ["/bin/sh", str(wrapper)] if target_os == "windows" else [str(wrapper)]
+                    )
+                    self.assertTrue(commands)
+                    for command in commands:
+                        self.assertEqual(command, expected)
+
     def test_windows_target_skips_strnlen_on_linux_host(self) -> None:
         with (
             mock.patch.object(mongo_config_header.platform, "system", return_value="Linux"),

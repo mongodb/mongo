@@ -28,7 +28,7 @@ class WindowsCrossToolchainTest(unittest.TestCase):
         self.assertEqual(
             cross["flags"],
             [
-                "--//bazel/config:compiler_type=clang",
+                "--@//bazel/config:compiler_type=clang",
                 "--@rules_rust//rust/settings:toolchain_linker_preference=cc",
             ],
         )
@@ -95,6 +95,13 @@ class WindowsCrossToolchainTest(unittest.TestCase):
             namespace,
         )
         return namespace
+
+    def test_resource_tools_include_bundled_shared_libraries(self) -> None:
+        template = TOOLCHAIN_SOURCE.with_name("BUILD.tmpl").read_text()
+        rc_tools = template.split('name = "rc_tools",', 1)[1].split("filegroup(", 1)[0]
+        for pattern in ("runtime_libs/**", "llvm/lib/lib*.so*", "llvm/libexec/lib*.so*"):
+            with self.subTest(pattern=pattern):
+                self.assertIn(f'"{pattern}"', rc_tools)
 
     def _staged_tools(self, bin_files: set[str]) -> dict[str, str]:
         """Runs _symlink_toolchain_files against an LLVM tree holding only `bin_files`."""

@@ -21,6 +21,7 @@ def log_check(message):
 class CompilerSettings:
     compiler_path: str = ""
     compiler_type: str = ""
+    target_os: str = ""
     compiler_args: str = ""
     env_vars: dict = {}
 
@@ -29,6 +30,31 @@ class HeaderDefinition:
     def __init__(self, key: str, value: str = None) -> None:
         self.key = key
         self.value = value
+
+
+def _compiler_command() -> list[str]:
+    """Return the command prefix needed to invoke the configured compiler."""
+    compiler_path = CompilerSettings.compiler_path
+
+    # Only Windows targets need to run these polyglot .cmd wrappers. Bazel's POSIX
+    # launcher can fall back to a shell for these files, but Python's
+    # subprocess does not perform that fallback when it invokes a path
+    # directly. The config-header generator runs under Linux Python on RBE,
+    # so invoke the wrapper through the POSIX shell explicitly in that
+    # environment. Use an absolute path because the cross action's hermetic
+    # PATH contains only staged toolchain directories.
+    if (
+        CompilerSettings.target_os.lower() == "windows"
+        and platform.system() != "Windows"
+        and compiler_path.lower().endswith((".cmd", ".bat"))
+    ):
+        # Preserve launch errors for missing or unreadable wrappers instead of
+        # interpreting the shell's failure as an unsupported compiler feature.
+        with open(compiler_path, "rb"):
+            pass
+        return ["/bin/sh", compiler_path]
+
+    return [compiler_path]
 
 
 def compile_check(source_text: str) -> bool:
@@ -40,7 +66,7 @@ def compile_check(source_text: str) -> bool:
             with open(source_path, "w", encoding="utf-8") as source:
                 source.write(source_text)
             command = [
-                CompilerSettings.compiler_path,
+                *_compiler_command(),
                 "/c",
                 "/TP",
                 source_path,
@@ -50,7 +76,7 @@ def compile_check(source_text: str) -> bool:
             input_text = None
         else:
             command = [
-                CompilerSettings.compiler_path,
+                *_compiler_command(),
                 "-c",
                 "-x",
                 "c++",
@@ -413,6 +439,7 @@ def generate_config_header(
         "msvc-cl" if platform.system() == "Windows" else "gcc"
     )
     target_os = extra_definitions_dict.get("TARGET_OS") or platform.system()
+    CompilerSettings.target_os = target_os
 
     definitions: list[HeaderDefinition] = []
 

@@ -1,0 +1,20 @@
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
+
+package(default_visibility = ["//visibility:private"])
+
+exports_files(
+    ["mongo_config_header.py"],
+    visibility = ["//src/mongo:__pkg__"],
+)
+
+py_library(
+    name = "mongo_config_header_lib",
+    srcs = ["mongo_config_header.py"],
+    imports = ["."],
+)
+
+py_test(
+    name = "mongo_config_header_test",
+    srcs = ["mongo_config_header_test.py"],
+    deps = [":mongo_config_header_lib"],
+)

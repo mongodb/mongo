@@ -12,7 +12,7 @@
 // remains consistent on all systems.
 #define IDI_ICON2 102
 
-IDI_ICON2               ICON                    "mongo/db/mongo.ico"
+IDI_ICON2               ICON                    "mongo/shell/mongo.ico"
 /////////////////////////////////////////////////////////////////////////////
 
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US

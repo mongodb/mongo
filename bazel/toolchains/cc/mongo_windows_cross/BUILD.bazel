@@ -1,5 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("//bazel:mongo_src_rules.bzl", "windows_rc_rule")
+load(":windows_rc_action_test.bzl", "windows_rc_action_analysis_test", "windows_rc_native_action_analysis_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -80,4 +82,51 @@ py_test(
     srcs = ["windows_container_action_wrapper_test.py"],
     main = "windows_container_action_wrapper_test.py",
     deps = [":windows_container_action_wrapper_lib"],
+)
+
+windows_rc_rule(
+    name = "windows_rc_action_test_target",
+    src = "windows_rc_action_test.rc",
+    rc = ":windows_rc_test_rc",
+    rc_sysroot = [":windows_rc_test_sysroot"],
+    rc_tools = [":windows_rc_test_tools"],
+    resources = ["//src/mongo/db:mongo.ico"],
+    tags = ["manual"],
+)
+
+filegroup(
+    name = "windows_rc_test_tools",
+    srcs = [
+        "windows_rc_action_test_clang",
+        "windows_rc_test_runtime/llvm/lib/libwindows_rc_test.so.1",
+        "windows_rc_test_runtime/runtime_libs/libwindows_rc_test.so",
+    ],
+)
+
+filegroup(
+    name = "windows_rc_test_sysroot",
+    srcs = ["windows_rc_test_sysroot/sysroot/winsdk/include/um/winres.h"],
+)
+
+sh_binary(
+    name = "windows_rc_test_rc",
+    srcs = ["windows_rc_action_test_rc.sh"],
+)
+
+windows_rc_action_analysis_test(
+    name = "windows_rc_action_analysis_test",
+    target_under_test = ":windows_rc_action_test_target",
+)
+
+windows_rc_rule(
+    name = "windows_rc_native_action_test_target",
+    src = "windows_rc_action_test.rc",
+    rc = ":windows_rc_test_rc",
+    resources = ["//src/mongo/db:mongo.ico"],
+    tags = ["manual"],
+)
+
+windows_rc_native_action_analysis_test(
+    name = "windows_rc_native_action_analysis_test",
+    target_under_test = ":windows_rc_native_action_test_target",
 )

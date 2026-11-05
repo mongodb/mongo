@@ -112,7 +112,11 @@ filegroup(
         "case_insensitive_vfs.yaml",
         "tools/clang",
         "tools/clang-real",
-    ],
+    ] + glob([
+        "runtime_libs/**",
+        "llvm/lib/lib*.so*",
+        "llvm/libexec/lib*.so*",
+    ]),
 )
 
 filegroup(

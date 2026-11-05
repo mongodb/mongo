@@ -1,0 +1,8 @@
+#include <winres.h>
+1 VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+BEGIN
+END
+
+1 RCDATA "mongo/db/mongo.ico"
