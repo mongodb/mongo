@@ -7,6 +7,7 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/fail_point.h"
 
 #include <chrono>
 
@@ -691,6 +692,112 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepDown) {
     };
     executePerIntent(assertRegistrySize);
     kill.get();
+}
+
+TEST_F(IntentRegistryTest, BlockingWriteRegisteredConcurrentlyWithStateTransitionIsDrained) {
+    // A BlockingWrite registration that has passed its pending state change check but not yet
+    // inserted its token must either be seen by the transition's BlockingWrite drain or wait out
+    // the transition. It must never hold its intent after the transition is recorded.
+    auto serviceContext = getServiceContext();
+    _intentRegistry->enable();
+    uint32_t timeout_sec = 10;
+
+    auto blockingClient = serviceContext->getService()->makeClient("testClientBlockingWrite");
+    auto blockingOpCtx = blockingClient->makeOperationContext();
+    auto transitionClient = serviceContext->getService()->makeClient("testClientTransition");
+    auto transitionOpCtx = transitionClient->makeOperationContext();
+
+    boost::optional<IntentGuard> blockingGuard;
+    stdx::thread registerThread;
+    stdx::thread transitionThread;
+    {
+        FailPointEnableBlock fp("hangBeforeInsertingBlockingWriteIntentToken");
+        registerThread = stdx::thread([&] {
+            blockingGuard.emplace(IntentRegistry::Intent::BlockingWrite, blockingOpCtx.get());
+        });
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+
+        transitionThread = stdx::thread([&] {
+            auto kill = _intentRegistry->killConflictingOperations(
+                IntentRegistry::InterruptionType::StepDown,
+                transitionOpCtx.get(),
+                nullptr,
+                timeout_sec);
+            (void)kill.get();
+        });
+        // Give the transition time to run as far as it can while the registration is paused.
+        std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
+    }
+    registerThread.join();
+    ASSERT_TRUE(blockingGuard->intent() != boost::none);
+
+    // The transition's BlockingWrite drain must see the token and kill its operation.
+    auto deadline = std::chrono::steady_clock::now() + 5s;
+    while (blockingOpCtx->getKillStatus() == ErrorCodes::OK &&
+           std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(10ms);
+    }
+    auto killStatus = blockingOpCtx->getKillStatus();
+
+    blockingGuard.reset();
+    transitionThread.join();
+
+    ASSERT_EQUALS(killStatus, ErrorCodes::InterruptedDueToReplStateChange);
+}
+
+TEST_F(IntentRegistryTest, NestedBlockingWriteDoesNotWaitForPendingStateTransition) {
+    // An operation holding a BlockingWrite intent that registers another (e.g. a prepared
+    // transaction's abort guard) must not wait for a state transition whose drain is waiting on
+    // the first intent.
+    auto serviceContext = getServiceContext();
+    _intentRegistry->enable();
+    uint32_t timeout_sec = 10;
+
+    auto blockingClient = serviceContext->getService()->makeClient("testClientBlockingWrite");
+    auto blockingOpCtx = blockingClient->makeOperationContext();
+    auto transitionClient = serviceContext->getService()->makeClient("testClientTransition");
+    auto transitionOpCtx = transitionClient->makeOperationContext();
+
+    boost::optional<IntentGuard> outerGuard;
+    outerGuard.emplace(IntentRegistry::Intent::BlockingWrite, blockingOpCtx.get());
+
+    auto transitionThread = stdx::thread([&] {
+        auto kill =
+            _intentRegistry->killConflictingOperations(IntentRegistry::InterruptionType::StepDown,
+                                                       transitionOpCtx.get(),
+                                                       nullptr,
+                                                       timeout_sec);
+        (void)kill.get();
+    });
+
+    // The transition is draining BlockingWrite intents once it has killed our operation.
+    auto deadline = std::chrono::steady_clock::now() + 5s;
+    while (blockingOpCtx->getKillStatus() == ErrorCodes::OK &&
+           std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(10ms);
+    }
+    ASSERT_EQUALS(blockingOpCtx->getKillStatus(), ErrorCodes::InterruptedDueToReplStateChange);
+
+    // Another operation's BlockingWrite registration still waits for the transition.
+    {
+        auto otherClient = serviceContext->getService()->makeClient("testClientOtherBlockingWrite");
+        auto otherOpCtx = otherClient->makeOperationContext();
+        otherOpCtx->setDeadlineAfterNowBy(Milliseconds(200), ErrorCodes::ExceededTimeLimit);
+        ASSERT_THROWS_CODE(IntentGuard(IntentRegistry::Intent::BlockingWrite, otherOpCtx.get()),
+                           DBException,
+                           ErrorCodes::ExceededTimeLimit);
+    }
+
+    // The nested registration, made uninterruptibly as the abort guard does, proceeds
+    // immediately and the transition completes once both intents are released.
+    {
+        UninterruptibleLockGuard noInterrupt(blockingOpCtx.get());  // NOLINT
+        IntentGuard innerGuard(IntentRegistry::Intent::BlockingWrite, blockingOpCtx.get());
+        ASSERT_EQUALS(2, getMapSize(IntentRegistry::Intent::BlockingWrite));
+    }
+    outerGuard.reset();
+    transitionThread.join();
+    ASSERT_EQUALS(0, getMapSize(IntentRegistry::Intent::BlockingWrite));
 }
 
 TEST_F(IntentRegistryTest, IntegrityRegistryEnableDisable) {

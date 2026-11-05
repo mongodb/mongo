@@ -305,6 +305,9 @@ private:
                        std::chrono::milliseconds timeout,
                        InterruptionType interruption);
 
+    // Returns true if opCtx's current operation holds a BlockingWrite intent.
+    bool _holdsBlockingWriteIntent(const OperationContext* opCtx);
+
     // Called by WriteIntentCleanup when an opCtx with active write intents is destroyed.
     // Removes the mapping so deferred deregistration callbacks skip the decrement.
     void _unregisterWriteCountForOpId(uint64_t opId);
@@ -320,7 +323,8 @@ private:
     bool _interruptionOrderedByGlobalLock = false;
     OperationContext* _interruptionCtx = nullptr;
     std::vector<tokenMap> _tokenMaps;
-    Atomic<int> _pendingStateChange = 0;
+    // Number of state transitions that are pending or in progress. Guarded by _stateMutex.
+    int _pendingStateChange = 0;
     stdx::condition_variable _pendingStateChangeCV;
 
     // Maps opCtx opId -> write intent counter pointer. Removed when the opCtx is destroyed

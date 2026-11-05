@@ -10,7 +10,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 
+#include <algorithm>
 #include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
@@ -20,6 +22,8 @@ namespace mongo {
 
 namespace rss {
 namespace consensus {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeInsertingBlockingWriteIntentToken);
 
 // Decoration on Client. When a client is destroyed (e.g., connection closed) while its stashed
 // WUOW still holds write-intent tokens, removes those tokens before the Client's memory is freed.
@@ -163,13 +167,20 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
 
     auto& tokenMap = _tokenMaps[(size_t)intent];
     if (intent == Intent::BlockingWrite) {
+        // If an opCtx already holds a BlockingWrite intent, allow it to acquire a nested
+        // BlockingWrite intent without waiting for pending state transitions to complete. Those
+        // transitions are already waiting for the outer intent to be released, so making the nested
+        // acquisition wait would deadlock.
+        auto canProceed = [&] {
+            return _pendingStateChange == 0 || _holdsBlockingWriteIntent(opCtx);
+        };
         if (opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
             // Do not check for interrupt if we are in an uninterruptible lock guard.
-            _pendingStateChangeCV.wait(lock, [&] { return _pendingStateChange.load() == 0; });
+            _pendingStateChangeCV.wait(lock, canProceed);
         } else {
-            opCtx->waitForConditionOrInterrupt(
-                _pendingStateChangeCV, lock, [&] { return _pendingStateChange.load() == 0; });
+            opCtx->waitForConditionOrInterrupt(_pendingStateChangeCV, lock, canProceed);
         }
+        hangBeforeInsertingBlockingWriteIntentToken.pauseWhileSet();
     }
 
     IntentToken token(intent);
@@ -251,6 +262,14 @@ void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
     if (tokenMap.map.empty()) {
         tokenMap.cv.notify_all();
     }
+}
+
+bool IntentRegistry::_holdsBlockingWriteIntent(const OperationContext* opCtx) {
+    auto& tokenMap = _tokenMaps[(size_t)Intent::BlockingWrite];
+    std::lock_guard<std::mutex> lock(tokenMap.lock);
+    return std::any_of(tokenMap.map.begin(), tokenMap.map.end(), [&](const auto& entry) {
+        return entry.second.opId == opCtx->getOpID();
+    });
 }
 
 void IntentRegistry::_unregisterWriteCountForOpId(uint64_t opId) {
@@ -341,7 +360,10 @@ IntentRegistry::killConflictingOperations(IntentRegistry::InterruptionType inter
                                           boost::optional<uint32_t> timeout_sec,
                                           bool orderedByGlobalLock) {
     LOGV2(9945003, "Intent Registry killConflictingOperations", "interrupt"_attr = interrupt);
-    _pendingStateChange.fetchAndAdd(1);
+    {
+        std::unique_lock lock(_stateMutex);
+        ++_pendingStateChange;
+    }
     auto timeOutSec = std::chrono::seconds(
         timeout_sec ? *timeout_sec : repl::fassertOnLockTimeoutForStepUpDown.load());
 
@@ -436,7 +458,7 @@ IntentRegistry::killConflictingOperations(IntentRegistry::InterruptionType inter
                 _lastInterruption = InterruptionType::None;
                 _interruptionOrderedByGlobalLock = false;
                 _activeInterruptionCV.notify_one();
-                if (_pendingStateChange.subtractAndFetch(1) == 0) {
+                if (--_pendingStateChange == 0) {
                     _pendingStateChangeCV.notify_all();
                 }
             });
