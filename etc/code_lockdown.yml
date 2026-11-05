@@ -102,7 +102,8 @@ groups:
       cold: 25
     teams:
       - "Workload Resilience"
-      - "Replication"
+      - "Replication - Failover and Concerns"
+      - "Replication - Oplog and Recovery"
       - "Storage Engines"
       - "Storage Engines - Server Integration"
       - "Storage Engines - Foundations"
@@ -175,13 +176,20 @@ teams:
     slack_tags:
       - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
       - "<@UCAV3DERW>" # jason.chan@mongodb.com
-  - name: "Replication"
+  - name: "Replication - Failover and Concerns"
     slack_tags:
       - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
       - "<!subteam^S0AK685U9TK>" # @rss-repl-triage - Leads + triagers
-    thresholds: # this accounts for the combination of RSSD and Replication
-      hot: 6
-      cold: 6
+    thresholds:
+      hot: 3
+      cold: 3
+  - name: "Replication - Oplog and Recovery"
+    slack_tags:
+      - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
+      - "<!subteam^S0AK685U9TK>" # @rss-repl-triage - Leads + triagers
+    thresholds:
+      hot: 3
+      cold: 3
   - name: "Storage Engines"
     slack_tags:
       - "<!subteam^S05UGLCB76U>" # @leads-storage-engines - Leads
