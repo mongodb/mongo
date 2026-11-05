@@ -195,17 +195,15 @@ for (const engine of kEngines) {
 
             let cursorId;
             try {
+                const shedBefore = memStats(db).loadShedding;
+                assert.eq(false, shedBefore.active, tojson(shedBefore));
                 cursorId = openIdleCursor(coll);
 
                 // No sweep runs while the feature is disabled, so after ten sweep intervals the
-                // shed counters are still absent.
+                // shed counters are unchanged.
                 sleep(10 * kSweepMillis);
-                const shedStats = memStats(db).loadShedding;
-                assert.eq(
-                    undefined,
-                    shedStats,
-                    "load-shedding metrics should be absent when disabled",
-                );
+                const shedAfter = memStats(db).loadShedding;
+                assert.docEq(shedBefore, shedAfter, "no idle cursor should be shed when disabled");
 
                 // The cursor is still alive: a getMore succeeds.
                 const res = assert.commandWorked(getMore(db, coll, cursorId, kNumDocs));

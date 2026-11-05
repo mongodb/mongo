@@ -101,7 +101,8 @@ struct IdleQueryShedDecision {
 [[MONGO_MOD_PUBLIC]] boost::optional<Milliseconds> queryMemoryIdleQuerySheddingInterval();
 
 /**
- * Appends the load-shedding metrics to 'b'. No-op when disabled.
+ * Appends the load-shedding metrics to 'b'. No-op if the process does not support shedding.
+ * More details are included if load shedding is currently active.
  */
 void appendQueryMemoryLoadSheddingStats(ServiceContext* serviceContext, BSONObjBuilder& b);
 

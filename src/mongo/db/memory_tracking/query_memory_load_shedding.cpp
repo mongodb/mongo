@@ -52,6 +52,8 @@ struct QueryMemoryLoadSheddingState {
     // Written (fetchAndAdd) on every shed. On its own cache line so those writes don't invalidate
     // the read-hot rssBytes/memLimitBytes line for the interrupt-check path (avoids false sharing).
     CacheExclusive<AtomicWord<long long>> operationsShed{0};
+    // Tracked memory held by shed operations, across all shed paths.
+    CacheExclusive<AtomicWord<long long>> bytesShed{0};
 
     // Cursors reaped while idle, and the tracked memory they held. These totals are also included
     // in 'operationsShed' but tracked separately to distinguish the different classes of shedding.
@@ -116,8 +118,19 @@ constexpr Milliseconds kMaxShedEvalDt{1000};
 struct QueryMemoryRssMonitorHolder {
     std::mutex mutex;
     std::shared_ptr<PeriodicJobAnchor> anchor;
+    // Start time of the current active period, or none while inactive.
+    boost::optional<Date_t> activeSince;
+    // Total duration of completed active periods.
+    Milliseconds completedActiveTime{0};
 };
 const auto getMonitorHolder = ServiceContext::declareDecoration<QueryMemoryRssMonitorHolder>();
+
+// Duration of the current active period, clamped so a wall-clock step back can't shrink the total.
+Milliseconds currentActiveTime(ServiceContext* serviceContext,
+                               const QueryMemoryRssMonitorHolder& holder) {
+    return std::max(Milliseconds{0},
+                    serviceContext->getFastClockSource()->now() - *holder.activeSince);
+}
 
 // Test-only: overrides the RSS signal. Data {usagePercent: <int>} = percent of the memory limit.
 MONGO_FAIL_POINT_DEFINE(queryMemoryPressureOverride);
@@ -162,6 +175,14 @@ otel::metrics::Counter<int64_t>& operationsShedCounter() {
         otel::metrics::MetricNames::kQueryMemoryLoadSheddingOperationsShed,
         "Operations load-shed due to query-memory pressure",
         otel::metrics::MetricUnit::kOperations);
+    return counter;
+}
+
+otel::metrics::Counter<int64_t>& bytesShedCounter() {
+    static auto& counter = otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kQueryMemoryLoadSheddingBytesShed,
+        "Tracked query memory held by operations shed due to query-memory pressure",
+        otel::metrics::MetricUnit::kBytes);
     return counter;
 }
 
@@ -259,6 +280,8 @@ void recordShed(QueryMemoryLoadSheddingState& processState,
                 bool waitingForTicket) {
     const long long total = processState.operationsShed->fetchAndAdd(1) + 1;
     operationsShedCounter().add(1);
+    processState.bytesShed->fetchAndAdd(opTrackedBytes);
+    bytesShedCounter().add(opTrackedBytes);
     // Rate-limit to one full line per second to avoid flooding the log under sustained pressure;
     // subsequent lines within the second drop to a debug severity.
     static logv2::SeveritySuppressor logSeverity{
@@ -537,6 +560,8 @@ IdleQueryShedDecision queryMemoryShouldShedIdleQuery(OperationContext* opCtx,
     decision.shed = true;
     processState.operationsShed->fetchAndAdd(1);
     operationsShedCounter().add(1);
+    processState.bytesShed->fetchAndAdd(trackedBytes);
+    bytesShedCounter().add(trackedBytes);
     processState.idleShed->cursors.fetchAndAdd(1);
     idleCursorsShedCounter().add(1);
     processState.idleShed->bytes.fetchAndAdd(trackedBytes);
@@ -552,20 +577,38 @@ boost::optional<Milliseconds> queryMemoryIdleQuerySheddingInterval() {
 }
 
 void appendQueryMemoryLoadSheddingStats(ServiceContext* serviceContext, BSONObjBuilder& b) {
-    if (!sheddingActive()) {
+    if (!loadSheddingSupportedOnThisProcess()) {
         return;
     }
+    bool active;
+    Milliseconds activeTime;
+    {
+        auto& holder = getMonitorHolder(serviceContext);
+        std::lock_guard lk(holder.mutex);
+        active = holder.activeSince.has_value();
+        activeTime = holder.completedActiveTime;
+        if (active) {
+            activeTime += currentActiveTime(serviceContext, holder);
+        }
+    }
     auto& processState = getProcessState(serviceContext);
-    const int64_t memLimit = processState.memLimitBytes.loadRelaxed();
-    const int32_t lowPct = gQueryMemoryLoadSheddingLowMarkPercent.loadRelaxed();
-    const int32_t highPct = gQueryMemoryLoadSheddingHighMarkPercent.loadRelaxed();
-    const int64_t rss = processState.rssBytes.loadRelaxed();
     BSONObjBuilder sub(b.subobjStart("loadShedding"));
-    sub.appendNumber("currentUsageBytes", static_cast<long long>(rss < 0 ? 0 : rss));
-    sub.appendNumber("lowMarkBytes", static_cast<long long>(memLimit * lowPct / 100));
-    sub.appendNumber("highMarkBytes", static_cast<long long>(memLimit * highPct / 100));
-    sub.appendNumber("memLimitBytes", static_cast<long long>(memLimit));
+    sub.append("active", active);
+    // The RSS sample and water marks are only meaningful while the monitor runs.
+    if (active) {
+        const int64_t memLimit = processState.memLimitBytes.loadRelaxed();
+        const int32_t lowPct = gQueryMemoryLoadSheddingLowMarkPercent.loadRelaxed();
+        const int32_t highPct = gQueryMemoryLoadSheddingHighMarkPercent.loadRelaxed();
+        const int64_t rss = processState.rssBytes.loadRelaxed();
+        sub.appendNumber("currentUsageBytes", static_cast<long long>(rss < 0 ? 0 : rss));
+        sub.appendNumber("lowMarkBytes", static_cast<long long>(memLimit * lowPct / 100));
+        sub.appendNumber("highMarkBytes", static_cast<long long>(memLimit * highPct / 100));
+        sub.appendNumber("memLimitBytes", static_cast<long long>(memLimit));
+    }
+    // Cumulative counters are always reported so consumers see no gaps across enable/disable.
+    sub.appendNumber("activeMillis", durationCount<Milliseconds>(activeTime));
     sub.appendNumber("operationsShed", processState.operationsShed->loadRelaxed());
+    sub.appendNumber("bytesShed", processState.bytesShed->loadRelaxed());
     sub.appendNumber("idleCursorsShed", processState.idleShed->cursors.loadRelaxed());
     sub.appendNumber("idleCursorBytesShed", processState.idleShed->bytes.loadRelaxed());
 }
@@ -630,6 +673,7 @@ void startQueryMemoryRssMonitor(ServiceContext* serviceContext, bool ignoreWhenN
         /*isKillableByStepdown=*/false);
     holder.anchor = std::make_shared<PeriodicJobAnchor>(runner->makeJob(std::move(job)));
     holder.anchor->start();
+    holder.activeSince = serviceContext->getFastClockSource()->now();
 }
 
 void stopQueryMemoryRssMonitor(ServiceContext* serviceContext) {
@@ -638,6 +682,10 @@ void stopQueryMemoryRssMonitor(ServiceContext* serviceContext) {
         auto& holder = getMonitorHolder(serviceContext);
         std::lock_guard lk(holder.mutex);
         anchor = std::exchange(holder.anchor, nullptr);
+        if (holder.activeSince) {
+            holder.completedActiveTime += currentActiveTime(serviceContext, holder);
+            holder.activeSince = boost::none;
+        }
     }
     // stop() blocks until the sampler has quiesced; do it outside the lock so we don't hold the
     // mutex during that wait.

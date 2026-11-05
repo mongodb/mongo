@@ -7,9 +7,10 @@
 namespace mongo {
 namespace {
 
-// serverStatus().queryMemory -- query-memory metrics. Holds the load-shedding decision state
-// (current RSS usage, the water marks, the memory limit, and the shed count) when load shedding is
-// enabled; the "queryMemory" parent leaves room for future query memory-tracking metrics.
+// serverStatus().queryMemory -- query-memory metrics. On shedding-eligible processes holds the
+// load-shedding state: whether shedding is active, the cumulative shed counters, and (while active)
+// the current RSS usage, water marks, and memory limit. The "queryMemory" parent leaves room for
+// future query memory-tracking metrics.
 class QueryMemoryServerStatusSection : public ServerStatusSection {
 public:
     using ServerStatusSection::ServerStatusSection;

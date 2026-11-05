@@ -44,11 +44,19 @@ describe("query memory monitor lifecycle", function () {
     });
 
     it("starts the monitor on runtime enable and publishes an RSS sample", function () {
-        // Disabled at startup: the queryMemory metrics are absent and no monitor runs.
-        assert.eq(
-            undefined,
+        // Disabled at startup: no monitor runs, so only the inactive flag and zeroed counters are
+        // reported.
+        assert.docEq(
+            {
+                active: false,
+                activeMillis: 0,
+                operationsShed: 0,
+                bytesShed: 0,
+                idleCursorsShed: 0,
+                idleCursorBytesShed: 0,
+            },
             memStats(db).loadShedding,
-            "queryMemory load-shedding metrics should be absent while disabled",
+            "only the shed counters should be reported while disabled",
         );
 
         // Enable at runtime -> the on-update hook starts the monitor, which soon publishes a real
@@ -59,13 +67,26 @@ describe("query memory monitor lifecycle", function () {
             return memStats(db).loadShedding?.currentUsageBytes > 0;
         }, "monitor should start and publish an RSS sample after enabling at runtime");
 
-        // Re-disable -> the metrics disappear again.
-        setLowMark(db, -1);
-        assert.eq(
-            undefined,
-            memStats(db).loadShedding,
-            "queryMemory load-shedding metrics should be absent after re-disabling",
+        // activeMillis grows while active.
+        assert.soon(
+            () => memStats(db).loadShedding.activeMillis > 0,
+            "activeMillis should grow while active",
         );
+
+        // Re-disable -> the usage and watermark fields disappear again, but the counters remain.
+        setLowMark(db, -1);
+        const disabledStats = memStats(db).loadShedding;
+        assert.eq(false, disabledStats.active, tojson(disabledStats));
+        assert.gt(disabledStats.activeMillis, 0, tojson(disabledStats));
+        sleep(200);
+        assert.eq(
+            disabledStats.activeMillis,
+            memStats(db).loadShedding.activeMillis,
+            "activeMillis should not grow while inactive",
+        );
+        assert.eq(undefined, disabledStats.currentUsageBytes, tojson(disabledStats));
+        assert.eq(undefined, disabledStats.memLimitBytes, tojson(disabledStats));
+        assert.eq(0, disabledStats.operationsShed, tojson(disabledStats));
 
         // Re-enable -> the monitor restarts and publishes a fresh sample, so stop-then-start leaves a
         // working monitor rather than a wedged or never-restarted one.
@@ -73,6 +94,10 @@ describe("query memory monitor lifecycle", function () {
         assert.soon(() => {
             return memStats(db).loadShedding?.currentUsageBytes > 0;
         }, "monitor should restart and publish an RSS sample after re-enabling");
+        assert.soon(
+            () => memStats(db).loadShedding.activeMillis > disabledStats.activeMillis,
+            "activeMillis should resume from its total after re-enabling",
+        );
         setLowMark(db, -1);
     });
 

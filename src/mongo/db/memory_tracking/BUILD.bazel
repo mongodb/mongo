@@ -127,6 +127,7 @@ mongo_cc_unit_test(
         "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/unittest",
+        "//src/mongo/util:mock_periodic_runner",
     ],
 )
 

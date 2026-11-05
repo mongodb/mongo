@@ -344,6 +344,8 @@ public:
     // Query Execution Team Metrics
     static constexpr MetricName kQueryMemoryLoadSheddingOperationsShed =
         MetricNameMaker::make("mongodb.serverStatus.queryMemory.loadShedding.operationsShed");
+    static constexpr MetricName kQueryMemoryLoadSheddingBytesShed =
+        MetricNameMaker::make("mongodb.serverStatus.queryMemory.loadShedding.bytesShed");
     static constexpr MetricName kQueryMemoryLoadSheddingIdleCursorsShed =
         MetricNameMaker::make("mongodb.serverStatus.queryMemory.loadShedding.idleCursorsShed");
     static constexpr MetricName kQueryMemoryLoadSheddingIdleCursorBytesShed =

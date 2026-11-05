@@ -234,8 +234,6 @@ describe("queued-operation query-memory load shedding", function () {
     itPerEngine(
         "with load shedding disabled, a queued getMore is admitted when the ticket frees",
         function () {
-            // The loadShedding serverStatus section only exists while the feature is enabled, so
-            // capture the baseline first.
             const shedBefore = loadSheddingStats(db).operationsShed;
             setParam(db, {queryMemoryLoadSheddingLowMarkPercent: -1});
             const cursorId = openGroupCursor(coll);
@@ -268,8 +266,9 @@ describe("queued-operation query-memory load shedding", function () {
                 });
                 // Give the disabled feature many intervals to misbehave.
                 sleep(500);
-                // While disabled there is no loadShedding serverStatus section at all.
-                assert.eq(undefined, loadSheddingStats(db));
+                const stats = loadSheddingStats(db);
+                assert.eq(false, stats.active, tojson(stats));
+                assert.eq(shedBefore, stats.operationsShed, "disabled shedding must not shed");
                 assert.eq(1, queuedReaders(db), "getMore should still be queued");
                 pressureFp.off();
             });

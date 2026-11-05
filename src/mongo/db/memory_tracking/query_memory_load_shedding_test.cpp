@@ -22,6 +22,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/mock_periodic_runner.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -324,6 +325,9 @@ TEST_F(QueryMemoryLoadSheddingCheckTest, ShedIncrementsOtelOperationsShedCounter
         ASSERT_EQ(capturer.readInt64Counter(
                       otel::metrics::MetricNames::kQueryMemoryLoadSheddingOperationsShed),
                   1);
+        ASSERT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kQueryMemoryLoadSheddingBytesShed),
+                  1 << 20);
     }
 }
 
@@ -570,10 +574,10 @@ public:
         });
         waitUntilQueued(waiterOpCtx);
 
-        const long long shedBefore = [&] {
+        const BSONObj before = [&] {
             BSONObjBuilder b;
             appendQueryMemoryLoadSheddingStats(getServiceContext(), b);
-            return b.obj()["loadShedding"]["operationsShed"].numberLong();
+            return b.obj().getObjectField("loadShedding").getOwned();
         }();
 
         // First pass only primes the sweep clock for the newly observed queued op.
@@ -599,8 +603,9 @@ public:
         // Hold the builder's obj so 'after' does not view a buffer owned by a temporary.
         BSONObj statsObj = b.obj();
         const BSONObj after = statsObj["loadShedding"].Obj();
-        // The queued sweep's shed is counted in operationsShed like any other shed.
-        ASSERT_EQ(after["operationsShed"].numberLong(), shedBefore + 1);
+        // The queued sweep's shed is counted like any other shed.
+        ASSERT_EQ(after["operationsShed"].numberLong(), before["operationsShed"].numberLong() + 1);
+        ASSERT_EQ(after["bytesShed"].numberLong(), before["bytesShed"].numberLong() + (1 << 20));
     }
 };
 
@@ -891,6 +896,7 @@ TEST_F(QueryMemoryLoadSheddingIdleTest, ShedCountsCursorsAndBytes) {
     const BSONObj after = readStats();
     // The idle shed is included in the comprehensive operationsShed total.
     ASSERT_EQ(after["operationsShed"].numberLong(), before["operationsShed"].numberLong() + 1);
+    ASSERT_EQ(after["bytesShed"].numberLong(), before["bytesShed"].numberLong() + kTrackedBytes);
     // And in the idle-specific breakdown.
     ASSERT_EQ(after["idleCursorsShed"].numberLong(), before["idleCursorsShed"].numberLong() + 1);
     ASSERT_EQ(after["idleCursorBytesShed"].numberLong(),
@@ -907,6 +913,9 @@ TEST_F(QueryMemoryLoadSheddingIdleTest, ShedCountsCursorsAndBytes) {
         ASSERT_EQ(capturer.readInt64Counter(
                       otel::metrics::MetricNames::kQueryMemoryLoadSheddingIdleCursorBytesShed),
                   kTrackedBytes);
+        ASSERT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kQueryMemoryLoadSheddingBytesShed),
+                  kTrackedBytes);
     }
 }
 
@@ -921,6 +930,98 @@ TEST_F(QueryMemoryLoadSheddingIdleTest, SheddingIntervalOnlyReportedWhileEnabled
     gQueryMemoryLoadSheddingLowMarkPercent.store(50);
     ASSERT_EQ(queryMemoryIdleQuerySheddingInterval(),
               Milliseconds(gQueryMemoryIdleCursorSheddingIntervalMillis.load()));
+}
+
+// The cumulative shed counters stay in serverStatus while shedding is disabled, so a consumer
+// computing a shed rate sees no gaps as shedding is toggled.
+TEST_F(QueryMemoryLoadSheddingIdleTest, ShedCountersReportedWhileDisabled) {
+    auto restore = scopedRestoreMarks();
+    gQueryMemoryLoadSheddingLowMarkPercent.store(50);  // enable (high mark stays default)
+    ON_BLOCK_EXIT([] {
+        globalFailPointRegistry().find("queryMemoryPressureOverride")->setMode(FailPoint::off);
+        globalFailPointRegistry()
+            .find("queryMemoryLoadSheddingAlwaysShed")
+            ->setMode(FailPoint::off);
+    });
+
+    auto readStats = [&] {
+        BSONObjBuilder b;
+        appendQueryMemoryLoadSheddingStats(getServiceContext(), b);
+        return b.obj().getObjectField("loadShedding").getOwned();
+    };
+
+    auto* opCtx = getExpCtx()->getOperationContext();
+    markOperationQueryMemorySheddingEligible(opCtx);
+    setPressureOverride(95);
+    globalFailPointRegistry()
+        .find("queryMemoryLoadSheddingAlwaysShed")
+        ->setMode(FailPoint::alwaysOn);
+    ASSERT_TRUE(queryMemoryShouldShedIdleQuery(opCtx, 1 << 20).shed);
+    const BSONObj enabled = readStats();
+    ASSERT_GT(enabled["operationsShed"].numberLong(), 0);
+
+    gQueryMemoryLoadSheddingLowMarkPercent.store(-1);
+    const BSONObj disabled = readStats();
+    for (auto field : {"operationsShed", "bytesShed", "idleCursorsShed", "idleCursorBytesShed"}) {
+        ASSERT_EQ(disabled[field].numberLong(), enabled[field].numberLong()) << field;
+    }
+}
+
+// Runs the real RSS monitor lifecycle on a mock periodic runner and mock clock.
+class QueryMemoryLoadSheddingMonitorTest : public ClockSourceMockServiceContextTest {
+public:
+    void setUp() override {
+        ClockSourceMockServiceContextTest::setUp();
+        getServiceContext()->setPeriodicRunner(std::make_unique<MockPeriodicRunner>());
+    }
+
+    void tearDown() override {
+        stopQueryMemoryRssMonitor(getServiceContext());
+        ClockSourceMockServiceContextTest::tearDown();
+    }
+
+    BSONObj readStats() {
+        BSONObjBuilder b;
+        appendQueryMemoryLoadSheddingStats(getServiceContext(), b);
+        return b.obj().getObjectField("loadShedding").getOwned();
+    }
+
+    void advance(Milliseconds ms) {
+        static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())->advance(ms);
+    }
+
+    static void assertThresholdFields(const BSONObj& stats, bool present) {
+        for (auto field : {"currentUsageBytes", "lowMarkBytes", "highMarkBytes", "memLimitBytes"}) {
+            ASSERT_EQ(stats.hasField(field), present) << field << " " << stats;
+        }
+    }
+};
+
+// Shedding is active while the monitor runs. activeMillis grows during an active period and holds
+// while inactive.
+TEST_F(QueryMemoryLoadSheddingMonitorTest, ActiveMillisAccumulatesWhileMonitorRuns) {
+    auto restore = scopedRestoreMarks();
+    gQueryMemoryLoadSheddingLowMarkPercent.store(50);
+    auto* svcCtx = getServiceContext();
+
+    BSONObj stats = readStats();
+    ASSERT_FALSE(stats["active"].Bool());
+    ASSERT_EQ(stats["activeMillis"].numberLong(), 0);
+    assertThresholdFields(stats, false);
+
+    startQueryMemoryRssMonitor(svcCtx);
+    advance(Milliseconds(100));
+    stats = readStats();
+    ASSERT_TRUE(stats["active"].Bool());
+    ASSERT_EQ(stats["activeMillis"].numberLong(), 100);
+    assertThresholdFields(stats, true);
+
+    stopQueryMemoryRssMonitor(svcCtx);
+    advance(Milliseconds(50));
+    stats = readStats();
+    ASSERT_FALSE(stats["active"].Bool());
+    ASSERT_EQ(stats["activeMillis"].numberLong(), 100);
+    assertThresholdFields(stats, false);
 }
 
 }  // namespace

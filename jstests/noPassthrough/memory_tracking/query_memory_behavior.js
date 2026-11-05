@@ -30,6 +30,7 @@ import {assertEngine} from "jstests/libs/query/analyze_plan.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 const kHuge = 512 * 1024 * 1024; // per-stage limit high enough that the group never self-fails
+const kNumDocs = 20000; // documents seeded into the collection, one $group key each
 
 // The blocking $group used throughout: unique keys each pushing a 512-byte value (~10 MB tracked).
 const kGroupPipeline = [{$group: {_id: "$g", vals: {$push: "$val"}}}];
@@ -126,7 +127,7 @@ for (const engine of kEngines) {
             db = conn.getDB("test");
             coll = db[jsTestName()];
             const docs = [];
-            for (let i = 0; i < 20000; i++) {
+            for (let i = 0; i < kNumDocs; i++) {
                 docs.push({_id: i, g: i, val: "x".repeat(512)});
             }
             assert.commandWorked(coll.insertMany(docs));
@@ -140,17 +141,20 @@ for (const engine of kEngines) {
             MongoRunner.stopMongod(conn);
         });
 
-        it("1. disabled (low mark -1): no shedding, queryMemory metrics absent", function () {
+        it("1. disabled (low mark -1): no shedding, only shed counters reported", function () {
             setLowMark(db, -1);
             setSignal(db, 95); // strong signal, but shedding is disabled
             forceShed(db, true);
             try {
+                const before = memStats(db).loadShedding;
+                assert.eq(false, before.active, tojson(before));
+                assert.eq(undefined, before.memLimitBytes, tojson(before));
+                assert.eq(kNumDocs, runGroup().length);
                 assert.eq(
-                    undefined,
-                    memStats(db).loadShedding,
-                    "queryMemory load-shedding metrics should be absent when disabled",
+                    before.operationsShed,
+                    memStats(db).loadShedding.operationsShed,
+                    "disabled shedding must not shed",
                 );
-                assert.eq(20000, runGroup().length);
             } finally {
                 forceShed(db, false);
                 clearSignal(db);
@@ -168,7 +172,7 @@ for (const engine of kEngines) {
                     memStats(db).loadShedding.memLimitBytes,
                     "queryMemory load-shedding metrics should be present when enabled",
                 );
-                assert.eq(20000, runGroup().length, "below-low-mark query should succeed");
+                assert.eq(kNumDocs, runGroup().length, "below-low-mark query should succeed");
             } finally {
                 forceShed(db, false);
                 clearSignal(db);
@@ -198,13 +202,13 @@ for (const engine of kEngines) {
             forceShed(db, true);
             try {
                 setLowMark(db, -1); // disabled -> not shed
-                assert.eq(20000, runGroup().length);
+                assert.eq(kNumDocs, runGroup().length);
 
                 setLowMark(db, 50); // enabled, over the mark -> shed
                 assertEventuallyShed(runGroup, "re-enabled over-mark query should be shed");
 
                 setLowMark(db, -1); // disabled again -> not shed
-                assert.eq(20000, runGroup().length);
+                assert.eq(kNumDocs, runGroup().length);
             } finally {
                 forceShed(db, false);
                 clearSignal(db);
@@ -227,8 +231,8 @@ for (const engine of kEngines) {
                         updates: [{q: {}, u: {$inc: {n: 1}}, multi: true}],
                     }),
                 );
-                assert.eq(20000, res.n, res);
-                assert.eq(20000, res.nModified, res);
+                assert.eq(kNumDocs, res.n, res);
+                assert.eq(kNumDocs, res.nModified, res);
             } finally {
                 forceShed(db, false);
                 clearSignal(db);
@@ -252,13 +256,13 @@ for (const engine of kEngines) {
                 const res = assert.commandWorked(
                     db.runCommand({delete: coll.getName(), deletes: [{q: {}, limit: 0}]}),
                 );
-                assert.eq(20000, res.n, res);
+                assert.eq(kNumDocs, res.n, res);
             } finally {
                 forceShed(db, false);
                 clearSignal(db);
                 // Re-seed so the collection stays at its seeded state for any later cases/reruns.
                 const docs = [];
-                for (let i = 0; i < 20000; i++) {
+                for (let i = 0; i < kNumDocs; i++) {
                     docs.push({_id: i, g: i, val: "x".repeat(512)});
                 }
                 assert.commandWorked(coll.insertMany(docs));
