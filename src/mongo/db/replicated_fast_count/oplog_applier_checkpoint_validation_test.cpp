@@ -115,8 +115,8 @@ protected:
 using SingleWorkerCheckpointValidationDeathTest = SingleWorkerCheckpointValidationTest;
 
 TEST_F(CheckpointValidationTest, CheckpointValidationLogsErrorsWhenInternodeValidationDisabled) {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", false);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", false);
     const Timestamp watermarkTs = nextOpTime().getTimestamp();
     std::vector<OplogEntry> oplog;
     oplog.push_back(makeWatermarkEntry(watermarkTs));
@@ -156,8 +156,8 @@ TEST_F(CheckpointValidationTest, NoMetricsOrValidationWhenPerCollectionValidatio
 }
 
 TEST_F(CheckpointValidationTest, CheckpointValidatesCrudDeltas) {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointCrud");
@@ -190,8 +190,8 @@ TEST_F(CheckpointValidationTest, CheckpointValidatesCrudDeltas) {
 
 TEST_F(SingleWorkerCheckpointValidationTest,
        CheckpointValidatesGroupedInsertsWithInterleavedWatermark) {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         "test.checkpointGroupedInsertsInterleavedWatermark");
@@ -225,8 +225,8 @@ TEST_F(SingleWorkerCheckpointValidationTest,
 }
 
 TEST_F(CheckpointValidationTest, TwoWatermarksTwoCheckpointsValidateCumulativeDeltas) {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         "test.checkpointTwoWatermarksTwoCheckpoints");
@@ -266,8 +266,8 @@ TEST_F(CheckpointValidationTest, TwoWatermarksTwoCheckpointsValidateCumulativeDe
 }
 
 TEST_F(CheckpointValidationTest, TwoWatermarksCheckpointForFirstOnly) {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointTwoWatermarksOneCheckpoint");
@@ -294,8 +294,8 @@ TEST_F(CheckpointValidationTest, TwoWatermarksCheckpointForFirstOnly) {
 }
 
 TEST_F(CheckpointValidationTest, TwoWatermarksNoCheckpointsPasses) {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointTwoWatermarksNoCheckpoints");
@@ -315,8 +315,8 @@ TEST_F(CheckpointValidationTest, TwoWatermarksNoCheckpointsPasses) {
 }
 
 TEST_F(CheckpointValidationTest, CheckpointValidatesDroppedCollection) {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointDropped");
@@ -389,7 +389,7 @@ protected:
 
 private:
     unittest::ServerParameterGuard _enableValidation{
-        "enableContinuousInternodePerCollectionValidation", true};
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true};
 };
 
 TEST_F(CheckpointRenameValidationTest, CheckpointValidatesCollectionDroppedByRenameDropTarget) {
@@ -448,8 +448,8 @@ using CheckpointValidationDeathTest = CheckpointValidationTest;
 
 TEST_F(CheckpointValidationTest,
        DroppedCollectionRecreatedWithSameUuidDoesNotFailInShardedCluster) {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer};
     ON_BLOCK_EXIT([] { serverGlobalParams.clusterRole = ClusterRole::None; });
@@ -469,8 +469,8 @@ TEST_F(CheckpointValidationTest,
 DEATH_TEST_F(CheckpointValidationDeathTest,
              CheckpointValidationFailsWhenStandbyMissingEntry,
              "13626001") {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
     const Timestamp watermarkTs = nextOpTime().getTimestamp();
     // Oplog contains no replicated metadata deltas, so the standby missed an entry the primary
     // applied.
@@ -487,8 +487,8 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
 DEATH_TEST_F(CheckpointValidationDeathTest,
              CheckpointValidationFailsWhenPrimaryMissingEntry,
              "13626006") {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointCrud");
@@ -523,8 +523,8 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
 DEATH_TEST_F(CheckpointValidationDeathTest,
              CheckpointValidationFailsOnCrudSizeMismatch,
              "13626005") {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointCrud");
@@ -549,8 +549,8 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
 DEATH_TEST_F(CheckpointValidationDeathTest,
              CheckpointValidationFailsOnCrudCountMismatch,
              "13626005") {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointCrud");
@@ -576,8 +576,8 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
 DEATH_TEST_F(SingleWorkerCheckpointValidationDeathTest,
              CheckpointValidationFailsOnGroupedInsertSizeMismatch,
              "13626005") {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         "test.checkpointGroupedInsertsInterleavedWatermark");
@@ -614,8 +614,8 @@ DEATH_TEST_F(SingleWorkerCheckpointValidationDeathTest,
 DEATH_TEST_F(CheckpointValidationDeathTest,
              CheckpointValidationFailsWhenPrimaryWritesCreatedAndDroppedCollection,
              "13626001") {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointCreatedDroppedWrites");
@@ -642,8 +642,8 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
 DEATH_TEST_F(CheckpointValidationDeathTest,
              CheckpointValidationFailsWhenPrimaryDeletesCreatedAndDroppedCollection,
              "13626002") {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointCreatedDroppedDeletes");
@@ -667,8 +667,8 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
 DEATH_TEST_F(CheckpointValidationDeathTest,
              CheckpointValidationFailsWhenPrimaryWritesDroppedCollection,
              "13626004") {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointDroppedWrites");
@@ -709,8 +709,8 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
 DEATH_TEST_F(CheckpointValidationDeathTest,
              CheckpointValidationFailsWhenPrimaryOmitsDroppedCollection,
              "13626006") {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointDroppedOmitted");
@@ -762,8 +762,8 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
 
 TEST_F(CheckpointValidationTest, CheckpointValidationAfterStepdownResetAdoptsCheckpoint) {
     otel::metrics::OtelMetricsCapturer capturer;
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation(
-        "enableContinuousInternodePerCollectionValidation", true);
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true);
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointAfterStepdownReset");

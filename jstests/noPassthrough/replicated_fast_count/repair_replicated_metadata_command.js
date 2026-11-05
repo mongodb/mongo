@@ -40,7 +40,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     const rst = new ReplSetTest({nodes: 2});
     rst.startSet({
         // TODO(SERVER-137710): Remove this server parameter.
-        setParameter: {enableContinuousInternodePerCollectionValidation: false},
+        setParameter: {fassertOnPerCollectionContinuousInternodeValidationFailure: false},
     });
     rst.initiate();
 

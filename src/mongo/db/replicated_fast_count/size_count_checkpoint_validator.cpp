@@ -395,7 +395,7 @@ void SizeCountCheckpointValidator::mergeAndValidate(OperationContext* opCtx,
         // validate it.
         primary.erase(oplogUuid);
 
-        if (repl::enableContinuousInternodePerCollectionValidation.load()) {
+        if (repl::fassertOnPerCollectionContinuousInternodeValidationFailure.load()) {
             validateCheckpoint(standby, primary, ReportingStrategy::kFassert);
         } else {
             validateCheckpoint(standby, primary, ReportingStrategy::kLogError);

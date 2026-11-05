@@ -95,7 +95,7 @@ struct ValidatorInterval {
  * 3. After oplog application, merge the thread-local buffers and validate the checkpoints in
  *    the batch, if any, against the replicated metadata deltas recorded during step 2.
  *
- * If validation fails while the `enableContinuousInternodePerCollectionValidation` server
+ * If validation fails while the `fassertOnPerCollectionContinuousInternodeValidationFailure` server
  * parameter is enabled, the node crashes with an fassert.
  */
 class [[MONGO_MOD_PUBLIC]] SizeCountCheckpointValidator {

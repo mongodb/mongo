@@ -417,8 +417,8 @@ TEST_F(CheckpointOplogParsingTest, ParseCheckpointReadsRealFlushedCheckpoints) {
 
 TEST_F(CheckpointOplogParsingTest, SplitFlushEntriesAreNotClassifiedAsCheckpoints) {
     otel::metrics::OtelMetricsCapturer capturer;
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation{
-        "enableContinuousInternodePerCollectionValidation", true};
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure{
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true};
     // When this server parameter is set to 1, the replicated metadata checkpoint is split into two
     // applyOps entries: one for the metadata store container write, and one for the timestamp store
     // container write.
@@ -580,8 +580,8 @@ protected:
     SizeCountCheckpointValidator validator;
     const UUID oplogUuid = UUID::gen();
 
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation{
-        "enableContinuousInternodePerCollectionValidation", true};
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure{
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true};
 };
 
 TEST_F(SizeCountCheckpointValidatorRecoveryTest, BatchWithNoCheckpointNotAdopted) {
@@ -1100,8 +1100,8 @@ TEST_F(SizeCountCheckpointValidatorTest, CheckpointsValidatedCounterIncrementsWh
 }
 
 TEST_F(SizeCountCheckpointValidatorTest, CheckpointsValidatedCounterIncrementsWhenParamOff) {
-    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation{
-        "enableContinuousInternodePerCollectionValidation", false};
+    unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure{
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", false};
     otel::metrics::OtelMetricsCapturer capturer;
     const UUID uuid = UUID::gen();
     const std::vector<repl::OplogEntry> ops{
@@ -1165,8 +1165,8 @@ TEST_F(SizeCountCheckpointValidatorTest, ValidationUsesBaselineAdvancedWhileDisa
     otel::metrics::OtelMetricsCapturer capturer;
     const UUID uuid = UUID::gen();
     {
-        unittest::ServerParameterGuard disabled{"enableContinuousInternodePerCollectionValidation",
-                                                false};
+        unittest::ServerParameterGuard disabled{
+            "fassertOnPerCollectionContinuousInternodeValidationFailure", false};
         applyBatch(validator,
                    {makeWatermarkEntry(kT1),
                     makeCheckpointEntry(kT1, {{uuid, makeSizeCount({.size = 10, .count = 1})}})},
