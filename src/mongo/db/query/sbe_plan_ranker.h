@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/result_materializer.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/query/plan_ranker.h"
@@ -24,7 +25,7 @@ namespace mongo::sbe::plan_ranker {
 struct CandidatePlanData {
     stage_builder::PlanStageData stageData;
     std::unique_ptr<TrialRunTracker> tracker;
-    value::SlotAccessor* resultAccessor = nullptr;
+    boost::optional<ResultMaterializer> materializer;
     value::SlotAccessor* recordIdAccessor = nullptr;
     bool open = false;
 };

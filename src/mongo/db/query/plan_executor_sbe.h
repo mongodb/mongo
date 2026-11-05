@@ -12,6 +12,7 @@
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/result_materializer.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/namespace_string.h"
@@ -187,7 +188,7 @@ private:
     stage_builder::PlanStageData _rootData;
     std::unique_ptr<QuerySolution> _solution;
 
-    sbe::value::SlotAccessor* _result{nullptr};
+    boost::optional<sbe::ResultMaterializer> _materializer;
     sbe::value::SlotAccessor* _resultRecordId{nullptr};
     sbe::value::TypeTags _tagLastRecordId{sbe::value::TypeTags::Nothing};
     sbe::value::Value _valLastRecordId{0};
@@ -232,8 +233,8 @@ private:
 };
 
 /**
- * Executes getNext() on the 'root' PlanStage and used 'resultSlot' and 'recordIdSlot' to access the
- * fetched document and it's record id, which are stored in 'out' and 'dlOut' parameters
+ * Executes getNext() on the 'root' PlanStage and uses 'materializer' and 'recordIdSlot' to build
+ * the fetched document and access its record id, which are stored in 'out' and 'dlOut' parameters
  * respectively, if they not null pointers.
  *
  * This common logic can be used by various consumers which need to fetch data using an SBE
@@ -244,7 +245,7 @@ private:
  */
 template <typename BSONTraits = BSONObj::DefaultSizeTrait>
 sbe::PlanState fetchNext(sbe::PlanStage* root,
-                         sbe::value::SlotAccessor* resultSlot,
+                         sbe::ResultMaterializer* materializer,
                          sbe::value::SlotAccessor* recordIdSlot,
                          BSONObj* out,
                          RecordId* dlOut,

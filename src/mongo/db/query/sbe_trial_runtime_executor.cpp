@@ -19,7 +19,7 @@ namespace mongo::sbe {
 
 bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candidate,
                                              size_t maxNumResults) {
-    auto* resultSlot = candidate->data.resultAccessor;
+    auto* materializer = candidate->data.materializer ? &*candidate->data.materializer : nullptr;
     auto* recordIdSlot = candidate->data.recordIdAccessor;
     try {
         if (!candidate->data.open) {
@@ -33,7 +33,7 @@ bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candida
         // SBE plan might be followed by an non-pushed down aggregation pipeline. In that case we
         // allow intermediate document to be large.
         auto state = fetchNext<BSONObj::LargeSizeTrait>(candidate->root.get(),
-                                                        resultSlot,
+                                                        materializer,
                                                         recordIdSlot,
                                                         &obj,
                                                         recordIdSlot ? &recordId : nullptr,
@@ -71,21 +71,22 @@ bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candida
     return true;
 }
 
-std::pair<value::SlotAccessor*, value::SlotAccessor*> TrialRuntimeExecutor::prepareExecutionPlan(
-    PlanStage* root,
-    stage_builder::PlanStageData* data,
-    const bool preparingFromCache,
-    RemoteCursorMap* remoteCursors) const {
+std::pair<boost::optional<ResultMaterializer>, value::SlotAccessor*>
+TrialRuntimeExecutor::prepareExecutionPlan(PlanStage* root,
+                                           stage_builder::PlanStageData* data,
+                                           const bool preparingFromCache,
+                                           RemoteCursorMap* remoteCursors) const {
     tassert(11321202, "root must not be null", root);
     tassert(11321203, "data must not be null", data);
 
     stage_builder::prepareSlotBasedExecutableTree(
         _opCtx, root, data, _cq, _collections, _yieldPolicy, preparingFromCache, remoteCursors);
 
-    value::SlotAccessor* resultSlot{nullptr};
+    boost::optional<ResultMaterializer> materializer;
     if (auto slot = data->staticData->resultSlot) {
-        resultSlot = root->getAccessor(data->env.ctx, *slot);
+        auto* resultSlot = root->getAccessor(data->env.ctx, *slot);
         tassert(4822871, "Query does not have a result slot.", resultSlot);
+        materializer.emplace(resultSlot, false /* closed */, std::vector<ResultField>{});
     }
 
     value::SlotAccessor* recordIdSlot{nullptr};
@@ -94,13 +95,13 @@ std::pair<value::SlotAccessor*, value::SlotAccessor*> TrialRuntimeExecutor::prep
         tassert(4822872, "Query does not have a recordId slot.", recordIdSlot);
     }
 
-    return std::make_pair(resultSlot, recordIdSlot);
+    return std::make_pair(std::move(materializer), recordIdSlot);
 }
 
 void TrialRuntimeExecutor::prepareCandidate(plan_ranker::CandidatePlan* candidate,
                                             bool preparingFromCache) {
     _indexExistenceChecker.check(_opCtx, _collections);
-    std::tie(candidate->data.resultAccessor, candidate->data.recordIdAccessor) =
+    std::tie(candidate->data.materializer, candidate->data.recordIdAccessor) =
         prepareExecutionPlan(candidate->root.get(), &candidate->data.stageData, preparingFromCache);
 }
 

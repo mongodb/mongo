@@ -21,7 +21,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -77,8 +76,9 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     tassert(13650700, "yieldPolicy must not be null", _yieldPolicy);
     auto& env = _rootData.env;
     if (auto slot = _rootData.staticData->resultSlot) {
-        _result = _root->getAccessor(env.ctx, *slot);
-        uassert(4822865, "Query does not have result slot.", _result);
+        auto* result = _root->getAccessor(env.ctx, *slot);
+        uassert(4822865, "Query does not have result slot.", result);
+        _materializer.emplace(result, false /* closed */, std::vector<sbe::ResultField>{});
     }
 
     if (auto slot = _rootData.staticData->recordIdSlot) {
@@ -201,7 +201,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
 
 template <typename ObjectType, typename BSONTraits = BSONObj::DefaultSizeTrait>
 sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
-                             sbe::value::SlotAccessor* resultSlot,
+                             sbe::ResultMaterializer* materializer,
                              sbe::value::SlotAccessor* recordIdSlot,
                              ObjectType* out,
                              RecordId* dlOut,
@@ -279,8 +279,12 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
                 fmt::format("Expected _state to be OPENED but found {}", serializeState(_state)),
                 _state == State::kOpened);
 
-        auto result =
-            fetchNextImpl(_root.get(), _result, _resultRecordId, out, dlOut, _mustReturnOwnedBson);
+        auto result = fetchNextImpl(_root.get(),
+                                    _materializer ? &*_materializer : nullptr,
+                                    _resultRecordId,
+                                    out,
+                                    dlOut,
+                                    _mustReturnOwnedBson);
 
         if (result == sbe::PlanState::IS_EOF) {
             _root->close();
@@ -340,7 +344,7 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
 
 template <typename ObjectType, typename BSONTraits>
 sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
-                             sbe::value::SlotAccessor* resultSlot,
+                             sbe::ResultMaterializer* materializer,
                              sbe::value::SlotAccessor* recordIdSlot,
                              ObjectType* out,
                              RecordId* dlOut,
@@ -364,44 +368,15 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
                         static_cast<int>(state)),
             state == sbe::PlanState::ADVANCED);
 
-    if (resultSlot) {
-        auto [tag, val] = resultSlot->getViewOfValue();
-        if (tag == sbe::value::TypeTags::Object) {
-            if constexpr (isBson) {
-                BSONObjBuilder bb;
-                sbe::bson::convertToBsonObj(bb, sbe::value::getObjectView(val));
-                *out = bb.obj<BSONTraits>();
-                uassertStatusOK(out->validateBSONObjSize(BSONTraits::MaxSize));
-            } else {
-                *out = sbe::convertToValue({tag, val}).getDocument();
-            }
-        } else if (tag == sbe::value::TypeTags::bsonObject) {
-            BSONObj result;
-            if (returnOwnedBson) {
-                if (auto bsonResultAccessor = resultSlot->as<sbe::value::BSONObjValueAccessor>()) {
-                    result = bsonResultAccessor->getOwnedBSONObj();
-                } else {
-                    auto [ownedTag, ownedVal] = sbe::value::copyValue(tag, val);
-                    auto sharedBuf =
-                        SharedBuffer(UniqueBuffer::reclaim(sbe::value::bitcastTo<char*>(ownedVal)));
-                    result = BSONObj{std::move(sharedBuf)};
-                }
-            } else {
-                result = BSONObj(sbe::value::bitcastTo<const char*>(val), BSONTraits{});
-            }
-
-            if constexpr (isBson) {
-                // We allow BSONObjs inside the pipeline to exceed BSONObjMaxInternalSize (16MB +
-                // 16KB), but once they reach this point we have to make sure they won't be returned
-                // to the user.
-                uassertStatusOK(result.validateBSONObjSize(BSONTraits::MaxSize));
-                *out = std::move(result);
-            } else {
-                *out = Document{result};
-            }
+    if (materializer) {
+        if constexpr (isBson) {
+            *out = materializer->toBson(returnOwnedBson);
+            // We allow BSONObjs inside the pipeline to exceed BSONObjMaxInternalSize (16MB +
+            // 16KB), but once they reach this point we have to make sure they won't be returned
+            // to the user.
+            uassertStatusOK(out->validateBSONObjSize(BSONTraits::MaxSize));
         } else {
-            // The query is supposed to return an object.
-            MONGO_UNREACHABLE;
+            *out = materializer->toDocument();
         }
     }
 
@@ -417,7 +392,7 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
 
 template sbe::PlanState fetchNextImpl<BSONObj, BSONObj::DefaultSizeTrait>(
     sbe::PlanStage* root,
-    sbe::value::SlotAccessor* resultSlot,
+    sbe::ResultMaterializer* materializer,
     sbe::value::SlotAccessor* recordIdSlot,
     BSONObj* out,
     RecordId* dlOut,
@@ -425,14 +400,14 @@ template sbe::PlanState fetchNextImpl<BSONObj, BSONObj::DefaultSizeTrait>(
 
 template sbe::PlanState fetchNextImpl<BSONObj, BSONObj::LargeSizeTrait>(
     sbe::PlanStage* root,
-    sbe::value::SlotAccessor* resultSlot,
+    sbe::ResultMaterializer* materializer,
     sbe::value::SlotAccessor* recordIdSlot,
     BSONObj* out,
     RecordId* dlOut,
     bool returnOwnedBson);
 
 template sbe::PlanState fetchNextImpl<Document>(sbe::PlanStage* root,
-                                                sbe::value::SlotAccessor* resultSlot,
+                                                sbe::ResultMaterializer* materializer,
                                                 sbe::value::SlotAccessor* recordIdSlot,
                                                 Document* out,
                                                 RecordId* dlOut,
@@ -442,24 +417,24 @@ template sbe::PlanState fetchNextImpl<Document>(sbe::PlanStage* root,
 // result from plan in 'Document' type is to call 'PlanExecutorSBE::getNextDocument()'.
 template <typename BSONTraits>
 sbe::PlanState fetchNext(sbe::PlanStage* root,
-                         sbe::value::SlotAccessor* resultSlot,
+                         sbe::ResultMaterializer* materializer,
                          sbe::value::SlotAccessor* recordIdSlot,
                          BSONObj* out,
                          RecordId* dlOut,
                          bool returnOwnedBson) {
     return fetchNextImpl<BSONObj, BSONTraits>(
-        root, resultSlot, recordIdSlot, out, dlOut, returnOwnedBson);
+        root, materializer, recordIdSlot, out, dlOut, returnOwnedBson);
 }
 
 template sbe::PlanState fetchNext<BSONObj::DefaultSizeTrait>(sbe::PlanStage* root,
-                                                             sbe::value::SlotAccessor* resultSlot,
+                                                             sbe::ResultMaterializer* materializer,
                                                              sbe::value::SlotAccessor* recordIdSlot,
                                                              BSONObj* out,
                                                              RecordId* dlOut,
                                                              bool returnOwnedBson);
 
 template sbe::PlanState fetchNext<BSONObj::LargeSizeTrait>(sbe::PlanStage* root,
-                                                           sbe::value::SlotAccessor* resultSlot,
+                                                           sbe::ResultMaterializer* materializer,
                                                            sbe::value::SlotAccessor* recordIdSlot,
                                                            BSONObj* out,
                                                            RecordId* dlOut,

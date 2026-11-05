@@ -261,7 +261,7 @@ ResultMaterializer::ResultMaterializer(value::SlotAccessor* base,
 Value ResultMaterializer::fieldValue(size_t fieldIdx) const {
     const auto& field = _fields[fieldIdx];
     auto view = field.accessor->getViewOfValue();
-    if (view.tagIn(value::TypeTags::bsonObject, value::TypeTags::Object)) {
+    if (view.tag == value::TypeTags::bsonObject) {
         return Value(Document{asOwnedBson(field.accessor, field.bsonAccessor)});
     }
     return convertToValue(view);
@@ -391,6 +391,13 @@ BSONObj ResultMaterializer::toBson(bool mustOwn) {
 
 Document ResultMaterializer::toDocument() {
     if (!hasChanges()) {
+        auto base = _base->getViewOfValue();
+        // We have a base with no changes to apply. If we have an Object, we convert to a Document
+        // and return it. If we have BSON, we can create an owned BSON and use that as the base of
+        // the document.
+        if (base.tag == value::TypeTags::Object) {
+            return convertToValue(base).getDocument();
+        }
         return Document{asOwnedBson(_base, _baseBsonAccessor)};
     }
 

@@ -110,7 +110,8 @@ concept ResultWriter =
  *  - Any other accessor's value is copied once per result, even when the stage owns it. Moving it
  *    out would leave the stage viewing a buffer it no longer owns, and stages expose such values
  *    again without re-owning them.
- *  - An SBE Object value is encoded to BSON once.
+ *  - An SBE Object value is encoded to BSON once by toBson(), and converted to a Document directly
+ *    by toDocument().
  *
  * Every Document returned is owned.
  */
