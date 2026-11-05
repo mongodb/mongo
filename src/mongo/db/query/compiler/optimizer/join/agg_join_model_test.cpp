@@ -214,7 +214,7 @@ TEST_F(PipelineAnalyzerTest, CloneCQWithUpdatedFilterSimplifiesOnlyWhenEnabled) 
 TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateExprNonSimpleCollation) {
     useReverseStringCollator(getExpCtx().get());
 
-    // $expr STP 'C.c = 10' over join A.c = C.c, so an $expr predicate is inferred onto node 0.
+    // $expr STP 'C.c = 10' over join A.c = C.c, so a predicate is inferred onto node 0.
     auto query = R"([
     {
         $lookup: {
@@ -238,20 +238,17 @@ TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateExprNonSimpleCollation) {
     auto& joinGraph = swJoinModel.getValue().getGraph();
     ASSERT_EQ(joinGraph.numNodes(), 2);
 
-    // The inferred $expr predicate reached the rebuilt node 0.
+    // The inferred predicate reached the rebuilt node 0.
     const auto* rebuiltAccessPath = joinGraph.accessPathAt((NodeId)0);
-    ASSERT_EQ(
-        "{ $and: [ { $expr: { $eq: [ \"$c\", { $const: 10 } ] } }, { c: { $_internalExprEq: 10 } } "
-        "] }",
-        rebuiltAccessPath->getPrimaryMatchExpression()->toString());
+    ASSERT_EQ("{ c: { $eq: 10 } }", rebuiltAccessPath->getPrimaryMatchExpression()->toString());
 
     ASSERT_TRUE(CollatorInterface::collatorsMatch(rebuiltAccessPath->getCollatorShared().get(),
                                                   getExpCtx()->getCollator()))
         << "the rebuilt node lost the collator from the original ExpressionContext";
 
-    const auto* internalExprEq = rebuiltAccessPath->getPrimaryMatchExpression()->getChild(1);
-    ASSERT_EQ(internalExprEq->matchType(), MatchExpression::INTERNAL_EXPR_EQ);
-    ASSERT_EQ(static_cast<const ComparisonMatchExpressionBase*>(internalExprEq)->getCollator(),
+    const auto* inferredEq = rebuiltAccessPath->getPrimaryMatchExpression();
+    ASSERT_EQ(inferredEq->matchType(), MatchExpression::EQ);
+    ASSERT_EQ(static_cast<const ComparisonMatchExpressionBase*>(inferredEq)->getCollator(),
               rebuiltAccessPath->getExpCtx()->getCollator())
         << "the rebuilt filter is not bound to its own ExpressionContext's collator";
 }
@@ -459,9 +456,7 @@ TEST_F(PipelineAnalyzerTest, PropagateSTPsThruJoinChain) {
 
     const auto* baseCollCQ = joinGraph.accessPathAt((NodeId)0);
     ASSERT_EQ(baseCollCQ->nss().coll(), "pipeline_test");
-    auto expectedChildren =
-        "{ $and: [ { $expr: { $eq: [ \"$a\", { $const: 3 } ] } }, { $expr: { $eq: [ \"$b\", { "
-        "$const: 4 } ] } }, { a: { $_internalExprEq: 3 } }, { b: { $_internalExprEq: 4 } } ] }";
+    auto expectedChildren = "{ $and: [ { a: { $eq: 3 } }, { b: { $eq: 4 } } ] }";
 
     ASSERT_EQ(expectedChildren, baseCollCQ->getPrimaryMatchExpression()->toString());
 
@@ -474,9 +469,7 @@ TEST_F(PipelineAnalyzerTest, PropagateSTPsThruJoinChain) {
 
     const auto* cCollCQ = joinGraph.accessPathAt((NodeId)2);
     ASSERT_EQ(cCollCQ->nss().coll(), "C");
-    expectedChildren =
-        "{ $and: [ { $expr: { $eq: [ \"$a\", { $const: 3 } ] } }, { a: { $_internalExprEq: 3 } } ] "
-        "}";
+    expectedChildren = "{ a: { $eq: 3 } }";
     ASSERT_EQ(expectedChildren, cCollCQ->getPrimaryMatchExpression()->toString());
 }
 
@@ -589,9 +582,7 @@ TEST_F(PipelineAnalyzerTest, JoinChainWithPartialSTPPropagation) {
 
     auto* baseCollCQ = joinGraph.accessPathAt((NodeId)0);
     ASSERT_EQ(baseCollCQ->nss().coll(), "pipeline_test");
-    auto expectedChildren =
-        "{ $and: [ { y: { $eq: 5 } }, { $expr: { $eq: [ \"$x\", { $const: 100 } ] } }, { x: { "
-        "$_internalExprEq: 100 } } ] }";
+    auto expectedChildren = "{ $and: [ { x: { $eq: 100 } }, { y: { $eq: 5 } } ] }";
     ASSERT_EQ(expectedChildren, baseCollCQ->getPrimaryMatchExpression()->toString());
 
     auto* bCollCQ = joinGraph.accessPathAt((NodeId)1);
@@ -606,19 +597,17 @@ TEST_F(PipelineAnalyzerTest, JoinChainWithPartialSTPPropagation) {
     ASSERT_EQ(cCollCQ->nss().coll(), "C");
     std::vector<std::string> expectedChildrenVec = {
         "{ $expr: { $eq: [ \"$q\", { $const: 42 } ] } }",
-        "{ $expr: { $eq: [ \"$x\", { $const: 100 } ] } }",
-        "{ n: { $_internalExprEq: 500 } }",
+        "{ n: { $eq: 500 } }",
         "{ q: { $_internalExprEq: 42 } }",
-        "{ x: { $_internalExprEq: 100 } }"};
+        "{ x: { $eq: 100 } }"};
     ASSERT_EQ(expectedChildrenVec, sortedAndChildStrings(cCollCQ->getPrimaryMatchExpression()));
 
     auto* dCollCQ = joinGraph.accessPathAt((NodeId)3);
     ASSERT_EQ(dCollCQ->nss().coll(), "D");
     expectedChildren =
         "{ $and: [ { $or: [ { r: { $_internalExprEq: 7 } }, { r: { $_internalExprEq: 8 } } ] }, { "
-        "$expr: { $or: [ { $eq: [ \"$r\", { $const: 7 } ] }, { $eq: [ \"$r\", { $const: 8 } ] } ] "
-        "} }, { $expr: { $eq: [ \"$o\", { $const: 500 } ] } }, { o: { $_internalExprEq: 500 } } ] "
-        "}";
+        "o: { $eq: 500 } }, { $expr: { $or: [ { $eq: [ \"$r\", { $const: 7 } ] }, { $eq: [ \"$r\", "
+        "{ $const: 8 } ] } ] } } ] }";
     ASSERT_EQ(expectedChildren, dCollCQ->getPrimaryMatchExpression()->toString());
 }
 
@@ -796,7 +785,7 @@ TEST_F(PipelineAnalyzerTest, PreserveEqExprSemantics) {
 
     // This query has STPs with a mix of $eq and $expr semantics.
     // For join A.a = B.b and B.b = 5 ($eq semantics) and A.c = C.c and C.c = 10 ($expr semantics),
-    // we need to propagate A.a = 5 with $eq semantics and A.c = 10 with $expr semantics
+    // we propagate A.a = 5 and A.c = 10, both with $eq semantics. C keeps its $expr predicate.
     const auto query = R"([
     {
         $lookup: {
@@ -858,9 +847,7 @@ TEST_F(PipelineAnalyzerTest, PreserveEqExprSemantics) {
 
     const auto* baseCollCQ = joinGraph.accessPathAt((NodeId)0);
     ASSERT_EQ(baseCollCQ->nss().coll(), "pipeline_test");
-    auto expectedChildren =
-        "{ $and: [ { a: { $eq: 5 } }, { $expr: { $eq: [ \"$c\", { $const: 10 } ] } }, { c: { "
-        "$_internalExprEq: 10 } } ] }";
+    auto expectedChildren = "{ $and: [ { a: { $eq: 5 } }, { c: { $eq: 10 } } ] }";
     ASSERT_EQ(expectedChildren, baseCollCQ->getPrimaryMatchExpression()->toString());
 
     const auto* bCollCQ = joinGraph.accessPathAt((NodeId)1);
@@ -876,17 +863,67 @@ TEST_F(PipelineAnalyzerTest, PreserveEqExprSemantics) {
     ASSERT_EQ(expectedChildren, cCollCQ->getPrimaryMatchExpression()->toString());
 }
 
+TEST_F(PipelineAnalyzerTest, PropagateExprEqNullAsRegularEquality) {
+    const auto* basePredicate = R"([
+            {$match: {$expr: {$eq: ["$a", null]}}},
+            {$lookup: {from: "B", localField: "a", foreignField: "b", as: "Bdocs"}},
+            {$unwind: "$Bdocs"}
+        ])";
+    const auto* foreignPredicate = R"([
+            {$lookup: {from: "B", localField: "a", foreignField: "b", as: "Bdocs", pipeline: [
+                {$match: {$expr: {$eq: ["$b", null]}}}
+            ]}},
+            {$unwind: "$Bdocs"}
+        ])";
+    for (const auto* query : {basePredicate, foreignPredicate}) {
+        auto pipeline = makePipeline(query, {"B"});
+        markFieldsAsScalar(*pipeline, {"a"sv}, {{"B", {"b"sv}}});
+
+        auto swJoinModel = AggJoinModel::constructJoinModel(
+            *pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+        ASSERT_OK(swJoinModel) << query;
+        ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 1) << query;
+
+        const auto& joinGraph = swJoinModel.getValue().getGraph();
+        const bool onBase = query == basePredicate;
+        ASSERT_EQ(onBase ? "{ b: { $eq: null } }" : "{ a: { $eq: null } }",
+                  joinGraph.accessPathAt(onBase ? NodeId{1} : NodeId{0})
+                      ->getPrimaryMatchExpression()
+                      ->toString())
+            << query;
+    }
+}
+
+TEST_F(PipelineAnalyzerTest, PropagateMixedEqAndExprEqOnSameField) {
+    // A.a has both a regular $eq and an $expr equality. Both are inferred onto B.b as $eq.
+    const auto query = R"([
+            {$match: {a: 1, $expr: {$eq: ["$a", 1]}}},
+            {$lookup: {from: "B", localField: "a", foreignField: "b", as: "Bdocs"}},
+            {$unwind: "$Bdocs"}
+        ])";
+    auto pipeline = makePipeline(query, {"B"});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"B", {"b"sv}}});
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 1);
+
+    const auto& joinGraph = swJoinModel.getValue().getGraph();
+    ASSERT_EQ("{ b: { $eq: 1 } }",
+              joinGraph.accessPathAt(NodeId{1})->getPrimaryMatchExpression()->toString());
+}
+
 TEST_F(PipelineAnalyzerTest, PreserveEqExprSemanticsInAJoinCycle) {
 
     // This query is a four-node cyclic join graph with five join predicates that contain a mix of
     // $eq and $expr semantics.
 
-    // 1. A.x = B.x where A.x = 1  (propagate B.x = 1 to B, $eq semantics)
-    // 2. A.z = C.z, A.x = C.x (propagate A.z = 5, $expr semantics and propagate C.x = 1, $eq
-    // semantics)
-    // 3. B.y = C.y where C.y = 10 (propagate B.y = 10 $expr semantics).
-    // 4. D.w = C.w where D.w = 2 (propagate C.w = 2, $expr semantics) and D.p = A.x (propagate D.p
-    // = 1, $eq semantics)
+    // 1. A.x = B.x where A.x = 1  (propagate B.x = 1 to B)
+    // 2. A.z = C.z, A.x = C.x (propagate A.z = 5 and C.x = 1)
+    // 3. B.y = C.y where C.y = 10 (propagate B.y = 10).
+    // 4. D.w = C.w where D.w = 2 (propagate C.w = 2) and D.p = A.x (propagate D.p = 1)
+    // $expr predicates are propagated with $eq semantics and stay on their own node.
     const auto query = R"([
         { $match: { x: 1 } },
         { $lookup: { from: "B", localField: "x", foreignField: "x", as: "bDocs" } },
@@ -958,25 +995,20 @@ TEST_F(PipelineAnalyzerTest, PreserveEqExprSemanticsInAJoinCycle) {
 
     const auto* baseCollCQ = joinGraph.accessPathAt((NodeId)0);
     ASSERT_EQ(baseCollCQ->nss().coll(), "pipeline_test");
-    auto expectedChildren =
-        "{ $and: [ { x: { $eq: 1 } }, { $expr: { $eq: [ \"$z\", { $const: 5 } ] } }, { z: { "
-        "$_internalExprEq: 5 } } ] }";
+    auto expectedChildren = "{ $and: [ { x: { $eq: 1 } }, { z: { $eq: 5 } } ] }";
     ASSERT_EQ(expectedChildren, baseCollCQ->getPrimaryMatchExpression()->toString());
 
     const auto* bCollCQ = joinGraph.accessPathAt((NodeId)1);
     ASSERT_EQ(bCollCQ->nss().coll(), "B");
-    expectedChildren =
-        "{ $and: [ { x: { $eq: 1 } }, { $expr: { $eq: [ \"$y\", { $const: 10 } ] } }, { y: { "
-        "$_internalExprEq: 10 } } ] }";
+    expectedChildren = "{ $and: [ { x: { $eq: 1 } }, { y: { $eq: 10 } } ] }";
     ASSERT_EQ(expectedChildren, bCollCQ->getPrimaryMatchExpression()->toString());
 
     const auto* cCollCQ = joinGraph.accessPathAt((NodeId)2);
     ASSERT_EQ(cCollCQ->nss().coll(), "C");
     expectedChildren =
-        "{ $and: [ { x: { $eq: 1 } }, { $expr: { $and: [ { $eq: [ \"$y\", { $const: 10 } ] }, { "
-        "$eq: [ \"$z\", { $const: 5 } ] } ] } }, { $expr: { $eq: [ \"$w\", { $const: 2 } ] } }, { "
-        "w: { $_internalExprEq: 2 } }, { y: { $_internalExprEq: 10 } }, { "
-        "z: { $_internalExprEq: 5 } } ] }";
+        "{ $and: [ { w: { $eq: 2 } }, { x: { $eq: 1 } }, { $expr: { $and: [ { $eq: [ \"$y\", { "
+        "$const: 10 } ] }, { $eq: [ \"$z\", { $const: 5 } ] } ] } }, { y: { $_internalExprEq: 10 } "
+        "}, { z: { $_internalExprEq: 5 } } ] }";
     ASSERT_EQ(expectedChildren, cCollCQ->getPrimaryMatchExpression()->toString());
 
     const auto* dCollCQ = joinGraph.accessPathAt((NodeId)3);

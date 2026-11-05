@@ -25,12 +25,12 @@ namespace mongo::join_ordering {
  * destroyed (see  propagateSingleTablePredicate() for more details). Thus we return the original
  * backing BSONObj to eventually be attached to the AggJoinModel instance.
  *
+ * $expr equalities are inferred as regular $eq, which is only correct in the absence of arrays.
  */
 StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
     MutableJoinGraph& graph,
     const std::vector<ResolvedPath>& resolvedPaths,
     size_t maxNodes,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     OpDebug::JoinOptimizationMetrics& metrics);
 
 /**

@@ -4,10 +4,9 @@
 #include "mongo/db/query/compiler/optimizer/join/predicate_inferer.h"
 
 #include "mongo/db/exec/classic/subplanning_utils.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -23,83 +22,15 @@ namespace mongo::join_ordering {
 
 
 /*
- * This helper modifies a single table predicate that is written in $expr syntax so that the paths
- * match the target node's field. eg consider the join A.a = C.c and the STP on node C, { $expr: {
- * $eq: [ "$c", { $const: 10 }. For node A the targetField will be "a" and as such, this helper will
- * return, { $expr: { $eq: [ "$a", { $const: 10 }.
- */
-boost::intrusive_ptr<Expression> rewritePipelineExpressionPath(Expression* expr,
-                                                               ExpressionContext* expCtx,
-                                                               const std::string& targetField) {
-
-    if (!expr) {
-        return nullptr;
-    }
-
-    // The pipeline expression tree is immutable so to rewrite the field path, we create a new
-    // ExpressionFieldPath with the path value for this equivalence class on the target node (eg
-    // targetField). Borrowing the example above, this is where we effectively change "y" to "x"
-    // so the STP (expr) can be applied to the target node A.
-    if (dynamic_cast<ExpressionFieldPath*>(expr)) {
-        return ExpressionFieldPath::createPathFromString(
-            expCtx, targetField, expCtx->variablesParseState);
-    }
-
-    if (auto* cmp = dynamic_cast<ExpressionCompare*>(expr)) {
-        std::vector<boost::intrusive_ptr<Expression>> newChildren;
-        for (auto& child : cmp->getChildren()) {
-            newChildren.push_back(rewritePipelineExpressionPath(child.get(), expCtx, targetField));
-        }
-        return boost::intrusive_ptr<Expression>(
-            new ExpressionCompare(expCtx, cmp->getOp(), std::move(newChildren)));
-    }
-
-    if (auto* andExpr = dynamic_cast<ExpressionAnd*>(expr)) {
-        std::vector<boost::intrusive_ptr<Expression>> newChildren;
-
-        for (auto& child : andExpr->getChildren()) {
-            newChildren.push_back(rewritePipelineExpressionPath(child.get(), expCtx, targetField));
-        }
-
-        return boost::intrusive_ptr<Expression>(new ExpressionAnd(expCtx, std::move(newChildren)));
-    }
-
-    if (auto* orExpr = dynamic_cast<ExpressionOr*>(expr)) {
-        std::vector<boost::intrusive_ptr<Expression>> newChildren;
-
-        for (auto& child : orExpr->getChildren()) {
-            newChildren.push_back(rewritePipelineExpressionPath(child.get(), expCtx, targetField));
-        }
-
-        return boost::intrusive_ptr<Expression>(new ExpressionOr(expCtx, std::move(newChildren)));
-    }
-
-    return expr->clone(*expCtx);
-}
-
-/*
  * This helper rewrites the single table predicate's path to match the target node's field.
  * eg we have join A.x = B.y and STP B.y = 5. This helper ensures we propogate the access path
  * A.x = 5 and *not* A.y = 5.
- *
- * If the STP is written in $eq syntax, it will just update the PathMatchExpression leafs.
- * If the STP is written in $expr syntax, it calls a helper to walk the underlying pipeline
- * expression tree to rewrite the field paths to match the target node.
  */
 std::unique_ptr<MatchExpression> rewriteMatchExpressionPath(std::unique_ptr<MatchExpression> expr,
-                                                            const std::string& targetField,
-                                                            ExpressionContext* expCtx) {
+                                                            const std::string& targetField) {
 
     if (!expr)
         return nullptr;
-
-    if (auto* exprMatch = dynamic_cast<ExprMatchExpression*>(expr.get())) {
-        // ExprMatchExpression is an ME wrapper around a pipeline expression. We need to access and
-        // descend the pipeline expression tree to successfully rewrite the paths.
-        auto rewritten =
-            rewritePipelineExpressionPath(exprMatch->getExpression().get(), expCtx, targetField);
-        return std::make_unique<ExprMatchExpression>(rewritten, expCtx);
-    }
 
     if (auto* pathExpr = dynamic_cast<PathMatchExpression*>(expr.get())) {
         pathExpr->setPath(targetField);
@@ -108,189 +39,108 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionPath(std::unique_ptr<Matc
     for (size_t i = 0; i < expr->numChildren(); ++i) {
         // resetChild takes ownership; clone+rewrite the child and reset.
         auto childClone = std::unique_ptr<MatchExpression>(expr->getChild(i)->clone().release());
-        auto rewrittenChild =
-            rewriteMatchExpressionPath(std::move(childClone), targetField, expCtx);
+        auto rewrittenChild = rewriteMatchExpressionPath(std::move(childClone), targetField);
         expr->resetChild(i, rewrittenChild.release());
     }
 
     return expr;
 }
 
-
-using SingleTablePredicate =
-    std::variant<boost::intrusive_ptr<Expression>, std::unique_ptr<MatchExpression>>;
-SingleTablePredicate pipelineExpression, matchExpression;
-
-/*
- * Combines a vector of SingleTablePredicate children into a single predicate using
- * the appropriate AND/OR constructor depending on whether the children are all
- * Expressions or all MatchExpressions.
- */
-template <typename ExprCombinator, typename MatchCombinator>
-boost::optional<SingleTablePredicate> combineChildren(
-    std::vector<SingleTablePredicate> children,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-
-    bool allExpr = std::all_of(children.begin(), children.end(), [](auto& c) {
-        return std::holds_alternative<boost::intrusive_ptr<Expression>>(c);
-    });
-    if (allExpr) {
-        std::vector<boost::intrusive_ptr<Expression>> exprChildren;
-        exprChildren.reserve(children.size());
-        for (auto& c : children) {
-            exprChildren.push_back(std::move(std::get<boost::intrusive_ptr<Expression>>(c)));
-        }
-        auto combined = make_intrusive<ExprCombinator>(expCtx.get(), std::move(exprChildren));
-        return SingleTablePredicate{combined->optimize()};
-    }
-
-    bool allMatch = std::all_of(children.begin(), children.end(), [](auto& c) {
-        return std::holds_alternative<std::unique_ptr<MatchExpression>>(c);
-    });
-    if (allMatch) {
-        auto combined = std::make_unique<MatchCombinator>();
-        for (auto& c : children) {
-            combined->add(std::move(std::get<std::unique_ptr<MatchExpression>>(c)));
-        }
-        return SingleTablePredicate{std::move(combined)};
-    }
-
-    return {};
-}
-
 /*
  * This is a recursive function that descends a join node's access path (expr) to return any single
  * table predicates that reference the node's fieldPath that is associated with this given
- * equivalence class.
+ * equivalence class. Returns nullptr if there are none.
  *
  * For example consider the join A.a = B.b, A.c = B.c and the predicate A.a = 4
  * and A.c = 2. This will create two EC: {A.a, B.b} and {A.c, B.c} and a filter on A, {a: 4, c: 2}.
  * For the first EC, we want to only return {a: 4} and not include the filter on c.
  *
- * We have to be careful to preserve $eq vs $expr semantics. As such, this function returns either a
- * MatchExpression or PipelineExpression. Later on, finalizeSTPForTargetNode() will take care of
- * converting PipelineExpressions to MatchExpressions.
+ * $expr equalities are returned as regular $eq, and the $expr predicate itself stays on its own
+ * node. A regular $eq is implied on the other nodes across both $eq and $expr join edges. The $expr
+ * equality is not: {$expr: {$eq: ["$a", null]}} does not match a missing 'a', but a
+ * localField/foreignField join matches missing to null.
+ *
+ * This is only correct because join fields are never arrays, which join optimization enforces.
+ * With arrays, neither form implies the other: {"a.b": {$eq: [3]}} matches {a: [{b: [3]}]} but not
+ * {a: [{b: 3}]}  and {$expr: {$eq: ["$a.b", [3]]}} matches the opposite.
  */
-boost::optional<SingleTablePredicate> getSingleTablePredicateForField(
-    const MatchExpression* expr,
-    const FieldPath& fieldPath,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+std::unique_ptr<MatchExpression> getSingleTablePredicateForField(const MatchExpression* expr,
+                                                                 const FieldPath& fieldPath) {
 
     if (!expr) {
-        return {};
+        return nullptr;
     }
 
     if (ComparisonMatchExpressionBase::isEquality(expr->matchType())) {
         // Ensure that the field associated with this leaf path expression is the same as the field
         // passed to this function (eg the field associated with this node in this equivalence
         // class).
-        const auto* cmp = dynamic_cast<const ComparisonMatchExpressionBase*>(expr);
+        const auto* cmp = checked_cast<const ComparisonMatchExpressionBase*>(expr);
         if (cmp->path() != fieldPath.fullPath()) {
-            return {};
+            return nullptr;
         }
 
-        // Preserve $eq vs $expr semantics.
         if (ComparisonMatchExpressionBase::isInternalExprComparison(expr->matchType())) {
-            // This case represents the $expr case!
-            // More specifically, we're dealing with $_internalExprEq, which is an internal operator
-            // the optimizer adds to the we $expr expression for indexability. To preserve $expr
-            // semantics and replace the incomplete/internal representation, we rewrite
-            // $_internalExprEq MatchExpression as an $eq pipeline expression.
-            const ComparisonMatchExpressionBase* cmp =
-                dynamic_cast<const ComparisonMatchExpressionBase*>(expr);
-            auto field = static_cast<std::string>(cmp->path());
-            BSONElement value = cmp->getData();
-            auto fieldExpr = ExpressionFieldPath::createPathFromString(
-                expCtx.get(), field, expCtx->variablesParseState);
-            auto constExpr = ExpressionConstant::create(expCtx.get(), Value(value));
-            auto eqExpr = ExpressionCompare::create(
-                expCtx.get(), ExpressionCompare::CmpOp::EQ, fieldExpr, constExpr);
-            return SingleTablePredicate{eqExpr};
+            // $_internalExprEq comes from an $expr equality, which we infer as a regular $eq.
+            return std::make_unique<EqualityMatchExpression>(cmp->path(), Value(cmp->getData()));
         }
         // This is an $eq MatchExpression. To preserve $eq semantics, we just return a copy
         // untouched.
-        return SingleTablePredicate{expr->clone()};
+        return expr->clone();
     }
 
     if (expr->matchType() == MatchExpression::MATCH_IN) {
         const auto* inExpr = checked_cast<const InMatchExpression*>(expr);
         if (inExpr->path() != fieldPath.fullPath()) {
-            return {};
+            return nullptr;
         }
 
-        return SingleTablePredicate{inExpr->clone()};
+        return inExpr->clone();
     }
 
     if (expr->matchType() == MatchExpression::AND) {
-        std::vector<SingleTablePredicate> children;
+        std::vector<std::unique_ptr<MatchExpression>> children;
         for (size_t i = 0; i < expr->numChildren(); ++i) {
-            auto child = getSingleTablePredicateForField(expr->getChild(i), fieldPath, expCtx);
-            if (child) {
-                children.push_back(std::move(*child));
+            if (auto child = getSingleTablePredicateForField(expr->getChild(i), fieldPath)) {
+                children.push_back(std::move(child));
             }
         }
 
         if (children.empty()) {
-            return {};
+            return nullptr;
         }
 
         if (children.size() == 1) {
             return std::move(children[0]);
         }
 
-        if (auto combined =
-                combineChildren<ExpressionAnd, AndMatchExpression>(std::move(children), expCtx)) {
-            return combined;
+        auto andExpr = std::make_unique<AndMatchExpression>();
+        for (auto& child : children) {
+            andExpr->add(std::move(child));
         }
+        return andExpr;
     }
 
     // Do not support $or, $nor, $not
-    return {};
+    return nullptr;
 }
 
 /*
  * This function finalizes the single table predicate so that it can be correctly propagated across
- * the equivalence class.
- * This includes three steps:
- * 1. Unify pred into match-expression form. A MatchExpression input is cloned as-is; a
- * PipelineExpression input is wrapped in $expr to produce an equivalent MatchExpression.
- * 2. Ensure the resulting MatchExpression's field paths match the target node's field paths and if
- * not, rewrite them to match.
+ * the equivalence class: it clones the predicate and, if the target node's field differs from the
+ * source node's, rewrites the field paths to match.
  */
-StatusWith<std::unique_ptr<MatchExpression>> finalizeSTPForTargetNode(
-    const SingleTablePredicate& pred,
+std::unique_ptr<MatchExpression> finalizeSTPForTargetNode(
+    const MatchExpression& pred,
     const std::vector<ResolvedPath>& resolvedPaths,
-    MutableJoinGraph& graph,
     PathId pathId,
     const FieldPath& sourceFieldName) {
 
-    auto& targetNode = graph.getNode(resolvedPaths[pathId].nodeId);
-    auto targetNodeExpCtx = targetNode.accessPath->getExpCtx().get();
     const auto& targetFieldName = resolvedPaths[pathId].underlyingFieldPath;
-    // Step 1: Get a MatchExpression, regardless of which alternative pred holds.
-    std::unique_ptr<MatchExpression> matchExpr = std::visit(
-        [&](const auto& singletablepreciate) -> std::unique_ptr<MatchExpression> {
-            using T = std::decay_t<decltype(singletablepreciate)>;
-            if constexpr (std::is_same_v<T, boost::intrusive_ptr<Expression>>) {
-                // Wrap a clone of the pipeline Expression in $expr.
-                return std::make_unique<ExprMatchExpression>(
-                    singletablepreciate->clone(*targetNodeExpCtx), targetNodeExpCtx);
-            } else {
-                // singletablepreciate is std::unique_ptr<MatchExpression>; clone it directly.
-                return singletablepreciate->clone();
-            }
-        },
-        pred);
-
-    if (!matchExpr) {
-        return Status(ErrorCodes::BadValue, "There is no predicate");
-    }
-
+    auto matchExpr = pred.clone();
     if (sourceFieldName != targetFieldName) {
-        matchExpr = rewriteMatchExpressionPath(
-            std::move(matchExpr), targetFieldName.fullPath(), targetNodeExpCtx);
+        matchExpr = rewriteMatchExpressionPath(std::move(matchExpr), targetFieldName.fullPath());
     }
-
     return matchExpr;
 }
 
@@ -334,7 +184,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> cloneCQWithUpdatedFilter(
  * propogates it to all other nodes in said equivalence class.
  */
 Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceClass,
-                                     SingleTablePredicate singleTablePred,
+                                     const MatchExpression& singleTablePred,
                                      PathId sourcePathId,
                                      const std::vector<ResolvedPath>& resolvedPaths,
                                      MutableJoinGraph& graph,
@@ -347,12 +197,8 @@ Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceC
             continue;
         }
         auto& targetNode = graph.getNode(resolvedPaths[pathId].nodeId);
-        auto swSTP = finalizeSTPForTargetNode(
-            singleTablePred, resolvedPaths, graph, pathId, sourceFieldName);
-        if (!swSTP.isOK()) {
-            return swSTP.getStatus();
-        }
-        auto normalizedSTP = std::move(swSTP.getValue());
+        auto normalizedSTP =
+            finalizeSTPForTargetNode(singleTablePred, resolvedPaths, pathId, sourceFieldName);
         auto* currentFilter = targetNode.accessPath->getPrimaryMatchExpression();
 
         // We add STPs to an increasingly large AND, which gets flattened during normalization in
@@ -392,7 +238,7 @@ Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceC
 }
 
 struct SingleTablePredResult {
-    SingleTablePredicate pred;
+    std::unique_ptr<MatchExpression> pred;
     PathId pathId;
     FieldPath fieldName;
 };
@@ -407,8 +253,7 @@ struct SingleTablePredResult {
 boost::optional<SingleTablePredResult> extractSingleTablePredicateFromEquivclass(
     const absl::InlinedVector<PathId, 8>& equivalenceClass,
     MutableJoinGraph& graph,
-    const std::vector<ResolvedPath>& resolvedPaths,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const std::vector<ResolvedPath>& resolvedPaths) {
 
     for (PathId pathId : equivalenceClass) {
         auto& cq = graph.getNode(resolvedPaths[pathId].nodeId).accessPath;
@@ -418,10 +263,10 @@ boost::optional<SingleTablePredResult> extractSingleTablePredicateFromEquivclass
             auto& fieldName = resolvedPaths[pathId].underlyingFieldPath;
             // Confirm that the STP is indeed on the field that is associated with this
             // equivalence class.
-            if (auto pred = getSingleTablePredicateForField(
-                    cq->getPrimaryMatchExpression(), fieldName, expCtx)) {
+            if (auto pred =
+                    getSingleTablePredicateForField(cq->getPrimaryMatchExpression(), fieldName)) {
 
-                return SingleTablePredResult{std::move(*pred), pathId, fieldName};
+                return SingleTablePredResult{std::move(pred), pathId, fieldName};
             }
         }
     }
@@ -441,17 +286,16 @@ StatusWith<std::vector<BSONObj>> inferSingleTablePredicate(
     MutableJoinGraph& graph,
     const std::vector<ResolvedPath>& resolvedPaths,
     stdx::unordered_map<size_t, absl::InlinedVector<PathId, 8>> pathSets,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     OpDebug::JoinOptimizationMetrics& metrics) {
     std::vector<BSONObj> accessPathsBackingBson;
 
     for (const auto& [setId, equivalenceClass] : pathSets) {
-        if (auto res = extractSingleTablePredicateFromEquivclass(
-                equivalenceClass, graph, resolvedPaths, expCtx)) {
+        if (auto res =
+                extractSingleTablePredicateFromEquivclass(equivalenceClass, graph, resolvedPaths)) {
             auto& [singleTablePredicate, pathId, fieldName] = *res;
             // Add the STP to all the other nodes in this equivalence class.
             auto sw = propagateSingleTablePredicate(equivalenceClass,
-                                                    std::move(singleTablePredicate),
+                                                    *singleTablePredicate,
                                                     pathId,
                                                     resolvedPaths,
                                                     graph,
@@ -482,7 +326,6 @@ StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
     MutableJoinGraph& graph,
     const std::vector<ResolvedPath>& resolvedPaths,
     size_t maxNodes,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     OpDebug::JoinOptimizationMetrics& metrics) {
     DisjointSet ds{resolvedPaths.size()};
     for (const auto& edge : graph.edges()) {
@@ -529,7 +372,7 @@ StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
         }
     }
 
-    return inferSingleTablePredicate(graph, resolvedPaths, pathSets, expCtx, metrics);
+    return inferSingleTablePredicate(graph, resolvedPaths, pathSets, metrics);
 }
 
 }  // namespace mongo::join_ordering

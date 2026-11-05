@@ -627,12 +627,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
         return Status(ErrorCodes::QueryFeatureNotAllowed, "Join reordering not allowed");
     }
 
-    auto swVec =
-        addImplicitEdgesAndInferPredicates(graph,
-                                           resolvedPaths,
-                                           buildParams.maxNumberNodesConsideredForImplicitEdges,
-                                           clonedExpCtx,
-                                           metrics);
+    auto swVec = addImplicitEdgesAndInferPredicates(
+        graph, resolvedPaths, buildParams.maxNumberNodesConsideredForImplicitEdges, metrics);
     tassert(13199202, "Failed to add implicit edges and infer predicates", swVec.isOK());
 
     // Update remaining inferred statistics.

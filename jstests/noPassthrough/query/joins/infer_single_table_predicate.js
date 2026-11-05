@@ -353,7 +353,7 @@ runTest({
 
 // Let's make it a little harder!
 // For joins A.a = B.a, A.str_1 = B.str_1 and C.a = B.a and STP B.a = 3 and B.str_1 = "7", we
-// can infer A.a = 3, A.str_1 = "7" and C.a = 3.
+// can infer A.a = 3, A.str_1 = "7" and C.a = 3. The $expr STPs are inferred with $eq semantics.
 runTest({
     pipeline: [
         {
@@ -389,30 +389,7 @@ runTest({
         {$unwind: "$final"},
     ],
     expectedFilters: {
-        A: {
-            "$and": [
-                {
-                    "$expr": {
-                        "$eq": [
-                            "$a",
-                            {
-                                "$const": 3,
-                            },
-                        ],
-                    },
-                },
-                {
-                    "$expr": {
-                        "$eq": [
-                            "$str_1",
-                            {
-                                "$const": "7",
-                            },
-                        ],
-                    },
-                },
-            ],
-        },
+        A: {"$and": [{"a": {"$eq": 3}}, {"str_1": {"$eq": "7"}}]},
         B: {
             "$and": [
                 {
@@ -439,20 +416,7 @@ runTest({
                 },
             ],
         },
-        C: {
-            "$and": [
-                {
-                    "$expr": {
-                        "$eq": [
-                            "$a",
-                            {
-                                "$const": 3,
-                            },
-                        ],
-                    },
-                },
-            ],
-        },
+        C: {"a": {"$eq": 3}},
     },
     expectedResults: [
         {
@@ -604,5 +568,55 @@ runWithParamsAllNonConfigNodes(
         );
     },
 );
+
+{
+    const local = db[jsTestName() + "_null_local"];
+    const foreign = db[jsTestName() + "_null_foreign"];
+    local.drop();
+    foreign.drop();
+    assert.commandWorked(local.insertMany([{_id: 0, a: null}, {_id: 1}]));
+    assert.commandWorked(foreign.insertMany([{_id: 0, b: null}, {_id: 1}]));
+    assert.commandWorked(local.createIndex({a: 1}));
+    assert.commandWorked(foreign.createIndex({b: 1}));
+
+    runTestWithUnorderedComparison({
+        db,
+        description: "$expr null predicate on the base collection",
+        coll: local,
+        pipeline: [
+            {$match: {$expr: {$eq: ["$a", null]}}},
+            {$lookup: {from: foreign.getName(), localField: "a", foreignField: "b", as: "f"}},
+            {$unwind: "$f"},
+        ],
+        expectedResults: [
+            {_id: 0, a: null, f: {_id: 0, b: null}},
+            {_id: 0, a: null, f: {_id: 1}},
+        ],
+        expectedUsedJoinOptimization: true,
+    });
+
+    runTestWithUnorderedComparison({
+        db,
+        description: "$expr null predicate in the $lookup sub-pipeline",
+        coll: local,
+        pipeline: [
+            {
+                $lookup: {
+                    from: foreign.getName(),
+                    localField: "a",
+                    foreignField: "b",
+                    pipeline: [{$match: {$expr: {$eq: ["$b", null]}}}],
+                    as: "f",
+                },
+            },
+            {$unwind: "$f"},
+        ],
+        expectedResults: [
+            {_id: 0, a: null, f: {_id: 0, b: null}},
+            {_id: 1, f: {_id: 0, b: null}},
+        ],
+        expectedUsedJoinOptimization: true,
+    });
+}
 
 MongoRunner.stopMongod(conn);

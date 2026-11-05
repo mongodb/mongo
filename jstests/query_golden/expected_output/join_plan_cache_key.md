@@ -42,18 +42,18 @@ Hash 2: 61042BC2
 ### Identical keys for queries with $expr in subpipeline with no outer references
 Command 1: {"aggregate":"foo","pipeline":[{"$lookup":{"from":"bar","localField":"a","foreignField":"a","as":"bar","pipeline":[{"$match":{"$expr":{"$eq":["$a",1]}}}]}},{"$unwind":"$bar"}]}  
 Command 2: {"aggregate":"foo","pipeline":[{"$lookup":{"from":"bar","localField":"a","foreignField":"a","as":"bar","pipeline":[{"$match":{"$expr":{"$eq":["$a",2]}}}]}},{"$unwind":"$bar"}]}  
-Hash 1: FAC4B54C  
-Hash 2: FAC4B54C  
+Hash 1: 920D0C0D  
+Hash 2: 920D0C0D  
 ### Identical keys for queries with let argument to aggregate() used in $expr
 Command 1: {"aggregate":"foo","pipeline":[{"$match":{"$expr":{"$eq":["$a","$$var"]}}},{"$lookup":{"from":"bar","localField":"a","foreignField":"a","as":"bar"}},{"$unwind":"$bar"}],"let":{"var":1}}  
 Command 2: {"aggregate":"foo","pipeline":[{"$match":{"$expr":{"$eq":["$a","$$var"]}}},{"$lookup":{"from":"bar","localField":"a","foreignField":"a","as":"bar"}},{"$unwind":"$bar"}],"let":{"var":2}}  
-Hash 1: 91DE93BF  
-Hash 2: 91DE93BF  
+Hash 1: F38F2817  
+Hash 2: F38F2817  
 ### Identical keys for queries with variables in the let argument to aggregate() that are named differently
 Command 1: {"aggregate":"foo","pipeline":[{"$match":{"$expr":{"$eq":["$a","$$var1"]}}},{"$lookup":{"from":"bar","localField":"a","foreignField":"a","as":"bar"}},{"$unwind":"$bar"}],"let":{"var1":1}}  
 Command 2: {"aggregate":"foo","pipeline":[{"$match":{"$expr":{"$eq":["$a","$$var2"]}}},{"$lookup":{"from":"bar","localField":"a","foreignField":"a","as":"bar"}},{"$unwind":"$bar"}],"let":{"var2":2}}  
-Hash 1: 91DE93BF  
-Hash 2: 91DE93BF  
+Hash 1: F38F2817  
+Hash 2: F38F2817  
 ## Queries where different join plan cache keys are expected
 ### Different keys for different base collections
 Command 1: {"aggregate":"foo","pipeline":[{"$lookup":{"from":"bar","localField":"a","foreignField":"a","as":"bar"}},{"$unwind":"$bar"}]}  
@@ -122,7 +122,7 @@ Hash 2: C161941F
 ### Different keys for queries with different fields in $expr
 Command 1: {"aggregate":"foo","pipeline":[{"$match":{"$expr":{"$eq":["$a","$$var"]}}},{"$lookup":{"from":"bar","localField":"a","foreignField":"a","as":"bar"}},{"$unwind":"$bar"}],"let":{"var":1}}  
 Command 2: {"aggregate":"foo","pipeline":[{"$match":{"$expr":{"$eq":["$b","$$var"]}}},{"$lookup":{"from":"bar","localField":"a","foreignField":"a","as":"bar"}},{"$unwind":"$bar"}],"let":{"var":1}}  
-Hash 1: 91DE93BF  
+Hash 1: F38F2817  
 Hash 2: 11614ABD  
 ### Different keys for queries with $unwind with preserveNullAndEmptyArrays true/false
 Command 1: {"aggregate":"foo","pipeline":[{"$lookup":{"from":"bar","localField":"a","foreignField":"a","as":"bar"}},{"$unwind":{"path":"$bar","preserveNullAndEmptyArrays":true}}]}  
