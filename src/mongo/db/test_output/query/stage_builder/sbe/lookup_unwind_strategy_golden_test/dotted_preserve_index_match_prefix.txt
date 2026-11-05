@@ -4,6 +4,7 @@
 { $match: { a: { $exists: true } } }
 
 ## HashJoin
+$$RESULT=s13 env: {  }
 [4] filter {exists(s14)} 
 [3] project [s14 = getField(s13, "a")] 
 [3] project [s13 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0), idx = Set(1)], Open, NewObj, 0), s1, s12, s5)] 
@@ -32,6 +33,7 @@
         [2] scan generic [s6 = record, s7 = recordId] [s8 = a, s9 = fkey] @"UUID" 
 
 ## NestedLoopJoin
+$$RESULT=s12 env: {  }
 [4] filter {exists(s13)} 
 [3] project [s13 = getField(s12, "a")] 
 [3] project [s12 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0), idx = Set(1)], Open, NewObj, 0), s1, s6, s11)] 
@@ -54,6 +56,7 @@
         [2] scan generic [s6 = record, s7 = recordId] [s8 = a, s9 = fkey] @"UUID" 
 
 ## IndexedLoopJoin
+$$RESULT=s22 env: { s12 = {"fkey" : 1} }
 [5] filter {exists(s23)} 
 [4] project [s23 = getField(s22, "a")] 
 [4] project [s22 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0), idx = Set(1)], Open, NewObj, 0), s1, s13, s21)] 
@@ -92,6 +95,7 @@
                 [2] ixseek seekKeyLow = s6 seekKeyHigh = s7 [s10 = indexKey, s8 = recordId, s11 = snapshotId, s9 = indexIdent] [] @"UUID" @"fkey_1" forward 
 
 ## DynamicIndexedLoopJoin
+$$RESULT=s28 env: { s12 = {"fkey" : 1} }
 [6] filter {exists(s29)} 
 [5] project [s29 = getField(s28, "a")] 
 [5] project [s28 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0), idx = Set(1)], Open, NewObj, 0), s1, s25, s27)] 

@@ -1,3 +1,4 @@
 # Golden test output of GoldenSbeStageBuilderTest/TestSkipOnly
+$$RESULT=s1 env: { s3 = 2 }
 [2] limitskip none s3 
 [1] scan generic [s1 = record, s2 = recordId] @"UUID" 

@@ -4,6 +4,7 @@
 { $addFields: { computed: { $add: [ "$n", "$a.b.c" ] } } }
 
 ## HashJoin
+$$RESULT=s20 env: {  }
 [4] project [s20 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s15, s19)] 
 [4] project [s19 = 
     if (isNullish(s17) || isNullish(s18)) 
@@ -52,6 +53,7 @@
         [2] scan generic [s7 = record, s8 = recordId] [s9 = a, s10 = fkey, s11 = n] @"UUID" 
 
 ## NestedLoopJoin
+$$RESULT=s19 env: {  }
 [4] project [s19 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s14, s18)] 
 [4] project [s18 = 
     if (isNullish(s16) || isNullish(s17)) 
@@ -94,6 +96,7 @@
         [2] scan generic [s7 = record, s8 = recordId] [s9 = a, s10 = fkey, s11 = n] @"UUID" 
 
 ## IndexedLoopJoin
+$$RESULT=s29 env: { s13 = {"fkey" : 1} }
 [5] project [s29 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s24, s28)] 
 [5] project [s28 = 
     if (isNullish(s26) || isNullish(s27)) 
@@ -152,6 +155,7 @@
                 [2] ixseek seekKeyLow = s7 seekKeyHigh = s8 [s11 = indexKey, s9 = recordId, s12 = snapshotId, s10 = indexIdent] [] @"UUID" @"fkey_1" forward 
 
 ## DynamicIndexedLoopJoin
+$$RESULT=s36 env: { s13 = {"fkey" : 1} }
 [6] project [s36 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s31, s35)] 
 [6] project [s35 = 
     if (isNullish(s33) || isNullish(s34)) 

@@ -4,6 +4,7 @@
 { $match: { idx: { $gt: 0 } } }
 
 ## HashJoin
+$$RESULT=s11 env: {  }
 [4] project [s11 = makeBsonObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s10)] 
 [4] hash_lookup_unwind inner s10 
     outer s8 
@@ -31,6 +32,7 @@
         [3] scan generic [s5 = record, s6 = recordId] [s7 = fkey] @"UUID" 
 
 ## NestedLoopJoin
+$$RESULT=s9 env: {  }
 [4] project [s9 = makeBsonObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s5)] 
 [4] nlj inner [s1] [s8] 
     left 
@@ -50,6 +52,7 @@
         [3] scan generic [s5 = record, s6 = recordId] [s7 = fkey] @"UUID" 
 
 ## IndexedLoopJoin
+$$RESULT=s19 env: { s11 = {"fkey" : 1} }
 [5] project [s19 = makeBsonObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s12)] 
 [5] nlj inner [s1] [s15] 
     left 
@@ -85,6 +88,7 @@
                 [3] ixseek seekKeyLow = s5 seekKeyHigh = s6 [s9 = indexKey, s7 = recordId, s10 = snapshotId, s8 = indexIdent] [] @"UUID" @"fkey_1" forward 
 
 ## DynamicIndexedLoopJoin
+$$RESULT=s24 env: { s11 = {"fkey" : 1} }
 [6] project [s24 = makeBsonObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s22)] 
 [6] nlj inner [s1] [s18, s1] 
     left 

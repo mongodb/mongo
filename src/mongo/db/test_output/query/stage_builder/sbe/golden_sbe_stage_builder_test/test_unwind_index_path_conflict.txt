@@ -1,4 +1,5 @@
 # Golden test output of GoldenSbeStageBuilderTest/TestUnwindIndexPathConflict
+$$RESULT=s6 env: {  }
 [2] project [s6 = 
     if exists(s3) 
     then makeBsonObj(MakeObjSpec([a = MakeObj([val = Set(0), idx = Set(1)], Open, NewObj, 0)], Open, NewObj, 0), s2, s4, s5) 

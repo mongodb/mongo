@@ -1,4 +1,5 @@
 # Golden test output of GoldenSbeStageBuilderTest/TestReplaceRoot
+$$RESULT=s4 env: {  }
 [2] project [s4 = 
     let [
         l2.0 = (s3 ?: null) 

@@ -1,4 +1,5 @@
 # Golden test output of SbeTimeseriesTest/TestGroupMax
+$$RESULT=s21 env: { s10 = Nothing (nothing), s20 = {} (emptyObj) }
 [5] sort [s22] [asc] [s21] 9223372036854775807ll 
 [5] project [s22 = getSortKeyAsc(s19)] 
 [4] project [s21 = makeBsonObj(MakeObjSpec([max = Add(0)], Closed, NewObj, 0), s20, s19)] 

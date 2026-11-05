@@ -238,7 +238,8 @@ GoldenSbeStageBuilderTestFixture::PlanRun GoldenSbeStageBuilderTestFixture::runP
     ASSERT_EQ(resultAccessors.size(), 1u);
 
     sbe::DebugPrintInfo debugPrintInfo{};
-    std::string explain = sbe::DebugPrinter().print(*stage.get(), debugPrintInfo);
+    std::string explain =
+        data.debugString() + "\n" + sbe::DebugPrinter().print(*stage.get(), debugPrintInfo);
     for (const auto& uuid : uuids) {
         explain = replaceUuid(std::move(explain), uuid);
     }

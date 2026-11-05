@@ -1,4 +1,5 @@
 # Golden test output of GoldenSbeStageBuilderTest/TestMatch
+$$RESULT=s4 env: {  }
 [3] project [s4 = newBsonObj("a", s3)] 
 [2] filter {false} 
 [1] project [s3 = getField(s2, "a")] 
