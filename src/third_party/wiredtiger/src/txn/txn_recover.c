@@ -842,42 +842,6 @@ __recovery_metadata_scan_prefix(WT_RECOVERY *r, const char *prefix, const char *
 }
 
 /*
- * __metadata_assert_complete_layered_table --
- *     Assert that all required metadata entries are present for a layered table.
- */
-static int
-__metadata_assert_complete_layered_table(WT_SESSION_IMPL *session, const char *name, bool leader)
-{
-    WT_DECL_ITEM(meta_key_buf);
-    WT_DECL_RET;
-    char *ingest_meta_value, *stable_meta_value;
-
-    ingest_meta_value = stable_meta_value = NULL;
-    WT_ERR(__wt_scr_alloc(session, 0, &meta_key_buf));
-
-    WT_ERR(__wt_buf_fmt(session, meta_key_buf, "file:%s.wt_ingest", name));
-    WT_ASSERT_ALWAYS(session,
-      __wt_metadata_search(session, meta_key_buf->data, &ingest_meta_value) == 0,
-      "layered table '%s' is missing its ingest file metadata", name);
-
-    /*
-     * The stable table may not exist on the follower in some situations, e.g. we created a new
-     * layered table from the oplog but haven't yet picked up a checkpoint. Thus the stable file
-     * metadata entry is only strictly required in leader mode.
-     */
-    WT_ERR(__wt_buf_fmt(session, meta_key_buf, "file:%s.wt_stable", name));
-    WT_ASSERT_ALWAYS(session,
-      !leader || __wt_metadata_search(session, meta_key_buf->data, &stable_meta_value) == 0,
-      "layered table '%s' is missing its stable file metadata on a leader node", name);
-
-err:
-    __wt_free(session, ingest_meta_value);
-    __wt_free(session, stable_meta_value);
-    __wt_scr_free(session, &meta_key_buf);
-    return (ret);
-}
-
-/*
  * __metadata_clean_incomplete_table --
  *     For each table metadata entry, check that the table was fully created. If not, clean up the
  *     incomplete table.
@@ -919,7 +883,13 @@ __metadata_clean_incomplete_table(WT_RECOVERY *r, const char *uri, const char *c
     WT_ERR_NOTFOUND_OK(
       __wt_metadata_search(r->session, meta_key_buf->data, &layered_meta_value), true);
     if (ret == 0) {
-        WT_ERR(__metadata_assert_complete_layered_table(r->session, name, r->leader));
+        /* Ingest metadata is created lazily, and stable metadata is optional on followers. */
+        if (r->leader) {
+            WT_ERR(__wt_buf_fmt(r->session, meta_key_buf, "file:%s.wt_stable", name));
+            WT_ASSERT_ALWAYS(r->session,
+              __wt_metadata_search(r->session, meta_key_buf->data, &file_meta_value) == 0,
+              "layered table '%s' is missing its stable file metadata on a leader node", name);
+        }
         goto done;
     }
 

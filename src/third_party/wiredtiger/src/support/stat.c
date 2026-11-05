@@ -3414,6 +3414,7 @@ static const char *const __stats_connection_desc[] = {
   "disagg: drops refused because the table holds unpublished data",
   "disagg: existing file metadata entries updated during checkpoint pick-up",
   "disagg: failed page inserts into the victim cache",
+  "disagg: ingest tables created on first open",
   "disagg: ingest-to-stable tombstone escape bytes stripped",
   "disagg: maximum time spent adding a single page to the victim cache, reset per checkpoint "
   "(usecs)",
@@ -3449,6 +3450,7 @@ static const char *const __stats_connection_desc[] = {
   "disagg: tables created without a stable constituent while the step-down timestamp is set",
   "disagg: time application threads spent adding pages to the victim cache (usecs)",
   "disagg: time spent adding pages to the victim cache (usecs)",
+  "disagg: time spent creating ingest tables on first open (usecs)",
   "disagg: time the most recently adopted checkpoint spent deferred, zero if adopted on delivery "
   "(msecs)",
   "disagg: unpublished schema operations canceled by a drop",
@@ -4596,6 +4598,7 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_DISAGG_DROP_REFUSED_UNPUBLISHED_DATA,
   WT_STAT_CONN_DISAGG_PICK_UP_FILE_META_UPDATED,
   WT_STAT_CONN_DISAGG_VICTIM_CACHE_PUT_FAILURES,
+  WT_STAT_CONN_DISAGG_INGEST_CREATE_ON_OPEN,
   WT_STAT_CONN_DISAGG_INGEST_STABLE_TOMBSTONE_STRIPPED,
   WT_STAT_CONN_DISAGG_VICTIM_CACHE_PUT_TIME_MAX,
   WT_STAT_CONN_DISAGG_CHECKPOINT_META_LSN,
@@ -4626,6 +4629,7 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_DISAGG_STEP_DOWN_WINDOW_CREATES,
   WT_STAT_CONN_DISAGG_VICTIM_CACHE_APP_THREAD_PUT_TIME,
   WT_STAT_CONN_DISAGG_VICTIM_CACHE_PUT_TIME,
+  WT_STAT_CONN_DISAGG_INGEST_CREATE_ON_OPEN_TIME,
   WT_STAT_CONN_DISAGG_CHECKPOINT_DEFER_ADOPT_WAIT,
   WT_STAT_CONN_DISAGG_SCHEMA_CANCELED,
   WT_STAT_CONN_LAYERED_CURS_BLIND_REMOVE_FOLLOWER,
@@ -5800,6 +5804,7 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->disagg_drop_refused_unpublished_data = 0;
     stats->disagg_pick_up_file_meta_updated = 0;
     stats->disagg_victim_cache_put_failures = 0;
+    stats->disagg_ingest_create_on_open = 0;
     stats->disagg_ingest_stable_tombstone_stripped = 0;
     /* not clearing disagg_victim_cache_put_time_max */
     /* not clearing disagg_checkpoint_meta_lsn */
@@ -5830,6 +5835,7 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->disagg_step_down_window_creates = 0;
     stats->disagg_victim_cache_app_thread_put_time = 0;
     stats->disagg_victim_cache_put_time = 0;
+    stats->disagg_ingest_create_on_open_time = 0;
     /* not clearing disagg_checkpoint_defer_adopt_wait */
     stats->disagg_schema_canceled = 0;
     stats->layered_curs_blind_remove_follower = 0;
@@ -7142,6 +7148,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, disagg_pick_up_file_meta_updated);
     to->disagg_victim_cache_put_failures +=
       WT_STAT_CONN_READ(from, disagg_victim_cache_put_failures);
+    to->disagg_ingest_create_on_open += WT_STAT_CONN_READ(from, disagg_ingest_create_on_open);
     to->disagg_ingest_stable_tombstone_stripped +=
       WT_STAT_CONN_READ(from, disagg_ingest_stable_tombstone_stripped);
     to->disagg_victim_cache_put_time_max +=
@@ -7195,6 +7202,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->disagg_victim_cache_app_thread_put_time +=
       WT_STAT_CONN_READ(from, disagg_victim_cache_app_thread_put_time);
     to->disagg_victim_cache_put_time += WT_STAT_CONN_READ(from, disagg_victim_cache_put_time);
+    to->disagg_ingest_create_on_open_time +=
+      WT_STAT_CONN_READ(from, disagg_ingest_create_on_open_time);
     to->disagg_checkpoint_defer_adopt_wait +=
       WT_STAT_CONN_READ(from, disagg_checkpoint_defer_adopt_wait);
     to->disagg_schema_canceled += WT_STAT_CONN_READ(from, disagg_schema_canceled);

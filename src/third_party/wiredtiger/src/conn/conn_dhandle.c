@@ -660,6 +660,9 @@ __wt_conn_dhandle_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t fla
 
     WT_ASSERT(session, !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING_NO_MORE_OPENS));
 
+    /* A layered table's ingest constituent may be created when it is first opened. */
+    WT_RET(__wti_layered_ingest_create_on_open(session));
+
     /* Turn off eviction. */
     if (WT_DHANDLE_BTREE(dhandle))
         WT_RET(__wt_evict_file_exclusive_on(session));

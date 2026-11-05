@@ -246,6 +246,113 @@ __layered_derive_layered_uri(WT_SESSION_IMPL *session, const char *ingest_uri, W
     return (__wt_buf_fmt(session, buf, "layered:%.*s", (int)name_len, ingest_uri + prefix_len));
 }
 
+/*
+ * __wti_layered_create_missing_ingest_table --
+ *     Create a missing ingest table from its layered table's configuration, opening its handle if
+ *     requested. An existing ingest table is left unchanged.
+ */
+int
+__wti_layered_create_missing_ingest_table(
+  WT_SESSION_IMPL *session, const char *ingest_uri, const char *layered_cfg, bool open_dhandle)
+{
+    WT_CONFIG_ITEM key_format, value_format;
+    WT_DECL_ITEM(ingest_config);
+    WT_DECL_RET;
+
+    WT_RET(__wt_config_getones(session, layered_cfg, "key_format", &key_format));
+    WT_RET(__wt_config_getones(session, layered_cfg, "value_format", &value_format));
+
+    /* FIXME-WT-14728: Refactor this with __create_layered? */
+    WT_RET(__wt_scr_alloc(session, 0, &ingest_config));
+    WT_ERR(__wt_buf_fmt(session, ingest_config,
+      "key_format=\"%.*s\",value_format=\"%.*s\","
+      "in_memory=true,log=(enabled=false),"
+      "disaggregated=(page_log=none,storage_source=none)",
+      (int)key_format.len, key_format.str, (int)value_format.len, value_format.str));
+
+    WT_WITH_SCHEMA_LOCK(session,
+      ret = __wt_schema_create_internal(session, ingest_uri, ingest_config->data, open_dhandle));
+    WT_ERR(ret);
+
+    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+      "Created missing ingest table \"%s\" from \"%s\"", ingest_uri, layered_cfg);
+
+err:
+    __wt_scr_free(session, &ingest_config);
+    return (ret);
+}
+
+/*
+ * __wti_layered_ingest_create_on_open --
+ *     Ensure the session's handle, if it is the live ingest constituent of a layered table, has a
+ *     metadata entry to open, creating it from the layered table. Return ENOENT, as for any missing
+ *     object, if no layered table names it.
+ */
+int
+__wti_layered_ingest_create_on_open(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *int_session = NULL;
+    uint64_t elapsed_us = 0, time_start = 0;
+
+    WT_DATA_HANDLE *dhandle = session->dhandle;
+    if (!WT_DHANDLE_BTREE(dhandle) || !WT_URI_IS_INGEST(dhandle->name) ||
+      !__wt_conn_is_disagg(session))
+        return (0);
+    const char *ingest_uri = dhandle->name;
+
+    /* The schema lock serializes the creation with checkpoint pickup and drop. */
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA));
+
+    char *ingest_cfg = NULL;
+    WT_RET_NOTFOUND_OK(ret = __wt_metadata_search(session, ingest_uri, &ingest_cfg));
+    __wt_free(session, ingest_cfg);
+    if (ret == 0)
+        return (0);
+
+    if (WT_STREQ(ingest_uri, "file:.wt_ingest"))
+        return (__wt_set_return(session, ENOENT));
+
+    WT_DECL_ITEM(layered_uri_buf);
+    WT_RET(__wt_scr_alloc(session, 0, &layered_uri_buf));
+    char *layered_cfg = NULL;
+    WT_ERR(__layered_derive_layered_uri(session, ingest_uri, layered_uri_buf));
+    WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, layered_uri_buf->data, &layered_cfg), true);
+    if (ret == 0) {
+        WT_CONFIG_ITEM cval;
+        WT_ERR(__wt_config_getones(session, layered_cfg, "ingest", &cval));
+        if (!WT_CONFIG_MATCH(ingest_uri, cval))
+            ret = WT_NOTFOUND;
+    }
+    if (ret == WT_NOTFOUND)
+        WT_ERR(__wt_set_return(session, ENOENT));
+
+    /*
+     * Use a separate session so schema creation cannot clear the caller's current data handle or
+     * join its metadata tracking.
+     */
+    time_start = __wt_clock(session);
+    WT_ERR(__wt_open_internal_session(S2C(session), "ingest-create-on-open", true,
+      F_MASK(session, WT_SESSION_SAVE_ERRORS), session->lock_flags, &int_session));
+    ret = __wti_layered_create_missing_ingest_table(int_session, ingest_uri, layered_cfg, false);
+    if (int_session->err_info.err != 0)
+        __wt_session_set_last_error(session, int_session->err_info.err,
+          int_session->err_info.sub_level_err, "%s", int_session->err_info.err_msg);
+    WT_TRET(__wt_session_close_internal(int_session));
+    WT_ERR(ret);
+
+    elapsed_us = WT_CLOCKDIFF_US(__wt_clock(session), time_start);
+    WT_STAT_CONN_INCR(session, disagg_ingest_create_on_open);
+    WT_STAT_CONN_INCRV(session, disagg_ingest_create_on_open_time, elapsed_us);
+    __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
+      "Created ingest table \"%s\" on first open in %" PRIu64 " usecs", ingest_uri, elapsed_us);
+
+err:
+    __wt_free(session, layered_cfg);
+    __wt_scr_free(session, &layered_uri_buf);
+    return (ret);
+}
+
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __layered_assert_ingest_table_empty --

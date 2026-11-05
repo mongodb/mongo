@@ -18,47 +18,6 @@ static int __disagg_adopt_deferred_checkpoint_meta(WT_SESSION_IMPL *, const char
 #define WT_DISAGG_URI_IS_SYSTEM(uri) (WT_IS_URI_METADATA(uri) || WT_IS_URI_HS(uri))
 
 /*
- * __layered_create_missing_ingest_table --
- *     Create a missing ingest table from an existing layered table configuration.
- */
-static int
-__layered_create_missing_ingest_table(
-  WT_SESSION_IMPL *session, const char *uri, const char *layered_cfg, bool is_startup)
-{
-    WT_CONFIG_ITEM key_format, value_format;
-    WT_DECL_ITEM(ingest_config);
-    WT_DECL_RET;
-
-    WT_ERR(__wt_config_getones(session, layered_cfg, "key_format", &key_format));
-    WT_ERR(__wt_config_getones(session, layered_cfg, "value_format", &value_format));
-
-    /* FIXME-WT-14728: Refactor this with __create_layered? */
-    WT_ERR(__wt_scr_alloc(session, 0, &ingest_config));
-    WT_ERR(__wt_buf_fmt(session, ingest_config,
-      "key_format=\"%.*s\",value_format=\"%.*s\","
-      "in_memory=true,log=(enabled=false),"
-      "disaggregated=(page_log=none,storage_source=none)",
-      (int)key_format.len, key_format.str, (int)value_format.len, value_format.str));
-
-    /*
-     * On the first checkpoint pickup, skip opening a dhandle for each newly created ingest table:
-     * the cost scales with the number of tables and dominates startup time and the dhandle will be
-     * opened on first access instead. This is safe because ingest tables are in-memory only and
-     * skipped by checkpoints. Steady-state pickups create few tables, so keep the eager open there
-     * to avoid acquiring the schema lock again on first access.
-     */
-    WT_WITH_SCHEMA_LOCK(
-      session, ret = __wt_schema_create_internal(session, uri, ingest_config->data, !is_startup));
-
-    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
-      "Created missing ingest table \"%s\" from \"%s\"", uri, layered_cfg);
-
-err:
-    __wt_scr_free(session, &ingest_config);
-    return (ret);
-}
-
-/*
  * __disagg_ckpt_addr --
  *     Return the address of the named checkpoint in the given metadata config string. Return
  *     WT_NOTFOUND if there is no such checkpoint, or if it has no address.
@@ -1025,8 +984,8 @@ __disagg_check_shared_only_table(
  *     metadata already has it. Return whether the ingest table was created.
  */
 static int
-__disagg_ensure_ingest_table(WT_SESSION_IMPL *session, WT_CURSOR *md_cursor,
-  const char *layered_value, bool is_startup, bool *createdp)
+__disagg_ensure_ingest_table(
+  WT_SESSION_IMPL *session, WT_CURSOR *md_cursor, const char *layered_value, bool *createdp)
 {
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
@@ -1046,13 +1005,12 @@ __disagg_ensure_ingest_table(WT_SESSION_IMPL *session, WT_CURSOR *md_cursor,
     /*
      * A missing ingest table is expected, not an error: ingest tables are local to each node and
      * never appear in the shared metadata, and the pickup may install a table this node does not
-     * yet know about. That happens at startup, and would happen if the application installed a
-     * checkpoint ahead of oplog application to catch up a lagging node, which is cheaper than
-     * restarting it.
+     * yet know about. That would happen if the application installed a checkpoint ahead of oplog
+     * application to catch up a lagging node, which is cheaper than restarting it.
      */
     if (md_value == NULL) {
         WT_ERR_MSG_CHK(session,
-          __layered_create_missing_ingest_table(session, ingest_uri, layered_value, is_startup),
+          __wti_layered_create_missing_ingest_table(session, ingest_uri, layered_value, true),
           "Failed to create missing ingest table \"%s\" from \"%s\"", ingest_uri, layered_value);
         *createdp = true;
     }
@@ -1163,10 +1121,10 @@ __disagg_check_layered_stable_file(
 /*
  * __disagg_pick_up_new_layered_table --
  *     Copy the shared entries of a layered table that the local metadata does not have into the
- *     local metadata, creating the table's ingest table if needed. The per-scheme keys and values
- *     are the shared entries for the table, NULL where the shared metadata has none. The caller has
- *     checked the "file:" entry, that this node did not drop the table, and that the local metadata
- *     has no entries for the table.
+ *     local metadata, creating the table's ingest table if needed after startup. The per-scheme
+ *     keys and values are the shared entries for the table, NULL where the shared metadata has
+ *     none. The caller has checked the "file:" entry, that this node did not drop the table, and
+ *     that the local metadata has no entries for the table.
  */
 static int
 __disagg_pick_up_new_layered_table(WT_SESSION_IMPL *session, WT_CURSOR *md_cursor,
@@ -1179,10 +1137,18 @@ __disagg_pick_up_new_layered_table(WT_SESSION_IMPL *session, WT_CURSOR *md_curso
       sh_values[WT_DISAGG_CURSOR_LAYERED] != NULL && sh_keys[WT_DISAGG_CURSOR_FILE] != NULL &&
         sh_values[WT_DISAGG_CURSOR_FILE] != NULL);
 
-    WT_RET(__disagg_ensure_ingest_table(
-      session, md_cursor, sh_values[WT_DISAGG_CURSOR_LAYERED], is_startup, &ingest_created));
-    if (ingest_created)
-        ++*new_ingestp;
+    /*
+     * Startup cost scales with the number of tables, so the first pickup leaves each ingest table
+     * to be created when it is first opened.
+     *
+     * FIXME-WT-19023: Defer ingest creation during steady-state checkpoint pickup too.
+     */
+    if (!is_startup) {
+        WT_RET(__disagg_ensure_ingest_table(
+          session, md_cursor, sh_values[WT_DISAGG_CURSOR_LAYERED], &ingest_created));
+        if (ingest_created)
+            ++*new_ingestp;
+    }
     WT_RET(__disagg_insert_meta(session, sh_keys[WT_DISAGG_CURSOR_LAYERED],
       sh_values[WT_DISAGG_CURSOR_LAYERED], stable_btree_ids));
     WT_RET(__disagg_insert_meta(
