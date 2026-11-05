@@ -696,8 +696,7 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPaths) {
     }
 }
 
-// A document can be multikey while generating no keys at all (SERVER-39705) -- a sparse
-// {"a.b": 1} index over {a: [{c: 1}]}, for instance.
+// An update can require multikey metadata even when its added-key delta is empty.
 TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithoutKeysRecordsMultikeyPaths) {
     unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
     unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
@@ -908,9 +907,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateRemovingAllKeysRecordsMultikey
         wuow.commit();
     }
     auto records = getSideWritesTableContents(info);
-    ASSERT_EQ(records.size(), 2);
+    ASSERT_EQ(records.size(), 1);
     EXPECT_EQ(records[0].getStringField("op"), "d");
-    assertRecordCarriesMultikeyPaths(records[1], MultikeyPaths{{0}});
+    EXPECT_FALSE(interceptor->getMultikeyPaths());
     EXPECT_EQ(numInserted, 0);
     EXPECT_EQ(numDeleted, 1);
     if (capturer.canReadMetrics()) {

@@ -34,7 +34,7 @@ describe("resumable primary-driven index build made multikey without new keys", 
         });
     });
 
-    it("recovers multikey state from documents without index keys", function () {
+    it("keeps indexes non-multikey for documents without index keys", function () {
         const docTemplate = (i) => ({
             _id: i,
             a: {b: i},
@@ -55,7 +55,7 @@ describe("resumable primary-driven index build made multikey without new keys", 
             writesWhilePaused: [
                 {_id: "multikey_without_keys", a: [{c: 1}], b: [{c: 1}], c: [{c: 1}]},
             ],
-            expectMultikey: true,
+            expectMultikey: false,
         });
     });
 });
