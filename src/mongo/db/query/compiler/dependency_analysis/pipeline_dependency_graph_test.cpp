@@ -4336,14 +4336,79 @@ TEST_F(PipelineDependencyGraphTest, GetTypeOfSubpathFlowsThroughRename) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, GetTypeAfterInclusionProjectionWithMissingPrefix) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$set: {p: 1}},
+        {$project: {'p.a': 1}},
+        {$match: {p: {$exists: false}}}
+    ])");
+    // The $project removes the 'p' from the document, but declares 'p' with 'a' embedded field in
+    // the graph. Therefore, the types here are missing and the 'p' is not existent.
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(stages.back().get(), "p").toDebugString(), "any");
+        ASSERT_EQ(graph->getType_forTest(stages.back().get(), "p.a").toDebugString(), "any");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "p").toDebugString(), "missing");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "p.a").toDebugString(), "missing");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeAfterInclusionRenameWithMissingPrefix) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {x: {$_internalSchemaType: 'number'}}},
+        {$set: {p: 1}},
+        {$project: {'p.a': '$x'}},
+        {$match: {p: {$exists: false}}}
+    ])");
+    // The $project here will always create an object over the scalar 'p', and 'p' cannot be
+    // missing, unlike with inclusion.
+    // TODO(SERVER-137963): 'p' should be object only, and p.a cannot be missing after the project.
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(stages.back().get(), "p").toDebugString(), "any");
+        ASSERT_EQ(graph->getType_forTest(stages.back().get(), "p.a").toDebugString(),
+                  "missing|number");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "p").toDebugString(), "missing");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "p.a").toDebugString(), "missing");
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, GetTypeIgnoresRenameTypeUnderPossiblyArrayPrefix) {
     unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
     setPipeline(R"([
-        {$match: {$and: [{x: {$type: 'number'}}, {x: {$not: {$type: 'array'}}}]}},
+        {$match: {x: {$_internalSchemaType: 'number'}}},
         {$project: {'p.a': '$x'}}
     ])");
+    // TODO(SERVER-137963): 'p' cannot be missing in this case, and neither can 'p.a'.
     runTest([&] {
-        ASSERT_EQ(graph->getType_forTest(nullptr, "p.a").toDebugString(), "number|array(S)");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "p.a").toDebugString(),
+                  "missing|number|array(S)");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeIgnoresRenameTypeUnderNonArrayPrefix) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {x: {$_internalSchemaType: 'number'}}},
+        {$project: {'p.a': '$x'}},
+        {$match: {p: {$not: {$_internalSchemaType: 'array'}}}}
+    ])");
+    // TODO(SERVER-137963): 'p' cannot be missing in this case, and neither can 'p.a'.
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "p.a").toDebugString(), "missing|number");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeRenameUnderObjectPrefix) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {p: {$_internalSchemaType: 'object'}}},
+        {$match: {x: {$_internalSchemaType: 'number'}}},
+        {$project: {'p.a': '$x'}}
+    ])");
+    // TODO(SERVER-137963): 'p' cannot be missing in this case, and neither can 'p.a'.
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "p.a").toDebugString(), "missing|number");
     });
 }
 
@@ -4354,6 +4419,19 @@ TEST_F(PipelineDependencyGraphTest, GetTypeOfDottedPathThroughPossibleArray) {
         ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "number|array(S)");
         ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "missing|array(S)");
         ASSERT_TRUE(graph->canPathBeArray(nullptr, "x.y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSubpathUnderScalarPrefix) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {x: {$_internalSchemaType: 'number'}}},
+        {$project: {'x.y': 0}}
+    ])");
+    // The exclusion $project does nothing, since there is no 'x.y' path to remove.
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "any");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "any");
     });
 }
 
@@ -4374,6 +4452,21 @@ TEST_F(PipelineDependencyGraphTest, GetTypeOfGroupKeyRenameOfMissingField) {
     ])");
     // $group turns a missing key into null, so types do not flow through it.
     runTest([&] { ASSERT_EQ(graph->getType_forTest(nullptr, "_id").toDebugString(), "any"); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeRenameOfNever) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {x: {$_internalSchemaType: 'string'}}},
+        {$match: {x: {$_internalSchemaType: 'number'}}},
+        {$set: {'a.b.c': '$x', 'y': '$x'}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "never");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "y").toDebugString(), "never");
+        // TODO(SERVER-137963): 'a.b.c' cannot be missing here.
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a.b.c").toDebugString(), "missing");
+    });
 }
 
 }  // namespace

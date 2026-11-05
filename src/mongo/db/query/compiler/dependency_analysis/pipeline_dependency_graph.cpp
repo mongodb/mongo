@@ -1129,36 +1129,109 @@ private:
     }
 
     Type getType(const PathMatch& pathMatch) const {
-        // We first infer type of the whole top-level document and then resolve the type of the
-        // requested path against the result.
-        Type result = Type::anyObject();
-        forEachPossiblyNarrowingStage(pathMatch, [&](const DocumentSourceMatch& match) {
-            result = ts::narrowType(std::move(result), match.getMatchExpression(), true);
-            return !result.isNever();
-        });
-
-        result = resolvePathType(std::move(result), pathMatch.path);
-        // If the matched path is a rename, we can narrow its type further based on the type of the
-        // rename source.
-        if (auto it = _types.find(pathMatch.field.fieldId); it != _types.end()) {
-            result = intersectType(std::move(result), resolveSuffixType(it->second, pathMatch));
-        }
-        return result;
+        // We first infer type of the whole top-level document containing the path and then resolve
+        // the type of the requested path against the result.
+        return resolvePathType(getDocumentType(pathMatch), pathMatch.path);
     }
 
-    /// Returns the type of the matched path, given the type of the matched field.
-    Type resolveSuffixType(const Type& fieldType, const PathMatch& match) const {
-        Type result = resolvePathType(fieldType, match.suffix());
-        // Even if we know that the matched field itself (or any field along the suffix) is not an
-        // array, we must consider the possibility that some field along the prefix might be an
-        // array. Consider for example:
-        // `[{$match: {x: {$not: {$type: 'array'}}}}, {$project: {'a.b': '$x'}}]`
-        // If 'a' is an array in the above rename, everything beneath it might become an array too
-        // when traversed.
-        if (canPrefixContainArrays(match.prefix)) {
-            result = unionType(std::move(result), Type::someArray());
+    /**
+     * Returns a document type containing the matched path.
+     */
+    Type getDocumentType(const PathMatch& pathMatch) const {
+        // Each source of type information produces top-level document containing the matched path.
+        // This allows prefix types to intersect first. Imagine two sources of a document type, A
+        // and B (could be type from schema and type from $match).
+        //
+        // A = {x: {y: array|number}}
+        // B = {x: array|{y: number}}
+        //
+        // Along the path 'x.y', source A tells us that 'x' is not array, but 'y' might be.
+        // And source B tells us that 'y' is not array, but 'x' might be.
+        //
+        // resolvePath('x.y', A) => array|number
+        // resolvePath('x.y', B) => any (since it traverses array on 'x')
+        //
+        // versus
+        //
+        // A ∩ B = {x: {y: number}}
+        // resolvePath('x.y', A ∩ B) => number
+
+        //  We start with the type from the graph, and then apply the narrowing on top.
+        Type rootType = getDocumentTypeFromGraph(pathMatch);
+        if (rootType.isNever()) {
+            return rootType;
         }
-        return result;
+        forEachPossiblyNarrowingStage(pathMatch, [&](const DocumentSourceMatch& match) {
+            rootType = ts::narrowType(std::move(rootType), match.getMatchExpression(), true);
+            return !rootType.isNever();
+        });
+        return rootType;
+    }
+
+    /**
+     * Takes the type for a field and constructs a nested object type, where the field type is
+     * nested inside the matched path.
+     */
+    Type createDocumentFromLeafMatch(Type leafType, const PathMatch& match) const {
+        auto objectWithField = [](std::string_view field, Type type) {
+            auto obj = Type::anyObject();
+            obj.setField(field, type);
+            return obj;
+        };
+
+        const auto& prefix = match.prefix;
+        std::vector<std::string_view> components = splitPath(match.path);
+        auto leafName = components[match.prefix.size()];
+        Type currentType = objectWithField(leafName, leafType);
+
+        for (auto i = std::ssize(prefix) - 1; i >= 0; --i) {
+            const auto& field = _fields[prefix[i]];
+            auto fieldName = components[i];
+            // A declared subpath does not imply an object-valued prefix.
+            currentType = unionType(std::move(currentType), Type::anyScalar());
+            // And of course, if the field may be array we need to also keep that.
+            if (field.metadata.canFieldBeArray) {
+                currentType = unionType(std::move(currentType), Type::someArray());
+            }
+            currentType = objectWithField(fieldName, std::move(currentType));
+        }
+        return currentType;
+    }
+
+    /**
+     * Returns an object type containing the path, with type information filled in from the graph
+     * and possibly a subpipeline.
+     */
+    Type getDocumentTypeFromGraph(const PathMatch& pathMatch) const {
+        Type fieldType = Type::any();
+        switch (pathMatch.field.type) {
+            case FieldMatchType::kExact:
+            case FieldMatchType::kShadowed: {
+                // If the matched path is a rename, we can narrow its type further based on the type
+                // of the rename source.
+                if (auto cached = getCachedType(pathMatch.field.fieldId); cached) {
+                    fieldType = std::move(*cached);
+                    break;
+                }
+                break;
+            }
+            case FieldMatchType::kMissing:
+                // TODO(SERVER-137963): Use missing information.
+                break;
+            case FieldMatchType::kBaseDocument: {
+                break;
+            }
+        }
+        return createDocumentFromLeafMatch(fieldType, pathMatch);
+    }
+
+    /// Returns the type of the field from the types side table.
+    boost::optional<Type> getCachedType(FieldId field) const {
+        auto it = _types.find(field);
+        if (it == _types.end()) {
+            return boost::none;
+        }
+        return it->second;
     }
 
     boost::intrusive_ptr<DocumentSource> getPrevModifyingStage(const PathMatch& match) const {
