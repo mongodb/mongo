@@ -7,6 +7,7 @@
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/server_options.h"
@@ -130,6 +131,28 @@ TEST_F(CheckpointValidationTest, CheckpointValidationLogsErrorsWhenInternodeVali
     logs.stop();
 
     EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626001)), 1);
+}
+
+TEST_F(CheckpointValidationTest, NoMetricsOrValidationWhenPerCollectionValidationDisabled) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    disableContinuousInternodeValidationPerCollection.store(true);
+    ON_BLOCK_EXIT([] { disableContinuousInternodeValidationPerCollection.store(false); });
+
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeWatermarkEntry(watermarkTs));
+    oplog.push_back(makeCheckpointEntry(
+        watermarkTs,
+        {{.uuid = UUID::gen(),
+          .metadata = CollectionReplicatedMetadata{
+              .sizeCount = CollectionSizeCount{.size = 999, .count = 999}, .hash = boost::none}}}));
+
+    unittest::LogCaptureGuard logs;
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+    logs.stop();
+
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626001)), 0);
+    expectValidatorMetrics(capturer, {.recorded = 0, .evicted = 0, .skipped = 0, .validated = 0});
 }
 
 TEST_F(CheckpointValidationTest, CheckpointValidatesCrudDeltas) {

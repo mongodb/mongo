@@ -4,8 +4,11 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {
@@ -19,6 +22,9 @@ namespace repl {
 
 [[MONGO_MOD_PARENT_PRIVATE]] Status onOplogApplicationEnforcesSteadyStateConstraintsUpdate(
     bool newValue);
+
+[[MONGO_MOD_PARENT_PRIVATE]] Status validateDisableContinuousInternodeValidationPerCollection(
+    const bool& newValue, const boost::optional<TenantId>& tenantId);
 
 }  // namespace repl
 }  // namespace mongo

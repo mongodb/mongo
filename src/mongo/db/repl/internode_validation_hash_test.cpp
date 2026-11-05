@@ -22,6 +22,7 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/rss/stub_persistence_provider.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
@@ -590,6 +591,44 @@ TEST_F(ProviderDrivenValidationTest, OverrideKeepsHashEmissionMandatedByProvider
 
     EXPECT_TRUE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
     EXPECT_TRUE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
+}
+
+TEST_F(ProviderDrivenValidationTest, PerCollectionOverrideDisablesPerCollectionEntirely) {
+    disableContinuousInternodeValidationPerCollection.store(true);
+    ON_BLOCK_EXIT([] { disableContinuousInternodeValidationPerCollection.store(false); });
+
+    EXPECT_TRUE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
+    EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
+}
+
+TEST_F(ProviderDrivenValidationTest, PerCollectionOverrideEnableAtRuntimeAllowed) {
+    ServerParameter* param = ServerParameterSet::getNodeParameterSet()->get(
+        "disableContinuousInternodeValidationPerCollection");
+    ASSERT_FALSE(disableContinuousInternodeValidationPerCollection.load());
+
+    ASSERT_OK(
+        param->set(BSON("disableContinuousInternodeValidationPerCollection" << true).firstElement(),
+                   boost::none));
+    ON_BLOCK_EXIT([] { disableContinuousInternodeValidationPerCollection.store(false); });
+
+    ASSERT_TRUE(disableContinuousInternodeValidationPerCollection.load());
+}
+
+TEST_F(ProviderDrivenValidationTest, PerCollectionOverrideDisableAtRuntimeRejected) {
+    ServerParameter* param = ServerParameterSet::getNodeParameterSet()->get(
+        "disableContinuousInternodeValidationPerCollection");
+    ASSERT_FALSE(disableContinuousInternodeValidationPerCollection.load());
+
+    ASSERT_OK(
+        param->set(BSON("disableContinuousInternodeValidationPerCollection" << true).firstElement(),
+                   boost::none));
+    ON_BLOCK_EXIT([] { disableContinuousInternodeValidationPerCollection.store(false); });
+
+    const Status status = param->set(
+        BSON("disableContinuousInternodeValidationPerCollection" << false).firstElement(),
+        boost::none);
+    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+    ASSERT_TRUE(disableContinuousInternodeValidationPerCollection.load());
 }
 
 // The feature flag enables validation on providers that do not mandate it. The fixture-installed

@@ -3,6 +3,9 @@
 
 #include "mongo/db/repl/oplog_application_steady_state.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+
 namespace mongo::repl {
 
 // ServerParameter has no built-in mechanism to distinguish "value equals the default because the
@@ -23,6 +26,16 @@ Atomic<bool> oplogApplicationEnforcesSteadyStateConstraintsInitializedUsingDefau
 
 Status onOplogApplicationEnforcesSteadyStateConstraintsUpdate(bool) {
     oplogApplicationEnforcesSteadyStateConstraintsInitializedUsingDefault.store(false);
+    return Status::OK();
+}
+
+Status validateDisableContinuousInternodeValidationPerCollection(const bool& newValue,
+                                                                 const boost::optional<TenantId>&) {
+    if (disableContinuousInternodeValidationPerCollection.load() && !newValue) {
+        return {ErrorCodes::BadValue,
+                "disableContinuousInternodeValidationPerCollection cannot be disabled at runtime; "
+                "restart the node to re-enable per-collection validation"};
+    }
     return Status::OK();
 }
 

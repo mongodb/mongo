@@ -885,6 +885,20 @@ server_parameters:
         default: false
         redact: false
 
+    disableContinuousInternodeValidationPerCollection:
+        description: >-
+            Emergency override that disables the continuous internode validation system for
+            validating per-collection replicated metadata during oplog application, even when the
+            persistence provider mandates it. Once enabled at runtime, this parameter cannot be
+            disabled at runtime; the node must be restarted to re-enable per-collection validation.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<bool>
+        cpp_varname: disableContinuousInternodeValidationPerCollection
+        default: false
+        validator:
+            callback: "validateDisableContinuousInternodeValidationPerCollection"
+        redact: false
+
     enableContinuousInternodePerCollectionValidation:
         description: >-
             When true, a replicated metadata mismatch detected during per-collection continuous

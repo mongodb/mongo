@@ -78,6 +78,10 @@ bool isContinuousInternodeValidationPerCollectionEnabled(OperationContext* opCtx
         return false;
     }
 
+    if (repl::disableContinuousInternodeValidationPerCollection.load()) {
+        return false;
+    }
+
     return isContinuousInternodeValidationPerDocumentEnabled(opCtx);
 }
 
