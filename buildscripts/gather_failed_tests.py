@@ -33,6 +33,23 @@ def process_bep(bep_path):
     return failed_tests, successful_tests
 
 
+def _symbol_download_flags(build_flags: list[str]) -> list[str]:
+    """Materialize debug files while retaining the saved build configuration and download regex."""
+    regex = None
+    for index, flag in enumerate(build_flags):
+        if flag.startswith("--remote_download_regex="):
+            regex = flag.split("=", 1)[1]
+        elif flag == "--remote_download_regex" and index + 1 < len(build_flags):
+            regex = build_flags[index + 1]
+    symbols = r".*\.(pdb|debug|dwp)$"
+    combined = f"(?:{regex})|(?:{symbols})" if regex else symbols
+    return [
+        *build_flags,
+        "--remote_download_outputs=toplevel",
+        f"--remote_download_regex={combined}",
+    ]
+
+
 def _relink_binaries_with_symbols(failed_test_labels: list[str]) -> list[str]:
     print("Rebuilding tests with --remote_download_outputs=toplevel...")
     bazel_build_flags = []
@@ -40,7 +57,7 @@ def _relink_binaries_with_symbols(failed_test_labels: list[str]) -> list[str]:
         with open(".bazel_build_flags", "r", encoding="utf-8") as f:
             bazel_build_flags = shlex.split(f.read())
 
-    bazel_build_flags.append("--remote_download_outputs=toplevel")
+    bazel_build_flags = _symbol_download_flags(bazel_build_flags)
 
     relink_command = [_bazel_binary(), "build", *bazel_build_flags, *failed_test_labels]
 

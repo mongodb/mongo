@@ -4,6 +4,7 @@ import contextlib
 import gzip
 import json
 import os
+import re
 import shlex
 import shutil
 import tempfile
@@ -61,7 +62,11 @@ class TestRelinkBinariesWithSymbols(unittest.TestCase):
             with self.subTest(config_flags=config_flags), tempfile.TemporaryDirectory() as tmpdir:
                 saved_flags = shlex.split(config_flags + " --remote_download_outputs=minimal")
                 command, repro = self._relink(tmpdir, shlex.join(saved_flags))
-                expected_flags = [*saved_flags, "--remote_download_outputs=toplevel"]
+                expected_flags = [
+                    *saved_flags,
+                    "--remote_download_outputs=toplevel",
+                    r"--remote_download_regex=.*\.(pdb|debug|dwp)$",
+                ]
                 self.assertEqual(
                     command,
                     [
@@ -89,6 +94,29 @@ class TestRelinkBinariesWithSymbols(unittest.TestCase):
             ]
             command, repro = self._relink(tmpdir, shlex.join(flags))
             self.assertEqual(shlex.split(repro)[2:], command[2:])
+
+    def test_symbol_download_extends_the_final_saved_regex(self):
+        for last_flag in (
+            [r"--remote_download_regex=.*\.exe$"],
+            ["--remote_download_regex", r".*\.exe$"],
+        ):
+            with self.subTest(last_flag=last_flag):
+                saved = [
+                    r"--remote_download_regex=.*\.json$",
+                    *last_flag,
+                    "--config=windows_unittest",
+                ]
+                flags = under_test._symbol_download_flags(saved)
+                self.assertEqual(flags[: len(saved)], saved)
+                regex = re.compile(flags[-1].split("=", 1)[1])
+                for path in [
+                    "bazel-out/test.exe",
+                    "bazel-out/test.pdb",
+                    "bazel-out/test.debug",
+                    "bazel-out/test.dwp",
+                ]:
+                    self.assertIsNotNone(regex.fullmatch(path))
+                self.assertIsNone(regex.fullmatch("bazel-out/old.json"))
 
 
 class TestCopyBinsToUpload(unittest.TestCase):

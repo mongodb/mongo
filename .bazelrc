@@ -562,9 +562,11 @@ common:windows --enable_runfiles
 
 # Execute Windows tests through the native launcher from their original binary path.
 test:windows --run_under=//bazel:windows_test_launcher
+test:windows-cross-x86_64 --run_under=//bazel:windows_test_launcher
 
 # Static linking and the native launcher for Evergreen Windows unit-test tasks.
 common:windows_unittest --linkstatic=True
+common:windows_unittest --config=remote_link
 test:windows_unittest --run_under=//bazel:windows_test_launcher
 build:windows --action_env=MSYS=winsymlinks:nativestrict
 test:windows --action_env=MSYS=winsymlinks:nativestrict
@@ -815,7 +817,8 @@ common:windows-cross-x86_64 --fission=no
 common:windows-cross-x86_64 --//bazel/config:create_dwp=False
 common:windows-cross-x86_64 --//bazel/config:compress_debug_compile=False
 common:windows-cross-x86_64 --remote_download_outputs=toplevel
-common:windows-cross-x86_64 --remote_download_regex=.*\.(exe|dll|lib|pdb|res|manifest|json|txt)$
+# Keep native Rust intermediates available; download PDBs on demand for failed-test diagnostics.
+common:windows-cross-x86_64 --remote_download_regex=.*\.(a|exe|dll|lib|rlib|rmeta|res|manifest|json|txt)$
 
 # Cross-compile Linux s390x/ppc64le from the host Bazel process. Compile and
 # tool-generation actions execute on Linux x86_64/aarch64 RBE workers; the

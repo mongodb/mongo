@@ -524,18 +524,27 @@ def _impl(ctx):
             flag_sets = [
                 flag_set(
                     actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],
-                    flag_groups = [flag_group(flags = ["/Od", "/Z7"])],
+                    flag_groups = [flag_group(flags = ["/Od"])],
+                ),
+                flag_set(
+                    actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],
+                    flag_groups = [flag_group(flags = ["/Z7"])],
+                    with_features = [with_feature_set(features = ["debug_symbols"])],
+                ),
+                flag_set(
+                    actions = all_link_actions,
+                    flag_groups = [flag_group(flags = ["/INCREMENTAL:NO"])],
                 ),
                 flag_set(
                     actions = all_link_actions,
                     flag_groups = [
                         flag_group(
-                            flags = [ctx.attr.fastbuild_mode_debug_flag, "/INCREMENTAL:NO"],
+                            flags = [ctx.attr.fastbuild_mode_debug_flag],
                         ),
                     ],
+                    with_features = [with_feature_set(features = ["debug_symbols"])],
                 ),
             ],
-            implies = ["generate_pdb_file"],
         )
 
         user_compile_flags_feature = feature(
@@ -655,18 +664,27 @@ def _impl(ctx):
             flag_sets = [
                 flag_set(
                     actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],
-                    flag_groups = [flag_group(flags = ["/Od", "/Z7"])],
+                    flag_groups = [flag_group(flags = ["/Od"])],
+                ),
+                flag_set(
+                    actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],
+                    flag_groups = [flag_group(flags = ["/Z7"])],
+                    with_features = [with_feature_set(features = ["debug_symbols"])],
+                ),
+                flag_set(
+                    actions = all_link_actions,
+                    flag_groups = [flag_group(flags = ["/INCREMENTAL:NO"])],
                 ),
                 flag_set(
                     actions = all_link_actions,
                     flag_groups = [
                         flag_group(
-                            flags = [ctx.attr.dbg_mode_debug_flag, "/INCREMENTAL:NO"],
+                            flags = [ctx.attr.dbg_mode_debug_flag],
                         ),
                     ],
+                    with_features = [with_feature_set(features = ["debug_symbols"])],
                 ),
             ],
-            implies = ["generate_pdb_file"],
         )
 
         opt_feature = feature(
@@ -902,6 +920,7 @@ def _impl(ctx):
 
         generate_pdb_file_feature = feature(
             name = "generate_pdb_file",
+            enabled = ctx.attr.debug_symbols,
         )
 
         generate_linkmap_feature = feature(
@@ -1449,8 +1468,7 @@ def _impl(ctx):
         #
         # Also note that this has nothing to do with _DEBUG or optimization.
 
-        # If the user set a /DEBUG flag explicitly, don't add another. Otherwise
-        # use the standard /DEBUG flag, since we always want PDBs.
+        # Emit compiler and linker symbols only when debug_symbols is enabled.
         debug_symbols_feature = feature(
             name = "debug_symbols",
             enabled = ctx.attr.debug_symbols,

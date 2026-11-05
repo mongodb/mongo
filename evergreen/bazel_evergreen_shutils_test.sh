@@ -499,6 +499,26 @@ test_retry_bazel_cmd_does_not_retry_test_timeouts() {
     PATH="$old_path"
 }
 
+test_windows_unittests_do_not_use_linux_remote_test_runner() {
+    local flags
+    flags=$(
+        source "${TEST_SRCDIR}/${TEST_WORKSPACE}/evergreen/bazel_evergreen_shutils.sh"
+        distro_id=windows-2022-container-xxlarge
+        evergreen_remote_exec=on
+        task_name=unit_tests
+        bazel_evergreen_shutils::compute_local_arg test
+    )
+    assert_not_contains "$flags" "--config=remote_test" "Windows binaries execute on the host"
+    flags=$(
+        source "${TEST_SRCDIR}/${TEST_WORKSPACE}/evergreen/bazel_evergreen_shutils.sh"
+        stub_function bazel_evergreen_shutils::is_windows 'return 1;'
+        evergreen_remote_exec=on
+        task_name=unit_tests
+        bazel_evergreen_shutils::compute_local_arg test
+    )
+    assert_contains "$flags" "--config=remote_test" "Linux remote tests retain their policy"
+}
+
 test_compute_local_arg_keeps_cross_rbe_for_ibm_run_mode() {
     local ppc_args
     local s390x_args
@@ -799,6 +819,7 @@ test_toolchain_capture_preserves_analysis_only_target_modes
 test_timeout_prefix_uses_the_expected_fallback_for_each_execution_mode
 test_retry_bazel_cmd_does_not_retry_test_timeouts
 test_compute_local_arg_keeps_cross_rbe_for_ibm_run_mode
+test_windows_unittests_do_not_use_linux_remote_test_runner
 test_compute_local_arg_keeps_engflow_cache_for_non_rbe_run_mode
 test_maybe_release_flag_classifies_patch_test_and_release_tasks
 test_local_release_command_disables_remote_fallback_timeout

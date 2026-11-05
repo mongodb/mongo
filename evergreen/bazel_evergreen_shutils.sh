@@ -40,6 +40,9 @@ bazel_evergreen_shutils::is_macos() {
 # they talk to is a native Win32 process. That mismatch matters for any PID handling: see
 # bazel_evergreen_shutils::pid_is_live.
 bazel_evergreen_shutils::is_windows() {
+    if [[ "${distro_id:-}" == windows-* ]]; then
+        return 0
+    fi
     local -r os="$(uname -s | tr '[:upper:]' '[:lower:]')"
     case "${os}" in
     cygwin* | mingw* | msys*) return 0 ;;
@@ -158,7 +161,8 @@ bazel_evergreen_shutils::compute_local_arg() {
     local local_arg=""
     if [[ "${evergreen_remote_exec:-}" != "on" ]]; then
         local_arg+=" --jobs=auto"
-    elif [[ "$mode" == "test" && "${task_name:-}" == "unit_tests" ]]; then
+    elif [[ "$mode" == "test" && "${task_name:-}" == "unit_tests" ]] &&
+        ! bazel_evergreen_shutils::is_windows; then
         local_arg+=" --config=remote_test"
         local_arg+=" --test_timeout=660" # Allow extra 60s for coredump on abort
 

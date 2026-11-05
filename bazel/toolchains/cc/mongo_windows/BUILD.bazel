@@ -1,0 +1,3 @@
+load(":debug_policy_test.bzl", "debug_policy_test_suite")
+
+debug_policy_test_suite(name = "debug_policy_test")
