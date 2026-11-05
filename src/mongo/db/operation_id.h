@@ -29,9 +29,9 @@ using OperationId = uint32_t;
  */
 class OperationIdManager {
 public:
-    // Supports up to 4,194,304 clients for 32-bit id types.
+    // Supports up to 1,048,576 clients for 32-bit id types.
     // Maximum # of clients = MAX_VALUE(OperationId) / leaseSize
-    static constexpr size_t kDefaultLeaseSize = 1024;
+    static constexpr size_t kDefaultLeaseSize = 4096;
     MONGO_STATIC_ASSERT_MSG((kDefaultLeaseSize & (kDefaultLeaseSize - 1)) == 0,
                             "Lease size must be a power of two");
 

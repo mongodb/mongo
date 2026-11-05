@@ -7,13 +7,14 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/tick_source_mock.h"
 
 #include <vector>
 
 namespace mongo {
 namespace {
 
-class OpIdPoolTest : public ServiceContextTest {};
+class OpIdPoolTest : public ClockSourceMockServiceContextTest {};
 
 TEST_F(OpIdPoolTest, CanIssueId) {
     OperationIdManager& manager = OperationIdManager::get(getServiceContext());
@@ -67,6 +68,78 @@ TEST_F(OpIdPoolTest, LeasePoolLoopsBackAround) {
     // by deleted client's leases.
     auto tempClient = getService()->makeClient("test");
     ASSERT_EQ(manager.issueForClient(tempClient.get()), 0);
+}
+
+TEST_F(OpIdPoolTest, ReusesReleasedLeaseAfterExpiration) {
+    OperationIdManager& manager = OperationIdManager::get(getServiceContext());
+    auto* tickSource =
+        checked_cast<TickSourceMock<Milliseconds>*>(getServiceContext()->getTickSource());
+    const size_t leaseSize = OperationIdManager::kDefaultLeaseSize;
+
+    // Issue and then release a lease by destroying the client that holds it.
+    {
+        auto client = getService()->makeClient("client");
+        ASSERT_EQ(manager.issueForClient(client.get()), 0);
+    }
+
+    // The released lease has not expired yet, so a new client gets a fresh lease.
+    auto client2 = getService()->makeClient("client2");
+    ASSERT_EQ(manager.issueForClient(client2.get()), leaseSize);
+
+    // Once the released lease expires, a new client reuses it instead of getting a fresh one.
+    tickSource->advance(duration_cast<Milliseconds>(Seconds(3600)));
+    auto client3 = getService()->makeClient("client3");
+    ASSERT_EQ(manager.issueForClient(client3.get()), 0);
+}
+
+TEST_F(OpIdPoolTest, CanIssueNewLeasesAfterReuse) {
+    OperationIdManager& manager = OperationIdManager::get(getServiceContext());
+    auto* tickSource =
+        checked_cast<TickSourceMock<Milliseconds>*>(getServiceContext()->getTickSource());
+    const size_t leaseSize = OperationIdManager::kDefaultLeaseSize;
+
+    // Issue and then release a lease by destroying the client that holds it.
+    {
+        auto client = getService()->makeClient("client");
+        ASSERT_EQ(manager.issueForClient(client.get()), 0);
+    }
+
+    // Expire the released lease so that the next client reuses it.
+    tickSource->advance(duration_cast<Milliseconds>(Seconds(3600)));
+    auto client2 = getService()->makeClient("client2");
+    ASSERT_EQ(manager.issueForClient(client2.get()), 0);
+
+    // With no released leases left, a new client gets a brand new lease.
+    auto client3 = getService()->makeClient("client3");
+    ASSERT_EQ(manager.issueForClient(client3.get()), leaseSize);
+
+    // Both clients continue issuing sequential ids from their own leases.
+    ASSERT_EQ(manager.issueForClient(client2.get()), 1);
+    ASSERT_EQ(manager.issueForClient(client3.get()), leaseSize + 1);
+}
+
+TEST_F(OpIdPoolTest, ReusesExpiredLeasesInReleaseOrder) {
+    OperationIdManager& manager = OperationIdManager::get(getServiceContext());
+    auto* tickSource =
+        checked_cast<TickSourceMock<Milliseconds>*>(getServiceContext()->getTickSource());
+    const size_t leaseSize = OperationIdManager::kDefaultLeaseSize;
+
+    // Release two leases by destroying the clients that hold them, in issue order.
+    {
+        auto client1 = getService()->makeClient("client1");
+        ASSERT_EQ(manager.issueForClient(client1.get()), 0);
+    }
+    {
+        auto client2 = getService()->makeClient("client2");
+        ASSERT_EQ(manager.issueForClient(client2.get()), leaseSize);
+    }
+
+    // Once both released leases have expired, they are reused in the order they were released.
+    tickSource->advance(duration_cast<Milliseconds>(Seconds(3600)));
+    auto client3 = getService()->makeClient("client3");
+    ASSERT_EQ(manager.issueForClient(client3.get()), 0);
+    auto client4 = getService()->makeClient("client4");
+    ASSERT_EQ(manager.issueForClient(client4.get()), leaseSize);
 }
 
 using OpIdPoolTestDeathTest = OpIdPoolTest;

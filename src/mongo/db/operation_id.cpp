@@ -6,17 +6,24 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/testing_proctor.h"
+#include "mongo/util/tick_source.h"
 
-#include <limits>
-#include <list>
+#include <deque>
 
 namespace mongo {
 
 namespace {
 const auto getOperationIdManager = ServiceContext::declareDecoration<OperationIdManager>();
+constexpr auto kTimeUntilReuse = Seconds{3600};  // 1 hour
+
+TickSource::Tick durationToTicks(TickSource* tickSource, Seconds duration) {
+    return static_cast<TickSource::Tick>(duration.count() * tickSource->getTicksPerSecond());
+}
 }  // namespace
 
 OperationIdManager& OperationIdManager::get(ServiceContext* svcCtx) {
@@ -27,39 +34,59 @@ struct Lease {
     OperationId start;
 };
 
+struct ReleasedLease {
+    Lease lease;
+    TickSource::Tick reuseAfter;
+};
+
 struct OperationIdManager::IdPool {
-    Lease lease(WithLock) {
-        if (exhaustedUniqueIds) {
-            invariant(!released.empty(),
+    Lease lease(TickSource* tickSource) {
+        if (_exhaustedUniqueIds) {
+            invariant(!_released.empty(),
                       "Process has run out of OperationIds. This indicates that there are too many "
                       "open client connections for the process to handle.");
-            auto l = released.front();
-            released.pop_front();
-            return l;
+            return _reuseOldestLease();
         }
 
-        auto leaseStart = nextId;
-        nextId += leaseSize;
-        if (MONGO_unlikely(std::numeric_limits<OperationId>::max() - nextId < leaseSize)) {
-            exhaustedUniqueIds = true;
+        // If enough time has elapsed, reuse a lease instead of getting a new one.
+        if (!_released.empty() && tickSource->getTicks() >= _released.front().reuseAfter) {
+            return _reuseOldestLease();
+        }
+
+        auto leaseStart = _nextId;
+        _nextId += _leaseSize;
+
+        OperationId probe = 0;
+        if (MONGO_unlikely(overflow::add(_nextId, static_cast<OperationId>(_leaseSize), &probe))) {
+            _exhaustedUniqueIds = true;
         }
         return {leaseStart};
     }
 
-    void releaseLease(WithLock, Lease lease) {
-        released.push_back(lease);
+    void releaseLease(TickSource* tickSource, Lease lease) {
+        _released.push_back(
+            {lease, tickSource->getTicks() + durationToTicks(tickSource, kTimeUntilReuse)});
     }
 
     void setLeaseSize_forTest(size_t size) {
-        invariant(!exhaustedUniqueIds && !nextId,
+        invariant(!_exhaustedUniqueIds && !_nextId,
                   "Cannot change lease size after a lease is issued");
-        leaseSize = size;
+        _leaseSize = size;
     }
 
-    bool exhaustedUniqueIds{false};
-    OperationId nextId{0};
-    std::list<Lease> released;
-    size_t leaseSize = OperationIdManager::kDefaultLeaseSize;
+private:
+    Lease _reuseOldestLease() {
+        auto l = _released.front();
+        _released.pop_front();
+        return l.lease;
+    }
+
+    bool _exhaustedUniqueIds{false};
+    OperationId _nextId{0};
+    // Stores leases that have already been used. Such leases can be reused after kTimeUntilReuse
+    // has elapsed. The next ready ReleasedLease will always be at the front.
+    std::deque<ReleasedLease> _released;
+    size_t _leaseSize = OperationIdManager::kDefaultLeaseSize;
 };
 
 OperationIdManager::OperationIdManager() : _pool(std::make_unique<OperationIdManager::IdPool>()) {}
@@ -80,9 +107,10 @@ const auto getClientState = Client::declareDecoration<ClientState>();
 }  // namespace
 
 OperationId OperationIdManager::issueForClient(Client* client) {
-    auto getLease = [this, client](Lease* oldLease) {
+    auto* tickSource = client->getServiceContext()->getTickSource();
+    auto getLease = [this, client, tickSource](Lease* oldLease) {
         std::lock_guard lk(_mutex);
-        auto lease = _pool->lease(lk);
+        auto lease = _pool->lease(tickSource);
         VERIFY_LEASE_START(lease.start, _leaseStartBitMask);
 
         bool successfullyInsertedNewClientEntry =
@@ -93,7 +121,7 @@ OperationId OperationIdManager::issueForClient(Client* client) {
         if (oldLease) {
             VERIFY_LEASE_START(oldLease->start, _leaseStartBitMask);
             _clientByOperationId.erase(oldLease->start);
-            _pool->releaseLease(lk, *oldLease);
+            _pool->releaseLease(tickSource, *oldLease);
         }
 
         return lease;
@@ -118,7 +146,7 @@ void OperationIdManager::eraseClientFromMap(Client* client) {
         VERIFY_LEASE_START(state.lease.start, _leaseStartBitMask);
         auto numErased = _clientByOperationId.erase(state.lease.start);
         invariant(numErased == 1);
-        _pool->releaseLease(lk, state.lease);
+        _pool->releaseLease(client->getServiceContext()->getTickSource(), state.lease);
         state.isInitialized = false;
     }
 }
