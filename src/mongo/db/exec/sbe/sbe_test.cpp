@@ -21,7 +21,9 @@
 #include <cstring>
 #include <limits>
 #include <string_view>
+#include <vector>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::sbe {
 using namespace std::literals::string_view_literals;
@@ -261,6 +263,53 @@ TEST(SBEValues, HashCompound) {
 
         value::releaseValue(tag1, val1);
         value::releaseValue(tag2, val2);
+    }
+}
+
+TEST(SBEValues, HashDecimal128) {
+    // Because Decimal128 values are not normalized, most numbers have multiple representations
+    // depending on which exponent is used. Numerically equivalent values represented in different
+    // ways belong to the same "cohort" and, for our purposes, must hash to the same value.
+    std::vector<std::vector<Decimal128>> decimal128Cohorts = {
+        // Decimal128 also has distinct positive and negative representations of zero that should
+        // hash to the same value.
+        {Decimal128("0"), Decimal128("-0"), Decimal128("0.0"), Decimal128("-0.0")},
+
+        // Values that can be converted to an integer or double type get converted to one of those
+        // types before hashing, which effectively normalizes them.
+        {Decimal128("1"), Decimal128("10e-1"), Decimal128("100e-2")},
+        {Decimal128("1.1"), Decimal128("11e-1"), Decimal128("110e-2")},
+
+        // Values that are out of range need explicit normalization before hashing.
+        {Decimal128("5E-6174"), Decimal128("50E-6175"), Decimal128("500E-6176")},
+        {Decimal128("5.1E-6174"), Decimal128("51E-6175"), Decimal128("510E-6176")},
+    };
+
+    // Verify that all values within the same cohort hash to the same value.
+    for (const auto& cohort : decimal128Cohorts) {
+        auto value0 = value::TagValueOwned::fromRaw(value::makeCopyDecimal(cohort[0]));
+        auto hash0 = value::hashValue(value0.tag(), value0.value());
+
+        for (size_t i = 1; i < cohort.size(); ++i) {
+            auto valueI = value::TagValueOwned::fromRaw(value::makeCopyDecimal(cohort[i]));
+            auto hashI = value::hashValue(valueI.tag(), valueI.value());
+            ASSERT_EQUALS(hash0, hashI)
+                << "cohort[0]: " << cohort[0] << ", cohort[" << i << "]: " << cohort[i];
+        }
+    }
+
+    // Verify that values from different cohorts hash to different values.
+    for (size_t i = 0; i < decimal128Cohorts.size(); ++i) {
+        auto valueI =
+            value::TagValueOwned::fromRaw(value::makeCopyDecimal(decimal128Cohorts[i][0]));
+        auto hashI = value::hashValue(valueI.tag(), valueI.value());
+
+        for (size_t j = i + 1; j < decimal128Cohorts.size(); ++j) {
+            auto valueJ =
+                value::TagValueOwned::fromRaw(value::makeCopyDecimal(decimal128Cohorts[j][0]));
+            auto hashJ = value::hashValue(valueJ.tag(), valueJ.value());
+            ASSERT_NE(hashI, hashJ) << "i: " << i << ", j: " << j;
+        }
     }
 }
 

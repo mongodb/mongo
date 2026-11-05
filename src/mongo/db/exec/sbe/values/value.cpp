@@ -19,6 +19,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/duration.h"
 
@@ -500,7 +501,11 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
             } else if (auto asDbl = representAs<double>(dec); asDbl) {
                 return abslHash(*asDbl);
             } else {
-                return abslHash(dec.getValue().low64) ^ abslHash(dec.getValue().high64);
+                // Normalization ensures that numerically equivalent Decimal128 values (e.g.,
+                // 5E-6174, 50E-6175, 500E-6176) have the same hash.
+                Decimal128 normalized = dec.normalize();
+                return abslHash(normalized.getValue().low64) ^
+                    abslHash(normalized.getValue().high64);
             }
         }
         case TypeTags::Date:
