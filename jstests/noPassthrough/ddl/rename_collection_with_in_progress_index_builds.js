@@ -85,18 +85,15 @@ function assertRenameFailsImmediately(sourceNs, targetNs, dropTarget) {
 }
 
 /**
- * Hangs an index build on shard0 for the given collection and returns the
- * failpoint and the await function.
+ * Starts an index build on the given collection and waits until it is paused before commit on
+ * shard0, by which point the index is visible to listIndexes. Returns the failpoint and the
+ * await function.
  */
 function hangIndexBuildOnShard0(coll, indexKey) {
     const shard0Primary = st.shard0.rs.getPrimary();
-    const shard0DB = shard0Primary.getDB(coll.getDB().getName());
     const hangFp = configureFailPoint(shard0Primary, "hangIndexBuildBeforeCommit");
     const awaitIndexBuild = IndexBuildTest.startIndexBuild(st.s, coll.getFullName(), indexKey);
-    const indexName = Object.keys(indexKey)
-        .map((k) => k + "_1")
-        .join("_");
-    IndexBuildTest.waitForIndexBuildToStart(shard0DB, coll.getName(), indexName);
+    hangFp.wait();
     return {hangFp, awaitIndexBuild};
 }
 
