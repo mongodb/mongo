@@ -328,6 +328,11 @@ TEST_F(ClientThreadNiceValueTest, AppliesToCallingThreadOnlyWhenPredicateAccepts
     registerClientThreadNiceEligibilityPredicate([] { return true; });
 
     const auto before = getClientThreadsRenicedCount();
+    errno = 0;
+    // Bazel and containers often start the process at a non-zero nice. A thread that never calls
+    // the helper keeps that value; it is not reset to 0.
+    const int baselineNice = getpriority(PRIO_PROCESS, 0);
+    ASSERT_EQ(errno, 0);
     int nicedThreadValue = 0;
     int otherThreadValue = 0;
 
@@ -346,7 +351,7 @@ TEST_F(ClientThreadNiceValueTest, AppliesToCallingThreadOnlyWhenPredicateAccepts
 
     ASSERT_EQ(nicedThreadValue, kNice);
     // A thread that never calls the helper (and is not spawned by a niced thread) is unaffected.
-    ASSERT_EQ(otherThreadValue, 0);
+    ASSERT_EQ(otherThreadValue, baselineNice);
     ASSERT_EQ(getClientThreadsRenicedCount(), before + 1);
 }
 #endif
