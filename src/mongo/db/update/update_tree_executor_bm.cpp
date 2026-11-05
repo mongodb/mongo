@@ -9,8 +9,11 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain_global.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include <benchmark/benchmark.h>
 
@@ -107,6 +110,25 @@ protected:
                         state);
     }
 
+    void benchmarkSet(BSONObj inputDoc, BSONObj setSpec, benchmark::State& state) {
+        std::set<std::string> foundIdentifiers;
+        auto updateTree = std::make_unique<UpdateObjectNode>();
+        for (auto&& elem : setSpec["$set"].Obj()) {
+            tassert(11788503,
+                    "Failed to parse $set",
+                    UpdateObjectNode::parseAndMerge(updateTree.get(),
+                                                    modifiertable::ModifierType::MOD_SET,
+                                                    elem,
+                                                    _expCtx,
+                                                    kArrayFilters,
+                                                    foundIdentifiers)
+                        .isOK());
+        }
+
+        UpdateTreeExecutor executor(std::move(updateTree));
+        benchmarkUpdate(std::move(executor), inputDoc, state);
+    }
+
     ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
@@ -183,8 +205,8 @@ BSONArray generateObjectWithStringArray(std::mt19937& random,
     });
 }
 
-BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark,
-                   AddToSetObjectWithStrings)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, AddToSetObjectWithStrings)
+(benchmark::State& state) {
     int64_t inputSize = state.range(0);
     int64_t updateSize = state.range(1);
     BSONObj inputDoc = BSON("a" << generateObjectWithStringArray(_random, 0, inputSize));
@@ -195,8 +217,8 @@ BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark,
     benchmarkAddToSet(inputDoc, addToSetSpec, /*collator=*/nullptr, state);
 }
 
-BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark,
-                   AddToSetObjectWithStringsCollator)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, AddToSetObjectWithStringsCollator)
+(benchmark::State& state) {
     int64_t inputSize = state.range(0);
     int64_t updateSize = state.range(1);
     BSONObj inputDoc = BSON("a" << generateObjectWithStringArray(_random, 0, inputSize));
@@ -251,6 +273,15 @@ BSONObj generateWideFlatObject(int64_t fieldCount) {
     return builder.obj();
 }
 
+// Returns {field0: 0, field1: 1, ..., field<n-1>: n-1}.
+BSONObj generateWideObject(int64_t numFields) {
+    BSONObjBuilder builder;
+    for (int64_t i = 0; i < numFields; ++i) {
+        builder.append("field" + std::to_string(i), i);
+    }
+    return builder.obj();
+}
+
 // Returns the index of the field to modify, given a percentage along the document.
 int64_t targetFieldIndex(int64_t fieldCount, int64_t offsetPercent) {
     return (fieldCount - 1) * offsetPercent / 100;
@@ -265,8 +296,8 @@ BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, SetFieldAtOffset)(benchmark::Sta
     benchmarkUpdate(makeExecutor(modifiertable::ModifierType::MOD_SET, setSpec), inputDoc, state);
 }
 
-BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark,
-                   SetFieldAtOffsetAndSerialize)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, SetFieldAtOffsetAndSerialize)
+(benchmark::State& state) {
     const int64_t fieldCount = state.range(0);
     const int64_t target = targetFieldIndex(fieldCount, state.range(1));
     BSONObj inputDoc = generateWideFlatObject(fieldCount);
@@ -293,8 +324,8 @@ BENCHMARK_REGISTER_F(UpdateTreeExecutorBenchmark, SetFieldAtOffsetAndSerialize)
 // opaque, which is the only shape in which the run copy is followed directly by the opaque tail
 // copy. The plain SetFieldAtOffset cases never produce it, because there the run always ends at the
 // modified field.
-BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark,
-                   SetFieldThenNoopSetAtOffsetAndSerialize)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, SetFieldThenNoopSetAtOffsetAndSerialize)
+(benchmark::State& state) {
     const int64_t fieldCount = state.range(0);
     // At least 1, because 'f0' is the field that actually changes and a modifier cannot name the
     // same path twice.
@@ -348,8 +379,8 @@ BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, SetEveryNthField)(benchmark::Sta
         makeMultiFieldExecutor(modifiertable::ModifierType::MOD_SET, setSpec), inputDoc, state);
 }
 
-BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark,
-                   SetEveryNthFieldAndSerialize)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, SetEveryNthFieldAndSerialize)
+(benchmark::State& state) {
     const int64_t fieldCount = state.range(0);
     const int64_t stride = state.range(1);
     BSONObj inputDoc = generateWideFlatObject(fieldCount);
@@ -374,6 +405,101 @@ BENCHMARK_REGISTER_F(UpdateTreeExecutorBenchmark, SetEveryNthField)
 
 BENCHMARK_REGISTER_F(UpdateTreeExecutorBenchmark, SetEveryNthFieldAndSerialize)
     ->Apply(configureSetEveryNthFieldBenchmark);
+
+// Returns {$set: {field0: 1, field1: 2, ..., field<n-1>: n}}.
+BSONObj generateWideSetSpec(int64_t numFields) {
+    BSONObjBuilder builder;
+    BSONObjBuilder inner(builder.subobjStart("$set"));
+    for (int64_t i = 0; i < numFields; ++i) {
+        inner.append("field" + std::to_string(i), i + 1);
+    }
+    inner.done();
+    return builder.obj();
+}
+
+// Returns a $set of 'numUpdated' fields at indexes 0, step, 2 * step, ... (mod 'docFields').
+BSONObj generatePartialSetSpec(int64_t docFields, int64_t numUpdated, int64_t step) {
+    BSONObjBuilder builder;
+    BSONObjBuilder inner(builder.subobjStart("$set"));
+    for (int64_t i = 0; i < numUpdated; ++i) {
+        int64_t index = (i * step) % docFields;
+        inner.append("field" + std::to_string(index), index + 1);
+    }
+    inner.done();
+    return builder.obj();
+}
+
+// The cache is off by default, so the benchmarks below take the threshold as their last argument
+// and run with it both off and on.
+constexpr int64_t kCacheOff = 0;
+constexpr int64_t kCacheOnThreshold = 50;
+
+unittest::ServerParameterGuard setCacheThreshold(int64_t threshold) {
+    return unittest::ServerParameterGuard("internalUpdateObjectNodeChildLookupCacheThreshold",
+                                          static_cast<int>(threshold));
+}
+
+// $set of every field. The 10 field case stays below the threshold and should not slow down.
+BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, SetAllFieldsOnWideObject)(benchmark::State& state) {
+    int64_t numFields = state.range(0);
+    auto threshold = setCacheThreshold(state.range(1));
+    BSONObj inputDoc = generateWideObject(numFields);
+    BSONObj setSpec = generateWideSetSpec(numFields);
+    benchmarkSet(inputDoc, setSpec, state);
+}
+
+BENCHMARK_REGISTER_F(UpdateTreeExecutorBenchmark, SetAllFieldsOnWideObject)
+    ->ArgNames({"fields", "threshold"})
+    ->ArgsProduct({{10, 100, 1000, 5000}, {kCacheOff, kCacheOnThreshold}});
+
+// $set of some fields of a 5000 field object. Building the cache scans up to the last target, so
+// the stride between targets matters as well as their number.
+BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, SetPartialFieldsOnWideObject)
+(benchmark::State& state) {
+    static constexpr int64_t kDocFields = 5000;
+    int64_t numUpdated = state.range(0);
+    int64_t step = state.range(1);
+    auto threshold = setCacheThreshold(state.range(2));
+    BSONObj inputDoc = generateWideObject(kDocFields);
+    BSONObj setSpec = generatePartialSetSpec(kDocFields, numUpdated, step);
+    benchmarkSet(inputDoc, setSpec, state);
+}
+
+static void configurePartialFieldsBenchmark(benchmark::internal::Benchmark* bm) {
+    bm->ArgNames({"updated", "stride", "threshold"});
+    static const std::vector<std::pair<int64_t, int64_t>> kShapes = {
+        {10, 1}, {100, 1}, {100, 50}, {1000, 5}};
+    for (const auto& [updated, stride] : kShapes) {
+        for (int64_t threshold : {kCacheOff, kCacheOnThreshold}) {
+            bm->Args({updated, stride, threshold});
+        }
+    }
+}
+
+BENCHMARK_REGISTER_F(UpdateTreeExecutorBenchmark, SetPartialFieldsOnWideObject)
+    ->Apply(configurePartialFieldsBenchmark);
+
+// $set of fields missing from a 5000 field object. Building the cache has to scan the whole object,
+// which is its worst case.
+BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, SetMissingFieldsOnWideObject)
+(benchmark::State& state) {
+    static constexpr int64_t kDocFields = 5000;
+    int64_t numCreated = state.range(0);
+    auto threshold = setCacheThreshold(state.range(1));
+    BSONObj inputDoc = generateWideObject(kDocFields);
+    BSONObjBuilder builder;
+    {
+        BSONObjBuilder inner(builder.subobjStart("$set"));
+        for (int64_t i = 0; i < numCreated; ++i) {
+            inner.append("missing" + std::to_string(i), i);
+        }
+    }
+    benchmarkSet(inputDoc, builder.obj(), state);
+}
+
+BENCHMARK_REGISTER_F(UpdateTreeExecutorBenchmark, SetMissingFieldsOnWideObject)
+    ->ArgNames({"created", "threshold"})
+    ->ArgsProduct({{50, 500}, {kCacheOff, kCacheOnThreshold}});
 
 }  // namespace
 }  // namespace mongo

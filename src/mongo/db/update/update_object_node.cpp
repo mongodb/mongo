@@ -9,20 +9,97 @@
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/update_array_node.h"
 #include "mongo/db/update/update_leaf_node.h"
+#include "mongo/db/update/update_object_node_knobs_gen.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 #include <memory>
 #include <string_view>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
 namespace {
 
 /**
- * Gets the child of 'element' named 'field', if it exists. Otherwise returns a non-ok element.
+ * Maps the field names an UpdateObjectNode is about to update to their elements in one object.
+ *
+ * getChild() normally calls findFirstChildNamed(), which scans the object's children, so updating m
+ * fields of an n-field object costs O(n * m). This class does a single scan, stopping once every
+ * target is found, and answers each later lookup from a hash map. It only holds the update's target
+ * names, so its size depends on the update rather than on the width of the document.
+ *
+ * The map is filled in once and never refreshed, which is only safe because:
+ *  - each field name has at most one static child, so no sibling update creates a field that was
+ *    recorded as missing. Positional children break this, so UpdateObjectNode::apply() does not
+ *    build the map for a node that has one;
+ *  - a recorded element may later be removed by a $rename whose destination sorts before its
+ *    source. Removal leaves the element ok(), so getChild() checks that it is still a child of
+ *    this object.
+ * Duplicate field names resolve to the first occurrence, as with findFirstChildNamed().
  */
-mutablebson::Element getChild(mutablebson::Element element, std::string_view field) {
+class ChildLookupCache {
+public:
+    ChildLookupCache(mutablebson::Element parent, const std::vector<std::string_view>& targetFields)
+        : _parent(parent) {
+        invariant(parent.ok() && parent.getType() == BSONType::object);
+
+        // Every target starts out missing until the scan finds it.
+        const auto absent = parent.getDocument().end();
+        _index.reserve(targetFields.size());
+        for (auto&& name : targetFields) {
+            _index.try_emplace(std::string{name}, absent);
+        }
+
+        size_t remaining = _index.size();
+        for (auto child = parent.leftChild(); child.ok() && remaining > 0;
+             child = child.rightSibling()) {
+            auto it = _index.find(child.getFieldName());
+            if (it != _index.end() && !it->second.ok()) {
+                it->second = child;
+                --remaining;
+            }
+        }
+    }
+
+    const mutablebson::Element& parent() const {
+        return _parent;
+    }
+
+    /**
+     * Returns the element for 'field', or a non-ok element if the field was missing. Returns
+     * boost::none if 'field' is not one of the targets.
+     */
+    boost::optional<mutablebson::Element> tryGetChild(std::string_view field) const {
+        if (auto it = _index.find(field); it != _index.end()) {
+            return it->second;
+        }
+        return boost::none;
+    }
+
+private:
+    mutablebson::Element _parent;
+    StringMap<mutablebson::Element> _index;
+};
+
+/**
+ * Gets the child of 'element' named 'field', if it exists. Otherwise returns a non-ok element.
+ *
+ * 'childCache' is only used when it was built for 'element'.
+ */
+mutablebson::Element getChild(mutablebson::Element element,
+                              std::string_view field,
+                              const ChildLookupCache* childCache = nullptr) {
     if (element.getType() == BSONType::object) {
+        if (childCache && element == childCache->parent()) {
+            if (auto cached = childCache->tryGetChild(field)) {
+                // Skip an element that has been removed since the cache was built.
+                if (!cached->ok() || cached->parent() == element) {
+                    return *cached;
+                }
+            }
+        }
         return element[field];
     } else if (element.getType() == BSONType::array) {
         auto indexFromField = str::parseUnsignedBase10Integer(field);
@@ -44,7 +121,8 @@ void applyChild(const UpdateNode& child,
                 std::string_view field,
                 UpdateExecutor::ApplyParams* applyParams,
                 UpdateNode::UpdateNodeApplyParams* updateNodeApplyParams,
-                UpdateExecutor::ApplyResult* applyResult) {
+                UpdateExecutor::ApplyResult* applyResult,
+                const ChildLookupCache* childCache = nullptr) {
 
     auto pathTakenSizeBefore = updateNodeApplyParams->pathTaken->fieldRef().numParts();
 
@@ -56,7 +134,9 @@ void applyChild(const UpdateNode& child,
         // We're already traversing a path with elements that don't exist yet, so we will definitely
         // need to append.
     } else {
-        childElement = getChild(applyParams->element, field);
+        // The lookups below that follow newly created paths do not pass the cache, since it does
+        // not know about the new elements.
+        childElement = getChild(applyParams->element, field, childCache);
     }
 
     if (childElement.ok()) {
@@ -386,6 +466,32 @@ UpdateExecutor::ApplyResult UpdateObjectNode::apply(
 
     auto applyResult = ApplyResult::noopResult();
 
+    // Look up the children through a ChildLookupCache when this node updates enough of them. Read
+    // the threshold once so a concurrent setParameter cannot change the choice halfway through.
+    //
+    // The cache is not built when:
+    //  - 'pathToCreate' is not empty. 'applyParams.element' is then an ancestor of the object these
+    //    children belong to, and applyChild() does not look anything up until that object exists.
+    //  - there is a positional child. It is ordered against '_children' with a plain string
+    //    comparison, while '_children' orders digit-only names numerically, so with matchedField
+    //    "10" and a static child "2" it runs early and misses the merge with a static "10". If it
+    //    then creates "10", the cache still has it as missing and the static child would add a
+    //    second "10". The oplog diff records a single "10", so secondaries would diverge.
+    boost::optional<ChildLookupCache> childCache;
+    const auto childLookupCacheThreshold = gUpdateObjectNodeChildLookupCacheThreshold.load();
+    if (childLookupCacheThreshold > 0 &&
+        _children.size() >= static_cast<size_t>(childLookupCacheThreshold) && !applyPositional &&
+        updateNodeApplyParams.pathToCreate->empty() && applyParams.element.ok() &&
+        applyParams.element.getType() == BSONType::object) {
+        std::vector<std::string_view> targetFields;
+        targetFields.reserve(_children.size());
+        for (const auto& pair : _children) {
+            targetFields.push_back(pair.first);
+        }
+        childCache.emplace(applyParams.element, targetFields);
+    }
+    const ChildLookupCache* childCachePtr = childCache ? childCache.get_ptr() : nullptr;
+
     for (const auto& pair : _children) {
         // If this child has the same field name as the positional child, they must be merged and
         // applied.
@@ -418,7 +524,8 @@ UpdateExecutor::ApplyResult UpdateObjectNode::apply(
                        pair.first,
                        &applyParams,
                        &updateNodeApplyParams,
-                       &applyResult);
+                       &applyResult,
+                       childCachePtr);
 
             applyPositional = false;
             continue;
@@ -431,12 +538,18 @@ UpdateExecutor::ApplyResult UpdateObjectNode::apply(
                        applyParams.matchedField,
                        &applyParams,
                        &updateNodeApplyParams,
-                       &applyResult);
+                       &applyResult,
+                       childCachePtr);
             applyPositional = false;
         }
 
         // Apply the current child.
-        applyChild(*pair.second, pair.first, &applyParams, &updateNodeApplyParams, &applyResult);
+        applyChild(*pair.second,
+                   pair.first,
+                   &applyParams,
+                   &updateNodeApplyParams,
+                   &applyResult,
+                   childCachePtr);
     }
 
     // 'matchedField' is alphabetically after all children, so we apply it now.
@@ -445,7 +558,8 @@ UpdateExecutor::ApplyResult UpdateObjectNode::apply(
                    applyParams.matchedField,
                    &applyParams,
                    &updateNodeApplyParams,
-                   &applyResult);
+                   &applyResult,
+                   childCachePtr);
     }
 
     return applyResult;
