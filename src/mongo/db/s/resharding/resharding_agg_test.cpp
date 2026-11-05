@@ -33,6 +33,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/s/resharding/document_source_resharding_ownership_match.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -370,6 +371,21 @@ protected:
     const ShardId _destinedRecipient = {"shard1"};
     const int _term{20};
 };
+
+TEST_F(ReshardingAggTest, ReshardingOwnershipMatchSerializeToleratesDetachedExpCtx) {
+    auto expCtx = createExpressionContext();
+    auto stageObj = fromjson(
+        "{$_internalReshardingOwnershipMatch: {recipientShardId: 'Shard0', "
+        "reshardingKey: {oldKey: 1}}}");
+    auto ds =
+        DocumentSourceReshardingOwnershipMatch::createFromBson(stageObj.firstElement(), expCtx);
+
+    expCtx->setOperationContext(nullptr);
+
+    // serialization must not dereference the nulled opCtx.
+    auto serialized = ds->serialize();
+    ASSERT_FALSE(serialized.getDocument().getField("$_internalReshardingOwnershipMatch").missing());
+}
 
 TEST_F(ReshardingAggTest, VerifyPipelineReturnsStartIndexBuildEntry) {
     const auto oplogBSON = fromjson(R"({

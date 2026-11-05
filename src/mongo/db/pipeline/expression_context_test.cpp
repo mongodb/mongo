@@ -12,6 +12,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -104,6 +105,41 @@ TEST_F(ExpressionContextTest, MqlJsEngineGapFeatureFlagIsCached) {
     {
         unittest::ServerParameterGuard enabled{"featureFlagMqlJsEngineGap", true};
         ASSERT_FALSE(expCtx->isFeatureFlagMqlJsEngineGapEnabled());
+    }
+}
+
+TEST_F(ExpressionContextTest, PercentileParseOnDetachedExpCtxToleratesNullOpCtx) {
+    auto opCtx = makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                      .build();
+    expCtx->setIsProfileFilter(true);
+    expCtx->setOperationContext(nullptr);
+    VariablesParseState vps = expCtx->variablesParseState;
+
+    {
+        unittest::ServerParameterGuard flagDisabled{"featureFlagAccuratePercentiles", false};
+        auto percentileObj =
+            fromjson("{$percentile: {input: '$x', p: [0.5], method: 'approximate'}}");
+        auto result = AccumulatorPercentile::parsePercentileAndMethod(
+            expCtx.get(), percentileObj.firstElement(), vps);
+        ASSERT_EQUALS(PercentileMethodEnum::kApproximate, result.second);
+
+        auto medianObj = fromjson("{$median: {input: '$x', method: 'approximate'}}");
+        auto medianResult = AccumulatorMedian::parsePercentileAndMethod(
+            expCtx.get(), medianObj.firstElement(), vps);
+        ASSERT_EQUALS(PercentileMethodEnum::kApproximate, medianResult.second);
+    }
+
+    {
+        // With the flag enabled, the kNoVersionContext fallback must still consult the flag
+        // (through the global FCV snapshot) and admit non-approximate methods.
+        unittest::ServerParameterGuard flagEnabled{"featureFlagAccuratePercentiles", true};
+        auto discreteObj = fromjson("{$percentile: {input: '$x', p: [0.5], method: 'discrete'}}");
+        auto discreteResult = AccumulatorPercentile::parsePercentileAndMethod(
+            expCtx.get(), discreteObj.firstElement(), vps);
+        ASSERT_EQUALS(PercentileMethodEnum::kDiscrete, discreteResult.second);
     }
 }
 

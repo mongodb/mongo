@@ -87,7 +87,7 @@ Value DocumentSourceReshardingOwnershipMatch::serialize(
                                                            _reshardingKey->getKeyPattern());
     // TODO SERVER-92437 ensure this behavior is safe during FCV upgrade/downgrade
     if (resharding::gFeatureFlagReshardingRelaxedMode.isEnabled(
-            VersionContext::getDecoration(getExpCtx()->getOperationContext()),
+            getExpCtx()->getVersionContext(),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         spec.setTemporaryReshardingNamespace(_temporaryReshardingNamespace);
     }

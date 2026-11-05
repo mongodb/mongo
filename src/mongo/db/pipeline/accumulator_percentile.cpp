@@ -177,8 +177,8 @@ AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const
 
     std::vector<double> ps = parseP(expCtx, spec.getP().getElement(), vps);
 
-    const PercentileMethodEnum method = methodNameToEnum(
-        VersionContext::getDecoration(expCtx->getOperationContext()), spec.getMethod());
+    const PercentileMethodEnum method =
+        methodNameToEnum(expCtx->versionContextForFeatureFlagCheck(), spec.getMethod());
 
     auto factory = [expCtx, ps, method] {
         return make_intrusive<AccumulatorPercentile>(expCtx, ps, method);
@@ -197,8 +197,7 @@ AccumulatorPercentile::parsePercentileAndMethod(ExpressionContext* expCtx,
     auto spec = AccumulatorPercentileSpec::parse(elem.Obj(), IDLParserContext(kName));
     return std::make_pair(
         parseP(expCtx, spec.getP().getElement(), vps),
-        methodNameToEnum(VersionContext::getDecoration(expCtx->getOperationContext()),
-                         spec.getMethod()));
+        methodNameToEnum(expCtx->versionContextForFeatureFlagCheck(), spec.getMethod()));
 }
 
 boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
@@ -213,8 +212,8 @@ boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
     boost::intrusive_ptr<Expression> input =
         Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
     std::vector<double> ps = parseP(expCtx, spec.getP().getElement(), vps);
-    const PercentileMethodEnum method = methodNameToEnum(
-        VersionContext::getDecoration(expCtx->getOperationContext()), spec.getMethod());
+    const PercentileMethodEnum method =
+        methodNameToEnum(expCtx->versionContextForFeatureFlagCheck(), spec.getMethod());
 
     return make_intrusive<ExpressionFromAccumulatorQuantile<AccumulatorPercentile>>(
         expCtx, ps, input, method);
@@ -336,8 +335,8 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
     boost::intrusive_ptr<Expression> input =
         Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
 
-    const PercentileMethodEnum method = methodNameToEnum(
-        VersionContext::getDecoration(expCtx->getOperationContext()), spec.getMethod());
+    const PercentileMethodEnum method =
+        methodNameToEnum(expCtx->versionContextForFeatureFlagCheck(), spec.getMethod());
 
     auto factory = [expCtx, method] {
         return make_intrusive<AccumulatorMedian>(expCtx, /*unused=*/std::vector<double>{}, method);
@@ -356,8 +355,7 @@ AccumulatorMedian::parsePercentileAndMethod(ExpressionContext* expCtx,
     auto spec = AccumulatorMedianSpec::parse(elem.Obj(), IDLParserContext(kName));
     return std::make_pair(
         std::vector<double>({0.5}),
-        methodNameToEnum(VersionContext::getDecoration(expCtx->getOperationContext()),
-                         spec.getMethod()));
+        methodNameToEnum(expCtx->versionContextForFeatureFlagCheck(), spec.getMethod()));
 }
 
 boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionContext* const expCtx,
@@ -375,8 +373,8 @@ boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionCo
 
     std::vector<double> p = {0.5};
 
-    const PercentileMethodEnum method = methodNameToEnum(
-        VersionContext::getDecoration(expCtx->getOperationContext()), spec.getMethod());
+    const PercentileMethodEnum method =
+        methodNameToEnum(expCtx->versionContextForFeatureFlagCheck(), spec.getMethod());
 
     return make_intrusive<ExpressionFromAccumulatorQuantile<AccumulatorMedian>>(
         expCtx, p, input, method);
