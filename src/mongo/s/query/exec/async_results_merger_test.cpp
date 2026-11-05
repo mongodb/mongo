@@ -4082,6 +4082,91 @@ TEST_F(AsyncResultsMergerTest, PostKillDrainLatchesTermMismatch) {
     ASSERT_EQ(expectedAbortHosts, seenAbortHosts);
 }
 
+/**
+ * Builds a getMore reply whose transaction metadata cannot be parsed: 'readOnly' is declared as an
+ * optional bool in TxnResponseMetadata, so a string value makes the IDL parse throw. Parsing
+ * happens in the network callback, so a reply like this must not be able to throw out of the
+ * callback.
+ */
+BSONObj makeGetMoreReplyWithMalformedTxnMetadata(const NamespaceString& nss,
+                                                 CursorId nextCursorId) {
+    BSONObjBuilder bob{CursorResponse(nss, nextCursorId, {BSON("x" << 1)})
+                           .toBSON(CursorResponse::ResponseType::SubsequentResponse)};
+    bob.append(TxnResponseMetadata::kReadOnlyFieldName, "notABool");
+    return bob.obj();
+}
+
+TEST_F(AsyncResultsMergerTest, MalformedTxnMetadataReplyFailsTheQuery) {
+    TransactionForBufferedParticipantTest txn{operationContext(), TxnNumber{5}};
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return makeGetMoreReplyWithMalformedTxnMetadata(kTestNss, 0LL);
+    });
+
+    // The malformed reply must not stall the ARM: the parse failure is recorded as the merger's
+    // status, so the query fails at 'nextReady()' rather than hanging.
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_NOT_OK(arm->nextReady().getStatus());
+    // A reply that failed to parse is never buffered for participant processing.
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 0u);
+}
+
+TEST_F(AsyncResultsMergerTest, MalformedTxnMetadataReplyDoesNotStallKill) {
+    TransactionForBufferedParticipantTest txn{operationContext(), TxnNumber{5}};
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return makeGetMoreReplyWithMalformedTxnMetadata(kTestNss, 0LL);
+    });
+
+    // The parse failure is recorded rather than thrown out of the network callback, so 'kill()'
+    // completes instead of stalling the cursor.
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+    arm->kill(operationContext()).wait();
+    ASSERT_EQ(arm->numberOfBufferedRemoteResponses_forTest(), 0u);
+}
+
+TEST_F(AsyncResultsMergerTest, MalformedTxnMetadataReplyFailsQueryWhileAnotherRemoteIsPending) {
+    TransactionForBufferedParticipantTest txn{operationContext(), TxnNumber{5}};
+
+    // A sorted merge with two remotes: the merger cannot pick a result until both have responded.
+    BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}}");
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 6, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
+
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Exactly one remote responds, with an otherwise-valid batch but malformed transaction
+    // metadata.
+    scheduleNetworkResponseObjs({makeGetMoreReplyWithMalformedTxnMetadata(kTestNss, 0LL)});
+    ASSERT_TRUE(networkHasReadyRequests());  // The second remote's getMore is still outstanding.
+
+    // Because the parse failure is recorded as the merger's status, the merger becomes ready and
+    // the error is delivered immediately, without waiting for the pending remote.
+    ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_NOT_OK(arm->nextReady().getStatus());
+}
+
 DEATH_TEST_F(AsyncResultsMergerTestDeathTest,
              ShouldFailIfAskedToPerformGetMoresWithoutAnOpCtx,
              "Cannot schedule a getMore without an OperationContext") {

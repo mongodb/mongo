@@ -148,6 +148,31 @@ void processAdditionalTransactionParticipantFromResponse(
     }
 }
 
+/**
+ * Parses the transaction metadata out of a getMore reply, returning a failure status instead of
+ * throwing. A shard is not expected to return malformed metadata, but the parse must not throw out
+ * of the network callback: doing so would skip the wake-up/cleanup paths and stall the cursor. The
+ * caller turns a failure into the merger's status so the query fails instead.
+ */
+StatusWith<TransactionRouter::ParsedParticipantResponseMetadata>
+parseParticipantResponseMetadataOrFailure(const ShardId& shardId, const BSONObj& responseObj) {
+    const auto failure = [&](Status status) {
+        LOGV2_DEBUG(13412905,
+                    2,
+                    "Failed to parse transaction participant response metadata",
+                    "shardId"_attr = shardId,
+                    "error"_attr = redact(status));
+        return status;
+    };
+    try {
+        return TransactionRouter::Router::parseParticipantResponseMetadata(responseObj);
+    } catch (const DBException& e) {
+        return failure(e.toStatus());
+    } catch (const std::exception& e) {
+        return failure(Status(ErrorCodes::InternalError, e.what()));
+    }
+}
+
 Status getStatusFromReleaseMemoryCommandResponse(const AsyncRequestsSender::Response& response) {
     auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
     if (!status.isOK()) {
@@ -1751,13 +1776,20 @@ void AsyncResultsMerger::_keepRecordOfAdditionalTxnParticipants(
         !gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
         return;
     }
+    // A shard is not expected to return malformed transaction metadata. If it does, fail the query
+    // rather than stall the cursor: a non-OK '_status' makes '_ready()' true, so the failure
+    // surfaces at the next 'nextReady()' (and wakes any waiter).
+    auto parsedMetadata =
+        parseParticipantResponseMetadataOrFailure(remote->shardId, cbData.response.data);
+    if (!parsedMetadata.isOK()) {
+        _status = parsedMetadata.getStatus();
+        return;
+    }
     // Here we buffer the parsed parts of the response pertaining to additional transaction
     // participants. Additional transaction participants processing cannot occur here
     // directly since access to the underlying transaction router is not thread-safe.
     _remoteResponses.push(
-        {.shardId = remote->shardId,
-         .parsedMetadata =
-             TransactionRouter::Router::parseParticipantResponseMetadata(cbData.response.data)});
+        {.shardId = remote->shardId, .parsedMetadata = std::move(parsedMetadata.getValue())});
     // To avoid data race issues we delay processing until the actual owner thread of the
     // ARM drains the queue.
     // Only log when additional participants were actually added.
