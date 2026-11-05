@@ -52,6 +52,21 @@ public:
     size_t numUses(sbe::value::SlotId slot) const;
 
     /**
+     * Records that one read of 'slot' was removed from the tree. Returns how many reads are left.
+     */
+    size_t removeUse(sbe::value::SlotId slot);
+
+    /**
+     * Records that 'slot' is no longer defined by any node in the tree.
+     */
+    void removeDef(sbe::value::SlotId slot);
+
+    /**
+     * Whether both summaries record the same defining nodes and use counts.
+     */
+    bool operator==(const SbBlueprintSlotUsage& other) const;
+
+    /**
      * Calls 'fn' for each slot that is read in the tree but defined by no node in it.
      */
     template <typename F>

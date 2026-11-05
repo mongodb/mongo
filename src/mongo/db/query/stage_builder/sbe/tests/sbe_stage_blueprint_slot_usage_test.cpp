@@ -169,6 +169,64 @@ TEST_F(SbBlueprintSlotUsageTest, ReportsUsesWithNoDefiningNode) {
     ASSERT_EQ(undefined, sbe::makeSV(outside.getId()));
 }
 
+class SbBlueprintSlotUsageEqualityTest : public SbBlueprintSlotUsageTest {
+protected:
+    // project [p = getField(record, "c")]
+    //   scan [record, recordId]
+    void setUp() override {
+        SbBlueprintSlotUsageTest::setUp();
+        SbBuilder b{*_state, 1};
+        auto [scan, recordSlot, recordIdSlot, fieldSlots] =
+            b.makeScan(UUID::gen(), DatabaseName::kAdmin, true, {});
+        auto [project, projectOut] =
+            b.makeProject(std::move(scan),
+                          b.makeFunction(sbe::EFn::kGetField, recordSlot, b.makeStrConstant("c")));
+        _root = project.idx();
+        _p = projectOut[0].getId();
+    }
+
+    SbBlueprintSlotUsage build(const SlotVector& rootUses) {
+        return SbBlueprintSlotUsage::build(blueprint(), _root, rootUses);
+    }
+
+    SbBlueprintNodeIdx _root;
+    SlotId _p;
+};
+
+TEST_F(SbBlueprintSlotUsageEqualityTest, SummariesOfTheSameTreeAreEqual) {
+    ASSERT_TRUE(build(sbe::makeSV(_p)) == build(sbe::makeSV(_p)));
+}
+
+TEST_F(SbBlueprintSlotUsageEqualityTest, DifferentUseCountsAreNotEqual) {
+    auto once = build(sbe::makeSV(_p));
+    auto twice = build(sbe::makeSV(_p, _p));
+    ASSERT_FALSE(once == twice);
+    ASSERT_FALSE(twice == once);
+
+    twice.removeUse(_p);
+    ASSERT_TRUE(once == twice);
+}
+
+TEST_F(SbBlueprintSlotUsageEqualityTest, DifferentDefiningNodesAreNotEqual) {
+    auto defined = build({});
+    auto undefined = build({});
+    undefined.removeDef(_p);
+    ASSERT_FALSE(defined == undefined);
+    ASSERT_FALSE(undefined == defined);
+}
+
+TEST_F(SbBlueprintSlotUsageEqualityTest, SlotsWithNoUsesAndNoDefinerDoNotAffectEquality) {
+    // 'outside' has the highest slot id and no definer, so only 'withOutside' has an entry for it.
+    auto outside = slot().getId();
+    auto withOutside = build(sbe::makeSV(outside));
+    auto without = build({});
+    ASSERT_FALSE(withOutside == without);
+
+    withOutside.removeUse(outside);
+    ASSERT_TRUE(withOutside == without);
+    ASSERT_TRUE(without == withOutside);
+}
+
 using SbBlueprintSlotUsageDeathTest = SbBlueprintSlotUsageTest;
 
 DEATH_TEST_F(SbBlueprintSlotUsageDeathTest, SlotDefinedTwiceFails, "13627003") {

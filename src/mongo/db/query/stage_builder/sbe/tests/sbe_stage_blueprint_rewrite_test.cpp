@@ -41,11 +41,10 @@ protected:
     }
 
     SbBlueprintNodeIdx rewrite(SbBlueprintNodeIdx root,
-                               std::unique_ptr<SbBlueprintRewriteRule> rule,
-                               size_t maxFirings = 10000) {
+                               std::unique_ptr<SbBlueprintRewriteRule> rule) {
         SbBlueprintRewriteRules rules;
         rules.push_back(std::move(rule));
-        return rewriteSbeBlueprint(_state->opCtx, &blueprint(), root, rules, maxFirings);
+        return rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, root, rules, 10000).root;
     }
 };
 
@@ -206,7 +205,8 @@ TEST_F(SbBlueprintRewriteTest, NodesAddedUnderTheReplacementAreRewritten) {
     SbBlueprintRewriteRules rules;
     rules.push_back(std::make_unique<WrapInLimitAndFilterOnceRule>(*_state));
     rules.push_back(std::make_unique<DropFiltersRule>());
-    auto newRoot = rewriteSbeBlueprint(_state->opCtx, &blueprint(), root, rules, 10000);
+    auto newRoot =
+        rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, root, rules, 10000).root;
 
     ASSERT_EQ(newRoot, root);
     auto wrapper = std::get<SbBlueprintLimitSkip>(node(root)).child;
@@ -378,7 +378,8 @@ TEST_F(SbBlueprintRewriteTest, ChangeTwoLevelsDownRewritesTheNodeAgain) {
     SbBlueprintRewriteRules rules;
     rules.push_back(std::make_unique<SwapFilterAndLimitRule>());
     rules.push_back(std::make_unique<DropUniqueOverTwoLimitsRule>());
-    auto newRoot = rewriteSbeBlueprint(_state->opCtx, &blueprint(), unique, rules, 10000);
+    auto newRoot =
+        rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, unique, rules, 10000).root;
 
     ASSERT_EQ(newRoot, upper);
     ASSERT_TRUE(std::holds_alternative<SbBlueprintLowered>(node(unique)));
@@ -423,8 +424,194 @@ TEST_F(SbBlueprintRewriteTest, InPlaceRuleFiresUntilItStops) {
     SbBlueprintRewriteRules rules;
     rules.push_back(std::make_unique<FireNTimesRule>(8));
 
-    ASSERT_EQ(rewriteSbeBlueprint(_state->opCtx, &blueprint(), root, rules, 10000), root);
+    auto result = rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, root, rules, 10000);
+    ASSERT_EQ(result.root, root);
+    ASSERT_EQ(result.firings, 8);
+    ASSERT_TRUE(result.converged);
     ASSERT_EQ(static_cast<FireNTimesRule&>(*rules[0]).left(), 0);
+}
+
+TEST_F(SbBlueprintRewriteTest, StoppingAtTheFiringBudgetDoesNotConverge) {
+    auto root = limitOne(coscan());
+    SbBlueprintRewriteRules rules;
+    rules.push_back(std::make_unique<FireNTimesRule>(8));
+
+    auto result = rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, root, rules, 5);
+    ASSERT_EQ(result.firings, 5);
+    ASSERT_FALSE(result.converged);
+    lowerSbeBlueprint(blueprint(), result.root, *_state);
+}
+
+// At a filter over a LimitSkip, marks the LimitSkip and queues it to be rewritten again. The
+// LimitSkip was rewritten before the filter, so nothing else would bring it back.
+class MarkChildAndEnqueueRule : public SbBlueprintRewriteRule {
+public:
+    std::string_view name() const override {
+        return "markChildAndEnqueue";
+    }
+
+    size_t depth() const override {
+        return 1;
+    }
+
+    boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
+                                          SbBlueprintRewriteContext& ctx) override {
+        auto* filter = std::get_if<SbBlueprintFilter>(&*node);
+        if (!filter || _marked) {
+            return boost::none;
+        }
+        _marked = filter->child;
+        ctx.enqueue(*_marked);
+        return boost::none;
+    }
+
+    boost::optional<SbBlueprintNodeIdx> marked() const {
+        return _marked;
+    }
+
+private:
+    boost::optional<SbBlueprintNodeIdx> _marked;
+};
+
+// Drops the marked LimitSkip, replacing it with its child.
+class DropMarkedRule : public SbBlueprintRewriteRule {
+public:
+    explicit DropMarkedRule(const MarkChildAndEnqueueRule& marker) : _marker(marker) {}
+
+    std::string_view name() const override {
+        return "dropMarked";
+    }
+
+    size_t depth() const override {
+        return 1;
+    }
+
+    boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
+                                          SbBlueprintRewriteContext& ctx) override {
+        if (node.get() != _marker.marked()) {
+            return boost::none;
+        }
+        return node.takeChild(0);
+    }
+
+private:
+    const MarkChildAndEnqueueRule& _marker;
+};
+
+TEST_F(SbBlueprintRewriteTest, EnqueueRewritesANodeAgain) {
+    auto leaf = coscan();
+    auto limit = limitOne(leaf);
+    auto filter = filterTrue(limit);
+
+    SbBlueprintRewriteRules rules;
+    rules.push_back(std::make_unique<MarkChildAndEnqueueRule>());
+    rules.push_back(
+        std::make_unique<DropMarkedRule>(static_cast<const MarkChildAndEnqueueRule&>(*rules[0])));
+    auto newRoot =
+        rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, filter, rules, 10000).root;
+
+    // The LimitSkip was dropped only because the filter's rule queued it again.
+    ASSERT_EQ(newRoot, filter);
+    ASSERT_EQ(std::get<SbBlueprintFilter>(node(filter)).child, leaf);
+    ASSERT_TRUE(std::holds_alternative<SbBlueprintLowered>(node(limit)));
+    lowerSbeBlueprint(blueprint(), newRoot, *_state);
+}
+
+// Replaces every filter with its child, and removes the filter's reads from the slot summary.
+class DropFiltersAndTheirReadsRule : public SbBlueprintRewriteRule {
+public:
+    std::string_view name() const override {
+        return "dropFiltersAndTheirReads";
+    }
+
+    size_t depth() const override {
+        return 1;
+    }
+
+    boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
+                                          SbBlueprintRewriteContext& ctx) override {
+        auto* filter = std::get_if<SbBlueprintFilter>(&*node);
+        if (!filter) {
+            return boost::none;
+        }
+        _seen = &ctx.slotUsage();
+        filter->condition.visitReferencedSlots(
+            [&](SbSlot slot) { ctx.slotUsage().removeUse(slot.getId()); });
+        return node.takeChild(0);
+    }
+
+    const SbBlueprintSlotUsage* seen() const {
+        return _seen;
+    }
+
+private:
+    const SbBlueprintSlotUsage* _seen{nullptr};
+};
+
+// At a LimitSkip, records the slot summary and how many times it says 'slot' is read.
+class RecordUsesAtLimitRule : public SbBlueprintRewriteRule {
+public:
+    explicit RecordUsesAtLimitRule(sbe::value::SlotId slot) : _slot(slot) {}
+
+    std::string_view name() const override {
+        return "recordUsesAtLimit";
+    }
+
+    size_t depth() const override {
+        return 1;
+    }
+
+    boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
+                                          SbBlueprintRewriteContext& ctx) override {
+        if (std::holds_alternative<SbBlueprintLimitSkip>(*node)) {
+            _seen = &ctx.slotUsage();
+            _uses = ctx.slotUsage().numUses(_slot);
+        }
+        return boost::none;
+    }
+
+    const SbBlueprintSlotUsage* seen() const {
+        return _seen;
+    }
+
+    boost::optional<size_t> uses() const {
+        return _uses;
+    }
+
+private:
+    const sbe::value::SlotId _slot;
+    const SbBlueprintSlotUsage* _seen{nullptr};
+    boost::optional<size_t> _uses;
+};
+
+TEST_F(SbBlueprintRewriteTest, RulesShareAndUpdateTheSuppliedSlotSummary) {
+    // limit <- filter [s] <- project [s = 1] <- coscan. Dropping the filter removes the only read
+    // of 's'. The LimitSkip is rewritten after the filter, so its rule sees that through the
+    // summary.
+    SbSlot s{_state->slotId()};
+    SbExprSlotVector projects;
+    projects.emplace_back(SbExprBuilder{*_state}.makeInt32Constant(1), s);
+    auto project =
+        blueprint().add(SbBlueprintProject{.child = coscan(), .projects = std::move(projects)});
+    auto root =
+        limitOne(blueprint().add(SbBlueprintFilter{.child = project, .condition = SbExpr{s}}));
+    auto usage = SbBlueprintSlotUsage::build(blueprint(), root, {});
+    ASSERT_EQ(usage.numUses(s.getId()), 1);
+
+    SbBlueprintRewriteRules rules;
+    rules.push_back(std::make_unique<DropFiltersAndTheirReadsRule>());
+    rules.push_back(std::make_unique<RecordUsesAtLimitRule>(s.getId()));
+    auto result = rewriteSbeBlueprint(_state->opCtx, &blueprint(), &usage, root, rules, 10000);
+
+    const auto& dropFilters = static_cast<const DropFiltersAndTheirReadsRule&>(*rules[0]);
+    const auto& recordUses = static_cast<const RecordUsesAtLimitRule&>(*rules[1]);
+    ASSERT_EQ(dropFilters.seen(), &usage);
+    ASSERT_EQ(recordUses.seen(), &usage);
+    ASSERT_EQ(recordUses.uses(), size_t{0});
+    ASSERT_EQ(result.root, root);
+    ASSERT_EQ(std::get<SbBlueprintLimitSkip>(node(root)).child, project);
+    ASSERT_TRUE(usage == SbBlueprintSlotUsage::build(blueprint(), result.root, {}));
+    lowerSbeBlueprint(blueprint(), result.root, *_state);
 }
 
 // The rules below misuse the API. The driver tasserts on misuse it can detect cheaply. Checking the
@@ -520,13 +707,20 @@ DEATH_TEST_F(SbBlueprintRewriteDeathTest, RuleCannotUseAMovedFromNode, "13627017
     rewrite(filterTrue(coscan()), std::make_unique<ReturnMovedFromNodeRule>(*_state));
 }
 
+DEATH_TEST_F(SbBlueprintRewriteDeathTest, SlotSummaryMustBeSupplied, "13627020") {
+    rewrite(filterTrue(coscan()), std::make_unique<DropFiltersAndTheirReadsRule>());
+}
+
 DEATH_TEST_F(SbBlueprintRewriteDeathTest, NewNodeNeedsOneChildPerChildField, "13627019") {
     rewrite(coscan(), std::make_unique<AddChildlessFilterRule>());
 }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
 DEATH_TEST_F(SbBlueprintRewriteDeathTest, RuleOverTheFiringBudgetFails, "13627005") {
-    rewrite(limitOne(coscan()), std::make_unique<FireNTimesRule>(8), 5 /* maxFirings */);
+    SbBlueprintRewriteRules rules;
+    rules.push_back(std::make_unique<FireNTimesRule>(8));
+    checkSbeBlueprintRewriteConverged(
+        rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, limitOne(coscan()), rules, 5));
 }
 #endif
 }  // namespace

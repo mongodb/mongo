@@ -5,6 +5,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint_slot_usage.h"
 #include "mongo/util/assert_util.h"
 
 #include <array>
@@ -27,6 +28,10 @@
  *
  * It is the rules' responsibility to maintain the tree structure. Lowering does a final check and
  * tasserts if the tree is invalid.
+ *
+ * A caller can supply a summary of which node defines each slot and how many times each slot is
+ * read, which every rule sees through SbBlueprintRewriteContext::slotUsage(). The engine never
+ * updates it: a rule that adds or removes slot definitions or reads must update it itself.
  */
 
 namespace mongo::stage_builder {
@@ -100,7 +105,8 @@ private:
  */
 class SbBlueprintRewriteContext {
 public:
-    explicit SbBlueprintRewriteContext(SbBlueprintRewriter& rewriter) : _rewriter(rewriter) {}
+    SbBlueprintRewriteContext(SbBlueprintRewriter& rewriter, SbBlueprintSlotUsage* slotUsage)
+        : _rewriter(rewriter), _slotUsage(slotUsage) {}
 
     /**
      * Returns the node at 'idx', for reading. A rule reaches the nodes below the one it rewrites
@@ -119,10 +125,26 @@ public:
         return add(std::move(node), std::span<SbDetachedNode>{childArray});
     }
 
+    /**
+     * Queues 'node' to be rewritten again. A rule calls this when it changes something a rule
+     * matching on 'node' depends on, such as removing the last read of a slot 'node' defines.
+     */
+    void enqueue(SbBlueprintNodeIdx node);
+
+    /**
+     * Returns the slot summary of the tree that the caller of rewriteSbeBlueprint() supplied. A
+     * rule that changes slot definitions or reads must update it.
+     */
+    SbBlueprintSlotUsage& slotUsage() {
+        tassert(13627020, "No slot summary was supplied to the blueprint rewrite", _slotUsage);
+        return *_slotUsage;
+    }
+
 private:
     SbDetachedNode add(SbBlueprintNode node, std::span<SbDetachedNode> children);
 
     SbBlueprintRewriter& _rewriter;
+    SbBlueprintSlotUsage* _slotUsage;
 };
 
 /**
@@ -152,13 +174,33 @@ public:
 
 using SbBlueprintRewriteRules = std::vector<std::unique_ptr<SbBlueprintRewriteRule>>;
 
+struct SbBlueprintRewriteResult {
+    // The root of the rewritten tree.
+    SbBlueprintNodeIdx root;
+
+    // How many times a rule fired.
+    size_t firings;
+
+    // False if the rewrite stopped at the firing budget, when more rules may have fired. The tree
+    // is still valid and can be lowered.
+    bool converged;
+};
+
 /**
  * Applies 'rules' to the tree rooted at 'root' until none fires or 'maxFirings' rules have fired.
- * Returns the root of the rewritten tree.
+ * 'slotUsage', if not null, is the slot summary of the tree, which the rules keep up to date.
  */
-SbBlueprintNodeIdx rewriteSbeBlueprint(OperationContext* opCtx,
-                                       SbBlueprint* blueprint,
-                                       SbBlueprintNodeIdx root,
-                                       const SbBlueprintRewriteRules& rules,
-                                       size_t maxFirings);
+SbBlueprintRewriteResult rewriteSbeBlueprint(OperationContext* opCtx,
+                                             SbBlueprint* blueprint,
+                                             SbBlueprintSlotUsage* slotUsage,
+                                             SbBlueprintNodeIdx root,
+                                             const SbBlueprintRewriteRules& rules,
+                                             size_t maxFirings);
+
+/**
+ * Checks that 'result' converged. A plan that does not converge is still valid and runnable, so
+ * this only tasserts in debug builds and logs a warning otherwise. Tests that stop at a firing
+ * budget on purpose do not call it.
+ */
+void checkSbeBlueprintRewriteConverged(const SbBlueprintRewriteResult& result);
 }  // namespace mongo::stage_builder

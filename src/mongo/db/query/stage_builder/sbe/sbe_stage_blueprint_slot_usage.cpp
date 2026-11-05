@@ -6,6 +6,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
 #include <variant>
 
 namespace mongo::stage_builder {
@@ -80,5 +81,33 @@ boost::optional<SbBlueprintNodeIdx> SbBlueprintSlotUsage::getDefiningNode(
 size_t SbBlueprintSlotUsage::numUses(sbe::value::SlotId slot) const {
     const size_t idx = slotIndex(slot);
     return idx < _numUses.size() ? _numUses[idx] : 0;
+}
+
+size_t SbBlueprintSlotUsage::removeUse(sbe::value::SlotId slot) {
+    const size_t idx = slotIndex(slot);
+    tassert(13627009,
+            "Removed a use of a slot that has none",
+            idx < _numUses.size() && _numUses[idx] > 0);
+    return --_numUses[idx];
+}
+
+void SbBlueprintSlotUsage::removeDef(sbe::value::SlotId slot) {
+    const size_t idx = slotIndex(slot);
+    if (idx < _definingNode.size()) {
+        _definingNode[idx] = boost::none;
+    }
+}
+
+bool SbBlueprintSlotUsage::operator==(const SbBlueprintSlotUsage& other) const {
+    const size_t numSlots = std::max(
+        {_numUses.size(), other._numUses.size(), _definingNode.size(), other._definingNode.size()});
+    for (size_t idx = 0; idx < numSlots; ++idx) {
+        auto slot = static_cast<sbe::value::SlotId>(idx);
+        if (numUses(slot) != other.numUses(slot) ||
+            getDefiningNode(slot) != other.getDefiningNode(slot)) {
+            return false;
+        }
+    }
+    return true;
 }
 }  // namespace mongo::stage_builder

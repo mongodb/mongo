@@ -79,13 +79,18 @@ size_t maxDepth(const SbBlueprintRewriteRules& rules) {
 class SbBlueprintRewriter {
 public:
     SbBlueprintRewriter(SbBlueprint* blueprint,
+                        SbBlueprintSlotUsage* slotUsage,
                         SbBlueprintNodeIdx root,
                         const SbBlueprintRewriteRules& rules,
                         size_t maxFirings);
 
-    SbBlueprintNodeIdx run(OperationContext* opCtx);
+    SbBlueprintRewriteResult run(OperationContext* opCtx);
 
     // The tree operations behind SbDetachedNode and SbBlueprintRewriteContext.
+
+    void enqueue(SbBlueprintNodeIdx node) {
+        _queue.push(node);
+    }
 
     SbBlueprintNode& node(SbBlueprintNodeIdx idx) {
         return (*_blueprint)[idx];
@@ -170,6 +175,9 @@ private:
 
     SbBlueprint* _blueprint;
 
+    // The slot summary the caller supplied, or null. Rules keep it up to date.
+    SbBlueprintSlotUsage* _slotUsage;
+
     // Placeholder for a child field whose child a rule took out.
     const SbBlueprintNodeIdx _emptyChild;
 
@@ -194,10 +202,12 @@ private:
 };
 
 SbBlueprintRewriter::SbBlueprintRewriter(SbBlueprint* blueprint,
+                                         SbBlueprintSlotUsage* slotUsage,
                                          SbBlueprintNodeIdx root,
                                          const SbBlueprintRewriteRules& rules,
                                          size_t maxFirings)
     : _blueprint(blueprint),
+      _slotUsage(slotUsage),
       _emptyChild(blueprint->add(SbBlueprintLowered{})),
       // An empty LimitSkip serves as the root holder.
       _rootHolder(blueprint->add(SbBlueprintLimitSkip{.child = root})),
@@ -223,7 +233,7 @@ SbBlueprintRewriter::SbBlueprintRewriter(SbBlueprint* blueprint,
     std::for_each(order.rbegin(), order.rend(), [&](auto node) { _queue.push(node); });
 }
 
-SbBlueprintNodeIdx SbBlueprintRewriter::run(OperationContext* opCtx) {
+SbBlueprintRewriteResult SbBlueprintRewriter::run(OperationContext* opCtx) {
     while (!_queue.empty() && _firings < _maxFirings) {
         auto node = _queue.pop();
         // Skips stale entries for nodes deleted after they were queued.
@@ -233,16 +243,6 @@ SbBlueprintNodeIdx SbBlueprintRewriter::run(OperationContext* opCtx) {
     }
     // Reaching the budget counts as not converging, since more rules may have fired.
     const bool converged = _firings < _maxFirings;
-
-    // A plan that does not converge is still valid and runnable, so this only tasserts in debug
-    // builds.
-    if (!converged) {
-        if constexpr (kDebugBuild) {
-            tasserted(13627005, "SBE blueprint rewrite did not converge");
-        }
-        LOGV2_WARNING(
-            13627006, "SBE blueprint rewrite did not converge", "firings"_attr = _firings);
-    }
     LOGV2_DEBUG(13627007,
                 2,
                 "Applied SBE blueprint rewrite rules",
@@ -252,7 +252,7 @@ SbBlueprintNodeIdx SbBlueprintRewriter::run(OperationContext* opCtx) {
     // The root holder is not part of the plan, and lowering requires every node to be lowered.
     auto root = *childField(node(_rootHolder), 0);
     node(_rootHolder) = SbBlueprintLowered{};
-    return root;
+    return {root, _firings, converged};
 }
 
 SbDetachedNode SbBlueprintRewriter::add(SbBlueprintNode node, std::span<SbDetachedNode> children) {
@@ -284,7 +284,7 @@ void SbBlueprintRewriter::destroy(SbBlueprintNodeIdx subtree) {
 }
 
 void SbBlueprintRewriter::applyRules(OperationContext* opCtx, SbBlueprintNodeIdx node) {
-    SbBlueprintRewriteContext ctx{*this};
+    SbBlueprintRewriteContext ctx{*this, _slotUsage};
     while (_firings < _maxFirings) {
         // Take 'node' out of the tree, as a rule takes a child out of its parent.
         const auto link = _parentLinks.at(node);
@@ -320,6 +320,10 @@ void SbBlueprintRewriter::applyRules(OperationContext* opCtx, SbBlueprintNodeIdx
         enqueueWithAncestors(link.parent);
         // 'detached' goes out of scope here and deletes the old node unless the rule kept it.
     }
+}
+
+void SbBlueprintRewriteContext::enqueue(SbBlueprintNodeIdx node) {
+    _rewriter.enqueue(node);
 }
 
 const SbBlueprintNode& SbBlueprintRewriteContext::node(SbBlueprintNodeIdx idx) const {
@@ -361,11 +365,24 @@ void SbDetachedNode::setChild(size_t childIdx, SbDetachedNode child) {
     _rewriter->setChild(get(), childIdx, std::move(child));
 }
 
-SbBlueprintNodeIdx rewriteSbeBlueprint(OperationContext* opCtx,
-                                       SbBlueprint* blueprint,
-                                       SbBlueprintNodeIdx root,
-                                       const SbBlueprintRewriteRules& rules,
-                                       size_t maxFirings) {
-    return SbBlueprintRewriter{blueprint, root, rules, maxFirings}.run(opCtx);
+SbBlueprintRewriteResult rewriteSbeBlueprint(OperationContext* opCtx,
+                                             SbBlueprint* blueprint,
+                                             SbBlueprintSlotUsage* slotUsage,
+                                             SbBlueprintNodeIdx root,
+                                             const SbBlueprintRewriteRules& rules,
+                                             size_t maxFirings) {
+    return SbBlueprintRewriter{blueprint, slotUsage, root, rules, maxFirings}.run(opCtx);
+}
+
+void checkSbeBlueprintRewriteConverged(const SbBlueprintRewriteResult& result) {
+    // A plan that does not converge is still valid and runnable, so this only tasserts in debug
+    // builds.
+    if (!result.converged) {
+        if constexpr (kDebugBuild) {
+            tasserted(13627005, "SBE blueprint rewrite did not converge");
+        }
+        LOGV2_WARNING(
+            13627006, "SBE blueprint rewrite did not converge", "firings"_attr = result.firings);
+    }
 }
 }  // namespace mongo::stage_builder
