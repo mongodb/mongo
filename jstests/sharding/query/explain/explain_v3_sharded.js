@@ -29,7 +29,7 @@ import {
     kPlannerStatsVerbosities,
     kPlanPhaseGroups,
 } from "jstests/libs/query/explain_v3_helpers.js";
-import {checkSbeCompletelyDisabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kV3Verbosities = ["plannerChoice", "plannerStats", "execStats"];
@@ -57,8 +57,6 @@ const kRankerModes = [
         forcedConfig: {internalQueryPlanRanker: "costBased"},
         chosenRanker: "costBased",
         reason: "queryPlanRankerKnob",
-        // TODO SERVER-130973: Remove this once CBR supports SBE.
-        skipOnFullSbe: true,
     },
     {
         name: "multi-planning forced",
@@ -89,7 +87,7 @@ function aggExecutionStatsNReturned(shardSection) {
 }
 
 /**
- * Runs 'testCallback(mode, skipIfCbrUnsupported, skipIfForcedClassicEngine)' once per entry of
+ * Runs 'testCallback(mode, skipIfForcedClassicEngine)' once per entry of
  * 'kRankerModes', each in its own nested describe that forces (and restores) that mode's ranker
  * configuration on every shard around it. 'testCallback' should call it() to register its test
  * cases against the active 'mode'.
@@ -98,15 +96,10 @@ function describeUnderEachRankerMode(testCallback) {
     for (const mode of kRankerModes) {
         describe(mode.name, function () {
             let savedRankerConfig;
-            let cbrUnsupported = false;
             let classicEngineForced = false;
 
             before(function () {
                 classicEngineForced = checkSbeCompletelyDisabled(st.shard0.getDB(dbName));
-                if (mode.skipOnFullSbe && checkSbeFullyEnabled(st.shard0.getDB(dbName))) {
-                    cbrUnsupported = true;
-                    return;
-                }
                 assert.commandWorked(db.runCommand({planCacheClear: kUnshardedCollName}));
                 assert.commandWorked(db.runCommand({planCacheClear: kShardedCollName}));
                 if (mode.forcedConfig) {
@@ -127,13 +120,6 @@ function describeUnderEachRankerMode(testCallback) {
                 }
             });
 
-            const skipIfCbrUnsupported = () => {
-                if (cbrUnsupported) {
-                    jsTest.log.info("Skipping test: CBR does not support SBE");
-                }
-                return cbrUnsupported;
-            };
-
             const skipIfForcedClassicEngine = () => {
                 if (classicEngineForced) {
                     jsTest.log.info(
@@ -144,7 +130,7 @@ function describeUnderEachRankerMode(testCallback) {
                 return classicEngineForced;
             };
 
-            testCallback(mode, skipIfCbrUnsupported, skipIfForcedClassicEngine);
+            testCallback(mode, skipIfForcedClassicEngine);
         });
     }
 }
@@ -190,12 +176,9 @@ describe("V3 explain in a sharded cluster", function () {
     const multiPlanFilter = {a: {$gte: 0}, b: {$gte: 0}};
 
     describe("on an unsharded collection in a sharded cluster", function () {
-        function runUnshardedTests(mode, skipIfCbrUnsupported, skipIfForcedClassicEngine) {
+        function runUnshardedTests(mode, skipIfForcedClassicEngine) {
             for (const verbosity of kV3Verbosities) {
                 it(`single shard's find explain at ${verbosity}`, function () {
-                    if (skipIfCbrUnsupported()) {
-                        return;
-                    }
                     const explain = assert.commandWorked(
                         db.runCommand({
                             explain: {find: kUnshardedCollName, filter: multiPlanFilter},
@@ -240,7 +223,7 @@ describe("V3 explain in a sharded cluster", function () {
                 });
 
                 it(`single shard's agg explain at ${verbosity}`, function () {
-                    if (skipIfCbrUnsupported() || skipIfForcedClassicEngine()) {
+                    if (skipIfForcedClassicEngine()) {
                         return;
                     }
                     const explain = assert.commandWorked(
@@ -296,12 +279,9 @@ describe("V3 explain in a sharded cluster", function () {
         // An equality on the shard key, in the range owned by shard0.
         const targetedFilter = Object.assign({sk: 3}, multiPlanFilter);
 
-        function runShardTargetedTests(mode, skipIfCbrUnsupported, skipIfForcedClassicEngine) {
+        function runShardTargetedTests(mode, skipIfForcedClassicEngine) {
             for (const verbosity of kV3Verbosities) {
                 it(`targets one shard and keeps the V3 find shape at ${verbosity}`, function () {
-                    if (skipIfCbrUnsupported()) {
-                        return;
-                    }
                     const explain = assert.commandWorked(
                         db.runCommand({
                             explain: {find: kShardedCollName, filter: targetedFilter},
@@ -348,7 +328,7 @@ describe("V3 explain in a sharded cluster", function () {
                 });
 
                 it(`targets one shard and keeps the V3 agg shape at ${verbosity}`, function () {
-                    if (skipIfCbrUnsupported() || skipIfForcedClassicEngine()) {
+                    if (skipIfForcedClassicEngine()) {
                         return;
                     }
                     const explain = assert.commandWorked(
@@ -408,7 +388,7 @@ describe("V3 explain in a sharded cluster", function () {
     });
 
     describe("on a sharded collection with a scatter-gather query", function () {
-        function runScatterGatherTests(mode, skipIfCbrUnsupported, skipIfForcedClassicEngine) {
+        function runScatterGatherTests(mode, skipIfForcedClassicEngine) {
             /**
              * Asserts that every entry of 'plans' carries a costBased node group when 'mode' forced
              * the cost-based ranker and 'verbosity' renders per-node statistics at all - and never
@@ -432,9 +412,6 @@ describe("V3 explain in a sharded cluster", function () {
 
             for (const verbosity of kV3Verbosities) {
                 it(`merges V3 find explains from every shard at ${verbosity}`, function () {
-                    if (skipIfCbrUnsupported()) {
-                        return;
-                    }
                     const explain = assert.commandWorked(
                         db.runCommand({
                             explain: {find: kShardedCollName, filter: multiPlanFilter},
@@ -489,9 +466,6 @@ describe("V3 explain in a sharded cluster", function () {
                 });
 
                 it(`merges sorted V3 find explains from every shard at ${verbosity}`, function () {
-                    if (skipIfCbrUnsupported()) {
-                        return;
-                    }
                     const explain = assert.commandWorked(
                         db.runCommand({
                             explain: {
@@ -575,7 +549,7 @@ describe("V3 explain in a sharded cluster", function () {
                     expectedTotalNReturned,
                 } of mergeCases) {
                     it(`merges V3 agg explains from every shard on ${name} at ${verbosity}`, function () {
-                        if (skipIfCbrUnsupported() || skipIfForcedClassicEngine()) {
+                        if (skipIfForcedClassicEngine()) {
                             return;
                         }
                         const explain = assert.commandWorked(
@@ -663,12 +637,9 @@ describe("V3 explain in a sharded cluster", function () {
         // No index covers this predicate, so the only candidate is a collection scan and no ranking takes place.
         const noIndexFilter = {nonexistent: 1};
 
-        function runSingleCandidatePlanTests(mode, skipIfCbrUnsupported) {
+        function runSingleCandidatePlanTests(mode) {
             for (const verbosity of kV3Verbosities) {
                 it(`reports "singlePlan" on every shard for a scatter find at ${verbosity}`, function () {
-                    if (skipIfCbrUnsupported()) {
-                        return;
-                    }
                     const explain = assert.commandWorked(
                         db.runCommand({
                             explain: {find: kShardedCollName, filter: noIndexFilter},
