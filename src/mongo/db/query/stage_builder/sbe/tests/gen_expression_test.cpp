@@ -141,16 +141,33 @@ public:
             sbe::value::TagValueOwned::fromRaw(sbe::value::makeValue(expected));
         runTest(expr, rootSlot, expectedTv.tag(), expectedTv.value(), test);
     }
+
+    SbSlot makeRootSlot(BSONObj root) {
+        _root = std::move(root);
+        auto slotId = _env->registerSlot("root"sv,
+                                         sbe::value::TypeTags::bsonObject,
+                                         sbe::value::bitcastFrom<const char*>(_root.objdata()),
+                                         false,
+                                         &_slotIdGenerator);
+        return SbSlot{slotId, TypeSignature::kObjectType};
+    }
+
+    boost::intrusive_ptr<Expression> field(const std::string& path) {
+        return ExpressionFieldPath::createPathFromString(
+            _expCtx.get(), path, _expCtx->variablesParseState);
+    }
+
+    boost::intrusive_ptr<Expression> constant(int value) {
+        return ExpressionConstant::create(_expCtx.get(), Value(value));
+    }
+
+private:
+    BSONObj _root;
 };
 
 TEST_F(GoldenGenExpressionTest, TestSimpleExpr) {
     auto root = BSON("_id" << 0 << "field1" << 4 << "field2" << true << "null" << BSONNULL);
-    auto rootSlotId = _env->registerSlot("root"sv,
-                                         sbe::value::TypeTags::bsonObject,
-                                         sbe::value::bitcastFrom<const char*>(root.objdata()),
-                                         false,
-                                         &_slotIdGenerator);
-    auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
+    auto rootSlot = makeRootSlot(root);
 
     auto fieldNumExpr = ExpressionFieldPath::createPathFromString(
         _expCtx.get(), "field1", _expCtx->variablesParseState);
@@ -987,6 +1004,291 @@ TEST_F(GoldenGenExpressionTest, TestExprAddLarge) {
     Value expected = Value(1475);  // 50*49/2+5*50 = 1475
     ExpressionAdd addExpr(_expCtx.get(), std::move(exprs));
     runTest(&addExpr, rootSlot, expected, "ExpressionAdd"sv);
+}
+
+TEST_F(GoldenGenExpressionTest, TestExprAdd) {
+    auto rootSlot = makeRootSlot(BSON("a" << 5 << "b" << 7));
+
+    {
+        ExpressionAdd addExpr(_expCtx.get(), {});
+        runTest(&addExpr, rootSlot, Value(0), "ZeroOperands"sv);
+    }
+    {
+        ExpressionAdd addExpr(_expCtx.get(), {field("a")});
+        runTest(&addExpr, rootSlot, Value(5), "OneOperand"sv);
+    }
+    {
+        ExpressionAdd addExpr(_expCtx.get(), {field("a"), field("b")});
+        runTest(&addExpr, rootSlot, Value(12), "TwoFields"sv);
+    }
+    {
+        ExpressionAdd addExpr(_expCtx.get(), {constant(10), field("a"), field("b")});
+        runTest(&addExpr, rootSlot, Value(22), "ThreeOperandsMixed"sv);
+    }
+    {
+        ExpressionAdd addExpr(_expCtx.get(), {constant(1), constant(2)});
+        runTest(&addExpr, rootSlot, Value(3), "AllConstants"sv);
+    }
+    {
+        boost::intrusive_ptr<Expression> inner =
+            new ExpressionAdd(_expCtx.get(), {field("a"), field("b")});
+        ExpressionAdd addExpr(_expCtx.get(), {inner, constant(1)});
+        runTest(&addExpr, rootSlot, Value(13), "NestedAdd"sv);
+    }
+}
+
+class AddGenExpressionTest : public sbe::EExpressionTestFixture {
+public:
+    void setUp() override {
+        sbe::EExpressionTestFixture::setUp();
+        _rootSlot = SbSlot{bindAccessor(&_rootAccessor), TypeSignature::kObjectType};
+    }
+
+    sbe::value::TagValueOwned evaluateAdd(std::string_view addSpec, const BSONObj& root) {
+        auto expression = Expression::parseExpression(
+            _expCtx.get(), fromjson(addSpec), _expCtx->variablesParseState);
+        PlanStageSlots slots;
+        auto sbeExpression =
+            generateExpression(_state, expression.get(), _rootSlot, slots).lower(_state);
+        auto compiled = compileExpression(*sbeExpression);
+        _rootAccessor.reset(sbe::value::TypeTags::bsonObject,
+                            sbe::value::bitcastFrom<const char*>(root.objdata()));
+        return sbe::value::TagValueOwned::fromRaw(runCompiledExpression(compiled.get()));
+    }
+
+    void assertAdd(std::string_view addSpec, const BSONObj& root, const Value& expected) {
+        auto actual = evaluateAdd(addSpec, root);
+        auto expectedTv = sbe::value::TagValueOwned::fromRaw(sbe::value::makeValue(expected));
+        ASSERT_EQ(actual.tag(), expectedTv.tag());
+        ASSERT_SBE_VALUE_EQ(actual.tag(), actual.value(), expectedTv.tag(), expectedTv.value());
+    }
+
+    void assertAddThrows(std::string_view addSpec, const BSONObj& root, int code) {
+        ASSERT_THROWS_CODE(evaluateAdd(addSpec, root), DBException, code);
+    }
+
+protected:
+    sbe::value::ViewOfValueAccessor _rootAccessor;
+    boost::optional<SbSlot> _rootSlot;
+};
+
+TEST_F(AddGenExpressionTest, EmptyOperandListReturnsInt32Zero) {
+    assertAdd("{$add: []}", BSON("a" << 1), Value(0));
+}
+
+TEST_F(AddGenExpressionTest, SingleNumericOperandIsReturnedUnchanged) {
+    assertAdd("{$add: ['$a']}", BSON("a" << 2.5), Value(2.5));
+    assertAdd("{$add: ['$a']}", BSON("a" << 7LL), Value(7LL));
+}
+
+TEST_F(AddGenExpressionTest, SingleDateOperandIsReturnedUnchanged) {
+    auto date = Date_t::fromMillisSinceEpoch(1731969824000);
+    assertAdd("{$add: ['$d']}", BSON("d" << date), Value(date));
+}
+
+TEST_F(AddGenExpressionTest, NullOperandReturnsNull) {
+    assertAdd("{$add: ['$a', '$n']}", BSON("a" << 1 << "n" << BSONNULL), Value(BSONNULL));
+    assertAdd("{$add: ['$n', '$a']}", BSON("a" << 1 << "n" << BSONNULL), Value(BSONNULL));
+}
+
+TEST_F(AddGenExpressionTest, MissingFieldReturnsNull) {
+    assertAdd("{$add: ['$a', '$missing']}", BSON("a" << 1), Value(BSONNULL));
+}
+
+TEST_F(AddGenExpressionTest, UndefinedOperandReturnsNull) {
+    assertAdd("{$add: ['$a', '$u']}", BSON("a" << 1 << "u" << BSONUndefined), Value(BSONNULL));
+}
+
+TEST_F(AddGenExpressionTest, NonNumericOperandFails) {
+    assertAddThrows("{$add: ['$a', '$x']}", BSON("a" << 1 << "x" << "str"), 7157723);
+    assertAddThrows("{$add: ['$a', '$x']}", BSON("a" << 1 << "x" << true), 7157723);
+    assertAddThrows("{$add: ['$a', '$x']}", BSON("a" << 1 << "x" << BSON("y" << 1)), 7157723);
+    assertAddThrows("{$add: ['$a', '$x']}", BSON("a" << 1 << "x" << BSON_ARRAY(1)), 7157723);
+}
+
+TEST_F(AddGenExpressionTest, TwoDatesFail) {
+    auto root = BSON("d1" << Date_t::fromMillisSinceEpoch(1000) << "d2"
+                          << Date_t::fromMillisSinceEpoch(2000) << "a" << 1);
+    assertAddThrows("{$add: ['$d1', '$d2']}", root, 7157722);
+    assertAddThrows("{$add: ['$d1', '$a', '$d2']}", root, 7157722);
+}
+
+TEST_F(AddGenExpressionTest, Int32PlusInt32StaysInt32) {
+    assertAdd("{$add: ['$a', '$b']}", BSON("a" << 1 << "b" << 2), Value(3));
+}
+
+TEST_F(AddGenExpressionTest, Int32PlusInt64GivesInt64) {
+    assertAdd("{$add: ['$a', '$b']}", BSON("a" << 1 << "b" << 2LL), Value(3LL));
+    assertAdd("{$add: ['$b', '$a']}", BSON("a" << 1 << "b" << 2LL), Value(3LL));
+}
+
+TEST_F(AddGenExpressionTest, IntPlusDoubleGivesDouble) {
+    assertAdd("{$add: ['$a', '$b']}", BSON("a" << 1 << "b" << 2.5), Value(3.5));
+    assertAdd("{$add: ['$a', '$b']}", BSON("a" << 1LL << "b" << 2.5), Value(3.5));
+}
+
+TEST_F(AddGenExpressionTest, AnythingPlusDecimalGivesDecimal) {
+    assertAdd("{$add: ['$a', '$b']}",
+              BSON("a" << 1 << "b" << Decimal128("1.5")),
+              Value(Decimal128("2.5")));
+    assertAdd("{$add: ['$a', '$b']}",
+              BSON("a" << 1LL << "b" << Decimal128("1.5")),
+              Value(Decimal128("2.5")));
+    assertAdd("{$add: ['$a', '$b']}",
+              BSON("a" << 1.5 << "b" << Decimal128("1.5")),
+              Value(Decimal128("3.0")));
+}
+
+TEST_F(AddGenExpressionTest, Int32OverflowPromotesToInt64) {
+    assertAdd("{$add: ['$a', '$b']}",
+              BSON("a" << std::numeric_limits<int32_t>::max() << "b" << 1),
+              Value(2147483648LL));
+}
+
+TEST_F(AddGenExpressionTest, Int64OverflowPromotesToDouble) {
+    assertAdd("{$add: ['$a', '$b']}",
+              BSON("a" << std::numeric_limits<long long>::max() << "b" << 1LL),
+              Value(9223372036854775808.0));
+}
+
+TEST_F(AddGenExpressionTest, OperandsAreSummedLeftToRight) {
+    assertAdd("{$add: ['$a', '$b', '$c']}",
+              BSON("a" << 1e308 << "b" << 1e308 << "c" << -1e308),
+              Value(std::numeric_limits<double>::infinity()));
+}
+
+TEST_F(AddGenExpressionTest, DatePlusInt32InEitherOrderGivesDate) {
+    auto root = BSON("d" << Date_t::fromMillisSinceEpoch(1000) << "a" << 5);
+    assertAdd("{$add: ['$d', '$a']}", root, Value(Date_t::fromMillisSinceEpoch(1005)));
+    assertAdd("{$add: ['$a', '$d']}", root, Value(Date_t::fromMillisSinceEpoch(1005)));
+}
+
+TEST_F(AddGenExpressionTest, DatePlusInt64GivesDate) {
+    auto root = BSON("d" << Date_t::fromMillisSinceEpoch(1000) << "a" << 5000000000LL);
+    assertAdd("{$add: ['$d', '$a']}", root, Value(Date_t::fromMillisSinceEpoch(5000001000)));
+    assertAdd("{$add: ['$a', '$d']}", root, Value(Date_t::fromMillisSinceEpoch(5000001000)));
+}
+
+TEST_F(AddGenExpressionTest, DatePlusDoubleRoundsHalfAwayFromZero) {
+    auto root = BSON("d" << Date_t::fromMillisSinceEpoch(1000) << "half" << 0.5 << "oneHalf" << 1.5
+                         << "onePointFour" << 1.4 << "negHalf" << -0.5);
+    assertAdd("{$add: ['$d', '$half']}", root, Value(Date_t::fromMillisSinceEpoch(1001)));
+    assertAdd("{$add: ['$d', '$oneHalf']}", root, Value(Date_t::fromMillisSinceEpoch(1002)));
+    assertAdd("{$add: ['$d', '$onePointFour']}", root, Value(Date_t::fromMillisSinceEpoch(1001)));
+    assertAdd("{$add: ['$d', '$negHalf']}", root, Value(Date_t::fromMillisSinceEpoch(999)));
+    assertAdd("{$add: ['$half', '$d']}", root, Value(Date_t::fromMillisSinceEpoch(1001)));
+}
+
+TEST_F(AddGenExpressionTest, DatePlusDecimalRoundsHalfToEven) {
+    auto root = BSON("d" << Date_t::fromMillisSinceEpoch(1000) << "oneHalf" << Decimal128("1.5")
+                         << "twoHalf" << Decimal128("2.5") << "onePointFour" << Decimal128("1.4"));
+    assertAdd("{$add: ['$d', '$oneHalf']}", root, Value(Date_t::fromMillisSinceEpoch(1002)));
+    assertAdd("{$add: ['$d', '$twoHalf']}", root, Value(Date_t::fromMillisSinceEpoch(1002)));
+    assertAdd("{$add: ['$d', '$onePointFour']}", root, Value(Date_t::fromMillisSinceEpoch(1001)));
+    assertAdd("{$add: ['$twoHalf', '$d']}", root, Value(Date_t::fromMillisSinceEpoch(1002)));
+}
+
+TEST_F(AddGenExpressionTest, DateInMiddleOfOperandsGivesDate) {
+    auto root = BSON("a" << 5 << "d" << Date_t::fromMillisSinceEpoch(1000) << "b" << 7LL);
+    assertAdd("{$add: ['$a', '$d', '$b']}", root, Value(Date_t::fromMillisSinceEpoch(1012)));
+}
+
+TEST_F(AddGenExpressionTest, DatePlusNaNFailsWithOverflow) {
+    auto root = BSON("d" << Date_t::fromMillisSinceEpoch(1000) << "nanDouble"
+                         << std::numeric_limits<double>::quiet_NaN() << "nanDecimal"
+                         << Decimal128::kPositiveNaN);
+    assertAddThrows("{$add: ['$d', '$nanDouble']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$nanDouble', '$d']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$d', '$nanDecimal']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$nanDecimal', '$d']}", root, ErrorCodes::Overflow);
+}
+
+TEST_F(AddGenExpressionTest, DatePlusValueOutsideInt64RangeFailsWithOverflow) {
+    auto root =
+        BSON("d" << Date_t::fromMillisSinceEpoch(1000) << "bigLong"
+                 << std::numeric_limits<long long>::max() << "bigDouble" << 9223372036854775808.0
+                 << "bigDecimal" << Decimal128("9223372036854775808"));
+    assertAddThrows("{$add: ['$d', '$bigLong']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$bigLong', '$d']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$d', '$bigDouble']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$bigDouble', '$d']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$d', '$bigDecimal']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$bigDecimal', '$d']}", root, ErrorCodes::Overflow);
+}
+
+TEST_F(AddGenExpressionTest, DatePlusOverflowAtMaxOrMinFails) {
+    auto root =
+        BSON("max" << Date_t::max() << "min" << Date_t::min() << "one" << 1 << "negOne" << -1);
+    assertAddThrows("{$add: ['$max', '$one']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$one', '$max']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$min', '$negOne']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$negOne', '$min']}", root, ErrorCodes::Overflow);
+}
+
+TEST_F(AddGenExpressionTest, DateAtLimitsStaysDateWhenResultFits) {
+    auto root = BSON("max" << Date_t::max() << "min" << Date_t::min() << "zero" << 0 << "one" << 1
+                           << "negOne" << -1);
+    assertAdd("{$add: ['$max', '$zero']}", root, Value(Date_t::max()));
+    assertAdd("{$add: ['$max', '$negOne']}",
+              root,
+              Value(Date_t::fromMillisSinceEpoch(std::numeric_limits<long long>::max() - 1)));
+    assertAdd("{$add: ['$min', '$zero']}", root, Value(Date_t::min()));
+    assertAdd("{$add: ['$min', '$one']}",
+              root,
+              Value(Date_t::fromMillisSinceEpoch(std::numeric_limits<long long>::min() + 1)));
+}
+
+TEST_F(AddGenExpressionTest, DateAtLimitsPlusDecimalOverflowFails) {
+    auto root = BSON("max" << Date_t::max() << "min" << Date_t::min() << "one" << Decimal128(1)
+                           << "negOne" << Decimal128(-1));
+    assertAddThrows("{$add: ['$max', '$one']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$one', '$max']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$min', '$negOne']}", root, ErrorCodes::Overflow);
+    assertAddThrows("{$add: ['$negOne', '$min']}", root, ErrorCodes::Overflow);
+}
+
+TEST_F(AddGenExpressionTest, NullOrMissingWithDateReturnsNull) {
+    auto root = BSON("d" << Date_t::fromMillisSinceEpoch(1000) << "a" << 1 << "n" << BSONNULL);
+    assertAdd("{$add: ['$d', '$n']}", root, Value(BSONNULL));
+    assertAdd("{$add: ['$n', '$d']}", root, Value(BSONNULL));
+    assertAdd("{$add: ['$d', '$missing']}", root, Value(BSONNULL));
+    assertAdd("{$add: ['$missing', '$d']}", root, Value(BSONNULL));
+    assertAdd("{$add: ['$d', '$a', '$n']}", root, Value(BSONNULL));
+}
+
+TEST_F(AddGenExpressionTest, Int64PlusInt64StaysInt64WithoutOverflow) {
+    auto root =
+        BSON("a" << 2LL << "b" << 3LL << "maxLessOne" << std::numeric_limits<long long>::max() - 1
+                 << "one" << 1LL << "max" << std::numeric_limits<long long>::max() << "min"
+                 << std::numeric_limits<long long>::min());
+    assertAdd("{$add: ['$a', '$b']}", root, Value(5LL));
+    assertAdd(
+        "{$add: ['$maxLessOne', '$one']}", root, Value(std::numeric_limits<long long>::max()));
+    assertAdd("{$add: ['$min', '$max']}", root, Value(-1LL));
+}
+
+TEST_F(AddGenExpressionTest, DoublePlusDoubleWithoutOverflow) {
+    auto root = BSON("a" << 1.5 << "b" << 2.25 << "max" << std::numeric_limits<double>::max()
+                         << "negMax" << -std::numeric_limits<double>::max() << "one" << 1.0);
+    assertAdd("{$add: ['$a', '$b']}", root, Value(3.75));
+    assertAdd("{$add: ['$max', '$negMax']}", root, Value(0.0));
+    assertAdd("{$add: ['$max', '$one']}", root, Value(std::numeric_limits<double>::max()));
+}
+
+TEST_F(AddGenExpressionTest, DecimalPlusDecimalIsDecimal) {
+    auto root = BSON("a" << Decimal128("1.5") << "b" << Decimal128("2.25") << "max"
+                         << Decimal128::kLargestPositive << "negOne" << Decimal128("-1"));
+    assertAdd("{$add: ['$a', '$b']}", root, Value(Decimal128("3.75")));
+    assertAdd("{$add: ['$max', '$negOne']}",
+              root,
+              Value(Decimal128::kLargestPositive.add(Decimal128("-1"))));
+}
+
+TEST_F(AddGenExpressionTest, DecimalPlusDecimalOverflowGivesInfinity) {
+    auto root =
+        BSON("max" << Decimal128::kLargestPositive << "min" << Decimal128::kLargestNegative);
+    assertAdd("{$add: ['$max', '$max']}", root, Value(Decimal128::kPositiveInfinity));
+    assertAdd("{$add: ['$min', '$min']}", root, Value(Decimal128::kNegativeInfinity));
 }
 
 }  // namespace mongo::stage_builder

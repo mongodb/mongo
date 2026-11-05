@@ -1,0 +1,118 @@
+# Golden test output of GoldenGenExpressionTest/TestExprAdd
+ZeroOperands
+0 
+# Golden test output of GoldenGenExpressionTest/TestExprAdd
+OneOperand
+
+    let [
+        l2.0 = getField(s1, "a") 
+    ] 
+    in 
+        if isNullish(l2.0) 
+        then null 
+        elif (
+            if isNumber(l2.0) 
+            then 0 
+            elif isDate(l2.0) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        > 1) 
+        then fail(7157722, "only one date allowed in an $add expression") 
+        else move(l2.0) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprAdd
+TwoFields
+
+    let [
+        l4.0 = getField(s1, "a") 
+        l4.1 = getField(s1, "b") 
+    ] 
+    in 
+        if (isNullish(l4.0) || isNullish(l4.1)) 
+        then null 
+        elif ((
+            if isNumber(l4.0) 
+            then 0 
+            elif isDate(l4.0) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 
+            if isNumber(l4.1) 
+            then 0 
+            elif isDate(l4.1) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+       ) > 1) 
+        then fail(7157722, "only one date allowed in an $add expression") 
+        else (move(l4.0) + move(l4.1)) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprAdd
+ThreeOperandsMixed
+
+    let [
+        l6.0 = getField(s1, "a") 
+        l6.1 = getField(s1, "b") 
+    ] 
+    in 
+        if (isNullish(l6.0) || isNullish(l6.1)) 
+        then null 
+        elif ((0 + 
+            if isNumber(l6.0) 
+            then 0 
+            elif isDate(l6.0) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 
+            if isNumber(l6.1) 
+            then 0 
+            elif isDate(l6.1) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+       ) > 1) 
+        then fail(7157722, "only one date allowed in an $add expression") 
+        else (10 + move(l6.0) + move(l6.1)) 
+
+# Golden test output of GoldenGenExpressionTest/TestExprAdd
+AllConstants
+3 
+# Golden test output of GoldenGenExpressionTest/TestExprAdd
+NestedAdd
+
+    let [
+        l10.0 = 
+            let [
+                l11.0 = getField(s1, "a") 
+                l11.1 = getField(s1, "b") 
+            ] 
+            in 
+                if (isNullish(l11.0) || isNullish(l11.1)) 
+                then null 
+                elif ((
+                    if isNumber(l11.0) 
+                    then 0 
+                    elif isDate(l11.0) 
+                    then 1 
+                    else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+                + 
+                    if isNumber(l11.1) 
+                    then 0 
+                    elif isDate(l11.1) 
+                    then 1 
+                    else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+               ) > 1) 
+                then fail(7157722, "only one date allowed in an $add expression") 
+                else (move(l11.0) + move(l11.1)) 
+    ] 
+    in 
+        if isNullish(l10.0) 
+        then null 
+        elif ((
+            if isNumber(l10.0) 
+            then 0 
+            elif isDate(l10.0) 
+            then 1 
+            else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+        + 0) > 1) 
+        then fail(7157722, "only one date allowed in an $add expression") 
+        else (move(l10.0) + 1) 
+
