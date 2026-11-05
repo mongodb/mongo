@@ -166,7 +166,10 @@ void StreamingAggStage::open(bool reOpen) {
 
 void StreamingAggStage::readInGroupKey() {
     for (size_t i = 0; i < _inKeyAccessors.size(); ++i) {
-        _inGroupKey.reset(i, _inKeyAccessors[i]->getViewOfValue());
+        auto keyView = _inKeyAccessors[i]->getViewOfValue();
+        tassert(
+            13857200, "Streaming group keys must never be arrays", !value::isArray(keyView.tag));
+        _inGroupKey.reset(i, keyView);
     }
 }
 

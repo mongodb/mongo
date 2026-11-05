@@ -489,6 +489,21 @@ TEST_F(StreamingAggStageTest, RejectsMismatchedClusterKeySlotCount) {
                         13625700);
 }
 
+TEST_F(StreamingAggStageTest, TassertsOnArrayKeyInFirstRow) {
+    auto [scanSlot, scanStage] = generateVirtualScan(BSON_ARRAY(BSON_ARRAY(1 << 2) << 3));
+    auto stage = makeStreamingAgg(std::move(scanStage), sbe::makeSV(scanSlot));
+    auto ctx = makeCompileCtx();
+    ASSERT_TASSERT_CODE(prepareTree(ctx.get(), stage.get(), scanSlot), 13857200);
+}
+
+TEST_F(StreamingAggStageTest, TassertsOnArrayKeyInLaterRow) {
+    auto [scanSlot, scanStage] = generateVirtualScan(BSON_ARRAY(1 << 1 << BSON_ARRAY(2 << 3)));
+    auto stage = makeStreamingAgg(std::move(scanStage), sbe::makeSV(scanSlot));
+    auto ctx = makeCompileCtx();
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
+    ASSERT_TASSERT_CODE(getAllResults(stage.get(), resultAccessor), 13857200);
+}
+
 TEST_F(StreamingAggStageTest, StatsDebugInfoReportsClusterKeySlots) {
     auto plan = makeGroupPlan(BSONArray{}, {"a", "b"}, {false, true}, EFn::kSum);
 

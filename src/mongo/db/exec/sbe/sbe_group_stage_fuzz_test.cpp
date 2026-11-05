@@ -169,10 +169,11 @@ std::vector<std::pair<value::TypeTags, value::Value>> arrayToSortedRows(value::T
 }
 
 /*
- * Builds the scan input for both group stages: one row per document, as sbe arrays holding just the
- * document itself. Returns the rows sorted by the documents' group key fields, with missing fields
- * ordered as null where the cluster key fills missing with null, so that every distinct grouping
- * key occupies a contiguous cluster of rows, as StreamingAggStage requires.
+ * Builds the scan input for both group stages: one row per document whose key fields are not
+ * arrays, as sbe arrays holding just the document itself. Returns the rows sorted by the documents'
+ * group key fields, with missing fields ordered as null where the cluster key fills missing with
+ * null, so that every distinct grouping key occupies a contiguous cluster of rows, as
+ * StreamingAggStage requires.
  */
 value::TagValueOwned makeSortedInput(const std::vector<DocumentSpec>& docs,
                                      const std::vector<KeyRef>& refs,
@@ -193,6 +194,11 @@ value::TagValueOwned makeSortedInput(const std::vector<DocumentSpec>& docs,
 
     for (size_t i = 0; i < docs.size(); ++i) {
         BSONObj doc = renderDocument(docs[i], static_cast<long long>(i));
+        if (std::any_of(refs.begin(), refs.end(), [&](KeyRef ref) {
+                return doc[positionalName(ref)].type() == BSONType::array;
+            })) {
+            continue;
+        }
 
         // Store the key field values in an array for sorting. This is only valid as long as there
         // are no Nothing values stored, since Nothing is silently dropped from SBE arrays.
