@@ -494,9 +494,6 @@ try-import %workspace%/.bazelrc.evergreen
 # local default dev settings
 try-import %workspace%/.bazelrc.common_bes
 
-# local default dev settings
-try-import %workspace%/.bazelrc.mongo_variables
-
 # Used for build profiles and any settings a user wants to consistently use
 try-import %workspace%/.bazelrc.local
 
