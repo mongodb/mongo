@@ -807,6 +807,12 @@ py_library(
 )
 
 py_library(
+    name = "package_test_archive",
+    srcs = ["package_test_archive.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
     name = "package_test_provenance",
     srcs = [
         "bazel_spawn_pb2.py",
