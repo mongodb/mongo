@@ -23,7 +23,9 @@ import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/s
 
 export const $config = (function () {
     const runningWithStepdowns =
-        TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
+        TestData.runningWithStepdowns ||
+        TestData.runningWithConfigStepdowns ||
+        TestData.runningWithShardStepdowns;
 
     let states = {
         collMod: function (db, collName) {

@@ -39,12 +39,14 @@ export const $config = (function () {
             assert.commandWorked(fromDB[collName].insertOne({x: 1}));
 
             // Verify that a document exist in the "to" collection after the rename occurs
-            assert.commandWorked(
+            assert.commandWorkedOrFailedWithCode(
                 fromDB.adminCommand({
                     renameCollection: fromDB.getName() + "." + collName,
                     to: toDB.getName() + "." + collName,
                     dropTarget: true,
                 }),
+                // Rename is not idempotent, so a retry after failover may fail to find the source.
+                ErrorCodes.NamespaceNotFound,
             );
 
             assert.eq(1, toDB[collName].find().itcount());

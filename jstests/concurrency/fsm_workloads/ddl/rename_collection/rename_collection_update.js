@@ -8,7 +8,8 @@
  *   assumes_unsharded_collection,
  *   incompatible_with_concurrency_simultaneous,
  *   multiversion_incompatible,
- *   requires_non_retryable_commands,
+ *   # renameCollection is not idempotent, so it can't be safely retried after a stepdown.
+ *   does_not_support_stepdowns,
  *   requires_replication,
  *   uses_rename,
  * ]

@@ -60,7 +60,11 @@ export const $config = (function () {
                 dropTarget: true,
             };
 
-            assert.commandWorked(fromDB.adminCommand(renameCommand));
+            assert.commandWorkedOrFailedWithCode(
+                fromDB.adminCommand(renameCommand),
+                // Rename is not idempotent, so a retry after failover may fail to find the source.
+                ErrorCodes.NamespaceNotFound,
+            );
             assert.eq(fromCollCount, toDB[collName].find().itcount());
             assert.eq(0, fromDB[collName].find().itcount());
 

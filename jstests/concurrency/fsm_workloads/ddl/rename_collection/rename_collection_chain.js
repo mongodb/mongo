@@ -34,6 +34,7 @@ export const $config = (function () {
             // SERVER-57128: NamespaceNotFound is an acceptable error if the mongos retries
             // the rename after the coordinator has already fulfilled the original request
             assert.commandWorkedOrFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+            assert(db[toCollName].exists());
 
             this.fromCollName = toCollName;
         }

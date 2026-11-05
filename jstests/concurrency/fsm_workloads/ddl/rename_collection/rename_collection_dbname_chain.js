@@ -37,7 +37,12 @@ export const $config = (function () {
                 dropTarget: false,
             };
 
-            assert.commandWorked(db.adminCommand(renameCommand));
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand(renameCommand),
+                // Rename is not idempotent, so a retry after failover may fail to find the source.
+                ErrorCodes.NamespaceNotFound,
+            );
+            assert(db.getSiblingDB(toDBName)[collName].exists());
 
             // Remove any files associated with the "from" namespace
             // to avoid having too many files open
