@@ -354,6 +354,7 @@ Status SortedDataIndexAccessMethod::insert(OperationContext* opCtx,
                                                      *keys,
                                                      *multikeyMetadataKeys,
                                                      *multikeyPaths,
+                                                     keys->size(),
                                                      *bsonRecord.docPtr,
                                                      options,
                                                      numInserted);
@@ -419,56 +420,12 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
     }
 
     if (entry->indexBuildInterceptor() || !entry->isReady()) {
-        // A primary-driven index build carries the multikey state a write implies on the side write
-        // records that write produces, so it needs at least one record to carry it. An update whose
-        // new keys are all present already -- a scalar becoming a single-element array, say, where
-        // the key does not change at all -- has an empty difference and produces none, losing that
-        // state. Such an update therefore writes one of its surviving keys as a delete and an
-        // insert on top of the real difference: that leaves the index exactly as it was while
-        // giving the insert record something to carry the state
-        //
-        // `sideWrite` decides multikey from the keys it is handed, which for an update is the
-        // difference between the old and new keys. That answer can differ from the document's own:
-        // an index without path-level tracking is multikey purely because a document generates
-        // several keys, so growing a document from one indexed term to two adds a single key and
-        // the difference looks non-multikey.
-        bool documentIsMultikey = shouldMarkIndexAsMultikey(updateTicket.newKeys.size(),
-                                                            updateTicket.newMultikeyMetadataKeys,
-                                                            updateTicket.newMultikeyPaths);
-        bool recordsWillBeWritten =
-            !updateTicket.added.empty() || !updateTicket.newMultikeyMetadataKeys.empty();
-        bool recordsWouldConveyIt = recordsWillBeWritten &&
-            shouldMarkIndexAsMultikey(updateTicket.added.size(),
-                                      updateTicket.newMultikeyMetadataKeys,
-                                      updateTicket.newMultikeyPaths);
-
-        // TODO (SERVER-135300): Remove once a side write can carry multikey state on its own.
-        bool needsCarrierForMultikeyState =
-            effectiveIndexBuildInterceptor(opCtx, entry) && documentIsMultikey &&
-            !recordsWouldConveyIt && !updateTicket.newKeys.empty() &&
-            index_builds::primary_driven::enabled(
-                opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-        KeyStringSet carrierRemoved;
-        KeyStringSet carrierAdded;
-        if (needsCarrierForMultikeyState) {
-            // Carry one of the document's own keys alongside the real difference: written as both a
-            // delete and an insert it leaves the index as it was, while making the insert record
-            // describe enough of the document for `sideWrite` to reach the same answer as above.
-            const auto& carrier = *updateTicket.newKeys.begin();
-            carrierRemoved = updateTicket.removed;
-            carrierRemoved.insert(carrier);
-            carrierAdded = updateTicket.added;
-            carrierAdded.insert(carrier);
-        }
-        auto& keysRemoved = needsCarrierForMultikeyState ? carrierRemoved : updateTicket.removed;
-        auto& keysAdded = needsCarrierForMultikeyState ? carrierAdded : updateTicket.added;
-
         bool logIfError = false;
         _unindexKeysOrWriteToSideTable(opCtx,
                                        coll,
                                        entry,
                                        loc,
-                                       keysRemoved,
+                                       updateTicket.removed,
                                        oldDoc,
                                        logIfError,
                                        numDeleted,
@@ -478,9 +435,10 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
                                             coll,
                                             entry,
                                             loc,
-                                            keysAdded,
+                                            updateTicket.added,
                                             updateTicket.newMultikeyMetadataKeys,
                                             updateTicket.newMultikeyPaths,
+                                            updateTicket.newKeys.size(),
                                             newDoc,
                                             options,
                                             numInserted);
@@ -987,12 +945,10 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
                                                              int64_t* const keysDeleted,
                                                              int64_t* const bytesInserted,
                                                              int64_t* const bytesDeleted) {
-    // Recover any multikey state the writer recorded alongside this key.
-    if (operation[IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue()) {
+    auto recordMultikeyPaths = [&](std::string_view pathsFieldName) -> Status {
         if (auto interceptor = entry->indexBuildInterceptor()) {
             MultikeyPaths multikeyPaths;
-            if (auto pathsElem = operation[IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName];
-                pathsElem.type() == BSONType::object) {
+            if (auto pathsElem = operation[pathsFieldName]; pathsElem.type() == BSONType::object) {
                 auto swPaths = multikey_paths::parse(pathsElem.Obj());
                 if (!swPaths.isOK()) {
                     return swPaths.getStatus();
@@ -1001,7 +957,8 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
             }
             interceptor->recordDrainedMultikeyPaths(multikeyPaths);
         }
-    }
+        return Status::OK();
+    };
 
     auto opType = [&operation] {
         switch (operation.getStringField("op")[0]) {
@@ -1017,8 +974,14 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
     }();
 
     if (opType == IndexBuildInterceptor::Op::kMultikey) {
-        // TODO (SERVER-135300): Handle multikey side writes.
-        return Status::OK();
+        return recordMultikeyPaths(IndexBuildInterceptor::kMultikeyOpPathsFieldName);
+    }
+
+    if (operation[IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue()) {
+        auto status = recordMultikeyPaths(IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     // Deserialize the encoded key_string::Value.
@@ -1927,6 +1890,7 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     const KeyStringSet& keys,
     const KeyStringSet& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths,
+    size_t numDocumentKeys,
     const BSONObj& obj,
     const InsertDeleteOptions& options,
     int64_t* keysInsertedOut) {
@@ -1936,14 +1900,16 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
         // Group this record's side-table writes so the packer keeps them with its collection write.
         BatchedWriteContext::AtomicOperationGroup sideWriteGroup(opCtx, recordId);
         int64_t inserted = 0;
-        status = interceptor->sideWrite(opCtx,
-                                        coll,
-                                        entry,
-                                        keys,
-                                        multikeyMetadataKeys,
-                                        multikeyPaths,
-                                        IndexBuildInterceptor::Op::kInsert,
-                                        &inserted);
+        status = interceptor->sideWrite(
+            opCtx,
+            coll,
+            entry,
+            keys,
+            multikeyMetadataKeys,
+            multikeyPaths,
+            shouldMarkIndexAsMultikey(numDocumentKeys, multikeyMetadataKeys, multikeyPaths),
+            IndexBuildInterceptor::Op::kInsert,
+            &inserted);
         if (keysInsertedOut) {
             *keysInsertedOut += inserted;
         }
@@ -1983,10 +1949,16 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
         // Group this record's side-table writes so the packer keeps them with its collection write.
         BatchedWriteContext::AtomicOperationGroup sideWriteGroup(opCtx, recordId);
         int64_t removed = 0;
-        fassert(
-            31155,
-            interceptor->sideWrite(
-                opCtx, coll, entry, keys, {}, {}, IndexBuildInterceptor::Op::kDelete, &removed));
+        fassert(31155,
+                interceptor->sideWrite(opCtx,
+                                       coll,
+                                       entry,
+                                       keys,
+                                       {},
+                                       {},
+                                       /*isMultikey=*/false,
+                                       IndexBuildInterceptor::Op::kDelete,
+                                       &removed));
         if (keysDeletedOut) {
             *keysDeletedOut += removed;
         }

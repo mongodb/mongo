@@ -326,6 +326,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
 
         int32_t batchSize = 0;
         int64_t batchSizeBytes = 0;
+        int32_t batchKeysProcessed = 0;
 
         auto cursor = rs.getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
 
@@ -374,6 +375,11 @@ Status SideWritesTracker::drainWritesIntoIndex(
                     &batchKeyBytesDeleted);
                 !status.isOK()) {
                 return status;
+            }
+
+            if (unownedDoc.getStringField("op") != "m") {
+                // Side writes with op "m" only record multikey information.
+                ++batchKeysProcessed;
             }
 
             // Save the record ids of the documents inserted into the index for deletion
@@ -438,7 +444,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         totalKeyBytesWritten += batchKeyBytesInserted + batchKeyBytesDeleted;
         auto timeElapsed = timer.elapsed();
 
-        recordIndexBuildSideWritesProcessedStats(batchSize,
+        recordIndexBuildSideWritesProcessedStats(batchKeysProcessed,
                                                  batchKeyBytesInserted + batchKeyBytesDeleted,
                                                  timeElapsed - durationLastUpdated);
         durationLastUpdated = timeElapsed;

@@ -766,6 +766,7 @@ private:
                                         const KeyStringSet& keys,
                                         const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths,
+                                        size_t numDocumentKeys,
                                         const BSONObj& obj,
                                         const InsertDeleteOptions& options,
                                         int64_t* keysInsertedOut);

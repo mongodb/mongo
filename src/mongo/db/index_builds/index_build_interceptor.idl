@@ -8,6 +8,16 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
 
+feature_flags:
+    featureFlagIndexBuildMultikeySideWrites:
+        description: >-
+            Record multikey updates in dedicated side write entries for two-phase index builds.
+            Ignored for primary-driven builds, which always enable this behavior.
+        cpp_varname: feature_flags::gIndexBuildMultikeySideWrites
+        default: true
+        version: 9.1
+        fcv_gated: true
+
 server_parameters:
     maxIndexBuildDrainBatchSize:
         description: >-

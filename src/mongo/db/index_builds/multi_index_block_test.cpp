@@ -1363,6 +1363,7 @@ TEST_F(MultiIndexBlockTest, PdibPersistsMultikeyStateRecoveredWhileDraining) {
                                          {keyString},
                                          {},
                                          multikeyPaths,
+                                         /*isMultikey=*/true,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         wuow.commit();

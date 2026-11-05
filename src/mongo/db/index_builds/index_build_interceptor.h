@@ -36,6 +36,7 @@ public:
     using DrainPhase = SideWritesTracker::DrainPhase;
 
     // Field names of the multikey state a side write record carries.
+    static constexpr std::string_view kMultikeyOpPathsFieldName = "paths";
     static constexpr std::string_view kSideWriteMultikeyFieldName = "multikey";
     static constexpr std::string_view kSideWriteMultikeyPathsFieldName = "multikeyPaths";
 
@@ -70,6 +71,7 @@ public:
                      const KeyStringSet& keys,
                      const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths,
+                     bool isMultikey,
                      Op op,
                      int64_t* numKeysOut);
 

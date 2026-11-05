@@ -42,6 +42,7 @@
 
 #include <span>
 #include <string_view>
+#include <tuple>
 
 #include <boost/optional/optional.hpp>
 
@@ -85,14 +86,19 @@ key_string::Value makeKeyString(int64_t value, RecordId rid) {
 }
 
 // Asserts that 'record' carries multikey state and that the paths it carries are 'expected'. The
-// flag alone is not enough: an index can already be multikey while the paths a write implies are
+// op alone is not enough: an index can already be multikey while the paths a write implies are
 // new, and the planner relies on that path-level detail.
 void assertRecordCarriesMultikeyPaths(const BSONObj& record, const MultikeyPaths& expected) {
-    ASSERT_TRUE(record[IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue()) << record;
-    auto pathsElem = record[IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName];
+    EXPECT_EQ(record.getStringField("op"), "m") << record;
+    EXPECT_FALSE(record.hasField("key")) << record;
+    EXPECT_FALSE(record.hasField(IndexBuildInterceptor::kSideWriteMultikeyFieldName)) << record;
+    EXPECT_FALSE(record.hasField(IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName))
+        << record;
+    EXPECT_EQ(record.nFields(), 2) << record;
+    auto pathsElem = record[IndexBuildInterceptor::kMultikeyOpPathsFieldName];
     ASSERT_EQ(pathsElem.type(), BSONType::object) << record;
     auto parsed = unittest::assertGet(multikey_paths::parse(pathsElem.Obj()));
-    ASSERT_EQ(multikey_paths::toString(parsed), multikey_paths::toString(expected));
+    EXPECT_EQ(multikey_paths::toString(parsed), multikey_paths::toString(expected));
 }
 
 class IndexBuilderInterceptorTest : public CatalogTestFixture {
@@ -226,8 +232,15 @@ void IndexBuilderInterceptorTest::testSingleOpIsSavedToSideWritesTable(
 
     WriteUnitOfWork wuow(operationContext());
     int64_t numKeys = 0;
-    ASSERT_OK(interceptor->sideWrite(
-        operationContext(), _coll->getCollectionPtr(), entry, {keyString}, {}, {}, op, &numKeys));
+    ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                     _coll->getCollectionPtr(),
+                                     entry,
+                                     {keyString},
+                                     {},
+                                     {},
+                                     /*isMultikey=*/false,
+                                     op,
+                                     &numKeys));
     EXPECT_EQ(1, numKeys);
     wuow.commit();
 
@@ -623,8 +636,18 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTablePrimar
 }
 
 TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPaths) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    otel::metrics::OtelMetricsCapturer capturer;
+    auto insertedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted)
+        : 0;
+    auto deletedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
-    auto interceptor = createIndexBuildInterceptor(indexBuildInfo);
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
     const auto entry = getIndexEntry("a_1");
 
     // Two keys from one document, with the path-level information a multikey index carries.
@@ -645,6 +668,7 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPaths) {
                                          {firstKey, secondKey},
                                          {},
                                          multikeyPaths,
+                                         /*isMultikey=*/true,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(numKeys, 2);
@@ -652,24 +676,41 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPaths) {
     }
 
     auto sideWrites = getSideWritesTableContents(indexBuildInfo);
-    ASSERT_EQ(sideWrites.size(), 2);
-
-    // Only the first of the document's records carries the state; every record is applied, so one
-    // is enough.
-    ASSERT_TRUE(sideWrites[0][IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue());
-    ASSERT_FALSE(sideWrites[1][IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue());
-
-    auto pathsElem = sideWrites[0][IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName];
-    ASSERT_EQ(pathsElem.type(), BSONType::object);
-    auto parsedPaths = unittest::assertGet(multikey_paths::parse(pathsElem.Obj()));
-    EXPECT_EQ(multikey_paths::toString(parsedPaths), multikey_paths::toString(multikeyPaths));
+    ASSERT_EQ(sideWrites.size(), 3);
+    for (size_t i = 0; i < 2; ++i) {
+        EXPECT_EQ(sideWrites[i].getStringField("op"), "i");
+        EXPECT_TRUE(sideWrites[i].hasField("key"));
+        EXPECT_EQ(sideWrites[i].nFields(), 2);
+        EXPECT_FALSE(sideWrites[i].hasField(IndexBuildInterceptor::kSideWriteMultikeyFieldName));
+        EXPECT_FALSE(
+            sideWrites[i].hasField(IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName));
+    }
+    assertRecordCarriesMultikeyPaths(sideWrites[2], multikeyPaths);
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted),
+            insertedBefore + 2);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
+            deletedBefore);
+    }
 }
 
 // A document can be multikey while generating no keys at all (SERVER-39705) -- a sparse
 // {"a.b": 1} index over {a: [{c: 1}]}, for instance.
-TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithoutKeysWritesNoRecord) {
+TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithoutKeysRecordsMultikeyPaths) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    otel::metrics::OtelMetricsCapturer capturer;
+    auto insertedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted)
+        : 0;
+    auto deletedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
-    auto interceptor = createIndexBuildInterceptor(indexBuildInfo);
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
     auto entry = getIndexEntry("a_1");
 
     const MultikeyPaths multikeyPaths{MultikeyComponents{0}};
@@ -683,20 +724,40 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithoutKeysWritesNoRecord) 
                                          {},
                                          {},
                                          multikeyPaths,
+                                         /*isMultikey=*/true,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(numKeys, 0);
         wuow.commit();
     }
 
-    EXPECT_EQ(getSideWritesTableContents(indexBuildInfo).size(), 0);
-    // The state is still tracked in memory for the node that received the write.
+    auto sideWrites = getSideWritesTableContents(indexBuildInfo);
+    ASSERT_EQ(sideWrites.size(), 1);
+    assertRecordCarriesMultikeyPaths(sideWrites[0], multikeyPaths);
     EXPECT_TRUE(interceptor->getMultikeyPaths());
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted),
+            insertedBefore);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
+            deletedBefore);
+    }
 }
 
-TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPathsOnMetadataKeyRecord) {
+TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithOnlyMetadataKeysRecordsMultikeyState) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    otel::metrics::OtelMetricsCapturer capturer;
+    auto insertedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted)
+        : 0;
+    auto deletedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'wc_1', key: {'$**': 1}}"));
-    auto interceptor = createIndexBuildInterceptor(indexBuildInfo);
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
     auto entry = getIndexEntry("wc_1");
 
     key_string::HeapBuilder metadataBuilder(key_string::Version::kLatestVersion);
@@ -712,6 +773,7 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPathsOnMetad
                                          {},
                                          {metadataKey},
                                          {},
+                                         /*isMultikey=*/true,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(numKeys, 1);
@@ -719,8 +781,18 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPathsOnMetad
     }
 
     auto sideWrites = getSideWritesTableContents(indexBuildInfo);
-    ASSERT_EQ(sideWrites.size(), 1);
-    EXPECT_TRUE(sideWrites[0][IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue());
+    ASSERT_EQ(sideWrites.size(), 2);
+    EXPECT_EQ(sideWrites[0].getStringField("op"), "i");
+    EXPECT_FALSE(sideWrites[0].hasField(IndexBuildInterceptor::kSideWriteMultikeyFieldName));
+    EXPECT_THAT(sideWrites[1], unittest::match::BSONObjEQ(BSON("op" << "m")));
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted),
+            insertedBefore + 1);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
+            deletedBefore);
+    }
 }
 
 // An update can make a document multikey without changing its key set at all: {a: 5} becoming
@@ -728,6 +800,13 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPathsOnMetad
 TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateWithUnchangedKeySetStillRecordsMultikeyPaths) {
     unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
     unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    otel::metrics::OtelMetricsCapturer capturer;
+    auto insertedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted)
+        : 0;
+    auto deletedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     std::shared_ptr<IndexBuildInterceptor> interceptor =
@@ -769,13 +848,79 @@ TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateWithUnchangedKeySetStillRecord
         wuow.commit();
     }
 
-    // The key itself is unchanged, so without writing the whole key sets there would be no record
-    // here at all.
     auto sideWrites = getSideWritesTableContents(indexBuildInfo);
-    ASSERT_EQ(sideWrites.size(), 2);
-    EXPECT_EQ(sideWrites[0].getStringField("op"), "d");
-    EXPECT_EQ(sideWrites[1].getStringField("op"), "i");
-    assertRecordCarriesMultikeyPaths(sideWrites[1], MultikeyPaths{MultikeyComponents{0}});
+    ASSERT_EQ(sideWrites.size(), 1);
+    assertRecordCarriesMultikeyPaths(sideWrites[0], MultikeyPaths{MultikeyComponents{0}});
+    EXPECT_EQ(numInserted, 0);
+    EXPECT_EQ(numDeleted, 0);
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted),
+            insertedBefore);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
+            deletedBefore);
+    }
+}
+
+TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateRemovingAllKeysRecordsMultikeyPaths) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    otel::metrics::OtelMetricsCapturer capturer;
+    auto insertedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted)
+        : 0;
+    auto deletedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
+    auto info =
+        buildIndexBuildInfo(fromjson("{v: 2, name: 'ab_1', key: {'a.b': 1}, sparse: true}"));
+    std::shared_ptr<IndexBuildInterceptor> interceptor =
+        createIndexBuildInterceptor(info, LazyRecordStore::CreateMode::immediate);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        CollectionWriter writer{operationContext(), &_coll.value()};
+        writer.getWritableCollection(operationContext())
+            ->getIndexCatalog()
+            ->getWritableEntryByName(
+                operationContext(), "ab_1", IndexCatalog::InclusionPolicy::kAll)
+            ->setIndexBuildInterceptor(interceptor);
+        wuow.commit();
+    }
+    auto* entry = getIndexEntry("ab_1");
+    SharedBufferFragmentBuilder pooledBuilder{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
+    int64_t numInserted = 0;
+    int64_t numDeleted = 0;
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(
+            entry->accessMethod()->update(operationContext(),
+                                          *shard_role_details::getRecoveryUnit(operationContext()),
+                                          pooledBuilder,
+                                          BSON("_id" << 0 << "a" << BSON("b" << 5)),
+                                          BSON("_id" << 0 << "a" << BSON_ARRAY(BSON("c" << 1))),
+                                          RecordId{1},
+                                          _coll->getCollectionPtr(),
+                                          entry,
+                                          InsertDeleteOptions{},
+                                          &numInserted,
+                                          &numDeleted));
+        wuow.commit();
+    }
+    auto records = getSideWritesTableContents(info);
+    ASSERT_EQ(records.size(), 2);
+    EXPECT_EQ(records[0].getStringField("op"), "d");
+    assertRecordCarriesMultikeyPaths(records[1], MultikeyPaths{{0}});
+    EXPECT_EQ(numInserted, 0);
+    EXPECT_EQ(numDeleted, 1);
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted),
+            insertedBefore);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
+            deletedBefore + 1);
+    }
 }
 
 TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateWithoutPathTrackingRecordsMultikeyState) {
@@ -820,23 +965,16 @@ TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateWithoutPathTrackingRecordsMult
         wuow.commit();
     }
 
-    // Some record must report the state, and the key the update genuinely adds must still be
-    // inserted.
     auto sideWrites = getSideWritesTableContents(indexBuildInfo);
-    std::size_t inserts = 0;
-    bool sawMultikey = false;
-    for (const auto& record : sideWrites) {
-        if (record.getStringField("op") == "i") {
-            ++inserts;
-            sawMultikey = sawMultikey ||
-                record[IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue();
-        }
-    }
-    EXPECT_TRUE(sawMultikey) << "no record carried the multikey state";
-    EXPECT_GE(inserts, 2) << "the added key and the carrier must both be inserted";
+    ASSERT_EQ(sideWrites.size(), 2);
+    EXPECT_EQ(sideWrites[0].getStringField("op"), "i");
+    EXPECT_FALSE(sideWrites[0].hasField(IndexBuildInterceptor::kSideWriteMultikeyFieldName));
+    EXPECT_THAT(sideWrites[1], unittest::match::BSONObjEQ(BSON("op" << "m")));
+    EXPECT_EQ(numInserted, 1);
+    EXPECT_EQ(numDeleted, 0);
 }
 
-TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateRemovingKeysPairsASingleCarrierKey) {
+TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateRemovingKeysWritesOnlyTheDifference) {
     unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
     unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
 
@@ -878,18 +1016,13 @@ TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateRemovingKeysPairsASingleCarrie
         wuow.commit();
     }
 
-    // The two removed keys, plus one surviving key written as a delete and an insert. Writing whole
-    // key sets would instead have produced five deletes and three inserts.
     auto sideWrites = getSideWritesTableContents(indexBuildInfo);
-    ASSERT_EQ(4, sideWrites.size());
-    std::size_t inserts = 0;
-    for (const auto& record : sideWrites) {
-        if (record.getStringField("op") == "i") {
-            ++inserts;
-            assertRecordCarriesMultikeyPaths(record, MultikeyPaths{MultikeyComponents{0}});
-        }
-    }
-    EXPECT_EQ(inserts, 1);
+    ASSERT_EQ(sideWrites.size(), 3);
+    EXPECT_EQ(sideWrites[0].getStringField("op"), "d");
+    EXPECT_EQ(sideWrites[1].getStringField("op"), "d");
+    assertRecordCarriesMultikeyPaths(sideWrites[2], MultikeyPaths{MultikeyComponents{0}});
+    EXPECT_EQ(numInserted, 0);
+    EXPECT_EQ(numDeleted, 2);
 }
 
 TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateMovingTheArrayPathRecordsTheNewPaths) {
@@ -935,18 +1068,12 @@ TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateMovingTheArrayPathRecordsTheNe
         wuow.commit();
     }
 
-    // The sole insert record must carry the new document's paths: the array is now at the first
-    // path component, not the second.
     auto sideWrites = getSideWritesTableContents(indexBuildInfo);
-    boost::optional<BSONObj> insertRecord;
-    for (const auto& record : sideWrites) {
-        if (record.getStringField("op") == "i") {
-            ASSERT_FALSE(insertRecord) << "expected exactly one insert record";
-            insertRecord = record;
-        }
-    }
-    ASSERT_TRUE(insertRecord);
-    assertRecordCarriesMultikeyPaths(*insertRecord, MultikeyPaths{MultikeyComponents{0}});
+    ASSERT_EQ(sideWrites.size(), 2);
+    EXPECT_EQ(sideWrites[0].getStringField("op"), "d");
+    assertRecordCarriesMultikeyPaths(sideWrites[1], MultikeyPaths{MultikeyComponents{0}});
+    EXPECT_EQ(numInserted, 0);
+    EXPECT_EQ(numDeleted, 1);
 }
 
 TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateChangingKeySetWritesOnlyTheDifference) {
@@ -991,14 +1118,26 @@ TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateChangingKeySetWritesOnlyTheDif
         wuow.commit();
     }
 
-    // Just the one added key, carrying the multikey state -- not all three.
     auto sideWrites = getSideWritesTableContents(indexBuildInfo);
-    ASSERT_EQ(sideWrites.size(), 1);
+    ASSERT_EQ(sideWrites.size(), 2);
     EXPECT_EQ(sideWrites[0].getStringField("op"), "i");
-    assertRecordCarriesMultikeyPaths(sideWrites[0], MultikeyPaths{MultikeyComponents{0}});
+    EXPECT_FALSE(sideWrites[0].hasField(IndexBuildInterceptor::kSideWriteMultikeyFieldName));
+    assertRecordCarriesMultikeyPaths(sideWrites[1], MultikeyPaths{MultikeyComponents{0}});
+    EXPECT_EQ(numInserted, 1);
+    EXPECT_EQ(numDeleted, 0);
 }
 
-TEST_F(IndexBuilderInterceptorTest, DrainRecoversMultikeyPathsFromSideWriteRecord) {
+class IndexBuilderInterceptorMultikeyDrainTest : public IndexBuilderInterceptorTest,
+                                                 public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(SideWriteFormats,
+                         IndexBuilderInterceptorMultikeyDrainTest,
+                         testing::Bool(),
+                         [](const testing::TestParamInfo<bool>& info) {
+                             return info.param ? "Dedicated" : "Piggybacked";
+                         });
+
+TEST_P(IndexBuilderInterceptorMultikeyDrainTest, DrainRecoversMultikeyPathsFromSideWriteRecord) {
     // TODO (SERVER-116165): Remove.
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
     unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
@@ -1032,12 +1171,15 @@ TEST_F(IndexBuilderInterceptorTest, DrainRecoversMultikeyPathsFromSideWriteRecor
         BufBuilder bufBuilder;
         keyString.serialize(bufBuilder);
         BSONObjBuilder recordBuilder;
-        recordBuilder.append("op", "i");
-        recordBuilder.appendBinData("key", bufBuilder.len(), BinDataGeneral, bufBuilder.buf());
-        recordBuilder.append(IndexBuildInterceptor::kSideWriteMultikeyFieldName, true);
+        recordBuilder.append("op", GetParam() ? "m" : "i");
+        if (!GetParam()) {
+            recordBuilder.appendBinData("key", bufBuilder.len(), BinDataGeneral, bufBuilder.buf());
+            recordBuilder.append(IndexBuildInterceptor::kSideWriteMultikeyFieldName, true);
+        }
         {
-            BSONObjBuilder pathsBuilder(
-                recordBuilder.subobjStart(IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName));
+            BSONObjBuilder pathsBuilder(recordBuilder.subobjStart(
+                GetParam() ? IndexBuildInterceptor::kMultikeyOpPathsFieldName
+                           : IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName));
             multikey_paths::serialize(BSON("a" << 1), multikeyPaths, pathsBuilder);
         }
         auto record = recordBuilder.obj();
@@ -1053,32 +1195,53 @@ TEST_F(IndexBuilderInterceptorTest, DrainRecoversMultikeyPathsFromSideWriteRecor
     }
 
     // Nothing is known in memory: this interceptor never handled the client write.
-    ASSERT_FALSE(interceptor->getMultikeyPaths());
+    EXPECT_FALSE(interceptor->getMultikeyPaths());
 
-    ASSERT_OK(interceptor->drainWritesIntoIndex(operationContext(),
-                                                _coll->getCollectionPtr(),
-                                                getIndexEntry("a_1"),
-                                                InsertDeleteOptions{.dupsAllowed = true},
-                                                /*onMultikeyPathsRecovered=*/{},
-                                                IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
-                                                IndexBuildInterceptor::DrainPhase::kFinal));
+    bool persisted = false;
+    ASSERT_OK(interceptor->drainWritesIntoIndex(
+        operationContext(),
+        _coll->getCollectionPtr(),
+        getIndexEntry("a_1"),
+        InsertDeleteOptions{.dupsAllowed = true},
+        [&](OperationContext* opCtx, const MultikeyPaths& paths) {
+            EXPECT_TRUE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+            EXPECT_EQ(multikey_paths::toString(paths), multikey_paths::toString(multikeyPaths));
+            persisted = true;
+            return Status::OK();
+        },
+        IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+        IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+        IndexBuildInterceptor::DrainPhase::kFinal));
 
     // The drain must have consumed the record, otherwise the assertion below would be vacuous.
-    ASSERT_EQ(getSideWritesTableContents(indexBuildInfo).size(), 0);
+    EXPECT_EQ(getSideWritesTableContents(indexBuildInfo).size(), 0);
+    EXPECT_TRUE(persisted);
+    EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().keysWritten, GetParam() ? 0 : 1);
+    if (GetParam()) {
+        EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().bytesWritten, 0);
+    }
 
     auto recovered = interceptor->getMultikeyPaths();
     ASSERT_TRUE(recovered);
     EXPECT_EQ(multikey_paths::toString(*recovered), multikey_paths::toString(multikeyPaths));
 }
 
-TEST_F(IndexBuilderInterceptorTest, DrainIgnoresMultikeySideWriteRecord) {
+TEST_F(IndexBuilderInterceptorTest, DrainRecoversFlagOnlyMultikeySideWriteRecord) {
     unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
     unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
-    auto interceptor =
+    std::shared_ptr<IndexBuildInterceptor> interceptor =
         createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        CollectionWriter writer{operationContext(), &_coll.value()};
+        writer.getWritableCollection(operationContext())
+            ->getIndexCatalog()
+            ->getWritableEntryByName(operationContext(), "a_1", IndexCatalog::InclusionPolicy::kAll)
+            ->setIndexBuildInterceptor(interceptor);
+        wuow.commit();
+    }
     auto* entry = getIndexEntry("a_1");
 
     key_string::HeapBuilder ksBuilder{key_string::Version::kLatestVersion};
@@ -1086,15 +1249,13 @@ TEST_F(IndexBuilderInterceptorTest, DrainIgnoresMultikeySideWriteRecord) {
     ksBuilder.appendRecordId(RecordId{1});
     key_string::Value keyString{ksBuilder.release()};
 
-    // A record this binary cannot interpret, followed by an ordinary one: the drain must skip the
-    // first and still apply the second.
+    // A flag-only multikey record has no key or path payload.
     {
         WriteUnitOfWork wuow{operationContext()};
         auto table = getTable(*indexBuildInfo.sideWritesIdent);
         auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
 
-        auto multikeyOnly = BSON("op" << "m"
-                                      << "multikey" << true);
+        auto multikeyOnly = BSON("op" << "m");
         ASSERT_OK(table->insertRecord(
             operationContext(), ru, multikeyOnly.objdata(), multikeyOnly.objsize(), Timestamp()));
 
@@ -1108,21 +1269,313 @@ TEST_F(IndexBuilderInterceptorTest, DrainIgnoresMultikeySideWriteRecord) {
         wuow.commit();
     }
 
-    ASSERT_OK(interceptor->drainWritesIntoIndex(operationContext(),
-                                                _coll->getCollectionPtr(),
-                                                entry,
-                                                InsertDeleteOptions{.dupsAllowed = true},
-                                                /*onMultikeyPathsRecovered=*/{},
-                                                IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
-                                                IndexBuildInterceptor::DrainPhase::kFinal));
+    EXPECT_FALSE(interceptor->getMultikeyPaths());
+    bool persisted = false;
+    ASSERT_OK(interceptor->drainWritesIntoIndex(
+        operationContext(),
+        _coll->getCollectionPtr(),
+        entry,
+        InsertDeleteOptions{.dupsAllowed = true},
+        [&](OperationContext* opCtx, const MultikeyPaths& paths) {
+            EXPECT_TRUE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+            EXPECT_TRUE(paths.empty());
+            persisted = true;
+            return Status::OK();
+        },
+        IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+        IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+        IndexBuildInterceptor::DrainPhase::kFinal));
 
     // Both records are consumed, and the key from the second one reached the index.
     EXPECT_EQ(getSideWritesTableContents(indexBuildInfo).size(), 0);
+    EXPECT_TRUE(persisted);
+    ASSERT_TRUE(interceptor->getMultikeyPaths());
+    EXPECT_TRUE(interceptor->getMultikeyPaths()->empty());
+    EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().keysWritten, 1);
+    EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().bytesWritten, keyString.getSize());
     auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
     auto indexCursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
     ASSERT(indexCursor->seekForKeyString(ru, keyString.getView()));
     EXPECT_FALSE(indexCursor->nextKeyString(ru));
+}
+
+TEST_F(IndexBuilderInterceptorTest, DrainRetriesMultikeyOnlyBatches) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard batchSize{"maxIndexBuildDrainBatchSize", 1};
+    otel::metrics::OtelMetricsCapturer capturer;
+    auto keysProcessedBefore = readDrainWritesServerStatusMetric("keysProcessed");
+    auto totalKeysProcessed = [] {
+        BSONObjBuilder builder;
+        globalMetricTreeSet()[ClusterRole::None].appendTo(builder);
+        return builder.obj()["metrics"]["indexBuilds"]["keysProcessed"].numberLong();
+    };
+    auto totalKeysProcessedBefore = totalKeysProcessed();
+    int64_t otelKeysProcessedBefore = 0;
+    int64_t drainedBefore = 0;
+    if (capturer.canReadMetrics()) {
+        otelKeysProcessedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+            std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)});
+        drainedBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained);
+    }
+    auto expectKeyMetricsUnchanged = [&] {
+        EXPECT_EQ(readDrainWritesServerStatusMetric("keysProcessed"), keysProcessedBefore);
+        EXPECT_EQ(totalKeysProcessed(), totalKeysProcessedBefore);
+        if (capturer.canReadMetrics()) {
+            EXPECT_EQ(capturer.readInt64Counter(
+                          otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                          std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}),
+                      otelKeysProcessedBefore);
+        }
+    };
+    auto info = buildIndexBuildInfo(fromjson("{v: 2, name: 'ab_1', key: {'a.b': 1}}"));
+    std::shared_ptr<IndexBuildInterceptor> interceptor =
+        createIndexBuildInterceptor(info, LazyRecordStore::CreateMode::immediate);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        CollectionWriter writer{operationContext(), &_coll.value()};
+        writer.getWritableCollection(operationContext())
+            ->getIndexCatalog()
+            ->getWritableEntryByName(
+                operationContext(), "ab_1", IndexCatalog::InclusionPolicy::kAll)
+            ->setIndexBuildInterceptor(interceptor);
+        auto table = getTable(*info.sideWritesIdent);
+        for (const auto& paths : {MultikeyPaths{{0}}, MultikeyPaths{{1}}}) {
+            BSONObjBuilder builder;
+            builder.append("op", "m");
+            {
+                BSONObjBuilder pathsBuilder(
+                    builder.subobjStart(IndexBuildInterceptor::kMultikeyOpPathsFieldName));
+                multikey_paths::serialize(BSON("a.b" << 1), paths, pathsBuilder);
+            }
+            auto record = builder.obj();
+            ASSERT_OK(table->insertRecord(operationContext(),
+                                          *shard_role_details::getRecoveryUnit(operationContext()),
+                                          record.objdata(),
+                                          record.objsize(),
+                                          Timestamp()));
+        }
+        wuow.commit();
+    }
+    auto drain = [&](const IndexBuildInterceptor::OnMultikeyPathsRecoveredFn& persist) {
+        return interceptor->drainWritesIntoIndex(operationContext(),
+                                                 _coll->getCollectionPtr(),
+                                                 getIndexEntry("ab_1"),
+                                                 InsertDeleteOptions{.dupsAllowed = true},
+                                                 persist,
+                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                 IndexBuildInterceptor::DrainPhase::kFinal);
+    };
+    EXPECT_EQ(drain([](OperationContext*, const MultikeyPaths&) {
+                  return Status{ErrorCodes::BadValue, "Injected multikey persistence failure"};
+              }),
+              ErrorCodes::BadValue);
+    EXPECT_EQ(getSideWritesTableContents(info).size(), 2);
+    expectKeyMetricsUnchanged();
+    int persisted = 0;
+    ASSERT_OK(drain([&](OperationContext* opCtx, const MultikeyPaths& paths) {
+        EXPECT_TRUE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+        MultikeyPaths expected = persisted == 0 ? MultikeyPaths{{0}} : MultikeyPaths{{0, 1}};
+        EXPECT_EQ(multikey_paths::toString(paths), multikey_paths::toString(expected));
+        ++persisted;
+        return Status::OK();
+    }));
+    EXPECT_EQ(persisted, 2);
+    EXPECT_TRUE(getSideWritesTableContents(info).empty());
+    EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().keysWritten, 0);
+    EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().bytesWritten, 0);
+    expectKeyMetricsUnchanged();
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained),
+            drainedBefore + 2);
+    }
+}
+
+TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRollbackRemovesDedicatedRecord) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    otel::metrics::OtelMetricsCapturer capturer;
+    auto insertedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted)
+        : 0;
+    auto deletedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
+    auto info = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor = createIndexBuildInterceptor(info, LazyRecordStore::CreateMode::immediate);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         _coll->getCollectionPtr(),
+                                         getIndexEntry("a_1"),
+                                         {},
+                                         {},
+                                         MultikeyPaths{{0}},
+                                         /*isMultikey=*/true,
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        EXPECT_EQ(numKeys, 0);
+        EXPECT_EQ(getSideWritesTableContents(info).size(), 1);
+        if (capturer.canReadMetrics()) {
+            EXPECT_EQ(capturer.readInt64Counter(
+                          otel::metrics::MetricNames::kIndexBuildSideWritesInserted),
+                      insertedBefore);
+            EXPECT_EQ(
+                capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
+                deletedBefore);
+        }
+    }
+    EXPECT_TRUE(getSideWritesTableContents(info).empty());
+    EXPECT_TRUE(interceptor->areAllWritesApplied(operationContext()));
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted),
+            insertedBefore);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
+            deletedBefore);
+    }
+}
+
+enum class NonPdibMultikeyMode { enabled, disabled };
+enum class MultikeyWriteShape { keys, noKeys, unchangedKeys };
+
+class IndexBuilderInterceptorNonPdibMultikeyTest
+    : public IndexBuilderInterceptorTest,
+      public testing::WithParamInterface<std::tuple<NonPdibMultikeyMode, MultikeyWriteShape>> {};
+
+INSTANTIATE_TEST_SUITE_P(NonPdibMultikeySideWrites,
+                         IndexBuilderInterceptorNonPdibMultikeyTest,
+                         testing::Combine(testing::Values(NonPdibMultikeyMode::enabled,
+                                                          NonPdibMultikeyMode::disabled),
+                                          testing::Values(MultikeyWriteShape::keys,
+                                                          MultikeyWriteShape::noKeys,
+                                                          MultikeyWriteShape::unchangedKeys)));
+
+TEST_P(IndexBuilderInterceptorNonPdibMultikeyTest, RecordsAndRecoversMultikeyState) {
+    auto [mode, shape] = GetParam();
+    otel::metrics::OtelMetricsCapturer capturer;
+    auto insertedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted)
+        : 0;
+    auto deletedBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", false};
+    unittest::ServerParameterGuard ffMultikey{"featureFlagIndexBuildMultikeySideWrites",
+                                              mode != NonPdibMultikeyMode::disabled};
+    bool expectMultikeyEntry = mode == NonPdibMultikeyMode::enabled;
+    MultikeyPaths paths{{0}};
+    auto info = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    std::shared_ptr<IndexBuildInterceptor> interceptor =
+        createIndexBuildInterceptor(info, LazyRecordStore::CreateMode::immediate);
+    auto attachInterceptor = [&] {
+        WriteUnitOfWork wuow{operationContext()};
+        CollectionWriter writer{operationContext(), &_coll.value()};
+        writer.getWritableCollection(operationContext())
+            ->getIndexCatalog()
+            ->getWritableEntryByName(operationContext(), "a_1", IndexCatalog::InclusionPolicy::kAll)
+            ->setIndexBuildInterceptor(interceptor);
+        wuow.commit();
+    };
+    attachInterceptor();
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        auto* entry = getIndexEntry("a_1");
+        if (shape == MultikeyWriteShape::unchangedKeys) {
+            SharedBufferFragmentBuilder pooledBuilder{
+                key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
+            int64_t numInserted = 0;
+            int64_t numDeleted = 0;
+            ASSERT_OK(entry->accessMethod()->update(
+                operationContext(),
+                *shard_role_details::getRecoveryUnit(operationContext()),
+                pooledBuilder,
+                BSON("a" << 10),
+                BSON("a" << BSON_ARRAY(10)),
+                RecordId{1},
+                _coll->getCollectionPtr(),
+                entry,
+                InsertDeleteOptions{},
+                &numInserted,
+                &numDeleted));
+            EXPECT_EQ(numInserted, 0);
+            EXPECT_EQ(numDeleted, 0);
+        } else {
+            KeyStringSet keys;
+            if (shape == MultikeyWriteShape::keys) {
+                keys = {makeKeyString(10, RecordId{1}), makeKeyString(20, RecordId{1})};
+            }
+            int64_t numKeys = 0;
+            ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                             _coll->getCollectionPtr(),
+                                             entry,
+                                             keys,
+                                             {},
+                                             paths,
+                                             /*isMultikey=*/true,
+                                             IndexBuildInterceptor::Op::kInsert,
+                                             &numKeys));
+            EXPECT_EQ(numKeys, keys.size());
+        }
+        wuow.commit();
+    }
+
+    const size_t keyCount = shape == MultikeyWriteShape::keys ? 2 : 0;
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted),
+            insertedBefore + keyCount);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
+            deletedBefore);
+    }
+    auto records = getSideWritesTableContents(info);
+    ASSERT_EQ(records.size(), keyCount + (expectMultikeyEntry ? 1 : 0));
+    for (size_t i = 0; i < keyCount; ++i) {
+        EXPECT_EQ(records[i].getStringField("op"), "i");
+        EXPECT_TRUE(records[i].hasField("key"));
+        EXPECT_EQ(records[i].nFields(), 2);
+    }
+    if (expectMultikeyEntry) {
+        assertRecordCarriesMultikeyPaths(records.back(), paths);
+    }
+    ASSERT_TRUE(interceptor->getMultikeyPaths());
+    EXPECT_EQ(multikey_paths::toString(*interceptor->getMultikeyPaths()),
+              multikey_paths::toString(paths));
+
+    // Recover through a fresh interceptor so in-memory writer state cannot mask a missing record.
+    interceptor = std::make_shared<IndexBuildInterceptor>(
+        operationContext(), info, LazyRecordStore::CreateMode::openExisting, false);
+    attachInterceptor();
+    EXPECT_FALSE(interceptor->getMultikeyPaths());
+    bool recovered = false;
+    ASSERT_OK(interceptor->drainWritesIntoIndex(
+        operationContext(),
+        _coll->getCollectionPtr(),
+        getIndexEntry("a_1"),
+        InsertDeleteOptions{.dupsAllowed = true},
+        [&](OperationContext* opCtx, const MultikeyPaths& recoveredPaths) {
+            EXPECT_TRUE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+            EXPECT_EQ(multikey_paths::toString(recoveredPaths), multikey_paths::toString(paths));
+            recovered = true;
+            return Status::OK();
+        },
+        IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+        IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+        IndexBuildInterceptor::DrainPhase::kFinal));
+    EXPECT_EQ(recovered, expectMultikeyEntry);
+    EXPECT_EQ(static_cast<bool>(interceptor->getMultikeyPaths()), expectMultikeyEntry);
+    EXPECT_TRUE(getSideWritesTableContents(info).empty());
+    EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().keysWritten, keyCount);
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+    EXPECT_EQ(getIndexEntry("a_1")->accessMethod()->asSortedData()->numKeys(operationContext(), ru),
+              keyCount);
 }
 
 class IndexBuilderInterceptorDrainPhaseTest
@@ -1164,6 +1617,7 @@ TEST_P(IndexBuilderInterceptorDrainPhaseTest, DrainPhases) {
                                          {key},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         wuow.commit();
@@ -1222,6 +1676,7 @@ TEST_P(IndexBuilderInterceptorPrepareConflictTest, InitialPrefixConflictRollsBac
                                              {makeKeyString(i, RecordId{i + 1})},
                                              {},
                                              {},
+                                             /*isMultikey=*/false,
                                              IndexBuildInterceptor::Op::kInsert,
                                              &numKeys));
         }
@@ -1296,6 +1751,7 @@ TEST_F(IndexBuilderInterceptorTest, LaterConflictEndsPreReadinessDrain) {
                                          {makeKeyString(1, RecordId{1})},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         wuow.commit();
@@ -1376,6 +1832,7 @@ TEST_F(IndexBuilderInterceptorTest, AbortedInitialTailDoesNotHideEarlierSideWrit
                                          {makeKeyString(1, RecordId{1})},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         wuow.commit();
@@ -1463,6 +1920,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
                                          {keyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -1591,6 +2049,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
                                          {keyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kDelete,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -1655,6 +2114,7 @@ TEST_F(IndexBuilderInterceptorTest, RecoveredMultikeyPathsSurviveThrowingBatchCa
                                              {makeKeyString(i, RecordId{i + 1})},
                                              {},
                                              {},
+                                             /*isMultikey=*/false,
                                              IndexBuildInterceptor::Op::kInsert,
                                              &numKeys));
         }
@@ -1737,6 +2197,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
                                              {keyString},
                                              {},
                                              {},
+                                             /*isMultikey=*/false,
                                              IndexBuildInterceptor::Op::kInsert,
                                              &numKeys));
             EXPECT_EQ(1, numKeys);
@@ -1840,6 +2301,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
                                              {keyString},
                                              {},
                                              {},
+                                             /*isMultikey=*/false,
                                              IndexBuildInterceptor::Op::kInsert,
                                              &numKeys));
             EXPECT_EQ(1, numKeys);
@@ -1940,6 +2402,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexRollbackAfterPartialBatc
                                              {makeKeyString(i, RecordId{i + 1})},
                                              {},
                                              {},
+                                             /*isMultikey=*/false,
                                              IndexBuildInterceptor::Op::kInsert,
                                              &numKeys));
             EXPECT_EQ(1, numKeys);
@@ -2115,6 +2578,7 @@ TEST_F(IndexBuilderInterceptorTest, OpenExistingPreservesExistingData) {
                                          {keyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         interceptor->getSkippedRecordTracker().record(
@@ -2265,6 +2729,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainSideWriteGeneratesNoContainerOpsWithout
                                          {keyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -2321,6 +2786,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainInsertSideWriteGeneratesContainerOpsPri
                                          {keyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -2394,6 +2860,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteSideWriteGeneratesContainerOpsPri
                                          {keyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kDelete,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -2479,6 +2946,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleSideWritesGeneratesContainerOps
                                          {keyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -2561,6 +3029,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {insertKeyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -2577,6 +3046,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {deleteKeyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kDelete,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -2638,6 +3108,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleBatchesGeneratesCorrectContaine
                                          {keyStrings.back()},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -2720,6 +3191,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {dupKeyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -2786,6 +3258,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {keyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -2862,6 +3335,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteOnUniqueIndexGeneratesContainerOp
                                          {keyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kDelete,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -2934,6 +3408,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {dupKeyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -3013,6 +3488,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {dupKeyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -3090,6 +3566,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {keyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);
@@ -3172,6 +3649,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {dupKeyString},
                                          {},
                                          {},
+                                         /*isMultikey=*/false,
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
         EXPECT_EQ(1, numKeys);

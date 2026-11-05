@@ -33,4 +33,29 @@ describe("resumable primary-driven index build made multikey without new keys", 
             expectMultikey: true,
         });
     });
+
+    it("recovers multikey state from documents without index keys", function () {
+        const docTemplate = (i) => ({
+            _id: i,
+            a: {b: i},
+            b: {b: i},
+            c: {b: i},
+        });
+        PrimaryDrivenResumableIndexBuildTest.run(this.rst, {
+            phase: PdibPhase.DRAIN,
+            collName: "no_keys",
+            docTemplate,
+            docCount: 1_000,
+            indexSpecs: [
+                {key: {"a.b": 1}, sparse: true},
+                {key: {"b.b": 1}, sparse: true},
+                {key: {"c.b": 1}, sparse: true},
+            ],
+            sideWrites: Array.from({length: 20}, (_, i) => docTemplate(1_000 + i)),
+            writesWhilePaused: [
+                {_id: "multikey_without_keys", a: [{c: 1}], b: [{c: 1}], c: [{c: 1}]},
+            ],
+            expectMultikey: true,
+        });
+    });
 });
