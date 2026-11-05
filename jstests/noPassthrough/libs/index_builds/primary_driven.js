@@ -415,10 +415,9 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         const name = testName || jsTestName();
         const {metricsDir, otelParams} = otelFileExportParams(name);
 
-        // When graceful unplanned stepdown is not supported, fail over by checkpointing on the
-        // primary, waiting for the secondary to install that checkpoint, then killing the primary.
-        // 2 nodes is sufficient for this case.
-        if (TestData.doesNotSupportGracefulUnplannedStepdown) {
+        // Only collapse to two nodes when neither kind of graceful stepdown is supported.
+        // Planned stepdown scenarios can require distinct secondaries across multiple failovers.
+        if (PrimaryDrivenResumableIndexBuildTest.failoverStopsOldPrimary()) {
             nodes = 2;
         }
 
@@ -835,10 +834,10 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             loadIntervalKeys,
         } = PrimaryDrivenResumableIndexBuildTest._normalizeOptions(options);
 
-        if (TestData.doesNotSupportGracefulUnplannedStepdown) {
+        if (PrimaryDrivenResumableIndexBuildTest.failoverStopsOldPrimary()) {
             jsTest.log.info(
                 "PrimaryDrivenResumableIndexBuildTest: skipping runAcrossTwoFailovers because this " +
-                    "configuration runs with two nodes and kill-based failover",
+                    "configuration supports neither graceful planned nor unplanned stepdown",
             );
             return;
         }
@@ -2042,14 +2041,18 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
     }
 
     /**
-     * Forces a checkpoint on the primary, waits for the secondary to install it, then kills the
-     * primary so the secondary steps up. The build is paused at its phase fail point, so no writes
-     * accumulate after the checkpoint. The old primary is always SIGKILLed. Returns the new primary
-     * (the stepped-up secondary).
+     * Forces a checkpoint on the primary, waits for the target secondary to install it, then kills
+     * the primary so that secondary steps up. Other secondaries are frozen to prevent them from
+     * winning the election. The build is paused at its phase fail point, so no writes accumulate
+     * after the checkpoint. The old primary is always SIGKILLed. Returns the new primary.
      */
-    static _failOverWithCheckpointInstall(rst, {unclean = false} = {}) {
-        const oldPrimary = rst.getPrimary();
-        const secondary = rst.getSecondary();
+    static _failOverWithCheckpointInstall(rst, oldPrimary, secondary, {unclean = false} = {}) {
+        const otherSecondaries = rst.nodes.filter(
+            (node) => node.host !== oldPrimary.host && node.host !== secondary.host,
+        );
+        for (const node of otherSecondaries) {
+            assert.commandWorked(node.adminCommand({replSetFreeze: ReplSetTest.kForeverSecs}));
+        }
 
         // Force a checkpoint on the primary and block until the secondary installs it.
         PrimaryDrivenResumableIndexBuildTest._awaitCheckpointInstalled(oldPrimary, secondary);
@@ -2069,7 +2072,11 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         );
         rst.waitForMyState(secondary, ReplSetTest.State.PRIMARY);
 
-        // Restart the old primary so it rejoins as a secondary (keeps the set at two live nodes).
+        for (const node of otherSecondaries) {
+            assert.commandWorked(node.adminCommand({replSetFreeze: 0}));
+        }
+
+        // Restart the old primary so it rejoins as a secondary.
         const restartedNode = rst.start(oldPrimary, {}, /*restart=*/ true);
         if (rst._pdibIndexBuildSettings) {
             assert.commandWorked(
@@ -2206,6 +2213,8 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      * failovers can step any of them up. Returns the new primary.
      */
     static _failOverWithStepDown(rst, oldPrimary, nextPrimaryNode) {
+        rst.awaitReplication();
+
         const otherSecondaries = rst.nodes.filter(
             (node) => node.host !== oldPrimary.host && node.host !== nextPrimaryNode.host,
         );
@@ -2257,9 +2266,12 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
                     nextPrimaryNode,
                 );
             }
-            return PrimaryDrivenResumableIndexBuildTest._failOverWithCheckpointInstall(rst, {
-                unclean: failoverMode === PdibFailoverMode.UNCLEAN_RESTART,
-            });
+            return PrimaryDrivenResumableIndexBuildTest._failOverWithCheckpointInstall(
+                rst,
+                oldPrimary,
+                nextPrimaryNode,
+                {unclean: failoverMode === PdibFailoverMode.UNCLEAN_RESTART},
+            );
         }
 
         if (failoverMode === PdibFailoverMode.NO_RESTART) {
