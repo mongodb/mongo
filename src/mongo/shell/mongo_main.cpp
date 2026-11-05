@@ -17,6 +17,7 @@
 #include "mongo/client/authenticate.h"
 #include "mongo/client/dbclient_session.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_aws_client_options.h"
 #include "mongo/client/sasl_oidc_client_params.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -587,6 +588,10 @@ int mongo_main(int argc, char* argv[]) {
 
         mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
         setGlobalServiceContext(ServiceContext::make());
+
+        // Join replica set monitor threads before exit to avoid LeakSanitizer false positives
+        // (see SERVER-138004).
+        ScopeGuard replicaSetMonitorGuard([] { ReplicaSetMonitor::shutdown(); });
 
         // TODO This should use a TransportLayerManager or TransportLayerFactory
         auto serviceContext = getGlobalServiceContext();

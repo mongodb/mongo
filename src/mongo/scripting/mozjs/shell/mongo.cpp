@@ -949,6 +949,7 @@ void MongoExternalInfo::Functions::load::call(JSContext* cx, JS::CallArgs args) 
 
 void MongoExternalInfo::Functions::quit::call(JSContext* cx, JS::CallArgs args) {
     auto arg = args.get(0);
+    ReplicaSetMonitor::shutdown();  // as in mongo_main() (see SERVER-138004)
     quickExit(((arg.isNumber()) && (arg.toNumber() >= 0) && (arg.toNumber() <= 255))
                   ? static_cast<ExitCode>(arg.toNumber())
                   : ExitCode::clean);
