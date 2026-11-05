@@ -489,10 +489,6 @@ public:
         return _coll->latestSizeCount(opCtx);
     }
 
-    CollectionSizeCount persistedSizeCount(OperationContext* opCtx) const override {
-        return _coll->persistedSizeCount(opCtx);
-    }
-
     int64_t sizeOnDisk(OperationContext* opCtx, const StorageEngine& storageEngine) const override {
         return _coll->sizeOnDisk(opCtx, storageEngine);
     }

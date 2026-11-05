@@ -266,10 +266,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    CollectionSizeCount persistedSizeCount(OperationContext* opCtx) const override {
-        MONGO_UNREACHABLE;
-    }
-
     int64_t sizeOnDisk(OperationContext* opCtx, const StorageEngine& storageEngine) const override {
         MONGO_UNREACHABLE;
     }

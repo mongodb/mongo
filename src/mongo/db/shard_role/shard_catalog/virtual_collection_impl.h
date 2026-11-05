@@ -468,11 +468,6 @@ public:
                                    _shared->_recordStore->approximateNumRecords()};
     }
 
-    CollectionSizeCount persistedSizeCount(OperationContext* opCtx) const final {
-        return CollectionSizeCount{_shared->_recordStore->approximateDataSize(),
-                                   _shared->_recordStore->approximateNumRecords()};
-    }
-
     int64_t sizeOnDisk(OperationContext* opCtx, const StorageEngine& storageEngine) const final {
         return 0;
     }

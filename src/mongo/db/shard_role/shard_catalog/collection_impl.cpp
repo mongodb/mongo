@@ -37,7 +37,6 @@
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -1048,22 +1047,6 @@ long long CollectionImpl::dataSize(OperationContext* opCtx) const {
 
 CollectionSizeCount CollectionImpl::latestSizeCount(OperationContext* opCtx) const {
     return {.size = dataSize(opCtx), .count = numRecords(opCtx)};
-}
-
-CollectionSizeCount CollectionImpl::persistedSizeCount(OperationContext* opCtx) const {
-    if (!shouldReadFromReplicatedFastCount(opCtx, _ns)) {
-        return CollectionSizeCount{_shared->_recordStore->approximateDataSize(),
-                                   _shared->_recordStore->approximateNumRecords()};
-    }
-
-    auto persisted =
-        replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
-            .findPersisted(opCtx, uuid());
-    massert(12793500,
-            fmt::format("Expected the size/count store to contain an entry for UUID={}",
-                        uuid().toString()),
-            persisted.has_value());
-    return persisted->first.sizeCount;
 }
 
 int64_t CollectionImpl::sizeOnDisk(OperationContext* opCtx,

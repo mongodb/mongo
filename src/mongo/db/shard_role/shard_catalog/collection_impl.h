@@ -259,8 +259,6 @@ public:
 
     CollectionSizeCount latestSizeCount(OperationContext* opCtx) const final;
 
-    CollectionSizeCount persistedSizeCount(OperationContext* opCtx) const final;
-
     int64_t sizeOnDisk(OperationContext* opCtx, const StorageEngine& storageEngine) const final;
 
     /**
