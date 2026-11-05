@@ -10,9 +10,11 @@ import {
     extractPrometheusMetricIntValue,
     extractPrometheusMetricTime,
     getCounterByAttribute,
+    getFlatMetricsList,
     getHistogramByAttributeAcrossFiles,
     getLatestMetrics,
     getLatestRawRecord,
+    getLatestRecordsByNode,
 } from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 function makeRecord(metrics) {
@@ -514,6 +516,75 @@ describe("getHistogramByAttributeAcrossFiles", function () {
 
         const result = getHistogramByAttributeAcrossFiles(dir, "h");
         assert.eq(result, {count: 2, sum: 1, bucketCounts: [1, 1, 0, 0], explicitBounds: kBounds});
+    });
+});
+
+describe("getLatestRecordsByNode", function () {
+    const sumValue = (record) => Number(getFlatMetricsList(record)[0].sum.dataPoints[0].asInt);
+
+    it("returns an empty array when no metrics files exist", function () {
+        const dir = createTestDir("by_node_no_files");
+        assert.eq(getLatestRecordsByNode(dir), []);
+    });
+
+    it("returns the last record of each node's file", function () {
+        const dir = createTestDir("by_node_two_nodes");
+        writeMetricsFile(dir, "mongodb-21791-20261102-1-metrics.jsonl", [
+            makeRecord([makeSumMetric("m", [makeDataPoint(1, kTime1Ns)])]),
+            makeRecord([makeSumMetric("m", [makeDataPoint(2, kTime2Ns)])]),
+        ]);
+        writeMetricsFile(dir, "mongodb-21792-20261102-1-metrics.jsonl", [
+            makeRecord([makeSumMetric("m", [makeDataPoint(5, kTime1Ns)])]),
+        ]);
+
+        const records = getLatestRecordsByNode(dir);
+        assert.eq(records.length, 2);
+        assert.sameMembers(records.map(sumValue), [2, 5]);
+    });
+
+    it("returns only the newest record per node across rotated files", function () {
+        const dir = createTestDir("by_node_rotation");
+        // Same node (pid 21791), rotated once at midnight UTC and once at the chunk size
+        // limit. Each file keeps its last cumulative snapshot.
+        writeMetricsFile(dir, "mongodb-21791-20261102-1-metrics.jsonl", [
+            makeRecord([makeSumMetric("m", [makeDataPoint(1, kTime1Ns)])]),
+        ]);
+        writeMetricsFile(dir, "mongodb-21791-20261103-1-metrics.jsonl", [
+            makeRecord([makeSumMetric("m", [makeDataPoint(2, kTime2Ns)])]),
+        ]);
+        writeMetricsFile(dir, "mongodb-21791-20261103-2-metrics.jsonl", [
+            makeRecord([makeSumMetric("m", [makeDataPoint(3, kTime3Ns)])]),
+        ]);
+
+        const records = getLatestRecordsByNode(dir);
+        assert.eq(records.length, 1);
+        assert.eq(sumValue(records[0]), 3);
+    });
+
+    it("skips a rotated file that has not been flushed yet", function () {
+        const dir = createTestDir("by_node_empty_rotation");
+        writeMetricsFile(dir, "mongodb-21791-20261102-1-metrics.jsonl", [
+            makeRecord([makeSumMetric("m", [makeDataPoint(1, kTime1Ns)])]),
+        ]);
+        writeFile(dir + "/mongodb-21791-20261103-1-metrics.jsonl", "");
+
+        const records = getLatestRecordsByNode(dir);
+        assert.eq(records.length, 1);
+        assert.eq(sumValue(records[0]), 1);
+    });
+
+    it("treats files with unexpected names as their own node", function () {
+        const dir = createTestDir("by_node_odd_names");
+        writeMetricsFile(dir, "node0-metrics.jsonl", [
+            makeRecord([makeSumMetric("m", [makeDataPoint(1, kTime1Ns)])]),
+        ]);
+        writeMetricsFile(dir, "node1-metrics.jsonl", [
+            makeRecord([makeSumMetric("m", [makeDataPoint(2, kTime1Ns)])]),
+        ]);
+
+        const records = getLatestRecordsByNode(dir);
+        assert.eq(records.length, 2);
+        assert.sameMembers(records.map(sumValue), [1, 2]);
     });
 });
 

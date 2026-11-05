@@ -124,6 +124,47 @@ export function getLatestRawRecord(directory) {
 }
 
 /**
+ * Returns the pid embedded in an OTel metrics file name, which has the form
+ * mongodb-<pid>-<YYYYMMDD>-<chunk>-metrics.jsonl (see makeMetricsFileExporterConfig in
+ * metrics_initialization.cpp). Returns the full file name when it does not match the expected
+ * pattern, so that such a file is treated as its own node.
+ */
+function pidFromFileName(fileName) {
+    const match = fileName.match(/mongodb-(\d+)-\d{8}-\d+-metrics\.jsonl$/);
+    return match ? match[1] : fileName;
+}
+
+/**
+ * Reads the last fully-formed record of every metrics file in the given directory and returns
+ * one record per node: for each pid, the record with the latest data point timestamp.
+ *
+ * The exporter rotates a node's file at midnight UTC (the file name embeds the date) and when
+ * a file reaches its chunk size limit, and every rotated file keeps its last cumulative
+ * snapshot. Consumers that aggregate across files must therefore reduce to one snapshot per
+ * node first, otherwise they count a rotated node once per file.
+ *
+ * @param {string} directory - The directory path to search in.
+ * @returns {Array<Object>} The latest raw OTLP JSON record of each node, in no particular
+ *     order.
+ */
+export function getLatestRecordsByNode(directory) {
+    const latestByPid = new Map();
+    for (const file of findOtelFilesWithSuffix(directory)) {
+        const records = readJsonlFile(file.name);
+        if (records.length === 0) {
+            continue;
+        }
+        const record = records.at(-1);
+        const pid = pidFromFileName(file.name);
+        const previous = latestByPid.get(pid);
+        if (!previous || latestTime(record) > latestTime(previous)) {
+            latestByPid.set(pid, record);
+        }
+    }
+    return [...latestByPid.values()];
+}
+
+/**
  * Gets the most recent metrics from the given directory.
  * @param {string} directory - The directory path to search in.
  * @returns {Object} An object with the metric name as the key and the metric value as the value, or null if no metrics

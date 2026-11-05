@@ -27,7 +27,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 import {
-    findOtelFilesWithSuffix,
+    getFlatMetricsList,
+    getLatestRecordsByNode,
     otelFileExportParams,
 } from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
@@ -2549,70 +2550,45 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      *   {succeeded: {<phase>: <count>, ...}, failed: <count>}
      *
      * Unlike getLatestMetrics() in otel_file_export_helpers.js, this preserves the `phase`
-     * attribute on succeeded so we can verify the per-phase breakdown. The OTel file exporter
-     * writes a fresh snapshot of every counter on each flush, so within a single file we MUST take
-     * only the latest record (the cumulative value from that node). Across files we SUM, because
-     * each file is a separate node's metrics and a step-up resume on node B is not reflected in
-     * node A's counter.
+     * attribute on succeeded so we can verify the per-phase breakdown.
+     * getLatestRecordsByNode() reduces the directory to one cumulative snapshot per node, so a
+     * node whose file rotated (midnight UTC or the chunk size limit) is counted exactly once.
+     * Across nodes we SUM, because a step-up resume on node B is not reflected in node A's
+     * counter.
      *
      * TODO (SERVER-127030): Use getLatestMetrics or equivalent and remove this function.
      *
      * @param {string} metricsDir
      * @returns {{succeeded: Object<string, number>, failed: number}} Per-phase succeeded totals
      *     (keyed by the `phase` attribute) and the cluster-wide failed total, summed across
-     *     per-node files.
+     *     per-node snapshots.
      */
     static _readResumeMetrics(metricsDir) {
         const result = {succeeded: {}, failed: 0};
-        const files = findOtelFilesWithSuffix(metricsDir);
-        for (const file of files) {
-            const content = cat(file.name);
-            if (!content || !content.trim()) continue;
-            // Read the last fully-formed JSON line in the file. The exporter appends one record per
-            // flush; the last record is the most recent cumulative snapshot. (The very last line
-            // can be cut off mid-write, in which case we fall back to the previous one.)
-            const lines = content.trim().split("\n");
-            let record = null;
-            for (let i = lines.length - 1; i >= 0; i--) {
-                const line = lines[i].trim();
-                if (!line) continue;
-                try {
-                    record = JSON.parse(line);
-                    break;
-                } catch (e) {
-                    // Try the previous line.
+        for (const record of getLatestRecordsByNode(metricsDir)) {
+            for (const metric of getFlatMetricsList(record)) {
+                if (
+                    metric.name !== RESUME_SUCCEEDED_METRIC &&
+                    metric.name !== RESUME_FAILED_METRIC
+                ) {
+                    continue;
                 }
-            }
-            for (const resourceMetric of record?.resourceMetrics ?? []) {
-                for (const scopeMetric of resourceMetric?.scopeMetrics ?? []) {
-                    for (const metric of scopeMetric?.metrics ?? []) {
-                        if (
-                            metric.name !== RESUME_SUCCEEDED_METRIC &&
-                            metric.name !== RESUME_FAILED_METRIC
-                        ) {
-                            continue;
-                        }
-                        for (const dp of metric.sum?.dataPoints ?? []) {
-                            const value = Number(dp.asInt ?? dp.asDouble ?? 0);
-                            if (metric.name === RESUME_FAILED_METRIC) {
-                                // Sum across nodes (per-file): each file is a separate node's
-                                // counter, and we want the cluster-wide total.
-                                result.failed += value;
-                                continue;
-                            }
-                            // succeeded counter: split by phase attribute and sum across nodes
-                            // (per-file) for the same phase.
-                            let phase = null;
-                            for (const kv of dp.attributes ?? []) {
-                                if (kv.key === "phase") {
-                                    phase = kv.value?.stringValue;
-                                    break;
-                                }
-                            }
-                            if (phase === null) continue;
-                            result.succeeded[phase] = (result.succeeded[phase] ?? 0) + value;
+                for (const dp of metric.sum?.dataPoints ?? []) {
+                    const value = Number(dp.asInt ?? dp.asDouble ?? 0);
+                    if (metric.name === RESUME_FAILED_METRIC) {
+                        result.failed += value;
+                        continue;
+                    }
+                    // succeeded counter: split by phase attribute and sum across nodes.
+                    let phase = null;
+                    for (const kv of dp.attributes ?? []) {
+                        if (kv.key === "phase") {
+                            phase = kv.value?.stringValue;
+                            break;
                         }
                     }
+                    if (phase === null) continue;
+                    result.succeeded[phase] = (result.succeeded[phase] ?? 0) + value;
                 }
             }
         }
