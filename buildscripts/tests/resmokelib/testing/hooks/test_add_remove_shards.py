@@ -3,9 +3,13 @@ buildscripts/resmokelib/testing/hooks/add_remove_shards.py."""
 
 import logging
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 
 import pymongo.errors
+from pymongo import MongoClient
+from pymongo.collection import Collection
+from pymongo.database import Database
 
 from buildscripts.resmokelib.testing.hooks import add_remove_shards
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
@@ -323,6 +327,80 @@ class TestReshardCollectionOffShard(unittest.TestCase):
         )
         with self.assertRaises(pymongo.errors.OperationFailure):
             self.thread._reshard_collection_off_shard("db.coll", {"x": 1}, "shard-rs0")
+
+
+class TestDrainCollectionEnumeration(unittest.TestCase):
+    def setUp(self) -> None:
+        self.catalog_collections = mock.create_autospec(Collection, instance=True, spec_set=True)
+        self.catalog_databases = mock.create_autospec(Collection, instance=True, spec_set=True)
+        self.db = mock.create_autospec(Database, instance=True, spec_set=True)
+        self.client = mock.create_autospec(MongoClient, instance=True, spec_set=True)
+        # MongoClient exposes .config dynamically rather than as a class attribute.
+        self.client.mock_add_spec([*dir(MongoClient), "config"], spec_set=True)
+        self.client.config = SimpleNamespace(
+            collections=self.catalog_collections, databases=self.catalog_databases
+        )
+        self.client.get_database.side_effect = [self.db]
+        self.thread = add_remove_shards._AddRemoveShardThread.__new__(
+            add_remove_shards._AddRemoveShardThread
+        )
+        self.thread._client = self.client
+
+    def test_tracked_candidates_skip_only_resharding_collections(self) -> None:
+        regular = {"_id": "test.regular"}
+        buckets = {"_id": "test.system.buckets.ts"}
+        embedded = {"_id": "test.archive.system.resharding.audit"}
+        self.catalog_collections.aggregate.side_effect = [
+            [
+                regular,
+                buckets,
+                embedded,
+                {"_id": "test.system.resharding.deadbeef"},
+                {"_id": "test.system.buckets.resharding.deadbeef"},
+            ]
+        ]
+
+        self.assertEqual(
+            self.thread._get_tracked_collections_on_shard("shard-rs0"),
+            [regular, buckets, embedded],
+        )
+        self.catalog_collections.aggregate.assert_called_once()
+
+    def test_untracked_candidates_skip_resharding_before_catalog_lookup(self) -> None:
+        self.catalog_databases.aggregate.side_effect = [[{"_id": "test"}]]
+        self.db.list_collections.side_effect = [
+            [
+                {"name": "regular"},
+                {"name": "system.resharding.deadbeef"},
+                {"name": "archive.system.resharding.audit"},
+            ]
+        ]
+        self.catalog_collections.find_one.side_effect = [None, None]
+
+        self.assertEqual(
+            self.thread._get_untracked_collections_on_shard("shard-rs0"),
+            [
+                {"name": "regular", "_id": "test.regular"},
+                {
+                    "name": "archive.system.resharding.audit",
+                    "_id": "test.archive.system.resharding.audit",
+                },
+            ],
+        )
+        self.catalog_databases.aggregate.assert_called_once_with(
+            [{"$match": {"primary": "shard-rs0"}}]
+        )
+        self.client.get_database.assert_called_once_with("test")
+        self.db.list_collections.assert_called_once_with(
+            filter={"name": {"$not": {"$regex": r".*system\.buckets.*"}}}
+        )
+        self.assertEqual(
+            self.catalog_collections.method_calls,
+            [
+                mock.call.find_one({"_id": "test.regular"}),
+                mock.call.find_one({"_id": "test.archive.system.resharding.audit"}),
+            ],
+        )
 
 
 if __name__ == "__main__":

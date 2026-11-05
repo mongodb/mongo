@@ -663,7 +663,7 @@ class _AddRemoveShardThread(threading.Thread):
                 raise errors.ServerFailure(teardown_handler.get_error_message())
 
     def _get_tracked_collections_on_shard(self, shard_id):
-        return list(
+        collections = list(
             self._client.config.collections.aggregate(
                 [
                     {
@@ -684,6 +684,14 @@ class _AddRemoveShardThread(threading.Thread):
                 ]
             )
         )
+        # Resharding owns these temporary collections; the drain hook must not move them.
+        return [
+            coll
+            for coll in collections
+            if not coll["_id"]
+            .split(".", 1)[1]
+            .startswith(("system.resharding.", "system.buckets.resharding."))
+        ]
 
     def _get_untracked_collections_on_shard(self, source):
         untracked_collections = []
@@ -704,6 +712,8 @@ class _AddRemoveShardThread(threading.Thread):
             for collection in self._client.get_database(database["_id"]).list_collections(
                 filter={"name": {"$not": {"$regex": r".*system\.buckets.*"}}}
             ):
+                if collection["name"].startswith("system.resharding."):
+                    continue
                 namespace = database["_id"] + "." + collection["name"]
                 coll_doc = self._client.config.collections.find_one({"_id": namespace})
                 if not coll_doc:
