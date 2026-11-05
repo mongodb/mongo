@@ -250,20 +250,26 @@ const buildingOpIdNonResumable = IndexBuildTest.waitForIndexBuildToScanCollectio
     buildingIndexNameNonResumable,
 );
 
-listIndexesDefaultOutput = assert.commandWorked(db.runCommand({listIndexes: collName})).cursor
-    .firstBatch;
-assert(listIndexesDefaultOutput.length == 4);
+// Wait for the new indexes to appear in listIndexes output.
+// Additionally, wait for the most recent build to show up with a "collection scan" phase.
+assert.soonNoExcept(() => {
+    listIndexesDefaultOutput = assert.commandWorked(db.runCommand({listIndexes: collName})).cursor
+        .firstBatch;
+    assert(listIndexesDefaultOutput.length == 4);
 
-listIndexesIncludeIndexBuildInfoOutput = assert.commandWorked(
-    db.runCommand({listIndexes: collName, includeIndexBuildInfo: true}),
-).cursor.firstBatch;
-const indexBuildWithCollectionScanPhase = listIndexesIncludeIndexBuildInfoOutput.find(
-    (indexInfo) =>
-        indexInfo.spec.name === buildingIndexNameNonResumable &&
-        indexInfo.indexBuildInfo &&
-        indexInfo.indexBuildInfo.phase === 1, // collection scan
-);
-assert(indexBuildWithCollectionScanPhase);
+    listIndexesIncludeIndexBuildInfoOutput = assert.commandWorked(
+        db.runCommand({listIndexes: collName, includeIndexBuildInfo: true}),
+    ).cursor.firstBatch;
+    const indexBuildWithCollectionScanPhase = listIndexesIncludeIndexBuildInfoOutput.find(
+        (indexInfo) =>
+            indexInfo.spec.name === buildingIndexNameNonResumable &&
+            indexInfo.indexBuildInfo &&
+            indexInfo.indexBuildInfo.phase === 1, // collection scan
+    );
+    assert(indexBuildWithCollectionScanPhase);
+
+    return true;
+});
 
 // Ensure that the format of the listIndexes output changes as expected in the in-progress index
 // case.
@@ -401,12 +407,26 @@ try {
         tsBuildingIndexName,
     );
 
+    // Wait for the new index to appear in listIndexes output.
+    // Additionally, wait for the build to show up with a "collection scan" phase.
+    let tsInProgressOutput;
+    assert.soonNoExcept(() => {
+        tsInProgressOutput = assert.commandWorked(
+            tsDb.runCommand({listIndexes: timeseriesCollName, includeIndexBuildInfo: true}),
+        ).cursor.firstBatch;
+        const indexBuildWithCollectionScanPhase = tsInProgressOutput.find(
+            (indexInfo) =>
+                indexInfo.spec.name === tsBuildingIndexName &&
+                indexInfo.indexBuildInfo &&
+                indexInfo.indexBuildInfo.phase === 1, // collection scan
+        );
+        assert(indexBuildWithCollectionScanPhase);
+        return true;
+    });
     const tsCurrWithoutBuildInfo = assert.commandWorked(
         tsDb.runCommand({listIndexes: timeseriesCollName}),
     ).cursor.firstBatch;
-    const tsInProgressOutput = assert.commandWorked(
-        tsDb.runCommand({listIndexes: timeseriesCollName, includeIndexBuildInfo: true}),
-    ).cursor.firstBatch;
+
     assertListIndexesOutputsMatch(
         tsCurrWithoutBuildInfo,
         tsInProgressOutput,
