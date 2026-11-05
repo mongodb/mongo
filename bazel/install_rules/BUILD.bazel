@@ -1,3 +1,5 @@
+load(":archive_name_test.bzl", "archive_name_test_suite")
+
 package(default_visibility = ["//visibility:public"])
 
 # Expose script for external usage through bazel.
@@ -5,3 +7,5 @@ exports_files([
     "install_rules.py",
     "pretty_printer_test_creator.py",
 ])
+
+archive_name_test_suite(name = "archive_name_test")

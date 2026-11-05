@@ -25,12 +25,16 @@ class Ppc64leCrossSchedulingTest(cross_tests.S390xCrossSchedulingTest):
     INTEGRATION_GROUP = "compile_integration_and_test_no_audit_parallel_stream_TG"
     HAS_MONGOR = False
 
-    def test_cross_archive_architecture_overrides_arm64_host(self) -> None:
+    def test_cross_configs_select_ppc64le_without_architecture_define(self) -> None:
+        target_platforms = {
+            "enterprise-rhel-81-ppc64le": "rhel8_ppc64le_cross",
+            "enterprise-rhel-9-ppc64le": "rhel9_ppc64le_cross",
+            "enterprise-rhel-10-ppc64le": "rhel10_ppc64le_cross",
+        }
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             shutil.copy(cross_tests.REPO_ROOT / ".bazelrc", root)
-            (root / ".bazelrc.wrapper_hook").write_text("common --define=MONGO_ARCH=aarch64\n")
-            for variant_name in self.STATIC_VARIANTS:
+            for variant_name, target_platform in target_platforms.items():
                 config = self.variants[variant_name]["expansions"]["mongo_ppc64le_cross_config"]
                 options = bazelrc._bazel_effective_options(
                     ["--nosystem_rc", "--nohome_rc", "build", f"--config={config}"],
@@ -41,7 +45,8 @@ class Ppc64leCrossSchedulingTest(cross_tests.S390xCrossSchedulingTest):
                     option for option in options if option.startswith("--define=MONGO_ARCH=")
                 ]
                 with self.subTest(variant=variant_name):
-                    self.assertEqual("--define=MONGO_ARCH=ppc64le", architecture_defines[-1])
+                    self.assertEqual([], architecture_defines)
+                    self.assertIn(f"--platforms=//bazel/platforms:{target_platform}", options)
 
     def test_native_dbtest_hosts_match_waterfall_release_flags(self) -> None:
         for static_name, native_distro in self.STATIC_VARIANTS.items():
