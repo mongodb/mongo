@@ -26,14 +26,22 @@ development.
 
 There are three types of feature flags, designed for three distinct use cases:
 
+- _Incremental feature rollout_ feature flags are a great default choice. These flags can optionally
+  be deployed using the Incremental Feature Rollout (IFR) process, which gradually introduces a
+  feature to a fleet of clusters by turning the feature flag on in selected clusters and, if bugs or
+  regressions are observed, can _roll back_ deployment by toggling the flag back off. This type of
+  flag is only appropriate for features that can be safely toggled at runtime. The IFR flag
+  infrastructure also allows all participants in the cluster to maintain a consistent view of the
+  flag's value over the lifetime of an operation, even if the instance-level value is changed on
+  some nodes mid-query.
 - _Binary-compatible_ feature flags are used to keep backwards-compatible features disabled until
-  their development is completed and they can be confidently enabled.
-- _Incremental feature rollout_ feature flags control features that are deployed using the
-  Incremental Feature Rollout (IFR) process, which gradually introduces a feature to a fleet of
-  clusters by turning the feature flag on in selected clusters and, if needed, can _roll back_
-  deployment by toggling the flag back off.
+  their development is completed and they can be confidently enabled. They are a suitable option for
+  features which cannot be toggled at runtime, and do not need the protection of FCV-gated flags.
 - _FCV-gated_ feature flags are for those features that have compatibility or upgrade/downgrade
-  concerns and must be kept disabled until FCV reaches a certain threshold version.
+  concerns (e.g. changes to on disk format) and must be kept disabled until FCV reaches a certain
+  threshold version. These cannot be manually toggled at runtime, their behavior is tied to the FCV.
+  Please keep in mind that this implies that **the observed value of the flag can change at
+  runtime** because the FCV was changed (which does not require a restart).
 
 For more details and guidelines on determining which style of flag is appropriate, see
 [Determining which style of feature flag to use](#determining-which-style-of-feature-flag-to-use).
@@ -57,94 +65,43 @@ Feature flags are not intended to control behaviors that users may want to enabl
 of normal operation. They are enabled as part of the release process and, once enabled, are rarely,
 if ever, disabled again. Feature flags primarily hide in-development features from production builds
 (enabling continuous deployment) and secondarily coordinate feature deployment during cluster
-upgrade.
-
-In production, binary-compatible feature flags have a fixed value that is baked into the release
-(defined by the `default` property in the flag's IDL specification), and there is no supported means
-to change that value. Tests can choose a value for a binary-compatible flag at startup but cannot
-change the value for a running process. Feature authors can safely assume that a binary-compatible
-flag will have the same value for the lifetime of a process.
-
-The state of an FCV-gated or IFR feature flag _can_ change during the lifetime of a process,
-however. An enabled-by-default FCV-gated flag can switch between enabled and disabled at runtime as
-part of FCV upgrade and downgrade, and an IFR flag can switch at any time as a result of a
-`setParameter` issued by the incremental rollout procedure.
+upgrade. If you expect there is a legitimate reason why customers might want to toggle your flag
+during operation, consider a setParameter as an alternative.
 
 A feature implementation hidden by an FCV-gated or IFR flag must be able to tolerate concurrent
 changes to the flag's state. Any operation that accesses the feature flag should be careful not to
-assume that multiple checks will produce the same result.
-
-In almost all cases, an individual operation (e.g., a query or DDL command) should access a feature
-flag _only once_. If the operation needs a flag's state at multiple times during its execution, it
-should check the flag once and save the result for future use, effectively snapshotting it, rather
-than accessing the flag each time. The
-[FCV-gated feature flag API](#fcv-gated-feature-flag-api-fcvgatedfeatureflag) and
+assume that multiple checks will produce the same result. In almost all cases, an individual
+operation (e.g., a query or DDL command) should access a feature flag _only once_. If the operation
+needs a flag's state at multiple times during its execution, it should check the flag once and save
+the result for future use, effectively snapshotting it, rather than accessing the flag each time.
+The [FCV-gated feature flag API](#fcv-gated-feature-flag-api-fcvgatedfeatureflag) and
 [IFR feature flag API](#ifr-feature-flag-api-incrementalrolloutfeatureflag) both provide affordances
 for this pattern in the form of the `VersionContext` and the `IncrementalFeatureRolloutContext`,
 respectively.
 
 ## Determining which style of feature flag to use
 
-Usually a feature will need to use an FCV-gated feature flag when the feature's behavior has a
-meaningful effect outside of a single process. Specifically,
+It is encouraged to start with the assumption that an IFR flag should be used, **unless** one of the
+following cases applies:
 
-1. the feature changes the on-disk format of some data or
-2. the feature changes the way nodes in a cluster communicate with each other.
+1. Your feature changes on-disk format or needs to hook into the setFCV process. In this case, an
+   **FCV-gated feature flag** is needed to ensure that your feature is not enabled until the upgrade
+   is finalized via the FCV upgrade process. Before the FCV transition completes, the feature
+   remains disabled so that it will not write data that is incompatible with the previous binary
+   version, thereby ensuring that the binary can be safely downgraded if needed.
+2. Your feature should not be toggled off after startup. In this case, a **binary-compatible flag**
+   should be used.
 
-### On-disk Format Risk
+In almost all other cases, an IFR flag is a good choice. The benefits are:
 
-In the first case, FCV gating is needed to ensure that a binary-upgraded cluster can still be
-restored to its previous binary version until the upgrade is finalized via the FCV upgrade process.
-Before the FCV transition completes, the feature remains disabled so that it will not write data
-that is incompatible with the previous binary version.
+1. Using an IFR flag does not necessitate an incremental rollout, but it allows for some flexibility
+   on this question.
+2. IFR flags can coordinate between nodes to handle mixed-version deployments gracefully.
+3. IFR flags come with builtin observability into their usage.
+4. Testing can often be easier since it is configurable at runtime.
 
-### Wire Protocol Risk
-
-In the second case, FCV gating allows an enabled feature to assume that no nodes with an older
-binary version remain in the cluster, so it can send commands and write oplog entries that older
-versions would not be able to interpret.
-
-Please note that this includes:
-
-- additions and changes to the query language and
-- changes to the serialization format of query operators.
-
-Not only are these operators serialized across the wire between nodes, they also can be written to
-oplog entries as part of non-materialized views or collection validators. If you are on the query
-team, please read more at
-[README_query_feature_flags.md](/src/mongo/db/query/README_query_feature_flags.md).
-
-> 🚧 Caution
->
-> Just because a feature only executes as part of shard routing does not mean it only executes on
-> mongos. A mongod instance can act as the router for a query that originates from a data-bearing
-> node.
-
-### Incremental Feature Rollout Flags
-
-Features that do not need an FCV gate may be suited to deployment via IFR feature flag. Examples
-include
-
-- features targeting query performance or plan selection that do not affect query semantics,
-- features that add node-level diagnostics or validation,
-- features that only execute on mongos, which does not have an FCV.
-
-An FCV-independent feature can use an IFR feature flag so long as it is written to tolerate runtime
-changes to the flag state that can occur at any time as
-[described above](#dynamically-toggling-features).
-
-> ❗️ Note
->
-> Incremental Feature Rollout is still in development. Reach out to the IFR team (see SERVER-89518)
-> before adding an IFR feature flag.
-
-An FCV-independent feature that is not practical to implement to IFR requirements can instead use a
-binary-compatible feature flag, avoiding the need to account for the possibility of the feature
-becoming enabled or disabled at runtime.
-
-If in doubt about whether your feature needs to be FCV gated, please reach out to the Catalog and
-Routing team in #server-featureflags and add the Catalog and Routing team as a reviewer to your code
-review.
+If in doubt about whether your feature needs to be FCV gated, please reach out in
+#server-featureflags and add the Catalog and Routing team as a reviewer to your code review.
 
 ## Lifecycle of a feature flag
 
@@ -155,21 +112,29 @@ review.
 
 - Enabling the feature by default
 
+  - Enable an IFR feature flag by changing the `incremental_rollout_phase` property in its
+    specification from `in_development` to either `rollout` or `release`. In both states, a mongod
+    or mongos started with no explicit setting for the flag will have it enabled, so the feature
+    will be on by default in testing and for most deployments. The difference matters for production
+    launch:
+    - Choosing `rollout` makes the flag eligible for deployment via the Incremental Feature Rollout
+      mechanism. During the initial launch of a `rollout`-state flag, Atlas is expected to override
+      the default and keep the flag **disabled** until it is enabled at runtime as part of the IFR
+      process.
+    - Choosing `release` means the feature is activated as soon as the binary is upgraded. The flag
+      still provides an "escape hatch" to turn off the feature if an issue is discovered, but it
+      does not participate in the incremental rollout process.
+    - If you choose `rollout`, remember to change this property to `release` on the master branch (
+      but not on any release branches) after the rollout completes.
   - Enable an FCV-gated or binary-compatible feature flag by updating its specification with
     `default: true`.
-  - Enable an IFR feature flag by changing the `incremental_rollout_phase` property in its
-    specification from `in_development` to `rollout`, which will automatically make it enabled by
-    default.
-    - After rollout completes, change this property to `release` on the master branch but not on any
-      release branches.
-  - FCV-gated feature flags with `default: true` must have a specific release version associated in
-    its definition.
-  - **_We do not support disabling feature flags once they have been enabled via IDL in a release
-    build_**.
-  - **_Feature flags must not be enabled after a branch cut if the FCV has not yet been upgraded_**.
-    This is because before FCVs are upgraded on master, we will temporarily have two builds that
-    have the same version (the newly cut branch and master). If the two builds differ on which
-    feature flags are enabled, this will lead to test failures in certain multiversion suites.
+    - FCV-gated feature flags with `default: true` must have a specific release version associated
+      in its definition.
+    - **_Feature flags must not be enabled after a branch cut if the FCV has not yet been
+      upgraded_**. This is because before FCVs are upgraded on master, we will temporarily have two
+      builds that have the same version (the newly cut branch and master). If the two builds differ
+      on which feature flags are enabled, this will lead to test failures in certain multiversion
+      suites.
   - Project team should run a full "required" alias patch. Double check that all tasks for all build
     variants prefixed with "!" are selected.
   - If there are downstream teams that will break when this flag is enabled then enabling the
@@ -206,10 +171,19 @@ global:
   cpp_namespace: "mongo"
 
 feature_flags:
-  # featureFlagFork is a binary-compatible feature flag that is finished and enabled by default.
-  featureFlagFork:
-    description: "Fork feature flag"
-    cpp_varname: feature_flags::gFeatureFlagFork
+  # featureFlagTablespoon is an IFR-eligible flag that is still under development.
+  featureFlagTablespoon:
+    description: "Text about what this flag enables/disables"
+    cpp_varname: feature_flags::gFeatureFlagTablespoon
+    incremental_rollout_phase: in_development
+    default: false
+    fcv_gated: false
+
+  # featureFlagTeaspoon is an IFR-eligible flag that is finished and enabled by default.
+  featureFlagTeaspoon:
+    description: "Text about what this flag enables/disables"
+    cpp_varname: feature_flags::gFeatureFlagTeaspoon
+    incremental_rollout_phase: release
     default: true
     fcv_gated: false
 
@@ -220,6 +194,13 @@ feature_flags:
     cpp_varname: feature_flags::gFeatureFlagToaster
     default: false
     fcv_gated: true
+
+  # featureFlagFork is a binary-compatible feature flag that is finished and enabled by default.
+  featureFlagFork:
+    description: "Fork feature flag"
+    cpp_varname: feature_flags::gFeatureFlagFork
+    default: true
+    fcv_gated: false
 ```
 
 A feature flag has the following properties:
@@ -227,8 +208,8 @@ A feature flag has the following properties:
 - Server Parameter Name: featureFlag\<MyFeatureName\>
   - Feature flags implicitly generate a server parameter (see `FeatureFlagServerParameter`).
   - The name should not include "Use", "Allow", "Enable", or "Disable".
-  - Feature flags can only be set at server startup: their server parameters are declared with
-    `set_at: startup`. This supports the use of feature flags as a release/development tool and
+  - Non-IFR Feature flags can only be set at server startup: their server parameters are declared
+    with `set_at: startup`. This supports the use of feature flags as a release/development tool and
     should not impose an unnecessary burden on server administration.
 - C++ Namespace: `mongo::feature_flags`
   - This should apply to all feature flags that follow the naming convention in the previous bullet.
@@ -368,8 +349,8 @@ IFR feature flags provide a `checkEnabled()` method that is similar to
 the feature flag, which can be useful diagnostically.
 
 Avoid invoking an IFR flag's `checkEnabled()` method more than once from the same operation, because
-the result may not stay the same between checks. Instead, check the flag once and store the result.
-Consider using the `IncrementalFeatureRolloutContext` to handle this requirement.
+the result may not stay the same between checks. Instead, use the `IncrementalFeatureRolloutContext`
+to check the flag once and remember the result.
 
 A feature whose behavior applies to a query can use the `IncrementalFeatureRolloutContext` belonging
 to the query's `ExpressionContext` for this purpose.
@@ -381,10 +362,6 @@ if (expCtx->getIfrContext()->getSavedFlagValue(featureFlagSpork)) {
     // The feature flag is disabled. Implement the backwards-compatible behavior.
 }
 ```
-
-> 🚧 Caution A query can have multiple `ExpressionContext`s if it includes operations with
-> subordinate queries, such as the `$lookup` and `$union` pipeline stages, and they do not share the
-> same `IncrementalFeatureRolloutContext`.
 
 ### FCV-gated feature flag API (`FCVGatedFeatureFlag`)
 
