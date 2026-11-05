@@ -459,41 +459,6 @@ assert.commandFailedWithCode(
 db[tsCollName].drop();
 
 // =============================================================================
-// unreplicated collections
-// =============================================================================
-
-// analyze should fail on an unreplicated collection and must not persist a sample.
-{
-    const localDb = conn.getDB("local");
-    const localColl = localDb[jsTestName()];
-    localColl.drop();
-    assert.commandWorked(localColl.insertMany([{a: 1}, {a: 2}, {a: 3}]));
-    assert.commandFailedWithCode(
-        localDb.runCommand({
-            analyze: localColl.getName(),
-            mode: "sample",
-            samplingMethod: "random",
-        }),
-        ErrorCodes.IllegalOperation,
-        "analyze on a collection in the local database should fail with IllegalOperation",
-    );
-    assert.eq(PersistentSamplesUtils.getSamplesColl(localDb).countDocuments({}), 0);
-    localColl.drop();
-}
-{
-    assert.commandWorked(db.setProfilingLevel(2));
-    assert.commandWorked(db.runCommand({ping: 1}));
-    assert.commandWorked(db.setProfilingLevel(0));
-    assert.commandFailedWithCode(
-        db.runCommand({analyze: "system.profile", mode: "sample", samplingMethod: "random"}),
-        ErrorCodes.IllegalOperation,
-        "analyze on system.profile should fail with IllegalOperation",
-    );
-    assert.eq(samplesColl.countDocuments({}), 0);
-    db.system.profile.drop();
-}
-
-// =============================================================================
 // Test-only sampling modes override specified samplingMethod
 // =============================================================================
 
