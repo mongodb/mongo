@@ -1,6 +1,13 @@
 function setup_mongo_task_generator {
     if [ ! -f mongo-task-generator ]; then
-        curl -fL --retry 5 --retry-delay 10 --retry-max-time 120 https://github.com/mongodb/mongo-task-generator/releases/download/v3.10.0/mongo-task-generator --output mongo-task-generator
+        local version="v3.11.0"
+        local sha256="2efa8a27f2628f65936fa65dad2a131abcecd28776f9ce5a4f960a2726b9f53b"
+        curl -fL --retry 5 --retry-delay 10 --retry-max-time 120 "https://github.com/mongodb/mongo-task-generator/releases/download/${version}/mongo-task-generator" --output mongo-task-generator
+        if ! echo "${sha256}  mongo-task-generator" | { sha256sum -c - || shasum -a 256 -c -; } >/dev/null 2>&1; then
+            echo "mongo-task-generator ${version} checksum mismatch" >&2
+            rm -f mongo-task-generator
+            return 1
+        fi
         chmod +x mongo-task-generator
     fi
 }
