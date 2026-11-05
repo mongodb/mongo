@@ -161,6 +161,19 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(AccessPathCounter, ACCESS_PATH_COUNTER_TABLE)
 constexpr size_t kNumAccessPathCounters = static_cast<size_t>(AccessPathCounter::kNumCounters);
 
 /**
+ * Identifies the execution engine that ran a query. The engines are mutually exclusive.
+ */
+#define ENGINE_COUNTER_TABLE(F) \
+    F(kClassic)                 \
+    F(kSbe)                     \
+    F(kNumCounters)
+
+QUERY_UTIL_NAMED_ENUM_DEFINE(EngineCounter, ENGINE_COUNTER_TABLE)
+#undef ENGINE_COUNTER_TABLE
+
+constexpr size_t kNumEngineCounters = static_cast<size_t>(EngineCounter::kNumCounters);
+
+/**
  * Returns the counter name `counter` is reported under.
  */
 template <typename CounterEnum>
@@ -171,16 +184,17 @@ std::string_view toCounterName(CounterEnum counter);
  * counters, the QuerySolutionNode counters, and the access path counters. Counts are stored
  * sparsely so that only counters with a non-zero count take up space.
  *
- * Serializes to BSON as '{patterns: {...}, nodes: {...}, accessPaths: {...}}', where each section
- * maps counter names to counts; zero counts and empty sections are omitted. Parsing ignores
- * unrecognized section names, counter names, and non-numeric values, so nodes on different
- * versions can exchange counts safely.
+ * Serializes to BSON as '{patterns: {...}, nodes: {...}, accessPaths: {...}, engines: {...}}',
+ * where each section maps counter names to counts; zero counts and empty sections are omitted.
+ * Parsing ignores unrecognized section names, counter names, and non-numeric values, so nodes on
+ * different versions can exchange counts safely.
  */
 class PlanShapeCounts {
 public:
     void increment(PlanShapeCounter counter, int64_t n = 1);
     void increment(QsnNodeCounter counter, int64_t n = 1);
     void increment(AccessPathCounter counter, int64_t n = 1);
+    void increment(EngineCounter counter, int64_t n = 1);
 
     void add(const PlanShapeCounts& other);
 
@@ -193,9 +207,13 @@ public:
     int64_t getCount(AccessPathCounter counter) const {
         return getCount(_accessPathCounts, counter);
     }
+    int64_t getCount(EngineCounter counter) const {
+        return getCount(_engineCounts, counter);
+    }
 
     bool empty() const {
-        return _patternCounts.empty() && _nodeCounts.empty() && _accessPathCounts.empty();
+        return _patternCounts.empty() && _nodeCounts.empty() && _accessPathCounts.empty() &&
+            _engineCounts.empty();
     }
 
     BSONObj toBSON() const;
@@ -204,6 +222,7 @@ public:
     void parsePatternCounts(const BSONObj& obj);
     void parseNodeCounts(const BSONObj& obj);
     void parseAccessPathCounts(const BSONObj& obj);
+    void parseEngineCounts(const BSONObj& obj);
 
 private:
     template <typename CounterEnum>
@@ -215,6 +234,7 @@ private:
     std::map<PlanShapeCounter, int64_t> _patternCounts;
     std::map<QsnNodeCounter, int64_t> _nodeCounts;
     std::map<AccessPathCounter, int64_t> _accessPathCounts;
+    std::map<EngineCounter, int64_t> _engineCounts;
 };
 
 }  // namespace mongo::plan_shape_counters

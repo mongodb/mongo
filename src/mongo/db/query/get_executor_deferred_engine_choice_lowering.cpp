@@ -67,6 +67,11 @@ public:
         auto solution = std::move(_rankingResult.solutions[0]);
         tassert(11974310, "Expected a non-null query solution for non-idhack queries", solution);
 
+        tassert(9735001,
+                "Expected engine selection to be performed during planning",
+                _rankingResult.engineSelection.has_value());
+        const auto engine = *_rankingResult.engineSelection;
+
         // TODO SERVER-130428 remove `internalQueryEnablePlanShapeAnalysis`
         // Only collect plan shape stats for the top-level query. For example we do not collect
         // the metrics for the foreign side of a $lookup.
@@ -77,15 +82,13 @@ public:
             // Gate on shouldRequestRemoteMetrics, which checks if metrics are requested by
             // mongos or if the local query stats key exists.
             if (query_stats::shouldRequestRemoteMetrics(opDebug)) {
-                plan_shape_counters::analyzePlanShapeForCounters(*solution).addTo(
-                    opDebug.getAdditiveMetrics().planShapeCounts);
+                auto& planShapeCounts = opDebug.getAdditiveMetrics().planShapeCounts;
+                plan_shape_counters::analyzePlanShapeForCounters(*solution).addTo(planShapeCounts);
+                planShapeCounts.increment(engine == EngineChoice::kClassic
+                                              ? plan_shape_counters::EngineCounter::kClassic
+                                              : plan_shape_counters::EngineCounter::kSbe);
             }
         }
-
-        tassert(9735001,
-                "Expected engine selection to be performed during planning",
-                _rankingResult.engineSelection.has_value());
-        const auto engine = *_rankingResult.engineSelection;
         const bool fromSbeCandidate = _rankingResult.execState &&
             _rankingResult.execState->peekExecState<SbeExecState>() != nullptr;
         return engine == EngineChoice::kClassic

@@ -37,7 +37,12 @@ function runPlanShapeCounterTest(coll) {
         const queryPlanner = metrics.hasOwnProperty("queryPlanner")
             ? metrics.queryPlanner
             : metrics;
-        return queryPlanner.planShapeCounters;
+        const counters = queryPlanner.planShapeCounters;
+        if (counters !== undefined) {
+            // Engine counters are covered by query_stats_engine_counters.js.
+            delete counters.engines;
+        }
+        return counters;
     }
 
     function reset() {

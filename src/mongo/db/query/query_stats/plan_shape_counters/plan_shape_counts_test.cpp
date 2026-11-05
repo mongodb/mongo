@@ -13,6 +13,7 @@
 #include "mongo/util/ctype.h"
 
 #include <cstddef>
+#include <limits>
 
 namespace mongo::plan_shape_counters {
 namespace {
@@ -52,6 +53,30 @@ TEST(PlanShapeCountsTest, EachCategoryAccumulatesSeparately) {
     ASSERT_EQ(counts.getCount(QsnNodeCounter::kFetchWithFilter), 2);
     ASSERT_EQ(counts.getCount(AccessPathCounter::kCollscan), 3);
     ASSERT_EQ(counts.getCount(AccessPathCounter::kCoveredIxscan), 0);
+}
+
+TEST(PlanShapeCountsTest, EngineCountsRoundTripAndAdd) {
+    PlanShapeCounts counts;
+    counts.increment(EngineCounter::kSbe, 2);
+    counts.increment(EngineCounter::kClassic);
+    ASSERT_BSONOBJ_EQ(counts.toBSON(), BSON("engines" << BSON("classic" << 1LL << "sbe" << 2LL)));
+    PlanShapeCounts sum;
+    sum.add(PlanShapeCounts::fromBSON(counts.toBSON()));
+    sum.add(counts);
+    ASSERT_EQ(sum.getCount(EngineCounter::kSbe), 4);
+    ASSERT_EQ(sum.getCount(EngineCounter::kClassic), 2);
+}
+
+TEST(PlanShapeCountsTest, EngineCountsSaturateInsteadOfOverflowing) {
+    constexpr int64_t kMax = std::numeric_limits<int64_t>::max();
+    PlanShapeCounts counts;
+    counts.increment(EngineCounter::kSbe, kMax);
+    counts.increment(EngineCounter::kSbe, 5);
+    ASSERT_EQ(counts.getCount(EngineCounter::kSbe), kMax);
+
+    PlanShapeCounts remote = PlanShapeCounts::fromBSON(BSON("engines" << BSON("sbe" << kMax)));
+    counts.add(remote);
+    ASSERT_EQ(counts.getCount(EngineCounter::kSbe), kMax);
 }
 
 TEST(PlanShapeCountsTest, EmptySectionsAreOmitted) {

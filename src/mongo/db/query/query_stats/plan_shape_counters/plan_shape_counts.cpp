@@ -10,16 +10,18 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/string_map.h"
 
+#include <limits>
 #include <string>
 #include <vector>
 
 namespace mongo::plan_shape_counters {
 namespace {
 
-// The names of the three counter category sections in the wire (toBSON/fromBSON) format.
+// The names of the four counter category sections in the wire (toBSON/fromBSON) format.
 constexpr auto kPatternSection = "patterns";
 constexpr auto kNodesSection = "nodes";
 constexpr auto kAccessPathsSection = "accessPaths";
+constexpr auto kEnginesSection = "engines";
 
 template <typename CounterEnum>
 const std::vector<std::string>& counterNames() {
@@ -61,7 +63,11 @@ void incrementMap(std::map<CounterEnum, int64_t>& counts, CounterEnum counter, i
         tassert(13022405, "Expected only non-negative increments on counters", n >= 0);
     }
     if (n > 0) {
-        counts[counter] += n;
+        auto& count = counts[counter];
+        // Saturate rather than overflow, since values may be supplied by remote nodes.
+        count = (count > std::numeric_limits<int64_t>::max() - n)
+            ? std::numeric_limits<int64_t>::max()
+            : count + n;
     }
 }
 
@@ -113,6 +119,7 @@ std::string_view toCounterName(CounterEnum counter) {
 template std::string_view toCounterName(PlanShapeCounter);
 template std::string_view toCounterName(QsnNodeCounter);
 template std::string_view toCounterName(AccessPathCounter);
+template std::string_view toCounterName(EngineCounter);
 
 void PlanShapeCounts::increment(PlanShapeCounter counter, int64_t n) {
     incrementMap(_patternCounts, counter, n);
@@ -126,6 +133,10 @@ void PlanShapeCounts::increment(AccessPathCounter counter, int64_t n) {
     incrementMap(_accessPathCounts, counter, n);
 }
 
+void PlanShapeCounts::increment(EngineCounter counter, int64_t n) {
+    incrementMap(_engineCounts, counter, n);
+}
+
 void PlanShapeCounts::add(const PlanShapeCounts& other) {
     for (const auto& [counter, count] : other._patternCounts) {
         increment(counter, count);
@@ -136,6 +147,9 @@ void PlanShapeCounts::add(const PlanShapeCounts& other) {
     for (const auto& [counter, count] : other._accessPathCounts) {
         increment(counter, count);
     }
+    for (const auto& [counter, count] : other._engineCounts) {
+        increment(counter, count);
+    }
 }
 
 BSONObj PlanShapeCounts::toBSON() const {
@@ -143,6 +157,7 @@ BSONObj PlanShapeCounts::toBSON() const {
     appendSection(builder, kPatternSection, _patternCounts);
     appendSection(builder, kNodesSection, _nodeCounts);
     appendSection(builder, kAccessPathsSection, _accessPathCounts);
+    appendSection(builder, kEnginesSection, _engineCounts);
     return builder.obj();
 }
 
@@ -156,6 +171,10 @@ void PlanShapeCounts::parseNodeCounts(const BSONObj& obj) {
 
 void PlanShapeCounts::parseAccessPathCounts(const BSONObj& obj) {
     parseSection(obj, _accessPathCounts, countersByName<AccessPathCounter>());
+}
+
+void PlanShapeCounts::parseEngineCounts(const BSONObj& obj) {
+    parseSection(obj, _engineCounts, countersByName<EngineCounter>());
 }
 
 PlanShapeCounts PlanShapeCounts::fromBSON(const BSONObj& obj) {
@@ -174,6 +193,8 @@ PlanShapeCounts PlanShapeCounts::fromBSON(const BSONObj& obj) {
             counts.parseNodeCounts(elem.Obj());
         } else if (sectionName == kAccessPathsSection) {
             counts.parseAccessPathCounts(elem.Obj());
+        } else if (sectionName == kEnginesSection) {
+            counts.parseEngineCounts(elem.Obj());
         }
     }
     return counts;
