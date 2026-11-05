@@ -2523,7 +2523,7 @@ void HandleRequest::completeOperation(DbResponse& response) {
     const auto& errInfo = currentOp.debug().errInfo;
     if (!errInfo.isOK()) {
         try {
-            collectQueryStatsMongodReadErrored(opCtx, errInfo.code());
+            collectQueryStatsMongodErrored(opCtx, errInfo.code());
         } catch (const DBException& ex) {
             // Failing to collect query stats for an errored operation is a bug. Surface a BF/AF,
             // but swallow it and fire once per process to avoid any negative impact on the cluster.

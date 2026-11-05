@@ -25,11 +25,11 @@ void collectQueryStatsMongod(OperationContext* opCtx,
                              std::unique_ptr<query_stats::Key> key);
 
 /**
- * Records query stats for reads that error while the query stats key is still held by the
- * operation's OpDebug. It no-ops for write commands, when no key was collected for this request, or
- * when the key was moved onto a cursor.
+ * Records query stats for reads and writes that error while the query stats key is still held by
+ * the operation's OpDebug. It no-ops if no key was collected for this request or
+ * if the key was moved onto a cursor.
  */
-[[MONGO_MOD_PUBLIC]] void collectQueryStatsMongodReadErrored(OperationContext* opCtx,
-                                                             ErrorCodes::Error errorCode);
+[[MONGO_MOD_PUBLIC]] void collectQueryStatsMongodErrored(OperationContext* opCtx,
+                                                         ErrorCodes::Error errorCode);
 
 }  // namespace mongo
