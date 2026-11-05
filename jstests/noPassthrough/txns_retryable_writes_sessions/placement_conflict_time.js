@@ -188,14 +188,6 @@ describe("Test placementConflictTime", function () {
     // Verifies that a transaction gets aborted if a participant steps down.
     // This is important because the placementConflictTime is an in memory variable on each participant shard.
     it("Verify transaction gets aborted if a participant steps down", () => {
-        // TODO (SERVER-136017): Remove graceful stepdown gating.
-        if (
-            TestData.doesNotSupportGracefulPlannedStepdown ||
-            TestData.doesNotSupportGracefulUnplannedStepdown
-        ) {
-            return;
-        }
-
         const session = st.s.startSession();
         const sessionDB = session.getDatabase(dbName);
 
@@ -205,9 +197,10 @@ describe("Test placementConflictTime", function () {
         // Run a find that will target one of the shards
         assert.eq(1, sessionDB.getCollection(nameCollA).find({x: 1}).itcount());
 
-        // Restart both shards
-        st.shard1.rs.restart(st.shard1.rs.getPrimary());
-        st.shard0.rs.restart(st.shard0.rs.getPrimary());
+        // Restart both shards without validation, which would block on the active transaction
+        // when the shutdown hook cannot step down the primary.
+        st.shard1.rs.restart(st.shard1.rs.getPrimary(), {skipValidation: true});
+        st.shard0.rs.restart(st.shard0.rs.getPrimary(), {skipValidation: true});
 
         st.shard1.rs.waitForPrimary();
         st.shard0.rs.waitForPrimary();
