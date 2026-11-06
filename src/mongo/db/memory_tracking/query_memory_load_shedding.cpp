@@ -594,10 +594,12 @@ void appendQueryMemoryLoadSheddingStats(ServiceContext* serviceContext, BSONObjB
     auto& processState = getProcessState(serviceContext);
     BSONObjBuilder sub(b.subobjStart("loadShedding"));
     sub.append("active", active);
-    // The RSS sample and water marks are only meaningful while the monitor runs.
-    if (active) {
+    // The RSS sample and water marks are only meaningful while the monitor runs. After setting
+    // lowMark = -1, there is a brief window when the monitor is not yet stopped and 'active' is
+    // true, so check both to avoid reporting a bogus negative lowMarkBytes in that window.
+    const int32_t lowPct = gQueryMemoryLoadSheddingLowMarkPercent.loadRelaxed();
+    if (active && lowPct >= 0) {
         const int64_t memLimit = processState.memLimitBytes.loadRelaxed();
-        const int32_t lowPct = gQueryMemoryLoadSheddingLowMarkPercent.loadRelaxed();
         const int32_t highPct = gQueryMemoryLoadSheddingHighMarkPercent.loadRelaxed();
         const int64_t rss = processState.rssBytes.loadRelaxed();
         sub.appendNumber("currentUsageBytes", static_cast<long long>(rss < 0 ? 0 : rss));

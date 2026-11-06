@@ -1024,5 +1024,24 @@ TEST_F(QueryMemoryLoadSheddingMonitorTest, ActiveMillisAccumulatesWhileMonitorRu
     assertThresholdFields(stats, false);
 }
 
+// The enable parameter is stored before its on_update hook stops the monitor, so a serverStatus
+// during a runtime disable can observe active with a negative low mark. The threshold fields are
+// omitted in that window rather than computed from the negative mark.
+TEST_F(QueryMemoryLoadSheddingMonitorTest, OmitsThresholdFieldsWhileDisableIsInFlight) {
+    auto restore = scopedRestoreMarks();
+    gQueryMemoryLoadSheddingLowMarkPercent.store(50);
+    auto* svcCtx = getServiceContext();
+    startQueryMemoryRssMonitor(svcCtx);
+    advance(Milliseconds(10));
+
+    // Simulates the disable window: the parameter storage is already updated, but the on_update
+    // hook has not yet stopped the monitor.
+    gQueryMemoryLoadSheddingLowMarkPercent.store(-1);
+    BSONObj stats = readStats();
+    ASSERT_TRUE(stats["active"].Bool());
+    assertThresholdFields(stats, false);
+    ASSERT_EQ(stats["activeMillis"].numberLong(), 10);
+}
+
 }  // namespace
 }  // namespace mongo
