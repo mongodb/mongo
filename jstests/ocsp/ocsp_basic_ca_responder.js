@@ -10,6 +10,7 @@ import {
 import {
     clearOCSPCache,
     OCSP_CA_PEM,
+    OCSP_CLIENT_CERT,
     OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
     OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM,
     OCSP_SERVER_CERT,
@@ -20,6 +21,34 @@ import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 if (determineSSLProvider() === "apple") {
     quit();
 }
+
+// The default (4s) can be exceeded by a slow revocation check, which soft-fails and accepts a
+// revoked certificate.
+const kOCSPVerifyTimeoutSecs = 10;
+
+// Connect from a child shell, since the OCSP verify timeout can only be set at shell startup.
+// Returns the child shell's exit code.
+function connectWithOCSPTimeout(conn) {
+    const pid = startMongoProgramNoConnect(
+        MongoRunner.getMongoShellPath(),
+        "--host",
+        conn.host,
+        "--tls",
+        "--tlsCAFile",
+        OCSP_CA_PEM,
+        "--tlsCertificateKeyFile",
+        OCSP_CLIENT_CERT,
+        "--tlsAllowInvalidHostnames",
+        "--setShellParameter",
+        "ocspEnabled=true",
+        "--setShellParameter",
+        `tlsOCSPVerifyTimeoutSecs=${kOCSPVerifyTimeoutSecs}`,
+        "--eval",
+        "assert.commandWorked(db.adminCommand({hello: 1}));",
+    );
+    return waitProgram(pid);
+}
+
 function test(serverCert, caCert, responderCertPair) {
     clearOCSPCache();
 
@@ -31,6 +60,7 @@ function test(serverCert, caCert, responderCertPair) {
         setParameter: {
             "failpoint.disableStapling": "{'mode':'alwaysOn'}",
             "ocspEnabled": "true",
+            "tlsOCSPVerifyTimeoutSecs": kOCSPVerifyTimeoutSecs,
         },
     };
 
@@ -45,13 +75,19 @@ function test(serverCert, caCert, responderCertPair) {
         conn = MongoRunner.runMongod(ocsp_options);
     });
 
+    // Check that the child shell connects while the certificate is good, so that a failure below
+    // can only be caused by the revoked status.
+    assert.eq(0, connectWithOCSPTimeout(conn), "Expected connection with a good certificate");
+
     mock_ocsp.stop();
     mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1, responderCertPair);
     mock_ocsp.start();
 
-    assert.throws(() => {
-        new Mongo(conn.host);
-    });
+    assert.neq(
+        0,
+        connectWithOCSPTimeout(conn),
+        "Expected connection with a revoked certificate to fail",
+    );
 
     MongoRunner.stopMongod(conn);
 
