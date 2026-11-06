@@ -210,7 +210,7 @@ const MULTIKEY_SPILLING_ELEMENT_PAD_BYTES = 1_000;
 export const MULTIKEY_SPILLING_OPTIONS = Object.freeze({
     docTemplate: multiKeySpillingDocTemplate,
     // Split across the three indexes this is 5 MB per sorter. It must stay well above the sorter's
-    // memory-pool block cap (`operationMemoryPoolBlockMaxSizeKB`, 2 MB by default): a document's
+    // memory-pool block cap (`operationMemoryPoolBlockMaxSizeKB`, set in `setUp()`): a document's
     // keys are allocated from that pool before they are added to the sorter, and the sorter charges
     // itself the pool's usage, so with a budget near or below the block size the spill would trip on
     // the first key of a document instead of part-way through it.
@@ -434,6 +434,10 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             oplogSize: 1024,
             nodeOptions: {
                 setParameter: {
+                    // Keep pool blocks well below the ~1 MB per-index sorter budgets, otherwise
+                    // sorters end up spilling once per key. Set before the `nodeParams` spread so
+                    // tests can override it.
+                    operationMemoryPoolBlockMaxSizeKB: 128,
                     ...otelParams,
                     ...nodeParams,
                     openTelemetryExportIntervalMillis: 5000,
