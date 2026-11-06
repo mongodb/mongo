@@ -11,7 +11,7 @@ import tempfile
 import threading
 import time
 import unittest
-from contextlib import chdir, redirect_stderr
+from contextlib import chdir, redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -783,6 +783,63 @@ class AdapterTest(unittest.TestCase):
             context.lint_args = ("--large-files",)
             result = adapters.run_file_size(context, ("changed.txt",))
         self.assertEqual(result.returncode, 0)
+
+
+class SharedToolsTest(unittest.TestCase):
+    def test_buildozer_uses_installer_even_when_on_path(self):
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(Path, "home", return_value=Path(temp)),
+            mock.patch("shutil.which", return_value="/system/old-buildozer") as which,
+            mock.patch("buildscripts.install_bazel.install_buildozer") as install,
+        ):
+            install_dir = Path(temp) / ".local" / "bin"
+            installed_buildozer = str(install_dir / "buildozer")
+            install.return_value = installed_buildozer
+            tools = adapters.SharedTools()
+
+            self.assertEqual(tools.buildozer, installed_buildozer)
+            self.assertEqual(tools.buildozer, installed_buildozer)
+            install.assert_called_once_with(str(install_dir))
+            self.assertTrue(install_dir.is_dir())
+            which.assert_not_called()
+
+    def test_buildozer_rejects_unsupported_platform(self):
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(Path, "home", return_value=Path(temp)),
+            mock.patch("shutil.which", return_value="/system/old-buildozer"),
+            mock.patch("buildscripts.install_bazel.install_buildozer", return_value=None),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "buildozer is not supported"):
+                _ = adapters.SharedTools().buildozer
+
+    def test_buildozer_rejects_stale_cache_when_replacement_fails(self):
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(Path, "home", return_value=Path(temp)),
+            mock.patch("buildscripts.install_bazel.determine_platform", return_value="linux"),
+            mock.patch("buildscripts.install_bazel.determine_architecture", return_value="amd64"),
+            mock.patch(
+                "buildscripts.s3_binary.download._download_and_verify",
+                side_effect=OSError("replacement failed"),
+            ) as download,
+            redirect_stdout(io.StringIO()),
+            redirect_stderr(io.StringIO()),
+        ):
+            install_dir = Path(temp) / ".local" / "bin"
+            install_dir.mkdir(parents=True)
+            stale_binary = install_dir / "buildozer"
+            stale_binary.write_bytes(b"old-buildozer")
+            tools = adapters.SharedTools()
+
+            # Each attempt must fail rather than return or cache the stale binary.
+            for _ in range(2):
+                with self.assertRaisesRegex(RuntimeError, "Failed to install Buildozer"):
+                    _ = tools.buildozer
+
+            self.assertEqual(download.call_count, 2)
+            self.assertEqual(stale_binary.read_bytes(), b"old-buildozer")
 
 
 class TelemetryTest(unittest.TestCase):

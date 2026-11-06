@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import platform
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -54,15 +53,13 @@ class SharedTools:
             if self._buildozer is None:
                 from buildscripts.install_bazel import install_buildozer
 
-                binary_name = "buildozer.exe" if platform.system() == "Windows" else "buildozer"
-                existing = shutil.which(binary_name)
-                if existing is None:
-                    install_dir = Path.home() / ".local" / "bin"
-                    install_dir.mkdir(parents=True, exist_ok=True)
-                    existing = install_buildozer(str(install_dir))
-                if existing is None:
+                # The installer verifies the pinned version even when a binary already exists.
+                install_dir = Path.home() / ".local" / "bin"
+                install_dir.mkdir(parents=True, exist_ok=True)
+                installed = install_buildozer(str(install_dir))
+                if installed is None:
                     raise RuntimeError("buildozer is not supported on this platform")
-                self._buildozer = existing
+                self._buildozer = installed
             return self._buildozer
 
     def lint_files_with_targets(

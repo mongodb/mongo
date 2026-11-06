@@ -57,7 +57,8 @@ def install_buildozer(download_location: str = "./"):
     url = f"https://mdb-build-public.s3.amazonaws.com/buildozer/v7.3.1/{binary_name}"
 
     file_location = os.path.join(download_location, f"buildozer{extension}")
-    download_s3_binary(url, file_location)
+    if not download_s3_binary(url, file_location):
+        raise RuntimeError(f"Failed to install Buildozer from {url}")
     os.chmod(file_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
     return file_location
 
