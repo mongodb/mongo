@@ -7,8 +7,9 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
+#include "mongo/db/repl/serial_processor.h"
 #include "mongo/platform/atomic.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
@@ -26,8 +27,8 @@ namespace mongo::repl {
  * A fixed set of persistent worker threads, each consuming its own queue of work items. Work
  * items enqueued to the same worker index are consumed serially, in FIFO order, by a single
  * thread; distinct workers consume independently. Each worker is backed by a single-threaded
- * ThreadPool. _startWorkers gives every worker thread an internally authorized Client that stepdown
- * cannot kill.
+ * SerialProcessor. _startWorkers gives every worker thread an internally authorized Client that
+ * stepdown cannot kill.
  *
  * The worker threads start at construction and run until shutdownAndJoin(), which consumes every
  * previously enqueued work item before joining the threads. Once a shutdown has been attempted,
@@ -86,21 +87,17 @@ public:
 
 private:
     /**
-     * A worker: a thread pool and its work item counters. _startWorkers configures each pool
-     * with a single thread.
+     * A worker: a serial processor and its work item counters.
      */
     struct Worker {
-        explicit Worker(ThreadPool::Options options) : pool(std::move(options)) {}
-
-        ThreadPool pool;
+        std::unique_ptr<SerialProcessor<WorkItem>> processor;
         Atomic<uint64_t> scheduled{0};
         Atomic<uint64_t> executed{0};
     };
 
-    [[nodiscard]] static std::deque<Worker> _startWorkers(size_t numWorkers);
+    [[nodiscard]] static std::deque<Worker> _startWorkers(size_t numWorkers, ConsumeFn consumeFn);
     [[nodiscard]] static PeriodicJobAnchor _makeMetricsCollector(const std::deque<Worker>& workers);
 
-    ConsumeFn _consumeFn;
     Atomic<bool> _isShutdown{false};
     const size_t _numWorkers;
     // The set of workers is fixed for the object's lifetime.
