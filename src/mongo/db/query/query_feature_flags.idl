@@ -323,6 +323,14 @@ feature_flags:
         fcv_gated: false
         incremental_rollout_phase: in_development
 
+    featureFlagSbeEfficientBoundaryMaterialization:
+        description: >-
+            Feature flag to enable efficient data materialization between SBE plans and
+            document sources.
+        cpp_varname: gFeatureFlagSbeEfficientBoundaryMaterialization
+        default: false
+        fcv_gated: false
+
     featureFlagPathArrayness:
         description: "Feature flag to enable tracking of path arrayness."
         cpp_varname: gFeatureFlagPathArrayness

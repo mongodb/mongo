@@ -21,6 +21,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
@@ -276,35 +277,45 @@ public:
             std::make_unique<ConstantFilterMock>(true, BSONObj{BSON("a" << 1)}));
     }
 
+    void runCountScanTest() {
+        createCollection(
+            {fromjson("{_id: 0, a: 1}"), fromjson("{_id: 1, a: 2}"), fromjson("{_id: 2, a: 3}")},
+            BSON("a" << 1));
+        // Build COUNT_SCAN node
+        auto csn = std::make_unique<CountScanNode>(_nss, makeIndexEntry(BSON("a" << 1)));
+        csn->startKey = BSON("a" << BSONType::minKey);
+        csn->startKeyInclusive = false;
+        csn->endKey = BSON("a" << BSONType::maxKey);
+        csn->endKeyInclusive = false;
+        // Build GROUP node
+        auto bson = fromjson("{count: {$count: {}}}");
+        VariablesParseState vps = _expCtx->variablesParseState;
+        auto groupByExpression = ExpressionFieldPath::parse(_expCtx.get(), "$_id", vps);
+        auto groupNode = std::make_unique<GroupNode>(
+            std::move(csn),
+            groupByExpression,
+            std::vector<AccumulationStatement>{AccumulationStatement::parseAccumulationStatement(
+                _expCtx.get(), bson["count"], vps)},
+            /*doingMerge=*/false,
+            /*willBeMerged=*/false,
+            /*shouldProduceBson=*/true);
+
+        runTest(std::move(groupNode), BSON_ARRAY(BSON("_id" << BSONNULL << "count" << 3)));
+    }
+
 protected:
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 
 TEST_F(GoldenSbeStageBuilderTest, TestCountScan) {
-    createCollection(
-        {fromjson("{_id: 0, a: 1}"), fromjson("{_id: 1, a: 2}"), fromjson("{_id: 2, a: 3}")},
-        BSON("a" << 1));
-    // Build COUNT_SCAN node
-    auto csn = std::make_unique<CountScanNode>(_nss, makeIndexEntry(BSON("a" << 1)));
-    csn->startKey = BSON("a" << BSONType::minKey);
-    csn->startKeyInclusive = false;
-    csn->endKey = BSON("a" << BSONType::maxKey);
-    csn->endKeyInclusive = false;
-    // Build GROUP node
-    auto bson = fromjson("{count: {$count: {}}}");
-    VariablesParseState vps = _expCtx->variablesParseState;
-    auto groupByExpression = ExpressionFieldPath::parse(_expCtx.get(), "$_id", vps);
-    auto groupNode = std::make_unique<GroupNode>(
-        std::move(csn),
-        groupByExpression,
-        std::vector<AccumulationStatement>{
-            AccumulationStatement::parseAccumulationStatement(_expCtx.get(), bson["count"], vps)},
-        /*doingMerge=*/false,
-        /*willBeMerged=*/false,
-        /*shouldProduceBson=*/true);
+    runCountScanTest();
+}
 
-    runTest(std::move(groupNode), BSON_ARRAY(BSON("_id" << BSONNULL << "count" << 3)));
+TEST_F(GoldenSbeStageBuilderTest, TestCountScanEfficientBoundaryMaterialization) {
+    unittest::ServerParameterGuard efficientMaterialization(
+        "featureFlagSbeEfficientBoundaryMaterialization", true);
+    runCountScanTest();
 }
 
 TEST_F(GoldenSbeStageBuilderTest, TestLimitSkip) {

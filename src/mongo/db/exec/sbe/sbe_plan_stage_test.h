@@ -246,12 +246,13 @@ public:
 
     /**
      * This method repeatedly calls getNext() on the specified PlanStage, stores all the values
-     * produced by the specified SlotAccessor into an SBE array, and returns the array.
+     * produced by 'source' into an SBE array, and returns the array. 'source' is a SlotAccessor, or
+     * a ResultMaterializer that builds each result like PlanExecutorSBE does.
      *
      * Note that the caller assumes ownership of the SBE array returned.
      */
-    std::pair<value::TypeTags, value::Value> getAllResults(PlanStage* stage,
-                                                           value::SlotAccessor* accessor);
+    template <typename Source>
+    std::pair<value::TypeTags, value::Value> getAllResults(PlanStage* stage, Source* source);
 
     void exhaustStage(PlanStage* stage, value::SlotAccessor* accessor);
 

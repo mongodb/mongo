@@ -536,6 +536,11 @@ SingleDocumentLookupExecutor::LookupResult SbeSingleDocumentLookupExecutor::exec
     tassert(12952807,
             "SBE plan must have a result slot",
             _preparedExecutor->data.staticData->resultSlot);
+    // These plans have no stage that participates with the root ResultInfo, so the result is the
+    // result base object itself.
+    tassert(13843600,
+            "SBE lookup plan must not have result changes",
+            !_preparedExecutor->data.staticData->resultChanges);
     auto* resultAccessor = root->getAccessor(_preparedExecutor->data.env.ctx,
                                              *_preparedExecutor->data.staticData->resultSlot);
     auto [resultTag, resultVal] = resultAccessor->getViewOfValue();

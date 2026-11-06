@@ -134,6 +134,9 @@ protected:
         BSONObj groupSpec,
         std::vector<BSONArray> inputDocs,
         std::unique_ptr<CollatorInterface> collator = nullptr) {
+        unittest::ServerParameterGuard efficientMaterialization(
+            "featureFlagSbeEfficientBoundaryMaterialization", true);
+
         // Makes a QuerySolution for GroupNode over VirtualScanNode.
         auto [querySolution, groupNode] = makeGroupQuerySolution(
             make_intrusive<ExpressionContextForTest>(), std::move(groupSpec), std::move(inputDocs));
@@ -142,9 +145,12 @@ protected:
         auto [resultSlots, stage, data, _] = buildPlanStage(
             std::move(querySolution), /*hasRecordId=*/false, nullptr, std::move(collator));
         ASSERT_EQ(resultSlots.size(), 1);
+        ASSERT_TRUE(data.staticData->resultChanges);
 
-        auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots[0]);
-        return getAllResults(stage.get(), &resultAccessors[0]);
+        prepareTree(&data.env.ctx, stage.get());
+        auto materializer =
+            stage_builder::bindResultMaterializer(stage.get(), data.env.ctx, *data.staticData);
+        return getAllResults(stage.get(), &materializer);
     }
 
     void runGroupAggregationTest(std::string_view groupSpec,

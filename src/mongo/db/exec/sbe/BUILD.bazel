@@ -255,6 +255,7 @@ mongo_cc_library(
     deps = [
         ":query_sbe",
         ":query_sbe_stages",
+        ":result_materializer",
         ":sbe_unittest_base",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:service_context_d_test_fixture",

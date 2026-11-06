@@ -234,8 +234,10 @@ GoldenSbeStageBuilderTestFixture::PlanRun GoldenSbeStageBuilderTestFixture::runP
 
     auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), colls, /*hasRecordId=*/false, std::move(param));
-    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
-    ASSERT_EQ(resultAccessors.size(), 1u);
+    ASSERT_EQ(resultSlots.size(), 1u);
+    prepareTree(&data.env.ctx, stage.get());
+    auto materializer =
+        stage_builder::bindResultMaterializer(stage.get(), data.env.ctx, *data.staticData);
 
     sbe::DebugPrintInfo debugPrintInfo{};
     std::string explain =
@@ -244,7 +246,7 @@ GoldenSbeStageBuilderTestFixture::PlanRun GoldenSbeStageBuilderTestFixture::runP
         explain = replaceUuid(std::move(explain), uuid);
     }
     return {std::move(explain),
-            sbe::value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessors[0]))};
+            sbe::value::TagValueOwned::fromRaw(getAllResults(stage.get(), &materializer))};
 }
 
 std::string GoldenSbeStageBuilderTestFixture::replaceUuid(std::string input, UUID uuid) {

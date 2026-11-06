@@ -954,12 +954,68 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
     }
 }
 
+namespace {
+/**
+ * Describes the root ResultInfo changes in 'outputs' for the executor. The mapping follows
+ * evaluateFieldEffects(): effects equal to the default effect are omitted, Modify/Set/Generic set
+ * the field in place and Add appends it. Returns boost::none when the result is the base object.
+ */
+boost::optional<ResultChanges> makeResultChanges(const PlanStageSlots& outputs) {
+    const auto& effects = outputs.getResultInfoChanges();
+    const auto defaultEffect = effects.getDefaultEffect();
+
+    ResultChanges changes{defaultEffect == FieldEffect::kDrop, {}};
+    for (const auto& field : effects.getFieldList()) {
+        auto effect = effects.get(field);
+        if (effect == defaultEffect) {
+            continue;
+        }
+
+        auto fieldSlot = [&] {
+            return outputs.get(std::pair(PlanStageSlots::kField, std::string_view{field})).getId();
+        };
+
+        // Similar logic to `evaluateFieldEffects` for makeObjSpec, mapping each FieldEffect to the
+        // associated keep/drop/add/set.
+        switch (effect) {
+            case FieldEffect::kKeep:
+                changes.fields.push_back({field, sbe::ResultFieldAction::kKeep, boost::none});
+                break;
+            case FieldEffect::kDrop:
+                changes.fields.push_back({field, sbe::ResultFieldAction::kDrop, boost::none});
+                break;
+            case FieldEffect::kAdd:
+                changes.fields.push_back({field, sbe::ResultFieldAction::kAdd, fieldSlot()});
+                break;
+            case FieldEffect::kModify:
+            case FieldEffect::kSet:
+            case FieldEffect::kGeneric:
+                changes.fields.push_back({field, sbe::ResultFieldAction::kSet, fieldSlot()});
+                break;
+        }
+    }
+
+    if (!changes.closed && changes.fields.empty()) {
+        return boost::none;
+    }
+    return changes;
+}
+}  // namespace
+
 std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildTree() {
     const bool needsRecordIdSlot = _cq.getForceGenerateRecordId();
 
     // We always produce a 'resultSlot'.
     PlanStageReqs reqs;
-    reqs.setResultObj();
+    if (_root->getType() == STAGE_GROUP &&
+        feature_flags::gFeatureFlagSbeEfficientBoundaryMaterialization.isEnabled()) {
+        // The executor builds each result from the result base object (the empty object) and the
+        // changed fields, instead of the plan materializing it.
+        // TODO SERVER-138443 use ResultMaterializer for more query shapes.
+        reqs.setResultInfo(FieldSet::makeUniverseSet(), FieldEffects());
+    } else {
+        reqs.setResultObj();
+    }
 
     // We force the root stage to produce a 'recordId' if the iteration can be resumed (via a resume
     // token or a tailable cursor) or if the caller simply expects to be able to read it.
@@ -998,17 +1054,21 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
 
     // Assert that we produced a 'resultSlot' and that we produced a 'recordIdSlot' if it was
     // needed.
-    tassert(11051838, "Expected 'resultSlot' to be produced", outputs.hasResultObj());
+    tassert(11051838, "Expected 'resultSlot' to be produced", outputs.hasResult());
 
     const bool needsRecordIdSlot = _cq.getForceGenerateRecordId();
     if (needsRecordIdSlot) {
         tassert(11051837, "Expected 'recordIdSlot' to be produced", outputs.has(kRecordId));
     }
 
-    auto resultSlot = outputs.getResultObjIfExists();
     auto recordIdSlot = outputs.getIfExists(PlanStageSlots::kRecordId);
 
-    _data->resultSlot = resultSlot ? boost::make_optional(resultSlot->getId()) : boost::none;
+    if (outputs.hasResultInfo()) {
+        _data->resultSlot = outputs.getResultInfoBaseObj().getId();
+        _data->resultChanges = makeResultChanges(outputs);
+    } else {
+        _data->resultSlot = outputs.getResultObj().getId();
+    }
     _data->recordIdSlot = recordIdSlot ? boost::make_optional(recordIdSlot->getId()) : boost::none;
 
     // Register the slots used in the dynamic index bounds in the global environment.
@@ -1027,10 +1087,18 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
         }
     }
 
-    // The slots read by the consumer of the plan: the result and the record id.
+    // The slots read by the consumer of the plan: the result, the result changes and the record
+    // id.
     auto rootUses = sbe::value::SlotVector{};
     if (_data->resultSlot) {
         rootUses.push_back(*_data->resultSlot);
+    }
+    if (_data->resultChanges) {
+        for (const auto& field : _data->resultChanges->fields) {
+            if (field.slot) {
+                rootUses.push_back(*field.slot);
+            }
+        }
     }
     if (_data->recordIdSlot) {
         rootUses.push_back(*_data->recordIdSlot);

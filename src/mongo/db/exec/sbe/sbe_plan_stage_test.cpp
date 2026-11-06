@@ -10,6 +10,7 @@
 #include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/virtual_scan.h"
+#include "mongo/db/exec/sbe/values/result_materializer.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/optional/optional.hpp>
@@ -116,8 +117,9 @@ std::vector<value::SlotAccessor*> PlanStageTestFixture::prepareTree(CompileCtx* 
     return slotAccessors;
 }
 
-std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
-    PlanStage* stage, value::SlotAccessor* accessor) {
+template <typename Source>
+std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(PlanStage* stage,
+                                                                             Source* source) {
     // Allocate an array to hold the results.
     value::TagValueOwned resultsOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto resultsView = value::getArrayView(resultsOwned.value());
@@ -125,7 +127,14 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
     // into the array.
     size_t i = 0;
     for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext(), ++i) {
-        resultsView->push_back(accessor->getCopyOfValue());
+        if constexpr (std::same_as<Source, ResultMaterializer>) {
+            BSONObj result = source->toBson(false /* mustOwn */);
+            resultsView->push_back(value::TagValueView{
+                value::TypeTags::bsonObject, value::bitcastFrom<const char*>(result.objdata())}
+                                       .copy());
+        } else {
+            resultsView->push_back(source->getCopyOfValue());
+        }
 
         // Test out saveState() and restoreState() for 50% of the documents (the first document,
         // the third document, the fifth document, and so on).
@@ -138,6 +147,11 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
 
     return resultsOwned.releaseToRaw();
 }
+
+template std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
+    PlanStage* stage, value::SlotAccessor* source);
+template std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
+    PlanStage* stage, ResultMaterializer* source);
 
 void PlanStageTestFixture::exhaustStage(PlanStage* stage, value::SlotAccessor* accessor) {
     for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext()) {

@@ -7,6 +7,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/in_list.h"
+#include "mongo/db/exec/sbe/values/result_materializer.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -113,12 +114,34 @@ struct Environment {
 };
 
 /**
+ * One top-level field change that the executor applies to the result base object.
+ */
+struct ResultFieldChange {
+    std::string name;
+    sbe::ResultFieldAction action;
+    boost::optional<sbe::value::SlotId> slot;  // Slot associated with kSet/kAdd value
+};
+
+/**
+ * The changes the executor applies to the result base object to build the query result, as
+ * described by the root's ResultInfo.
+ */
+struct ResultChanges {
+    bool closed;
+    std::vector<ResultFieldChange> fields;
+};
+
+/**
  * This struct used to hold all of a PlanStageData's immutable data.
  */
 struct PlanStageStaticData {
     // This holds the output slots produced by SBE plan (resultSlot, recordIdSlot, etc).
     boost::optional<sbe::value::SlotId> resultSlot;
     boost::optional<sbe::value::SlotId> recordIdSlot;
+
+    // The changes to apply to 'resultSlot' to build the result, or none when the result is the base
+    // object itself.
+    boost::optional<ResultChanges> resultChanges;
 
     // Scan direction if this plan has a collection scan: 1 means forward; -1 means reverse.
     int direction{1};
@@ -247,5 +270,13 @@ struct PlanStageData {
     // that 'debugInfo' is present only if this PlanStageData is recovered from the plan cache.
     std::shared_ptr<const DebugInfoSBE> debugInfo;
 };
+
+/**
+ * Binds a ResultMaterializer to the result slot and the result change slots of the prepared plan
+ * 'root'. 'data.resultSlot' must be set.
+ */
+sbe::ResultMaterializer bindResultMaterializer(sbe::PlanStage* root,
+                                               sbe::CompileCtx& ctx,
+                                               const PlanStageStaticData& data);
 
 }  // namespace mongo::stage_builder

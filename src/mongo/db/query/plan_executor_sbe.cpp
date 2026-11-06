@@ -75,10 +75,9 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     // even for plans that never yield (those use an INTERRUPT_ONLY policy).
     tassert(13650700, "yieldPolicy must not be null", _yieldPolicy);
     auto& env = _rootData.env;
-    if (auto slot = _rootData.staticData->resultSlot) {
-        auto* result = _root->getAccessor(env.ctx, *slot);
-        uassert(4822865, "Query does not have result slot.", result);
-        _materializer.emplace(result, false /* closed */, std::vector<sbe::ResultField>{});
+    if (_rootData.staticData->resultSlot) {
+        _materializer.emplace(
+            stage_builder::bindResultMaterializer(_root.get(), env.ctx, *_rootData.staticData));
     }
 
     if (auto slot = _rootData.staticData->recordIdSlot) {

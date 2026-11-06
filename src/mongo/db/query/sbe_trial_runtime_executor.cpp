@@ -83,10 +83,9 @@ TrialRuntimeExecutor::prepareExecutionPlan(PlanStage* root,
         _opCtx, root, data, _cq, _collections, _yieldPolicy, preparingFromCache, remoteCursors);
 
     boost::optional<ResultMaterializer> materializer;
-    if (auto slot = data->staticData->resultSlot) {
-        auto* resultSlot = root->getAccessor(data->env.ctx, *slot);
-        tassert(4822871, "Query does not have a result slot.", resultSlot);
-        materializer.emplace(resultSlot, false /* closed */, std::vector<ResultField>{});
+    if (data->staticData->resultSlot) {
+        materializer.emplace(
+            stage_builder::bindResultMaterializer(root, data->env.ctx, *data->staticData));
     }
 
     value::SlotAccessor* recordIdSlot{nullptr};

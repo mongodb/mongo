@@ -1,0 +1,6 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestCountScanEfficientBoundaryMaterialization
+$$RESULT=s2 $$RESULT_CHANGES=closed{_id=add(s6),count=add(s4)} env: { s2 = {} (emptyObj) }
+[2] group [s6] [s4 = _internalCount::accumulate(s4, 1)] spillSlots[s5] mergingExprs[_internalCount::merge] 
+[2] project [s6 = (s3 ?: null)] 
+[1] project [s3 = getField(s2, "_id")] 
+[1] ixseek seekKeyLow = KS(27FDFE) seekKeyHigh = KS(2BFE01) [s1 = recordId] [] @"UUID" @"a_1" forward 

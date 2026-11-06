@@ -57,10 +57,10 @@ public:
 
     /**
      * Prepares the given plan stage tree for execution, attaches it to the operation context and
-     * returns a ResultMaterializer bound to the result slot, and a slot accessor for the recordId
-     * slot. The caller should pass true for 'preparingFromCache' if the SBE plan being prepared is
-     * being recovered from the SBE plan cache. The caller should pass 'remoteCursors' for
-     * replanning hash lookup in $search query, otherwise keep it nullptr.
+     * returns a ResultMaterializer bound to the result slot and result changes, and a slot accessor
+     * for the recordId slot. The caller should pass true for 'preparingFromCache' if the SBE plan
+     * being prepared is being recovered from the SBE plan cache. The caller should pass
+     * 'remoteCursors' for replanning hash lookup in $search query, otherwise keep it nullptr.
      */
     std::pair<boost::optional<ResultMaterializer>, sbe::value::SlotAccessor*> prepareExecutionPlan(
         PlanStage* root,
