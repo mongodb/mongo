@@ -61,8 +61,7 @@ struct FlushResult {
 
     /**
      * The counts of the writes persisted to the fast count metadata store. `entryWriteCount` is
-     * <= `checkpointBufferSize` because some deltas can be skipped. See
-     * `persistCheckpointSnapshot()`.
+     * <= `checkpointBufferSize` because removing an untracked collection can be a no-op.
      */
     CheckpointWriteCounts writeCounts;
 

@@ -116,7 +116,6 @@ mongo_cc_library(
         ":skip_replicated_metadata_startup_oplog_scan_gen",
     ],
     deps = [
-        "replicated_fast_count_advance_checkpoint",
         "replicated_fast_count_committer",
         "replicated_fast_count_delta_utils",
         "replicated_fast_count_metrics",
@@ -213,20 +212,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "replicated_fast_count_advance_checkpoint",
-    srcs = [
-        "replicated_fast_count_advance_checkpoint.cpp",
-    ],
-    deps = [
-        "replicated_fast_count_delta_utils",
-        "replicated_fast_count_metrics",
-        "replicated_fast_count_streaming_oplog_delta_accumulator",
-        "size_count_store",
-        "size_count_timestamp_store",
-    ],
-)
-
-mongo_cc_library(
     name = "size_count_checkpoint_oplog_tailer",
     srcs = [
         "size_count_checkpoint_oplog_tailer.cpp",
@@ -245,7 +230,6 @@ mongo_cc_library(
         "size_count_checkpoint_flusher.cpp",
     ],
     deps = [
-        "replicated_fast_count_advance_checkpoint",
         "replicated_fast_count_metrics",
         "replicated_fast_count_streaming_oplog_delta_accumulator",
         "size_count_store",
@@ -345,26 +329,6 @@ mongo_cc_library(
         "//src/mongo/db/shard_role",
         "//src/mongo/db/storage:ident",
         "//src/mongo/db/storage:recovery_unit_base",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "replicated_fast_count_advance_checkpoint_test",
-    srcs = [
-        "replicated_fast_count_advance_checkpoint_test.cpp",
-    ],
-    tags = [
-        "mongo_unittest_first_group",
-        "server-collection-write-path",
-    ],
-    deps = [
-        "replicated_fast_count_advance_checkpoint",
-        "replicated_fast_count_delta_utils",
-        "replicated_fast_count_test_helpers",
-        "size_count_store",
-        "size_count_timestamp_store",
-        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
-        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 
@@ -552,10 +516,12 @@ mongo_cc_unit_test(
     ],
     deps = [
         "replicated_fast_count_test_helpers",
+        "size_count_checkpoint_buffer",
         "size_count_checkpoint_oplog_tailer",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:ident",
         "//src/mongo/db/storage:record_store_write_conflict_fail_points",
         "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/unittest:server_parameter_guard",
@@ -611,8 +577,6 @@ mongo_cc_unit_test(
         "size_count_checkpoint_flusher",
         "size_count_store",
         "size_count_timestamp_store",
-        "//src/mongo/db/op_observer:op_observer_impl",
-        "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/storage:record_store_write_conflict_fail_points",
@@ -780,13 +744,14 @@ mongo_cc_unit_test(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
-        "replicated_fast_count_advance_checkpoint",
         "replicated_fast_count_init",
         "replicated_fast_count_metrics",
         "replicated_fast_count_op_observer",
+        "replicated_fast_count_streaming_oplog_delta_accumulator",
         "replicated_fast_count_test_helpers",
         "size_count_store",
         "size_count_timestamp_store",
+        "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/storage:storage_engine_impl",
         "//src/mongo/otel/metrics:metrics_test_util",

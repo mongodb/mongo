@@ -4,9 +4,6 @@
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_flusher.h"
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer/op_observer_impl.h"
-#include "mongo/db/op_observer/op_observer_registry.h"
-#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
@@ -21,6 +18,9 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
+
+#include <array>
+#include <utility>
 
 namespace mongo::replicated_fast_count::flusher {
 namespace {
@@ -58,11 +58,28 @@ protected:
         return sizeCountStore->read(operationContext(), uuid);
     }
 
+    boost::optional<FlushResult> flushBatch(const OplogScanResult& batch) {
+        const auto previousValidAsOf = readTimestampStore().value_or(Timestamp::min());
+        auto result = flush(operationContext(), *sizeCountStore, *timestampStore, batch);
+        if (result) {
+            EXPECT_EQ(result->previousValidAsOfTS, previousValidAsOf);
+            EXPECT_EQ(result->checkpointBufferSize, batch.deltas.size());
+            EXPECT_EQ(boost::optional<Timestamp>(result->newValidAsOfTS), batch.lastTimestamp);
+            EXPECT_EQ(result->flushAttempts, 1);
+            EXPECT_EQ(readTimestampStore(), batch.lastTimestamp);
+        }
+        return result;
+    }
+
     std::unique_ptr<SizeCountStore> sizeCountStore;
     std::unique_ptr<SizeCountTimestampStore> timestampStore;
 
     const test_helpers::NsAndUUID collA{
         .nss = NamespaceString::createNamespaceString_forTest("flusher_test", "collA"),
+        .uuid = UUID::gen(),
+    };
+    const test_helpers::NsAndUUID collB{
+        .nss = NamespaceString::createNamespaceString_forTest("flusher_test", "collB"),
         .uuid = UUID::gen(),
     };
 };
@@ -124,6 +141,10 @@ TEST_F(FlusherTest, FlushWithNoNewWorkIsNoOp) {
         };
         EXPECT_FALSE(
             flush(operationContext(), *sizeCountStore, *timestampStore, batch).has_value());
+        EXPECT_FALSE(readTimestampStore().has_value());
+        EXPECT_FALSE(readSizeCount(collA.uuid).has_value());
+        EXPECT_FALSE(readSizeCount(collB.uuid).has_value());
+        EXPECT_FALSE(flushBatch(OplogScanResult{}).has_value());
     }
 
     // Persisted timestamp (1, 1).
@@ -137,7 +158,297 @@ TEST_F(FlusherTest, FlushWithNoNewWorkIsNoOp) {
         };
         EXPECT_FALSE(
             flush(operationContext(), *sizeCountStore, *timestampStore, batch).has_value());
+        EXPECT_EQ(readTimestampStore(), persistedTs);
+        EXPECT_FALSE(readSizeCount(collA.uuid).has_value());
+        EXPECT_FALSE(readSizeCount(collB.uuid).has_value());
+        EXPECT_FALSE(flushBatch(OplogScanResult{}).has_value());
+        EXPECT_EQ(readTimestampStore(), persistedTs);
     }
+}
+
+TEST_F(FlusherTest, FlushAdvancesExistingSizeCountAndTimestamp) {
+    const Timestamp previousTs(1, 1);
+    const Timestamp newTs(1, 3);
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       *sizeCountStore,
+                                       collA.uuid,
+                                       {.timestamp = previousTs, .size = 100, .count = 3});
+    test_helpers::insertSizeCountTimestamp(operationContext(), *timestampStore, previousTs);
+
+    const OplogScanResult batch{
+        .deltas = {{collA.uuid,
+                    ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 60, .count = 2}}}}},
+        .lastTimestamp = newTs};
+    const auto result = flushBatch(batch);
+    ASSERT_TRUE(result);
+    EXPECT_EQ(result->writeCounts,
+              (CheckpointWriteCounts{.entryWriteCount = 1, .insertCount = 0, .updateCount = 1}));
+    EXPECT_EQ(readSizeCount(collA.uuid),
+              (SizeCountStore::Entry{.timestamp = newTs, .size = 160, .count = 5}));
+}
+
+TEST_F(FlusherTest, FlushAdvancesTimestampWithoutMetadataWrites) {
+    const SizeCountStore::Entry initial{.timestamp = Timestamp(1, 1), .size = 100, .count = 3};
+    test_helpers::insertSizeCountEntry(operationContext(), *sizeCountStore, collA.uuid, initial);
+    test_helpers::insertSizeCountTimestamp(operationContext(), *timestampStore, initial.timestamp);
+
+    const auto result = flushBatch({.deltas = {}, .lastTimestamp = Timestamp(50, 1)});
+    ASSERT_TRUE(result);
+    EXPECT_EQ(result->writeCounts, (CheckpointWriteCounts{}));
+    EXPECT_EQ(readSizeCount(collA.uuid), initial);
+}
+
+TEST_F(FlusherTest, FlushPersistsZeroNetDelta) {
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       *sizeCountStore,
+                                       collA.uuid,
+                                       {.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
+    const auto result = flushBatch(
+        {.deltas = {{collA.uuid, ReplicatedMetadataDelta{.metadata = {.sizeCount = {0, 0}}}}},
+         .lastTimestamp = Timestamp(1, 3)});
+    ASSERT_TRUE(result);
+    EXPECT_EQ(result->writeCounts,
+              (CheckpointWriteCounts{.entryWriteCount = 1, .insertCount = 0, .updateCount = 1}));
+    EXPECT_EQ(readSizeCount(collA.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 3), .size = 100, .count = 3}));
+}
+
+TEST_F(FlusherTest, FlushTracksCollectionsIndependently) {
+    const auto first = flushBatch(
+        {.deltas = {{collA.uuid, ReplicatedMetadataDelta{.metadata = {.sizeCount = {50, 1}}}},
+                    {collB.uuid, ReplicatedMetadataDelta{.metadata = {.sizeCount = {40, 1}}}}},
+         .lastTimestamp = Timestamp(1, 3)});
+    ASSERT_TRUE(first);
+    EXPECT_EQ(first->writeCounts,
+              (CheckpointWriteCounts{.entryWriteCount = 2, .insertCount = 2, .updateCount = 0}));
+    const SizeCountStore::Entry expectedA{.timestamp = Timestamp(1, 3), .size = 50, .count = 1};
+    EXPECT_EQ(readSizeCount(collA.uuid), expectedA);
+    EXPECT_EQ(readSizeCount(collB.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 3), .size = 40, .count = 1}));
+
+    const auto second = flushBatch(
+        {.deltas = {{collB.uuid, ReplicatedMetadataDelta{.metadata = {.sizeCount = {-80, -2}}}}},
+         .lastTimestamp = Timestamp(1, 4)});
+    ASSERT_TRUE(second);
+    EXPECT_EQ(second->writeCounts,
+              (CheckpointWriteCounts{.entryWriteCount = 1, .insertCount = 0, .updateCount = 1}));
+    EXPECT_EQ(readSizeCount(collA.uuid), expectedA);
+    EXPECT_EQ(readSizeCount(collB.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 4), .size = -40, .count = -1}));
+}
+
+TEST_F(FlusherTest, FlushCreatesCollectionWithAccumulatedInserts) {
+    for (const auto sizeCount : std::array{CollectionSizeCount{0, 0}, CollectionSizeCount{30, 2}}) {
+        const auto uuid = UUID::gen();
+        const Timestamp ts(1, static_cast<unsigned int>(sizeCount.count + 1));
+        const auto result =
+            flushBatch({.deltas = {{uuid,
+                                    ReplicatedMetadataDelta{.metadata = {.sizeCount = sizeCount},
+                                                            .state = DDLState::kCreated}}},
+                        .lastTimestamp = ts});
+        ASSERT_TRUE(result);
+        EXPECT_EQ(
+            result->writeCounts,
+            (CheckpointWriteCounts{.entryWriteCount = 1, .insertCount = 1, .updateCount = 0}));
+        EXPECT_EQ(readSizeCount(uuid),
+                  (SizeCountStore::Entry{
+                      .timestamp = ts, .size = sizeCount.size, .count = sizeCount.count}));
+    }
+}
+
+TEST_F(FlusherTest, FlushDropsTrackedAndUntrackedCollections) {
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       *sizeCountStore,
+                                       collA.uuid,
+                                       {.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
+    // Removing an untracked UUID is a no-op, but the global timestamp still advances.
+    int increment = 2;
+    for (const auto uuid : {collA.uuid, collB.uuid}) {
+        const auto result =
+            flushBatch({.deltas = {{uuid, ReplicatedMetadataDelta{.state = DDLState::kDropped}}},
+                        .lastTimestamp = Timestamp(1, increment++)});
+        ASSERT_TRUE(result);
+        EXPECT_EQ(result->writeCounts,
+                  (CheckpointWriteCounts{.entryWriteCount = uuid == collA.uuid ? 1u : 0u,
+                                         .insertCount = 0,
+                                         .updateCount = 0}));
+        EXPECT_FALSE(readSizeCount(uuid));
+    }
+}
+
+TEST_F(FlusherTest, FlushDropAndRecreateDiscardsPersistedTotals) {
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       *sizeCountStore,
+                                       collA.uuid,
+                                       {.timestamp = Timestamp(1, 1), .size = 100, .count = 50});
+    const auto result =
+        flushBatch({.deltas = {{collA.uuid,
+                                ReplicatedMetadataDelta{.metadata = {.sizeCount = {200, 1}},
+                                                        .state = DDLState::kDroppedAndRecreated}}},
+                    .lastTimestamp = Timestamp(1, 4)});
+    ASSERT_TRUE(result);
+    EXPECT_EQ(result->writeCounts,
+              (CheckpointWriteCounts{.entryWriteCount = 1, .insertCount = 0, .updateCount = 1}));
+    EXPECT_EQ(readSizeCount(collA.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 4), .size = 200, .count = 1}));
+}
+
+TEST_F(FlusherTest, FlushPersistsNegativeDeltaForUntrackedCollection) {
+    ASSERT_TRUE(flushBatch(
+        {.deltas = {{collB.uuid, ReplicatedMetadataDelta{.metadata = {.sizeCount = {-80, -2}}}}},
+         .lastTimestamp = Timestamp(1, 2)}));
+    EXPECT_EQ(readSizeCount(collB.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 2), .size = -80, .count = -2}));
+}
+
+TEST_F(FlusherTest, FlushAppliesRepairHashDiffToPersistedMetadata) {
+    const int64_t persistedHash = 0x0f0f0f0f0f0f0f0f;
+    const int64_t repairHash = 0x0123456789abcdef;
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        *sizeCountStore,
+        collA.uuid,
+        {.timestamp = Timestamp(0, 1), .size = 1000, .count = 10, .hash = persistedHash});
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       *sizeCountStore,
+                                       collB.uuid,
+                                       {.timestamp = Timestamp(0, 1), .size = 1000, .count = 10});
+    ASSERT_TRUE(flushBatch(
+        {.deltas =
+             {{collA.uuid,
+               ReplicatedMetadataDelta{.metadata = {.sizeCount = {100, 5}, .hash = repairHash}}},
+              {collB.uuid,
+               ReplicatedMetadataDelta{.metadata = {.sizeCount = {100, 5}, .hash = repairHash}}}},
+         .lastTimestamp = Timestamp(1, 1)}));
+    EXPECT_EQ(readSizeCount(collA.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 1),
+                                     .size = 1100,
+                                     .count = 15,
+                                     .hash = persistedHash ^ repairHash}));
+    EXPECT_EQ(readSizeCount(collB.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 1100, .count = 15}));
+}
+
+TEST_F(FlusherTest, FlushPersistsPresentAndAbsentHashesForEachDDLState) {
+    int increment = 1;
+    for (const auto state : {DDLState::kCreated, DDLState::kNone, DDLState::kDroppedAndRecreated}) {
+        for (const auto hash :
+             std::array{boost::optional<int64_t>{}, boost::optional<int64_t>{0x1234}}) {
+            const auto uuid = UUID::gen();
+            if (state != DDLState::kCreated) {
+                test_helpers::insertSizeCountEntry(
+                    operationContext(),
+                    *sizeCountStore,
+                    uuid,
+                    {.timestamp = Timestamp::min(),
+                     .size = 10,
+                     .count = 2,
+                     .hash = hash ? boost::optional<int64_t>{0} : boost::none});
+            }
+            const Timestamp ts(1, increment++);
+            ASSERT_TRUE(
+                flushBatch({.deltas = {{uuid,
+                                        ReplicatedMetadataDelta{
+                                            .metadata = {.sizeCount = {25, 1}, .hash = hash},
+                                            .state = state}}},
+                            .lastTimestamp = ts}));
+            EXPECT_EQ(readSizeCount(uuid),
+                      (SizeCountStore::Entry{.timestamp = ts,
+                                             .size = state == DDLState::kNone ? 35 : 25,
+                                             .count = state == DDLState::kNone ? 3 : 1,
+                                             .hash = hash}));
+        }
+    }
+}
+
+TEST_F(FlusherTest, FlushDropAndRecreateTracksHashAcrossBatches) {
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       *sizeCountStore,
+                                       collA.uuid,
+                                       {.timestamp = Timestamp::min(), .size = 1, .count = 2});
+    ASSERT_TRUE(
+        flushBatch({.deltas = {{collA.uuid, ReplicatedMetadataDelta{.state = DDLState::kDropped}}},
+                    .lastTimestamp = Timestamp(1, 1)}));
+    EXPECT_FALSE(readSizeCount(collA.uuid));
+    ASSERT_TRUE(flushBatch(
+        {.deltas = {{collA.uuid,
+                     ReplicatedMetadataDelta{.metadata = {.sizeCount = {25, 1}, .hash = 0x1234},
+                                             .state = DDLState::kCreated}}},
+         .lastTimestamp = Timestamp(1, 2)}));
+    EXPECT_EQ(readSizeCount(collA.uuid),
+              (SizeCountStore::Entry{
+                  .timestamp = Timestamp(1, 2), .size = 25, .count = 1, .hash = 0x1234}));
+}
+
+TEST_F(FlusherTest, FlushDropAndRecreatePreservesAbsentHashWithinBatch) {
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       *sizeCountStore,
+                                       collA.uuid,
+                                       {.timestamp = Timestamp::min(), .size = 1, .count = 2});
+    ASSERT_TRUE(flushBatch(
+        {.deltas = {{collA.uuid,
+                     ReplicatedMetadataDelta{.metadata = {.sizeCount = {25, 1}, .hash = 0x1234},
+                                             .state = DDLState::kDroppedAndRecreated}}},
+         .lastTimestamp = Timestamp(1, 1)}));
+    // TODO SERVER-133557: Decide if this is the behavior we want.
+    EXPECT_EQ(readSizeCount(collA.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 25, .count = 1}));
+}
+
+TEST_F(FlusherTest, FlushAccumulatesOplogMetadataIndependentlyAcrossBatches) {
+    // The flusher treats oplog metadata like any other UUID's already-aggregated delta.
+    const UUID oplog = UUID::gen();
+    ASSERT_TRUE(flushBatch(
+        {.deltas = {{collA.uuid, ReplicatedMetadataDelta{.metadata = {.sizeCount = {50, 1}}}},
+                    {oplog, ReplicatedMetadataDelta{.metadata = {.sizeCount = {200, 1}}}}},
+         .lastTimestamp = Timestamp(1, 1)}));
+    EXPECT_EQ(readSizeCount(oplog),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 1}));
+
+    ASSERT_TRUE(flushBatch(
+        {.deltas = {{collA.uuid, ReplicatedMetadataDelta{.metadata = {.sizeCount = {50, 0}}}},
+                    {oplog, ReplicatedMetadataDelta{.metadata = {.sizeCount = {250, 1}}}}},
+         .lastTimestamp = Timestamp(1, 2)}));
+    EXPECT_EQ(readSizeCount(collA.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 2), .size = 100, .count = 1}));
+    EXPECT_EQ(readSizeCount(oplog),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 2), .size = 450, .count = 2}));
+
+    // A negative size delta reduces the persisted oplog size without changing its count.
+    ASSERT_TRUE(flushBatch(
+        {.deltas = {{oplog, ReplicatedMetadataDelta{.metadata = {.sizeCount = {-100, 0}}}}},
+         .lastTimestamp = Timestamp(1, 3)}));
+    EXPECT_EQ(readSizeCount(oplog),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 3), .size = 350, .count = 2}));
+    EXPECT_EQ(readSizeCount(collA.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 2), .size = 100, .count = 1}));
+
+    ASSERT_TRUE(flushBatch(
+        {.deltas = {{collA.uuid, ReplicatedMetadataDelta{.metadata = {.sizeCount = {20, 1}}}},
+                    {oplog, ReplicatedMetadataDelta{.metadata = {.sizeCount = {150, 1}}}}},
+         .lastTimestamp = Timestamp(1, 5)}));
+    EXPECT_EQ(readSizeCount(oplog),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 5), .size = 500, .count = 3}));
+    EXPECT_EQ(readSizeCount(collA.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 5), .size = 120, .count = 2}));
+}
+
+TEST_F(FlusherTest, FlushAppliesNegativeAndPositiveDeltasAcrossBatches) {
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       *sizeCountStore,
+                                       collA.uuid,
+                                       {.timestamp = Timestamp(1, 1), .size = 200, .count = 5});
+    ASSERT_TRUE(flushBatch(
+        {.deltas = {{collA.uuid, ReplicatedMetadataDelta{.metadata = {.sizeCount = {-120, -3}}}}},
+         .lastTimestamp = Timestamp(1, 2)}));
+    EXPECT_EQ(readSizeCount(collA.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 2), .size = 80, .count = 2}));
+    ASSERT_TRUE(flushBatch(
+        {.deltas = {{collA.uuid, ReplicatedMetadataDelta{.metadata = {.sizeCount = {70, 1}}}}},
+         .lastTimestamp = Timestamp(1, 5)}));
+    EXPECT_EQ(readSizeCount(collA.uuid),
+              (SizeCountStore::Entry{.timestamp = Timestamp(1, 5), .size = 150, .count = 3}));
 }
 
 TEST_F(FlusherTest, FlushRetriesOnWriteConflict) {

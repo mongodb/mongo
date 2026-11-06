@@ -3,15 +3,17 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 
-#include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_op_observer.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -355,9 +357,7 @@ TEST(ReplicatedFastCountMetricsTest, OplogLagSecsUpdatesOnNewCheckpoint) {
     EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 10);
 }
 
-// Fixture that wires OtelMetricsCapturer with the same CatalogTestFixture used by the
-// advance-checkpoint tests, allowing end-to-end verification that advanceCheckpoint fires
-// the checkpoint scan counters.
+// Exercises counters emitted while scanning the oplog with checkpoint semantics.
 class CheckpointScanMetricsTest : public CatalogTestFixture {
 public:
     Options makeServiceContextOptions() override {
@@ -369,17 +369,22 @@ protected:
     void setUp() override {
         CatalogTestFixture::setUp();
         opCtx = operationContext();
+    }
 
-        auto stores = test_helpers::createContainerFastCountStores(opCtx);
-        sizeCountStore = std::move(stores.sizeCountStore);
-        timestampStore = std::move(stores.timestampStore);
-
-        registerReplicatedFastCountOpObserver(opCtx->getServiceContext());
+    void scan(Timestamp startAfter = Timestamp::min()) {
+        const auto oplog = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, NamespaceString::kRsOplogNamespace, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        invariant(oplog.exists());
+        auto cursor = oplog.getCollectionPtr()->getRecordStore()->getCursor(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        aggregateReplicatedMetadataDeltasInOplog(
+            *cursor, startAfter, oplog.uuid(), /*isCheckpoint=*/true);
     }
 
     OperationContext* opCtx;
-    std::unique_ptr<SizeCountStore> sizeCountStore;
-    std::unique_ptr<SizeCountTimestampStore> timestampStore;
     OtelMetricsCapturer capturer;
 };
 
@@ -396,7 +401,7 @@ TEST_F(CheckpointScanMetricsTest, ProcessedAndSizeCountFireForUserEntries) {
         test_helpers::makeOplogEntry(
             Timestamp{1, 2}, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20));
 
-    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
+    scan();
 
     EXPECT_EQ(
         capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointOplogEntriesProcessed),
@@ -419,8 +424,7 @@ TEST_F(CheckpointScanMetricsTest, SkippedFiresForFastCountInternalEntries) {
         test_helpers::makeOplogEntry(
             Timestamp{1, 1}, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
 
-    // Run the first checkpoint so the timestamp store advances to ts{1,1}.
-    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
+    scan();
 
     // Now write an applyOps that only touches the internal fast count containers. This entry
     // should be counted as skipped, not processed.
@@ -437,34 +441,23 @@ TEST_F(CheckpointScanMetricsTest, SkippedFiresForFastCountInternalEntries) {
     }};
     test_helpers::writeToOplog(opCtx, internalEntry);
 
-    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
+    // Only scan the new entry; checkpoint persistence is not needed for scan counters.
+    scan(Timestamp(1, 1));
 
     // The internal applyOps entry must have been skipped (not processed).
-    EXPECT_GT(
+    EXPECT_EQ(
         capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointOplogEntriesSkipped),
-        0);
-}
-
-TEST_F(CheckpointScanMetricsTest, CheckpointAdvancePopulatesOplogLagSecs) {
-    // Seed an applied oplog timestamp that is ahead of the checkpoint we're about to persist so the
-    // gauge has a meaningful non-zero value.
-    recordAppliedOpTime(Timestamp{1000, 1});
-
-    const test_helpers::NsAndUUID collA{
-        .nss = NamespaceString::createNamespaceString_forTest("db", "collA"), .uuid = UUID::gen()};
-    test_helpers::writeToOplog(
-        opCtx,
-        test_helpers::makeOplogEntry(
-            Timestamp{500, 1}, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
-
-    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
-
-    // applied=1000, checkpoint=500 -> lag=500.
-    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 500);
+        1);
+    EXPECT_EQ(
+        capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointOplogEntriesProcessed),
+        1);
+    EXPECT_EQ(capturer.readInt64Counter(
+                  MetricNames::kReplicatedFastCountCheckpointSizeCountEntriesProcessed),
+              1);
 }
 
 TEST_F(CheckpointScanMetricsTest, NoCountersFireWhenOplogIsEmpty) {
-    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
+    scan();
 
     EXPECT_EQ(
         capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointOplogEntriesProcessed),
@@ -533,7 +526,7 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
             .wallClockTime = Date_t::now(),
         }}});
 
-    advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore);
+    scan();
 
     EXPECT_EQ(
         capturer.readInt64Counter(MetricNames::kReplicatedFastCountCheckpointOplogEntriesProcessed),
