@@ -3,18 +3,11 @@
 
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 
-#include "mongo/db/exec/classic/batched_delete_stage.h"
 #include "mongo/db/exec/classic/count.h"
-#include "mongo/db/exec/classic/projection.h"
-#include "mongo/db/exec/classic/spool.h"
-#include "mongo/db/exec/classic/timeseries_modify.h"
-#include "mongo/db/exec/classic/timeseries_upsert.h"
-#include "mongo/db/exec/classic/upsert_stage.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
-#include "mongo/db/query/write_ops/delete_request_gen.h"
 
 namespace mongo::classic_runtime_planner {
 
@@ -81,116 +74,6 @@ SavedExecState ClassicPlannerInterface::extractExecState() && {
     return ClassicExecState{.workingSet = std::move(_plannerData.workingSet),
                             .root = std::move(_root)};
 }
-
-void ClassicPlannerInterface::addDeleteStage(CanonicalDelete& canonicalDelete,
-                                             projection_ast::Projection* projection,
-                                             DeleteStageParams deleteStageParams) {
-    invariant(_state == kNotInitialized);
-    invariant(collections().hasMainCollection());
-    const auto& coll = collections().getMainCollectionAcquisition();
-    const auto& collectionPtr = coll.getCollectionPtr();
-
-    // TODO (SERVER-64506): support change streams' pre- and post-images.
-    // TODO (SERVER-66079): allow batched deletions in the config.* namespace.
-    const bool batchDelete = gBatchUserMultiDeletes.load() &&
-        (shard_role_details::getRecoveryUnit(opCtx())->getState() ==
-             RecoveryUnit::State::kInactive ||
-         shard_role_details::getRecoveryUnit(opCtx())->getState() ==
-             RecoveryUnit::State::kActiveNotInUnitOfWork) &&
-        !opCtx()->inMultiDocumentTransaction() && !opCtx()->isRetryableWrite() &&
-        !collectionPtr->isChangeStreamPreAndPostImagesEnabled() &&
-        !collectionPtr->ns().isConfigDB() && deleteStageParams.isMulti &&
-        !deleteStageParams.fromMigrate && !deleteStageParams.returnDeleted &&
-        deleteStageParams.sort.isEmpty() && !deleteStageParams.numStatsForDoc;
-
-    if (canonicalDelete.isEligibleForArbitraryTimeseriesDelete()) {
-        // Checks if the delete is on a time-series collection and cannot run on bucket
-        // documents directly.
-        _root = std::make_unique<TimeseriesModifyStage>(
-            cq()->getExpCtxRaw(),
-            TimeseriesModifyParams(&deleteStageParams),
-            ws(),
-            std::move(_root),
-            coll,
-            timeseries::BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
-            canonicalDelete.releaseResidualExpr());
-    } else if (batchDelete) {
-        _root = std::make_unique<BatchedDeleteStage>(cq()->getExpCtxRaw(),
-                                                     std::move(deleteStageParams),
-                                                     std::make_unique<BatchedDeleteStageParams>(),
-                                                     ws(),
-                                                     coll,
-                                                     _root.release());
-    } else {
-        _root = std::make_unique<DeleteStage>(
-            cq()->getExpCtxRaw(), std::move(deleteStageParams), ws(), coll, _root.release());
-    }
-
-    if (projection) {
-        _root = std::make_unique<ProjectionStageDefault>(cq()->getExpCtx(),
-                                                         canonicalDelete.getRequest()->getProj(),
-                                                         projection,
-                                                         ws(),
-                                                         std::move(_root));
-    }
-}
-
-void ClassicPlannerInterface::addUpdateStage(CanonicalUpdate& canonicalUpdate,
-                                             projection_ast::Projection* projection,
-                                             UpdateStageParams updateStageParams) {
-    invariant(_state == kNotInitialized);
-    invariant(collections().hasMainCollection());
-    const auto& request = canonicalUpdate.getRequest();
-    const bool isUpsert = updateStageParams.request->isUpsert();
-    const auto timeseriesOptions = collections().getMainCollection()->getTimeseriesOptions();
-    if (canonicalUpdate.isEligibleForArbitraryTimeseriesUpdate()) {
-        if (request->isMulti()) {
-            // If this is a multi-update, we need to spool the data before beginning to apply
-            // updates, in order to avoid the Halloween problem.
-            _root = std::make_unique<SpoolStage>(cq()->getExpCtxRaw(), ws(), std::move(_root));
-        }
-        if (isUpsert) {
-            _root = std::make_unique<TimeseriesUpsertStage>(
-                cq()->getExpCtxRaw(),
-                TimeseriesModifyParams(&updateStageParams),
-                ws(),
-                std::move(_root),
-                collections().getMainCollectionAcquisition(),
-                timeseries::BucketUnpacker(*timeseriesOptions),
-                canonicalUpdate.releaseResidualExpr(),
-                canonicalUpdate.releaseOriginalExpr(),
-                *request);
-        } else {
-            _root = std::make_unique<TimeseriesModifyStage>(
-                cq()->getExpCtxRaw(),
-                TimeseriesModifyParams(&updateStageParams),
-                ws(),
-                std::move(_root),
-                collections().getMainCollectionAcquisition(),
-                timeseries::BucketUnpacker(*timeseriesOptions),
-                canonicalUpdate.releaseResidualExpr(),
-                canonicalUpdate.releaseOriginalExpr());
-        }
-    } else if (isUpsert) {
-        _root = std::make_unique<UpsertStage>(cq()->getExpCtxRaw(),
-                                              updateStageParams,
-                                              ws(),
-                                              collections().getMainCollectionAcquisition(),
-                                              _root.release());
-    } else {
-        _root = std::make_unique<UpdateStage>(cq()->getExpCtxRaw(),
-                                              updateStageParams,
-                                              ws(),
-                                              collections().getMainCollectionAcquisition(),
-                                              _root.release());
-    }
-
-    if (projection) {
-        _root = std::make_unique<ProjectionStageDefault>(
-            cq()->getExpCtx(), request->getProj(), projection, ws(), std::move(_root));
-    }
-}
-
 
 void ClassicPlannerInterface::addCountStage(long long limit, long long skip) {
     invariant(_state == kNotInitialized);

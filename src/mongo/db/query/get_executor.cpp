@@ -10,16 +10,22 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/classic/batched_delete_stage.h"
 #include "mongo/db/exec/classic/cached_plan.h"
 #include "mongo/db/exec/classic/count.h"
 #include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/exec/classic/eof.h"
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/projection.h"
 #include "mongo/db/exec/classic/record_store_fast_count.h"
 #include "mongo/db/exec/classic/sort_key_generator.h"
+#include "mongo/db/exec/classic/spool.h"
 #include "mongo/db/exec/classic/subplan.h"
+#include "mongo/db/exec/classic/timeseries_modify.h"
+#include "mongo/db/exec/classic/timeseries_upsert.h"
 #include "mongo/db/exec/classic/update_stage.h"
+#include "mongo/db/exec/classic/upsert_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/express/plan_executor_express.h"
@@ -879,6 +885,117 @@ auto makePlannerFactory(OperationContext* opCtx,
     };
 }
 
+/**
+ * Builds the stages that perform the delete on top of 'root', the root of the winning plan.
+ */
+std::unique_ptr<PlanStage> addDeleteStage(std::unique_ptr<PlanStage> root,
+                                          WorkingSet* ws,
+                                          const CollectionAcquisition& coll,
+                                          CanonicalDelete& canonicalDelete,
+                                          const projection_ast::Projection* projection,
+                                          DeleteStageParams deleteStageParams) {
+    const auto& expCtx = deleteStageParams.canonicalQuery->getExpCtx();
+    OperationContext* opCtx = expCtx->getOperationContext();
+    const auto& collectionPtr = coll.getCollectionPtr();
+
+    // TODO (SERVER-64506): support change streams' pre- and post-images.
+    // TODO (SERVER-66079): allow batched deletions in the config.* namespace.
+    const bool batchDelete = gBatchUserMultiDeletes.load() &&
+        (shard_role_details::getRecoveryUnit(opCtx)->getState() == RecoveryUnit::State::kInactive ||
+         shard_role_details::getRecoveryUnit(opCtx)->getState() ==
+             RecoveryUnit::State::kActiveNotInUnitOfWork) &&
+        !opCtx->inMultiDocumentTransaction() && !opCtx->isRetryableWrite() &&
+        !collectionPtr->isChangeStreamPreAndPostImagesEnabled() &&
+        !collectionPtr->ns().isConfigDB() && deleteStageParams.isMulti &&
+        !deleteStageParams.fromMigrate && !deleteStageParams.returnDeleted &&
+        deleteStageParams.sort.isEmpty() && !deleteStageParams.numStatsForDoc;
+
+    if (canonicalDelete.isEligibleForArbitraryTimeseriesDelete()) {
+        // Checks if the delete is on a time-series collection and cannot run on bucket
+        // documents directly.
+        root = std::make_unique<TimeseriesModifyStage>(
+            expCtx.get(),
+            TimeseriesModifyParams(&deleteStageParams),
+            ws,
+            std::move(root),
+            coll,
+            timeseries::BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
+            canonicalDelete.releaseResidualExpr());
+    } else if (batchDelete) {
+        root = std::make_unique<BatchedDeleteStage>(expCtx.get(),
+                                                    std::move(deleteStageParams),
+                                                    std::make_unique<BatchedDeleteStageParams>(),
+                                                    ws,
+                                                    coll,
+                                                    root.release());
+    } else {
+        root = std::make_unique<DeleteStage>(
+            expCtx.get(), std::move(deleteStageParams), ws, coll, root.release());
+    }
+
+    if (projection) {
+        root = std::make_unique<ProjectionStageDefault>(
+            expCtx, canonicalDelete.getRequest()->getProj(), projection, ws, std::move(root));
+    }
+    return root;
+}
+
+/**
+ * Builds the stages that perform the update on top of 'root', the root of the winning plan.
+ */
+std::unique_ptr<PlanStage> addUpdateStage(std::unique_ptr<PlanStage> root,
+                                          WorkingSet* ws,
+                                          const CollectionAcquisition& coll,
+                                          CanonicalUpdate& canonicalUpdate,
+                                          const projection_ast::Projection* projection,
+                                          UpdateStageParams updateStageParams) {
+    const auto& expCtx = updateStageParams.canonicalQuery->getExpCtx();
+    const auto& request = canonicalUpdate.getRequest();
+    const bool isUpsert = updateStageParams.request->isUpsert();
+    if (canonicalUpdate.isEligibleForArbitraryTimeseriesUpdate()) {
+        const auto timeseriesOptions = coll.getCollectionPtr()->getTimeseriesOptions();
+        if (request->isMulti()) {
+            // If this is a multi-update, we need to spool the data before beginning to apply
+            // updates, in order to avoid the Halloween problem.
+            root = std::make_unique<SpoolStage>(expCtx.get(), ws, std::move(root));
+        }
+        if (isUpsert) {
+            root = std::make_unique<TimeseriesUpsertStage>(
+                expCtx.get(),
+                TimeseriesModifyParams(&updateStageParams),
+                ws,
+                std::move(root),
+                coll,
+                timeseries::BucketUnpacker(*timeseriesOptions),
+                canonicalUpdate.releaseResidualExpr(),
+                canonicalUpdate.releaseOriginalExpr(),
+                *request);
+        } else {
+            root = std::make_unique<TimeseriesModifyStage>(
+                expCtx.get(),
+                TimeseriesModifyParams(&updateStageParams),
+                ws,
+                std::move(root),
+                coll,
+                timeseries::BucketUnpacker(*timeseriesOptions),
+                canonicalUpdate.releaseResidualExpr(),
+                canonicalUpdate.releaseOriginalExpr());
+        }
+    } else if (isUpsert) {
+        root = std::make_unique<UpsertStage>(
+            expCtx.get(), updateStageParams, ws, coll, root.release());
+    } else {
+        root = std::make_unique<UpdateStage>(
+            expCtx.get(), updateStageParams, ws, coll, root.release());
+    }
+
+    if (projection) {
+        root = std::make_unique<ProjectionStageDefault>(
+            expCtx, request->getProj(), projection, ws, std::move(root));
+    }
+    return root;
+}
+
 }  // namespace
 
 //
@@ -1034,26 +1151,24 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     deleteStageParams.canonicalQuery = cq.get();
 
     MultipleCollectionAccessor collections{coll};
-    auto addDeleteStageFn = [&](classic_runtime_planner::ClassicPlannerInterface* runtimePlanner) {
-        runtimePlanner->addDeleteStage(canonicalDelete, projection.get(), deleteStageParams);
-    };
-
-    // Invoke the lambda returned from the factory for the initial planner params.
-    auto plannerParams = makeQueryPlannerParamsFactory(opCtx, collections)(
-        *cq.get(), QueryPlannerParams::DEFAULT, /*replanningData=*/boost::none);
-    auto planner =
-        retryMakePlanner(std::move(plannerParams),
-                         makeQueryPlannerParamsFactory(opCtx, collections),
-                         makePlannerFactory(opCtx,
-                                            collections,
-                                            cq.get(),
-                                            policy,
-                                            boost::make_optional<AddNewStageFn>(addDeleteStageFn)),
-                         cq.get(),
-                         QueryPlannerParams::DEFAULT,
-                         /*pipeline=*/nullptr);
-
-    return planner->makeExecutor(std::move(cq));
+    bool rootStageAdded = false;
+    return exec_deferred_engine_choice::getExecutorWithClassicRootStage(
+        opCtx,
+        collections,
+        std::move(cq),
+        policy,
+        makeQueryPlannerParamsFactory(opCtx, collections),
+        QueryPlannerParams::DEFAULT,
+        [&](std::unique_ptr<PlanStage> root, WorkingSet* ws) {
+            tassert(13847302, "Expected the delete stage to be added only once", !rootStageAdded);
+            rootStageAdded = true;
+            return addDeleteStage(std::move(root),
+                                  ws,
+                                  coll,
+                                  canonicalDelete,
+                                  projection.get(),
+                                  std::move(deleteStageParams));
+        });
 }
 
 //
@@ -1205,26 +1320,24 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     updateStageParams.canonicalQuery = cq.get();
 
     MultipleCollectionAccessor collections{coll};
-    auto addUpdateStageFn = [&](classic_runtime_planner::ClassicPlannerInterface* runtimePlanner) {
-        runtimePlanner->addUpdateStage(canonicalUpdate, projection.get(), updateStageParams);
-    };
-
-    // Invoke the lambda returned from the factory for the initial planner params.
-    auto plannerParams = makeQueryPlannerParamsFactory(opCtx, collections)(
-        *cq, QueryPlannerParams::DEFAULT, /*replanningData=*/boost::none);
-    auto planner =
-        retryMakePlanner(std::move(plannerParams),
-                         makeQueryPlannerParamsFactory(opCtx, collections),
-                         makePlannerFactory(opCtx,
-                                            collections,
-                                            cq.get(),
-                                            policy,
-                                            boost::make_optional<AddNewStageFn>(addUpdateStageFn)),
-                         cq.get(),
-                         QueryPlannerParams::DEFAULT,
-                         /*pipeline=*/nullptr);
-
-    return planner->makeExecutor(std::move(cq));
+    bool rootStageAdded = false;
+    return exec_deferred_engine_choice::getExecutorWithClassicRootStage(
+        opCtx,
+        collections,
+        std::move(cq),
+        policy,
+        makeQueryPlannerParamsFactory(opCtx, collections),
+        QueryPlannerParams::DEFAULT,
+        [&](std::unique_ptr<PlanStage> root, WorkingSet* ws) {
+            tassert(13847303, "Expected the update stage to be added only once", !rootStageAdded);
+            rootStageAdded = true;
+            return addUpdateStage(std::move(root),
+                                  ws,
+                                  coll,
+                                  canonicalUpdate,
+                                  projection.get(),
+                                  std::move(updateStageParams));
+        });
 }
 
 //
@@ -1312,26 +1425,19 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     }
 
     MultipleCollectionAccessor collections{coll};
-    auto addCountStageFn = [&](classic_runtime_planner::ClassicPlannerInterface* runtimePlanner) {
-        runtimePlanner->addCountStage(limit, skip);
-    };
-
-    // Invoke the lambda returned from the factory for the initial planner params.
-    auto plannerParams = makeQueryPlannerParamsFactory(opCtx, collections)(
-        *cq, plannerOptions, /*replanningData=*/boost::none);
-    auto planner =
-        retryMakePlanner(std::move(plannerParams),
-                         makeQueryPlannerParamsFactory(opCtx, collections),
-                         makePlannerFactory(opCtx,
-                                            collections,
-                                            cq.get(),
-                                            yieldPolicy,
-                                            boost::make_optional<AddNewStageFn>(addCountStageFn)),
-                         cq.get(),
-                         plannerOptions,
-                         /*pipeline=*/nullptr);
-
-    return planner->makeExecutor(std::move(cq));
+    bool rootStageAdded = false;
+    return exec_deferred_engine_choice::getExecutorWithClassicRootStage(
+        opCtx,
+        collections,
+        std::move(cq),
+        yieldPolicy,
+        makeQueryPlannerParamsFactory(opCtx, collections),
+        plannerOptions,
+        [&](std::unique_ptr<PlanStage> root, WorkingSet* ws) -> std::unique_ptr<PlanStage> {
+            tassert(13847304, "Expected the count stage to be added only once", !rootStageAdded);
+            rootStageAdded = true;
+            return std::make_unique<CountStage>(expCtx.get(), limit, skip, ws, root.release());
+        });
 }
 
 StatusWith<std::unique_ptr<QuerySolution>> tryGetQuerySolutionForDistinct(
