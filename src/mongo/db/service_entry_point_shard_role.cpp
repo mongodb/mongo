@@ -107,6 +107,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
@@ -135,6 +136,7 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
@@ -1403,9 +1405,13 @@ void RunCommandAndWaitForWriteConcern::_setup() {
             } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
                        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 if (!genericArgs.getWriteConcern()) {
-                    // TODO(SERVER-44539): Disabled to avoid log spam.
-                    // LOGV2(21959, "Missing writeConcern on {command}", "Missing "
-                    // "writeConcern on command", "command"_attr = command->getName());
+                    // Logs are rate limited to avoid log spam.
+                    static StaticImmortal<logv2::SeveritySuppressor> logSeverity{
+                        Minutes{30}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
+                    LOGV2_DEBUG(21959,
+                                (*logSeverity)().toInt(),
+                                "Missing writeConcern for command",
+                                "command"_attr = command->getName());
                 }
             }
         }
@@ -1551,10 +1557,13 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
             if ((serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
                  serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) &&
                 !readConcernArgs.isSpecified()) {
-                // TODO(SERVER-44539): Disabled to avoid log spam.
-                // LOGV2(21954,
-                //       "Missing readConcern for command",
-                //       "command"_attr = _invocation->definition()->getName());
+                // Logs are rate limited to avoid log spam.
+                static StaticImmortal<logv2::SeveritySuppressor> logSeverity{
+                    Minutes{30}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
+                LOGV2_DEBUG(21954,
+                            (*logSeverity)().toInt(),
+                            "Missing readConcern for command",
+                            "command"_attr = _invocation->definition()->getName());
             }
 
             // Apply the CWRC default when the client did not set a level. Empty RC: replace
