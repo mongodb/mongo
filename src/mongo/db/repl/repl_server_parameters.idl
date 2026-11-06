@@ -264,8 +264,8 @@ server_parameters:
         description: >-
             Set this to specify the maximum number of times the oplog fetcher will
             consecutively restart the oplog tailing query on non-cancellation errors
-            during steady state replication. Exponential backoff is implemented between 
-            each restart, starting by waiting 5ms on the first restart and doubling 
+            during steady state replication. Exponential backoff is implemented between
+            each restart, starting by waiting 5ms on the first restart and doubling
             the wait on each subsequent restart, with an upper limit of 500ms.
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>
@@ -280,10 +280,10 @@ server_parameters:
             Set this to specify the maximum number of times the oplog fetcher will
             consecutively restart the oplog tailing query on non-cancellation errors
             during initial sync. By default we provide a generous amount of restarts
-            to avoid potentially restarting an entire initial sync from scratch. 
+            to avoid potentially restarting an entire initial sync from scratch.
             Exponential backoff is implemented between each restart, starting
-            by waiting 5ms on the first restart and doubling the wait on each 
-            subsequent restart, with an upper limit of 500ms. As a result, the default 
+            by waiting 5ms on the first restart and doubling the wait on each
+            subsequent restart, with an upper limit of 500ms. As a result, the default
             of 10 total restarts will take approximately ~2 seconds total.
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>
@@ -345,23 +345,6 @@ server_parameters:
             expr: 1024LL * 1024 * 1024
         validator:
             gte: 1
-        redact: false
-
-    pipelinedApplierHysteresisFactor:
-        description: >-
-            Hysteresis factor applied to the pipelined applier's in-flight thresholds.
-            When the dispatcher blocks after tipping over a threshold, it remains blocked
-            until the corresponding in-flight value dips below (threshold * factor) before
-            unblocking. This is to avoid the batch counts repeatedly flipping over and
-            under the threshold.
-            Must be in the range (0, 1].
-        set_at: [startup, runtime]
-        cpp_vartype: Atomic<double>
-        cpp_varname: pipelinedApplierHysteresisFactor
-        default: 0.5
-        validator:
-            gt: 0.0
-            lte: 1.0
         redact: false
 
     recoverFromOplogAsStandalone:
@@ -596,7 +579,7 @@ server_parameters:
     fileBasedInitialSyncMaxCyclesWithoutProgress:
         description: >-
             Specifies the max number of cycles that file copy based initial sync runs trying to
-            clone updates while the lag between the syncing node and the sync source is higher than 
+            clone updates while the lag between the syncing node and the sync source is higher than
             fileBasedInitialSyncMaxLagSec.
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>

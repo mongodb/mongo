@@ -36,29 +36,20 @@ std::shared_ptr<std::atomic<uint32_t>> PipelinedApplierBatchTracker::addBatch(
         // Block until admission is allowed under both caps, or shutdown.
         auto maxBatches = pipelinedApplierMaxInflightBatches.loadRelaxed();
         auto maxBytes = pipelinedApplierMaxInflightBytes.loadRelaxed();
-        double hysteresisFactor = pipelinedApplierHysteresisFactor.loadRelaxed();
 
         if (backpressureNecessary(_inflightBatches.size(), _inflightBytes, maxBatches, maxBytes)) {
             if (MONGO_unlikely(hangBeforePipelinedApplierCapacityWait.shouldFail())) {
                 hangBeforePipelinedApplierCapacityWait.pauseWhileSet();
             }
-            auto newBatchThreshold = static_cast<uint64_t>(maxBatches * hysteresisFactor);
-            auto newBytesThreshold = static_cast<uint64_t>(maxBytes * hysteresisFactor);
-            auto updateThresholds = [&] {
-                maxBatches = pipelinedApplierMaxInflightBatches.loadRelaxed();
-                maxBytes = pipelinedApplierMaxInflightBytes.loadRelaxed();
-                hysteresisFactor = pipelinedApplierHysteresisFactor.loadRelaxed();
-                newBatchThreshold = static_cast<uint64_t>(maxBatches * hysteresisFactor);
-                newBytesThreshold = static_cast<uint64_t>(maxBytes * hysteresisFactor);
-            };
             boost::optional<BackpressureReason> reason;
             const auto underThresholdOrShuttingDown = [&] {
-                updateThresholds();
+                maxBatches = pipelinedApplierMaxInflightBatches.loadRelaxed();
+                maxBytes = pipelinedApplierMaxInflightBytes.loadRelaxed();
                 if (_shutdown) {
                     return true;
                 }
                 reason = backpressureNecessary(
-                    _inflightBatches.size(), _inflightBytes, newBatchThreshold, newBytesThreshold);
+                    _inflightBatches.size(), _inflightBytes, maxBatches, maxBytes);
                 return !reason;
             };
             // Emit a log message after having waited for 1sec, 30sec, 1hr, and 24hrs.
@@ -79,8 +70,8 @@ std::shared_ptr<std::atomic<uint32_t>> PipelinedApplierBatchTracker::addBatch(
                       "batch queue count/bytes to drop under threshold before enqueuing further",
                       "batchesOverThreshold"_attr = reason->batchesOverThreshold,
                       "bytesOverThreshold"_attr = reason->bytesOverThreshold,
-                      "batchThreshold"_attr = newBatchThreshold,
-                      "byteThreshold"_attr = newBytesThreshold,
+                      "batchThreshold"_attr = maxBatches,
+                      "byteThreshold"_attr = maxBytes,
                       "timeBlocked"_attr = Date_t::now() - start);
                 // If this is the last duration in the loop, perform an unbounded wait.
                 if (duration == logFrequencies.back()) {

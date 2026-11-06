@@ -26,24 +26,21 @@ OpTimeAndWallTime batchTime(uint32_t timestamp) {
 // previous values on destruction so tests don't leak state to one another.
 class ScopedBackpressureParams {
 public:
-    ScopedBackpressureParams(long long maxBatches, long long maxBytes, double hysteresisFactor)
+    ScopedBackpressureParams(long long maxBatches, long long maxBytes)
         : _prevMaxBatches(pipelinedApplierMaxInflightBatches.load()),
-          _prevMaxBytes(pipelinedApplierMaxInflightBytes.load()),
-          _prevHysteresis(pipelinedApplierHysteresisFactor.load()) {
+          _prevMaxBytes(pipelinedApplierMaxInflightBytes.load()) {
         pipelinedApplierMaxInflightBatches.store(maxBatches);
         pipelinedApplierMaxInflightBytes.store(maxBytes);
-        pipelinedApplierHysteresisFactor.store(hysteresisFactor);
     }
+
     ~ScopedBackpressureParams() {
         pipelinedApplierMaxInflightBatches.store(_prevMaxBatches);
         pipelinedApplierMaxInflightBytes.store(_prevMaxBytes);
-        pipelinedApplierHysteresisFactor.store(_prevHysteresis);
     }
 
 private:
     long long _prevMaxBatches;
     long long _prevMaxBytes;
-    double _prevHysteresis;
 };
 
 TEST(PipelinedApplierBatchTrackerTest, WaitTimesOutWithoutACompletedFrontBatch) {
@@ -279,35 +276,21 @@ TEST(PipelinedApplierBatchTrackerTest, BackpressureNecessaryReportsCorrectly) {
     }
 }
 
-// Tests that adding a batch that pushes us over our limit(s) blocks and we only unblock once we
-// drop under our lower limit (limit * hysteresis_factor). We configure the limits so that we can
-// test the following situations for the byte and batch limits independently, and then together:
-//
-// (ops_limit=3 and/or bytes_limit=900)
-// (lower_ops_limit=floor(3*0.5)=1, lower_bytes_limit=floor(900*0.5)=450)
-// 1. under limit (ops=2 and bytes=600)
-// 2. on limit (ops=3 and bytes=900)
-// 3. over limit, will block on next push (ops=4 and bytes=1200)
-// 4. blocks (dispatcher waits before pushing; inflight stays at ops=4, bytes=1200)
-// 5. back on limit, still blocked (ops=3 and bytes=900)
-// 6. below limit, over lower limit, still blocked (ops=2 and bytes=600)
-// 7. on/below lower limit, unblocked (ops=1 and bytes=300)
-TEST(PipelinedApplierBatchTrackerTest, AddBatchBlocksAndHysteresisUnblocks) {
+TEST(PipelinedApplierBatchTrackerTest, AddBatchBlocksAndPoppingUnblocks) {
     constexpr long long perBatchBytes = 300;
-    constexpr double hysteresisFactor = 0.5;
 
     auto run = [&](std::string_view scenario, long long maxBatches, long long maxBytes) {
-        ScopedBackpressureParams params(maxBatches, maxBytes, hysteresisFactor);
+        ScopedBackpressureParams params(maxBatches, maxBytes);
         PipelinedApplierBatchTracker tracker;
 
-        // Case 1: under limit
+        // Under limit
         tracker.addBatch(batchTime(1), 0 /* numWorkers */, {}, {}, nullptr, perBatchBytes);
         tracker.addBatch(batchTime(2), 0 /* numWorkers */, {}, {}, nullptr, perBatchBytes);
 
-        // Case 2: on limit
+        // On limit
         tracker.addBatch(batchTime(3), 0 /* numWorkers */, {}, {}, nullptr, perBatchBytes);
 
-        // Case 3: over limit, will block on next push
+        // Over limit, will block on next push
         tracker.addBatch(batchTime(4), 0 /* numWorkers */, {}, {}, nullptr, perBatchBytes);
 
         std::shared_ptr<std::atomic<uint32_t>> fifth;
@@ -315,9 +298,9 @@ TEST(PipelinedApplierBatchTrackerTest, AddBatchBlocksAndHysteresisUnblocks) {
         unittest::JoinThread dispatch;
         {
             FailPointEnableBlock beforeCapacityWait("hangBeforePipelinedApplierCapacityWait");
-            // Case 4: blocks due to limit
+            // Blocks, due to limit
             dispatch = unittest::JoinThread{[&] {
-                fifth = tracker.addBatch(batchTime(5), 1, {}, {}, nullptr, perBatchBytes);
+                fifth = tracker.addBatch(batchTime(5), 0, {}, {}, nullptr, perBatchBytes);
                 done.store(true);
                 done.notifyAll();
             }};
@@ -325,42 +308,17 @@ TEST(PipelinedApplierBatchTrackerTest, AddBatchBlocksAndHysteresisUnblocks) {
         }
         ASSERT_FALSE(done.waitFor(false, Milliseconds(200))) << scenario;
 
-        // Case 5: back on limit
-        auto pop1 = tracker.popCompletedBatch(Seconds(10));
-        ASSERT_TRUE(pop1) << scenario;
+        // Back on limit, unblocks
+        ASSERT_TRUE(tracker.popCompletedBatch(Seconds(10))) << scenario;
         tracker.onBatchPublished();
-        // still blocked
-        ASSERT_FALSE(done.waitFor(false, Milliseconds(200))) << scenario;
+        ASSERT_TRUE(done.waitFor(false, Milliseconds(200))) << scenario;
 
-        // Case 6: below limit, above lower limit
-        auto pop2 = tracker.popCompletedBatch(Seconds(10));
-        ASSERT_TRUE(pop2) << scenario;
-        tracker.onBatchPublished();
-        // still blocked
-        ASSERT_FALSE(done.waitFor(false, Milliseconds(200))) << scenario;
-
-        // Case 7: on/below lower limit
-        auto pop3 = tracker.popCompletedBatch(Seconds(10));
-        ASSERT_TRUE(pop3) << scenario;
-        tracker.onBatchPublished();
-        // unblocked
-        ASSERT_TRUE(done.waitFor(false, Seconds(10))) << scenario;
-
-        ASSERT(fifth) << scenario;
-        ASSERT_EQ(fifth->load(), 1) << scenario;
-
-        // Drain the remaining batches to leave the tracker idle
-        auto pop4 = tracker.popCompletedBatch(Seconds(10));
-        ASSERT_TRUE(pop4) << scenario;
-        tracker.onBatchPublished();
-
-        tracker.onWorkerCompletion(fifth);
-        auto pop5 = tracker.popCompletedBatch(Seconds(10));
-        ASSERT_TRUE(pop5) << scenario;
-        ASSERT_EQ(pop5->lastOpTime, batchTime(5)) << scenario;
-        tracker.onBatchPublished();
-
-        ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(250)));
+        // Drain the remaining batches to ensure there are now 4 items in the tracker's queue
+        for (size_t i = 0; i < 4; ++i) {
+            ASSERT_TRUE(tracker.popCompletedBatch(Milliseconds(200))) << scenario;
+            tracker.onBatchPublished();
+        }
+        ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(200))) << scenario;
     };
 
     // Tight batch cap, no byte cap: trips on batch count.
@@ -376,8 +334,8 @@ TEST(PipelinedApplierBatchTrackerTest, AddBatchBlocksAndHysteresisUnblocks) {
 // A shutdown while a dispatcher is blocked on capacity must wake it and cause addBatch to return
 // nullptr rather than a live counter.
 TEST(PipelinedApplierBatchTrackerTest, ShutdownWakesDispatcherBlockedOnCapacity) {
-    ScopedBackpressureParams params(
-        1 /* maxBatches */, std::numeric_limits<long long>::max() /* maxBytes */, 0.5);
+    ScopedBackpressureParams params(1 /* maxBatches */,
+                                    std::numeric_limits<long long>::max() /* maxBytes */);
     PipelinedApplierBatchTracker tracker;
 
     // Add one batch to hit the threshold, and another batch to push us over the threshold.
