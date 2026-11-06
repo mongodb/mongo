@@ -286,6 +286,12 @@ commands:
                 type: HelloInternalClientField
                 optional: true
                 stability: stable
+            replicationCompressionClient:
+                # Sent by oplog fetching, initial sync and rollback connections to select
+                # replicationNetworkCompression.
+                type: safeBool
+                optional: true
+                stability: internal
             client:
                 type: ClientMetadata
                 optional: true

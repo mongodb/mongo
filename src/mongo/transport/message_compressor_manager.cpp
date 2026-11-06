@@ -19,10 +19,12 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/shared_buffer.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -49,6 +51,14 @@ StatusWith<Message> MessageCompressorManager::compressMessage(
     if (compressorId) {
         compressor = _registry->getCompressor(*compressorId);
         invariant(compressor);
+        // A registered compressor may still be outside this connection's policy.
+        if (!_isCompressorPermittedForThisSession(*compressorId)) {
+            LOGV2_DEBUG(10130418,
+                        3,
+                        "Compressor not permitted for this connection; sending uncompressed",
+                        "compressorId"_attr = static_cast<int>(*compressorId));
+            return {msg};
+        }
     } else if (!_negotiated.empty()) {
         compressor = _negotiated[0];
     } else {
@@ -93,6 +103,11 @@ StatusWith<Message> MessageCompressorManager::compressMessage(
     auto realCompressedSize = sws.getValue();
     outMessage.setLen(realCompressedSize + CompressionHeader::size() + MsgData::MsgDataHeaderSize);
 
+    // compressData() has already counted these bytes in network.compression.
+    if (_countAsReplicationCompressionTraffic) {
+        compressor->counterHitReplicationCompress(input.length(), realCompressedSize);
+    }
+
     return {Message(outputMessageBuffer)};
 }
 
@@ -110,6 +125,11 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
     if (!compressor) {
         return {ErrorCodes::InternalError,
                 "Compression algorithm specified in message is not available"};
+    }
+
+    // The registry also holds replication-only compressors, so check this connection's policy.
+    if (!_isCompressorPermittedForThisSession(compressionHeader.compressorId)) {
+        return {ErrorCodes::BadValue, "Compressor is not allowed on this connection"};
     }
 
     if (compressorId) {
@@ -157,6 +177,10 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
 
     outMessage.setLen(sws.getValue() + MsgData::MsgDataHeaderSize);
 
+    if (_countAsReplicationCompressionTraffic) {
+        compressor->counterHitReplicationDecompress(input.length(), sws.getValue());
+    }
+
     return {Message(outputMessageBuffer)};
 }
 
@@ -165,15 +189,68 @@ void MessageCompressorManager::clientBegin(BSONObjBuilder* output) {
 
     // We're about to update the compressor list with the negotiation result from the server.
     _negotiated.clear();
+    _advertisedCompressors.clear();
+    // Reject compressed responses until clientFinish() accepts the server's reply.
+    _setPermittedCompressors({});
 
-    auto& compressorList = _registry->getCompressorNames();
-    if (compressorList.size() == 0)
+    // Sent even when compression is off, so the server applies the replication policy.
+    if (_isReplicationClient) {
+        output->append(kReplicationCompressionClientFieldName, true);
+    }
+
+    if (!_offerCompressionOnClientBegin) {
+        LOGV2_DEBUG(
+            10130410,
+            3,
+            "Compression advertisement suppressed for this connection; negotiating uncompressed");
+        return;
+    }
+
+    // Keep the caller's order, which is the client's preference.
+    if (!_allowListedCompressors.empty()) {
+        const auto& compressorList = _registry->getCompressorNames();
+        std::vector<std::string_view> filtered;
+        filtered.reserve(_allowListedCompressors.size());
+        for (const auto& name : _allowListedCompressors) {
+            const auto it = std::find(compressorList.begin(), compressorList.end(), name);
+            if (it == compressorList.end()) {
+                LOGV2_WARNING(10130411,
+                              "Ignoring per-session compressor not registered process-wide",
+                              "compressor"_attr = name);
+                continue;
+            }
+            filtered.push_back(*it);
+        }
+        if (filtered.empty()) {
+            LOGV2_WARNING(10130412,
+                          "Requested per-session compressors are not registered process-wide; this "
+                          "connection will be uncompressed",
+                          "requestedCompressors"_attr = _allowListedCompressors);
+            return;
+        }
+        BSONArrayBuilder sub(output->subarrayStart("compression"));
+        for (const auto& e : filtered) {
+            LOGV2_DEBUG(10130413,
+                        3,
+                        "Offering compressor to server (per-session allow-list)",
+                        "compressor"_attr = e);
+            sub.append(e);
+            _advertisedCompressors.emplace_back(e);
+        }
+        sub.doneFast();
+        return;
+    }
+
+    // Without an allow-list, never offer replication-only compressors.
+    const auto& netCompressorList = _registry->getNetCompressorNames();
+    if (netCompressorList.empty())
         return;
 
     BSONArrayBuilder sub(output->subarrayStart("compression"));
-    for (const auto& e : _registry->getCompressorNames()) {
+    for (const auto& e : netCompressorList) {
         LOGV2_DEBUG(22929, 3, "Offering compressor to server", "compressor"_attr = e);
         sub.append(e);
+        _advertisedCompressors.push_back(e);
     }
     sub.doneFast();
 }
@@ -185,6 +262,24 @@ void MessageCompressorManager::clientFinish(const BSONObj& input) {
     // We've just called clientBegin, so the list of compressors should be empty.
     invariant(_negotiated.empty());
 
+    _setPermittedCompressors({});
+    auto& permitted = *_permittedCompressorIds;
+
+    auto logReplicationNegotiationResult = [&] {
+        if (!_isReplicationClient) {
+            return;
+        }
+        std::vector<std::string> negotiatedNames;
+        negotiatedNames.reserve(_negotiated.size());
+        for (const auto* compressor : _negotiated) {
+            negotiatedNames.emplace_back(compressor->getName());
+        }
+        LOGV2(10130422,
+              "Replication network compression negotiation completed",
+              "compressed"_attr = !_negotiated.empty(),
+              "negotiatedCompressors"_attr = negotiatedNames);
+    };
+
     // If the server didn't send back a "compression" array, then we assume compression is not
     // supported by this server and just return. We've already disabled compression by clearing
     // out the _negotiated array above.
@@ -193,31 +288,62 @@ void MessageCompressorManager::clientFinish(const BSONObj& input) {
                     3,
                     "No compression algorithms were sent from the server. This connection will be "
                     "uncompressed");
+        logReplicationNegotiationResult();
         return;
     }
 
     LOGV2_DEBUG(22932, 3, "Received message compressors from server");
     for (const auto& e : elem.Obj()) {
-        auto algoName = e.checkAndGetStringData();
+        std::string algoName{e.checkAndGetStringData()};
+
+        // Do not let the server pick something this client did not offer.
+        const bool advertised =
+            std::find(_advertisedCompressors.begin(), _advertisedCompressors.end(), algoName) !=
+            _advertisedCompressors.end();
+        if (!advertised) {
+            LOGV2_DEBUG(
+                10130421,
+                3,
+                "Ignoring compressor not advertised by this client in server hello response",
+                "compressor"_attr = algoName);
+            continue;
+        }
+
         auto ret = _registry->getCompressor(algoName);
+        if (!ret) {
+            LOGV2_DEBUG(10130419,
+                        3,
+                        "Ignoring unknown compressor in server hello response",
+                        "compressor"_attr = algoName);
+            continue;
+        }
         LOGV2_DEBUG(22933, 3, "Adding compressor", "compressor"_attr = ret->getName());
         _negotiated.push_back(ret);
+        permitted[ret->getId()] = true;
     }
+    logReplicationNegotiationResult();
 }
 
 void MessageCompressorManager::serverNegotiate(
     const boost::optional<std::vector<std::string_view>>& clientCompressors,
-    BSONObjBuilder* result) {
+    BSONObjBuilder* result,
+    const boost::optional<std::vector<std::string>>& serverCompressorAllowList) {
     LOGV2_DEBUG(22934, 3, "Starting server-side compression negotiation");
+
+    // Later hellos on a replication connection usually omit the replication field, so keep the
+    // allow-list from the hello that had it.
+    if (serverCompressorAllowList) {
+        _serverReplicationCompressorAllowListForThisSession = *serverCompressorAllowList;
+    }
 
     // No advertised compressions, just asking for the last negotiated result.
     if (!clientCompressors) {
         // If we haven't negotiated any compressors yet, then don't append anything to the
         // output - this makes this compatible with older versions of MongoDB that don't
         // support compression.
-        std::vector<std::string> ret;
         if (_negotiated.empty()) {
             LOGV2_DEBUG(22935, 3, "Compression negotiation not requested by client");
+            _setPermittedCompressors({});
         } else {
             BSONArrayBuilder sub(result->subarrayStart("compression"));
             for (const auto& algo : _negotiated) {
@@ -234,11 +360,30 @@ void MessageCompressorManager::serverNegotiate(
     // First we go through all the compressor names that the client has requested support for
     if (clientCompressors->empty()) {
         LOGV2_DEBUG(22936, 3, "No compressors provided");
+        _setPermittedCompressors({});
         return;
     }
 
+    const std::vector<std::string>& allowed = _serverReplicationCompressorAllowListForThisSession
+        ? *_serverReplicationCompressorAllowListForThisSession
+        : _registry->getNetCompressorNames();
+    _setPermittedCompressors(allowed);
+
+    // Startup rejects compressors that are not built in, so this should stay false.
+    bool droppedPermittedButUnregistered = false;
     for (const auto& curName : *clientCompressors) {
         MessageCompressorBase* cur;
+        const bool isCandidate =
+            std::any_of(allowed.begin(), allowed.end(), [&](const std::string& allowedName) {
+                return std::string_view(allowedName) == curName;
+            });
+        if (!isCandidate) {
+            LOGV2_DEBUG(10130415,
+                        3,
+                        "Rejecting compressor not permitted for this connection type",
+                        "compressor"_attr = curName);
+            continue;
+        }
         // If the MessageCompressorRegistry knows about a compressor with that name, then it is
         // valid and we add it to our list of negotiated compressors.
         if ((cur = _registry->getCompressor(curName))) {
@@ -246,17 +391,40 @@ void MessageCompressorManager::serverNegotiate(
             _negotiated.push_back(cur);
         } else {  // Otherwise the compressor is not supported and we skip over it.
             LOGV2_DEBUG(22938, 3, "compressor is not supported", "compressor"_attr = curName);
+            droppedPermittedButUnregistered = true;
         }
     }
 
     // If the number of compressors that were eventually negotiated is greater than 0, then
     // we should send that back to the client.
     if (_negotiated.empty()) {
-        LOGV2_DEBUG(22939, 3, "Could not agree on compressor to use");
+        if (_serverReplicationCompressorAllowListForThisSession &&
+            droppedPermittedButUnregistered) {
+            LOGV2_WARNING(
+                10130417,
+                "A replication connection advertised compressor(s) permitted by "
+                "replicationNetworkCompression, but none are available in this build; the "
+                "connection will be uncompressed. Only compressors present at startup can "
+                "be used",
+                "clientAdvertised"_attr = *clientCompressors,
+                "permittedCandidates"_attr = allowed);
+        } else {
+            LOGV2_DEBUG(22939, 3, "Could not agree on compressor to use");
+        }
     } else {
         BSONArrayBuilder sub(result->subarrayStart("compression"));
         for (const auto& algo : _negotiated) {
             sub << algo->getName();
+        }
+    }
+}
+
+void MessageCompressorManager::_setPermittedCompressors(const std::vector<std::string>& names) {
+    _permittedCompressorIds.emplace();
+    _permittedCompressorIds->fill(false);
+    for (const auto& name : names) {
+        if (auto* c = _registry->getCompressor(name)) {
+            (*_permittedCompressorIds)[c->getId()] = true;
         }
     }
 }

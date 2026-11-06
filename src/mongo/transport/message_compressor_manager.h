@@ -11,7 +11,10 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/modules.h"
 
+#include <array>
+#include <limits>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -45,11 +48,58 @@ public:
     MessageCompressorManager& operator=(MessageCompressorManager&&) = default;
 
     /*
-     * Called by a client constructing a "hello" request. This function will append the result
-     * of _registry->getCompressorNames() to the BSONObjBuilder as a BSON array. If no compressors
-     * are configured, it won't append anything.
+     * Called by a client constructing a "hello" request. Advertises the net compressors, or this
+     * session's allow-list if one is set. Nothing is advertised after
+     * disableCompressionForThisSession().
      */
     void clientBegin(BSONObjBuilder* output);
+
+    /*
+     * Stops clientBegin() from advertising compressors. Takes effect on the next handshake and is
+     * kept across reconnects.
+     */
+    void disableCompressionForThisSession() {
+        _offerCompressionOnClientBegin = false;
+    }
+
+    /*
+     * Undoes disableCompressionForThisSession() for the next handshake.
+     */
+    void enableCompressionForThisSession() {
+        _offerCompressionOnClientBegin = true;
+    }
+
+    bool isCompressionOfferedForThisSession() const {
+        return _offerCompressionOnClientBegin;
+    }
+
+    /*
+     * Limits what clientBegin() advertises to these compressors, in this order. Names missing from
+     * the registry are skipped. An empty list goes back to the net compressors.
+     */
+    void setCompressorAllowListForThisSession(std::vector<std::string> allowList) {
+        _allowListedCompressors = std::move(allowList);
+    }
+
+    /*
+     * Hello field sent by replication data-plane clients. Older servers ignore it.
+     */
+    static constexpr auto kReplicationCompressionClientFieldName = "replicationCompressionClient";
+
+    /*
+     * Makes clientBegin() send kReplicationCompressionClientFieldName.
+     */
+    void markReplicationClientForThisSession(bool isReplicationClient) {
+        _isReplicationClient = isReplicationClient;
+    }
+
+    /*
+     * Counts this connection's compression bytes in serverStatus().repl.compression as well. The
+     * server side of a replication connection sets this without sending the hello field.
+     */
+    void countAsReplicationCompressionTrafficForThisSession(bool countAsReplicationTraffic) {
+        _countAsReplicationCompressionTraffic = countAsReplicationTraffic;
+    }
 
     /*
      * Called by a client that has received a "hello" response (received after calling
@@ -64,11 +114,17 @@ public:
     /*
      * Called by a server that has received a "hello" request.
      *
+     * Client compressors are matched against 'serverCompressorAllowList', or against the net
+     * compressors when it is boost::none. An empty allow-list negotiates no compression. The
+     * allow-list used for a connection is kept for later hellos on it.
+     *
      * If no compressors are configured that match those requested by the client, then it will
      * not append anything to the BSONObjBuilder output.
      */
-    void serverNegotiate(const boost::optional<std::vector<std::string_view>>& clientCompressors,
-                         BSONObjBuilder*);
+    void serverNegotiate(
+        const boost::optional<std::vector<std::string_view>>& clientCompressors,
+        BSONObjBuilder* result,
+        const boost::optional<std::vector<std::string>>& serverCompressorAllowList = boost::none);
 
     /*
      * Returns a new Message containing the compressed contentx of 'msg'. If compressorId is null,
@@ -87,19 +143,12 @@ public:
     /*
      * Returns a new Message containing the decompressed copy of the input message.
      *
-     * If the compressor specified in the input message is not supported, it will return a Status
-     * error.
+     * If the compressor is not supported or decompression fails, it returns a Status error.
+     * After negotiation, only compressors allowed for this connection are accepted. Before that,
+     * any registered compressor is accepted.
      *
-     * If an error occurs in the compressor, it will return a Status error.
-     *
-     * This can be called before Compression is negotiated with the client. This class has a
-     * pointer to the global MessageCompressorRegistry and can lookup any message's compressor
-     * by ID number through that registry. As long as the compressor has been enabled process-wide,
-     * it can decompress any message without negotiation.
-     *
-     * If the 'compressorId' parameter is non-null, it will be populated with the compressor
-     * used. If 'decompressMessage' returns succesfully, then that value can be fed back into
-     * compressMessage, ensuring that the same compressor is used on both sides of a conversation.
+     * If 'compressorId' is non-null, it is populated with the compressor used and may be fed back
+     * into compressMessage().
      */
     StatusWith<Message> decompressMessage(const Message& msg,
                                           MessageCompressorId* compressorId = nullptr,
@@ -107,11 +156,41 @@ public:
 
     const std::vector<MessageCompressorBase*>& getNegotiatedCompressors() const;
 
+    // True once negotiation has set the compressors allowed on this connection.
+    bool hasCompressorPermitListForThisSession() const {
+        return _permittedCompressorIds.has_value();
+    }
+
     static MessageCompressorManager& forSession(const std::shared_ptr<transport::Session>& session);
 
 private:
+    // Allows exactly the registered compressors named in 'names' on this connection.
+    void _setPermittedCompressors(const std::vector<std::string>& names);
+
+    // The registry holds both net and replication compressors, so each connection keeps the ids it
+    // may use. boost::none means negotiation has not happened yet.
+    boost::optional<std::array<bool, std::numeric_limits<MessageCompressorId>::max() + 1>>
+        _permittedCompressorIds;
+
+    bool _isCompressorPermittedForThisSession(MessageCompressorId id) const {
+        if (!_permittedCompressorIds) {
+            return true;
+        }
+        return (*_permittedCompressorIds)[id];
+    }
+
+    std::vector<std::string> _advertisedCompressors;
     std::vector<MessageCompressorBase*> _negotiated;
     MessageCompressorRegistry* _registry;
+
+    bool _offerCompressionOnClientBegin{true};
+    std::vector<std::string> _allowListedCompressors;
+    bool _isReplicationClient{false};
+    bool _countAsReplicationCompressionTraffic{false};
+
+    // Server side only: the allow-list this connection negotiated against. Later hellos often omit
+    // the replication field, so this is kept instead of falling back to the net compressors.
+    boost::optional<std::vector<std::string>> _serverReplicationCompressorAllowListForThisSession;
 };
 
 }  // namespace mongo

@@ -56,13 +56,25 @@ public:
     void registerImplementation(std::unique_ptr<MessageCompressorBase> impl);
 
     /*
-     * Returns the list of compressor names that have been registered and configured.
+     * Returns the net and replication compressor names together. Only these are registered;
+     * negotiation decides which of them a connection may use.
      *
      * Iterators and value in this vector may be invalidated by calls to:
      *   setSupportedCompressors
+     *   addReplicationCompressors
      *   finalizeSupportedCompressors
      */
     const std::vector<std::string>& getCompressorNames() const;
+
+    /*
+     * Returns net.compression.compressors. Empty when net compression is disabled.
+     */
+    const std::vector<std::string>& getNetCompressorNames() const;
+
+    /*
+     * Returns the compressors named in replicationNetworkCompression.
+     */
+    const std::vector<std::string>& getReplCompressorNames() const;
 
     /*
      * Returns a compressor given an ID number. If no compressor exists with the ID number, it
@@ -77,14 +89,21 @@ public:
 
     /*
      * Sets the list of supported compressors for this registry. Should be called during
-     * option parsing and before calling registerImplementation for any compressors.
+     * option parsing and before calling registerImplementation for any compressors. Clears the
+     * replication compressors, so call it before addReplicationCompressors().
      */
     void setSupportedCompressors(std::vector<std::string>&& compressorNames);
 
     /*
+     * Adds replication compressors to the registered set without offering them to other
+     * connections. Call before compressor implementations register.
+     */
+    void addReplicationCompressors(const std::vector<std::string>& replCompressorNames);
+
+    /*
      * Finalizes the list of supported compressors for this registry. Should be called after all
-     * calls to registerImplementation. It will remove any compressor names that aren't keys in
-     * the _compressors map.
+     * calls to registerImplementation. Returns an error for any configured compressor that is not
+     * built in.
      */
     Status finalizeSupportedCompressors();
 
@@ -93,9 +112,14 @@ private:
     std::array<std::unique_ptr<MessageCompressorBase>,
                std::numeric_limits<MessageCompressorId>::max() + 1>
         _compressorsByIds;
+    // Net and replication compressors combined.
     std::vector<std::string> _compressorNames;
+    std::vector<std::string> _netCompressorNames;
+    std::vector<std::string> _replCompressorNames;
 };
 
 Status storeMessageCompressionOptions(const std::string& compressors);
 void appendMessageCompressionStats(BSONObjBuilder* b);
+// Same format as appendMessageCompressionStats(), counting replication connections only.
+void appendReplicationMessageCompressionStats(BSONObjBuilder* b);
 }  // namespace mongo

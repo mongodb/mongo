@@ -36,6 +36,8 @@ global:
         - "mongo/client/read_preference_validators.h"
         - "mongo/db/repl/repl_worker_pool_thread_count.h"
         - "mongo/db/repl/oplog_application_steady_state.h"
+        - "mongo/db/repl/replication_network_compression.h"
+        - "mongo/util/synchronized_value.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -376,6 +378,22 @@ server_parameters:
         default: 5
         validator:
             gte: 0
+        redact: false
+
+    replicationNetworkCompression:
+        description: >-
+            Compression for oplog fetching, initial sync and rollback connections, both when this
+            node syncs from another member and when another member syncs from it. Other connections
+            use net.compression.compressors. "" (default) uses net.compression.compressors,
+            "disabled" turns compression off, and a comma-separated list gives the compressors in
+            preference order; unknown names fail startup. Connections from older versions are
+            treated as ordinary connections.
+        set_at: [startup]
+        cpp_vartype: synchronized_value<std::string>
+        cpp_varname: gReplicationNetworkCompression
+        default: ""
+        validator:
+            callback: validateReplicationNetworkCompression
         redact: false
 
     oplogApplicationEnforcesSteadyStateConstraints:

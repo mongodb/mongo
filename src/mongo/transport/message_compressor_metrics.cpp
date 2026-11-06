@@ -42,4 +42,30 @@ void appendMessageCompressionStats(BSONObjBuilder* b) {
     compressionSection.doneFast();
 }
 
+void appendReplicationMessageCompressionStats(BSONObjBuilder* b) {
+    auto& registry = MessageCompressorRegistry::get();
+    const auto& names = registry.getCompressorNames();
+    if (names.empty()) {
+        return;
+    }
+    BSONObjBuilder compressionSection(b->subobjStart("compression"));
+
+    for (auto&& name : names) {
+        auto&& compressor = registry.getCompressor(name);
+        BSONObjBuilder base(compressionSection.subobjStart(name));
+
+        BSONObjBuilder compressorSection(base.subobjStart("compressor"));
+        compressorSection << kBytesIn << compressor->getReplicationCompressorBytesIn() << kBytesOut
+                          << compressor->getReplicationCompressorBytesOut();
+        compressorSection.doneFast();
+
+        BSONObjBuilder decompressorSection(base.subobjStart("decompressor"));
+        decompressorSection << kBytesIn << compressor->getReplicationDecompressorBytesIn()
+                            << kBytesOut << compressor->getReplicationDecompressorBytesOut();
+        decompressorSection.doneFast();
+        base.doneFast();
+    }
+    compressionSection.doneFast();
+}
+
 }  // namespace mongo

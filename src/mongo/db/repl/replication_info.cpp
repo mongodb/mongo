@@ -32,6 +32,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_network_compression.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/split_horizon/split_horizon.h"
 #include "mongo/db/server_options.h"
@@ -60,6 +61,7 @@
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/message_compressor_manager.h"
+#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -268,6 +270,9 @@ public:
                 result);
         }
 
+        // The part of network.compression sent or received on replication connections.
+        appendReplicationMessageCompressionStats(&result);
+
         return result.obj();
     }
 };
@@ -430,17 +435,20 @@ public:
             connectionTagsToSet |= Client::kKeepOpen;
         }
 
+        auto client = opCtx->getClient();
+        const auto internalClient = cmd.getInternalClient();
+        const bool isInternalClient = internalClient.has_value();
+
         // Negotiate compressors before logging metadata so we can include the result in the log
         // line.
         auto result = replyBuilder->getBodyBuilder();
         if (opCtx->getClient()->session()) {
-            MessageCompressorManager::forSession(opCtx->getClient()->session())
-                .serverNegotiate(cmd.getCompression(), &result);
+            repl::negotiateHelloCompression(
+                MessageCompressorManager::forSession(opCtx->getClient()->session()),
+                isInternalClient && cmd.getReplicationCompressionClient().value_or(false),
+                cmd.getCompression(),
+                &result);
         }
-
-        auto client = opCtx->getClient();
-        const auto internalClient = cmd.getInternalClient();
-        const bool isInternalClient = internalClient.has_value();
 
         bool isInitialHandshake = false;
         if (ClientMetadata::tryFinalize(client)) {

@@ -22,6 +22,7 @@
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_network_compression.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
@@ -106,6 +107,7 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
 
 BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
     auto* client = getClient();
+    applyReplicationNetworkCompressionToManager(client->getCompressorManager());
     // If the client already has the address (from a previous attempt), we must allow it to
     // handle the reconnect itself. This is necessary to get correct backoff behavior.
     if (client->getServerHostAndPort() != getSource()) {

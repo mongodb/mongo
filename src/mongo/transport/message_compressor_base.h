@@ -100,6 +100,30 @@ public:
         return _decompressBytesOut.loadRelaxed();
     }
 
+    /*
+     * The part of the counters above that was on replication connections.
+     */
+    int64_t getReplicationCompressorBytesIn() const {
+        return _replCompressBytesIn.loadRelaxed();
+    }
+    int64_t getReplicationCompressorBytesOut() const {
+        return _replCompressBytesOut.loadRelaxed();
+    }
+    int64_t getReplicationDecompressorBytesIn() const {
+        return _replDecompressBytesIn.loadRelaxed();
+    }
+    int64_t getReplicationDecompressorBytesOut() const {
+        return _replDecompressBytesOut.loadRelaxed();
+    }
+
+    void counterHitReplicationCompress(int64_t bytesIn, int64_t bytesOut) {
+        _replCompressBytesIn.addAndFetch(bytesIn);
+        _replCompressBytesOut.addAndFetch(bytesOut);
+    }
+    void counterHitReplicationDecompress(int64_t bytesIn, int64_t bytesOut) {
+        _replDecompressBytesIn.addAndFetch(bytesIn);
+        _replDecompressBytesOut.addAndFetch(bytesOut);
+    }
 
 protected:
     /*
@@ -134,5 +158,11 @@ private:
 
     Atomic<long long> _decompressBytesIn;
     Atomic<long long> _decompressBytesOut;
+
+    Atomic<long long> _replCompressBytesIn;
+    Atomic<long long> _replCompressBytesOut;
+
+    Atomic<long long> _replDecompressBytesIn;
+    Atomic<long long> _replDecompressBytesOut;
 };
 }  // namespace mongo

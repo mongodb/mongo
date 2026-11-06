@@ -80,3 +80,13 @@ configs:
         arg_vartype: Bool
         short_name: serverless
         source: [yaml, cli]
+
+    "replication.networkCompression.compressors":
+        section: "Replica set options"
+        description: >-
+            Comma-separated compressors for oplog fetching, initial sync and rollback connections.
+            Empty uses net.compression.compressors; "disabled" turns compression off for these
+            connections. The listed compressors can be used even if net compression is disabled.
+        short_name: replicationNetworkCompressionCompressors
+        arg_vartype: String
+        source: [yaml, cli]

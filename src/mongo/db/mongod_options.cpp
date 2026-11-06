@@ -27,6 +27,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config_params_gen.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_network_compression.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
@@ -553,6 +555,28 @@ Status storeMongodOptions(const moe::Environment& params) {
     if (!replSettingsWithStatus.isOK())
         return replSettingsWithStatus.getStatus();
     const repl::ReplSettings& replSettings(replSettingsWithStatus.getValue());
+
+    if (params.count("replication.networkCompression.compressors")) {
+        auto conflictStatus = checkConflictWithSetParameter(
+            "replication.networkCompression.compressors", "replicationNetworkCompression");
+        if (!conflictStatus.isOK())
+            return conflictStatus;
+        const auto value = params["replication.networkCompression.compressors"].as<std::string>();
+        repl::ReplicationNetworkCompressionSetting parsed;
+        auto s = repl::parseReplicationNetworkCompression(value, &parsed);
+        if (!s.isOK())
+            return s;
+        *repl::gReplicationNetworkCompression = value;
+    }
+
+    // Read the parameter rather than the config option so --setParameter is covered too. This has
+    // to run before the compressors register.
+    {
+        const auto setting = repl::getReplicationNetworkCompressionSetting();
+        if (!setting.disabled && !setting.inheritProcessDefault) {
+            MessageCompressorRegistry::get().addReplicationCompressors(setting.allowList);
+        }
+    }
 
     if (replSettings.isReplSet()) {
         if ((params.count("security.authorization") &&
