@@ -101,6 +101,14 @@ ContainerVal toContainerVal(BSONBinData binData) {
     return ContainerVal(std::span<const char>{static_cast<const char*>(binData.data),
                                               static_cast<size_t>(binData.length)});
 }
+
+// Returns a copy of 'base' carrying 'sizeMetadata' as its size metadata (m).
+OplogEntry withSizeMetadata(const OplogEntry& base, const BSONObj& sizeMetadata) {
+    BSONObjBuilder builder;
+    builder.appendElements(base.getEntry().toBSON());
+    builder.append("m", sizeMetadata);
+    return {DurableOplogEntry(builder.obj())};
+}
 }  // namespace
 
 OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
@@ -621,6 +629,39 @@ OplogEntry makeDeleteOplogEntryWithRecordIdAndSizeMetadata(OpTime opTime,
     builder.append("m", BSON("sz" << sizeDelta));
 
     return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(OpTime opTime,
+                                                               const NamespaceString& nss,
+                                                               const UUID& uuid,
+                                                               const BSONObj& docToInsert,
+                                                               const RecordId& rid,
+                                                               int64_t hash) {
+    return withSizeMetadata(makeInsertOplogEntryWithRecordId(opTime, nss, uuid, docToInsert, rid),
+                            BSON("sz" << docToInsert.objsize() << "h" << hash));
+}
+
+OplogEntry makeUpdateOplogEntryWithRecordIdSizeMetadataAndHash(OpTime opTime,
+                                                               const NamespaceString& nss,
+                                                               const BSONObj& documentToUpdate,
+                                                               const BSONObj& updatedDocument,
+                                                               const RecordId& rid,
+                                                               int sizeDelta,
+                                                               int64_t hash) {
+    return withSizeMetadata(
+        makeUpdateOplogEntryWithRecordId(opTime, nss, documentToUpdate, updatedDocument, rid),
+        BSON("sz" << sizeDelta << "h" << hash));
+}
+
+OplogEntry makeDeleteOplogEntryWithRecordIdSizeMetadataAndHash(OpTime opTime,
+                                                               const NamespaceString& nss,
+                                                               const UUID& uuid,
+                                                               const BSONObj& docToDelete,
+                                                               const RecordId& rid,
+                                                               int sizeDelta,
+                                                               int64_t hash) {
+    return withSizeMetadata(makeDeleteOplogEntryWithRecordId(opTime, nss, uuid, docToDelete, rid),
+                            BSON("sz" << sizeDelta << "h" << hash));
 }
 
 OplogEntry makeUpdateOplogEntryWithRecordIdWithoutSz(OpTime opTime,

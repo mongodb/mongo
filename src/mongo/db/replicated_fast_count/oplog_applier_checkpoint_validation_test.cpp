@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/internode_validation_hash_utils.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
@@ -15,6 +16,8 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
@@ -114,6 +117,89 @@ protected:
 
 using SingleWorkerCheckpointValidationDeathTest = SingleWorkerCheckpointValidationTest;
 
+class CheckpointHashValidationTest : public CheckpointValidationTest {
+protected:
+    void setUp() override {
+        CheckpointValidationTest::setUp();
+        createCollection(_opCtx.get(), _nss, {});
+        _uuid = getCollectionUUID(_opCtx.get(), _nss);
+    }
+
+    // Appends a watermark and a checkpoint valid as of that watermark's timestamp.
+    void appendCheckpoint(std::vector<OplogEntry>& oplog,
+                          CollectionSizeCount sizeCount,
+                          boost::optional<int64_t> hash,
+                          boost::optional<UUID> uuid = boost::none) {
+        const Timestamp watermarkTs = nextOpTime().getTimestamp();
+        oplog.push_back(makeWatermarkEntry(watermarkTs));
+        oplog.push_back(makeCheckpointEntry(
+            watermarkTs,
+            {{.uuid = uuid.value_or(_uuid),
+              .metadata = CollectionReplicatedMetadata{.sizeCount = sizeCount, .hash = hash}}}));
+    }
+
+    // Applies `oplog` and returns how many entries carried a hash with no size delta.
+    int countHashWithoutSizeDeltaWarnings(std::vector<OplogEntry> oplog) {
+        // The warning is throttled to debug level 2.
+        unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kReplication,
+                                                           logv2::LogSeverity::Debug(2)};
+        unittest::LogCaptureGuard logs;
+        EXPECT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+        logs.stop();
+        return logs.countBSONContainingSubset(BSON("id" << 13629800));
+    }
+
+    // Returns a copy of `op` with `ui` set to `_uuid` when `hasUuid` is true.
+    // Otherwise, removes the `ui` field.
+    OplogEntry withUuid(const OplogEntry& op, bool hasUuid = true) {
+        BSONObjBuilder builder;
+        for (auto&& elem : op.getEntry().toBSON()) {
+            if (elem.fieldNameStringData() != "ui") {
+                builder.append(elem);
+            }
+        }
+        if (hasUuid) {
+            _uuid.appendToBuilder(&builder, "ui");
+        }
+        return {DurableOplogEntry(builder.obj())};
+    }
+    OplogEntry withoutUuid(const OplogEntry& op) {
+        return withUuid(op, /*hasUuid=*/false);
+    }
+
+    const BSONObj kDoc1 = BSON("_id" << 1 << "x" << 1);
+    const BSONObj kDoc2 = BSON("_id" << 2 << "x" << 2);
+    const BSONObj kSetX3 = BSON("$set" << BSON("x" << 3));
+    const BSONObj kDoc1Updated = BSON("_id" << 1 << "x" << 3);
+    const int64_t kDoc1Hash = computeDocValidationHash(kDoc1);
+    const int64_t kDoc2Hash = computeDocValidationHash(kDoc2);
+    // Also the hash of an image of kDoc1 that a diverged node does not hold.
+    const int64_t kDoc1UpdatedHash = computeDocValidationHash(kDoc1Updated);
+    const int64_t kUpdateHash = computeUpdateValidationHash(kDoc1, kDoc1Updated);
+
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("test.checkpointHash");
+    UUID _uuid = UUID::gen();
+
+private:
+    unittest::ServerParameterGuard _enablePerCollectionValidation{
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true};
+    // Per-document verification only logs mismatches, so checkpoint validation must detect
+    // divergence.
+    unittest::ServerParameterGuard _perDocumentMismatchNotFatal{
+        "continuousInternodeValidationFatalOnMismatch", false};
+};
+
+using CheckpointHashValidationDeathTest = CheckpointHashValidationTest;
+
+// A single worker groups consecutive inserts.
+class SingleWorkerCheckpointHashValidationTest : public CheckpointHashValidationTest {
+protected:
+    boost::optional<size_t> workerCount() const override {
+        return 1;
+    }
+};
+
 TEST_F(CheckpointValidationTest, CheckpointValidationLogsErrorsWhenInternodeValidationDisabled) {
     unittest::ServerParameterGuard fassertOnPerCollectionContinuousInternodeValidationFailure(
         "fassertOnPerCollectionContinuousInternodeValidationFailure", false);
@@ -185,6 +271,203 @@ TEST_F(CheckpointValidationTest, CheckpointValidatesCrudDeltas) {
           .metadata = CollectionReplicatedMetadata{
               .sizeCount = CollectionSizeCount{.size = doc2AfterSize, .count = 1},
               .hash = boost::none}}}));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+TEST_F(CheckpointHashValidationTest, CheckpointValidatesCrudHashes) {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2), kDoc2Hash));
+    oplog.push_back(makeDeleteOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2), -kDoc2.objsize(), kDoc2Hash));
+    oplog.push_back(makeUpdateOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, kDoc1, kSetX3, RecordId(1), 0, kUpdateHash));
+    // The insert and delete of kDoc2 cancel, and the update swaps kDoc1's contribution for
+    // kDoc1Updated's.
+    appendCheckpoint(
+        oplog, CollectionSizeCount{.size = kDoc1Updated.objsize(), .count = 1}, kDoc1UpdatedHash);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+TEST_F(SingleWorkerCheckpointHashValidationTest, CheckpointValidatesGroupedInsertHashes) {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2), kDoc2Hash));
+    appendCheckpoint(oplog,
+                     CollectionSizeCount{.size = kDoc1.objsize() + kDoc2.objsize(), .count = 2},
+                     kDoc1Hash ^ kDoc2Hash);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+TEST_F(SingleWorkerCheckpointHashValidationTest, GroupedInsertWithHashOnlyOnFirstEntry) {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2)));
+    appendCheckpoint(oplog,
+                     CollectionSizeCount{.size = kDoc1.objsize() + kDoc2.objsize(), .count = 2},
+                     boost::none);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+TEST_F(SingleWorkerCheckpointHashValidationTest, GroupedInsertWithHashOnlyOnLastEntry) {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1)));
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2), kDoc2Hash));
+    appendCheckpoint(oplog,
+                     CollectionSizeCount{.size = kDoc1.objsize() + kDoc2.objsize(), .count = 2},
+                     boost::none);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+TEST_F(SingleWorkerCheckpointHashValidationTest,
+       GroupedInsertComputesHashesWhenPerDocumentVerificationDisabled) {
+    unittest::ServerParameterGuard disableContinuousInternodeValidation(
+        "disableContinuousInternodeValidation", true);
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1UpdatedHash));
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2), kDoc2Hash));
+    appendCheckpoint(oplog,
+                     CollectionSizeCount{.size = kDoc1.objsize() + kDoc2.objsize(), .count = 2},
+                     kDoc1Hash ^ kDoc2Hash);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+DEATH_TEST_F(CheckpointHashValidationDeathTest,
+             CheckpointWithoutHashFailsWhenStandbyHasHash,
+             "13626005") {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    appendCheckpoint(oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, boost::none);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+TEST_F(CheckpointHashValidationTest, HashWithoutSizeDeltaOnInsertFoldsAgainstZeroSizeAndCount) {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    appendCheckpoint(oplog, CollectionSizeCount{.size = 0, .count = 0}, kDoc1Hash);
+    EXPECT_EQ(countHashWithoutSizeDeltaWarnings(std::move(oplog)), 1);
+}
+
+TEST_F(CheckpointHashValidationTest, HashWithoutSizeDeltaOnUpdateFoldsAgainstZeroSizeAndCount) {
+    // Only the update lacks a size delta, so the insert must not warn.
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(withUuid(makeUpdateOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, kDoc1, kSetX3, RecordId(1), kUpdateHash)));
+    appendCheckpoint(
+        oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1UpdatedHash);
+    EXPECT_EQ(countHashWithoutSizeDeltaWarnings(std::move(oplog)), 1);
+}
+
+TEST_F(CheckpointHashValidationTest, HashWithoutSizeDeltaOnDeleteFoldsAgainstZeroSizeAndCount) {
+    // Only the delete lacks a size delta, so the insert must not warn.
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(withUuid(makeDeleteOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash)));
+    // The delete removes the document's hash, but its size and count stay counted.
+    appendCheckpoint(oplog,
+                     CollectionSizeCount{.size = kDoc1.objsize(), .count = 1},
+                     kEmptyCollectionValidationHash);
+    EXPECT_EQ(countHashWithoutSizeDeltaWarnings(std::move(oplog)), 1);
+}
+
+TEST_F(SingleWorkerCheckpointHashValidationTest,
+       HashWithoutSizeDeltaOnGroupedInsertFoldsAgainstZeroSizeAndCount) {
+    // Only the second insert lacks a size delta, so only it warns.
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(makeInsertOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2), kDoc2Hash));
+    appendCheckpoint(
+        oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1Hash ^ kDoc2Hash);
+    EXPECT_EQ(countHashWithoutSizeDeltaWarnings(std::move(oplog)), 1);
+}
+
+// The primary folds a hash without a size delta only into the collection the entry's UUID names, so
+// without one the standby must not fold it in either.
+TEST_F(CheckpointHashValidationTest, HashWithoutSizeDeltaOrUuidOnInsertIsSkipped) {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(withoutUuid(makeInsertOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2), kDoc2Hash)));
+    appendCheckpoint(oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1Hash);
+    EXPECT_EQ(countHashWithoutSizeDeltaWarnings(std::move(oplog)), 1);
+}
+
+TEST_F(CheckpointHashValidationTest, HashWithoutSizeDeltaOrUuidOnUpdateIsSkipped) {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(makeUpdateOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, kDoc1, kSetX3, RecordId(1), kUpdateHash));
+    appendCheckpoint(oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1Hash);
+    EXPECT_EQ(countHashWithoutSizeDeltaWarnings(std::move(oplog)), 1);
+}
+
+TEST_F(CheckpointHashValidationTest, HashWithoutSizeDeltaOrUuidOnDeleteIsSkipped) {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(withoutUuid(makeDeleteOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash)));
+    appendCheckpoint(oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1Hash);
+    EXPECT_EQ(countHashWithoutSizeDeltaWarnings(std::move(oplog)), 1);
+}
+
+TEST_F(SingleWorkerCheckpointHashValidationTest,
+       HashWithoutSizeDeltaOrUuidOnGroupedInsertIsSkipped) {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(withoutUuid(makeInsertOplogEntryWithRecordIdAndHash(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2), kDoc2Hash)));
+    appendCheckpoint(oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1Hash);
+    EXPECT_EQ(countHashWithoutSizeDeltaWarnings(std::move(oplog)), 1);
+}
+
+TEST_F(CheckpointHashValidationTest, EntryWithoutHashLeavesCollectionWithoutHash) {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2)));
+    // The entry without a hash leaves the primary unable to account for the collection's hash.
+    appendCheckpoint(oplog,
+                     CollectionSizeCount{.size = kDoc1.objsize() + kDoc2.objsize(), .count = 2},
+                     boost::none);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+TEST_F(CheckpointHashValidationTest, CheckpointCarriesPrimaryHashForReshardingCollection) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "test.system.resharding." + UUID::gen().toString());
+    createCollection(_opCtx.get(), nss, {});
+    const UUID uuid = getCollectionUUID(_opCtx.get(), nss);
+
+    // This node's image differs from the one the primary hashed, but resharding's collections are
+    // not verified, so the standby carries the primary's hash rather than its own.
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), nss, uuid, kDoc1, RecordId(1), kDoc1UpdatedHash));
+    appendCheckpoint(
+        oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1UpdatedHash, uuid);
     ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
 }
 
@@ -328,11 +611,12 @@ TEST_F(CheckpointValidationTest, CheckpointValidatesDroppedCollection) {
         ASSERT_OK(runThroughApplyOplogBatch(std::move(createOplog)));
         const Timestamp watermarkTs = nextOpTime().getTimestamp();
         createOplog.push_back(makeWatermarkEntry(watermarkTs));
-        createOplog.push_back(makeCheckpointEntry(
-            watermarkTs,
-            {{.uuid = coll.uuid,
-              .metadata = CollectionReplicatedMetadata{
-                  .sizeCount = CollectionSizeCount{.size = 0, .count = 0}, .hash = boost::none}}}));
+        createOplog.push_back(
+            makeCheckpointEntry(watermarkTs,
+                                {{.uuid = coll.uuid,
+                                  .metadata = CollectionReplicatedMetadata{
+                                      .sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                      .hash = kEmptyCollectionValidationHash}}}));
         ASSERT_OK(runThroughApplyOplogBatch(std::move(createOplog)));
     }
 
@@ -378,7 +662,8 @@ protected:
     }
 
     inline static const CollectionReplicatedMetadata kEmpty{
-        .sizeCount = CollectionSizeCount{.size = 0, .count = 0}, .hash = boost::none};
+        .sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+        .hash = kEmptyCollectionValidationHash};
 
     const NsAndUUID _source{
         .nss = NamespaceString::createNamespaceString_forTest("test.checkpointRenameSource"),
@@ -573,6 +858,18 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
     ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
 }
 
+DEATH_TEST_F(CheckpointHashValidationDeathTest,
+             CheckpointValidationFailsOnCrudHashMismatch,
+             "13626005") {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    // The standby and primary agree on size and count but disagree on the hash of the collection.
+    appendCheckpoint(
+        oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1Hash ^ 1);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
 DEATH_TEST_F(SingleWorkerCheckpointValidationDeathTest,
              CheckpointValidationFailsOnGroupedInsertSizeMismatch,
              "13626005") {
@@ -608,6 +905,127 @@ DEATH_TEST_F(SingleWorkerCheckpointValidationDeathTest,
 
     // By using exactly one worker thread, the first two inserts are grouped and the grouped insert
     // oplog application path is exercised.
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+DEATH_TEST_F(CheckpointHashValidationDeathTest,
+             CheckpointValidationCatchesDivergenceMissedByPerDocumentVerification,
+             "13626005") {
+    // The primary hashed a document other than the one this node applies. Per-document
+    // verification only logs the mismatch, so the checkpoint has to catch it from this node's own
+    // hash.
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1UpdatedHash));
+    appendCheckpoint(
+        oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1UpdatedHash);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+DEATH_TEST_F(CheckpointHashValidationDeathTest,
+             CheckpointValidationCatchesUpdateDivergenceMissedByPerDocumentVerification,
+             "13626005") {
+    // This node applies the update to x: 2, but the primary hashed a post-image with x: 3.
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(makeUpdateOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, kDoc1, BSON("$set" << BSON("x" << 2)), RecordId(1), 0, kUpdateHash));
+    appendCheckpoint(
+        oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1UpdatedHash);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+DEATH_TEST_F(CheckpointHashValidationDeathTest,
+             CheckpointValidationCatchesDeleteDivergenceMissedByPerDocumentVerification,
+             "13626005") {
+    // This node deletes the document it stored, but the primary hashed a different one.
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(makeDeleteOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), -kDoc1.objsize(), kDoc1UpdatedHash));
+    appendCheckpoint(
+        oplog, CollectionSizeCount{.size = 0, .count = 0}, kDoc1Hash ^ kDoc1UpdatedHash);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+DEATH_TEST_F(CheckpointHashValidationDeathTest,
+             CheckpointValidationCatchesGroupedInsertDivergenceMissedByPerDocumentVerification,
+             "13626005") {
+    // Only the second of the grouped inserts diverges.
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2), kDoc1UpdatedHash));
+    appendCheckpoint(oplog,
+                     CollectionSizeCount{.size = kDoc1.objsize() + kDoc2.objsize(), .count = 2},
+                     kDoc1Hash ^ kDoc1UpdatedHash);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+DEATH_TEST_F(CheckpointHashValidationDeathTest,
+             CheckpointValidatesHashWhilePerDocumentVerificationIsDisabled,
+             "13626005") {
+    unittest::ServerParameterGuard disableContinuousInternodeValidation(
+        "disableContinuousInternodeValidation", true);
+
+    // Per-document verification is skipped, but the checkpoint still compares this node's hash.
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1UpdatedHash));
+    appendCheckpoint(
+        oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1UpdatedHash);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+DEATH_TEST_F(CheckpointHashValidationDeathTest,
+             CheckpointValidationFailsWhenEntryWithoutHashLeavesStandbyWithoutHash,
+             "13626005") {
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2)));
+    appendCheckpoint(oplog,
+                     CollectionSizeCount{.size = kDoc1.objsize() + kDoc2.objsize(), .count = 2},
+                     kDoc1Hash);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+DEATH_TEST_F(CheckpointHashValidationDeathTest,
+             CheckpointValidationCatchesApplyOpsDivergenceMissedByPerDocumentVerification,
+             "13626005") {
+    // An applyOps inner op is applied through the same path as a top-level insert, so this node's
+    // own hash is recorded for it too.
+    const OplogEntry innerInsert = makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        OpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1UpdatedHash);
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeCommandOplogEntry(
+        nextOpTime(),
+        NamespaceString::kAdminCommandNamespace,
+        BSON("applyOps" << BSON_ARRAY(innerInsert.getDurableReplOperation().toBSON())),
+        boost::none,
+        boost::none));
+    appendCheckpoint(
+        oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1UpdatedHash);
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+}
+
+DEATH_TEST_F(CheckpointHashValidationDeathTest,
+             CheckpointValidationCatchesDivergenceDuringStartup,
+             "13626005") {
+    // Per-document verification only logs a mismatch during startup, even when fatal.
+    unittest::ServerParameterGuard continuousInternodeValidationFatalOnMismatch(
+        "continuousInternodeValidationFatalOnMismatch", true);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_STARTUP2));
+
+    std::vector<OplogEntry> oplog;
+    oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1UpdatedHash));
+    appendCheckpoint(
+        oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1UpdatedHash);
     ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
 }
 
@@ -682,11 +1100,12 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
         std::vector<OplogEntry> checkpointOplog;
         const Timestamp watermarkTs = nextOpTime().getTimestamp();
         checkpointOplog.push_back(makeWatermarkEntry(watermarkTs));
-        checkpointOplog.push_back(makeCheckpointEntry(
-            watermarkTs,
-            {{.uuid = coll.uuid,
-              .metadata = CollectionReplicatedMetadata{
-                  .sizeCount = CollectionSizeCount{.size = 0, .count = 0}, .hash = boost::none}}}));
+        checkpointOplog.push_back(
+            makeCheckpointEntry(watermarkTs,
+                                {{.uuid = coll.uuid,
+                                  .metadata = CollectionReplicatedMetadata{
+                                      .sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                      .hash = kEmptyCollectionValidationHash}}}));
         ASSERT_OK(runThroughApplyOplogBatch(std::move(checkpointOplog)));
     }
 
@@ -735,10 +1154,11 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
             {{.uuid = coll.uuid,
               .metadata = CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 0,
                                                                                         .count = 0},
-                                                       .hash = boost::none}},
+                                                       .hash = kEmptyCollectionValidationHash}},
              {.uuid = otherColl.uuid,
               .metadata = CollectionReplicatedMetadata{
-                  .sizeCount = CollectionSizeCount{.size = 0, .count = 0}, .hash = boost::none}}}));
+                  .sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                  .hash = kEmptyCollectionValidationHash}}}));
         ASSERT_OK(runThroughApplyOplogBatch(std::move(checkpointOplog)));
     }
 

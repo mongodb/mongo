@@ -126,6 +126,7 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
@@ -135,6 +136,7 @@
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/serialization_context.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/version/releases.h"
@@ -250,28 +252,62 @@ boost::optional<CreateCollCatalogIdentifier> extractReplicatedCatalogIdentifier(
         .catalogId = catalogId, .ident = ident, .idIndexIdent = idIndexIdent};
 }
 
-void recordSingleInsertDelta(UUID uuid, const OplogEntry& op, const BSONObj& o) {
+// Records an entry that carries a document hash but no size delta. The primary folds such an entry
+// against a zero size and count, so this node does the same.
+void recordHashOnlyDelta(UUID uuid, const OplogEntry& op, boost::optional<int64_t> localHash) {
+    // TODO(SERVER-138104): Add a metric for entries carrying a document hash with no size delta.
+    static StaticImmortal<logv2::SeveritySuppressor> logSeverity{
+        Seconds{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+    LOGV2_DEBUG(13629800,
+                (*logSeverity)().toInt(),
+                "Unexpected input: Size metadata carries a document hash with no size delta",
+                logAttrs(op.getNss()),
+                "opTime"_attr = op.getOpTime(),
+                "oplogEntry"_attr = redact(op.toBSONForLogging()));
+    // The primary only folds such an entry into the collection its UUID names.
+    if (!op.getUuid()) {
+        return;
+    }
+    replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
+        uuid,
+        op.getOpTime().getTimestamp(),
+        ReplicatedMetadataDelta{
+            .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                         .hash = localHash},
+            .state = DDLState::kNone});
+}
+
+void recordSingleInsertDelta(UUID uuid,
+                             const OplogEntry& op,
+                             const BSONObj& o,
+                             boost::optional<int64_t> localHash) {
     const auto& insertSizeMeta = op.getDurableReplOperation().getSizeMetadata();
     if (insertSizeMeta) {
         if (const auto* singleOpMeta = std::get_if<SingleOpSizeMetadata>(&insertSizeMeta.value());
             singleOpMeta && singleOpMeta->getSz().has_value()) {
-            // TODO(SERVER-136298): Record hash.
             replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
                 uuid,
                 op.getOpTime().getTimestamp(),
                 ReplicatedMetadataDelta{
                     .metadata = {.sizeCount = CollectionSizeCount{.size = o.objsize(), .count = 1},
-                                 .hash = boost::none},
+                                 .hash = localHash},
                     .state = DDLState::kNone});
+        } else if (singleOpMeta && singleOpMeta->getH()) {
+            recordHashOnlyDelta(uuid, op, localHash);
         }
     }
 }
 
 void recordGroupedInsertDelta(UUID uuid,
                               const std::vector<InsertStatement>& insertObjs,
-                              const std::vector<ApplierOperation>& insertOps) {
+                              const std::vector<ApplierOperation>& insertOps,
+                              const std::vector<boost::optional<int64_t>>& localHashes) {
+    invariant(localHashes.empty() || localHashes.size() == insertOps.size());
     for (size_t i = 0; i < insertObjs.size(); ++i) {
-        recordSingleInsertDelta(uuid, *insertOps[i], insertObjs[i].doc);
+        recordSingleInsertDelta(uuid,
+                                *insertOps[i],
+                                insertObjs[i].doc,
+                                localHashes.empty() ? boost::none : localHashes[i]);
     }
 }
 
@@ -1873,6 +1909,26 @@ bool isValidationHashVerifiableFor(OperationContext* opCtx,
     // transiently invalid documents that self-heal, so they are not verified.
     return !isReshardingInternalCollection(collection->ns());
 }
+
+// Hashes this node's own image of 'op' wherever the primary recorded a hash on it. The checkpoint
+// validator records this hash rather than the primary's.
+template <typename ComputeHash>
+boost::optional<int64_t> computeLocalValidationHash(OplogApplication::Mode mode,
+                                                    const OplogEntry& op,
+                                                    ComputeHash&& computeHash) {
+    if (mode != OplogApplication::Mode::kSecondary || !getValidationHash(op)) {
+        return boost::none;
+    }
+    // Resharding's collections are not verified, so this node carries the primary's hash instead of
+    // hashing its own copy. That keeps the collection's hash present once it is renamed onto the
+    // source namespace, where this node's own hashes are compared again.
+    // TODO(SERVER-138102): Determine whether this node can hash its own copy of resharding's
+    // collections.
+    if (isReshardingInternalCollection(op.getNss())) {
+        return getValidationHash(op);
+    }
+    return computeHash();
+}
 }  // namespace
 
 bool shouldVerifyValidationHash(OperationContext* opCtx,
@@ -2155,15 +2211,11 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
         update::parseAndTransformOplogUpdate(opCtx, coll, obj, request, rid, cursor.get());
 
     // The update only reads 'obj', so it is still the pre-image here.
+    const boost::optional<int64_t> localHash = computeLocalValidationHash(
+        mode, op, [&] { return computeUpdateValidationHash(obj.value(), postImage); });
     if (shouldVerifyValidationHash(opCtx, collPtr, mode, op)) {
-        const BSONObj& preImage = obj.value();
-        verifyValidationHash(opCtx,
-                             collPtr,
-                             rid,
-                             preImage,
-                             postImage,
-                             computeUpdateValidationHash(preImage, postImage),
-                             op);
+        tassert(13629801, "Expected a local validation hash for a verified update", localHash);
+        verifyValidationHash(opCtx, collPtr, rid, obj.value(), postImage, *localHash, op);
     }
 
     // On secondaries, verify that the size delta recorded in the oplog matches the actual size
@@ -2201,17 +2253,24 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                     actualDelta == oplogSz);
 
                 shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                    [uuid = collPtr->uuid(), ts = op.getOpTime().getTimestamp(), actualDelta](
-                        OperationContext*, boost::optional<Timestamp>) {
-                        // TODO(SERVER-136298): Record hash.
+                    [uuid = collPtr->uuid(),
+                     ts = op.getOpTime().getTimestamp(),
+                     actualDelta,
+                     localHash](OperationContext*, boost::optional<Timestamp>) {
                         replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
                             uuid,
                             ts,
                             ReplicatedMetadataDelta{
                                 .metadata = {.sizeCount = CollectionSizeCount{.size = actualDelta,
                                                                               .count = 0},
-                                             .hash = boost::none},
+                                             .hash = localHash},
                                 .state = DDLState::kNone});
+                    });
+            } else if (singleOpMeta && singleOpMeta->getH()) {
+                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                    [uuid = collPtr->uuid(), op, localHash](OperationContext*,
+                                                            boost::optional<Timestamp>) {
+                        recordHashOnlyDelta(uuid, op, localHash);
                     });
             }
         }
@@ -2349,13 +2408,16 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
         return deleteObject(opCtx, coll, request);
     }
 
+    const boost::optional<int64_t> localHash = computeLocalValidationHash(
+        mode, op, [&] { return computeDocValidationHash(preImage.value()); });
     if (shouldVerifyValidationHash(opCtx, collPtr, mode, op)) {
+        tassert(13629802, "Expected a local validation hash for a verified delete", localHash);
         verifyValidationHash(opCtx,
                              collPtr,
                              rid,
                              preImage.value(),
                              /*postImage=*/boost::none,
-                             computeDocValidationHash(preImage.value()),
+                             *localHash,
                              op);
     }
 
@@ -2411,17 +2473,24 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                     actualDelta == oplogSz);
 
                 shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                    [uuid = collPtr->uuid(), ts = op.getOpTime().getTimestamp(), actualDelta](
-                        OperationContext*, boost::optional<Timestamp>) {
-                        // TODO(SERVER-136298): Record hash.
+                    [uuid = collPtr->uuid(),
+                     ts = op.getOpTime().getTimestamp(),
+                     actualDelta,
+                     localHash](OperationContext*, boost::optional<Timestamp>) {
                         replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
                             uuid,
                             ts,
                             ReplicatedMetadataDelta{
                                 .metadata = {.sizeCount = CollectionSizeCount{.size = actualDelta,
                                                                               .count = -1},
-                                             .hash = boost::none},
+                                             .hash = localHash},
                                 .state = DDLState::kNone});
+                    });
+            } else if (singleOpMeta && singleOpMeta->getH()) {
+                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                    [uuid = collPtr->uuid(), op, localHash](OperationContext*,
+                                                            boost::optional<Timestamp>) {
+                        recordHashOnlyDelta(uuid, op, localHash);
                     });
             }
         }
@@ -2794,18 +2863,35 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     return status;
                 }
 
-                // Everything but the per-entry hash stays the same across a grouped insert, so it
-                // is evaluated once here and only the hash is checked inside the loop.
-                if (isValidationHashVerifiableFor(opCtx, collection, mode)) {
+                // Left empty unless an entry carries a hash.
+                std::vector<boost::optional<int64_t>> localHashes;
+                if (mode == repl::OplogApplication::Mode::kSecondary) {
+                    const bool verifyHashes =
+                        isValidationHashVerifiableFor(opCtx, collection, mode);
                     for (size_t i = 0; i < insertObjs.size(); i++) {
-                        if (getValidationHash(*insertOps[i]).has_value()) {
+                        auto localHash = computeLocalValidationHash(mode, *insertOps[i], [&] {
+                            return computeDocValidationHash(insertObjs[i].doc);
+                        });
+                        if (verifyHashes && getValidationHash(*insertOps[i]).has_value()) {
+                            tassert(13629803,
+                                    "Expected a local validation hash for a verified insert",
+                                    localHash);
+                        }
+                        if (!localHash) {
+                            continue;
+                        }
+                        if (localHashes.empty()) {
+                            localHashes.resize(insertObjs.size());
+                        }
+                        localHashes[i] = localHash;
+                        if (verifyHashes) {
                             const BSONObj& doc = insertObjs[i].doc;
                             verifyValidationHash(opCtx,
                                                  collection,
                                                  insertObjs[i].replicatedRecordId,
                                                  /*preImage=*/boost::none,
                                                  doc,
-                                                 computeDocValidationHash(doc),
+                                                 *localHash,
                                                  *insertOps[i]);
                         }
                     }
@@ -2813,9 +2899,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 if (mode == repl::OplogApplication::Mode::kSecondary) {
                     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                        [uuid = collection->uuid(), insertObjs, insertOps](
-                            OperationContext*, boost::optional<Timestamp>) {
-                            recordGroupedInsertDelta(uuid, insertObjs, insertOps);
+                        [uuid = collection->uuid(),
+                         insertObjs,
+                         insertOps,
+                         localHashes = std::move(localHashes)](OperationContext*,
+                                                               boost::optional<Timestamp>) {
+                            recordGroupedInsertDelta(uuid, insertObjs, insertOps, localHashes);
                         });
                 }
 
@@ -2920,20 +3009,25 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         opCtx, collection, insertStmt, nullOpDebug, /*fromMigrate=*/false);
 
                     if (status.isOK()) {
+                        const boost::optional<int64_t> localHash = computeLocalValidationHash(
+                            mode, op, [&] { return computeDocValidationHash(o); });
                         if (shouldVerifyValidationHash(opCtx, collection, mode, op)) {
+                            tassert(13629804,
+                                    "Expected a local validation hash for a verified insert",
+                                    localHash);
                             verifyValidationHash(opCtx,
                                                  collection,
                                                  insertStmt.replicatedRecordId,
                                                  /*preImage=*/boost::none,
                                                  o,
-                                                 computeDocValidationHash(o),
+                                                 *localHash,
                                                  op);
                         }
                         if (mode == OplogApplication::Mode::kSecondary) {
                             shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                                [uuid = collection->uuid(), op, o](OperationContext*,
-                                                                   boost::optional<Timestamp>) {
-                                    recordSingleInsertDelta(uuid, op, o);
+                                [uuid = collection->uuid(), op, o, localHash](
+                                    OperationContext*, boost::optional<Timestamp>) {
+                                    recordSingleInsertDelta(uuid, op, o, localHash);
                                 });
                         }
                         wuow.commit();

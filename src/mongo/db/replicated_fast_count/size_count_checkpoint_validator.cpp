@@ -32,6 +32,9 @@ namespace mongo::replicated_fast_count {
 // Adds one byte to the size of each live collection in the standby's expected checkpoint.
 MONGO_FAIL_POINT_DEFINE(skewStandbyCheckpointSize);
 
+// Flips the low bit of the hash of each live collection in the standby's expected checkpoint.
+MONGO_FAIL_POINT_DEFINE(skewStandbyCheckpointHash);
+
 namespace {
 
 thread_local std::vector<ValidatorDeltaRecord>* tValidatorBuffer = nullptr;
@@ -71,6 +74,21 @@ UUID uuidFromContainerInnerOp(const repl::DurableReplOperation& inner) {
     }
     const auto keyBytes = key.getBytesKey();
     return UUID::fromCDR(ConstDataRange(keyBytes.data(), keyBytes.data() + keyBytes.size()));
+}
+
+// Returns the `ReplicatedMetadataDelta` in `deltas` with the provided `uuid`, if it exists.
+// Otherwise, inserts a new `ReplicatedMetadataDelta` into `deltas`.
+//
+// The inserted `ReplicatedMetadataDelta` is initialized with the hash XOR identity
+// `kEmptyCollectionValidationHash` so future hash deltas for this UUID can be combined. If the hash
+// was instead set to `boost::none`, future hash deltas for this UUID would be ignored.
+ReplicatedMetadataDelta& getOrCreateEntry(ReplicatedMetadataDeltas& deltas, UUID uuid) {
+    return deltas
+        .try_emplace(std::move(uuid),
+                     ReplicatedMetadataDelta{
+                         .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                      .hash = kEmptyCollectionValidationHash}})
+        .first->second;
 }
 
 absl::flat_hash_map<UUID, CollectionReplicatedMetadata> scanMetadataStore(OperationContext* opCtx) {
@@ -139,6 +157,7 @@ void addDelta(ReplicatedMetadataDelta& entry, const ReplicatedMetadataDelta& del
             MONGO_UNREACHABLE;
     }
 }
+
 }  // namespace
 
 void validateCheckpoint(const CheckpointContents& standby,
@@ -183,7 +202,9 @@ void validateCheckpoint(const CheckpointContents& standby,
                                uuid.toString()));
         } else if (!primaryRemoved && !standbyRemoved) {
             // Check that the metadata match if neither collection was dropped.
-            if (metadata->sizeCount != standbyIt->second->sizeCount) {
+            // TODO(SERVER-137710): Account for hash repairs, which the standby does not record a
+            // delta for.
+            if (*standbyIt->second != *metadata) {
                 report(reportingStrategy,
                        13626005,
                        fmt::format("Replicated metadata checkpoint mismatch for collection {}: "
@@ -441,11 +462,11 @@ void SizeCountCheckpointValidator::merge(const ValidatorBuffers& threadRecords) 
                     it->cutoff != rec.ts,
                     "Timestamp of a replicated metadata delta should never equal the timestamp "
                     "of a watermark");
-                addDelta(it->deltas[rec.uuid], rec.delta);
+                addDelta(getOrCreateEntry(it->deltas, rec.uuid), rec.delta);
             } else {
                 // The watermark will arrive in another batch, so we fold this record into the
                 // _ongoing map.
-                addDelta(_ongoing[rec.uuid], rec.delta);
+                addDelta(getOrCreateEntry(_ongoing, rec.uuid), rec.delta);
             }
         }
     }
@@ -512,7 +533,7 @@ CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Times
     auto it = _intervals.begin();
     while (it != _intervals.end() && it->cutoff <= validAsOf) {
         for (const auto& [uuid, delta] : it->deltas) {
-            addDelta(observed[uuid], delta);
+            addDelta(getOrCreateEntry(observed, uuid), delta);
         }
         ++it;
     }
@@ -550,12 +571,21 @@ CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Times
             // baseline is seeded with the primary's first checkpoint.
             return baseIt == _baseline->end()
                 ? CollectionReplicatedMetadata{.sizeCount =
-                                                   CollectionSizeCount{.size = 0, .count = 0}}
+                                                   CollectionSizeCount{.size = 0, .count = 0},
+                                               .hash = kEmptyCollectionValidationHash}
                 : baseIt->second;
         }();
         const CollectionReplicatedMetadata absolute = base + delta.metadata;
         expected[uuid] = absolute;
         (*_baseline)[uuid] = absolute;
+    }
+
+    if (MONGO_unlikely(skewStandbyCheckpointHash.shouldFail())) {
+        for (auto&& [uuid, metadata] : expected) {
+            if (metadata && metadata->hash) {
+                *metadata->hash ^= 1;
+            }
+        }
     }
 
     if (MONGO_unlikely(skewStandbyCheckpointSize.shouldFail())) {

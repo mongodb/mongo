@@ -913,10 +913,13 @@ repl::OplogEntry makeCheckpointEntry(Timestamp validAsOf,
         BSONObjBuilder oBuilder;
         key.serialize("k", &oBuilder);
         if (spec.metadata.has_value()) {
-            const BSONObj value =
-                BSON("valid-as-of" << validAsOf << "meta"
-                                   << BSON("ct" << spec.metadata->sizeCount.count << "sz"
-                                                << spec.metadata->sizeCount.size));
+            BSONObjBuilder metaBuilder;
+            metaBuilder.append("ct", spec.metadata->sizeCount.count);
+            metaBuilder.append("sz", spec.metadata->sizeCount.size);
+            if (spec.metadata->hash) {
+                metaBuilder.append(kHashKey, *spec.metadata->hash);
+            }
+            const BSONObj value = BSON("valid-as-of" << validAsOf << "meta" << metaBuilder.obj());
             const repl::ContainerVal valueView(
                 std::span<const char>(value.objdata(), value.objsize()));
             valueView.serialize("v", &oBuilder);

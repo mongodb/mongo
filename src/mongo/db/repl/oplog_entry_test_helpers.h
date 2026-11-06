@@ -332,6 +332,41 @@ OplogEntry makeDeleteOplogEntryWithRecordIdAndSizeMetadata(OpTime opTime,
                                                            const RecordId& rid,
                                                            int sizeDelta);
 
+/**
+ * Creates an insert oplog entry with the given recordId and size metadata carrying both the
+ * inserted document's size (m.sz) and the given document hash (m.h).
+ */
+OplogEntry makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(OpTime opTime,
+                                                               const NamespaceString& nss,
+                                                               const UUID& uuid,
+                                                               const BSONObj& docToInsert,
+                                                               const RecordId& rid,
+                                                               int64_t hash);
+
+/**
+ * Creates an update oplog entry with the given recordId and size metadata carrying both a size
+ * delta (m.sz) and a document hash (m.h).
+ */
+OplogEntry makeUpdateOplogEntryWithRecordIdSizeMetadataAndHash(OpTime opTime,
+                                                               const NamespaceString& nss,
+                                                               const BSONObj& documentToUpdate,
+                                                               const BSONObj& updatedDocument,
+                                                               const RecordId& rid,
+                                                               int sizeDelta,
+                                                               int64_t hash);
+
+/**
+ * Creates a delete oplog entry with the given recordId and size metadata carrying both a size delta
+ * (m.sz) and a document hash (m.h).
+ */
+OplogEntry makeDeleteOplogEntryWithRecordIdSizeMetadataAndHash(OpTime opTime,
+                                                               const NamespaceString& nss,
+                                                               const UUID& uuid,
+                                                               const BSONObj& docToDelete,
+                                                               const RecordId& rid,
+                                                               int sizeDelta,
+                                                               int64_t hash);
+
 OplogEntry makeUpdateOplogEntryWithRecordIdWithoutSz(OpTime opTime,
                                                      const NamespaceString& nss,
                                                      const BSONObj& documentToUpdate,

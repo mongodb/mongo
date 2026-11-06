@@ -23,7 +23,6 @@
 #include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -192,6 +191,107 @@ TEST(ValidateCheckpointTest, CountMismatchLogsError) {
     logs.stop();
 
     EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626005)), 1);
+}
+
+TEST(ValidateCheckpointTest, MatchingHashPasses) {
+    const UUID uuid = UUID::gen();
+    CheckpointContents expected;
+    expected[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 42};
+    CheckpointContents actual;
+    actual[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 42};
+    validateCheckpoint(expected, actual, ReportingStrategy::kFassert);
+}
+
+DEATH_TEST(ValidateCheckpointDeathTest, HashMismatchFasserts, "13626005") {
+    const UUID uuid = UUID::gen();
+    CheckpointContents expected;
+    expected[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 42};
+    CheckpointContents actual;
+    actual[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 43};
+    validateCheckpoint(expected, actual, ReportingStrategy::kFassert);
+}
+
+TEST(ValidateCheckpointTest, HashMismatchLogsError) {
+    const UUID uuid = UUID::gen();
+    CheckpointContents expected;
+    expected[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 42};
+    CheckpointContents actual;
+    actual[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 43};
+
+    unittest::LogCaptureGuard logs;
+    validateCheckpoint(expected, actual, ReportingStrategy::kLogError);
+    logs.stop();
+
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626005)), 1);
+}
+
+DEATH_TEST(ValidateCheckpointDeathTest, HashAbsentOnStandbyFasserts, "13626005") {
+    const UUID uuid = UUID::gen();
+    CheckpointContents expected;
+    expected[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = boost::none};
+    CheckpointContents actual;
+    actual[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 42};
+    validateCheckpoint(expected, actual, ReportingStrategy::kFassert);
+}
+
+TEST(ValidateCheckpointTest, HashAbsentOnStandbyLogsError) {
+    const UUID uuid = UUID::gen();
+    CheckpointContents expected;
+    expected[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = boost::none};
+    CheckpointContents actual;
+    actual[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 42};
+
+    unittest::LogCaptureGuard logs;
+    validateCheckpoint(expected, actual, ReportingStrategy::kLogError);
+    logs.stop();
+
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626005)), 1);
+}
+
+DEATH_TEST(ValidateCheckpointDeathTest, HashAbsentOnPrimaryFasserts, "13626005") {
+    const UUID uuid = UUID::gen();
+    CheckpointContents expected;
+    expected[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 42};
+    CheckpointContents actual;
+    actual[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = boost::none};
+    validateCheckpoint(expected, actual, ReportingStrategy::kFassert);
+}
+
+TEST(ValidateCheckpointTest, HashAbsentOnPrimaryLogsError) {
+    const UUID uuid = UUID::gen();
+    CheckpointContents expected;
+    expected[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = 42};
+    CheckpointContents actual;
+    actual[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = boost::none};
+
+    unittest::LogCaptureGuard logs;
+    validateCheckpoint(expected, actual, ReportingStrategy::kLogError);
+    logs.stop();
+
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13626005)), 1);
+}
+
+TEST(ValidateCheckpointTest, HashAbsentOnBothPasses) {
+    const UUID uuid = UUID::gen();
+    CheckpointContents expected;
+    expected[uuid] = CollectionReplicatedMetadata{
+        .sizeCount = CollectionSizeCount{.size = 10, .count = 1}, .hash = boost::none};
+    CheckpointContents actual = expected;
+    validateCheckpoint(expected, actual, ReportingStrategy::kFassert);
 }
 
 DEATH_TEST(ValidateCheckpointDeathTest, MissingWriteFasserts, "13626006") {
@@ -897,7 +997,8 @@ TEST_F(SizeCountCheckpointValidatorTest, DropOfKnownCollectionCheckedByMembershi
         makeCheckpointEntry(kT1,
                             {{uuid,
                               CollectionReplicatedMetadata{
-                                  .sizeCount = CollectionSizeCount{.size = 100, .count = 10}}}}),
+                                  .sizeCount = CollectionSizeCount{.size = 100, .count = 10},
+                                  .hash = kEmptyCollectionValidationHash}}}),
         makeWatermarkEntry(kT3),
         makeCheckpointEntry(kT3, {{uuid, boost::none}})};
     applyBatch(
@@ -937,10 +1038,11 @@ TEST_F(SizeCountCheckpointValidatorTest, CreatedCollectionStartsAtZero) {
     const UUID uuid = UUID::gen();
     const std::vector<repl::OplogEntry> ops{
         makeWatermarkEntry(kT1),
-        makeCheckpointEntry(kT1,
-                            {{uuid,
-                              CollectionReplicatedMetadata{
-                                  .sizeCount = CollectionSizeCount{.size = 0, .count = 0}}}})};
+        makeCheckpointEntry(
+            kT1,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                           .hash = kEmptyCollectionValidationHash}}})};
     applyBatch(validator,
                ops,
                {{.ts = kT0,
@@ -1257,24 +1359,149 @@ DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
         {});
 }
 
-DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
-             SkewStandbyCheckpointSizeFailPointFasserts,
-             "13626005") {
-    FailPointEnableBlock skewFp("skewStandbyCheckpointSize");
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest, WrongHashInCheckpointFasserts, "13626005") {
     const UUID uuid = UUID::gen();
     const std::vector<repl::OplogEntry> ops{
         makeWatermarkEntry(kT1),
-        makeCheckpointEntry(kT1,
-                            {{uuid,
-                              CollectionReplicatedMetadata{
-                                  .sizeCount = CollectionSizeCount{.size = 50, .count = 5}}}})};
+        makeCheckpointEntry(
+            kT1,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 50, .count = 5},
+                                           .hash = 999}}})};
     applyBatch(validator,
                ops,
                std::vector<ValidatorDeltaRecord>{
                    {.ts = kT0,
                     .uuid = uuid,
                     .delta = ReplicatedMetadataDelta{
-                        .metadata = {.sizeCount = CollectionSizeCount{.size = 50, .count = 5}}}}});
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 50, .count = 5},
+                                     .hash = 7}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, HashesFoldAcrossDeltasAndCheckpoints) {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(
+            kT1,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 30, .count = 2},
+                                           .hash = 0b0011 ^ 0b0101}}}),
+        makeWatermarkEntry(kT3),
+        makeCheckpointEntry(
+            kT3,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 40, .count = 3},
+                                           .hash = 0b0011 ^ 0b0101 ^ 0b1000}}})};
+    applyBatch(validator,
+               ops,
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT0,
+                    .uuid = uuid,
+                    .delta =
+                        ReplicatedMetadataDelta{
+                            .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                         .hash = 0b0011}}},
+                   {.ts = Timestamp(Seconds(100), 1),
+                    .uuid = uuid,
+                    .delta =
+                        ReplicatedMetadataDelta{
+                            .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 1},
+                                         .hash = 0b0101}}},
+                   {.ts = kT2,
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                     .hash = 0b1000}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, HashesFoldAcrossIntervalsForLaterCheckpoint) {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeWatermarkEntry(kT3),
+        makeCheckpointEntry(
+            kT3,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 30, .count = 2},
+                                           .hash = 0b0011 ^ 0b0101}}})};
+    applyBatch(validator,
+               ops,
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT0,
+                    .uuid = uuid,
+                    .delta =
+                        ReplicatedMetadataDelta{
+                            .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                         .hash = 0b0011}}},
+                   {.ts = kT2,
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 1},
+                                     .hash = 0b0101}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, HashesFoldAcrossBatchesBeforeWatermark) {
+    const UUID uuid = UUID::gen();
+    applyBatch(validator,
+               /*ops=*/{},
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT0,
+                    .uuid = uuid,
+                    .delta =
+                        ReplicatedMetadataDelta{
+                            .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                         .hash = 0b0011}}},
+                   {.ts = Timestamp(Seconds(100), 1),
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 1},
+                                     .hash = 0b0101}}}});
+    // The delta past the watermark belongs to a later checkpoint.
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(
+            kT1,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 30, .count = 2},
+                                           .hash = 0b0011 ^ 0b0101}}})};
+    applyBatch(validator,
+               ops,
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT2,
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 40, .count = 1},
+                                     .hash = 0b1000}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, HashesValidatePerCollection) {
+    const UUID uuidA = UUID::gen();
+    const UUID uuidB = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(
+            kT1,
+            {{uuidA,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                           .hash = 0b0011}},
+             {uuidB,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 20, .count = 1},
+                                           .hash = 0b0101}}})};
+    applyBatch(validator,
+               ops,
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT0,
+                    .uuid = uuidA,
+                    .delta =
+                        ReplicatedMetadataDelta{
+                            .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                         .hash = 0b0011}}},
+                   {.ts = Timestamp(Seconds(100), 1),
+                    .uuid = uuidB,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 1},
+                                     .hash = 0b0101}}}});
 }
 
 DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
@@ -1347,7 +1574,8 @@ DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
         makeCheckpointEntry(kT1,
                             {{uuid,
                               CollectionReplicatedMetadata{
-                                  .sizeCount = CollectionSizeCount{.size = 100, .count = 10}}}}),
+                                  .sizeCount = CollectionSizeCount{.size = 100, .count = 10},
+                                  .hash = kEmptyCollectionValidationHash}}}),
         makeWatermarkEntry(kT3),
         makeCheckpointEntry(kT3,
                             {{uuid,
@@ -1376,7 +1604,8 @@ DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
         makeCheckpointEntry(kT1,
                             {{uuid,
                               CollectionReplicatedMetadata{
-                                  .sizeCount = CollectionSizeCount{.size = 100, .count = 10}}}}),
+                                  .sizeCount = CollectionSizeCount{.size = 100, .count = 10},
+                                  .hash = kEmptyCollectionValidationHash}}}),
         makeWatermarkEntry(kT3),
         makeCheckpointEntry(kT3,
                             {{otherUuid,

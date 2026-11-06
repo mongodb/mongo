@@ -846,10 +846,12 @@ server_parameters:
 
     continuousInternodeValidationFatalOnMismatch:
         description: >-
-            When true, a hash mismatch detected by continuous internode validation crashes the
+            When true, a per-document hash mismatch detected during oplog application crashes the
             node, unless the node is still in STARTUP or STARTUP2, where the mismatch is only
             logged so that a mismatch reproducing from the last checkpoint cannot turn into a
             startup crash loop. When false, the mismatch is only logged in every state.
+            Per-collection replicated metadata checkpoint mismatches are governed by
+            fassertOnPerCollectionContinuousInternodeValidationFailure instead.
         set_at: [startup, runtime]
         cpp_vartype: Atomic<bool>
         cpp_varname: continuousInternodeValidationFatalOnMismatch

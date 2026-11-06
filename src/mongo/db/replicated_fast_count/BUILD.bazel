@@ -309,7 +309,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/storage:write_unit_of_work",
         "//src/mongo/otel/metrics:metrics_test_util",
-        "//src/mongo/util:fail_point",
     ],
 )
 
@@ -712,6 +711,7 @@ mongo_cc_unit_test(
     deps = [
         "replicated_fast_count_init",
         "replicated_fast_count_test_helpers",
+        "//src/mongo/db/repl:internode_validation_hash_utils",
         "//src/mongo/db/repl:oplog_applier_impl_test_fixture",
         "//src/mongo/unittest",
     ],
