@@ -80,6 +80,27 @@ ResumeTokenData resolveResumeTokenFromSpec(const boost::intrusive_ptr<Expression
 bool shouldEmitCollectionUUIDForChangeEvent(const DocumentSourceChangeStreamSpec& spec);
 
 /**
+ * Returns true if this change stream is opted into 'showErrorsAsEvents'. Kept out of the generic
+ * ExpressionContext so that class stays change-stream-agnostic.
+ */
+inline bool changeStreamShowsErrorsAsEvents(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& spec = expCtx->getChangeStreamSpec();
+    return spec && spec->getShowErrorsAsEvents().value_or(false);
+}
+
+/**
+ * Records 'doc' on the ExpressionContext as the change stream event in flight above the transform
+ * stage, so that a recoverable failure in a stage above it can later be reported against this
+ * event. Error events ('operationType: "error"') are not recorded. A result without a resume token
+ * (a single-element object sort key) clears the recorded event instead, so that a failure on it is
+ * never attributed to an earlier event.
+ *
+ * The caller must only call this for streams opted in to 'showErrorsAsEvents'.
+ */
+void recordActiveEventIdentity(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               const Document& doc);
+
+/**
  * Creates endOfTransaction no-op oplog entry
  */
 [[MONGO_MOD_NEEDS_REPLACEMENT]]

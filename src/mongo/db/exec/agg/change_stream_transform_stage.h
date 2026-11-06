@@ -28,6 +28,10 @@ public:
 private:
     GetNextResult doGetNext() final;
 
+    // Whether this stream opts into 'showErrorsAsEvents'. Cached at construction time so the hot
+    // path does not re-read the option from the spec for every event.
+    const bool _showErrorsAsEvents;
+
     std::shared_ptr<ChangeStreamEventTransformer> _transformer;
 };
 }  // namespace mongo::exec::agg

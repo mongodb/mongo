@@ -4,6 +4,7 @@
 #include "mongo/db/exec/agg/change_stream_transform_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/util/assert_util.h"
 
@@ -35,7 +36,9 @@ ChangeStreamTransformStage::ChangeStreamTransformStage(
     std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     std::shared_ptr<ChangeStreamEventTransformer> transformer)
-    : Stage(stageName, pExpCtx), _transformer(std::move(transformer)) {
+    : Stage(stageName, pExpCtx),
+      _showErrorsAsEvents(change_stream::changeStreamShowsErrorsAsEvents(pExpCtx)),
+      _transformer(std::move(transformer)) {
     uassert(50988,
             "Illegal attempt to execute an internal change stream stage on router. A $changeStream "
             "stage must be the first stage in a pipeline",
@@ -48,7 +51,14 @@ GetNextResult ChangeStreamTransformStage::doGetNext() {
         return input;
     }
 
-    return _transformer->applyTransformation(input.releaseDocument());
+    auto result = _transformer->applyTransformation(input.releaseDocument());
+
+    // From here on this event is in flight above the transform: record it so that a failure in
+    // the stages above can be reported against it.
+    if (_showErrorsAsEvents) {
+        change_stream::recordActiveEventIdentity(pExpCtx, result);
+    }
+    return std::move(result);
 }
 
 }  // namespace exec::agg

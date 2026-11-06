@@ -87,6 +87,12 @@ bool shouldEmitCollectionUUIDForChangeEvent(const DocumentSourceChangeStreamSpec
     return spec.getShowExpandedEvents();
 }
 
+void recordActiveEventIdentity(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               const Document& doc) {
+    // Documents are immutable and refcounted: this stores a reference, not a copy.
+    expCtx->setActiveChangeStreamEvent(doc);
+}
+
 repl::MutableOplogEntry createEndOfTransactionOplogEntry(
     const LogicalSessionId& lsid,
     const TxnNumber& txnNumber,

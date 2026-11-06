@@ -18,6 +18,7 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
 #include "mongo/db/pipeline/change_stream_reader_builder.h"
 #include "mongo/db/pipeline/change_stream_reader_builder_mock.h"
@@ -1721,6 +1722,167 @@ TEST_F(ChangeStreamStageTest, TransformInsertDocKeyXAndId) {
                                   fromMigrate,           // fromMigrate
                                   insert.getObject2());  // o2
     checkTransformation(insert2, expectedInsert);
+}
+
+// The transform records the event it builds on the ExpressionContext, only for streams opted in to
+// 'showErrorsAsEvents'.
+class ChangeStreamTransformRecordsEventTest : public ChangeStreamStageTest {
+protected:
+    std::unique_ptr<exec::agg::Pipeline> makeInsertPipeline(bool showErrorsAsEvents) {
+        auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
+                                     nss,                           // namespace
+                                     BSON("_id" << 1 << "x" << 2),  // o
+                                     testUuid(),                    // uuid
+                                     boost::none,                   // fromMigrate
+                                     BSON("_id" << 1));             // o2
+        // Baked into the spec (as production does) rather than set on the expCtx afterward, so the
+        // flag is visible to the transform stage at construction time.
+        BSONObj spec =
+            BSON(DocumentSourceChangeStream::kStageName
+                 << (showErrorsAsEvents ? BSON("showErrorsAsEvents"
+                                               << true << "startAtOperationTime" << kDefaultTs)
+                                        : BSON("startAtOperationTime" << kDefaultTs)));
+        unittest::ServerParameterGuard flagEnabler("featureFlagChangeStreamEmitErrorEvents",
+                                                   showErrorsAsEvents);
+        auto pipeline = makeExecPipeline(insert, spec);
+        return pipeline;
+    }
+};
+
+TEST_F(ChangeStreamTransformRecordsEventTest, DoesNotRecordWhenOptionIsOff) {
+    auto pipeline = makeInsertPipeline(false /* showErrorsAsEvents */);
+
+    ASSERT_TRUE(pipeline->getStages().back()->getNext().isAdvanced());
+    ASSERT_FALSE(getExpCtx()->getActiveChangeStreamEvent());
+}
+
+TEST_F(ChangeStreamTransformRecordsEventTest, RecordsBuiltEventWhenOptionIsOn) {
+    auto pipeline = makeInsertPipeline(true /* showErrorsAsEvents */);
+
+    auto next = pipeline->getStages().back()->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+
+    const auto& recorded = getExpCtx()->getActiveChangeStreamEvent();
+    ASSERT_TRUE(recorded);
+    ASSERT_DOCUMENT_EQ(*recorded, next.getDocument());
+    ASSERT_VALUE_EQ(recorded->metadata().getSortKey(), next.getDocument().metadata().getSortKey());
+}
+
+// The transform records only the change events it produces; a pause-execution result is passed
+// through without producing one, so nothing is recorded for it.
+TEST_F(ChangeStreamTransformRecordsEventTest, PauseExecutionDoesNotRecord) {
+    unittest::ServerParameterGuard flagEnabler("featureFlagChangeStreamEmitErrorEvents", true);
+
+    auto mockSource = exec::agg::MockStage::createForTest(
+        std::deque<exec::agg::GetNextResult>{exec::agg::GetNextResult::makePauseExecution()},
+        getExpCtx());
+
+    // Build the transform stage against a mock source so we can feed a pause-execution result.
+    auto transformDS = DocumentSourceChangeStreamTransform::createFromBson(
+        BSON(DocumentSourceChangeStreamTransform::kStageName
+             << BSON("showErrorsAsEvents" << true << "startAtOperationTime" << kDefaultTs))
+            .firstElement(),
+        getExpCtx());
+    auto transformStage = exec::agg::buildStageAndStitch(transformDS, mockSource);
+
+    auto next = transformStage->getNext();
+    ASSERT_TRUE(next.isPaused());
+    // A pause does not produce a change event, so nothing is recorded.
+    ASSERT_FALSE(getExpCtx()->getActiveChangeStreamEvent());
+}
+
+// The transform records only events it produces; EOF passes through without producing a change
+// event, so nothing is recorded.
+TEST_F(ChangeStreamTransformRecordsEventTest, EOFPassesThroughWithoutRecording) {
+    unittest::ServerParameterGuard flagEnabler("featureFlagChangeStreamEmitErrorEvents", true);
+
+    auto mockSource = exec::agg::MockStage::createForTest(
+        std::deque<exec::agg::GetNextResult>{exec::agg::GetNextResult::makeEOF()}, getExpCtx());
+
+    auto transformDS = DocumentSourceChangeStreamTransform::createFromBson(
+        BSON(DocumentSourceChangeStreamTransform::kStageName
+             << BSON("showErrorsAsEvents" << true << "startAtOperationTime" << kDefaultTs))
+            .firstElement(),
+        getExpCtx());
+    auto transformStage = exec::agg::buildStageAndStitch(transformDS, mockSource);
+
+    auto next = transformStage->getNext();
+    ASSERT_TRUE(next.isEOF());
+    ASSERT_FALSE(getExpCtx()->getActiveChangeStreamEvent());
+}
+
+// A control document passes through the transform; it must not be recorded as the in-flight event,
+// since it is not an ordinary resumable change event.
+TEST_F(ChangeStreamTransformRecordsEventTest, DoesNotRecordControlEvent) {
+    unittest::ServerParameterGuard flagEnabler("featureFlagChangeStreamEmitErrorEvents", true);
+
+    MutableDocument control;
+    control[DSChangeStream::kOperationTypeField] = Value(DSChangeStream::kInvalidateOpType);
+    control.metadata().setSortKey(Value(BSON("_data" << "token")), true /* isSingleElem */);
+    control.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology);
+
+    auto mockSource = exec::agg::MockStage::createForTest(
+        std::deque<exec::agg::GetNextResult>{
+            exec::agg::GetNextResult::makeAdvancedControlDocument(control.freeze())},
+        getExpCtx());
+
+    auto transformDS = DocumentSourceChangeStreamTransform::createFromBson(
+        BSON(DocumentSourceChangeStreamTransform::kStageName
+             << BSON("showErrorsAsEvents" << true << "startAtOperationTime" << kDefaultTs))
+            .firstElement(),
+        getExpCtx());
+    auto transformStage = exec::agg::buildStageAndStitch(transformDS, mockSource);
+
+    auto next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvancedControlDocument());
+    ASSERT_FALSE(getExpCtx()->getActiveChangeStreamEvent());
+}
+
+// Verifies that a user $project, which strips fields from a change stream event, does not affect
+// the event identity recorded by the transform. The recorded document is a refcounted, immutable
+// snapshot taken before user stages run; projection builds a NEW downstream document and cannot
+// mutate the already-recorded snapshot.
+TEST_F(ChangeStreamTransformRecordsEventTest, RecordedEventIsUnaffectedByUpstreamProjection) {
+    unittest::ServerParameterGuard flagEnabler("featureFlagChangeStreamEmitErrorEvents", true);
+
+    // An event carrying fields that a user $project may strip (documentKey, ns, clusterTime), plus
+    // the resume-token sort key that identifies it.
+    MutableDocument event;
+    event[DSChangeStream::kOperationTypeField] = Value(DSChangeStream::kInsertOpType);
+    event[DSChangeStream::kDocumentKeyField] = Value(Document{{"_id"sv, 1}});
+    event[DSChangeStream::kNamespaceField] = Value(Document{{"db"sv, "test"sv}, {"coll"sv, "c"sv}});
+    event[DSChangeStream::kClusterTimeField] = Value(kDefaultTs);
+    event.metadata().setSortKey(Value(BSON("_data" << "token")), true /* isSingleElem */);
+    const Document recordedSnapshot = event.freeze();
+
+    // Record the event identity, as the transform stage does before user stages run.
+    change_stream::recordActiveEventIdentity(getExpCtx(), recordedSnapshot);
+    ASSERT_TRUE(getExpCtx()->getActiveChangeStreamEvent());
+
+    // A $project that removes exactly the fields above. It builds a new downstream document.
+    auto mockSource = exec::agg::MockStage::createForTest(recordedSnapshot, getExpCtx());
+    auto project = DocumentSourceProject::create(
+        BSON("documentKey" << 0 << "ns" << 0 << "clusterTime" << 0), getExpCtx(), "$project"sv);
+    auto projectStage = exec::agg::buildStageAndStitch(project, mockSource);
+
+    auto next = projectStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    // The projected (new) document no longer has the stripped fields...
+    ASSERT_TRUE(next.getDocument()[DSChangeStream::kDocumentKeyField].missing());
+    ASSERT_TRUE(next.getDocument()[DSChangeStream::kNamespaceField].missing());
+    ASSERT_TRUE(next.getDocument()[DSChangeStream::kClusterTimeField].missing());
+
+    // ...but the recorded snapshot still does: projection cannot mutate the recorded, immutable
+    // document; it only produced a separate downstream document.
+    const auto& active = getExpCtx()->getActiveChangeStreamEvent();
+    ASSERT_TRUE(active);
+    ASSERT_VALUE_EQ(active->getField(DSChangeStream::kDocumentKeyField),
+                    recordedSnapshot.getField(DSChangeStream::kDocumentKeyField));
+    ASSERT_VALUE_EQ(active->getField(DSChangeStream::kNamespaceField),
+                    recordedSnapshot.getField(DSChangeStream::kNamespaceField));
+    ASSERT_VALUE_EQ(active->getField(DSChangeStream::kClusterTimeField),
+                    recordedSnapshot.getField(DSChangeStream::kClusterTimeField));
 }
 
 TEST_F(ChangeStreamStageTest, TransformInsertDocKeyIdAndX) {
