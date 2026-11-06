@@ -93,7 +93,7 @@ describe("resharding recipient waiting on a pre-existing index build", function 
             .getDB("admin")
             .aggregate([
                 {$currentOp: {allUsers: true, idleConnections: true}},
-                {$match: {desc: {$regex: "^ReshardingRecipientService"}}},
+                {$match: {desc: {$regex: "^ReshardingRecipientService"}, opid: {$exists: true}}},
             ])
             .toArray();
     }
