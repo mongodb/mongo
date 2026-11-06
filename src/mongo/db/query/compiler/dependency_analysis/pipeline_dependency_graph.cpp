@@ -489,6 +489,21 @@ std::string_view skipPathComponents(std::string_view path, size_t count) {
 }
 
 /**
+ * Extracts the prefix made of the first 'count' path components from a dotted path string.
+ */
+std::string_view takePathComponents(std::string_view path, size_t count) {
+    size_t end = 0;
+    for (size_t i = 0, pos = 0; i < count; i++) {
+        end = path.find('.', pos);
+        if (end == std::string::npos) {
+            return path;
+        }
+        pos = end + 1;
+    }
+    return path.substr(0, end);
+}
+
+/**
  * Extracts the prefix from a dotted path.
  * Examples:
  * - a -> ""
@@ -680,6 +695,15 @@ Type resolvePathType(Type type, PathRef path) {
     }
     return ts::expression::traversePath(
         std::move(type), fieldPath.getValue(), ts::expression::PathSemantics::kFieldPath);
+}
+
+/// Returns the type of a non-array value which holds no array along the dotted 'path' below it.
+Type nonArrayPathType(PathRef path) {
+    Type type = ts::complement(Type(BSONType::array, ts::Extent::kAll));
+    if (!path.empty()) {
+        type.setField(takePathComponents(path, 1), nonArrayPathType(skipPathComponents(path, 1)));
+    }
+    return type;
 }
 }  // namespace
 
@@ -1218,9 +1242,8 @@ private:
             case FieldMatchType::kMissing:
                 // TODO(SERVER-137963): Use missing information.
                 break;
-            case FieldMatchType::kBaseDocument: {
-                break;
-            }
+            case FieldMatchType::kBaseDocument:
+                return getDocumentTypeFromCollection(pathMatch);
         }
         return createDocumentFromLeafMatch(fieldType, pathMatch);
     }
@@ -1232,6 +1255,36 @@ private:
             return boost::none;
         }
         return it->second;
+    }
+
+    /**
+     * Returns the document type of the collection holding the matched path, with arrays removed
+     * where the collection's path arrayness proves them absent.
+     */
+    Type getDocumentTypeFromCollection(const PathMatch& pathMatch) const {
+        const PathRef topLevelField = takePathComponents(pathMatch.path, 1);
+        Type rootType = Type::anyObject();
+        rootType.setField(topLevelField, getTypeFromSchema(topLevelField));
+        if (!rootType.canPathBeArray(FieldRef(pathMatch.path))) {
+            return rootType;
+        }
+        return ts::intersectType(std::move(rootType), getConstraintFromPathArrayness(pathMatch));
+    }
+
+    /**
+     * Returns a Type encoding the PathArrayness information for the given path.
+     */
+    Type getConstraintFromPathArrayness(const PathMatch& pathMatch) const {
+        // Probe prefixes, until we exhaust the path.
+        // For 'a.b.c', check 'a.b.c' then 'a.b', then 'a'.
+        for (PathRef path = pathMatch.path;; path = getPathPrefix(path)) {
+            if (!canCollectionFieldBeArray(path)) {
+                return nonArrayPathType(path);
+            }
+            if (path == takePathComponents(path, 1)) {
+                return Type::any();
+            }
+        }
     }
 
     boost::intrusive_ptr<DocumentSource> getPrevModifyingStage(const PathMatch& match) const {

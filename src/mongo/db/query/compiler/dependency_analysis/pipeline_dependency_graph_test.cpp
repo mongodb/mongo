@@ -11,6 +11,7 @@
 #include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -18,6 +19,9 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph_test_util.h"
+#include "mongo/db/query/compiler/metadata/schema_type_info.h"
+#include "mongo/db/query/compiler/type_system/matcher_typing.h"
+#include "mongo/db/query/compiler/type_system/type.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
@@ -46,22 +50,26 @@ using namespace std::literals::string_view_literals;
 namespace mongo::pipeline::dependency_graph {
 namespace {
 
+using namespace pipeline::type_system;
+
 using Stages = std::vector<const DocumentSource*>;
 
 class PipelineDependencyGraphTest : public unittest::Test {
 protected:
     void SetUp() override {
+        expCtx = new ExpressionContextForTest();
         pathArrayness = std::make_shared<PathArrayness>();
+        schemaTypeInfo = std::make_shared<SchemaTypeInfo>();
     }
 
     void setPipeline(std::unique_ptr<Pipeline> p) {
         pipeline = std::move(p);
-        auto& expCtx = *pipeline->getContext();
-        const auto& nss = expCtx.getNamespaceString();
-        expCtx.setPathArraynessForNss(nss, pathArrayness);
+        const auto& nss = expCtx->getNamespaceString();
+        expCtx->setPathArraynessForNss(nss, pathArrayness);
+        expCtx->setSchemaTypeInfoForNss(nss, schemaTypeInfo);
         stages.assign(pipeline->getSources().begin(), pipeline->getSources().end());
         graph = std::make_unique<DependencyGraph>(
-            pipeline->getSources(), nss, CollectionMetadataAccessor{expCtx});
+            pipeline->getSources(), nss, CollectionMetadataAccessor{*expCtx});
     }
 
     void setPipeline(const std::string& array) {
@@ -72,6 +80,19 @@ protected:
         auto p = parsePipeline(array);
         pipeline_optimization::optimizePipeline(*p);
         setPipeline(std::move(p));
+    }
+
+    void setSchemaType(Type type) {
+        schemaTypeInfo = std::make_shared<SchemaTypeInfo>(type);
+    }
+
+    void setSchemaTypeFromMatch(std::string expr) {
+        auto match = MatchExpressionParser::parse(fromjson(expr),
+                                                  expCtx,
+                                                  ExtensionsCallbackNoop(),
+                                                  MatchExpressionParser::kAllowAllSpecialFeatures);
+        auto type = narrowType(Type::anyObject(), match.getValue().get(), true);
+        setSchemaType(type);
     }
 
     /**
@@ -101,8 +122,10 @@ protected:
         recomputeAndAssert(*graph, *pipeline, std::forward<F>(func));
     }
 
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx;
     std::unique_ptr<Pipeline> pipeline;
     std::shared_ptr<PathArrayness> pathArrayness;
+    std::shared_ptr<SchemaTypeInfo> schemaTypeInfo;
     std::vector<boost::intrusive_ptr<DocumentSource>> stages;
     std::unique_ptr<DependencyGraph> graph;
 
@@ -136,7 +159,6 @@ private:
         }
 
         AggregateCommandRequest request(kTestNss, rawPipeline);
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx = new ExpressionContextForTest();
         expCtx->setResolvedNamespaces(resolvedNs);
 
         return pipeline_factory::makePipeline(
@@ -4381,6 +4403,11 @@ TEST_F(PipelineDependencyGraphTest, GetTypeIgnoresRenameTypeUnderPossiblyArrayPr
     ])");
     // TODO(SERVER-137963): 'p' cannot be missing in this case, and neither can 'p.a'.
     runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(stages[1].get(), "x").toDebugString(), "number");
+        // TODO(SERVER-137963): 'x' should be 'missing' after the project.
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "any");
+        // TODO(SERVER-137963): 'p' should have some sort of object|array type.
+        ASSERT_EQ(graph->getType_forTest(nullptr, "p").toDebugString(), "any");
         ASSERT_EQ(graph->getType_forTest(nullptr, "p.a").toDebugString(),
                   "missing|number|array(S)");
     });
@@ -4467,6 +4494,186 @@ TEST_F(PipelineDependencyGraphTest, GetTypeRenameOfNever) {
         // TODO(SERVER-137963): 'a.b.c' cannot be missing here.
         ASSERT_EQ(graph->getType_forTest(nullptr, "a.b.c").toDebugString(), "missing");
     });
+}
+
+TEST_F(PipelineDependencyGraphTest, TypeOfSuffixPathAfterRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {$and: [
+            {x: {$not: {$type: 'array'}}},
+            {'x.y': {$not: {$type: 'array'}}},
+            {'x.y': {$type: 'number'}}
+        ]}},
+        {$set: {'a.b': '$x'}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "{y: number, ...}");
+        // 'a' can be an array or an object with field 'b'.
+        // TODO(SERVER-137963): Report array(S)|object instead of any.
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a").toDebugString(), "any");
+        // The rename target 'a.b' can be an array(S), since the prefix 'a' could have been!
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a.b").toDebugString(),
+                  "missing|{y: number, ...}|array(S)");
+        // Tricky: getType_forTest uses ExpressionFieldPath semantics, so indeed, $a.b.y will
+        // produce only these types.
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a.b.y").toDebugString(),
+                  "missing|number|array(S)");
+        // TODO(SERVER-137672) for getPathType we must return 'any' here, since we don't
+        // know how the caller will want to traverse the array that would be 'a.b'. A $match
+        // expression would see the elements inside the array which could be of any type (since
+        // arrays are opaque), e.g. for input {a: {b: [{y: 1}, {y: "string"}]}}, "$a.b" cannot
+        // produce "string", but a $match on that path will match on the string too!
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeIntersectsBaseFieldWithArrayness) {
+    pathArrayness->addPathsFromIndexKeyPattern(
+        BSON("x" << 1), MultikeyPaths{{}}, true /* isFullRebuild */);
+    setPipeline("[{$match: {x: {$type: 'number'}}}]");
+    runTest([&] {
+        auto type = graph->getType_forTest(nullptr, "x");
+        ASSERT_TRUE(type.hasType(BSONType::numberInt));
+        ASSERT_FALSE(type.hasType(BSONType::array));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeCombinesSchemaAndPathArrayness) {
+    // Setup: x non-array from path arrayness, but string|array(S) from schema.
+    pathArrayness->addPathsFromIndexKeyPattern(
+        BSON("x" << 1), MultikeyPaths{{}}, true /* isFullRebuild */);
+    setSchemaTypeFromMatch("{x: {$type: 'string'}}");
+    setPipeline("[]");
+
+    const auto type = graph->getType_forTest(nullptr, "x");
+    ASSERT_EQ(type.toDebugString(), "string");
+    ASSERT_TRUE(expCtx->hasUsedSchemaTypeInfo());
+    ASSERT_FALSE(expCtx->nonArrayPathsForNss(expCtx->getNamespaceString()).empty());
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeDoesNotUsePathArraynessWhenNotNeeded) {
+    // Setup: x is non-array from schema, so the PathArrayness is not needed.
+    pathArrayness->addPathsFromIndexKeyPattern(
+        BSON("x" << 1), MultikeyPaths{{}}, true /* isFullRebuild */);
+    setSchemaTypeFromMatch("{x: {$not: {$type: 'array'}}}");
+    setPipeline("[]");
+
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "~array");
+    ASSERT_TRUE(expCtx->hasUsedSchemaTypeInfo());
+    ASSERT_TRUE(expCtx->nonArrayPathsForNss(expCtx->getNamespaceString()).empty());
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeIntersectsMatchesAndSchema) {
+    // Setup: x is 'missing|string|array(S)' from schema.
+    // And x is also matched as string|array(S) from $match in pipeline.
+    setSchemaTypeFromMatch("{$or: [{x: {$type: 'string'}}, {x: {$exists: false}}]}");
+    setPipeline("[{$match: {x: {$type: 'string'}}}]");
+
+    ASSERT_EQ(graph->getType_forTest(stages.at(0).get(), "x").toDebugString(),
+              "missing|string|array(S)");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "string|array(S)");
+    ASSERT_TRUE(expCtx->nonArrayPathsForNss(expCtx->getNamespaceString()).empty());
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeAfterProjectedBase) {
+    setSchemaTypeFromMatch(
+        R"({
+            x: {$not: {$type: 'array'}},
+            'x.y': {$not: {$type: 'array'}},
+            'x.y.z': {$type: 'number'}
+        })");
+    setPipeline("[{$project: {'x.y': 1}}]");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "{z: number|array(S), ...}");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y.z").toDebugString(), "number|array(S)");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSiblingOfSetPathUsesSchema) {
+    setSchemaTypeFromMatch(
+        R"({
+            x: {$not: {$type: 'array'}},
+            'x.foo': {$type: 'number'}
+        })");
+    setPipeline("[{$set: {'x.y': 'str'}}]");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.foo").toDebugString(), "number|array(S)");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSiblingOfSetPathUsesPathArrayness) {
+    pathArrayness->addPathsFromIndexKeyPattern(
+        BSON("x.foo" << 1), MultikeyPaths{{}}, true /* isFullRebuild */);
+    setPipeline("[{$set: {'x.y': 'str'}}]");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.foo").toDebugString(), "~array");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeIntersectsSchemaAndMatch) {
+    pathArrayness->addPathsFromIndexKeyPattern(
+        BSON("x" << 1), MultikeyPaths{{}}, true /* isFullRebuild */);
+    setSchemaTypeFromMatch("{$or: [{x: {$type: 'string'}}, {x: {$exists: false}}]}");
+    setPipeline("[{$match: {x: {$type: 'string'}}}]");
+
+    ASSERT_EQ(graph->getType_forTest(stages.at(0).get(), "x").toDebugString(), "missing|string");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "string");
+    ASSERT_FALSE(expCtx->nonArrayPathsForNss(expCtx->getNamespaceString()).empty());
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUsesSecondaryCollSchemaType) {
+    setSchemaType(Type::object({{"x", Type(BSONType::numberInt, Extent::kAll)}}, Open::kYes));
+    setPipeline(R"([{$lookup: {from: "coll_b", as: "docs", pipeline: []}}])");
+
+    const auto secondaryNss = stages[0]->getSubpipelineExpCtx()->getNamespaceString();
+    expCtx->setSchemaTypeInfoForNss(
+        secondaryNss,
+        std::make_shared<SchemaTypeInfo>(
+            Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes)));
+    graph->recompute_forTest();
+
+    runTest([&] {
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        ASSERT_EQ(subGraph->getType_forTest(nullptr, "x").toDebugString(), "string");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfUnmatchedSuffixUsesPathArrayness) {
+    pathArrayness->addPathsFromIndexKeyPattern(
+        BSON("x.y" << 1), MultikeyPaths{{}}, true /* isFullRebuild */);
+    setPipeline("[]");
+
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "~array");
+    ASSERT_FALSE(expCtx->nonArrayPathsForNss(expCtx->getNamespaceString()).empty());
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeUsesArraynessOfIntermediateComponents) {
+    pathArrayness->addPathsFromIndexKeyPattern(
+        BSON("x.y.z" << 1), MultikeyPaths{MultikeyComponents{2U}}, true /* isFullRebuild */);
+    setSchemaTypeFromMatch("{'x.y.z': {$_internalSchemaType: 'number'}}");
+    setPipeline("[]");
+
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y.z").toDebugString(), "number");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaFieldUnderMatchedNonArrayPrefix) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setSchemaTypeFromMatch("{'x.y': {$_internalSchemaType: 'number'}}");
+    setPipeline("[{$set: {'x.z': 1}}, {$match: {x: {$not: {$type: 'array'}}}}]");
+
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "number");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaFieldUnderObjectPrefix) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setSchemaTypeFromMatch("{'x.y': {$_internalSchemaType: 'number'}}");
+    setPipeline("[{$set: {'x.z': 1}}, {$match: {x: {$_internalSchemaType: 'object'}}}]");
+
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "number");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaFieldUnderMixedPrefix) {
+    setSchemaTypeFromMatch(R"({
+        x: {$not: {$_internalSchemaType: 'array'}},
+        $or: [{x: {$_internalSchemaType: 'string'}}, {'x.y': {$_internalSchemaType: 'number'}}]
+    })");
+    setPipeline("[{$project: {'x.y': 1}}]");
+
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "missing|number");
 }
 
 }  // namespace
