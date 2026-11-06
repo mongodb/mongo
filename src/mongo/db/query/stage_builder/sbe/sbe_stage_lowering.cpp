@@ -510,6 +510,7 @@ struct Lowerer {
                                               std::move(node.outerProjects),
                                               std::move(node.outerCorrelated),
                                               std::move(node.innerProjects),
+                                              std::move(node.innerProjectOutputs),
                                               le(node.predicate),
                                               node.joinType,
                                               node.nodeId,

@@ -280,12 +280,14 @@ void checkLoopJoin(SlotMembershipChecker& c) {
     auto outerProj = c.slot();
     auto outerCorr = c.slot();
     auto innerProj = c.slot();
+    auto innerOut = c.slot();
     auto [predicate, predicateSlot] = c.expr();
     c.check(SbBlueprintLoopJoin{.outerProjects = {outerProj},
                                 .outerCorrelated = {outerCorr},
                                 .innerProjects = {innerProj},
+                                .innerProjectOutputs = {innerOut},
                                 .predicate = std::move(predicate)},
-            {},
+            {innerOut},
             {outerProj, outerCorr, innerProj, predicateSlot});
 }
 

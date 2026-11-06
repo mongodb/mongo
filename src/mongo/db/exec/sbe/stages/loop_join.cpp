@@ -30,6 +30,7 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                     std::move(outerProjects),
                     std::move(outerCorrelated),
                     value::SlotVector{},
+                    value::SlotVector{},
                     std::move(predicate),
                     JoinType::Inner,
                     nodeId,
@@ -41,6 +42,7 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                              value::SlotVector outerProjects,
                              value::SlotVector outerCorrelated,
                              value::SlotVector innerProjects,
+                             value::SlotVector innerProjectOutputs,
                              std::unique_ptr<EExpression> predicate,
                              JoinType joinType,
                              PlanNodeId nodeId,
@@ -56,6 +58,7 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
       _outerProjects(std::move(outerProjects)),
       _outerCorrelated(std::move(outerCorrelated)),
       _innerProjects(std::move(innerProjects)),
+      _innerProjectOutputs(std::move(innerProjectOutputs)),
       _predicate(std::move(predicate)),
       _joinType(joinType) {
     _children.emplace_back(std::move(outer));
@@ -64,6 +67,11 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
     tassert(11094719,
             "Expecting either inner or left join in loop join stage",
             _joinType == JoinType::Inner || _joinType == JoinType::Left);
+    tassert(13871400,
+            "Expecting a left loop join to have one output slot per inner project, and an inner "
+            "loop join to have none",
+            _joinType == JoinType::Left ? _innerProjectOutputs.size() == _innerProjects.size()
+                                        : _innerProjectOutputs.empty());
 }
 
 
@@ -73,6 +81,7 @@ std::unique_ptr<PlanStage> LoopJoinStage::clone() const {
                                            _outerProjects,
                                            _outerCorrelated,
                                            _innerProjects,
+                                           _innerProjectOutputs,
                                            _predicate ? _predicate->clone() : nullptr,
                                            _joinType,
                                            _commonStats.nodeId,
@@ -98,15 +107,26 @@ void LoopJoinStage::prepare(CompileCtx& ctx) {
     }
 
     if (_joinType == JoinType::Left) {
-        for (auto slot : _innerProjects) {
-            _outProjectAccessors.emplace(
-                slot, value::SwitchAccessor{{_children[1]->getAccessor(ctx, slot), &_constant}});
+        for (size_t idx = 0; idx < _innerProjects.size(); ++idx) {
+            const auto slot = _innerProjectOutputs[idx];
+            auto [it, inserted] = _outProjectAccessors.emplace(
+                slot,
+                value::SwitchAccessor{
+                    {_children[1]->getAccessor(ctx, _innerProjects[idx]), &_constant}});
+            tassert(13871401,
+                    str::stream() << "Left loop join output slot " << slot
+                                  << " is repeated or is also an outer project",
+                    inserted && !_outerRefs.contains(slot));
         }
     }
 
     if (_predicate) {
         ctx.root = this;
+        // The predicate is evaluated for each pair of rows, so a left join's predicate reads the
+        // inner side's slots directly.
+        _compilingPredicate = true;
         _predicateCode = _predicate->compile(ctx);
+        _compilingPredicate = false;
     }
 }
 
@@ -117,6 +137,11 @@ value::SlotAccessor* LoopJoinStage::getAccessor(CompileCtx& ctx, value::SlotId s
     if (_joinType == JoinType::Left) {
         if (auto it = _outProjectAccessors.find(slot); it != _outProjectAccessors.end()) {
             return &it->second;
+        }
+        // This lets the join predicate read the inner child's slots directly, ignoring the
+        // remapping done for left joins.
+        if (_compilingPredicate) {
+            return _children[1]->getAccessor(ctx, slot);
         }
         return ctx.getAccessor(slot);
     }
@@ -269,6 +294,19 @@ void LoopJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
+    if (_joinType == JoinType::Left) {
+        ret.emplace_back(DebugPrinter::Block("[`"));
+        for (size_t idx = 0; idx < _innerProjects.size(); ++idx) {
+            if (idx) {
+                ret.emplace_back(DebugPrinter::Block("`,"));
+            }
+            DebugPrinter::addIdentifier(ret, _innerProjectOutputs[idx]);
+            ret.emplace_back("=");
+            DebugPrinter::addIdentifier(ret, _innerProjects[idx]);
+        }
+        ret.emplace_back(DebugPrinter::Block("`]"));
+    }
+
     if (_predicate) {
         ret.emplace_back("{`");
         DebugPrinter::addBlocks(ret, _predicate->debugPrint());
@@ -300,6 +338,8 @@ size_t LoopJoinStage::estimateCompileTimeSize() const {
     size += size_estimator::estimate(_children);
     size += size_estimator::estimate(_outerProjects);
     size += size_estimator::estimate(_outerCorrelated);
+    size += size_estimator::estimate(_innerProjects);
+    size += size_estimator::estimate(_innerProjectOutputs);
     size += _predicate ? _predicate->estimateSize() : 0;
     size += size_estimator::estimate(_specificStats);
     return size;

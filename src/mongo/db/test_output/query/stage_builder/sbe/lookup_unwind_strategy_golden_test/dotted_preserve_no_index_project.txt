@@ -32,10 +32,10 @@ $$RESULT=s11 env: {  }
         [2] scan generic [s4 = record, s5 = recordId] [s6 = fkey] @"UUID" 
 
 ## NestedLoopJoin
-$$RESULT=s9 env: {  }
-[4] project [s9 = makeBsonObj(MakeObjSpec([lkey, a = MakeObj([b], Closed, RetNothing)], Closed, RetNothing, 0), s8)] 
-[3] project [s8 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s4)] 
-[3] nlj left [s1] [s7] 
+$$RESULT=s10 env: {  }
+[4] project [s10 = makeBsonObj(MakeObjSpec([lkey, a = MakeObj([b], Closed, RetNothing)], Closed, RetNothing, 0), s9)] 
+[3] project [s9 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s8)] 
+[3] nlj left [s1] [s7] [s8 = s4] 
     left 
         [3] project [s7 = arrayToSet(
             if (isArray(s3) ?: false) 
@@ -52,10 +52,10 @@ $$RESULT=s9 env: {  }
         [2] scan generic [s4 = record, s5 = recordId] [s6 = fkey] @"UUID" 
 
 ## IndexedLoopJoin
-$$RESULT=s19 env: { s10 = {"fkey" : 1} }
-[5] project [s19 = makeBsonObj(MakeObjSpec([lkey, a = MakeObj([b], Closed, RetNothing)], Closed, RetNothing, 0), s18)] 
-[4] project [s18 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s11)] 
-[4] nlj left [s1] [s14] 
+$$RESULT=s20 env: { s10 = {"fkey" : 1} }
+[5] project [s20 = makeBsonObj(MakeObjSpec([lkey, a = MakeObj([b], Closed, RetNothing)], Closed, RetNothing, 0), s19)] 
+[4] project [s19 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s18)] 
+[4] nlj left [s1] [s14] [s18 = s11] 
     left 
         [4] project [s14 = arrayToSet(
             if (isArray(s3) ?: false) 
@@ -88,10 +88,10 @@ $$RESULT=s19 env: { s10 = {"fkey" : 1} }
                 [2] ixseek seekKeyLow = s4 seekKeyHigh = s5 [s8 = indexKey, s6 = recordId, s9 = snapshotId, s7 = indexIdent] [] @"UUID" @"fkey_1" forward 
 
 ## DynamicIndexedLoopJoin
-$$RESULT=s24 env: { s10 = {"fkey" : 1} }
-[6] project [s24 = makeBsonObj(MakeObjSpec([lkey, a = MakeObj([b], Closed, RetNothing)], Closed, RetNothing, 0), s23)] 
-[5] project [s23 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s21)] 
-[5] nlj left [s1] [s17, s1] 
+$$RESULT=s25 env: { s10 = {"fkey" : 1} }
+[6] project [s25 = makeBsonObj(MakeObjSpec([lkey, a = MakeObj([b], Closed, RetNothing)], Closed, RetNothing, 0), s24)] 
+[5] project [s24 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s23)] 
+[5] nlj left [s1] [s17, s1] [s23 = s21] 
     left 
         [5] project [s17 = arrayToSet(
             if (isArray(s3) ?: false) 

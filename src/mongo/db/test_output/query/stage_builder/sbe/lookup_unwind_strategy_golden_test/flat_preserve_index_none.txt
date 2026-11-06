@@ -30,10 +30,10 @@ $$RESULT=s11 env: {  }
         [2] scan generic [s5 = record, s6 = recordId] [s7 = fkey] @"UUID" 
 
 ## NestedLoopJoin
-$$RESULT=s10 env: {  }
-[3] project [s10 = makeBsonObj(MakeObjSpec([joined = Set(0), idx = Set(1)], Open, NewObj, 0), s1, s5, s9)] 
-[3] project [s9 = (s4 ?: null)] 
-[3] nlj left [s1] [s8] 
+$$RESULT=s12 env: {  }
+[3] project [s12 = makeBsonObj(MakeObjSpec([joined = Set(0), idx = Set(1)], Open, NewObj, 0), s1, s9, s11)] 
+[3] project [s11 = (s4 ?: null)] 
+[3] nlj left [s1] [s8] [s9 = s5, s4 = s10] 
     left 
         [3] project [s8 = arrayToSet(
             if (isArray(s3) ?: false) 
@@ -46,15 +46,15 @@ $$RESULT=s10 env: {  }
        )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = lkey] @"UUID" 
     right 
-        [3] agg_project [s4 = sum(1ll) init{-1ll}] 
+        [3] agg_project [s10 = sum(1ll) init{-1ll}] 
         [3] filter {traverseF((s7 ?: null), lambda(l5.0) { isMember(move(l5.0), s8) }, true)} 
         [2] scan generic [s5 = record, s6 = recordId] [s7 = fkey] @"UUID" 
 
 ## IndexedLoopJoin
-$$RESULT=s20 env: { s11 = {"fkey" : 1} }
-[4] project [s20 = makeBsonObj(MakeObjSpec([joined = Set(0), idx = Set(1)], Open, NewObj, 0), s1, s12, s19)] 
-[4] project [s19 = (s4 ?: null)] 
-[4] nlj left [s1] [s15] 
+$$RESULT=s22 env: { s11 = {"fkey" : 1} }
+[4] project [s22 = makeBsonObj(MakeObjSpec([joined = Set(0), idx = Set(1)], Open, NewObj, 0), s1, s19, s21)] 
+[4] project [s21 = (s4 ?: null)] 
+[4] nlj left [s1] [s15] [s19 = s12, s4 = s20] 
     left 
         [4] project [s15 = arrayToSet(
             if (isArray(s3) ?: false) 
@@ -67,7 +67,7 @@ $$RESULT=s20 env: { s11 = {"fkey" : 1} }
        )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = lkey] @"UUID" 
     right 
-        [4] agg_project [s4 = sum(1ll) init{-1ll}] 
+        [4] agg_project [s20 = sum(1ll) init{-1ll}] 
         [4] filter {traverseF((s14 ?: null), lambda(l9.0) { isMember(move(l9.0), s15) }, true)} 
         [4] nlj inner [] [s5, s6] 
             left 
@@ -88,10 +88,10 @@ $$RESULT=s20 env: { s11 = {"fkey" : 1} }
                 [2] ixseek seekKeyLow = s5 seekKeyHigh = s6 [s9 = indexKey, s7 = recordId, s10 = snapshotId, s8 = indexIdent] [] @"UUID" @"fkey_1" forward 
 
 ## DynamicIndexedLoopJoin
-$$RESULT=s25 env: { s11 = {"fkey" : 1} }
-[5] project [s25 = makeBsonObj(MakeObjSpec([joined = Set(0), idx = Set(1)], Open, NewObj, 0), s1, s22, s24)] 
-[5] project [s24 = (s4 ?: null)] 
-[5] nlj left [s1] [s18, s1] 
+$$RESULT=s27 env: { s11 = {"fkey" : 1} }
+[5] project [s27 = makeBsonObj(MakeObjSpec([joined = Set(0), idx = Set(1)], Open, NewObj, 0), s1, s24, s26)] 
+[5] project [s26 = (s4 ?: null)] 
+[5] nlj left [s1] [s18, s1] [s24 = s22, s4 = s25] 
     left 
         [5] project [s18 = arrayToSet(
             if (isArray(s3) ?: false) 
@@ -104,7 +104,7 @@ $$RESULT=s25 env: { s11 = {"fkey" : 1} }
        )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = lkey] @"UUID" 
     right 
-        [5] agg_project [s4 = sum(1ll) init{-1ll}] 
+        [5] agg_project [s25 = sum(1ll) init{-1ll}] 
         [5] filter {traverseF((s23 ?: null), lambda(l11.0) { isMember(move(l11.0), s18) }, true)} 
         [5] branch {!(traverseF(s18, lambda(l10.0) { typeMatch(move(l10.0), 1024) }, false))} [s22, s23] 
         [s12, s14] [5] nlj inner [] [s5, s6] 

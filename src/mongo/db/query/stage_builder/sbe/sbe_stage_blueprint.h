@@ -756,12 +756,16 @@ struct SbBlueprintLoopJoin {
     sbe::value::SlotVector outerProjects;
     sbe::value::SlotVector outerCorrelated;
     sbe::value::SlotVector innerProjects;
+    // For a left join, the slots that expose 'innerProjects' above the join.
+    sbe::value::SlotVector innerProjectOutputs;
     SbExpr predicate;
     sbe::IntermediateTrackingBehavior intermediateTracking{
         sbe::IntermediateTrackingBehavior::kNone};
     InnerTrialRunTracking innerTrialRunTracking{InnerTrialRunTracking::kTrack};
 
-    void def(SbSlotCollector&) const {}
+    void def(SbSlotCollector& out) const {
+        out.add(innerProjectOutputs);
+    }
 
     void use(SbSlotCollector& out) const {
         out.add(outerProjects);

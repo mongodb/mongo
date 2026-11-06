@@ -53,31 +53,31 @@ $$RESULT=s19 env: {  }
         [2] scan generic [s6 = record, s7 = recordId] [s8 = a, s9 = fkey, s10 = n] @"UUID" 
 
 ## NestedLoopJoin
-$$RESULT=s17 env: {  }
-[4] project [s17 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s12, s16)] 
-[4] project [s16 = 
-    if (isNullish(s14) || isNullish(s15)) 
+$$RESULT=s18 env: {  }
+[4] project [s18 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s13, s17)] 
+[4] project [s17 = 
+    if (isNullish(s15) || isNullish(s16)) 
     then null 
     elif ((
-        if isNumber(s14) 
-        then 0 
-        elif isDate(s14) 
-        then 1 
-        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
-    + 
         if isNumber(s15) 
         then 0 
         elif isDate(s15) 
         then 1 
         else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+    + 
+        if isNumber(s16) 
+        then 0 
+        elif isDate(s16) 
+        then 1 
+        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
    ) > 1) 
     then fail(7157722, "only one date allowed in an $add expression") 
-    else (s14 + s15) 
+    else (s15 + s16) 
 ] 
-[4] extract_field_paths inputs[s13 = Get(a)/Id, s14 = Get(n)/Id] outputs[s15 = Get(a)/Traverse/Get(b)/Traverse/Get(c)/Id] 
-[3] project [s13 = getField(s12, "a"), s14 = getField(s12, "n")] 
-[3] project [s12 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s6)] 
-[3] nlj left [s1] [s11] 
+[4] extract_field_paths inputs[s14 = Get(a)/Id, s15 = Get(n)/Id] outputs[s16 = Get(a)/Traverse/Get(b)/Traverse/Get(c)/Id] 
+[3] project [s14 = getField(s13, "a"), s15 = getField(s13, "n")] 
+[3] project [s13 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s12)] 
+[3] nlj left [s1] [s11] [s12 = s6] 
     left 
         [3] project [s11 = arrayToSet(
             if (isArray(s4) ?: false) 
@@ -94,31 +94,31 @@ $$RESULT=s17 env: {  }
         [2] scan generic [s6 = record, s7 = recordId] [s8 = a, s9 = fkey, s10 = n] @"UUID" 
 
 ## IndexedLoopJoin
-$$RESULT=s27 env: { s12 = {"fkey" : 1} }
-[5] project [s27 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s22, s26)] 
-[5] project [s26 = 
-    if (isNullish(s24) || isNullish(s25)) 
+$$RESULT=s28 env: { s12 = {"fkey" : 1} }
+[5] project [s28 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s23, s27)] 
+[5] project [s27 = 
+    if (isNullish(s25) || isNullish(s26)) 
     then null 
     elif ((
-        if isNumber(s24) 
-        then 0 
-        elif isDate(s24) 
-        then 1 
-        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
-    + 
         if isNumber(s25) 
         then 0 
         elif isDate(s25) 
         then 1 
         else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+    + 
+        if isNumber(s26) 
+        then 0 
+        elif isDate(s26) 
+        then 1 
+        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
    ) > 1) 
     then fail(7157722, "only one date allowed in an $add expression") 
-    else (s24 + s25) 
+    else (s25 + s26) 
 ] 
-[5] extract_field_paths inputs[s23 = Get(a)/Id, s24 = Get(n)/Id] outputs[s25 = Get(a)/Traverse/Get(b)/Traverse/Get(c)/Id] 
-[4] project [s23 = getField(s22, "a"), s24 = getField(s22, "n")] 
-[4] project [s22 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s13)] 
-[4] nlj left [s1] [s18] 
+[5] extract_field_paths inputs[s24 = Get(a)/Id, s25 = Get(n)/Id] outputs[s26 = Get(a)/Traverse/Get(b)/Traverse/Get(c)/Id] 
+[4] project [s24 = getField(s23, "a"), s25 = getField(s23, "n")] 
+[4] project [s23 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s22)] 
+[4] nlj left [s1] [s18] [s22 = s13] 
     left 
         [4] project [s18 = arrayToSet(
             if (isArray(s4) ?: false) 
@@ -151,31 +151,31 @@ $$RESULT=s27 env: { s12 = {"fkey" : 1} }
                 [2] ixseek seekKeyLow = s6 seekKeyHigh = s7 [s10 = indexKey, s8 = recordId, s11 = snapshotId, s9 = indexIdent] [] @"UUID" @"fkey_1" forward 
 
 ## DynamicIndexedLoopJoin
-$$RESULT=s34 env: { s12 = {"fkey" : 1} }
-[6] project [s34 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s29, s33)] 
-[6] project [s33 = 
-    if (isNullish(s31) || isNullish(s32)) 
+$$RESULT=s35 env: { s12 = {"fkey" : 1} }
+[6] project [s35 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s30, s34)] 
+[6] project [s34 = 
+    if (isNullish(s32) || isNullish(s33)) 
     then null 
     elif ((
-        if isNumber(s31) 
-        then 0 
-        elif isDate(s31) 
-        then 1 
-        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
-    + 
         if isNumber(s32) 
         then 0 
         elif isDate(s32) 
         then 1 
         else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+    + 
+        if isNumber(s33) 
+        then 0 
+        elif isDate(s33) 
+        then 1 
+        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
    ) > 1) 
     then fail(7157722, "only one date allowed in an $add expression") 
-    else (s31 + s32) 
+    else (s32 + s33) 
 ] 
-[6] extract_field_paths inputs[s30 = Get(a)/Id, s31 = Get(n)/Id] outputs[s32 = Get(a)/Traverse/Get(b)/Traverse/Get(c)/Id] 
-[5] project [s30 = getField(s29, "a"), s31 = getField(s29, "n")] 
-[5] project [s29 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s27)] 
-[5] nlj left [s1] [s23, s1] 
+[6] extract_field_paths inputs[s31 = Get(a)/Id, s32 = Get(n)/Id] outputs[s33 = Get(a)/Traverse/Get(b)/Traverse/Get(c)/Id] 
+[5] project [s31 = getField(s30, "a"), s32 = getField(s30, "n")] 
+[5] project [s30 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s29)] 
+[5] nlj left [s1] [s23, s1] [s29 = s27] 
     left 
         [5] project [s23 = arrayToSet(
             if (isArray(s4) ?: false) 

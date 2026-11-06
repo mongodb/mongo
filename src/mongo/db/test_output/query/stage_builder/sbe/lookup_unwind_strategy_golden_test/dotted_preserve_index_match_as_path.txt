@@ -33,12 +33,12 @@ $$RESULT=s13 env: {  }
         [2] scan generic [s6 = record, s7 = recordId] [s8 = a, s9 = fkey] @"UUID" 
 
 ## NestedLoopJoin
-$$RESULT=s12 env: {  }
-[4] filter {traverseF(s13, lambda(l8.0) { exists(getField(move(l8.0), "b")) }, false)} 
-[3] project [s13 = getField(s12, "a")] 
-[3] project [s12 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0), idx = Set(1)], Open, NewObj, 0), s1, s6, s11)] 
-[3] project [s11 = (s5 ?: null)] 
-[3] nlj left [s1] [s10] 
+$$RESULT=s14 env: {  }
+[4] filter {traverseF(s15, lambda(l8.0) { exists(getField(move(l8.0), "b")) }, false)} 
+[3] project [s15 = getField(s14, "a")] 
+[3] project [s14 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0), idx = Set(1)], Open, NewObj, 0), s1, s11, s13)] 
+[3] project [s13 = (s5 ?: null)] 
+[3] nlj left [s1] [s10] [s11 = s6, s5 = s12] 
     left 
         [3] project [s10 = arrayToSet(
             if (isArray(s4) ?: false) 
@@ -51,17 +51,17 @@ $$RESULT=s12 env: {  }
        )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"UUID" 
     right 
-        [3] agg_project [s5 = sum(1ll) init{-1ll}] 
+        [3] agg_project [s12 = sum(1ll) init{-1ll}] 
         [3] filter {traverseF((s9 ?: null), lambda(l7.0) { isMember(move(l7.0), s10) }, true)} 
         [2] scan generic [s6 = record, s7 = recordId] [s8 = a, s9 = fkey] @"UUID" 
 
 ## IndexedLoopJoin
-$$RESULT=s22 env: { s12 = {"fkey" : 1} }
-[5] filter {traverseF(s23, lambda(l12.0) { exists(getField(move(l12.0), "b")) }, false)} 
-[4] project [s23 = getField(s22, "a")] 
-[4] project [s22 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0), idx = Set(1)], Open, NewObj, 0), s1, s13, s21)] 
-[4] project [s21 = (s5 ?: null)] 
-[4] nlj left [s1] [s17] 
+$$RESULT=s24 env: { s12 = {"fkey" : 1} }
+[5] filter {traverseF(s25, lambda(l12.0) { exists(getField(move(l12.0), "b")) }, false)} 
+[4] project [s25 = getField(s24, "a")] 
+[4] project [s24 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0), idx = Set(1)], Open, NewObj, 0), s1, s21, s23)] 
+[4] project [s23 = (s5 ?: null)] 
+[4] nlj left [s1] [s17] [s21 = s13, s5 = s22] 
     left 
         [4] project [s17 = arrayToSet(
             if (isArray(s4) ?: false) 
@@ -74,7 +74,7 @@ $$RESULT=s22 env: { s12 = {"fkey" : 1} }
        )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"UUID" 
     right 
-        [4] agg_project [s5 = sum(1ll) init{-1ll}] 
+        [4] agg_project [s22 = sum(1ll) init{-1ll}] 
         [4] filter {traverseF((s16 ?: null), lambda(l11.0) { isMember(move(l11.0), s17) }, true)} 
         [4] nlj inner [] [s6, s7] 
             left 
@@ -95,12 +95,12 @@ $$RESULT=s22 env: { s12 = {"fkey" : 1} }
                 [2] ixseek seekKeyLow = s6 seekKeyHigh = s7 [s10 = indexKey, s8 = recordId, s11 = snapshotId, s9 = indexIdent] [] @"UUID" @"fkey_1" forward 
 
 ## DynamicIndexedLoopJoin
-$$RESULT=s28 env: { s12 = {"fkey" : 1} }
-[6] filter {traverseF(s29, lambda(l14.0) { exists(getField(move(l14.0), "b")) }, false)} 
-[5] project [s29 = getField(s28, "a")] 
-[5] project [s28 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0), idx = Set(1)], Open, NewObj, 0), s1, s25, s27)] 
-[5] project [s27 = (s5 ?: null)] 
-[5] nlj left [s1] [s21, s1] 
+$$RESULT=s30 env: { s12 = {"fkey" : 1} }
+[6] filter {traverseF(s31, lambda(l14.0) { exists(getField(move(l14.0), "b")) }, false)} 
+[5] project [s31 = getField(s30, "a")] 
+[5] project [s30 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0), idx = Set(1)], Open, NewObj, 0), s1, s27, s29)] 
+[5] project [s29 = (s5 ?: null)] 
+[5] nlj left [s1] [s21, s1] [s27 = s25, s5 = s28] 
     left 
         [5] project [s21 = arrayToSet(
             if (isArray(s4) ?: false) 
@@ -113,7 +113,7 @@ $$RESULT=s28 env: { s12 = {"fkey" : 1} }
        )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"UUID" 
     right 
-        [5] agg_project [s5 = sum(1ll) init{-1ll}] 
+        [5] agg_project [s28 = sum(1ll) init{-1ll}] 
         [5] filter {traverseF((s26 ?: null), lambda(l13.0) { isMember(move(l13.0), s21) }, true)} 
         [5] branch {!(traverseF(s21, lambda(l12.0) { typeMatch(move(l12.0), 1024) }, false))} [s25, s26] 
         [s13, s16] [5] nlj inner [] [s6, s7] 

@@ -33,11 +33,11 @@ $$RESULT=s12 env: {  }
         [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey] @"UUID" 
 
 ## NestedLoopJoin
-$$RESULT=s10 env: {  }
-[4] filter {traverseF(s11, lambda(l8.0) { exists(getField(move(l8.0), "b")) }, false)} 
-[3] project [s11 = getField(s10, "a")] 
-[3] project [s10 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s5)] 
-[3] nlj left [s1] [s9] 
+$$RESULT=s11 env: {  }
+[4] filter {traverseF(s12, lambda(l8.0) { exists(getField(move(l8.0), "b")) }, false)} 
+[3] project [s12 = getField(s11, "a")] 
+[3] project [s11 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s10)] 
+[3] nlj left [s1] [s9] [s10 = s5] 
     left 
         [3] project [s9 = arrayToSet(
             if (isArray(s4) ?: false) 
@@ -54,11 +54,11 @@ $$RESULT=s10 env: {  }
         [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey] @"UUID" 
 
 ## IndexedLoopJoin
-$$RESULT=s20 env: { s11 = {"fkey" : 1} }
-[5] filter {traverseF(s21, lambda(l12.0) { exists(getField(move(l12.0), "b")) }, false)} 
-[4] project [s21 = getField(s20, "a")] 
-[4] project [s20 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s12)] 
-[4] nlj left [s1] [s16] 
+$$RESULT=s21 env: { s11 = {"fkey" : 1} }
+[5] filter {traverseF(s22, lambda(l12.0) { exists(getField(move(l12.0), "b")) }, false)} 
+[4] project [s22 = getField(s21, "a")] 
+[4] project [s21 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s20)] 
+[4] nlj left [s1] [s16] [s20 = s12] 
     left 
         [4] project [s16 = arrayToSet(
             if (isArray(s4) ?: false) 
@@ -91,11 +91,11 @@ $$RESULT=s20 env: { s11 = {"fkey" : 1} }
                 [2] ixseek seekKeyLow = s5 seekKeyHigh = s6 [s9 = indexKey, s7 = recordId, s10 = snapshotId, s8 = indexIdent] [] @"UUID" @"fkey_1" forward 
 
 ## DynamicIndexedLoopJoin
-$$RESULT=s26 env: { s11 = {"fkey" : 1} }
-[6] filter {traverseF(s27, lambda(l14.0) { exists(getField(move(l14.0), "b")) }, false)} 
-[5] project [s27 = getField(s26, "a")] 
-[5] project [s26 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s24)] 
-[5] nlj left [s1] [s20, s1] 
+$$RESULT=s27 env: { s11 = {"fkey" : 1} }
+[6] filter {traverseF(s28, lambda(l14.0) { exists(getField(move(l14.0), "b")) }, false)} 
+[5] project [s28 = getField(s27, "a")] 
+[5] project [s27 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s26)] 
+[5] nlj left [s1] [s20, s1] [s26 = s24] 
     left 
         [5] project [s20 = arrayToSet(
             if (isArray(s4) ?: false) 

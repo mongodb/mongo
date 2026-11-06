@@ -13,6 +13,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -126,17 +127,19 @@ TEST_F(LoopJoinStageTest, LeftLoopJoinConstFalsePredicate) {
     auto [innerScanSlot, innerScanStage] = generateVirtualScan(BSON_ARRAY(3 << 4 << 5));
 
     // Build and prepare for execution loop join of the two scan stages.
+    auto innerOutSlot = generateSlotId();
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
                                          std::move(innerScanStage),
                                          /*outerProjects=*/makeSV(outerScanSlot),
                                          /*outerCorrelated=*/makeSV(),
                                          /*innerProjects=*/makeSV(innerScanSlot),
+                                         /*innerProjectOutputs=*/makeSV(innerOutSlot),
                                          /*predicate=*/makeBoolConstant(false),
                                          JoinType::Left,
                                          kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
     auto outer = loopJoin->getAccessor(*ctx, outerScanSlot);
-    auto inner = loopJoin->getAccessor(*ctx, innerScanSlot);
+    auto inner = loopJoin->getAccessor(*ctx, innerOutSlot);
 
     // Expected output: each outer doc has no match, but it's part of the results due to left join
     // being used.
@@ -152,6 +155,43 @@ TEST_F(LoopJoinStageTest, LeftLoopJoinConstFalsePredicate) {
         ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::Nothing, 0);
     }
     ASSERT_EQ(i, expected.size());
+}
+
+TEST_F(LoopJoinStageTest, LeftLoopJoinOutputHoldsTheInnerValueOrNothing) {
+    auto ctx = makeCompileCtx();
+    auto [outerScanSlot, outerScanStage] = generateVirtualScan(BSON_ARRAY(1 << 2));
+    auto [innerScanSlot, innerScanStage] = generateVirtualScan(BSON_ARRAY(1 << 3));
+
+    // Outer 1 matches inner 1. Outer 2 matches nothing.
+    auto predicate = makeE<EPrimBinary>(
+        EPrimBinary::eq, makeE<EVariable>(outerScanSlot), makeE<EVariable>(innerScanSlot));
+    auto innerOutSlot = generateSlotId();
+    auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
+                                         std::move(innerScanStage),
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
+                                         /*innerProjects=*/makeSV(innerScanSlot),
+                                         /*innerProjectOutputs=*/makeSV(innerOutSlot),
+                                         std::move(predicate),
+                                         JoinType::Left,
+                                         kEmptyPlanNodeId);
+    prepareTree(ctx.get(), loopJoin.get());
+    auto outer = loopJoin->getAccessor(*ctx, outerScanSlot);
+    auto inner = loopJoin->getAccessor(*ctx, innerOutSlot);
+
+    ASSERT(PlanState::ADVANCED == loopJoin->getNext());
+    auto [outerTag, outerVal] = outer->getViewOfValue();
+    ASSERT_SBE_VALUE_EQ(outerTag, outerVal, value::TypeTags::NumberInt32, 1);
+    auto [innerTag, innerVal] = inner->getViewOfValue();
+    ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::NumberInt32, 1);
+
+    ASSERT(PlanState::ADVANCED == loopJoin->getNext());
+    auto [unmatchedOuterTag, unmatchedOuterVal] = outer->getViewOfValue();
+    ASSERT_SBE_VALUE_EQ(unmatchedOuterTag, unmatchedOuterVal, value::TypeTags::NumberInt32, 2);
+    auto [unmatchedInnerTag, unmatchedInnerVal] = inner->getViewOfValue();
+    ASSERT_SBE_VALUE_EQ(unmatchedInnerTag, unmatchedInnerVal, value::TypeTags::Nothing, 0);
+
+    ASSERT(PlanState::IS_EOF == loopJoin->getNext());
 }
 
 TEST_F(LoopJoinStageTest, LoopJoinEqualityPredicate) {
@@ -185,5 +225,24 @@ TEST_F(LoopJoinStageTest, LoopJoinEqualityPredicate) {
         ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i]);
     }
     ASSERT_EQ(i, expected.size());
+}
+
+using LoopJoinStageDeathTest = LoopJoinStageTest;
+
+DEATH_TEST_F(LoopJoinStageDeathTest, LeftLoopJoinOutputMustNotRepeat, "13871401") {
+    auto ctx = makeCompileCtx();
+    auto [outerScanSlot, outerScanStage] = generateVirtualScan(BSON_ARRAY(1));
+    auto [innerScanSlot, innerScanStage] = generateVirtualScan(BSON_ARRAY(2));
+    auto innerOutSlot = generateSlotId();
+    auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
+                                         std::move(innerScanStage),
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
+                                         /*innerProjects=*/makeSV(innerScanSlot, innerScanSlot),
+                                         /*innerProjectOutputs=*/makeSV(innerOutSlot, innerOutSlot),
+                                         /*predicate=*/nullptr,
+                                         JoinType::Left,
+                                         kEmptyPlanNodeId);
+    prepareTree(ctx.get(), loopJoin.get());
 }
 }  // namespace mongo::sbe

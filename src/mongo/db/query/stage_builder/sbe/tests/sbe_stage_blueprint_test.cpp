@@ -222,6 +222,7 @@ TEST_F(SbBlueprintLoweringTest, DisableTrialRunTrackingAppliesToLoweredStage) {
                                              /*outerProjects=*/{},
                                              /*outerCorrelated=*/{},
                                              /*innerProjects=*/{},
+                                             /*innerProjectOutputs=*/{},
                                              /*predicate=*/SbExpr{},
                                              sbe::JoinType::Inner,
                                              sbe::IntermediateTrackingBehavior::kNone,

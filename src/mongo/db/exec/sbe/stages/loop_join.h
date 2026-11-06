@@ -28,17 +28,25 @@ enum class JoinType : uint8_t { Inner, Left, Right };
  * predicate expression is provided, then the Cartesian product is produced.
  *
  * For symmetry with hash join, this is a binding reflector on the outer side. Nodes higher in the
- * tree can only access those slots from the outer side that are named in 'outerProjects'. All slots
- * from the inner side are visible.
+ * tree can only access those slots from the outer side that are named in 'outerProjects'. For an
+ * inner join, all slots from the inner side are visible.
+ *
+ * A left join instead defines the slots 'innerProjectOutputs', parallel to 'innerProjects', and
+ * nodes higher in the tree see the inner side only through them. 'innerProjectOutputs[i]' holds
+ * the value of 'innerProjects[i]' for a matching inner row, and Nothing for an outer row with no
+ * match.
  *
  * The 'outerCorrelated' slots are slots from the outer side which are made visible to the inner
  * side.
  *
  * Debug string format:
  *
- *  nlj [inner|left] [<outer projects>] [<outer correlated>] { predicate }
+ *  nlj [inner|left] [<outer projects>] [<outer correlated>]
+ *      [<inner project output> = <inner project>, ...] { predicate }
  *      left childStage
  *      right childStage
+ *
+ * The inner project outputs are printed for left joins only.
  */
 class LoopJoinStage final : public PlanStage {
 public:
@@ -59,6 +67,7 @@ public:
         value::SlotVector outerProjects,
         value::SlotVector outerCorrelated,
         value::SlotVector innerProjects,
+        value::SlotVector innerProjectOutputs,
         std::unique_ptr<EExpression> predicate,
         JoinType joinType,
         PlanNodeId planNodeId,
@@ -108,6 +117,10 @@ private:
 
     const value::SlotVector _innerProjects;
 
+    // For a left join, the slots that expose '_innerProjects' above this stage. Empty for an
+    // inner join.
+    const value::SlotVector _innerProjectOutputs;
+
     // Predicate to filter the joint set. If not set then the result is a cross product.
     // Note: the predicate resolves the slots it's using through this stage's public accessors,
     // meaning that if they are coming from the 'outer', they must be projected by the 'outer'.
@@ -127,6 +140,10 @@ private:
     LoopJoinStats _specificStats;
 
     const JoinType _joinType;
+
+    // True while 'prepare()' compiles '_predicate', which reads the inner side's slots even for a
+    // left join.
+    bool _compilingPredicate{false};
 
     bool _reOpenInner{false};
     bool _outerGetNext{false};

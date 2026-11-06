@@ -594,6 +594,7 @@ public:
         const SbSlotVector& outerProjects,
         const SbSlotVector& outerCorrelated,
         const SbSlotVector& innerProjects = SbSlotVector{},
+        const SbSlotVector& innerProjectOutputs = SbSlotVector{},
         SbExpr predicate = SbExpr{},
         sbe::JoinType joinType = sbe::JoinType::Inner,
         sbe::IntermediateTrackingBehavior intermediateTracking =
@@ -605,6 +606,7 @@ public:
                             outerProjects,
                             outerCorrelated,
                             innerProjects,
+                            innerProjectOutputs,
                             std::move(predicate),
                             joinType,
                             intermediateTracking,
@@ -618,6 +620,7 @@ public:
         const SbSlotVector& outerProjects,
         const SbSlotVector& outerCorrelated,
         const SbSlotVector& innerProjects = SbSlotVector{},
+        const SbSlotVector& innerProjectOutputs = SbSlotVector{},
         SbExpr predicate = SbExpr{},
         sbe::JoinType joinType = sbe::JoinType::Inner,
         sbe::IntermediateTrackingBehavior intermediateTracking =

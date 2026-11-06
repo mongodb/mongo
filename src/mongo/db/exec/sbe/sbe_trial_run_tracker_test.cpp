@@ -482,6 +482,7 @@ std::pair<value::SlotId, std::unique_ptr<PlanStage>> makeLoopJoinStageWithTracki
                                       makeSV(outerSlot) /* outerProjects */,
                                       makeSV() /* outerCorrelated */,
                                       makeSV() /* innerProjects */,
+                                      makeSV() /* innerProjectOutputs */,
                                       nullptr /* predicate */,
                                       JoinType::Inner,
                                       PlanNodeId{3},
