@@ -502,7 +502,8 @@ void DocumentSourceChangeStream::LiteParsed::assertPermittedInAPIVersion(
     for (auto fieldName : {DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName,
                            DocumentSourceChangeStreamSpec::kShowRawUpdateDescriptionFieldName,
                            DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName,
-                           DocumentSourceChangeStreamSpec::kShowEndOfTransactionFieldName}) {
+                           DocumentSourceChangeStreamSpec::kShowEndOfTransactionFieldName,
+                           DocumentSourceChangeStreamSpec::kShowErrorsAsEventsFieldName}) {
         uassert(ErrorCodes::APIStrictError,
                 str::stream() << "The '" << fieldName
                               << "' parameter to $changeStream is not supported in API Version 1",
@@ -637,6 +638,20 @@ ChangeStreamReaderVersionEnum DocumentSourceChangeStream::_determineChangeStream
     throw;
 }
 
+void DocumentSourceChangeStream::assertShowErrorsAsEventsAllowed(
+    const intrusive_ptr<ExpressionContext>& expCtx, const DocumentSourceChangeStreamSpec& spec) {
+    // The option crosses the wire and adds a new operation type, so it needs the enabling FCV.
+    // Initial-sync nodes have no FCV set yet: check against the latest FCV there.
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            "The $changeStream option 'showErrorsAsEvents' is not allowed in the current feature "
+            "compatibility version",
+            !spec.getShowErrorsAsEvents().value_or(false) ||
+                feature_flags::gFeatureFlagChangeStreamEmitErrorEvents
+                    .isEnabledUseLatestFCVWhenUninitialized(
+                        VersionContext::getDecoration(expCtx->getOperationContext()),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+}
+
 void DocumentSourceChangeStream::assertIsLegalSpecification(
     const intrusive_ptr<ExpressionContext>& expCtx, const DocumentSourceChangeStreamSpec& spec) {
     // We can only run on a replica set, or through mongoS. Confirm that this is the case.
@@ -661,6 +676,8 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
                              "enabled",
             feature_flags::gFeatureFlagEndOfTransactionChangeEventSynthesis.isEnabled());
     }
+
+    assertShowErrorsAsEventsAllowed(expCtx, spec);
 
     // If 'allChangesForCluster' is true, the stream must be opened on the 'admin' database with
     // {aggregate: 1}.

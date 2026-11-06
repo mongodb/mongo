@@ -232,6 +232,17 @@ public:
     // not exposed to users, and a stream may not be resumed from one of their resume tokens.
     static constexpr std::string_view kNamespacePlacementChangedOpType{"namespacePlacementChanged"};
 
+    // Emitted when showErrorsAsEvents:true and a recoverable per-document error occurs.
+    static constexpr std::string_view kErrorOpType{"error"};
+
+    // Throws QueryFeatureNotAllowed if 'spec' opts into 'showErrorsAsEvents' while the feature
+    // flag is disabled at the current FCV. Checked where the user's $changeStream is parsed and
+    // again on each shard when it parses the forwarded spec: mongos always runs at the latest FCV,
+    // so only the shards can enforce the cluster's actual FCV.
+    static void assertShowErrorsAsEventsAllowed(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentSourceChangeStreamSpec& spec);
+
     // These events are guarded behind the 'showExpandedEvents' flag.
     static constexpr std::string_view kCreateOpType{"create"};
     static constexpr std::string_view kCreateIndexesOpType{"createIndexes"};

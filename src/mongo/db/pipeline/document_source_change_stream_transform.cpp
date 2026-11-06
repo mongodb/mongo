@@ -52,6 +52,13 @@ DocumentSourceChangeStreamTransform::createFromBson(
             "non-shard replica set member",
             !spec.getSupportedEvents() || !change_stream::isRouterOrNonShardedReplicaSet(expCtx));
 
+    // This is where a shard parses the spec forwarded by mongos. Re-check the feature gate here,
+    // since mongos always runs at the latest FCV and cannot check the cluster's actual one. Skipped
+    // in parse-only contexts (e.g. query stats), which do not execute the query.
+    if (expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+        DocumentSourceChangeStream::assertShowErrorsAsEventsAllowed(expCtx, spec);
+    }
+
     // Set the change stream spec on the expression context.
     expCtx->setChangeStreamSpec(spec);
 

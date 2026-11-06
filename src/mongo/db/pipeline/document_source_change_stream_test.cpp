@@ -4463,6 +4463,28 @@ TEST_F(ChangeStreamStageTest, ShowEndOfTransactionGating) {
     }
 }
 
+// Tests that the 'showErrorsAsEvents' option is accepted when the feature flag is enabled and
+// rejected when it is disabled.
+TEST_F(ChangeStreamStageTest, ShowErrorsAsEventsOptionGatedByFeatureFlag) {
+    auto spec = BSON("$changeStream" << BSON("showErrorsAsEvents" << true));
+
+    // With the feature flag disabled, the option is rejected.
+    {
+        unittest::ServerParameterGuard flagDisabler("featureFlagChangeStreamEmitErrorEvents",
+                                                    false);
+        ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
+                           AssertionException,
+                           ErrorCodes::QueryFeatureNotAllowed);
+    }
+
+    // With the feature flag enabled, the option is accepted.
+    {
+        unittest::ServerParameterGuard flagEnabler("featureFlagChangeStreamEmitErrorEvents", true);
+        auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+        ASSERT_FALSE(pipeline.empty());
+    }
+}
+
 TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseInvalidSupportedEvents) {
     auto expCtx = getExpCtx();
     expCtx->setForPerShardCursor(true);

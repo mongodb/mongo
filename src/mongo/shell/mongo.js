@@ -647,6 +647,7 @@ Mongo.prototype._extractChangeStreamOptions = function (opts) {
         "showRawUpdateDescription",
         "showCommitTimestamp",
         "showEndOfTransaction",
+        "showErrorsAsEvents",
         "matchCollectionUUIDForUpdateLookup",
         "version",
     ];

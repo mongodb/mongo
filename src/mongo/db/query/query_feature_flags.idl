@@ -22,6 +22,14 @@ feature_flags:
         version: 9.0
         fcv_gated: true
 
+    featureFlagChangeStreamEmitErrorEvents:
+        description:
+            "Feature flag to allow the $changeStream 'showErrorsAsEvents' option, which reports
+            recoverable errors as operationType 'error' events instead of closing the cursor."
+        cpp_varname: gFeatureFlagChangeStreamEmitErrorEvents
+        default: false
+        fcv_gated: true
+
     featureFlagChangeStreamReaderV2:
         description:
             "IFR kill switch gating the change stream v2 (precise shard targeting) reader. Disabling

@@ -264,6 +264,14 @@ structs:
                     to a value other than "off" changes the query shape and query shape hash.
                 query_shape: parameter
 
+            showErrorsAsEvents:
+                type: optionalBool
+                description:
+                    When true, recoverable per-document processing errors are emitted as
+                    operationType:"error" change events instead of closing the cursor.
+                    Defaults to false.
+                query_shape: literal
+
     DocumentSourceChangeStreamOplogMatchSpec:
         strict: true
         description:
