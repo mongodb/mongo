@@ -44,7 +44,7 @@ class RecoveryUnit;
 class ValidateResults;
 
 namespace collection_validation {
-class ValidationOptions;
+struct ValidationOptions;
 }
 
 /**

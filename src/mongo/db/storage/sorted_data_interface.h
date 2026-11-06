@@ -28,7 +28,7 @@ class IndexValidateResults;
 class SortedDataKeyValueView;
 
 namespace collection_validation {
-class ValidationOptions;
+struct ValidationOptions;
 }
 
 /**

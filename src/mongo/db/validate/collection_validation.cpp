@@ -121,8 +121,8 @@ void _validateIndexesInternalStructure(OperationContext* opCtx,
                                 "index"_attr = descriptor->indexName(),
                                 logAttrs(validateState.nss()));
 
-        auto indexResults =
-            iam->validate(opCtx, *shard_role_details::getRecoveryUnit(opCtx), validateState);
+        auto indexResults = iam->validate(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), validateState.getOptions());
 
         results.getIndexValidateResult(descriptor->indexName()) = std::move(indexResults);
     }
@@ -147,7 +147,7 @@ void _validateIndexKeyCount(OperationContext* opCtx,
 void _logInvalidIndexes(OperationContext* opCtx,
                         ValidateState& validateState,
                         ValidateResults& results) {
-    if (validateState.isFullIndexValidation()) {
+    if (validateState.getOptions().isFullIndexValidation()) {
         uassert(13680100,
                 "Full index validation requires the collection lock",
                 shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
@@ -896,17 +896,18 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
             PrepareConflictBehavior::ignoreAndAllowWrites);
     }
 
-    return {validateMode,
-            repairMode,
-            logDiagnostics,
-            getTestCommandsEnabled() ? (ValidationVersion)bsonTestValidationVersion
-                                     : currentValidationVersion,
-            getConfigOverrideOrThrow(rawConfigOverride),
-            timestamp,
-            hashPrefixes,
-            revealHashedIds,
-            getTargetRecordsPerRecordStoreSlice(),
-            sizeStats};
+    return {.validateMode = validateMode,
+            .repairMode = repairMode,
+            .logDiagnostics = logDiagnostics,
+            .validationVersion = getTestCommandsEnabled()
+                ? (ValidationVersion)bsonTestValidationVersion
+                : currentValidationVersion,
+            .verifyConfigurationOverride = getConfigOverrideOrThrow(rawConfigOverride),
+            .readTimestamp = timestamp,
+            .hashPrefixes = hashPrefixes,
+            .revealHashedIds = revealHashedIds,
+            .targetRecordsPerRecordStoreSlice = getTargetRecordsPerRecordStoreSlice(),
+            .sizeStats = sizeStats};
 }
 
 BSONObj ValidationMetrics::toBSON(const ValidateResults& results) const {
@@ -966,7 +967,7 @@ Status validate(OperationContext* opCtx,
     // Report the cost of every validation, including those that fail or throw. 'valid' only
     // describes the collection when 'completed' is true; a validation that stopped early may not
     // have reached the checks that would have found errors.
-    const ValidateMode mode = options.getValidateMode();
+    const ValidateMode mode = options.validateMode;
     Timer totalTimer;
     ValidationMetrics metrics;
     // Cleared if validation stopped early because of an exception it reports as a warning or
@@ -1048,7 +1049,7 @@ Status validate(OperationContext* opCtx,
     // the requested read timestamp (e.g. atClusterTime). This mirrors the atClusterTime handling in
     // applyReadConcern(). Without this wait, a secondary could open a read transaction at a
     // timestamp greater than its appliedOpTime, potentially triggering an invariant.
-    if (auto readTimestamp = options.getReadTimestamp()) {
+    if (auto readTimestamp = options.readTimestamp) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (replCoord->getSettings().isReplSet()) {
             recordError([&] {
@@ -1073,15 +1074,15 @@ Status validate(OperationContext* opCtx,
             oldDataCorruptionMode);
     });
 
-    results.setRepairMode(validateState.getRepairMode());
+    results.setRepairMode(validateState.getOptions().repairMode);
 
-    if (validateState.fixErrors()) {
+    if (validateState.getOptions().fixErrors()) {
         // Note: cannot set PrepareConflictBehavior here, since the validate command with repair
         // needs ignoreAndAllowWrites, but validate repair at startup cannot set that here
         // due to an already active WriteUnitOfWork.  The prepare conflict behavior for validate
         // command with repair is set in the command code prior to this point.
-        invariant(!validateState.isBackground());
-    } else if (!validateState.isBackground()) {
+        invariant(!validateState.getOptions().isBackground());
+    } else if (!validateState.getOptions().isBackground()) {
         // Foreground validation may perform writes to fix up inconsistencies that are not
         // correctness errors.
         shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
@@ -1108,12 +1109,12 @@ Status validate(OperationContext* opCtx,
 
     results.setNamespaceString(validateState.nss());
     results.setUUID(validateState.uuid());
-    results.setReadTimestamp(validateState.getReadTimestamp());
+    results.setReadTimestamp(validateState.getOptions().readTimestamp);
 
     try {
         uassert(13680101,
                 "Full index validation requires the collection lock",
-                !validateState.isFullIndexValidation() ||
+                !validateState.getOptions().isFullIndexValidation() ||
                     shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
                         validateState.nss(), validateState.collectionLockMode()));
 
@@ -1123,9 +1124,9 @@ Status validate(OperationContext* opCtx,
                       "validating collection",
                       logAttrs(validateState.nss()),
                       logAttrs(validateState.uuid()),
-                      "options"_attr = validateState.toBSON());
+                      "options"_attr = validateState.getOptions().toBSON());
 
-        if (validateState.isHashDrillDown()) {
+        if (validateState.getOptions().isHashDrillDown()) {
             validateState.initializeCursors(opCtx);
             ValidateAdaptorSerial recordStoreValidator(opCtx, validateState);
             recordStoreValidator.hashDrillDown(opCtx, results);
@@ -1137,7 +1138,7 @@ Status validate(OperationContext* opCtx,
         {
             Timer timer;
             validateState.getCollection()->getRecordStore()->validate(
-                *shard_role_details::getRecoveryUnit(opCtx), validateState, &results);
+                *shard_role_details::getRecoveryUnit(opCtx), validateState.getOptions(), &results);
             metrics.recordStoreValidateDuration = timer.elapsed();
         }
 
@@ -1164,7 +1165,7 @@ Status validate(OperationContext* opCtx,
 
         _validateCatalogEntry(opCtx, &validateState, results);
 
-        if (validateState.isMetadataValidation()) {
+        if (validateState.getOptions().isMetadataValidation()) {
             if (results.isValid()) {
                 LOGV2(5980500,
                       "Validation of metadata complete for collection. No problems detected",
@@ -1194,7 +1195,8 @@ Status validate(OperationContext* opCtx,
         Timer phase1Timer;
         {
             Timer timer;
-            indexValidator.traverseRecordStore(opCtx, results, validateState.validationVersion());
+            indexValidator.traverseRecordStore(
+                opCtx, results, validateState.getOptions().validationVersion);
             metrics.recordStoreTraversalDuration = timer.elapsed();
             // The slices traverse on their own operation contexts, so their storage statistics
             // are added to this operation's to keep its slow operation reporting complete.
@@ -1208,17 +1210,17 @@ Status validate(OperationContext* opCtx,
             }
         }
 
-        if (validateState.isCollHashValidation()) {
+        if (validateState.getOptions().isCollHashValidation()) {
             indexValidator.computeMetadataHash(opCtx, validateState.getCollection(), results);
         }
 
         // Compare the accumulated hash against the replicated metadata system's view of the
         // collection.
-        if (validateState.isCollHashValidation() &&
+        if (validateState.getOptions().isCollHashValidation() &&
             rss::ReplicatedStorageService::get(opCtx)
                 .getPersistenceProvider()
                 .shouldUseContinuousInternodeValidation()) {
-            if (validateState.getReadTimestamp()) {
+            if (validateState.getOptions().readTimestamp) {
                 results.setHashComparison(ValidateResults::HashComparison::kPinnedReadTimestamp);
             } else {
                 _compareCollectionHash(opCtx, validateState, results);

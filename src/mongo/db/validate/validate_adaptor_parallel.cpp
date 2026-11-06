@@ -165,10 +165,10 @@ void ValidateAdaptorParallel::traverseRecordStore(OperationContext* opCtx,
                               gValidateParallelMaxRecordStoreSlices.load())
         : 1;
 
-    const bool hashDrillDown = validateState.getHashPrefixes().has_value() ||
-        validateState.getRevealHashedIds().has_value();
-    const bool parallelEligible = !validateState.isBackground() &&
-        validateState.getRepairMode() == collection_validation::RepairMode::kNone &&
+    const bool hashDrillDown = validateState.getOptions().hashPrefixes.has_value() ||
+        validateState.getOptions().revealHashedIds.has_value();
+    const bool parallelEligible = !validateState.getOptions().isBackground() &&
+        validateState.getOptions().repairMode == collection_validation::RepairMode::kNone &&
         getKeyBasedIndexConsistency().canMergeResults() && !hashDrillDown && sliceCount > 1;
 
     const auto slicePivotResults = parallelEligible

@@ -177,19 +177,15 @@ std::vector<ValidateResults> foregroundValidate(
     for (const auto mode : modes) {
         ValidateResults validateResults;
         EXPECT_EQ(ErrorCodes::OK,
-                  collection_validation::validate(opCtx,
-                                                  nss,
-                                                  collection_validation::ValidationOptions{
-                                                      mode,
-                                                      repairMode,
-                                                      /*logDiagnostics=*/false,
-                                                      validationVersion,
-                                                      /*verifyConfigurationOverride=*/boost::none,
-                                                      /*readTimestamp=*/boost::none,
-                                                      /*hashPrefixes=*/boost::none,
-                                                      /*revealHashedIds=*/boost::none,
-                                                      targetRecordsPerSlice},
-                                                  validateResults))
+                  collection_validation::validate(
+                      opCtx,
+                      nss,
+                      collection_validation::ValidationOptions{
+                          .validateMode = mode,
+                          .repairMode = repairMode,
+                          .validationVersion = validationVersion,
+                          .targetRecordsPerRecordStoreSlice = targetRecordsPerSlice},
+                      validateResults))
             << "Validation Mode: " << static_cast<int>(mode);
         BSONObjBuilder validateResultsBuilder;
         validateResults.appendToResultObj(&validateResultsBuilder, /*debugging=*/true);
@@ -554,10 +550,9 @@ Status validateThrowingBeforeIndexValidation(OperationContext* opCtx,
     return collection_validation::validate(
         opCtx,
         nss,
-        collection_validation::ValidationOptions{collection_validation::ValidateMode::kForeground,
-                                                 collection_validation::RepairMode::kNone,
-                                                 /*logDiagnostics=*/false,
-                                                 currentValidationVersion},
+        collection_validation::ValidationOptions{
+            .validateMode = collection_validation::ValidateMode::kForeground,
+            .repairMode = collection_validation::RepairMode::kNone},
         results);
 }
 
@@ -600,17 +595,15 @@ TEST_F(CollectionValidationTest, ValidateLogsMetricsWhenCollectionMissing) {
     const auto missingNss = NamespaceString::createNamespaceString_forTest("test.missing");
     unittest::LogCaptureGuard logs;
     ValidateResults results;
-    ASSERT_THROWS_CODE(
-        collection_validation::validate(opCtx,
-                                        missingNss,
-                                        collection_validation::ValidationOptions{
-                                            collection_validation::ValidateMode::kForeground,
-                                            collection_validation::RepairMode::kNone,
-                                            /*logDiagnostics=*/false,
-                                            currentValidationVersion},
-                                        results),
-        DBException,
-        ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(collection_validation::validate(
+                           opCtx,
+                           missingNss,
+                           collection_validation::ValidationOptions{
+                               .validateMode = collection_validation::ValidateMode::kForeground,
+                               .repairMode = collection_validation::RepairMode::kNone},
+                           results),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
     logs.stop();
     EXPECT_EQ(logs.countBSONContainingSubset(
                   BSON("id" << kValidationMetricsLogId << "attr"
@@ -691,15 +684,10 @@ ValidateResults validateWithSliceTarget(OperationContext* opCtx,
     ASSERT_OK(collection_validation::validate(
         opCtx,
         kNss,
-        collection_validation::ValidationOptions{collection_validation::ValidateMode::kForeground,
-                                                 collection_validation::RepairMode::kNone,
-                                                 /*logDiagnostics=*/false,
-                                                 currentValidationVersion,
-                                                 /*verifyConfigurationOverride=*/boost::none,
-                                                 /*readTimestamp=*/boost::none,
-                                                 /*hashPrefixes=*/boost::none,
-                                                 /*revealHashedIds=*/boost::none,
-                                                 targetRecordsPerSlice},
+        collection_validation::ValidationOptions{
+            .validateMode = collection_validation::ValidateMode::kForeground,
+            .repairMode = collection_validation::RepairMode::kNone,
+            .targetRecordsPerRecordStoreSlice = targetRecordsPerSlice},
         results));
     return results;
 }
@@ -1230,16 +1218,10 @@ TEST_F(CollectionValidationTest, LargeCollectionSlicesOnParallelExecution) {
     auto opCtx = operationContext();
     ASSERT_EQ(kCountDocs, insertDataRange(opCtx, 0, kCountDocs));
     ValidateResults results;
-    collection_validation::ValidationOptions opts(
-        collection_validation::ValidateMode::kForeground,
-        collection_validation::RepairMode::kNone,
-        /*logDiagnostics=*/false,
-        currentValidationVersion,
-        /*verifyConfigurationOverride=*/boost::none,
-        /*readTimestamp=*/boost::none,
-        /*hashPrefixes=*/boost::none,
-        /*revealHashedIds=*/boost::none,
-        /*targetRecordsPerRecordStoreSlice=*/kTargetRecordsPerSlice);
+    collection_validation::ValidationOptions opts{
+        .validateMode = collection_validation::ValidateMode::kForeground,
+        .repairMode = collection_validation::RepairMode::kNone,
+        .targetRecordsPerRecordStoreSlice = kTargetRecordsPerSlice};
     ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, results));
     // Do not strictly validate on a particular count, simply check that it's more than one, and the
     // value is populated.
@@ -1250,15 +1232,9 @@ TEST_F(CollectionValidationTest, LargeCollectionSlicesOnParallelExecution) {
 TEST_F(CollectionValidationTest, LargeCollectionDoesNotSliceOnSerialExecution) {
     auto opCtx = operationContext();
     ASSERT_EQ(kCountDocs, insertDataRange(opCtx, 0, kCountDocs));
-    collection_validation::ValidationOptions opts(collection_validation::ValidateMode::kForeground,
-                                                  collection_validation::RepairMode::kNone,
-                                                  /*logDiagnostics=*/false,
-                                                  currentValidationVersion,
-                                                  /*verifyConfigurationOverride=*/boost::none,
-                                                  /*readTimestamp=*/boost::none,
-                                                  /*hashPrefixes=*/boost::none,
-                                                  /*revealHashedIds=*/boost::none,
-                                                  /*targetRecordsPerRecordStoreSlice=*/boost::none);
+    collection_validation::ValidationOptions opts{
+        .validateMode = collection_validation::ValidateMode::kForeground,
+        .repairMode = collection_validation::RepairMode::kNone};
     ValidateResults results;
     ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, results));
     // Ensure that only one slice was run, or the value is unpopulated.
@@ -1270,16 +1246,10 @@ TEST_F(CollectionValidationTest, ParallelTraversalAgreesWithSerialTraversal) {
     ASSERT_EQ(kCountDocs, insertDataRange(opCtx, 0, kCountDocs));
 
     auto validateWithSliceTarget = [&](boost::optional<int64_t> targetRecordsPerSlice) {
-        collection_validation::ValidationOptions opts(
-            collection_validation::ValidateMode::kForeground,
-            collection_validation::RepairMode::kNone,
-            /*logDiagnostics=*/false,
-            currentValidationVersion,
-            /*verifyConfigurationOverride=*/boost::none,
-            /*readTimestamp=*/boost::none,
-            /*hashPrefixes=*/boost::none,
-            /*revealHashedIds=*/boost::none,
-            /*targetRecordsPerRecordStoreSlice=*/targetRecordsPerSlice);
+        collection_validation::ValidationOptions opts{
+            .validateMode = collection_validation::ValidateMode::kForeground,
+            .repairMode = collection_validation::RepairMode::kNone,
+            .targetRecordsPerRecordStoreSlice = targetRecordsPerSlice};
         ValidateResults results;
         ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, results));
         return results;
@@ -1305,16 +1275,10 @@ TEST_F(CollectionValidationTest, ValidateLogsParallelTraversalMetricsWhenTravers
 
     unittest::LogCaptureGuard logs;
     ValidateResults results;
-    collection_validation::ValidationOptions opts(collection_validation::ValidateMode::kForeground,
-                                                  collection_validation::RepairMode::kNone,
-                                                  /*logDiagnostics=*/false,
-                                                  currentValidationVersion,
-                                                  /*verifyConfigurationOverride=*/boost::none,
-                                                  /*readTimestamp=*/boost::none,
-                                                  /*hashPrefixes=*/boost::none,
-                                                  /*revealHashedIds=*/boost::none,
-                                                  /*targetRecordsPerRecordStoreSlice=*/
-                                                  kTargetRecordsPerSlice);
+    collection_validation::ValidationOptions opts{
+        .validateMode = collection_validation::ValidateMode::kForeground,
+        .repairMode = collection_validation::RepairMode::kNone,
+        .targetRecordsPerRecordStoreSlice = kTargetRecordsPerSlice};
     ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, results));
     logs.stop();
     const auto numSlices = results.getNumRecordStoreSlices().value_or(-1);
@@ -1369,15 +1333,10 @@ TEST_F(CollectionValidationTest, SliceCountIsCappedRegardlessOfTarget) {
     ASSERT_EQ(kCountDocs, insertDataRange(opCtx, 0, kCountDocs));
 
     // A target of one record per slice would ask for kCountDocs slices without the cap.
-    collection_validation::ValidationOptions opts(collection_validation::ValidateMode::kForeground,
-                                                  collection_validation::RepairMode::kNone,
-                                                  /*logDiagnostics=*/false,
-                                                  currentValidationVersion,
-                                                  /*verifyConfigurationOverride=*/boost::none,
-                                                  /*readTimestamp=*/boost::none,
-                                                  /*hashPrefixes=*/boost::none,
-                                                  /*revealHashedIds=*/boost::none,
-                                                  /*targetRecordsPerRecordStoreSlice=*/1);
+    collection_validation::ValidationOptions opts{
+        .validateMode = collection_validation::ValidateMode::kForeground,
+        .repairMode = collection_validation::RepairMode::kNone,
+        .targetRecordsPerRecordStoreSlice = 1};
     ValidateResults results;
     ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, results));
 
@@ -1402,16 +1361,10 @@ TEST_F(CollectionValidationTest, InterruptedParallelTraversalWaitsForSlicesToFin
     Status validateStatus = Status::OK();
     unittest::JoinThread validateThread([&] {
         AlternativeClientRegion acr(validateClient);
-        collection_validation::ValidationOptions opts(
-            collection_validation::ValidateMode::kForeground,
-            collection_validation::RepairMode::kNone,
-            /*logDiagnostics=*/false,
-            currentValidationVersion,
-            /*verifyConfigurationOverride=*/boost::none,
-            /*readTimestamp=*/boost::none,
-            /*hashPrefixes=*/boost::none,
-            /*revealHashedIds=*/boost::none,
-            /*targetRecordsPerRecordStoreSlice=*/kTargetRecordsPerSlice);
+        collection_validation::ValidationOptions opts{
+            .validateMode = collection_validation::ValidateMode::kForeground,
+            .repairMode = collection_validation::RepairMode::kNone,
+            .targetRecordsPerRecordStoreSlice = kTargetRecordsPerSlice};
         ValidateResults results;
         validateStatus = collection_validation::validate(validateOpCtx.get(), kNss, opts, results);
         validateReturned.store(true);
@@ -2519,9 +2472,8 @@ protected:
                       operationContext(),
                       nss,
                       collection_validation::ValidationOptions{
-                          collection_validation::ValidateMode::kCollectionHash,
-                          collection_validation::RepairMode::kNone,
-                          /*logDiagnostics=*/false},
+                          .validateMode = collection_validation::ValidateMode::kCollectionHash,
+                          .repairMode = collection_validation::RepairMode::kNone},
                       results));
         return results;
     }
@@ -2726,22 +2678,18 @@ TEST_F(CollectionHashComparisonTest, SkipsWhenTheCallerPinsAReadTimestamp) {
     // The scan would read an earlier instant than the replayed oplog describes, so the two sides
     // would be measuring different moments and could disagree on a healthy collection.
     ValidateResults results;
-    EXPECT_EQ(
-        ErrorCodes::OK,
-        collection_validation::validate(operationContext(),
-                                        kNss,
-                                        collection_validation::ValidationOptions{
-                                            collection_validation::ValidateMode::kCollectionHash,
-                                            collection_validation::RepairMode::kNone,
-                                            /*logDiagnostics=*/false,
-                                            currentValidationVersion,
-                                            /*verifyConfigurationOverride=*/boost::none,
-                                            /*readTimestamp=*/
-                                            operationContext()
-                                                ->getServiceContext()
-                                                ->getStorageEngine()
-                                                ->getAllDurableTimestamp()},
-                                        results));
+    EXPECT_EQ(ErrorCodes::OK,
+              collection_validation::validate(
+                  operationContext(),
+                  kNss,
+                  collection_validation::ValidationOptions{
+                      .validateMode = collection_validation::ValidateMode::kCollectionHash,
+                      .repairMode = collection_validation::RepairMode::kNone,
+                      .readTimestamp = operationContext()
+                                           ->getServiceContext()
+                                           ->getStorageEngine()
+                                           ->getAllDurableTimestamp()},
+                  results));
 
     ASSERT_TRUE(results.getHashComparison().has_value());
     EXPECT_EQ(toString(*results.getHashComparison()), "pinnedReadTimestamp");
@@ -3013,9 +2961,8 @@ protected:
                       operationContext(),
                       nss,
                       collection_validation::ValidationOptions{
-                          collection_validation::ValidateMode::kCollectionHash,
-                          collection_validation::RepairMode::kNone,
-                          /*logDiagnostics=*/false},
+                          .validateMode = collection_validation::ValidateMode::kCollectionHash,
+                          .repairMode = collection_validation::RepairMode::kNone},
                       results));
         return results;
     }
@@ -3135,15 +3082,14 @@ TEST_F(CollectionValidationTest, NoXxh3HashWithoutContinuousInternodeValidation)
     }
 
     ValidateResults results;
-    EXPECT_EQ(
-        ErrorCodes::OK,
-        collection_validation::validate(operationContext(),
-                                        kNss,
-                                        collection_validation::ValidationOptions{
-                                            collection_validation::ValidateMode::kCollectionHash,
-                                            collection_validation::RepairMode::kNone,
-                                            /*logDiagnostics=*/false},
-                                        results));
+    EXPECT_EQ(ErrorCodes::OK,
+              collection_validation::validate(
+                  operationContext(),
+                  kNss,
+                  collection_validation::ValidationOptions{
+                      .validateMode = collection_validation::ValidateMode::kCollectionHash,
+                      .repairMode = collection_validation::RepairMode::kNone},
+                  results));
 
     // The default attached storage provider does not record the per-document validation hashes,
     // so there is nothing for this hash to be compared against.

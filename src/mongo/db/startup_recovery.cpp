@@ -795,17 +795,13 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
     const auto parsedOptions = !validateOptions.isEmpty()
         ? collection_validation::parseValidateOptions(
               opCtx, nss, validateOptions, skipAtClusterTime, /*enableSizeStats=*/true)
-        : collection_validation::ValidationOptions(
-              collection_validation::ValidateMode::kForegroundFull,
-              collection_validation::RepairMode::kNone,
-              /*logDiagnostics=*/false,
-              currentValidationVersion,
-              /*verifyConfigurationOverride=*/boost::none,
-              /*readTimestamp=*/boost::none,
-              /*hashPrefixes=*/boost::none,
-              /*revealHashedIds=*/boost::none,
-              collection_validation::getTargetRecordsPerRecordStoreSlice());
-    if (parsedOptions.getRepairMode() != collection_validation::RepairMode::kNone) {
+        : collection_validation::ValidationOptions{
+              .validateMode = collection_validation::ValidateMode::kForegroundFull,
+              .repairMode = collection_validation::RepairMode::kNone,
+              .logDiagnostics = false,
+              .targetRecordsPerRecordStoreSlice =
+                  collection_validation::getTargetRecordsPerRecordStoreSlice()};
+    if (parsedOptions.repairMode != collection_validation::RepairMode::kNone) {
         return Status{ErrorCodes::InvalidOptions,
                       "Repair is not allowed in offline validation mode"};
     }
@@ -826,7 +822,7 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
         // have existed at that timestamp because it was created or renamed into place afterwards;
         // validate() throws NamespaceNotFound. That is a valid catalog state rather than
         // corruption, so skip the collection and continue validating the rest.
-        if (e.code() == ErrorCodes::NamespaceNotFound && parsedOptions.getReadTimestamp()) {
+        if (e.code() == ErrorCodes::NamespaceNotFound && parsedOptions.readTimestamp) {
             if (!gValidateCollectionName.empty()) {
                 // If validating a single collection, return non-OK status to indicate that the
                 // collection was not validated and return early.
@@ -840,7 +836,7 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
             LOGV2(11790100,
                   "Skipping validation of collection because it did not exist at atClusterTime",
                   "nss"_attr = nss.toStringForErrorMsg(),
-                  "atClusterTime"_attr = *parsedOptions.getReadTimestamp());
+                  "atClusterTime"_attr = *parsedOptions.readTimestamp);
             return true;
         }
         LOGV2_ERROR(11790201,

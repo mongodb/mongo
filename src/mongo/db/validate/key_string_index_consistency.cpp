@@ -215,7 +215,7 @@ void KeyStringIndexConsistency::merge(const KeyStringIndexConsistency& other) {
 void KeyStringIndexConsistency::addMultikeyMetadataPath(const key_string::Value& ks,
                                                         IndexInfo& indexInfo) {
     auto hash = _hashKeyString(ks, indexInfo.indexNameHash());
-    if (MONGO_unlikely(_validateState->logDiagnostics())) {
+    if (MONGO_unlikely(_validateState->getOptions().logDiagnostics)) {
         LOGV2(6208500,
               "[validate](multikeyMetadataPath) Adding with the hash",
               "hash"_attr = hash,
@@ -227,7 +227,7 @@ void KeyStringIndexConsistency::addMultikeyMetadataPath(const key_string::Value&
 void KeyStringIndexConsistency::removeMultikeyMetadataPath(const key_string::Value& ks,
                                                            IndexInfo& indexInfo) {
     auto hash = _hashKeyString(ks, indexInfo.indexNameHash());
-    if (MONGO_unlikely(_validateState->logDiagnostics())) {
+    if (MONGO_unlikely(_validateState->getOptions().logDiagnostics)) {
         LOGV2(6208501,
               "[validate](multikeyMetadataPath) Removing with the hash",
               "hash"_attr = hash,
@@ -246,7 +246,7 @@ bool KeyStringIndexConsistency::haveEntryMismatch() const {
                     _indexKeyBuckets.end(),
                     [](const IndexKeyBucket& bucket) -> bool { return bucket.indexKeyCount; });
 
-    if (haveMismatch && _validateState->logDiagnostics()) {
+    if (haveMismatch && _validateState->getOptions().logDiagnostics) {
         for (size_t i = 0; i < _indexKeyBuckets.size(); i++) {
             if (_indexKeyBuckets[i].indexKeyCount == 0) {
                 continue;
@@ -427,7 +427,7 @@ void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
         upper.bucketSizeBytes += ks.getSize();
         ++indexInfo.numRecords;
 
-        if (MONGO_unlikely(_validateState->logDiagnostics())) {
+        if (MONGO_unlikely(_validateState->getOptions().logDiagnostics)) {
             LOGV2(4666602,
                   "[validate](record) Adding with hashes",
                   "hashUpper"_attr = hashUpper,
@@ -467,7 +467,7 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
         upper.bucketSizeBytes += ks.getSize();
         ++indexInfo.numKeys;
 
-        if (MONGO_unlikely(_validateState->logDiagnostics())) {
+        if (MONGO_unlikely(_validateState->getOptions().logDiagnostics)) {
             LOGV2(4666603,
                   "[validate](index) Adding with hashes",
                   "hashUpper"_attr = hashUpper,
@@ -485,7 +485,7 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
         // index entry key, we add the key to the '_extraIndexEntries' map.
         IndexKey key{&indexInfo, ks};
         if (_missingIndexEntries.count(key) == 0) {
-            if (_validateState->fixErrors()) {
+            if (_validateState->getOptions().fixErrors()) {
                 // Removing extra index entries.
                 InsertDeleteOptions options;
                 options.dupsAllowed = !indexInfo.getEntry().descriptor()->unique();
@@ -850,7 +850,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
 
     // Adjust multikey metadata when allowed. These states are all allowed by the design of
     // multikey. A collection should still be valid without these adjustments.
-    if (_validateState->adjustMultikey()) {
+    if (_validateState->getOptions().adjustMultikey()) {
 
         // If this collection has documents that make this index multikey, then check whether
         // those multikey paths match the index's metadata.
@@ -1024,7 +1024,7 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
     };
 
     if (!index.isMultikey(opCtx, coll) && shouldBeMultikey) {
-        if (_validateState->fixErrors()) {
+        if (_validateState->getOptions().fixErrors()) {
             WriteUnitOfWork wuow(opCtx);
             coll->getIndexCatalog()->setMultikeyPaths(
                 opCtx, coll, &index, *multikeyMetadataKeys, *documentMultikeyPaths);
@@ -1056,7 +1056,7 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
     if (index.isMultikey(opCtx, coll) && !documentKeySet->empty()) {
         const MultikeyPaths& indexPaths = index.getMultikeyPaths(opCtx, coll);
         if (!MultikeyPathTracker::covers(indexPaths, *documentMultikeyPaths.get())) {
-            if (_validateState->fixErrors()) {
+            if (_validateState->getOptions().fixErrors()) {
                 WriteUnitOfWork wuow(opCtx);
                 coll->getIndexCatalog()->setMultikeyPaths(
                     opCtx, coll, &index, *multikeyMetadataKeys, *documentMultikeyPaths);

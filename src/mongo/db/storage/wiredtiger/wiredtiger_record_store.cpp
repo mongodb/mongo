@@ -1151,13 +1151,13 @@ void WiredTigerRecordStore::validate(RecoveryUnit& ru,
                                          *results);
 
     if (!options.isFullValidation()) {
-        invariant(!options.verifyConfigurationOverride().has_value());
+        invariant(!options.verifyConfigurationOverride.has_value());
         return;
     }
 
     int err = WiredTigerUtil::verifyTable(*WiredTigerRecoveryUnit::get(ru).getSession(),
                                           getURI(),
-                                          options.verifyConfigurationOverride(),
+                                          options.verifyConfigurationOverride,
                                           results->getErrorsUnsafe());
     if (!err) {
         return;
@@ -1620,7 +1620,7 @@ void WiredTigerRecordStore::Oplog::validate(RecoveryUnit& ru,
                                          *results);
 
     if (!options.isFullValidation()) {
-        invariant(!options.verifyConfigurationOverride().has_value());
+        invariant(!options.verifyConfigurationOverride.has_value());
         return;
     }
 

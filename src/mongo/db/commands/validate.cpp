@@ -235,7 +235,7 @@ public:
                   "fixMultiKey"_attr = options.adjustMultikey(),
                   "repair"_attr = options.fixErrors(),
                   "wiredtigerVerifyConfigurationOverride"_attr =
-                      options.verifyConfigurationOverride());
+                      options.verifyConfigurationOverride);
         }
 
         // Only one validation per collection can be in progress, the rest wait.

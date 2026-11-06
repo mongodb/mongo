@@ -258,10 +258,10 @@ Status repairCollection(OperationContext* opCtx,
     status = collection_validation::validate(
         opCtx,
         nss,
-        collection_validation::ValidationOptions(
-            collection_validation::ValidateMode::kForegroundFullIndexOnly,
-            collection_validation::RepairMode::kFixErrors,
-            /*logDiagnostics=*/false),
+        collection_validation::ValidationOptions{
+            .validateMode = collection_validation::ValidateMode::kForegroundFullIndexOnly,
+            .repairMode = collection_validation::RepairMode::kFixErrors,
+            .logDiagnostics = false},
         validateResults);
     if (!status.isOK()) {
         return status;

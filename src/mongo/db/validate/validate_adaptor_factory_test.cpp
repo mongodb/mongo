@@ -28,17 +28,13 @@ protected:
     }
 
     std::unique_ptr<ValidateAdaptor> create(boost::optional<int64_t> targetRecordsPerSlice) {
-        ValidateState validateState(operationContext(),
-                                    kNss,
-                                    ValidationOptions(ValidateMode::kForeground,
-                                                      RepairMode::kNone,
-                                                      /*logDiagnostics=*/false,
-                                                      currentValidationVersion,
-                                                      /*verifyConfigurationOverride=*/boost::none,
-                                                      /*readTimestamp=*/boost::none,
-                                                      /*hashPrefixes=*/boost::none,
-                                                      /*revealHashedIds=*/boost::none,
-                                                      targetRecordsPerSlice));
+        ValidateState validateState(
+            operationContext(),
+            kNss,
+            ValidationOptions{.validateMode = ValidateMode::kForeground,
+                              .repairMode = RepairMode::kNone,
+                              .logDiagnostics = false,
+                              .targetRecordsPerRecordStoreSlice = targetRecordsPerSlice});
         return ValidateAdaptorFactory::create(operationContext(), validateState);
     }
 };

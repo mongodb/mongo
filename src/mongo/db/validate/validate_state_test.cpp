@@ -23,13 +23,10 @@ namespace mongo::collection_validation {
 namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.validateState");
-const ValidationOptions kValidationOptions(ValidateMode::kForeground,
-                                           RepairMode::kNone,
-                                           /*logDiagnostics=*/false);
-const ValidationOptions kValidationOptionsEnforceFastCount(
-    ValidateMode::kForegroundFullEnforceFastCount,
-    RepairMode::kNone,
-    /*logDiagnostics=*/false);
+const ValidationOptions kValidationOptions{.validateMode = ValidateMode::kForeground,
+                                           .repairMode = RepairMode::kNone};
+const ValidationOptions kValidationOptionsEnforceFastCount{
+    .validateMode = ValidateMode::kForegroundFullEnforceFastCount, .repairMode = RepairMode::kNone};
 
 class ValidateStateTest : public CatalogTestFixture {};
 
@@ -63,7 +60,7 @@ public:
     }
 
     ValidationOptions makeOptions(ValidateMode mode, RepairMode repairMode) {
-        return ValidationOptions(mode, repairMode, /*logDiagnostics=*/false);
+        return ValidationOptions{.validateMode = mode, .repairMode = repairMode};
     }
 };
 
@@ -127,7 +124,8 @@ TEST_F(ValidateStateWithoutSizeStorerTest, GetDetectedFastCountTypeReturnsNeithe
 }
 
 TEST(ValidationOptionsToBSONTest, ReportsModeAndRepairMode) {
-    const ValidationOptions options(ValidateMode::kCollectionHash, RepairMode::kNone, false);
+    const ValidationOptions options{.validateMode = ValidateMode::kCollectionHash,
+                                    .repairMode = RepairMode::kNone};
     const BSONObj obj = options.toBSON();
     EXPECT_EQ(obj["mode"].String(), "collectionHash");
     EXPECT_EQ(obj["repairMode"].String(), "none");
@@ -137,16 +135,11 @@ TEST(ValidationOptionsToBSONTest, ReportsModeAndRepairMode) {
 }
 
 TEST(ValidationOptionsToBSONTest, ReportsSliceTargetAndSizeStats) {
-    const ValidationOptions options(ValidateMode::kForegroundFull,
-                                    RepairMode::kFixErrors,
-                                    true,
-                                    currentValidationVersion,
-                                    boost::none,
-                                    boost::none,
-                                    boost::none,
-                                    boost::none,
-                                    /*targetRecordsPerRecordStoreSlice=*/5000,
-                                    /*sizeStats=*/true);
+    const ValidationOptions options{.validateMode = ValidateMode::kForegroundFull,
+                                    .repairMode = RepairMode::kFixErrors,
+                                    .logDiagnostics = true,
+                                    .targetRecordsPerRecordStoreSlice = 5000,
+                                    .sizeStats = true};
     const BSONObj obj = options.toBSON();
     EXPECT_EQ(obj["mode"].String(), "foregroundFull");
     EXPECT_EQ(obj["repairMode"].String(), "fixErrors");
@@ -207,11 +200,10 @@ auto runShouldEnforceTestCases =
         for (const auto& [dbName, collName, enforce, expected] : testCases) {
             const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
                 std::string{dbName} + "." + std::string{collName});
-            const ValidationOptions options(
-                enforce ? ValidateMode::kForegroundFullEnforceFastCountAndSize
-                        : ValidateMode::kForeground,
-                RepairMode::kNone,
-                /*logDiagnostics=*/false);
+            const ValidationOptions options{
+                .validateMode = enforce ? ValidateMode::kForegroundFullEnforceFastCountAndSize
+                                        : ValidateMode::kForeground,
+                .repairMode = RepairMode::kNone};
             ValidateState validateState(opCtx, nss, options);
             EXPECT_EQ(validateState.shouldEnforceFastCount(opCtx, type), expected)
                 << "shouldEnforceFastCount failed for " << nss.toStringForErrorMsg();
@@ -442,12 +434,10 @@ INSTANTIATE_TEST_SUITE_P(
     });
 
 TEST_F(ValidateStateTest, ShouldNotEnforceFastCountAndSizeWithReadTimestamp) {
-    const ValidationOptions options(ValidateMode::kForegroundFullEnforceFastCountAndSize,
-                                    RepairMode::kNone,
-                                    /*logDiagnostics=*/false,
-                                    currentValidationVersion,
-                                    /*verifyConfigurationOverride=*/boost::none,
-                                    /*readTimestamp=*/Timestamp(1, 1));
+    const ValidationOptions options{.validateMode =
+                                        ValidateMode::kForegroundFullEnforceFastCountAndSize,
+                                    .repairMode = RepairMode::kNone,
+                                    .readTimestamp = Timestamp(1, 1)};
     ValidateState validateState(operationContext(), kNss, options);
     const FastCountType fastCountType = validateState.getDetectedFastCountType(operationContext());
     EXPECT_FALSE(validateState.shouldEnforceFastCount(operationContext(), fastCountType));
@@ -456,12 +446,10 @@ TEST_F(ValidateStateTest, ShouldNotEnforceFastCountAndSizeWithReadTimestamp) {
 
 TEST_F(ValidateStateWithoutSizeStorerTest, ShouldNotEnforceFastCountAndSizeWithReadTimestamp) {
     createReplicatedFastCountContainers(operationContext());
-    const ValidationOptions options(ValidateMode::kForegroundFullEnforceFastCountAndSize,
-                                    RepairMode::kNone,
-                                    /*logDiagnostics=*/false,
-                                    currentValidationVersion,
-                                    /*verifyConfigurationOverride=*/boost::none,
-                                    /*readTimestamp=*/Timestamp(1, 1));
+    const ValidationOptions options{.validateMode =
+                                        ValidateMode::kForegroundFullEnforceFastCountAndSize,
+                                    .repairMode = RepairMode::kNone,
+                                    .readTimestamp = Timestamp(1, 1)};
     ValidateState validateState(operationContext(), kNss, options);
     const FastCountType fastCountType = validateState.getDetectedFastCountType(operationContext());
     EXPECT_EQ(fastCountType, FastCountType::replicated);

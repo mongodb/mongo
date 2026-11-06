@@ -88,72 +88,46 @@ std::string_view toString(RepairMode repairMode);
 /**
  * Additional validation options that can run in any mode.
  */
-class ValidationOptions {
-public:
-    ValidationOptions(ValidateMode validateMode,
-                      RepairMode repairMode,
-                      bool logDiagnostics,
-                      ValidationVersion validationVersion = currentValidationVersion,
-                      boost::optional<std::string> verifyConfigurationOverride = boost::none,
-                      boost::optional<Timestamp> readTimestamp = boost::none,
-                      boost::optional<std::vector<std::string>> hashPrefixes = boost::none,
-                      boost::optional<std::vector<std::string>> revealHashedIds = boost::none,
-                      boost::optional<int64_t> targetRecordsPerRecordStoreSlice = boost::none,
-                      bool sizeStats = false);
-
-    virtual ~ValidationOptions() = default;
+struct ValidationOptions {
 
     bool isMetadataValidation() const {
-        return _validateMode == ValidateMode::kMetadata;
+        return validateMode == ValidateMode::kMetadata;
     }
 
     bool isBackground() const {
-        return _validateMode == ValidateMode::kBackground ||
-            _validateMode == ValidateMode::kBackgroundCheckBSON;
+        return validateMode == ValidateMode::kBackground ||
+            validateMode == ValidateMode::kBackgroundCheckBSON;
     }
 
     bool isFullValidation() const {
-        return _validateMode == ValidateMode::kForegroundFull ||
-            _validateMode == ValidateMode::kForegroundFullCheckBSON ||
-            _validateMode == ValidateMode::kForegroundFullEnforceFastCount ||
-            _validateMode == ValidateMode::kForegroundFullEnforceFastSize ||
-            _validateMode == ValidateMode::kForegroundFullEnforceFastCountAndSize;
+        return validateMode == ValidateMode::kForegroundFull ||
+            validateMode == ValidateMode::kForegroundFullCheckBSON ||
+            validateMode == ValidateMode::kForegroundFullEnforceFastCount ||
+            validateMode == ValidateMode::kForegroundFullEnforceFastSize ||
+            validateMode == ValidateMode::kForegroundFullEnforceFastCountAndSize;
     }
 
     bool isFullIndexValidation() const {
-        return isFullValidation() || _validateMode == ValidateMode::kForegroundFullIndexOnly;
+        return isFullValidation() || validateMode == ValidateMode::kForegroundFullIndexOnly;
     }
 
     bool isBSONConformanceValidation() const {
-        return _validateMode == ValidateMode::kForegroundFullCheckBSON ||
-            _validateMode == ValidateMode::kBackgroundCheckBSON ||
-            _validateMode == ValidateMode::kForegroundCheckBSON;
+        return validateMode == ValidateMode::kForegroundFullCheckBSON ||
+            validateMode == ValidateMode::kBackgroundCheckBSON ||
+            validateMode == ValidateMode::kForegroundCheckBSON;
     }
 
     bool isExtendedValidation() const {
-        return _validateMode == ValidateMode::kCollectionHash ||
-            _validateMode == ValidateMode::kHashDrillDown;
-    }
-
-    ValidateMode getValidateMode() const {
-        return _validateMode;
+        return validateMode == ValidateMode::kCollectionHash ||
+            validateMode == ValidateMode::kHashDrillDown;
     }
 
     bool isCollHashValidation() const {
-        return _validateMode == ValidateMode::kCollectionHash;
-    }
-
-    /**
-     * Returns true iff the caller opted in to accumulating and logging a storage size summary. When
-     * set, the record store and index scans are opened as size-stats cursors which log the size
-     * summary when the scan complete.
-     */
-    bool sizeStats() const {
-        return _sizeStats;
+        return validateMode == ValidateMode::kCollectionHash;
     }
 
     bool isHashDrillDown() const {
-        return _validateMode == ValidateMode::kHashDrillDown;
+        return validateMode == ValidateMode::kHashDrillDown;
     }
 
     /**
@@ -162,8 +136,8 @@ public:
      * ValidateState::shouldEnforceFastCount().
      */
     bool enforceFastCountRequested() const {
-        return _validateMode == ValidateMode::kForegroundFullEnforceFastCount ||
-            _validateMode == ValidateMode::kForegroundFullEnforceFastCountAndSize;
+        return validateMode == ValidateMode::kForegroundFullEnforceFastCount ||
+            validateMode == ValidateMode::kForegroundFullEnforceFastCountAndSize;
     }
 
     /**
@@ -172,51 +146,16 @@ public:
      * ValidateState::shouldEnforceFastCount().
      */
     bool enforceFastSizeRequested() const {
-        return _validateMode == ValidateMode::kForegroundFullEnforceFastSize ||
-            _validateMode == ValidateMode::kForegroundFullEnforceFastCountAndSize;
-    }
-
-    const boost::optional<Timestamp>& getReadTimestamp() const {
-        return _readTimestamp;
-    }
-
-    const boost::optional<std::vector<std::string>>& getHashPrefixes() const {
-        return _hashPrefixes;
-    }
-
-    const boost::optional<std::vector<std::string>>& getRevealHashedIds() const {
-        return _revealHashedIds;
-    }
-
-    RepairMode getRepairMode() const {
-        return _repairMode;
+        return validateMode == ValidateMode::kForegroundFullEnforceFastSize ||
+            validateMode == ValidateMode::kForegroundFullEnforceFastCountAndSize;
     }
 
     bool fixErrors() const {
-        return _repairMode == RepairMode::kFixErrors;
+        return repairMode == RepairMode::kFixErrors;
     }
 
     bool adjustMultikey() const {
-        return _repairMode == RepairMode::kFixErrors || _repairMode == RepairMode::kAdjustMultikey;
-    }
-
-    /**
-     * Indicates whether extra logging should occur during validation.
-     */
-    bool logDiagnostics() const {
-        return _logDiagnostics;
-    }
-
-    ValidationVersion validationVersion() const {
-        return _validationVersion;
-    }
-
-    const boost::optional<std::string>& verifyConfigurationOverride() const {
-        return _verifyConfigurationOverride;
-    }
-
-    const boost::optional<int64_t>& getTargetRecordsPerRecordStoreSlice() const {
-        return _targetRecordsPerRecordStoreSlice;
+        return repairMode == RepairMode::kFixErrors || repairMode == RepairMode::kAdjustMultikey;
     }
 
     /**
@@ -226,29 +165,28 @@ public:
      */
     BSONObj toBSON() const;
 
-private:
-    ValidateMode _validateMode;
+    ValidateMode validateMode = ValidateMode::kForeground;
 
-    RepairMode _repairMode;
+    RepairMode repairMode = RepairMode::kNone;
 
     // Can be set to obtain better insight into what validate sees/does.
-    bool _logDiagnostics;
+    bool logDiagnostics = false;
 
-    ValidationVersion _validationVersion;
+    ValidationVersion validationVersion = currentValidationVersion;
 
-    boost::optional<std::string> _verifyConfigurationOverride;
+    boost::optional<std::string> verifyConfigurationOverride;
 
-    boost::optional<Timestamp> _readTimestamp;
+    boost::optional<Timestamp> readTimestamp;
 
-    boost::optional<std::vector<std::string>> _hashPrefixes;
+    boost::optional<std::vector<std::string>> hashPrefixes;
 
-    boost::optional<std::vector<std::string>> _revealHashedIds;
+    boost::optional<std::vector<std::string>> revealHashedIds;
 
-    boost::optional<int64_t> _targetRecordsPerRecordStoreSlice;
+    boost::optional<int64_t> targetRecordsPerRecordStoreSlice;
 
     // Opt-in: when true (and running collHash validation), the record store and index scans
     // accumulate a storage size summary that is read back and logged.
-    bool _sizeStats;
+    bool sizeStats = false;
 };
 
 }  // namespace mongo::collection_validation

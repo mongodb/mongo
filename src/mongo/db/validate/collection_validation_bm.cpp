@@ -155,8 +155,10 @@ void BM_Validate(benchmark::State& state, collection_validation::ValidateMode mo
         uassertStatusOK(collection_validation::validate(
             opCtx,
             kNss,
-            collection_validation::ValidationOptions{
-                mode, collection_validation::RepairMode::kNone, /*logDiagnostics=*/false},
+            collection_validation::ValidationOptions{.validateMode = mode,
+                                                     .repairMode =
+                                                         collection_validation::RepairMode::kNone,
+                                                     .logDiagnostics = false},
             results));
         invariant(results.isValid());
         benchmark::DoNotOptimize(results);
@@ -362,16 +364,12 @@ void BM_ValidateTimeseries(benchmark::State& state, collection_validation::Valid
             opCtx,
             kTsNss,
             collection_validation::ValidationOptions{
-                mode,
-                collection_validation::RepairMode::kNone,
-                /*logDiagnostics=*/false,
-                currentValidationVersion,
-                /*verifyConfigurationOverride=*/boost::none,
-                /*readTimestamp=*/boost::none,
-                /*hashPrefixes=*/boost::none,
-                /*revealHashedIds=*/boost::none,
-                targetRecordsPerSlice > 0 ? boost::optional<int64_t>(targetRecordsPerSlice)
-                                          : boost::none},
+                .validateMode = mode,
+                .repairMode = collection_validation::RepairMode::kNone,
+                .logDiagnostics = false,
+                .targetRecordsPerRecordStoreSlice = targetRecordsPerSlice > 0
+                    ? boost::optional<int64_t>(targetRecordsPerSlice)
+                    : boost::none},
             results));
         invariant(results.isValid());
         numSlices = results.getNumRecordStoreSlices().value_or(1);

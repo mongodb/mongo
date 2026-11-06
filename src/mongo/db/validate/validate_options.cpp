@@ -54,50 +54,29 @@ std::string_view toString(RepairMode repairMode) {
 
 BSONObj ValidationOptions::toBSON() const {
     BSONObjBuilder builder;
-    builder.append("mode", toString(_validateMode));
-    builder.append("repairMode", toString(_repairMode));
+    builder.append("mode", toString(validateMode));
+    builder.append("repairMode", toString(repairMode));
     builder.append("repair", fixErrors());
     builder.append("fixMultikey", adjustMultikey());
-    builder.append("logDiagnostics", _logDiagnostics);
-    builder.append("validationVersion", static_cast<int>(_validationVersion));
-    builder.append("sizeStats", _sizeStats);
-    if (_verifyConfigurationOverride) {
-        builder.append("verifyConfigurationOverride", *_verifyConfigurationOverride);
+    builder.append("logDiagnostics", logDiagnostics);
+    builder.append("validationVersion", static_cast<int>(validationVersion));
+    builder.append("sizeStats", sizeStats);
+    if (verifyConfigurationOverride) {
+        builder.append("verifyConfigurationOverride", *verifyConfigurationOverride);
     }
-    if (_readTimestamp) {
-        builder.append("readTimestamp", *_readTimestamp);
+    if (readTimestamp) {
+        builder.append("readTimestamp", *readTimestamp);
     }
-    if (_hashPrefixes) {
-        builder.append("hashPrefixes", *_hashPrefixes);
+    if (hashPrefixes) {
+        builder.append("hashPrefixes", *hashPrefixes);
     }
-    if (_revealHashedIds) {
-        builder.append("revealHashedIds", *_revealHashedIds);
+    if (revealHashedIds) {
+        builder.append("revealHashedIds", *revealHashedIds);
     }
-    if (_targetRecordsPerRecordStoreSlice) {
-        builder.append("targetRecordsPerRecordStoreSlice", *_targetRecordsPerRecordStoreSlice);
+    if (targetRecordsPerRecordStoreSlice) {
+        builder.append("targetRecordsPerRecordStoreSlice", *targetRecordsPerRecordStoreSlice);
     }
     return builder.obj();
 }
-
-ValidationOptions::ValidationOptions(ValidateMode validateMode,
-                                     RepairMode repairMode,
-                                     bool logDiagnostics,
-                                     ValidationVersion validationVersion,
-                                     boost::optional<std::string> verifyConfigurationOverride,
-                                     boost::optional<Timestamp> readTimestamp,
-                                     boost::optional<std::vector<std::string>> hashPrefixes,
-                                     boost::optional<std::vector<std::string>> revealHashedIds,
-                                     boost::optional<int64_t> targetRecordsPerRecordStoreSlice,
-                                     bool sizeStats)
-    : _validateMode(validateMode),
-      _repairMode(repairMode),
-      _logDiagnostics(logDiagnostics),
-      _validationVersion(validationVersion),
-      _verifyConfigurationOverride(std::move(verifyConfigurationOverride)),
-      _readTimestamp(readTimestamp),
-      _hashPrefixes(std::move(hashPrefixes)),
-      _revealHashedIds(std::move(revealHashedIds)),
-      _targetRecordsPerRecordStoreSlice(targetRecordsPerRecordStoreSlice),
-      _sizeStats(sizeStats) {}
 
 }  // namespace mongo::collection_validation

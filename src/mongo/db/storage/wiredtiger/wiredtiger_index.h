@@ -34,7 +34,7 @@
 namespace mongo {
 
 namespace collection_validation {
-class ValidationOptions;
+struct ValidationOptions;
 }
 
 class WiredTigerIndex : public SortedDataInterface {

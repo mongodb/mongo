@@ -87,15 +87,16 @@ Lock::ExclusiveLock obtainExclusiveValidationLock(OperationContext* opCtx) {
 ValidateState::ValidateState(OperationContext* opCtx,
                              const NamespaceString& nss,
                              ValidationOptions options)
-    : ValidationOptions(std::move(options)),
-      _validateLock(isBackground() ? boost::none
-                                   : boost::optional<Lock::SharedLock>{{opCtx, validateLock}}),
+    : _options(std::move(options)),
+      _validateLock(_options.isBackground()
+                        ? boost::none
+                        : boost::optional<Lock::SharedLock>{{opCtx, validateLock}}),
       _globalLock(opCtx,
                   collectionLockMode() == MODE_X ? MODE_IX : MODE_IS,
                   {false,
                    false,
                    false,
-                   getRepairMode() != RepairMode::kNone
+                   _options.repairMode != RepairMode::kNone
                        ? rss::consensus::IntentRegistry::Intent::LocalWrite
                        : rss::consensus::IntentRegistry::Intent::Read}),
       _nss(nss),
@@ -104,10 +105,10 @@ ValidateState::ValidateState(OperationContext* opCtx,
 
     // RepairMode is incompatible with the ValidateModes kBackground and
     // kForegroundFullEnforceFast[Count|Size|CountAndSize].
-    if (fixErrors()) {
+    if (_options.fixErrors()) {
         uassert(11950900,
                 "Cannot fix errors when validation is run in the background",
-                !isBackground());
+                !_options.isBackground());
         // If the persistence provider does use replicated fast count, we enforce
         // fast count unconditionally and do not fix the value up when performing validation, so it
         // is not incompatible with fixErrors.
@@ -119,10 +120,10 @@ ValidateState::ValidateState(OperationContext* opCtx,
                         .shouldUseReplicatedFastCount());
     }
 
-    if (adjustMultikey()) {
+    if (_options.adjustMultikey()) {
         uassert(11950902,
                 "Cannot run adjust multikey repair when validation is run in the background",
-                !isBackground());
+                !_options.isBackground());
     }
 }
 
@@ -180,10 +181,10 @@ bool ValidateState::shouldEnforceFastCount(OperationContext* opCtx, FastCountTyp
     if (MONGO_unlikely(skipEnforcingFastSizeAndCount.shouldFail())) {
         return false;
     }
-    if (isBackground()) {
+    if (_options.isBackground()) {
         return false;
     }
-    if (getReadTimestamp()) {
+    if (_options.readTimestamp) {
         return false;
     }
     if (rss::ReplicatedStorageService::get(opCtx)
@@ -195,7 +196,7 @@ bool ValidateState::shouldEnforceFastCount(OperationContext* opCtx, FastCountTyp
     } else {
         // TODO SERVER-128302: Re-enable validation when the fast count type is both.
         return type != FastCountType::both && _isNSEligibleForSizeStorerValidation() &&
-            enforceFastCountRequested();
+            _options.enforceFastCountRequested();
     }
 }
 
@@ -203,10 +204,10 @@ bool ValidateState::shouldEnforceFastSize(OperationContext* opCtx, FastCountType
     if (MONGO_unlikely(skipEnforcingFastSizeAndCount.shouldFail())) {
         return false;
     }
-    if (isBackground()) {
+    if (_options.isBackground()) {
         return false;
     }
-    if (getReadTimestamp()) {
+    if (_options.readTimestamp) {
         return false;
     }
     if (rss::ReplicatedStorageService::get(opCtx)
@@ -218,7 +219,7 @@ bool ValidateState::shouldEnforceFastSize(OperationContext* opCtx, FastCountType
     } else {
         // TODO SERVER-128302: Re-enable validation when the fast count type is both.
         return type != FastCountType::both && _isNSEligibleForSizeStorerValidation() &&
-            enforceFastSizeRequested();
+            _options.enforceFastSizeRequested();
     }
 }
 
@@ -282,9 +283,9 @@ void ValidateState::yieldCursors(OperationContext* opCtx) {
 }
 
 Status ValidateState::initializeCollection(OperationContext* opCtx) {
-    if (getReadTimestamp()) {
+    if (_options.readTimestamp) {
         shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
-            RecoveryUnit::ReadSource::kProvided, *getReadTimestamp());
+            RecoveryUnit::ReadSource::kProvided, *_options.readTimestamp);
 
         invariant(!shard_role_details::getRecoveryUnit(opCtx)->isActive());
     }
@@ -295,7 +296,7 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
             CollectionAcquisitionRequest::fromOpCtx(
                 opCtx,
                 _nss,
-                !isBackground() && getRepairMode() != RepairMode::kNone
+                !_options.isBackground() && _options.repairMode != RepairMode::kNone
                     ? AcquisitionPrerequisites::OperationType::kUnreplicatedWrite
                     : AcquisitionPrerequisites::OperationType::kRead),
             collectionLockMode());
@@ -311,7 +312,7 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
 
         _collection = std::move(acquisition);
     } catch (const ExceptionFor<ErrorCodes::SnapshotTooOld>&) {
-        if (isBackground()) {
+        if (_options.isBackground()) {
             // This will throw SnapshotTooOld to indicate we cannot find an available snapshot at
             // the provided timestamp. This is likely because minSnapshotHistoryWindowInSeconds has
             // been changed to a lower value from the default of 5 minutes.
@@ -334,7 +335,7 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
     // We want to share the same data throttle instance across all the cursors used during this
     // validation. Validations started on other collections will not share the same data
     // throttle instance.
-    if (!isBackground()) {
+    if (!_options.isBackground()) {
         _dataThrottle.turnThrottlingOff();
     }
 
@@ -345,7 +346,7 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
 }
 
 bool ValidateState::isRecordStoreSlicingEnabled() const {
-    const auto& targetRecordsPerSlice = getTargetRecordsPerRecordStoreSlice();
+    const auto& targetRecordsPerSlice = _options.targetRecordsPerRecordStoreSlice;
     return targetRecordsPerSlice && *targetRecordsPerSlice > 0 &&
         gValidateParallelMaxRecordStoreSlices.load() > 1;
 }
@@ -358,7 +359,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     // left off for the seek cursor and every other cursor. Opt-in only; results are logged after
     // the scans complete.
     const bool collectSizeStats =
-        isCollHashValidation() && sizeStats() && !isRecordStoreSlicingEnabled();
+        _options.isCollHashValidation() && _options.sizeStats && !isRecordStoreSlicingEnabled();
 
     {
         if (collectSizeStats) {

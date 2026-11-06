@@ -64,12 +64,16 @@ std::string_view toString(FastCountType unit);
  * options. Additionally it maintains the state of shared objects throughout the validation, such
  * as locking, cursors, and data throttling.
  */
-class ValidateState : public ValidationOptions {
+class ValidateState {
     ValidateState(const ValidateState&) = delete;
     ValidateState& operator=(const ValidateState&) = delete;
 
 public:
     ValidateState(OperationContext* opCtx, const NamespaceString& nss, ValidationOptions options);
+
+    const ValidationOptions& getOptions() const {
+        return _options;
+    }
 
     const NamespaceString& nss() const {
         return _nss;
@@ -140,9 +144,9 @@ public:
      * Returns the collection lock mode validation holds, depending on options selected.
      */
     LockMode collectionLockMode() const {
-        if (isBackground()) {
+        if (_options.isBackground()) {
             return MODE_IS;
-        } else if (getRepairMode() != RepairMode::kNone || isFullIndexValidation()) {
+        } else if (_options.repairMode != RepairMode::kNone || _options.isFullIndexValidation()) {
             return MODE_X;
         }
         return MODE_S;
@@ -160,8 +164,8 @@ public:
     FastCountType getExpectedFastCountType(OperationContext* opCtx) const;
 
     BSONValidateModeEnum getBSONValidateMode() const {
-        return isBSONConformanceValidation() ? BSONValidateModeEnum::kFull
-                                             : BSONValidateModeEnum::kExtended;
+        return _options.isBSONConformanceValidation() ? BSONValidateModeEnum::kFull
+                                                      : BSONValidateModeEnum::kExtended;
     }
 
     UUID uuid() const {
@@ -236,6 +240,8 @@ private:
      * size and count is stored in the size storer.
      */
     bool _isNSEligibleForSizeStorerValidation() const;
+
+    ValidationOptions _options;
 
     // This lock needs to be obtained before the global lock. Initialise in the validation
     // constructor. Oplog Batch Applier takes this lock in exclusive mode when applying the batch.

@@ -221,7 +221,7 @@ TEST_P(ValidateAdaptorTest, GatherIndexEntryErrorsMeterTotalExcludesSkippedIndex
     }
 
     auto adaptor = ValidateAdaptorFactory::create(opCtx, validateState);
-    adaptor->traverseRecordStore(opCtx, results, validateState.validationVersion());
+    adaptor->traverseRecordStore(opCtx, results, validateState.getOptions().validationVersion);
     adaptor->validateIndexes(opCtx, results);
 
     // A structural error in the first phase makes the second phase skip the index.

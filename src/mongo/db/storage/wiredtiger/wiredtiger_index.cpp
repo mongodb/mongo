@@ -362,12 +362,12 @@ IndexValidateResults WiredTigerIndex::validate(
                                          results);
 
     if (!options.isFullIndexValidation()) {
-        invariant(!options.verifyConfigurationOverride().has_value());
+        invariant(!options.verifyConfigurationOverride.has_value());
         return results;
     }
 
     WiredTigerIndexUtil::validateStructure(
-        wtRu, _container.uri(), options.verifyConfigurationOverride(), results);
+        wtRu, _container.uri(), options.verifyConfigurationOverride, results);
 
     return results;
 }

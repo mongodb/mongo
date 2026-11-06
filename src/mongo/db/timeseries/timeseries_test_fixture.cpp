@@ -64,9 +64,9 @@ void TimeseriesTestFixture::validateCollectionsHelper(
             _opCtx,
             nss,
             collection_validation::ValidationOptions{
-                /*validateMode=*/collection_validation::ValidateMode::kForegroundFull,
-                /*repairMode=*/collection_validation::RepairMode::kNone,
-                /*logDiagnostics=*/false},
+                .validateMode = collection_validation::ValidateMode::kForegroundFull,
+                .repairMode = collection_validation::RepairMode::kNone,
+                .logDiagnostics = false},
             validateResults));
         ASSERT(validateResults.isValid());
     }

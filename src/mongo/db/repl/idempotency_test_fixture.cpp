@@ -370,9 +370,9 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
             _opCtx.get(),
             _nss,
             collection_validation::ValidationOptions{
-                collection_validation::ValidateMode::kForegroundFull,
-                collection_validation::RepairMode::kNone,
-                /*logDiagnostics=*/false},
+                .validateMode = collection_validation::ValidateMode::kForegroundFull,
+                .repairMode = collection_validation::RepairMode::kNone,
+                .logDiagnostics = false},
             validateResults));
         ASSERT_TRUE(validateResults.isValid());
     }

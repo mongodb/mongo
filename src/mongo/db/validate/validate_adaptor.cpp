@@ -457,7 +457,7 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
     const BSONObj recordBson = record.data.toBson();
 
-    if (MONGO_unlikely(_validateState->logDiagnostics())) {
+    if (MONGO_unlikely(_validateState->getOptions().logDiagnostics)) {
         LOGV2(4666601, "[validate]", "recordId"_attr = record.id, "recordData"_attr = recordBson);
     }
 
@@ -583,11 +583,12 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults& re
     auto traverseRecordStoreCursor = _validateState->getTraverseRecordStoreCursor();
 
     // Convert the vector of hashPrefixes provided to a set for easy lookup.
-    const stdx::unordered_set<std::string> hashPrefixes(_validateState->getHashPrefixes()->begin(),
-                                                        _validateState->getHashPrefixes()->end());
-    auto prefixLength = _validateState->getHashPrefixes().get()[0].size();
+    const auto& validateOptions = _validateState->getOptions();
+    const stdx::unordered_set<std::string> hashPrefixes(validateOptions.hashPrefixes->begin(),
+                                                        validateOptions.hashPrefixes->end());
+    auto prefixLength = validateOptions.hashPrefixes.get()[0].size();
     const size_t N = collection_validation::getNumberOfAdditionalCharactersForHashDrillDown(
-        _validateState->getHashPrefixes()->size(), prefixLength);
+        validateOptions.hashPrefixes->size(), prefixLength);
     uassert(ErrorCodes::BadValue, "Too many hash prefixes provided.", N);
     // Searches through the list of hash prefixes for a prefix of the provided 'hash', which
     // is the hash of the _id field. If a matching prefix has been found, returns
@@ -693,7 +694,7 @@ void ValidateAdaptor::postTraverseRecordStoreImpl(OperationContext* opCtx,
     // TODO(SERVER-119193): Add condition for the fastCountType being valid.
     // Only update the record store stats when repairing. Background validation reads a checkpoint
     // that may not have the most up-to-date changes.
-    if (validateResults.isValid() && _validateState->fixErrors()) {
+    if (validateResults.isValid() && _validateState->getOptions().fixErrors()) {
         coll->getRecordStore()->updateStatsAfterRepair(_numRecords, dataSizeTotal);
     }
 }
@@ -739,8 +740,9 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
     // the results object this gets merged into.
     results.validateResults.setNamespaceString(_validateState->nss());
     results.validateResults.setUUID(_validateState->uuid());
-    results.validateResults.setRepairMode(_validateState->getRepairMode());
-    results.validateResults.setReadTimestamp(_validateState->getReadTimestamp());
+    const auto& validateOptions = _validateState->getOptions();
+    results.validateResults.setRepairMode(validateOptions.repairMode);
+    results.validateResults.setReadTimestamp(validateOptions.readTimestamp);
 
     RecordId prevRecordId;
 
@@ -748,7 +750,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
     results.validateResults.setNumInvalidDocuments(0);
     results.validateResults.setNumNonCompliantDocuments(0);
 
-    const bool computeXxh3Hash = _validateState->isCollHashValidation() &&
+    const bool computeXxh3Hash = validateOptions.isCollHashValidation() &&
         rss::ReplicatedStorageService::get(opCtx)
             .getPersistenceProvider()
             .shouldUseContinuousInternodeValidation();
@@ -756,7 +758,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
     if (opts.beginRecordId.isNull()) {
         // The record store is empty if the first RecordId isn't initialized. Stand in an empty
         // hash, which is the correct collection hash for an empty collection.
-        if (_validateState->isCollHashValidation()) {
+        if (validateOptions.isCollHashValidation()) {
             results.validateResults.setCollectionHash(SHA256Block::computeHash({}));
         }
         if (computeXxh3Hash) {
@@ -785,10 +787,10 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
         // Set when a record that failed validation was folded into the hashes, which then cover
         // that record's raw bytes rather than a document.
         bool hashedCorruptRecord = false;
-        bool revealHashedIds = _validateState->getRevealHashedIds().has_value();
+        bool revealHashedIds = validateOptions.revealHashedIds.has_value();
         stdx::unordered_map<std::string, std::vector<BSONObj>> revealedIds;
         if (revealHashedIds) {
-            for (const auto& hashPrefix : _validateState->getRevealHashedIds().get()) {
+            for (const auto& hashPrefix : validateOptions.revealHashedIds.get()) {
                 revealedIds[hashPrefix] = {};
             }
         }
@@ -841,7 +843,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
             results.validateResults.incrementNumNonCompliantDocuments(compliantDocument ? 0 : 1);
             results.validateResults.incrementNumInvalidDocuments(validDocument ? 0 : 1);
 
-            if (_validateState->isCollHashValidation()) {
+            if (validateOptions.isCollHashValidation()) {
                 const ConstDataRange recordRange(record->data.data(), record->data.size());
                 const SHA256Block block = SHA256Block::computeHashWithCtx(&hashCtx, {recordRange});
                 accumulatedBlock.xorInline(block);
@@ -857,7 +859,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                     const auto idBlock = SHA256Block::computeHashWithCtx(
                         &hashCtx, {ConstDataRange(idField.value(), idField.valuesize())});
                     const auto idBlockHexStr = idBlock.toHexString();
-                    for (const auto& hashPrefix : _validateState->getRevealHashedIds().get()) {
+                    for (const auto& hashPrefix : validateOptions.revealHashedIds.get()) {
                         if (idBlockHexStr.starts_with(hashPrefix)) {
                             revealedIds[hashPrefix].push_back(idField.wrap());
                         }
@@ -903,7 +905,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                                   "recordBytes"_attr = dataSize);
                 }
 
-                if (_validateState->fixErrors()) {
+                if (validateOptions.fixErrors()) {
                     WriteUnitOfWork wunit(opCtx);
                     rs->deleteRecord(
                         opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
@@ -1112,7 +1114,7 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
             }
         }
 
-        if (_validateState->isCollHashValidation()) {
+        if (validateOptions.isCollHashValidation()) {
             results.validateResults.setCollectionHash(accumulatedBlock);
             if (computeXxh3Hash) {
                 results.validateResults.setXxh3CollectionHash(accumulatedXxh3);
@@ -1211,7 +1213,8 @@ void ValidateAdaptor::gatherIndexEntryErrors(OperationContext* opCtx, ValidateRe
         // Second phase doesn't report errors, but needs to know which indexes are structurally
         // sound enough to validate
         tempValidateResults.getIndexResultsMap() = results.getIndexResultsMap();
-        traverseRecordStoreSerial(opCtx, tempValidateResults, validateState.validationVersion());
+        traverseRecordStoreSerial(
+            opCtx, tempValidateResults, validateState.getOptions().validationVersion);
     }
 
     LOGV2_OPTIONS(20298,
@@ -1282,7 +1285,7 @@ void ValidateAdaptor::gatherIndexEntryErrors(OperationContext* opCtx, ValidateRe
                                          << " extra index entries.");
     }
 
-    if (validateState.fixErrors()) {
+    if (validateState.getOptions().fixErrors()) {
         repairIndexEntries(opCtx, results);
     }
 

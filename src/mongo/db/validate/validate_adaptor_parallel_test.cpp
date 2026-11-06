@@ -196,8 +196,8 @@ TEST_F(ValidateAdaptorParallelTest, CancellingTwoValidationsDoesNotHang) {
                 ValidateResults results;
                 results.setNamespaceString(state.nss());
                 results.setUUID(state.uuid());
-                results.setRepairMode(state.getRepairMode());
-                results.setReadTimestamp(state.getReadTimestamp());
+                results.setRepairMode(state.getOptions().repairMode);
+                results.setReadTimestamp(state.getOptions().readTimestamp);
                 InfiniteTestAdaptor(opCtx, state, /*targetRecordsPerSlice=*/1)
                     .traverseRecordStore(opCtx, results, currentValidationVersion);
             } catch (const DBException& e) {
@@ -288,8 +288,8 @@ TEST_F(ValidateAdaptorParallelTest, ValidationsShareOnePoolUntilTheLastLetsGo) {
                     ValidateResults results;
                     results.setNamespaceString(state.nss());
                     results.setUUID(state.uuid());
-                    results.setRepairMode(state.getRepairMode());
-                    results.setReadTimestamp(state.getReadTimestamp());
+                    results.setRepairMode(state.getOptions().repairMode);
+                    results.setReadTimestamp(state.getOptions().readTimestamp);
                     InfiniteTestAdaptor(opCtx, state, /*targetRecordsPerSlice=*/1, &cursorsBarrier)
                         .traverseRecordStore(opCtx, results, currentValidationVersion);
                 } catch (const DBException& e) {

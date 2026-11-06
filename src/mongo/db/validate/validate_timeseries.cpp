@@ -678,7 +678,7 @@ TimeseriesValidationStatus validateTimeSeriesBucketRecord(OperationContext* opCt
 
     // TODO: SERVER-119598
     // Enable snapshot-based validation check
-    if (!validateState.getReadTimestamp()) {
+    if (!validateState.getOptions().readTimestamp) {
         if (auto status = validateTimeseriesExtendedRangeTimestamps(
                 coll->getRequiresTimeseriesExtendedRangeSupport(),
                 timeseriesOptions.getTimeField(),

@@ -27,10 +27,10 @@ namespace {
 // Namespace String for the collection used in these tests.
 const auto kNss = NamespaceString::createNamespaceString_forTest(
     "keyStringIndexConsistencyDB.keyStringIndexConsistencyColl"sv);
-const auto kDefaultValidateOptions =
-    collection_validation::ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
-                                             collection_validation::RepairMode::kNone,
-                                             /*logDiagnostics=*/true};
+const auto kDefaultValidateOptions = collection_validation::ValidationOptions{
+    .validateMode = collection_validation::ValidateMode::kForegroundFull,
+    .repairMode = collection_validation::RepairMode::kNone,
+    .logDiagnostics = true};
 
 using KeyStringIndexConsistencyTest = CatalogTestFixture;
 

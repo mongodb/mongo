@@ -16,7 +16,7 @@ std::unique_ptr<ValidateAdaptor> ValidateAdaptorFactory::create(
 
     if (validateState.isRecordStoreSlicingEnabled()) {
         return std::make_unique<ValidateAdaptorParallel>(
-            opCtx, validateState, validateState.getTargetRecordsPerRecordStoreSlice());
+            opCtx, validateState, validateState.getOptions().targetRecordsPerRecordStoreSlice);
     }
     return std::make_unique<ValidateAdaptorSerial>(opCtx, validateState);
 }
