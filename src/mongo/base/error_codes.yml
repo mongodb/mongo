@@ -1419,5 +1419,15 @@ error_codes:
       name: ReshardingPostconditionFailure,
       categories: [InternalOnly],
     }
+
+  # Internal kickback raised by the end-of-transaction synthesis stage on the router when a change
+  # stream must look back to reconstruct its state. Caught and handled by the change stream
+  # execution layer; never returned to the client.
+  - {
+      code: 537,
+      name: ChangeStreamEndOfTransactionBackfillRequired,
+      categories: [InternalOnly],
+      extra: ChangeStreamEndOfTransactionBackfillRequiredInfo,
+    }
   # ^^^^
   # Add new codes, sequentially numbered, above.

@@ -999,11 +999,24 @@ idl_generator(
 mongo_cc_library(
     name = "change_stream_error_extra_info",
     srcs = [
+        "change_stream_end_of_transaction_backfill_required_info.cpp",
         "change_stream_invalidation_info.cpp",
         "change_stream_start_after_invalidate_info.cpp",
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "change_stream_error_extra_info_test",
+    srcs = [
+        "change_stream_end_of_transaction_backfill_required_info_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":change_stream_error_extra_info",
+        "//src/mongo/unittest",
     ],
 )
 
