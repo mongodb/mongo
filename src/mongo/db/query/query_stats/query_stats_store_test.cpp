@@ -165,7 +165,8 @@ public:
 };
 
 TEST_F(QueryStatsStoreTest, BasicUsage) {
-    QueryStatsStore queryStatsStore{5000000, 1000};
+    auto opCtx = makeOperationContext();
+    auto& queryStatsStore = getQueryStatsStore(opCtx.get());
 
     auto getMetrics = [&](BSONObj query) {
         auto key = makeFindKeyFromQuery(query);
