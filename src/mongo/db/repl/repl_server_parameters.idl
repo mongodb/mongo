@@ -428,6 +428,18 @@ server_parameters:
         default: true
         redact: false
 
+    disableReplicationNetworkCompression:
+        description: >-
+            When true, replication data connections opened by this node (OplogFetcher, initial
+            sync cloner and rollback) do not negotiate network message compression, regardless
+            of net.compression.compressors. Other connections are unaffected. Has no effect on
+            mongos.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: disableReplicationNetworkCompression
+        default: false
+        redact: false
+
     oplogNetworkTimeoutBufferSeconds:
         description: >-
             Number of seconds to add to the `find` and `getMore` timeouts for oplog fetching to

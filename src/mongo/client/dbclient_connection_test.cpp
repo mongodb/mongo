@@ -9,14 +9,19 @@
 #include "mongo/executor/rpc_local_timing.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/transport/message_compressor_noop.h"
+#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
 
 #include <deque>
 #include <memory>
+#include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -56,8 +61,11 @@ public:
         return Future<void>::makeReady();
     }
 
-    Status sinkMessage(Message) override {
+    Status sinkMessage(Message message) override {
         _clock.advance(_writeAdvance);
+        if (_writeStatus.isOK()) {
+            _sent.push_back(std::move(message));
+        }
         return _writeStatus;
     }
 
@@ -108,9 +116,14 @@ public:
         _readStatus = std::move(status);
     }
 
+    const std::vector<Message>& sentMessages() const {
+        return _sent;
+    }
+
 private:
     TickSourceMock<Microseconds>& _clock;
     std::deque<Message> _replies;
+    std::vector<Message> _sent;
     Microseconds _writeAdvance{0};
     Microseconds _readAdvance{0};
     Microseconds _endAdvance{0};
@@ -120,8 +133,11 @@ private:
 
 class FakeSyncConnection : public DBClientConnection {
 public:
-    explicit FakeSyncConnection(TickSourceMock<Microseconds>& clock, bool autoReconnect = false)
-        : DBClientConnection({.autoReconnect = autoReconnect}),
+    explicit FakeSyncConnection(TickSourceMock<Microseconds>& clock,
+                                bool autoReconnect = false,
+                                bool disableCompression = false)
+        : DBClientConnection(
+              {.autoReconnect = autoReconnect, .disableCompression = disableCompression}),
           _fakeSession(std::make_shared<FakeSyncSession>(clock)) {
         setTickSource_forTest(&clock);
     }
@@ -359,6 +375,122 @@ TEST_F(DBClientConnectionTimingFixture, FailedWriteStillRecordsTheAttempt) {
 
     EXPECT_EQ(countFor("initial"), 1);
     EXPECT_EQ(sumFor("initial"), 3000);
+}
+
+MessageCompressorRegistry makeNoopRegistry() {
+    MessageCompressorRegistry registry;
+    auto compressor = std::make_unique<NoopMessageCompressor>();
+    registry.setSupportedCompressors({compressor->getName()});
+    registry.registerImplementation(std::move(compressor));
+    ASSERT_OK(registry.finalizeSupportedCompressors());
+    return registry;
+}
+
+Message makeHelloReplyWithCompression() {
+    return makeOpMsg(BSON("ok" << 1 << "minWireVersion" << 0 << "maxWireVersion"
+                               << WireVersion::LATEST_WIRE_VERSION << "compression"
+                               << BSON_ARRAY("noop")));
+}
+
+class DBClientConnectionCompressionFixture : public ServiceContextTest {
+protected:
+    // Replaces the connection's compressor manager with one backed by 'registry', which offers
+    // the noop compressor, so the test does not depend on process-wide compression options.
+    void useRegistry(FakeSyncConnection& connection) {
+        connection.getCompressorManager() =
+            MessageCompressorManager(MessageCompressionDirection::kEgress, &_registry);
+    }
+
+    static BSONObj sentBody(const Message& message) {
+        ASSERT_NE(message.operation(), dbCompressed);
+        return OpMsg::parseOwned(message).body;
+    }
+
+    void connectWithHello(FakeSyncConnection& connection, Message helloReply) {
+        connection.fakeSession().queueReply(std::move(helloReply));
+        connection.connect(HostAndPort("localhost", 27017), "test", boost::none);
+    }
+
+    TickSourceMock<Microseconds> _clock;
+    MessageCompressorRegistry _registry = makeNoopRegistry();
+};
+
+TEST_F(DBClientConnectionCompressionFixture, DefaultConnectionNegotiatesCompression) {
+    FakeSyncConnection connection(_clock);
+    useRegistry(connection);
+    connectWithHello(connection, makeHelloReplyWithCompression());
+
+    const auto& sent = connection.fakeSession().sentMessages();
+    ASSERT_EQ(sent.size(), 1U);
+    auto hello = sentBody(sent[0]);
+    ASSERT_TRUE(hello.hasField("compression"));
+    ASSERT_EQ(connection.getCompressorManager().getNegotiatedCompressors().size(), 1U);
+
+    connection.fakeSession().queueReply(makeOpMsg(BSON("ok" << 1)));
+    connection.runCommandWithTarget(makeCommandRequest());
+    ASSERT_EQ(sent.size(), 2U);
+    ASSERT_EQ(sent[1].operation(), dbCompressed);
+}
+
+TEST_F(DBClientConnectionCompressionFixture, DisabledConnectionDoesNotOfferCompression) {
+    FakeSyncConnection connection(_clock, false /* autoReconnect */, true /* disableCompression */);
+    useRegistry(connection);
+    ASSERT_TRUE(connection.isCompressionDisabled());
+
+    // Even if the server (incorrectly) replies with a compressor list, it must be ignored.
+    connectWithHello(connection, makeHelloReplyWithCompression());
+
+    const auto& sent = connection.fakeSession().sentMessages();
+    ASSERT_EQ(sent.size(), 1U);
+    auto hello = sentBody(sent[0]);
+    ASSERT_FALSE(hello.hasField("compression"));
+    ASSERT_TRUE(connection.getCompressorManager().getNegotiatedCompressors().empty());
+
+    connection.fakeSession().queueReply(makeOpMsg(BSON("ok" << 1)));
+    connection.runCommandWithTarget(makeCommandRequest());
+    ASSERT_EQ(sent.size(), 2U);
+    ASSERT_NE(sent[1].operation(), dbCompressed);
+}
+
+TEST_F(DBClientConnectionCompressionFixture, DisabledConnectionClearsStaleStateOnReconnect) {
+    FakeSyncConnection connection(_clock, true /* autoReconnect */, true /* disableCompression */);
+    useRegistry(connection);
+
+    // Simulate compressor state left over from a previous session on the same client object.
+    auto& manager = connection.getCompressorManager();
+    BSONObjBuilder offer;
+    manager.clientBegin(&offer);
+    manager.clientFinish(BSON("compression" << BSON_ARRAY("noop")));
+    ASSERT_FALSE(manager.getNegotiatedCompressors().empty());
+
+    // The reconnect handshake must neither be compressed with the stale compressor nor offer
+    // compression.
+    connectWithHello(connection, makeHelloReply());
+
+    const auto& sent = connection.fakeSession().sentMessages();
+    ASSERT_EQ(sent.size(), 1U);
+    auto hello = sentBody(sent[0]);
+    ASSERT_FALSE(hello.hasField("compression"));
+    ASSERT_TRUE(manager.getNegotiatedCompressors().empty());
+}
+
+TEST_F(DBClientConnectionCompressionFixture, DisabledConnectionStaysUncompressedAfterAutoReconnect) {
+    FakeSyncConnection connection(_clock, true /* autoReconnect */, true /* disableCompression */);
+    useRegistry(connection);
+    connectWithHello(connection, makeHelloReplyWithCompression());
+
+    connection.markFailed();
+    connection.fakeSession().queueReply(makeHelloReplyWithCompression());
+    connection.fakeSession().queueReply(makeOpMsg(BSON("ok" << 1)));
+    connection.runCommandWithTarget(makeCommandRequest());
+
+    const auto& sent = connection.fakeSession().sentMessages();
+    ASSERT_EQ(sent.size(), 3U);
+    for (const auto& message : sent) {
+        ASSERT_NE(message.operation(), dbCompressed);
+    }
+    ASSERT_FALSE(sentBody(sent[1]).hasField("compression"));
+    ASSERT_TRUE(connection.getCompressorManager().getNegotiatedCompressors().empty());
 }
 
 }  // namespace
