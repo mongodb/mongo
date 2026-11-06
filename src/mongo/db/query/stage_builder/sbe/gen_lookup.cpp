@@ -2183,46 +2183,19 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
     // parent stage. All slots from the inner side of the join are automatically available.
     SbExpr::Vector equalityPredicates;
     SbSlotVector outerProjects;
-    sbe::value::SlotSet
-        outerProjectsSet;  // Used to avoid duplicates in the 'outerProjections' list.
+    sbe::value::SlotSet outerProjectsSet;  // Used to avoid duplicates in the 'outerProjects' list.
     // Include the special Nothing slot, so that we avoid referencing it in the projection list.
     if (auto nothingSlot = _state.env->getSlotIfExists(kNothingEnvSlotName); nothingSlot) {
         outerProjectsSet.insert(*nothingSlot);
     }
-    if (leftOutputs.has(kResult)) {
-        auto resultObj = leftOutputs.get(kResult);
-        if (outerProjectsSet.insert(resultObj.getId()).second) {
-            outerProjects.emplace_back(resultObj);
-        }
-    }
-
-    // ensure that requested fields coming from the left side are propagated (the right side is
-    // automatically exposed).
-    for (const auto& requestedFields : {fieldEffect->getFieldList(), reqs.getFields()}) {
-        for (const auto& field : requestedFields) {
-            if (auto slot = leftOutputs.getIfExists(makeSlotName(field)); slot) {
-                if (auto [_, inserted] = outerProjectsSet.insert(slot->getId()); inserted) {
-                    outerProjects.emplace_back(slot->getId());
-                }
-            }
+    for (auto& produce : leftOutputs.getAllSlotsInOrder()) {
+        if (outerProjectsSet.insert(produce.getId()).second) {
+            outerProjects.emplace_back(produce);
         }
     }
 
     equalityPredicates.reserve(nestedLoopJoinEmbeddingNode->joinPredicates.size());
     for (const auto& predicate : nestedLoopJoinEmbeddingNode->joinPredicates) {
-        // Make sure that the join predicate has access to any slot needed to evaluate the left
-        // path.
-        // NOTE: This assumes that calling PlanStageSlots::get() for a top-level field will always
-        // return either an SbSlot or an expression that depends on only the ResultObj slot.
-        for (size_t i = 0; i < predicate.leftField.getPathLength(); ++i) {
-            auto prefix = predicate.leftField.getSubpath(i);
-            if (auto slot = leftOutputs.getIfExists(makeSlotName(prefix)); slot) {
-                if (auto [_, inserted] = outerProjectsSet.insert(slot->getId()); inserted) {
-                    outerProjects.emplace_back(slot->getId());
-                }
-            }
-        }
-
         // Generate an expression for one predicate, which evaluates a path on each document
         // and compares the resulting values.
         switch (predicate.op) {

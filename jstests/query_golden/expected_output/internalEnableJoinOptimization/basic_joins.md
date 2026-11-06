@@ -6781,3 +6781,103 @@ probePredicates: [ "n $= a" ]
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
 ```
+## 38. Forced NLJ with a renaming $project in the sub-pipeline and a later join on the renamed field
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$_internalJoinHint" : {
+			"perSubsetLevelMode" : [
+				{
+					"level" : NumberInt(0),
+					"mode" : "CHEAPEST",
+					"hint" : {
+						"node" : NumberInt(1)
+					}
+				},
+				{
+					"level" : NumberInt(1),
+					"hint" : {
+						"node" : NumberInt(0),
+						"method" : "NLJ",
+						"isLeftChild" : false
+					},
+					"mode" : "CHEAPEST"
+				},
+				{
+					"level" : NumberInt(2),
+					"hint" : {
+						"node" : NumberInt(2),
+						"method" : "HJ",
+						"isLeftChild" : false
+					},
+					"mode" : "CHEAPEST"
+				}
+			]
+		}
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$project" : {
+						"a" : "$d",
+						"d" : "$a",
+						"c" : 1
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign3",
+			"as" : "z",
+			"localField" : "x.a",
+			"foreignField" : "a"
+		}
+	},
+	{
+		"$unwind" : "$z"
+	}
+]
+```
+### Results
+```json
+{ "_id" : 0, "a" : 1, "b" : "foo", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
+{ "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [x.a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "z"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [d = a]
+  leftEmbeddingField: "x"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  PROJECTION_DEFAULT
+  transformBy: { "_id" : true, "c" : true, "a" : "$d", "d" : "$a" }
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  direction: "forward"
+```

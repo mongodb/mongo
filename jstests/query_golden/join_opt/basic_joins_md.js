@@ -779,4 +779,53 @@ joinTestWrapper(db, () => {
         {$match: {$expr: {$eq: ["$m", "$x.n"]}}},
         {$project: {_id: 0, "x._id": 0}},
     ]);
+
+    // SERVER-137999 NLJ whose outer side is a foreign node with a renaming sub-pipeline
+    // $project fails with "undefined slot accessor" when a later join reads the renamed field.
+    section(
+        "Forced NLJ with a renaming $project in the sub-pipeline and a later join on the renamed field",
+    );
+    {
+        runBasicJoinTest([
+            {
+                $_internalJoinHint: {
+                    perSubsetLevelMode: [
+                        // Level 0: start from foreign1 as the base (outer) node.
+                        {level: NumberInt(0), mode: "CHEAPEST", hint: {node: NumberInt(1)}},
+                        // Level 1: NLJ with coll (node 0) on the right. foreign1 stays on the left.
+                        {
+                            level: NumberInt(1),
+                            hint: {node: NumberInt(0), method: "NLJ", isLeftChild: false},
+                            mode: "CHEAPEST",
+                        },
+                        // Level 2: HJ with foreign3 (node 2) on the right.
+                        {
+                            level: NumberInt(2),
+                            hint: {node: NumberInt(2), method: "HJ", isLeftChild: false},
+                            mode: "CHEAPEST",
+                        },
+                    ],
+                },
+            },
+            {
+                $lookup: {
+                    from: foreignColl1.getName(),
+                    as: "x",
+                    localField: "a",
+                    foreignField: "a",
+                    pipeline: [{$project: {a: "$d", d: "$a", c: 1}}],
+                },
+            },
+            {$unwind: "$x"},
+            {
+                $lookup: {
+                    from: foreignColl3.getName(),
+                    as: "z",
+                    localField: "x.a",
+                    foreignField: "a",
+                },
+            },
+            {$unwind: "$z"},
+        ]);
+    }
 }); // joinTestWrapper();
