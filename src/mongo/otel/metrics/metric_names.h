@@ -610,6 +610,8 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.inserted");
     static constexpr MetricName kIndexBuildSideWritesDeleted =
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.deleted");
+    static constexpr MetricName kIndexBuildSideWritesMultikey =
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.multikey");
     static constexpr MetricName kIndexBuildSideWritesDrained =
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.drained");
     static constexpr MetricName kIndexBuildSideWritesDrainDuration =

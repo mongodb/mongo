@@ -56,6 +56,10 @@ auto& sideWritesDeletedCounter = otel::metrics::MetricsService::instance().creat
     otel::metrics::MetricNames::kIndexBuildSideWritesDeleted,
     "Total number of side write deletes written",
     otel::metrics::MetricUnit::kOperations);
+auto& sideWritesMultikeyCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildSideWritesMultikey,
+    "Total number of multikey side write entries written",
+    otel::metrics::MetricUnit::kOperations);
 }  // namespace
 
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
@@ -258,11 +262,15 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     }
 
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [written = *numKeysOut, op](OperationContext*, boost::optional<Timestamp>) {
+        [written = *numKeysOut, op, writeMultikeyEntry](OperationContext*,
+                                                        boost::optional<Timestamp>) {
             if (op == Op::kInsert) {
                 sideWritesInsertedCounter.add(written);
             } else {
                 sideWritesDeletedCounter.add(written);
+            }
+            if (writeMultikeyEntry) {
+                sideWritesMultikeyCounter.add(1);
             }
         });
 

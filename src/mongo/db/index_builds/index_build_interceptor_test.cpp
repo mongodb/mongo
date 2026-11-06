@@ -215,11 +215,14 @@ void IndexBuilderInterceptorTest::testSingleOpIsSavedToSideWritesTable(
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t insertedBefore = 0;
     int64_t deletedBefore = 0;
+    int64_t multikeyBefore = 0;
     if (capturer.canReadMetrics()) {
         insertedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted);
         deletedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted);
+        multikeyBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey);
     }
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
@@ -261,6 +264,9 @@ void IndexBuilderInterceptorTest::testSingleOpIsSavedToSideWritesTable(
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
             deletedBefore + (op == IndexBuildInterceptor::Op::kDelete ? 1 : 0));
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey),
+            multikeyBefore);
     }
 }
 
@@ -645,6 +651,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPaths) {
     auto deletedBefore = capturer.canReadMetrics()
         ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
         : 0;
+    auto multikeyBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey)
+        : 0;
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
         createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
@@ -693,6 +702,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPaths) {
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
             deletedBefore);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey),
+            multikeyBefore + 1);
     }
 }
 
@@ -706,6 +718,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithoutKeysRecordsMultikeyP
         : 0;
     auto deletedBefore = capturer.canReadMetrics()
         ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
+    auto multikeyBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey)
         : 0;
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
@@ -741,6 +756,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithoutKeysRecordsMultikeyP
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
             deletedBefore);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey),
+            multikeyBefore + 1);
     }
 }
 
@@ -753,6 +771,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithOnlyMetadataKeysRecords
         : 0;
     auto deletedBefore = capturer.canReadMetrics()
         ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
+    auto multikeyBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey)
         : 0;
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'wc_1', key: {'$**': 1}}"));
     auto interceptor =
@@ -791,6 +812,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithOnlyMetadataKeysRecords
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
             deletedBefore);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey),
+            multikeyBefore + 1);
     }
 }
 
@@ -805,6 +829,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateWithUnchangedKeySetStillRecord
         : 0;
     auto deletedBefore = capturer.canReadMetrics()
         ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
+    auto multikeyBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey)
         : 0;
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
@@ -859,6 +886,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateWithUnchangedKeySetStillRecord
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
             deletedBefore);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey),
+            multikeyBefore + 1);
     }
 }
 
@@ -871,6 +901,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateRemovingAllKeysRecordsMultikey
         : 0;
     auto deletedBefore = capturer.canReadMetrics()
         ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
+    auto multikeyBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey)
         : 0;
     auto info =
         buildIndexBuildInfo(fromjson("{v: 2, name: 'ab_1', key: {'a.b': 1}, sparse: true}"));
@@ -919,6 +952,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeyUpdateRemovingAllKeysRecordsMultikey
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
             deletedBefore + 1);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey),
+            multikeyBefore);
     }
 }
 
@@ -1404,6 +1440,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRollbackRemovesDedicatedRec
     auto deletedBefore = capturer.canReadMetrics()
         ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
         : 0;
+    auto multikeyBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey)
+        : 0;
     auto info = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor = createIndexBuildInterceptor(info, LazyRecordStore::CreateMode::immediate);
     {
@@ -1427,6 +1466,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRollbackRemovesDedicatedRec
             EXPECT_EQ(
                 capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
                 deletedBefore);
+            EXPECT_EQ(capturer.readInt64Counter(
+                          otel::metrics::MetricNames::kIndexBuildSideWritesMultikey),
+                      multikeyBefore);
         }
     }
     EXPECT_TRUE(getSideWritesTableContents(info).empty());
@@ -1438,6 +1480,9 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRollbackRemovesDedicatedRec
         EXPECT_EQ(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
             deletedBefore);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey),
+            multikeyBefore);
     }
 }
 
@@ -1464,6 +1509,9 @@ TEST_P(IndexBuilderInterceptorNonPdibMultikeyTest, RecordsAndRecoversMultikeySta
         : 0;
     auto deletedBefore = capturer.canReadMetrics()
         ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted)
+        : 0;
+    auto multikeyBefore = capturer.canReadMetrics()
+        ? capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey)
         : 0;
     unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", false};
     unittest::ServerParameterGuard ffMultikey{"featureFlagIndexBuildMultikeySideWrites",
@@ -1535,6 +1583,11 @@ TEST_P(IndexBuilderInterceptorNonPdibMultikeyTest, RecordsAndRecoversMultikeySta
             deletedBefore);
     }
     auto records = getSideWritesTableContents(info);
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesMultikey),
+            multikeyBefore + (expectMultikeyEntry ? 1 : 0));
+    }
     ASSERT_EQ(records.size(), keyCount + (expectMultikeyEntry ? 1 : 0));
     for (size_t i = 0; i < keyCount; ++i) {
         EXPECT_EQ(records[i].getStringField("op"), "i");
