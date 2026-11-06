@@ -639,43 +639,56 @@ std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
     std::vector<std::unique_ptr<Pipeline>> pipelines;
 
     if (aggExState.getRequest().getExchange() && !pipeline->getContext()->getExplain()) {
-        auto expCtx = pipeline->getContext();
-        // The Exchange constructor deregisters the pipeline from the context. Since we need a valid
-        // opCtx for the ExpressionContextBuilder call below, store the pointer ahead of the
-        // Exchange() call.
+        const auto& exchangeSpec = aggExState.getRequest().getExchange().value();
         auto* opCtx = aggExState.getOpCtx();
-        auto exchange = make_intrusive<exec::agg::Exchange>(
-            opCtx, aggExState.getRequest().getExchange().value(), std::move(pipeline));
 
-        for (size_t idx = 0; idx < exchange->getConsumers(); ++idx) {
-            // For every new pipeline we have create a new ExpressionContext as the context
-            // cannot be shared between threads. There is no synchronization for pieces of
-            // the execution machinery above the Exchange, so nothing above the Exchange can be
-            // shared between different exchange-producer cursors.
+        // Build the consumers' ExpressionContexts before the Exchange, so that memory charged while
+        // handling 'let' variables lands in the operation memory tracker currently on the
+        // opCtx, creating it if needed.
+        std::vector<boost::intrusive_ptr<ExpressionContext>> consumerExpCtxs;
+        auto expCtx = pipeline->getContext();
+        for (int idx = 0; idx < exchangeSpec.getConsumers(); ++idx) {
             auto collator = expCtx->getCollator() ? expCtx->getCollator()->clone() : nullptr;
-            expCtx = ExpressionContextBuilder{}
-                         .fromRequest(opCtx, aggExState.getRequest(), allowDiskUseByDefault.load())
-                         .collator(std::move(collator))
-                         .collUUID(expCtx->getUUID())
-                         .mongoProcessInterface(MongoProcessInterface::create(opCtx))
-                         .mayDbProfile(CurOp::get(opCtx)->dbProfileLevel() > 0)
-                         .resolvedNamespace(
-                             uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(opCtx)))
-                         .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
-                         .collationMatchesDefault(expCtx->getCollationMatchesDefault())
-                         .build();
+            consumerExpCtxs.push_back(
+                ExpressionContextBuilder{}
+                    .fromRequest(opCtx, aggExState.getRequest(), allowDiskUseByDefault.load())
+                    .collator(std::move(collator))
+                    .collUUID(expCtx->getUUID())
+                    .mongoProcessInterface(MongoProcessInterface::create(opCtx))
+                    .mayDbProfile(CurOp::get(opCtx)->dbProfileLevel() > 0)
+                    .resolvedNamespace(
+                        uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(opCtx)))
+                    .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
+                    .collationMatchesDefault(expCtx->getCollationMatchesDefault())
+                    .build());
+        }
+
+        for (auto& consumerExpCtx : consumerExpCtxs) {
+            // Expressions may later run on any consumer's opCtx. Keep their expression fallback
+            // standalone from now on, so it never lazily creates an operation memory tracker on a
+            // consumer's opCtx that conflicts with the one owned by the Exchange.
+            //
+            // TODO SERVER-110499 We should address this as part of work to track memory in stages
+            // after exchange.
+            consumerExpCtx->setExcludeExpressionFallbackFromOperationMemoryTracking(true);
+        }
+
+        auto exchange =
+            make_intrusive<exec::agg::Exchange>(opCtx, exchangeSpec, std::move(pipeline));
+
+        const auto& resourceYielder = ResourceYielderFactory::get(*opCtx->getService());
+        for (size_t idx = 0; idx < consumerExpCtxs.size(); ++idx) {
             // Create a new pipeline for the consumer consisting of a single
             // DocumentSourceExchange.
-            const auto& resourceYielder = ResourceYielderFactory::get(*opCtx->getService());
             auto consumer = make_intrusive<DocumentSourceExchange>(
-                expCtx,
+                consumerExpCtxs[idx],
                 exchange,
                 idx,
                 // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code
                 // which relies on this parameter does not distinguish/care about the difference so
                 // we simply always pass 'aggregate'.
                 resourceYielder ? resourceYielder->make(opCtx, "aggregate"sv) : nullptr);
-            pipelines.emplace_back(Pipeline::create({consumer}, expCtx));
+            pipelines.emplace_back(Pipeline::create({consumer}, consumerExpCtxs[idx]));
         }
     } else {
         pipelines.emplace_back(std::move(pipeline));

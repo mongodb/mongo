@@ -184,11 +184,18 @@ private:
      */
     void detachContext(OperationContext* opCtx, size_t consumerId);
 
+    /**
+     * Best-effort cleanup if attachContext() fails. Detaches the shared sub-pipelines. Leaves
+     * operation memory tracker in place to avoid freeing it and creating dangling pointers.
+     */
+    void detachContextAfterFailedAttach();
+
     size_t getTargetConsumer(const Document& input);
 
     /**
      * For consumerId zero, updates CurOp with the current memory metrics in
-     * OperationMemoryUsageTracker.
+     * OperationMemoryUsageTracker. If the opCtx holds a different tracker, the flush is skipped
+     * rather than throwing: dispose runs from non-throwing teardown paths.
      */
     void updateMemoryTrackingForDispose(OperationContext* opCtx);
 

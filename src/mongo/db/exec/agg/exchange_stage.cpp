@@ -16,6 +16,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -286,19 +287,21 @@ void Exchange::unblockLoading(size_t consumerId) {
 }
 
 void Exchange::attachContext(OperationContext* opCtx, size_t consumerId) {
-    _pipeline->reattachToOperationContext(opCtx);
-    _execPipeline->reattachToOperationContext(opCtx);
     if (!reportsInputMemoryToCurOp()) {
+        _pipeline->reattachToOperationContext(opCtx);
+        _execPipeline->reattachToOperationContext(opCtx);
         return;
     }
 
-    auto* trackerOnOpCtx = OperationMemoryUsageTracker::getIfExists(opCtx);
     // Finding our own tracker on the opCtx is fine, but finding a different one is not.
+    auto* trackerOnOpCtx = OperationMemoryUsageTracker::getIfExists(opCtx);
     tassert(12920100,
             str::stream() << "cannot publish the exchange producer's memory tracker: the driving "
                              "consumer's opCtx already has a different operation memory tracker, "
                              "consumerId: "
-                          << consumerId,
+                          << consumerId << ", tracker on opCtx: "
+                          << static_cast<const void*>(trackerOnOpCtx) << ", exchange's tracker: "
+                          << static_cast<const void*>(_memoryTracker.get()),
             !_memoryTracker || !trackerOnOpCtx || trackerOnOpCtx == _memoryTracker.get());
 
     // Stats are only reported to CurOp for consumer 0 to avoid double-counting the producer's
@@ -307,27 +310,45 @@ void Exchange::attachContext(OperationContext* opCtx, size_t consumerId) {
     const auto reportToCurOp = consumerId == 0 ? OperationMemoryUsageTracker::ReportToCurOp::kYes
                                                : OperationMemoryUsageTracker::ReportToCurOp::kNo;
     // Publish a co-owning copy to the consumer driving the load, so that Exchange also remains an
-    // owner for the duration of the load.
+    // owner for the duration of the load. Publish *before* running the reattach hooks: stages like
+    // BatchedEnrichmentStage will lazily create an OMT on reattach if one does not already exist.
     OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, _memoryTracker, reportToCurOp);
+
+    _pipeline->reattachToOperationContext(opCtx);
+    _execPipeline->reattachToOperationContext(opCtx);
 }
 
 void Exchange::detachContext(OperationContext* opCtx, size_t consumerId) {
+    _execPipeline->detachFromOperationContext();
+    _pipeline->detachFromOperationContext();
+
     if (reportsInputMemoryToCurOp()) {
-        auto detached = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx);
+        // Peek before detaching the tracker. A tracker we don't recognize must be left where it is:
+        // detaching it could make the reference count go to zero and leave the _base pointer of
+        // sub-trackers dangling.
+        auto* trackerOnOpCtx = OperationMemoryUsageTracker::getIfExists(opCtx);
         tassert(13090701,
                 str::stream()
                     << "cannot reclaim the exchange producer's memory tracker: the driving "
                        "consumer's opCtx has a different operation memory tracker, consumerId: "
                     << consumerId
-                    << ", tracker on opCtx: " << static_cast<const void*>(detached.get())
+                    << ", tracker on opCtx: " << static_cast<const void*>(trackerOnOpCtx)
                     << ", exchange's tracker: " << static_cast<const void*>(_memoryTracker.get()),
-                !_memoryTracker || !detached || detached == _memoryTracker);
+                !_memoryTracker || !trackerOnOpCtx || trackerOnOpCtx == _memoryTracker.get());
+        auto detached = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx);
         if (!_memoryTracker) {
             // Take the memory tracker if it was lazily created by a stage during the load so
             // Exchange can manage the tracker.
             _memoryTracker = std::move(detached);
         }
     }
+}
+
+void Exchange::detachContextAfterFailedAttach() {
+    // If we failed to attach (perhaps because memory trackers were in an inconsistent state), then
+    // clean up our own state only: detach the shared sub-pipelines, but leave any operation memory
+    // tracker on the opCtx exactly where it is to avoid creating a dangling _base pointer in any
+    // sub-trackers.
     _execPipeline->detachFromOperationContext();
     _pipeline->detachFromOperationContext();
 }
@@ -360,7 +381,12 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
         if (_loadingThreadId == kInvalidThreadId) {
             LOGV2_DEBUG(20896, 3, "A consumer begins loading", "consumerId"_attr = consumerId);
 
-            attachContext(opCtx, consumerId);
+            try {
+                attachContext(opCtx, consumerId);
+            } catch (...) {
+                detachContextAfterFailedAttach();
+                throw;
+            }
             // From this point forward, we need to call detachContext(), no matter what. RAII
             // helpers like ScopeGuard are not appropriate here because detaching may throw from a
             // destructor, which can cause std::terminate() to be called if we are already
@@ -520,16 +546,22 @@ void Exchange::updateMemoryTrackingForDispose(OperationContext* opCtx) {
     // opCtx might be null here if we are disposing outside of an operation. E.g., when the server
     // shuts down and we are deleting the CursorManager.
     if (reportsInputMemoryToCurOp() && _memoryTracker && opCtx) {
-        // As in attachContext(), co-owning the same tracker is fine; displacing a different one
-        // would split the operation's memory across two tallies.
-        auto* trackerOnOpCtx = OperationMemoryUsageTracker::getIfExists(opCtx);
-        tassert(12920101,
-                str::stream()
-                    << "cannot flush the exchange producer's memory tracker while disposing: the "
-                       "opCtx already has a different operation memory tracker, tracker on opCtx: "
-                    << static_cast<const void*>(trackerOnOpCtx)
-                    << ", exchange's tracker: " << static_cast<const void*>(_memoryTracker.get()),
-                !trackerOnOpCtx || trackerOnOpCtx == _memoryTracker.get());
+        // As in attachContext(), co-owning the same tracker is fine, but a different one must not
+        // be displaced.
+        if (auto* trackerOnOpCtx = OperationMemoryUsageTracker::getIfExists(opCtx);
+            trackerOnOpCtx && trackerOnOpCtx != _memoryTracker.get()) {
+            // Log a warning here, since we shouldn't throw an exception from this method. It's
+            // possible that we're already recovering from some other exception.
+            LOGV2_WARNING(13090702,
+                          "Skipping the exchange producer's memory tracker flush on dispose: the "
+                          "consumer's opCtx has a different operation memory tracker",
+                          "consumer's tracker on opCtx"_attr =
+                              unsignedHex(reinterpret_cast<uintptr_t>(trackerOnOpCtx)),
+                          "exchange's tracker"_attr =
+                              unsignedHex(reinterpret_cast<uintptr_t>(_memoryTracker.get())));
+            // Return here to avoid freeing an operation tracker that may still be in use.
+            return;
+        }
         OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, _memoryTracker);
         // We need the operation memory tracker to stay alive until all consumers have finished, and
         // dispose has been called for all of the Exchange stage's source stages. So, detach it from

@@ -33,6 +33,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
@@ -99,6 +100,100 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceDynamicBatchMockToStageFn(
 REGISTER_AGG_STAGE_MAPPING(dynamicBatchMockStage,
                            DocumentSourceDynamicBatchMock::id,
                            documentSourceDynamicBatchMockToStageFn);
+
+namespace exec::agg {
+/**
+ * A stage that binds its memory tracker to the operation tracker at construction and re-binds it on
+ * every reattach (the BatchedEnrichmentStage pattern).
+ */
+class RebindingMockStage : public Stage {
+public:
+    RebindingMockStage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : Stage("$mockRebind", expCtx),
+          _tracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)) {}
+
+    // The tracker base seen by doGetNext(), i.e. after the reattach hooks have run.
+    const SimpleMemoryUsageTracker* baseMemTrackerDuringGetNext = nullptr;
+
+    // Set to make the next reattach bind the tracker and then fail.
+    bool failNextReattach = false;
+
+    // Set to make the next doGetNext() replace the memory tracker on the opCtx with a new one.
+    bool replaceMemTrackerOnNextGetNext = false;
+
+    // The memory tracker base currently bound.
+    const SimpleMemoryUsageTracker* currentBaseMemTracker() const {
+        return _tracker.base_forTest();
+    }
+
+    void reattachToOperationContext(OperationContext* opCtx) override {
+        OperationMemoryUsageTracker::rebindToOperation(_tracker, *getContext(), opCtx);
+        if (std::exchange(failNextReattach, false)) {
+            uasserted(ErrorCodes::InternalError, "injected reattach failure");
+        }
+    }
+    void detachFromOperationContext() override {
+        _tracker.resetBase(nullptr);
+    }
+
+private:
+    GetNextResult doGetNext() override {
+        if (std::exchange(replaceMemTrackerOnNextGetNext, false)) {
+            auto* opCtx = getContext()->getOperationContext();
+            invariant(opCtx);
+            // Unpublish the Exchange's tracker and install a new one. The Exchange keeps its own
+            // reference, so the tracker it published stays alive.
+            OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx);
+            OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(opCtx);
+        }
+        baseMemTrackerDuringGetNext = _tracker.base_forTest();
+        _tracker.add(100);  // account through the re-bound base, as a buffering stage does
+        return pSource->getNext();
+    }
+
+    SimpleMemoryUsageTracker _tracker;
+};
+}  // namespace exec::agg
+
+class DocumentSourceMockRebind : public DocumentSourceMock {
+public:
+    DocumentSourceMockRebind(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceMock({}, expCtx) {}
+
+    static const Id& id;
+    Id getId() const override {
+        return id;
+    }
+
+    // Set by the stage mapping below so the test can inspect the exec stage the Exchange built.
+    boost::intrusive_ptr<exec::agg::RebindingMockStage> stage;
+
+    void reattachSourceToOperationContext(OperationContext* opCtx) override {
+        ++reattachCount;
+        DocumentSourceMock::reattachSourceToOperationContext(opCtx);
+    }
+    void detachSourceFromOperationContext() override {
+        ++detachCount;
+        DocumentSourceMock::detachSourceFromOperationContext();
+    }
+
+    // Number of times the document-source-layer reattach/detach hooks have run.
+    int reattachCount = 0;
+    int detachCount = 0;
+};
+ALLOCATE_DOCUMENT_SOURCE_ID(mockRebind, DocumentSourceMockRebind::id);
+
+boost::intrusive_ptr<exec::agg::Stage> documentSourceMockRebindToStageFn(
+    const boost::intrusive_ptr<DocumentSource>& documentSource) {
+    auto ds = boost::dynamic_pointer_cast<DocumentSourceMockRebind>(documentSource);
+    ASSERT(ds) << "expected 'DocumentSourceMockRebind' type";
+    ds->stage = make_intrusive<exec::agg::RebindingMockStage>(ds->getExpCtx());
+    return ds->stage;
+}
+
+REGISTER_AGG_STAGE_MAPPING(mockRebindStage,
+                           DocumentSourceMockRebind::id,
+                           documentSourceMockRebindToStageFn);
 
 namespace {
 /**
@@ -630,6 +725,202 @@ TEST_F(DocumentSourceExchangeTest, ErrorInLoadNextBatchReclaimsPublishedTracker)
     ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
 }
 
+// Make sure that if we inadvertently lazily create a new operation memory tracker from a consumer
+// OpCtx that we throw and clean up appropriately.
+TEST_F(DocumentSourceExchangeTest, TrackerPublishFailureLeavesSharedStateUsable) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+
+    const size_t nInputDocs = 500;
+    const size_t nOutputDocs = 250;
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(2);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, spec, makeGroupProducerPipeline(nInputDocs, nOutputDocs));
+    ASSERT(ex->getOperationMemoryTracker_forTest());
+
+    std::vector<ThreadInfo> threads = createNConsumers(2, ex);
+    OperationContext* opCtx0 = threads[0].opCtx.get();
+    OperationContext* opCtx1 = threads[1].opCtx.get();
+
+    // The Exchange took ownership of the operation tracker at construction, so a consumer creating
+    // another one must trip the guard.
+    auto dependentTracker =
+        OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(opCtx0);
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx0));
+    ASSERT_TASSERT_CODE(ex->getNext(opCtx0, 0, nullptr), 12920100);
+
+    // The failure must leave the producer pipelines detached.
+    ASSERT_EQ(getExpCtx()->getOperationContext(), nullptr);
+
+    // The foreign tracker stays on the opCtx, owned by consumer 0's operation: destroying it here
+    // would dangle dependentTracker's _base.
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx0));
+    dependentTracker.add(4096);
+    ASSERT_EQ(dependentTracker.inUseTrackedMemoryBytes(), 4096);
+
+    // The failure stays loud for this consumer for as long as the inconsistent state persists.
+    ASSERT_TASSERT_CODE(ex->getNext(opCtx0, 0, nullptr), 12920100);
+
+    // Disposing with the foreign tracker present must neither throw (dispose runs from non-throwing
+    // teardown when a cursor is killed) nor displace or destroy it.
+    ex->dispose(opCtx0, 0);
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx0));
+
+    // The failure is scoped to consumer 0: consumer 1 can still drive a load.
+    ASSERT_TRUE(ex->getNext(opCtx1, 1, nullptr).isAdvanced());
+    ex->dispose(opCtx1, 1);
+
+    // Consumer 0's foreign tracker is still alive and usable after all of the above.
+    dependentTracker.add(-2048);
+    ASSERT_EQ(dependentTracker.inUseTrackedMemoryBytes(), 2048);
+}
+
+// Make sure that if we inadvertently lazily create a new operation memory tracker from inside an
+// exchange sub-pipeline stage that we throw and clean up appropriately on detach.
+TEST_F(DocumentSourceExchangeTest, TrackerSwapDuringLoadDetachesSubPipelinesBeforeTassert) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(2);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(opCtx);
+    auto rebind = make_intrusive<DocumentSourceMockRebind>(getExpCtx());
+    boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
+        opCtx, spec, Pipeline::create({getMockSource(10), rebind}, getExpCtx()));
+    auto* exchangeTracker = ex->getOperationMemoryTracker_forTest();
+    ASSERT(exchangeTracker);
+
+    std::vector<ThreadInfo> threads = createNConsumers(2, ex);
+    OperationContext* opCtx0 = threads[0].opCtx.get();
+    OperationContext* opCtx1 = threads[1].opCtx.get();
+
+    // While consumer 0 drives the load, swap the tracker the Exchange published for a new one.
+    rebind->stage->replaceMemTrackerOnNextGetNext = true;
+
+    // The load completes, then we tassert only after detaching.
+    ASSERT_TASSERT_CODE(ex->getNext(opCtx0, 0, nullptr), 13090701);
+    ASSERT_EQ(getExpCtx()->getOperationContext(), nullptr);
+
+    // The new tracker stays on the opCtx, owned by consumer 0's operation; the Exchange still
+    // owns its own tracker.
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx0));
+    ASSERT_NE(OperationMemoryUsageTracker::getIfExists(opCtx0), exchangeTracker);
+    ASSERT_EQ(ex->getOperationMemoryTracker_forTest(), exchangeTracker);
+
+    // Disposing with the foreign tracker present must neither throw nor displace it.
+    ex->dispose(opCtx0, 0);
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx0));
+
+    // The failure is scoped to consumer 0: consumer 1 still drives a load and disposes cleanly.
+    ASSERT_TRUE(ex->getNext(opCtx1, 1, nullptr).isAdvanced());
+    ex->dispose(opCtx1, 1);
+}
+
+// Show that a producer stage that re-binds its memory tracker to the operation during reattach (the
+// BatchedEnrichmentStage pattern) is handled properly be exchange.
+TEST_F(DocumentSourceExchangeTest, ProducerStageRebindingOnReattachUsesPublishedTracker) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(1);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    auto rebind = make_intrusive<DocumentSourceMockRebind>(getExpCtx());
+    boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
+        opCtx, spec, Pipeline::create({getMockSource(10), rebind}, getExpCtx()));
+
+    // The rebind stage will have created an operation memory tracker during construction. The
+    // Exchange object will inherit it and share ownership.
+    ASSERT(rebind->stage);
+    auto* exchangeTracker = ex->getOperationMemoryTracker_forTest();
+    ASSERT(exchangeTracker);
+
+    // Even though we detach and reattach between loads, there is only one operation memory tracker
+    // for the producer pipeline.
+    ASSERT_TRUE(ex->getNext(opCtx, 0, nullptr).isAdvanced());
+    ASSERT_EQ(rebind->stage->baseMemTrackerDuringGetNext,
+              static_cast<const SimpleMemoryUsageTracker*>(exchangeTracker));
+
+    // Drain and dispose cleanly; the Exchange's tracker settles back to zero.
+    for (auto next = ex->getNext(opCtx, 0, nullptr); next.isAdvanced();
+         next = ex->getNext(opCtx, 0, nullptr)) {
+    }
+    ex->dispose(opCtx, 0);
+    ASSERT_EQ(exchangeTracker->inUseTrackedMemoryBytes(), 0);
+}
+
+// Simulate a failure when reattaching a pipeline and show that we detach properly and maintain a
+// consistent state.
+TEST_F(DocumentSourceExchangeTest, ReattachFailureDetachesSubPipelinesAndKeepsTracker) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(2);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    auto rebind = make_intrusive<DocumentSourceMockRebind>(getExpCtx());
+    boost::intrusive_ptr<exec::agg::Exchange> ex = new exec::agg::Exchange(
+        opCtx, spec, Pipeline::create({getMockSource(10), rebind}, getExpCtx()));
+
+    // Construction detaches the producer sub-pipelines and moves their tracker to the Exchange.
+    ASSERT(rebind->stage);
+    auto* tracker = ex->getOperationMemoryTracker_forTest();
+    ASSERT(tracker);
+    ASSERT_EQ(getExpCtx()->getOperationContext(), nullptr);
+    const int reattachCountBefore = rebind->reattachCount;
+    const int detachCountBefore = rebind->detachCount;
+
+    std::vector<ThreadInfo> threads = createNConsumers(2, ex);
+    OperationContext* opCtx0 = threads[0].opCtx.get();
+    OperationContext* opCtx1 = threads[1].opCtx.get();
+
+    // Fail consumer 0's load from the reattach hook, after the Exchange published its tracker and
+    // the hook bound itself to it.
+    rebind->stage->failNextReattach = true;
+    ASSERT_THROWS_CODE(
+        ex->getNext(opCtx0, 0, nullptr), AssertionException, ErrorCodes::InternalError);
+
+    // Both sub-pipelines are detached again: the rebind stage's memory tracker no longer points at
+    // the Exchange's operation memory tracker.
+    ASSERT_EQ(rebind->reattachCount, reattachCountBefore + 1);
+    ASSERT_EQ(rebind->detachCount, detachCountBefore + 1);
+    ASSERT_EQ(rebind->stage->currentBaseMemTracker(), nullptr);
+    ASSERT_EQ(getExpCtx()->getOperationContext(), nullptr);
+
+    // The Exchange still owns its tracker. Normally we would also detach the memory tracker from
+    // the consumer's opCtx, since we handled an exception we want to avoid potentially creating a
+    // dangling reference.
+    ASSERT_EQ(ex->getOperationMemoryTracker_forTest(), tracker);
+
+    // If the failure was intermittent, we can proceed. Upon success, we detach the operation memory
+    // tracker from the consumer's opCtx.
+    ASSERT_TRUE(ex->getNext(opCtx0, 0, nullptr).isAdvanced());
+    ASSERT_EQ(OperationMemoryUsageTracker::getIfExists(opCtx0), nullptr);
+
+    // The failure is scoped to consumer 0: consumer 1 still loads, binding to that same tracker.
+    ASSERT_TRUE(ex->getNext(opCtx1, 1, nullptr).isAdvanced());
+    ASSERT_EQ(rebind->stage->baseMemTrackerDuringGetNext,
+              static_cast<const SimpleMemoryUsageTracker*>(tracker));
+
+    // A clean dispose reclaims the tracker from consumer 0's opCtx and keeps the Exchange's own.
+    ex->dispose(opCtx0, 0);
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx0));
+    ex->dispose(opCtx1, 1);
+    ASSERT_EQ(ex->getOperationMemoryTracker_forTest(), tracker);
+}
+
 class DocumentSourceExchangeDeathTest : public DocumentSourceExchangeTest {};
 
 // Publishing the producer's tracker requires consumer 0's opCtx to have no operation tracker of
@@ -668,11 +959,9 @@ DEATH_TEST_F(DocumentSourceExchangeDeathTest,
 }
 
 // The dispose-time flush has the same precondition as publishing during getNext: consumer 0's
-// opCtx must not already hold an operation tracker, or installing the producer's tracker to
-// propagate its stats would free it.
-DEATH_TEST_F(DocumentSourceExchangeDeathTest,
-             FlushingProducerTrackerOverConsumerTrackerFails,
-             "cannot flush the exchange producer's memory tracker") {
+// opCtx must not already hold an operation tracker. If this happens, we leave it in place since
+// dispose() shouldn't throw, as it's executed in noexcept contexts.
+TEST_F(DocumentSourceExchangeTest, FlushingProducerTrackerOverConsumerTrackerSkipsFlush) {
     unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
 
     const size_t nInputDocs = 10;
@@ -695,12 +984,23 @@ DEATH_TEST_F(DocumentSourceExchangeDeathTest,
     }
     ASSERT_EQ(docs, nOutputDocs);
 
-    // An operation tracker appearing on consumer 0's opCtx before dispose must trip the flush
-    // guard.
-    OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(opCtx);
-    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx));
+    // An operation tracker appearing on consumer 0's opCtx before dispose must not be displaced by
+    // the flush.
+    auto dependentTracker =
+        OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(opCtx);
+    const auto* foreignTracker = dependentTracker.base_forTest();
+    ASSERT(foreignTracker);
+    ASSERT_EQ(OperationMemoryUsageTracker::getIfExists(opCtx), foreignTracker);
 
-    ASSERT_THROWS_CODE(ex->dispose(opCtx, 0), AssertionException, 12920101);
+    ex->dispose(opCtx, 0);
+
+    // The flush was skipped: the foreign tracker is untouched, still owned by the opCtx, and is
+    // usable. The Exchange kept its own tracker.
+    ASSERT_EQ(OperationMemoryUsageTracker::getIfExists(opCtx), foreignTracker);
+    ASSERT(ex->getOperationMemoryTracker_forTest());
+    dependentTracker.add(4096);
+    ASSERT_EQ(dependentTracker.inUseTrackedMemoryBytes(), 4096);
+    ASSERT_EQ(foreignTracker->inUseTrackedMemoryBytes(), 4096);
 }
 
 TEST_F(DocumentSourceExchangeTest, NonZeroConsumerFirstLoadDoesNotDangleSharedTracker) {

@@ -92,6 +92,13 @@ public:
     }
 
     /**
+     * Test-only: the tracker this one reports to, or nullptr when it is standalone or detached.
+     */
+    const SimpleMemoryUsageTracker* base_forTest() const {
+        return _base;
+    }
+
+    /**
      * Returns true only if this tracker and every ancestor in the base chain are within their
      * respective limits. A stage is compared on its full figure, the operation tracker on its
      * unique one; see 'limitFigure()'. This is the check whose failure fails the operation.

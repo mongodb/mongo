@@ -6,11 +6,13 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/db_command_test_fixture.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/exchange_stage.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
@@ -302,6 +304,83 @@ protected:
     }
 
     std::shared_ptr<executor::TaskExecutor> _executor;
+
+    /**
+     * Runs an exchange aggregate with 'nConsumers' consumers. Validates the state of each consumer
+     * cursor, then kills the cursors. Returns the in-use bytes of the operation memory tracker
+     * owned by the Exchange, as observed right after the initial aggregate command.
+     */
+    int64_t runExchangeAndGetTrackedBytes(size_t nConsumers, const BSONObj& letParams) {
+        unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
+        unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
+
+        BSONObjBuilder cmdBuilder;
+        cmdBuilder.append("aggregate", 1);
+        cmdBuilder.append("pipeline", BSON_ARRAY(generateTrackingMockStage(10)));
+        cmdBuilder.append("cursor", BSON("batchSize" << 0));
+        cmdBuilder.append("exchange",
+                          BSON("policy" << "roundrobin"
+                                        << "consumers" << static_cast<int>(nConsumers)
+                                        << "orderPreserving" << false << "bufferSize" << 128
+                                        << "key" << BSONObj{}));
+        if (!letParams.isEmpty()) {
+            cmdBuilder.append("let", letParams);
+        }
+        BSONObj res = runCommand(cmdBuilder.obj());
+
+        std::vector<CursorId> cursorIds;
+        if (nConsumers == 1) {
+            // If there is just one consumer, we get back a single cursor object.
+            assertBSONOk(res);
+            cursorIds.push_back(res["cursor"].Obj()["id"].Long());
+        } else {
+            for (auto&& elem : res["cursors"].Array()) {
+                assertBSONOk(elem.Obj());
+                cursorIds.push_back(elem.Obj()["cursor"].Obj()["id"].Long());
+            }
+        }
+        ASSERT_EQ(cursorIds.size(), nConsumers);
+
+        int64_t trackedBytes = 0;
+        const exec::agg::Exchange* exchange = nullptr;
+        CursorManager* cursorManager = CursorManager::get(opCtx->getServiceContext());
+        for (size_t consumerId = 0; consumerId < cursorIds.size(); ++consumerId) {
+            ClientCursorPin pin = unittest::assertGet(
+                cursorManager->pinCursor(opCtx, cursorIds[consumerId], "getMore"));
+
+            // Consumer cursors must not have an operation memory tracker of their own, the tracker
+            // should be owned by only the Exchange when no pipeline is executing.
+            ASSERT_EQ(OperationMemoryUsageTracker::getIfExists(opCtx), nullptr)
+                << "consumerId: " << consumerId;
+
+            Pipeline* pipeline = pin->getExecutor()->getPipeline();
+            ASSERT(pipeline);
+            auto* consumer = dynamic_cast<DocumentSourceExchange*>(pipeline->peekFront());
+            ASSERT(consumer);
+            ASSERT_TRUE(
+                pipeline->getContext()->getExcludeExpressionFallbackFromOperationMemoryTracking());
+
+            if (!exchange) {
+                exchange = consumer->getExchange().get();
+                const auto* tracker = exchange->getOperationMemoryTracker_forTest();
+                ASSERT(tracker);
+                trackedBytes = tracker->inUseTrackedMemoryBytes();
+            }
+            // All consumers share the same Exchange.
+            ASSERT_EQ(consumer->getExchange().get(), exchange);
+        }
+
+        BSONArrayBuilder cursorsToKill;
+        for (auto cursorId : cursorIds) {
+            cursorsToKill.append(cursorId);
+        }
+        res = runCommand(BSON("killCursors" << "$cmd.aggregate"
+                                            << "cursors" << cursorsToKill.arr()));
+        ASSERT_EQ(res["ok"].Number(), 1.0);
+        ASSERT_EQ(res["cursorsKilled"].Array().size(), nConsumers);
+
+        return trackedBytes;
+    }
 };
 
 namespace {
@@ -616,6 +695,32 @@ TEST_F(RunAggregateTest, ExchangePipelineAndMemoryTrackingWorksNConsumersWithErr
         .nTotalDocs = 500,
         .errorOffset = 400,
     });
+}
+
+// Show that when we execute an exchange pipeline that 'let' variables, we charge the memory to the
+// Exchange's memory tracker (reported via consumer 0).
+TEST_F(RunAggregateTest, ExchangeConsumerLetParametersChargedToExchangeTracker) {
+    // 'Let' parameters bound to a raw array will charge memory when the expression context is
+    // constructed for each consumer, due to constant folding.
+    const BSONObj letParams = fromjson("{arr: [1, 2, 3, 4, 5]}");
+
+    const int64_t noLetOneConsumer = runExchangeAndGetTrackedBytes(1, BSONObj{});
+    const int64_t noLetThreeConsumers = runExchangeAndGetTrackedBytes(3, BSONObj{});
+    const int64_t letOneConsumer = runExchangeAndGetTrackedBytes(1, letParams);
+    const int64_t letThreeConsumers = runExchangeAndGetTrackedBytes(3, letParams);
+
+    // Without 'let' parameters, adding consumers does not change the tracked memory, since the
+    // exchange pipeline has not executed yet.
+    ASSERT_EQ(noLetOneConsumer, noLetThreeConsumers);
+
+    // The 'let' parameters are retained once by the producer and once per consumer, and every copy
+    // is charged to the Exchange's tracker.
+    const int64_t producerAndOneConsumerLetBytes = letOneConsumer - noLetOneConsumer;
+    const int64_t producerAndThreeConsumersLetBytes = letThreeConsumers - noLetThreeConsumers;
+    const int64_t letBytesPerConsumer =
+        (producerAndThreeConsumersLetBytes - producerAndOneConsumerLetBytes) / 2;
+    ASSERT_GT(letBytesPerConsumer, 0) << "consumers' 'let' memory is not charged to the Exchange";
+    ASSERT_EQ(producerAndOneConsumerLetBytes, 2 * letBytesPerConsumer);
 }
 
 TEST_F(RunAggregateTest, RunAggregateReadsIFRFlagsFromRequest) {
