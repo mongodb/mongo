@@ -326,6 +326,8 @@ class PackageTestInternalHelpersTest(unittest.TestCase):
         readelf_output = """
  0x0000000000000001 (NEEDED)             Shared library: [ld-linux-aarch64.so.1]
  0x0000000000000001 (NEEDED)             Shared library: [ld-linux-x86-64.so.2]
+ 0x0000000000000001 (NEEDED)             Shared library: [ld64.so.1]
+ 0x0000000000000001 (NEEDED)             Shared library: [ld64.so.2]
  0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
 """
 
@@ -353,6 +355,18 @@ libcurl.so.4 => /lib/aarch64-linux-gnu/libcurl.so.4 (0x0000ffff)
         self.assertNotIn("ld-linux-aarch64.so.1", expected)
         self.assertNotIn("ld-linux-x86-64.so.2", expected)
 
+    def test_rhel9_system_dependencies(self):
+        for edition in ("org", "enterprise"):
+            with self.subTest(edition=edition):
+                expected = under_test.get_expected_direct_system_libraries("rhel9", edition)
+                self.assertIn("libcrypto.so.3", expected)
+                self.assertIn("libssl.so.3", expected)
+                if edition == "enterprise":
+                    self.assertIn("libldap.so.2", expected)
+                    self.assertIn("liblber.so.2", expected)
+                else:
+                    self.assertNotIn("libldap.so.2", expected)
+
     def test_system_dependency_check_checks_mongod_and_mongos(self):
         test_args = {
             "package_manager": "apt",
@@ -377,6 +391,48 @@ libcurl.so.4 => /lib/aarch64-linux-gnu/libcurl.so.4 (0x0000ffff)
             under_test.test_binary_system_dependencies(test_args)
 
         self.assertEqual(2, get_dependencies.call_count)
+
+    def test_ibm_system_dependency_check_requires_atomic_only_for_mongod(self):
+        for arch, package_platform in (
+            ("ppc64le", "rhel81"),
+            ("ppc64le", "rhel9"),
+            ("ppc64le", "rhel10"),
+            ("s390x", "rhel83"),
+            ("s390x", "rhel9"),
+            ("s390x", "rhel10"),
+        ):
+            expected = under_test.get_expected_direct_system_libraries(
+                package_platform, "enterprise"
+            )
+            actual = {"mongod": expected | {"libatomic.so.1"}, "mongos": expected}
+            test_args = {
+                "package_manager": "yum",
+                "package_names": ["mongodb-enterprise"],
+                "platform": package_platform,
+                "arch": arch,
+            }
+            with (
+                self.subTest(arch=arch, package_platform=package_platform),
+                mock.patch.object(under_test.pathlib.Path, "is_file", return_value=True),
+                mock.patch.object(
+                    under_test,
+                    "get_binary_system_dependencies",
+                    side_effect=lambda path: (actual[path.name], set(), {}),
+                ),
+                mock.patch.object(under_test, "get_system_package_names", return_value=[]),
+            ):
+                under_test.test_binary_system_dependencies(test_args)
+                actual["mongod"] = expected
+                with self.assertRaisesRegex(RuntimeError, "Missing: libatomic.so.1"):
+                    under_test.test_binary_system_dependencies(test_args)
+                actual["mongod"] = expected | {"libatomic.so.1"}
+                actual["mongos"] = expected | {"libatomic.so.1"}
+                with self.assertRaisesRegex(RuntimeError, "mongos.*unexpected: libatomic.so.1"):
+                    under_test.test_binary_system_dependencies(test_args)
+                actual["mongos"] = expected
+                test_args["arch"] = "x86_64"
+                with self.assertRaisesRegex(RuntimeError, "mongod.*unexpected: libatomic.so.1"):
+                    under_test.test_binary_system_dependencies(test_args)
 
     def test_system_dependency_check_rejects_unexpected_direct_dependency(self):
         test_args = {

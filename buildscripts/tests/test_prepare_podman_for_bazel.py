@@ -1,12 +1,71 @@
 from __future__ import annotations
 
+import os
 import pathlib
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
 
 from buildscripts import prepare_podman_for_bazel
+
+
+class PreparePodmanForPackageTestsTest(unittest.TestCase):
+    def test_docker_package_tasks_skip_preparation(self) -> None:
+        runner = mock.Mock()
+        with tempfile.TemporaryDirectory() as directory:
+            state = pathlib.Path(directory) / "task-3"
+            result = prepare_podman_for_bazel.prepare_podman_for_package_tests(
+                {"MONGO_PACKAGE_TEST_STATE_DIR": str(state)}, runner=runner
+            )
+            self.assertEqual(0, result)
+            runner.assert_not_called()
+            self.assertFalse(state.exists())
+
+    @unittest.skipUnless(sys.platform == "linux", "Rootless Podman preparation requires Linux")
+    def test_package_preparation_recovers_in_an_execution_specific_context(self) -> None:
+        calls: list[tuple[list[str], dict[str, object]]] = []
+
+        def runner(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+            calls.append((argv, kwargs))
+            return subprocess.CompletedProcess(argv, 0, "", "")
+
+        with tempfile.TemporaryDirectory() as directory:
+            state = pathlib.Path(directory) / "task-3"
+            environment = {
+                "MONGO_PACKAGE_TEST_RUNTIME": "podman",
+                "MONGO_PACKAGE_TEST_TASK_ID": "task-3",
+                "MONGO_PACKAGE_TEST_STATE_DIR": str(state),
+                "XDG_RUNTIME_DIR": "/broken/runtime",
+                "CONTAINERS_STORAGE_CONF": "/broken/storage.conf",
+                "CONTAINERS_CONF": "/broken/containers.conf",
+                "MONGO_LINUX_CONTAINER_ACTIONS": "false",
+            }
+            result = prepare_podman_for_bazel.prepare_podman_for_package_tests(
+                environment,
+                runner=runner,
+                which=mock.Mock(return_value="/usr/bin/podman"),
+            )
+            self.assertEqual(0, result)
+            self.assertEqual("task-3\n", (state / "active").read_text())
+            self.assertEqual(
+                [command for command, kwargs in calls],
+                [
+                    ["sudo", "loginctl", "enable-linger", str(os.getuid())],
+                    ["podman", "system", "migrate"],
+                    ["podman", "rm", "--all", "--force"],
+                    ["podman", "system", "reset", "--force"],
+                    ["podman", "info"],
+                ],
+            )
+            for name in ("XDG_RUNTIME_DIR", "CONTAINERS_STORAGE_CONF", "CONTAINERS_CONF"):
+                value = (state / name).read_text()
+                self.assertTrue(pathlib.Path(value).is_relative_to(state))
+                self.assertTrue(pathlib.Path(value).exists())
+                for command, kwargs in calls[1:]:
+                    self.assertEqual(value, kwargs["env"][name])
+            self.assertEqual("/broken/runtime", environment["XDG_RUNTIME_DIR"])
 
 
 class PreparePodmanForBazelTest(unittest.TestCase):

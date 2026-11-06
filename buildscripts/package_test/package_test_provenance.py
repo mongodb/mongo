@@ -103,15 +103,28 @@ def package_test_task_chain(api: Any, task_id: str, expected_build_id: str) -> l
                 continue
             producer = api.task_by_id(dependency["id"])
             # Shared version generation is an infrastructure dependency, not an artifact producer.
-            if producer.display_name == "version_expansions_gen":
-                continue
-            for field in ("build_id", "build_variant", "version_id"):
+            is_version_generation = producer.display_name in (
+                "version_gen",
+                "version_expansions_gen",
+            )
+            fields = (
+                ("version_id",)
+                if is_version_generation
+                else (
+                    "build_id",
+                    "build_variant",
+                    "version_id",
+                )
+            )
+            for field in fields:
                 if not getattr(producer, field) or getattr(producer, field) != getattr(root, field):
                     raise ValueError(
                         f"Package test dependency {producer.task_id} {field} does not match "
                         f"the executing Evergreen task: {getattr(producer, field)} != "
                         f"{getattr(root, field)}"
                     )
+            if is_version_generation:
+                continue
             pending.append(producer)
     return tasks
 

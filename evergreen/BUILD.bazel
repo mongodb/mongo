@@ -6,6 +6,7 @@ load("//bazel/uv:defs.bzl", "dependency")
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
+    "package_test_cleanup.sh",
     "prelude.sh",
     "remote_execution_containers_generate.sh",
     "resmoke_tests_execute.sh",
@@ -110,6 +111,13 @@ sh_test(
         "bazel_compile.sh",
         "bazel_evergreen_shutils.sh",
     ],
+)
+
+sh_test(
+    name = "package_test_cleanup_test",
+    srcs = ["package_test_cleanup_test.sh"],
+    data = ["package_test_cleanup.sh"],
+    target_compatible_with = ["@platforms//os:linux"],
 )
 
 sh_test(

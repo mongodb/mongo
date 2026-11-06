@@ -509,6 +509,7 @@ py_test(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts:generate_bazel_spawn_pb2",
+        "//buildscripts/package_test:package_test_container",
         "//buildscripts/package_test:package_test_provenance",
         dependency(
             "evergreen-py",
@@ -531,6 +532,18 @@ py_test(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts/package_test:package_test_commands",
+    ],
+)
+
+py_test(
+    name = "test_package_test_container",
+    size = "small",
+    srcs = ["test_package_test_container.py"],
+    data = ["//evergreen:package_test_cleanup.sh"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:prepare_podman_for_bazel",
+        "//buildscripts/package_test:package_test_container",
     ],
 )
 

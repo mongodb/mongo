@@ -1,4 +1,5 @@
 import argparse
+import atexit
 import dataclasses
 import fnmatch
 import json
@@ -6,9 +7,11 @@ import logging
 import os
 import platform
 import re
+import shlex
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 import traceback
 import uuid
@@ -17,12 +20,7 @@ from pathlib import Path
 from typing import Any, Generator, Optional
 from urllib.parse import urlparse
 
-import docker
-import docker.errors
 import requests
-from docker.client import DockerClient
-from docker.models.containers import Container
-from docker.models.images import Image
 from retry.api import retry_call
 
 from buildscripts.package_test.package_test_archive import validate_top_level_directory
@@ -32,6 +30,14 @@ from buildscripts.package_test.package_test_commands import (
     build_package_test_internal_args,
     build_python_setup_commands,
     build_update_command,
+)
+from buildscripts.package_test.package_test_container import (
+    CONTAINER_TIMEOUT_SECONDS,
+    ContainerError,
+    ContainerRuntime,
+    ContainerTestRuntime,
+    RunningContainer,
+    create_container_runtime,
 )
 from buildscripts.package_test.package_test_internal import write_compressed_text_file
 from buildscripts.package_test.package_test_provenance import (
@@ -456,6 +462,12 @@ OS_DOCKER_LOOKUP = {
         frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
         "python3",
     ),
+    "rhel9": (
+        "almalinux:9",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
     "rhel90": (
         "almalinux:9",
         "yum",
@@ -602,17 +614,19 @@ class Test:
         return self.os_name + "-" + self.edition + "-" + self.version
 
 
-def get_image(test: Test, client: DockerClient) -> Image:
+def get_image(test: Test, runtime: ContainerRuntime) -> str:
     tries = 1
     while True:
         try:
             logging.info(
                 "Pulling base image for %s: %s, try %s", test.os_name, test.base_image, tries
             )
-            base_image = client.images.pull(test.base_image)
-        except docker.errors.ImageNotFound as exc:
+            base_image = runtime.pull(test.base_image)
+        except ContainerError as exc:
             if tries >= 5:
-                logging.error("Base image %s not found after %s tries", test.base_image, tries)
+                logging.error(
+                    "Could not pull base image %s after %s tries: %s", test.base_image, tries, exc
+                )
                 raise exc
         else:
             return base_image
@@ -637,10 +651,22 @@ def build_rhel_subscription_volumes() -> list[str]:
     ]
 
 
-def run_test_with_timeout(test: Test, client: DockerClient, timeout: int) -> Result:
+def run_test_with_timeout(test: Test, runtime: ContainerRuntime, timeout: int) -> Result:
     start_time = time.time()
-    with futures.ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(run_test, test, client)
+    test_runtime = ContainerTestRuntime(runtime)
+    future: futures.Future[Result] = futures.Future()
+
+    def execute_test() -> None:
+        try:
+            future.set_result(run_test(test, test_runtime))
+        except BaseException as exc:
+            future.set_exception(exc)
+
+    # ThreadPoolExecutor joins workers at interpreter shutdown even with wait=False.
+    # A canceled test must not keep the report or the Python process from finishing.
+    threading.Thread(target=execute_test, daemon=True).start()
+    result: Result | None = None
+    try:
         try:
             result = future.result(timeout=timeout)
         except futures.TimeoutError:
@@ -654,10 +680,20 @@ def run_test_with_timeout(test: Test, client: DockerClient, timeout: int) -> Res
                 end=end_time,
                 exit_code=1,
             )
+    finally:
+        try:
+            test_runtime.close()
+        except ContainerError as exc:
+            logging.error("Failed to clean up test containers: %s", exc)
+            if result is not None:
+                result["log_raw"] += f"\nFailed to clean up test containers: {exc}\n"
+                result["status"] = "fail"
+                result["exit_code"] = 1
+    assert result is not None
     return result
 
 
-def run_test(test: Test, client: DockerClient) -> Result:
+def run_test(test: Test, runtime: ContainerRuntime) -> Result:
     result = Result(status="pass", test_file=test.name(), start=time.time(), log_raw="")
 
     log_name = f"logs/{test.name()}_{test.version}_{uuid.uuid4().hex}.log"
@@ -737,18 +773,23 @@ def run_test(test: Test, client: DockerClient) -> Result:
         test.package_kind,
     )
     commands.append(
-        f"python3 /mnt/package_test/package_test_internal.py {log_docker_path} "
-        f"{' '.join(internal_test_options)}"
+        shlex.join(
+            [
+                "python3",
+                "/mnt/package_test/package_test_internal.py",
+                str(log_docker_path),
+                *internal_test_options,
+            ]
+        )
     )
     logging.debug(
-        "Attempting to run the following docker commands:\n\t%s",
+        "Attempting to run the following container commands:\n\t%s",
         join_commands(commands, sep="\n\t"),
     )
 
-    image: Image | None = None
-    container: Container | None = None
+    container: RunningContainer | None = None
     try:
-        image = get_image(test, client)
+        image = get_image(test, runtime)
         # Mount the custom build's library prefix (e.g. a system OpenSSL 3) into the
         # container; the ld.so.conf.d command above makes the linker find it.
         # A no-op unless the variant sets the mongo_openssl_root expansion.
@@ -758,40 +799,46 @@ def run_test(test: Test, client: DockerClient) -> Result:
         openssl_root = os.environ.get("mongo_openssl_root")
         if openssl_root:
             volumes.append(f"{openssl_root}:{openssl_root}:ro")
-        container = client.containers.run(
+        container = runtime.run(
             image,
-            command=f'bash -c "{join_commands(commands)}"',
-            auto_remove=True,
-            detach=True,
-            user="root",
+            command=["bash", "-c", join_commands(commands)],
             volumes=volumes,
             environment={"MONGO_RELEASE_BINARY_HASHES": json.dumps(test.release_binary_hashes)}
             if test.release_binary_hashes is not None
             else {},
         )
-        for log in container.logs(stream=True):
+        for log in container.logs():
             result["log_raw"] += log.decode("UTF-8")
             # This is pretty verbose, lets run this way for a while and we can delete this if it ends up being too much
             logging.debug(log.decode("UTF-8").strip())
-        exit_code = container.wait()
-        result["exit_code"] = exit_code["StatusCode"]
-    except docker.errors.APIError as exc:
+        result["exit_code"] = container.wait()
+    except ContainerError as exc:
         traceback.print_exception(type(exc), exc, exc.__traceback__)
-        logging.error("Failed to start test")
+        logging.error("Container operation failed: %s", exc)
+        result["log_raw"] += f"\nContainer operation failed: {exc}\n"
         result["end"] = time.time()
         result["status"] = "fail"
         result["exit_code"] = 1
         return result
+    finally:
+        if container is not None:
+            try:
+                container.remove()
+            except ContainerError as exc:
+                logging.error("Failed to remove test container: %s", exc)
+                result["log_raw"] += f"\nFailed to remove test container: {exc}\n"
+                result["status"] = "fail"
+                result["exit_code"] = 1
 
-    if exit_code["StatusCode"] == 0:
+    if result["exit_code"] == 0:
         try:
             with open(log_external_path, "r") as log_raw:
                 result["log_raw"] += log_raw.read()
         except OSError as oserror:
             logging.error("Failed to open %s with error %s", log_external_path, oserror)
 
-    if exit_code["StatusCode"] != 0:
-        logging.error("Failed test %s with exit code %s", test, exit_code)
+    if result["exit_code"] != 0:
+        logging.error("Failed test %s with exit code %s", test, result["exit_code"])
         result["status"] = "fail"
     result["end"] = time.time()
     return result
@@ -945,7 +992,13 @@ for dl in iterate_over_downloads():
     versions.add(dl["version"])
 
 parser = argparse.ArgumentParser(
-    description="Test packages on various hosts. This will spin up docker containers and test the installs."
+    description="Test package installs in Docker or Podman containers on native hosts."
+)
+parser.add_argument(
+    "--container-runtime",
+    choices=("docker", "podman"),
+    default="docker",
+    help="Container runtime used to test package installs (default: docker).",
 )
 parser.add_argument(
     "--arch",
@@ -1451,20 +1504,20 @@ if args.command == "release":
 
 for i in range(5):
     try:
-        docker_client = docker.client.from_env()
+        container_runtime = create_container_runtime(args.container_runtime)
+        atexit.register(container_runtime.close)
         docker_username = os.environ.get("docker_username")
         docker_password = os.environ.get("docker_password")
         if all((docker_username, docker_password)):
             logging.info("Logging into docker.io")
-            response = docker_client.login(username=docker_username, password=docker_password)
-            logging.debug("Login response: %s", response)
+            container_runtime.login(username=docker_username, password=docker_password)
         else:
-            logging.warning("Skipping docker login")
+            logging.warning("Skipping container registry login")
         break
     except Exception as ex:
-        logging.warning("Caught exception when trying to create docker client: %s", ex)
+        logging.warning("Failed to initialize %s container runtime: %s", args.container_runtime, ex)
         if i == 4:
-            logging.error("Failed to create docker client after 5 tries, exiting")
+            logging.error("Failed to initialize container runtime after 5 tries, exiting")
             sys.exit(1)
         else:
             logging.warning("Retrying...")
@@ -1473,9 +1526,9 @@ for i in range(5):
 report = Report(results=[], failures=0)
 with futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as tpe:
     # Set a timeout of 10mins timeout for a single test
-    SINGLE_TEST_TIMEOUT = 10 * 60
+    SINGLE_TEST_TIMEOUT = CONTAINER_TIMEOUT_SECONDS
     test_futures = {
-        tpe.submit(run_test_with_timeout, test, docker_client, SINGLE_TEST_TIMEOUT): test
+        tpe.submit(run_test_with_timeout, test, container_runtime, SINGLE_TEST_TIMEOUT): test
         for test in tests
     }
     completed_tests: int = 0
@@ -1492,9 +1545,14 @@ with futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as tpe:
                 if completed_test.attempts < args.retries:
                     retried_tests += 1
                     completed_test.attempts += 1
-                    test_futures[tpe.submit(run_test, completed_test, docker_client)] = (
-                        completed_test
-                    )
+                    test_futures[
+                        tpe.submit(
+                            run_test_with_timeout,
+                            completed_test,
+                            container_runtime,
+                            SINGLE_TEST_TIMEOUT,
+                        )
+                    ] = completed_test
                     continue
                 report["failures"] += 1
 

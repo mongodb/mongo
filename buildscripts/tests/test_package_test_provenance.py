@@ -2,16 +2,23 @@ import ast
 import json
 import logging
 import os
+import shlex
+import subprocess
+import sys
 import tarfile
 import tempfile
+import threading
+import time
 import types
 import unittest
 import zipfile
+from concurrent import futures
 from pathlib import Path
 from unittest import mock
 
 from buildscripts import generate_bazel_spawn_pb2
 from buildscripts.package_test import package_test_provenance as under_test
+from buildscripts.package_test.package_test_container import ContainerError, ContainerTestRuntime
 
 
 def release_local_suffix() -> str:
@@ -70,6 +77,122 @@ def compact_log_with_spawns(*spawns: tuple[str, bool]) -> bytes:
 
 
 class PackageTestProvenanceTest(unittest.TestCase):
+    def _timeout_runner(self, run_test):
+        source = workspace_file_path("buildscripts/package_test/package_test.py").read_text()
+        runner = next(
+            node
+            for node in ast.parse(source).body
+            if isinstance(node, ast.FunctionDef) and node.name == "run_test_with_timeout"
+        )
+        namespace = {
+            "Test": object,
+            "ContainerRuntime": object,
+            "ContainerTestRuntime": ContainerTestRuntime,
+            "ContainerError": ContainerError,
+            "Result": dict,
+            "time": time,
+            "logging": mock.Mock(),
+            "futures": futures,
+            "threading": threading,
+            "run_test": run_test,
+        }
+        exec(
+            compile(ast.Module(body=[runner], type_ignores=[]), "package_test.py", "exec"),
+            namespace,
+        )
+        return namespace["run_test_with_timeout"]
+
+    def test_timeout_removes_container_without_joining_hung_worker(self):
+        released = threading.Event()
+        started = threading.Event()
+        returned = threading.Event()
+        results = []
+        errors = []
+        runtime = mock.Mock()
+
+        def run_test(test, test_runtime):
+            container = test_runtime.run("image", ["sleep", "1000"], [], {})
+            started.set()
+            try:
+                if not released.wait(5):
+                    raise AssertionError("Test did not release hung worker")
+            finally:
+                container.remove()
+
+        runner = self._timeout_runner(run_test)
+
+        def run_timeout():
+            try:
+                results.append(runner(types.SimpleNamespace(name=lambda: "hung"), runtime, 0.05))
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                returned.set()
+
+        worker = threading.Thread(target=run_timeout)
+        worker.start()
+        try:
+            self.assertTrue(started.wait(5))
+            self.assertTrue(returned.wait(2), "Timeout wrapper joined the hung test")
+            self.assertEqual([], errors)
+            self.assertEqual("test timed out", results[0]["log_raw"])
+            self.assertEqual("fail", results[0]["status"])
+            runtime.run.return_value.remove.assert_called_once()
+        finally:
+            released.set()
+            worker.join(5)
+
+    def test_unexpected_worker_failure_still_removes_container(self):
+        runtime = mock.Mock()
+
+        def run_test(test, test_runtime):
+            test_runtime.run("image", ["sleep", "1000"], [], {})
+            raise ValueError("unexpected error")
+
+        runner = self._timeout_runner(run_test)
+        with self.assertRaisesRegex(ValueError, "unexpected error"):
+            runner(types.SimpleNamespace(name=lambda: "failed"), runtime, 5)
+        runtime.run.return_value.remove.assert_called_once()
+
+    def test_timed_out_worker_does_not_block_interpreter_shutdown(self):
+        source = workspace_file_path("buildscripts/package_test/package_test.py").read_text()
+        runner = next(
+            node
+            for node in ast.parse(source).body
+            if isinstance(node, ast.FunctionDef) and node.name == "run_test_with_timeout"
+        )
+        child_source = (
+            """
+import logging
+import threading
+import time
+from concurrent import futures
+from types import SimpleNamespace
+from unittest.mock import Mock
+from buildscripts.package_test.package_test_container import ContainerError, ContainerTestRuntime
+Test = ContainerRuntime = object
+Result = dict
+def run_test(test, runtime):
+    threading.Event().wait()
+"""
+            + ast.unparse(runner)
+            + """
+result = run_test_with_timeout(SimpleNamespace(name=lambda: 'hung'), Mock(), 0.05)
+assert result['status'] == 'fail'
+"""
+        )
+        subprocess.run(
+            [sys.executable, "-c", child_source],
+            env={
+                **os.environ,
+                "PYTHONPATH": str(
+                    workspace_file_path("buildscripts/package_test/package_test.py").parents[2]
+                ),
+            },
+            check=True,
+            timeout=5,
+        )
+
     def test_branch_defaults_validate_the_package_binaries_and_preserve_overrides(self):
         source = workspace_file_path("buildscripts/package_test/package_test.py").read_text()
         selection = next(
@@ -165,7 +288,7 @@ class PackageTestProvenanceTest(unittest.TestCase):
                     "build_id",
                 )
 
-    def test_package_container_receives_release_hashes_only_when_provenance_was_validated(self):
+    def _package_container_runner(self):
         # Import the container runner without the script's network requests and argument parsing.
         source = workspace_file_path("buildscripts/package_test/package_test.py").read_text()
         runner = next(
@@ -178,11 +301,14 @@ class PackageTestProvenanceTest(unittest.TestCase):
             "os": os,
             "Path": Path,
             "json": json,
+            "shlex": shlex,
             "time": mock.Mock(time=mock.Mock(return_value=0)),
             "uuid": mock.Mock(uuid4=mock.Mock(return_value=types.SimpleNamespace(hex="test"))),
             "logging": mock.Mock(),
+            "traceback": mock.Mock(),
             "Test": object,
-            "DockerClient": object,
+            "ContainerRuntime": object,
+            "ContainerError": RuntimeError,
             "Result": dict,
             "urlparse": mock.Mock(),
             "RHEL7_OS_NAMES": (),
@@ -197,9 +323,13 @@ class PackageTestProvenanceTest(unittest.TestCase):
             compile(ast.Module(body=[runner], type_ignores=[]), "package_test.py", "exec"),
             namespace,
         )
+        return namespace["run_test"]
+
+    def test_package_container_receives_release_hashes_only_when_provenance_was_validated(self):
+        run_test = self._package_container_runner()
         client = mock.Mock()
-        client.containers.run.return_value.logs.return_value = []
-        client.containers.run.return_value.wait.return_value = {"StatusCode": 1}
+        client.run.return_value.logs.return_value = []
+        client.run.return_value.wait.return_value = 1
         test = types.SimpleNamespace(
             name=lambda: "provenance",
             version="9.1",
@@ -225,11 +355,44 @@ class PackageTestProvenanceTest(unittest.TestCase):
             ):
                 test.release_binary_hashes = hashes
                 test.package_kind = package_kind
-                namespace["run_test"](test, client)
+                run_test(test, client)
                 expected = (
                     {} if hashes is None else {"MONGO_RELEASE_BINARY_HASHES": json.dumps(hashes)}
                 )
-                self.assertEqual(expected, client.containers.run.call_args.kwargs["environment"])
+                self.assertEqual(expected, client.run.call_args.kwargs["environment"])
+                client.run.return_value.remove.assert_called()
+
+    def test_package_container_is_removed_after_runtime_failures(self):
+        run_test = self._package_container_runner()
+        test = types.SimpleNamespace(
+            name=lambda: "cleanup",
+            version="9.1",
+            os_name="ubuntu2204",
+            edition="org",
+            update_command="update",
+            install_command="install {}",
+            base_packages=[],
+            python_command="python3",
+            packages_urls=[],
+            package_kind="server",
+            release_binary_hashes=None,
+        )
+        for failed_operation in ("logs", "wait", "remove"):
+            with (
+                self.subTest(operation=failed_operation),
+                mock.patch.dict(os.environ, {}, clear=True),
+                mock.patch("os.makedirs"),
+            ):
+                runtime = mock.Mock()
+                container = runtime.run.return_value
+                container.logs.return_value = []
+                container.wait.return_value = 0
+                getattr(container, failed_operation).side_effect = RuntimeError("container error")
+                result = run_test(test, runtime)
+                self.assertEqual("fail", result["status"])
+                self.assertEqual(1, result["exit_code"])
+                self.assertIn("container error", result["log_raw"])
+                container.remove.assert_called_once()
 
     def test_branch_package_tests_keep_verified_crypt_hashes(self):
         source = workspace_file_path("buildscripts/package_test/package_test.py").read_text()
@@ -612,11 +775,27 @@ class PackageTestProvenanceTest(unittest.TestCase):
             depends_on=[{"id": "test"}],
         )
         generator = types.SimpleNamespace(
-            task_id="generator", display_name="version_expansions_gen"
+            task_id="generator",
+            display_name="version_gen",
+            build_id="shared-build",
+            build_variant="generate-tasks-for-version",
+            version_id="version",
+            depends_on=[{"id": "unrelated"}],
         )
         api = mock.Mock()
         api.task_by_id.side_effect = {t.task_id: t for t in (root, package, generator)}.__getitem__
-        self.assertEqual([root, package], under_test.package_test_task_chain(api, "test", "build"))
+        for task_name in ("version_gen", "version_expansions_gen"):
+            with self.subTest(task_name=task_name):
+                generator.display_name = task_name
+                generator.version_id = "version"
+                self.assertEqual(
+                    [root, package], under_test.package_test_task_chain(api, "test", "build")
+                )
+                for version_id in (None, "", "unrelated-version"):
+                    with self.subTest(version_id=version_id):
+                        generator.version_id = version_id
+                        with self.assertRaisesRegex(ValueError, "version_id"):
+                            under_test.package_test_task_chain(api, "test", "build")
         with self.assertRaisesRegex(ValueError, "build_id"):
             under_test.package_test_task_chain(api, "test", "wrong")
 

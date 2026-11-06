@@ -50,7 +50,7 @@ SERVER_PACKAGE_RE = re.compile(r"^mongodb-(?:org|enterprise)(?:-unstable)?(?:-se
 CRYPT_V1_PACKAGE_RE = re.compile(r"^mongodb-enterprise(?:-unstable)?-crypt-v1$")
 # The ELF interpreter is reported as a DT_NEEDED entry by some Linux toolchains, but it is an
 # architecture-specific runtime component rather than a library dependency of the server binary.
-ARCHITECTURE_LOADER_RE = re.compile(r"^ld-linux-[^.]+\.so\.[0-9.]+$")
+ARCHITECTURE_LOADER_RE = re.compile(r"^(?:ld-linux-[^.]+|ld64)\.so\.[0-9.]+$")
 _LOGGING_CONFIGURED = False
 
 SERVER_BINARY_NAMES = ("mongod", "mongos")
@@ -96,8 +96,8 @@ def validate_installed_release_binaries(
 # 2026-08-19, with the 8.3.8 Linux release archives used for enterprise and
 # current release targets and the 7.0.40 archives used for legacy targets that
 # do not publish a public nightly archive. The two server binaries have the
-# same direct dependencies for each platform and edition, but both are checked
-# below so that a future divergence is visible.
+# same direct dependencies for each platform and edition except for IBM mongod,
+# which also links libatomic. Both binaries are checked below.
 _COMMON_SYSTEM_LIBRARIES = frozenset(
     ["libcurl.so.4", "libm.so.6", "libresolv.so.2", "libgcc_s.so.1", "libc.so.6"]
 )
@@ -233,6 +233,10 @@ EXPECTED_DIRECT_SYSTEM_LIBRARIES = {
     "rhel88": {
         "org": _OPENSSL_1_1_SYSTEM_LIBRARIES,
         "enterprise": _OPENSSL_1_1_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_4_SYSTEM_LIBRARIES,
+    },
+    "rhel9": {
+        "org": _OPENSSL_3_SYSTEM_LIBRARIES,
+        "enterprise": _OPENSSL_3_SYSTEM_LIBRARIES | _ENTERPRISE_RPM_LDAP_2_6_SYSTEM_LIBRARIES,
     },
     "rhel90": {
         "org": _OPENSSL_3_SYSTEM_LIBRARIES,
@@ -456,7 +460,9 @@ def write_compressed_text_file(output_path: pathlib.Path, contents: str) -> None
         output_file.write(contents)
 
 
-def get_expected_direct_system_libraries(package_platform: str, edition: str) -> Set[str]:
+def get_expected_direct_system_libraries(
+    package_platform: str, edition: str, *, arch: str = "", binary_name: str = ""
+) -> Set[str]:
     base_edition = get_base_edition(edition)
     try:
         expected = EXPECTED_DIRECT_SYSTEM_LIBRARIES[package_platform][base_edition]
@@ -466,6 +472,13 @@ def get_expected_direct_system_libraries(package_platform: str, edition: str) ->
             "edition `{}`".format(package_platform, base_edition)
         ) from exc
 
+    # IBM mongod links libatomic; mongos does not link it.
+    if (
+        package_platform in ("rhel81", "rhel83", "rhel9", "rhel10")
+        and arch in ("ppc64le", "ppc64el", "s390x")
+        and binary_name == "mongod"
+    ):
+        expected = expected | {"libatomic.so.1"}
     return set(expected)
 
 
@@ -609,9 +622,6 @@ def test_binary_system_dependencies(test_args: TestArgs) -> None:
 
     package_platform = test_args.get("platform") or test_args["os_name"]
     package_edition = get_package_edition(test_args["package_names"])
-    expected_direct_dependencies = get_expected_direct_system_libraries(
-        package_platform, package_edition
-    )
     failures = []  # type: List[str]
 
     logging.info(
@@ -621,6 +631,12 @@ def test_binary_system_dependencies(test_args: TestArgs) -> None:
     )
 
     for binary_name in SERVER_BINARY_NAMES:
+        expected_direct_dependencies = get_expected_direct_system_libraries(
+            package_platform,
+            package_edition,
+            arch=test_args["arch"],
+            binary_name=binary_name,
+        )
         binary_path = pathlib.Path("/usr/bin") / binary_name
         if not binary_path.is_file():
             failures.append("Required binary missing: {}".format(binary_path))

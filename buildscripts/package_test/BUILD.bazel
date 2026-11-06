@@ -38,6 +38,19 @@ py_library(
 )
 
 py_library(
+    name = "package_test_container",
+    srcs = [
+        "__init__.py",
+        "package_test_container.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [dependency(
+        "docker",
+        group = "testing",
+    )],
+)
+
+py_library(
     name = "package_test_internal",
     srcs = [
         "__init__.py",

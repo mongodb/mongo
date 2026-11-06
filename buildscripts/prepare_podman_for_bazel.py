@@ -630,7 +630,41 @@ def cleanup_podman_for_bazel(
     return 0
 
 
+def prepare_podman_for_package_tests(
+    env: Mapping[str, str] | None = None,
+    *,
+    runner: Runner = _run,
+    which: Which = shutil.which,
+) -> int:
+    """Use the Bazel preflight in an isolated package-test Podman context."""
+    current_env = dict(os.environ if env is None else env)
+    if current_env.get("MONGO_PACKAGE_TEST_RUNTIME", "docker") != "podman":
+        return 0
+    task_id = current_env.get("MONGO_PACKAGE_TEST_TASK_ID")
+    state_directory = current_env.get("MONGO_PACKAGE_TEST_STATE_DIR")
+    if not task_id or not state_directory:
+        raise ValueError("Podman package preparation requires a task ID and state directory")
+    state = pathlib.Path(state_directory)
+    uid = os.getuid()
+    _ensure_owned_directory(state, uid)
+    current_env[_PODMAN_TASK_ID_ENV] = task_id
+    current_env[_PODMAN_REQUIRED_ENV] = "true"
+    # Always generate the task's cgroupfs configuration, independently of the host.
+    current_env.pop(_PODMAN_CONFIG_ENV, None)
+    runtime_env = _podman_runtime_env(current_env, uid=uid, runtime_root=state)
+    # Publish the context before recovery starts, so timeout/post teardown can
+    # recover a preflight that was killed. These files contain paths, not secrets.
+    for name in ("XDG_RUNTIME_DIR", "CONTAINERS_STORAGE_CONF", _PODMAN_CONFIG_ENV):
+        (state / name).write_text(runtime_env[name], encoding="utf-8")
+    (state / "active").write_text(task_id + "\n", encoding="utf-8")
+    return prepare_podman_for_bazel(
+        runtime_env, runner=runner, which=which, uid=uid, runtime_root=state
+    )
+
+
 if __name__ == "__main__":
-    if "--cleanup" in sys.argv[1:]:
+    if "--package-tests" in sys.argv[1:]:
+        sys.exit(prepare_podman_for_package_tests())
+    elif "--cleanup" in sys.argv[1:]:
         sys.exit(cleanup_podman_for_bazel())
     sys.exit(prepare_podman_for_bazel())
