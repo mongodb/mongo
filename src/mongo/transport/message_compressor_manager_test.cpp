@@ -262,6 +262,48 @@ TEST(MessageCompressorManager, FullNormalCompression) {
     clientManager.clientFinish(serverObj);
 }
 
+TEST(MessageCompressorManager, SkipNegotiationLeavesNothingNegotiated) {
+    auto registry = buildRegistry();
+    MessageCompressorManager clientManager(MessageCompressionDirection::kEgress, &registry);
+    MessageCompressorManager serverManager(MessageCompressionDirection::kIngress, &registry);
+
+    // The client offers nothing, which a server sees as no 'compression' field.
+    clientManager.clientSkipNegotiation();
+    BSONObjBuilder serverOutput;
+    serverManager.serverNegotiate(boost::none, &serverOutput);
+    checkNegotiationResult(serverOutput.done(), {});
+
+    ASSERT_TRUE(clientManager.getNegotiatedCompressors().empty());
+    ASSERT_TRUE(serverManager.getNegotiatedCompressors().empty());
+
+    auto msg = buildMessage();
+    auto out = assertOk(clientManager.compressMessage(msg));
+    ASSERT_NE(out.operation(), dbCompressed);
+}
+
+TEST(MessageCompressorManager, SkipNegotiationClearsPreviouslyNegotiatedState) {
+    auto registry = buildRegistry();
+    MessageCompressorManager clientManager(MessageCompressionDirection::kEgress, &registry);
+    MessageCompressorManager serverManager(MessageCompressionDirection::kIngress, &registry);
+
+    // Negotiate compression as on a first session.
+    BSONObjBuilder clientOutput;
+    clientManager.clientBegin(&clientOutput);
+    BSONObjBuilder serverOutput;
+    serverManager.serverNegotiate(parseBSON(clientOutput.done()), &serverOutput);
+    clientManager.clientFinish(serverOutput.done());
+    ASSERT_FALSE(clientManager.getNegotiatedCompressors().empty());
+
+    auto msg = buildMessage();
+    ASSERT_EQ(assertOk(clientManager.compressMessage(msg)).operation(), dbCompressed);
+
+    // A reconnect with compression disabled must not reuse the old compressor, including for
+    // the "hello" request itself.
+    clientManager.clientSkipNegotiation();
+    ASSERT_TRUE(clientManager.getNegotiatedCompressors().empty());
+    ASSERT_NE(assertOk(clientManager.compressMessage(msg)).operation(), dbCompressed);
+}
+
 TEST(NoopMessageCompressor, Fidelity) {
     auto testMessage = buildMessage();
     checkFidelity(testMessage, std::make_unique<NoopMessageCompressor>());

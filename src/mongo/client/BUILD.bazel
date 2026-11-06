@@ -624,6 +624,8 @@ mongo_cc_unit_test(
         ":clientdriver_network",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/rpc:message",
+        "//src/mongo/transport:message_compressor",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/util:version_impl",
     ],

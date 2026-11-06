@@ -721,7 +721,9 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     auto getConnection = [&connection, source]() -> DBClientBase* {
         if (!connection) {
             connection = std::make_unique<DBClientConnection>(
-                DBClientConnectionOptions{.connectionPurpose = ConnectionPurpose::kReplication});
+                DBClientConnectionOptions{.connectionPurpose = ConnectionPurpose::kReplication,
+                                          .disableCompression =
+                                              disableReplicationNetworkCompression});
             connection->setSoTimeout(durationCount<Milliseconds>(kRollbackOplogSocketTimeout) /
                                      1000.0);
             connection->connect(source, "Rollback"sv, boost::none);
