@@ -980,11 +980,9 @@ public:
             }
         }
 
-        auto pcreRegexesConstant = b.makeConstant(pcreRegexes.tag(), pcreRegexes.value());
-        pcreRegexes.disown();
+        auto pcreRegexesConstant = b.makeConstant(std::move(pcreRegexes));
 
-        auto regexSetConstant = b.makeConstant(regexSet.tag(), regexSet.value());
-        regexSet.disown();
+        auto regexSetConstant = b.makeConstant(std::move(regexSet));
 
         auto makePredicate = [&, hasNull = hasNull](SbExpr inputExpr) {
             auto resultExpr = b.makeBooleanOpTree(
@@ -1047,11 +1045,13 @@ public:
         const auto frameId = state.frameIdGenerator->generate();
         auto lhsVar = SbExpr{SbLocalVar{frameId, 0}};
 
-        auto [rhsTag, rhsVal] = sbe::value::makeValue(Value(expr->getData()));
-
         // Generate the comparison expression and coerce the result to boolean.
         auto translatedCmpExpr =
-            generateExpressionCompare(state, cmpOp, lhsVar.clone(), b.makeConstant(rhsTag, rhsVal));
+            generateExpressionCompare(state,
+                                      cmpOp,
+                                      lhsVar.clone(),
+                                      b.makeConstant(sbe::value::TagValueOwned::fromRaw(
+                                          sbe::value::makeValue(Value(expr->getData())))));
 
         auto isArrayExpr = b.makeBooleanOpTree(
             abt::Operations::Or,
@@ -1448,8 +1448,7 @@ SbExpr generateComparisonExpr(StageBuilderState& state,
         if (auto inputParam = expr->getInputParamId()) {
             return SbExpr{SbSlot{state.registerInputParamSlot(*inputParam)}};
         }
-        auto [copyTag, copyVal] = sbe::value::copyValue(tag, val);
-        return b.makeConstant(copyTag, copyVal);
+        return b.makeConstant(sbe::value::TagValueOwned::fromRaw(sbe::value::copyValue(tag, val)));
     };
 
     return generateComparisonExpr(
@@ -1480,8 +1479,8 @@ SbExpr generateBitTestExpr(StageBuilderState& state,
             auto bitPosSlot = SbSlot{state.registerInputParamSlot(*bitPosParamId)};
             return bitPosSlot;
         } else {
-            auto [bitPosTag, bitPosVal] = convertBitTestBitPositions(expr);
-            return b.makeConstant(bitPosTag, bitPosVal);
+            return b.makeConstant(
+                sbe::value::TagValueOwned::fromRaw(convertBitTestBitPositions(expr)));
         }
     }();
 
@@ -1589,9 +1588,8 @@ SbExpr generateRegexExpr(StageBuilderState& state,
             auto sourceRegexSlot = SbSlot{state.registerInputParamSlot(*sourceRegexParam)};
             return sourceRegexSlot;
         } else {
-            auto [bsonRegexTag, bsonRegexVal] =
-                sbe::value::makeNewBsonRegex(expr->getString(), expr->getFlags());
-            return b.makeConstant(bsonRegexTag, bsonRegexVal);
+            return b.makeConstant(sbe::value::TagValueOwned::fromRaw(
+                sbe::value::makeNewBsonRegex(expr->getString(), expr->getFlags())));
         }
     }();
 
@@ -1600,9 +1598,7 @@ SbExpr generateRegexExpr(StageBuilderState& state,
             auto compiledRegexSlot = SbSlot{state.registerInputParamSlot(*compiledRegexParam)};
             return compiledRegexSlot;
         } else {
-            auto [compiledRegexTag, compiledRegexVal] =
-                sbe::makeNewPcreRegex(expr->getString(), expr->getFlags()).releaseToRaw();
-            return b.makeConstant(compiledRegexTag, compiledRegexVal);
+            return b.makeConstant(sbe::makeNewPcreRegex(expr->getString(), expr->getFlags()));
         }
     }();
 
@@ -1628,10 +1624,10 @@ SbExpr generateWhereExpr(StageBuilderState& state,
     // a safe operation, given that the match expression tree is allocated on the heap, and this
     // visitor has exclusive access to this tree (after it has been translated into an SBE tree,
     // it's no longer used).
-    auto predicate =
-        b.makeConstant(sbe::value::TypeTags::jsFunction,
-                       sbe::value::bitcastFrom<JsFunction*>(
-                           const_cast<WhereMatchExpression*>(expr)->extractPredicate().release()));
+    auto predicate = b.makeConstant(sbe::value::TagValueOwned::fromRaw(
+        sbe::value::TypeTags::jsFunction,
+        sbe::value::bitcastFrom<JsFunction*>(
+            const_cast<WhereMatchExpression*>(expr)->extractPredicate().release())));
 
     // If there's an "inputParamId" in this expr meaning this expr got parameterized, we can
     // register a SlotId for it and use the slot directly.

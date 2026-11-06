@@ -1023,12 +1023,13 @@ SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
                 "parameter 'n' must be coercible to a positive 64-bit integer",
                 convert.tag() != sbe::value::TypeTags::Nothing &&
                     static_cast<int64_t>(convert.value()) > 0);
-        return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kNewArray,
-                                              b.makeFunction(sbe::EFn::kNewArray),
-                                              b.makeInt64Constant(0),
-                                              b.makeConstant(convert.tag(), convert.value()),
-                                              b.makeInt32Constant(0),
-                                              b.makeInt32Constant(maxAccumulatorBytes)));
+        return SbExpr::makeSeq(
+            b.makeFunction(sbe::EFn::kNewArray,
+                           b.makeFunction(sbe::EFn::kNewArray),
+                           b.makeInt64Constant(0),
+                           b.makeInt64Constant(sbe::value::bitcastTo<int64_t>(convert.value())),
+                           b.makeInt32Constant(0),
+                           b.makeInt32Constant(maxAccumulatorBytes)));
     } else {
         auto frameId = state.frameIdGenerator->generate();
         auto binds = SbExpr::makeSeq(

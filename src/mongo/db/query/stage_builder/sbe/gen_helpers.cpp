@@ -651,9 +651,9 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
 
         if (!sortSpecExpr) {
             auto sortSpec = makeSortSpecFromSortPattern(sortPattern);
-            sortSpecExpr =
-                b.makeConstant(sbe::value::TypeTags::sortSpec,
-                               sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec.release()));
+            sortSpecExpr = b.makeConstant(sbe::value::TagValueOwned::fromRaw(
+                sbe::value::TypeTags::sortSpec,
+                sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec.release())));
         }
 
         // generateSortKey() will handle the parallel arrays check and sort key traversal for us,

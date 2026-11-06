@@ -1164,11 +1164,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
         }
     }
 
-    auto [inputTag, inputVal] = input.releaseToRaw();
-
     // Make a VirtualScanStage, and then make a ProjectStage to unpack the elements of the array
     // produced by the scan.
-    auto [scanStage, arraySlot] = b.makeVirtualScan(inputTag, inputVal);
+    auto [scanStage, arraySlot] = b.makeVirtualScan(std::move(input));
 
     SbExprOptSlotVector projects;
 
@@ -3286,8 +3284,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildTextMatch(
     // instance.
     auto ftsMatch =
         b.makeFunction(sbe::EFn::kFtsMatch,
-                       b.makeConstant(sbe::value::TypeTags::ftsMatcher,
-                                      sbe::value::bitcastFrom<fts::FTSMatcher*>(matcher.release())),
+                       b.makeConstant(sbe::value::TagValueOwned::fromRaw(
+                           sbe::value::TypeTags::ftsMatcher,
+                           sbe::value::bitcastFrom<fts::FTSMatcher*>(matcher.release()))),
                        outputs.getResultObj());
 
     // Wrap the 'ftsMatch' expression into an 'if' expression to ensure that it can be applied only

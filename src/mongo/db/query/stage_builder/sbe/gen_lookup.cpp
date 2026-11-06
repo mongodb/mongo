@@ -395,8 +395,9 @@ std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySetForLocal(StageBuild
                                                                       const PlanNodeId nodeId) {
     SbBuilder b(state, nodeId);
 
-    auto [arrayWithNullTag, arrayWithNullVal] = sbe::value::makeNewArray();
-    sbe::value::Array* arrayWithNullView = sbe::value::getArrayView(arrayWithNullVal);
+    sbe::value::TagValueOwned arrayWithNull =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
+    sbe::value::Array* arrayWithNullView = sbe::value::getArrayView(arrayWithNull.value());
     arrayWithNullView->push_back_raw(sbe::value::TypeTags::Null, 0);
 
     auto resultObjSlot = slots.getResultObjIfExists();
@@ -419,7 +420,7 @@ std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySetForLocal(StageBuild
             resultObjSlot ? SbExpr{*resultObjSlot} : SbExpr{}, fp, 0, state, topLevelFieldSlot)),
         b.makeIf(b.makeFillEmptyFalse(b.makeFunction(sbe::EFn::kIsArray, SbLocalVar{frameId, 0})),
                  b.makeIf(b.makeFunction(sbe::EFn::kIsArrayEmpty, SbLocalVar{frameId, 0}),
-                          b.makeConstant(arrayWithNullTag, arrayWithNullVal),
+                          b.makeConstant(std::move(arrayWithNull)),
                           SbLocalVar{frameId, 0}),
                  b.makeFunction(sbe::EFn::kNewArray, b.makeFillEmptyNull(SbLocalVar{frameId, 0}))));
 
@@ -527,10 +528,8 @@ std::pair<SbSlot /* resultSlot */, SbStage> buildForeignMatchedArray(SbStage inn
     // array returns either 1 or 0 results, so to return an empty array for no-matches case we union
     // this branch with a const scan that produces an empty array but limit it to 1, so if the given
     // branch does produce a record, only that record is returned.
-    auto [emptyArrayTag, emptyArrayVal] = sbe::value::makeNewArray();
-    // Immediately take ownership of the new array (we could use a ValueGuard here but we'll
-    // need the constant below anyway).
-    SbExpr emptyArrayConst = b.makeConstant(emptyArrayTag, emptyArrayVal);
+    SbExpr emptyArrayConst =
+        b.makeConstant(sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray()));
 
     auto [emptyArrayStage, emptyArrayOutSlots] =
         b.makeProject(b.makeCoScan(1), std::move(emptyArrayConst));
@@ -951,20 +950,16 @@ SbStage buildIndexSeek(StageBuilderState& state,
                         "Only single intervals are supported",
                         constNodePtr->oil.intervals.size() == 1);
                 if (constNodePtr->oil.isPoint()) {
-                    auto [tag, val] =
-                        sbe::bson::convertToOwned(constNodePtr->oil.intervals[0].start)
-                            .releaseToRaw();
-                    args.push_back(b.makeConstant(tag, val));
+                    args.push_back(b.makeConstant(
+                        sbe::bson::convertToOwned(constNodePtr->oil.intervals[0].start)));
                 } else {
                     // Use proper lower/upper boundaries keeping into account the index order.
                     bool lowerBound = discriminator == key_string::Discriminator::kExclusiveBefore
                         ? indexBoundsEvaluationInfo.ordering.get(i) > 0
                         : indexBoundsEvaluationInfo.ordering.get(i) < 0;
-                    auto [tag, val] =
-                        sbe::bson::convertToOwned(lowerBound ? constNodePtr->oil.intervals[0].start
-                                                             : constNodePtr->oil.intervals[0].end)
-                            .releaseToRaw();
-                    args.push_back(b.makeConstant(tag, val));
+                    args.push_back(b.makeConstant(sbe::bson::convertToOwned(
+                        lowerBound ? constNodePtr->oil.intervals[0].start
+                                   : constNodePtr->oil.intervals[0].end)));
                 }
             } else {
                 tasserted(12173003,
@@ -1456,8 +1451,8 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
                                                             state.getCollatorSlot());
 
         // Add a projection that returns an empty array in the "as" field if no foreign row matched.
-        auto [emptyArrayTag, emptyArrayVal] = sbe::value::makeNewArray();
-        auto emptyArrayConstant = b.makeConstant(emptyArrayTag, emptyArrayVal);
+        auto emptyArrayConstant =
+            b.makeConstant(sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray()));
 
         SbExpr innerResultProjection =
             b.makeFillEmpty(lookupStageOutputSlot, std::move(emptyArrayConstant));
@@ -1483,8 +1478,8 @@ std::pair<SbSlot, SbStage> buildNonExistentForeignCollLookupStage(SbStage localS
         CurOp::get(state.opCtx)->debug().luNestedLoopJoin += 1;
     }
 
-    auto [emptyArrayTag, emptyArrayVal] = sbe::value::makeNewArray();
-    auto emptyArrayConstant = b.makeConstant(emptyArrayTag, emptyArrayVal);
+    auto emptyArrayConstant =
+        b.makeConstant(sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray()));
     auto [outStage, outSlots] = b.makeProject(std::move(localStage), std::move(emptyArrayConstant));
     SbSlot emptyArraySlot = outSlots[0];
 

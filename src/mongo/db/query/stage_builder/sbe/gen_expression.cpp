@@ -643,8 +643,8 @@ public:
     };
 
     void visit(const ExpressionConstant* expr) final {
-        auto [tag, val] = sbe::value::makeValue(expr->getValue());
-        pushExpr(_b.makeConstant(tag, val));
+        pushExpr(_b.makeConstant(
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeValue(expr->getValue()))));
     }
 
     void visit(const ExpressionAbs* expr) final {
@@ -829,8 +829,8 @@ public:
         _context->ensureArity(arity);
 
         if (arity == 0) {
-            auto [emptyArrTag, emptyArrVal] = sbe::value::makeNewArray();
-            pushExpr(_b.makeConstant(emptyArrTag, emptyArrVal));
+            pushExpr(
+                _b.makeConstant(sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray())));
             return;
         }
 
@@ -1002,8 +1002,8 @@ public:
 
         // If there are no children, return an empty array.
         if (numChildren == 0) {
-            auto [emptyArrTag, emptyArrVal] = sbe::value::makeNewArray();
-            pushExpr(_b.makeConstant(emptyArrTag, emptyArrVal));
+            pushExpr(
+                _b.makeConstant(sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray())));
             return;
         }
 
@@ -2566,8 +2566,8 @@ public:
     }
     void visit(const ExpressionSetIntersection* expr) final {
         if (expr->getChildren().size() == 0) {
-            auto [emptySetTag, emptySetValue] = sbe::value::makeNewArraySet();
-            pushExpr(_b.makeConstant(emptySetTag, emptySetValue));
+            pushExpr(
+                _b.makeConstant(sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArraySet())));
             return;
         }
 
@@ -2582,8 +2582,8 @@ public:
     }
     void visit(const ExpressionSetUnion* expr) final {
         if (expr->getChildren().size() == 0) {
-            auto [emptySetTag, emptySetValue] = sbe::value::makeNewArraySet();
-            pushExpr(_b.makeConstant(emptySetTag, emptySetValue));
+            pushExpr(
+                _b.makeConstant(sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArraySet())));
             return;
         }
 
@@ -2654,8 +2654,8 @@ public:
         auto frameId = _context->state.frameId();
         SbVar var{frameId, 0};
 
-        auto [specTag, specVal] = makeValue(expr->getSortPattern());
-        auto specConstant = _b.makeConstant(specTag, specVal);
+        auto specConstant =
+            _b.makeConstant(sbe::value::TagValueOwned::fromRaw(makeValue(expr->getSortPattern())));
 
         auto argumentIsNotArray = _b.makeNot(_b.makeFunction(sbe::EFn::kIsArray, var));
 
@@ -2724,9 +2724,7 @@ public:
         SbVar varString{frameId, 0};
         SbVar varDelimiter{frameId, 1};
 
-        auto emptyResult =
-            _b.makeConstant(arrayWithEmptyString.tag(), arrayWithEmptyString.value());
-        arrayWithEmptyString.disown();
+        auto emptyResult = _b.makeConstant(std::move(arrayWithEmptyString));
 
         // In order to maintain MQL semantics, first check both the string expression
         // (first agument), and delimiter string (second argument) for null, undefined, or
@@ -3517,8 +3515,8 @@ private:
         SbVar nVar{frameId, 0};
         SbVar inputVar{frameId, 1};
 
-        auto [specTag, specVal] = makeValue(expr->getSortPattern());
-        auto specConstant = _b.makeConstant(specTag, specVal);
+        auto specConstant =
+            _b.makeConstant(sbe::value::TagValueOwned::fromRaw(makeValue(expr->getSortPattern())));
 
         auto nIsNegative = _b.makeBinaryOp(abt::Operations::Lt, nVar, _b.makeInt64Constant(0));
         auto argumentIsNotArray = _b.makeNot(_b.makeFunction(sbe::EFn::kIsArray, inputVar));
@@ -3568,8 +3566,8 @@ private:
         auto frameId = _context->state.frameId();
         SbVar inputVar{frameId, 0};
 
-        auto [specTag, specVal] = makeValue(expr->getSortPattern());
-        auto specConstant = _b.makeConstant(specTag, specVal);
+        auto specConstant =
+            _b.makeConstant(sbe::value::TagValueOwned::fromRaw(makeValue(expr->getSortPattern())));
 
         auto argumentIsNotArray = _b.makeNot(_b.makeFunction(sbe::EFn::kIsArray, inputVar));
 
@@ -3701,9 +3699,9 @@ private:
                     str::stream() << "$" << sbe::toString(exprName)
                                   << " parameter 'timezone' must be a valid timezone",
                     sbe::vm::isValidTimezone({timezoneTag, timezoneVal}, timezoneDB));
-            auto [timezoneObjTag, timezoneObjVal] = sbe::value::makeCopyTimeZone(
-                sbe::vm::getTimezone({timezoneTag, timezoneVal}, timezoneDB));
-            auto timezoneConst = _b.makeConstant(timezoneObjTag, timezoneObjVal);
+            auto timezoneConst =
+                _b.makeConstant(sbe::value::TagValueOwned::fromRaw(sbe::value::makeCopyTimeZone(
+                    sbe::vm::getTimezone({timezoneTag, timezoneVal}, timezoneDB))));
             arguments.push_back(std::move(timezoneConst));
         } else {
             inputValidationCases.push_back(
@@ -4096,8 +4094,8 @@ private:
             if (exprName == sbe::EFn::kRegexMatch) {
                 return _b.makeBoolConstant(false);
             } else if (exprName == sbe::EFn::kRegexFindAll) {
-                auto [emptyArrTag, emptyArrVal] = sbe::value::makeNewArray();
-                return _b.makeConstant(emptyArrTag, emptyArrVal);
+                return _b.makeConstant(
+                    sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray()));
             } else {
                 return _b.makeNullConstant();
             }
@@ -4130,8 +4128,7 @@ private:
                 }
 
                 // Create the compiled Regex from constant pattern and options.
-                auto [regexTag, regexVal] = sbe::makeNewPcreRegex(*pattern, options).releaseToRaw();
-                auto compiledRegex = _b.makeConstant(regexTag, regexVal);
+                auto compiledRegex = _b.makeConstant(sbe::makeNewPcreRegex(*pattern, options));
                 return makeRegexFunctionCall(std::move(compiledRegex));
             }
 

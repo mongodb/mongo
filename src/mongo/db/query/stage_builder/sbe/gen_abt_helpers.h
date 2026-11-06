@@ -36,13 +36,13 @@ inline auto makeABTFunction(sbe::EFn fn, Args&&... args) {
     return abt::make<abt::FunctionCall>(fn, abt::makeSeq(std::forward<Args>(args)...));
 }
 
-inline auto makeABTConstant(sbe::value::TypeTags tag, sbe::value::Value value) {
+inline auto makeABTConstant(sbe::value::TagValueOwned val) {
+    auto [tag, value] = val.releaseToRaw();
     return abt::make<abt::Constant>(tag, value);
 }
 
 inline auto makeABTConstant(std::string_view str) {
-    auto [tag, value] = sbe::value::makeNewString(str);
-    return makeABTConstant(tag, value);
+    return makeABTConstant(sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString(str)));
 }
 
 abt::ABT makeVariable(abt::ProjectionName var);

@@ -338,9 +338,7 @@ SbExpr::Vector generateGroupByKeyExprs(StageBuilderState& state,
     return exprs;
 }
 
-using TagAndValue = std::pair<sbe::value::TypeTags, sbe::value::Value>;
-
-std::variant<Expression*, TagAndValue> getTopBottomNValueExprHelper(
+std::variant<Expression*, sbe::value::TagValueOwned> getTopBottomNValueExprHelper(
     const AccumulationStatement& accStmt) {
     auto accOp = AccumOp{accStmt};
 
@@ -364,7 +362,7 @@ std::variant<Expression*, TagAndValue> getTopBottomNValueExprHelper(
         // `outputField` may reference data in objBson, so must not outlive it.
         auto outputField = objBson.getField(AccumulatorN::kFieldNameOutput);
         if (outputField.ok()) {
-            return sbe::bson::convertToOwned(outputField).releaseToRaw();
+            return sbe::bson::convertToOwned(outputField);
         }
     }
 
@@ -385,8 +383,7 @@ SbExpr getTopBottomNValueExpr(StageBuilderState& state,
         auto* expr = get<Expression*>(valueExpr);
         return b.makeFillEmptyNull(generateExpression(state, expr, rootSlot, outputs));
     } else {
-        auto [tag, val] = get<TagAndValue>(valueExpr);
-        return b.makeConstant(tag, val);
+        return b.makeConstant(std::move(get<sbe::value::TagValueOwned>(valueExpr)));
     }
 }
 
@@ -422,8 +419,9 @@ std::pair<SbExpr::Vector, bool> getBlockTopBottomNValueExpr(StageBuilderState& s
         auto sbExpr = b.makeFillEmptyNull(generateExpression(state, expr, rootSlot, outputs));
         return {SbExpr::makeSeq(std::move(sbExpr)), isArray};
     } else {
-        auto [tag, val] = get<TagAndValue>(valueExpr);
-        return {SbExpr::makeSeq(b.makeConstant(tag, val)), isArray};
+        return {
+            SbExpr::makeSeq(b.makeConstant(std::move(get<sbe::value::TagValueOwned>(valueExpr)))),
+            isArray};
     }
 }
 
@@ -1303,10 +1301,10 @@ std::pair<SbStage, SbExpr::Vector> generateInitRootSlot(SbStage stage,
     } else {
         // If we're not sure whether '_id' is an object, then we need to project the
         // aforementioned expression to a slot and use that.
-        auto [emptyObjTag, emptyObjVal] = sbe::value::makeNewObject();
-        SbExpr idOrEmptyObjExpr = b.makeIf(b.makeFunction(sbe::EFn::kIsObject, groupByExpr.clone()),
-                                           groupByExpr.clone(),
-                                           b.makeConstant(emptyObjTag, emptyObjVal));
+        SbExpr idOrEmptyObjExpr = b.makeIf(
+            b.makeFunction(sbe::EFn::kIsObject, groupByExpr.clone()),
+            groupByExpr.clone(),
+            b.makeConstant(sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewObject())));
 
         auto [outStage, outSlots] =
             b.makeProject(buildVariableTypes(childOutputs, individualSlots),

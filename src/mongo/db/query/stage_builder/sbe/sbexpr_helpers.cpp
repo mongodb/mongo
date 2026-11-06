@@ -171,8 +171,9 @@ SbExpr SbExprBuilder::makeNaryOp(abt::Operations naryOp, SbExpr::Vector args) {
     }
 }
 
-SbExpr SbExprBuilder::makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
-    return abt::make<abt::Constant>(tag, val);
+SbExpr SbExprBuilder::makeConstant(sbe::value::TagValueOwned val) {
+    auto [tag, value] = val.releaseToRaw();
+    return abt::make<abt::Constant>(tag, value);
 }
 
 SbExpr SbExprBuilder::makeNothingConstant() {
@@ -586,16 +587,13 @@ std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> SbBuilder::makeGener
     return {std::move(stage), recordIdSlot, std::move(indexKeySlots), std::move(indexInfoSlots)};
 }
 
-std::pair<SbStage, SbSlot> SbBuilder::makeVirtualScan(sbe::value::TypeTags inputTag,
-                                                      sbe::value::Value inputVal) {
+std::pair<SbStage, SbSlot> SbBuilder::makeVirtualScan(sbe::value::TagValueOwned input) {
     auto outSlotId = _state.slotId();
     auto outSlot = SbSlot{outSlotId};
 
     auto stage = addBlueprint(
         _state,
-        SbBlueprintVirtualScan{.nodeId = _nodeId,
-                               .outSlot = outSlotId,
-                               .input = sbe::value::TagValueOwned::fromRaw(inputTag, inputVal)});
+        SbBlueprintVirtualScan{.nodeId = _nodeId, .outSlot = outSlotId, .input = std::move(input)});
     return {std::move(stage), outSlot};
 }
 

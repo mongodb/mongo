@@ -422,10 +422,9 @@ std::tuple<SbStage, PlanStageSlots, boost::optional<SbSlot>> generateGenericMult
         boundsSlot = SbSlot{state.slotIdGenerator->generate()};
         boundsExpr = boundsSlot;
     } else {
-        // 'b.makeConstant()' will take the ownership of the 'IndexBounds' pointer.
-        boundsExpr =
-            b.makeConstant(sbe::value::TypeTags::indexBounds,
-                           sbe::value::bitcastFrom<IndexBounds*>(new IndexBounds(ixn->bounds)));
+        boundsExpr = b.makeConstant(sbe::value::TagValueOwned::fromRaw(
+            sbe::value::TypeTags::indexBounds,
+            sbe::value::bitcastFrom<IndexBounds*>(new IndexBounds(ixn->bounds))));
     }
 
     SbIndexInfoType indexInfoTypeMask = getIndexInfoTypeMask(reqs);
@@ -597,14 +596,12 @@ generateSingleIntervalIndexScanAndSlotsImpl(StageBuilderState& state,
     auto highKeySlot =
         !highKey ? boost::make_optional(SbSlot{state.slotIdGenerator->generate()}) : boost::none;
 
-    auto lowKeyExpr = !lowKey
-        ? SbExpr{*lowKeySlot}
-        : b.makeConstant(sbe::value::TypeTags::keyString,
-                         sbe::value::makeKeyString(std::move(*lowKey)).second);
-    auto highKeyExpr = !highKey
-        ? SbExpr{*highKeySlot}
-        : b.makeConstant(sbe::value::TypeTags::keyString,
-                         sbe::value::makeKeyString(std::move(*highKey)).second);
+    auto lowKeyExpr = !lowKey ? SbExpr{*lowKeySlot}
+                              : b.makeConstant(sbe::value::TagValueOwned::fromRaw(
+                                    sbe::value::makeKeyString(std::move(*lowKey))));
+    auto highKeyExpr = !highKey ? SbExpr{*highKeySlot}
+                                : b.makeConstant(sbe::value::TagValueOwned::fromRaw(
+                                      sbe::value::makeKeyString(std::move(*highKey))));
 
     auto [stage, outputs] = generateSingleIntervalIndexScanImpl(state,
                                                                 collection,

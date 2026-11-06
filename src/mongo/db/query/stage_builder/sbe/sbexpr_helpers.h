@@ -141,7 +141,7 @@ public:
     SbExpr makeBinaryOp(abt::Operations binaryOp, SbExpr lhs, SbExpr rhs);
     SbExpr makeNaryOp(abt::Operations naryOp, SbExpr::Vector args);
 
-    SbExpr makeConstant(sbe::value::TypeTags tag, sbe::value::Value val);
+    SbExpr makeConstant(sbe::value::TagValueOwned val);
     SbExpr makeNothingConstant();
     SbExpr makeNullConstant();
     SbExpr makeBoolConstant(bool boolVal);
@@ -407,8 +407,7 @@ public:
         sbe::IndexKeysInclusionSet indexKeysToInclude = sbe::IndexKeysInclusionSet{},
         SbIndexInfoType indexInfoTypeMask = SbIndexInfoType::kNoInfo);
 
-    std::pair<SbStage, SbSlot> makeVirtualScan(sbe::value::TypeTags inputTag,
-                                               sbe::value::Value inputVal);
+    std::pair<SbStage, SbSlot> makeVirtualScan(sbe::value::TagValueOwned input);
 
     SbStage makeCoScan(boost::optional<int64_t> numRows = boost::none);
 

@@ -330,8 +330,9 @@ SbExpr generateObjectExpr(StageBuilderState& state,
     auto [spec, args] = buildMakeObjSpec(state, std::move(pa));
 
     // Generate a makeBsonObj() expression using 'spec' and 'args'.
-    auto specExpr = b.makeConstant(sbe::value::TypeTags::makeObjSpec,
-                                   sbe::value::bitcastFrom<sbe::MakeObjSpec*>(spec.release()));
+    auto specExpr = b.makeConstant(sbe::value::TagValueOwned::fromRaw(
+        sbe::value::TypeTags::makeObjSpec,
+        sbe::value::bitcastFrom<sbe::MakeObjSpec*>(spec.release())));
 
     const sbe::EFn makeObjFn = shouldProduceBson ? sbe::EFn::kMakeBsonObj : sbe::EFn::kMakeObj;
     auto funcArgs = SbExpr::makeSeq(std::move(specExpr), std::move(expr));
@@ -381,9 +382,9 @@ SbExpr generateSingleFieldExpr(StageBuilderState& state,
             auto& childPa = *eval->getMakeObj().projActions;
 
             auto [spec, args] = buildMakeObjSpec(state, std::move(childPa));
-            auto specExpr =
-                b.makeConstant(sbe::value::TypeTags::makeObjSpec,
-                               sbe::value::bitcastFrom<sbe::MakeObjSpec*>(spec.release()));
+            auto specExpr = b.makeConstant(sbe::value::TagValueOwned::fromRaw(
+                sbe::value::TypeTags::makeObjSpec,
+                sbe::value::bitcastFrom<sbe::MakeObjSpec*>(spec.release())));
 
             auto funcArgs = SbExpr::makeSeq(std::move(specExpr), std::move(expr));
             std::move(args.begin(), args.end(), std::back_inserter(funcArgs));

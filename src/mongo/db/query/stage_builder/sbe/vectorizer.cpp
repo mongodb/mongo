@@ -316,12 +316,11 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::BinaryOp& 
                                                       std::move(*rhs.expr));
 
                     if (flipOp) {
-                        resultExpr =
-                            makeABTFunction(sbe::EFn::kValueBlockSub,
-                                            generateMaskArg(),
-                                            makeABTConstant(sbe::value::TypeTags::NumberInt32,
-                                                            sbe::value::bitcastFrom<int32_t>(0)),
-                                            std::move(resultExpr));
+                        resultExpr = makeABTFunction(
+                            sbe::EFn::kValueBlockSub,
+                            generateMaskArg(),
+                            makeABTConstant(sbe::value::TagValueOwned::numberInt32(0)),
+                            std::move(resultExpr));
                     }
 
                     // Propagate the name of the associated cell variable, this is not the place
@@ -722,17 +721,16 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::FunctionCa
                         for (size_t i = 3; i < arity; i++) {
                             functionArgs.emplace_back(std::move(*args[i].expr));
                         }
-                        return {
-                            makeABTFunction(sbe::EFn::kValueBlockSub,
-                                            generateMaskArg(),
-                                            makeABTConstant(sbe::value::TypeTags::NumberInt64,
-                                                            sbe::value::bitcastFrom<int64_t>(0)),
-                                            makeABTFunction(sbe::EFn::kValueBlockDateDiff,
-                                                            std::move(functionArgs))),
-                            TypeSignature::kBlockType
-                                .include(getTypeSignature(sbe::value::TypeTags::NumberInt64))
-                                .include(TypeSignature::kNothingType),
-                            args[2].sourceCell};
+                        return {makeABTFunction(
+                                    sbe::EFn::kValueBlockSub,
+                                    generateMaskArg(),
+                                    makeABTConstant(sbe::value::TagValueOwned::numberInt64(0)),
+                                    makeABTFunction(sbe::EFn::kValueBlockDateDiff,
+                                                    std::move(functionArgs))),
+                                TypeSignature::kBlockType
+                                    .include(getTypeSignature(sbe::value::TypeTags::NumberInt64))
+                                    .include(TypeSignature::kNothingType),
+                                args[2].sourceCell};
                     }
                 }
                 break;
