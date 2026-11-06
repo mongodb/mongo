@@ -82,6 +82,14 @@ public:
 
     BSONObj serializeSort(const query_shape::SerializationOptions& opts) const;
 
+    /**
+     * Returns the parsed returned-document projection, or nullptr when 'fields' is absent or
+     * empty. The projection is parsed on the first call and cached, so building a shape does not
+     * parse it again and charge the expression context's memory-intensive expression budget a
+     * second time.
+     */
+    const projection_ast::Projection* projection() const;
+
     BSONObj serializeProjection(const query_shape::SerializationOptions& opts) const;
 
     Value serializeUpdate(const query_shape::SerializationOptions& opts) const;
@@ -120,8 +128,8 @@ private:
     // must keep alive along with the command.
     std::variant<ParsedUpdate, ParsedDelete> _parsedBranch;
 
-    // Returned-document projection is parsed lazily once for shape serialization. Keep this on
-    // ParsedFindAndModify because the projection exists only for findAndModify and parsing it
+    // Returned-document projection is parsed lazily once and cached via projection(). Keep this
+    // on ParsedFindAndModify because the projection exists only for findAndModify and parsing it
     // repeatedly would charge the memory-intensive expression budget repeatedly. The AST may
     // retain pointers to the expression context's collator, which is retained above.
     mutable std::unique_ptr<projection_ast::Projection> _projection;

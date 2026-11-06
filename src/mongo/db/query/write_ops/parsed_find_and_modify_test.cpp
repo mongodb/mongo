@@ -514,5 +514,38 @@ TEST_F(ParsedFindAndModifyTest, RetainsExpressionContextForParsedBranch) {
     ASSERT_EQ(0, aliveCollators);
 }
 
+TEST_F(ParsedFindAndModifyTest, ProjectionIsNullWhenFieldsAbsentOrEmpty) {
+    for (auto cmd : {R"({
+            findAndModify: "testColl",
+            query: {a: 5},
+            update: {$set: {b: 1}},
+            $db: "testDb"
+        })",
+                     R"({
+            findAndModify: "testColl",
+            query: {a: 5},
+            fields: {},
+            update: {$set: {b: 1}},
+            $db: "testDb"
+        })"}) {
+        auto p = parse(fromjson(cmd));
+        ASSERT_EQ(nullptr, p.parsed->projection());
+    }
+}
+
+TEST_F(ParsedFindAndModifyTest, ProjectionIsCachedAcrossCalls) {
+    auto p = parse(fromjson(R"({
+        findAndModify: "testColl",
+        query: {a: 5},
+        fields: {out: {$concatArrays: ["$a", "$b"]}},
+        update: {$set: {b: 1}},
+        $db: "testDb"
+    })"));
+
+    const auto* first = p.parsed->projection();
+    ASSERT(first);
+    ASSERT_EQ(first, p.parsed->projection());
+}
+
 }  // namespace
 }  // namespace mongo

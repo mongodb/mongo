@@ -48,6 +48,18 @@ projection_ast::Projection parseFindAndModifyProjection(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback& extensionsCallback);
 
+/**
+ * Serializes the findAndModify returned-document projection, parsing it on demand with
+ * parseFindAndModifyProjection() and initializing the system variables referenced only by the
+ * projection before serializing.
+ */
+BSONObj serializeFindAndModifyProjection(const ParsedFindCommand* parsedFind,
+                                         const BSONObj& rawQuery,
+                                         const BSONObj& rawProjection,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const ExtensionsCallback& extensionsCallback,
+                                         const SerializationOptions& opts);
+
 /** Serializes the update ('u') component, preserving its object/array/string BSON type. */
 Value serializeUpdate(const ParsedUpdate& parsedUpdate, const SerializationOptions& opts);
 

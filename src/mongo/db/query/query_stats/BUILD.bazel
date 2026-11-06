@@ -80,6 +80,22 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "find_and_modify_key",
+    srcs = [
+        "find_and_modify_key.cpp",
+    ],
+    hdrs = [
+        "find_and_modify_key.h",
+    ],
+    deps = [
+        ":key",
+        "//src/mongo:base",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db/query/query_shape:find_and_modify_cmd_shape",
+    ],
+)
+
+mongo_cc_library(
     name = "write_cmd_shape_registration",
     srcs = [
         "write_cmd_shape_registration.cpp",
@@ -132,6 +148,7 @@ mongo_cc_unit_test(
         "count_key_test.cpp",
         "delete_key_test.cpp",
         "distinct_key_test.cpp",
+        "find_and_modify_key_test.cpp",
         "find_key_test.cpp",
         "insert_key_test.cpp",
         "is_internal_test.cpp",
@@ -148,6 +165,7 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
+        ":find_and_modify_key",
         ":query_stats",
         ":write_key",
         ":write_key_test_util",
@@ -161,6 +179,9 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/query_settings:query_settings_context_test_util",
         "//src/mongo/db/query/query_stats/plan_shape_counters",
         "//src/mongo/db/query/query_stats/plan_shape_counters:plan_shape_counts",
+        "//src/mongo/db/query/write_ops:delete_util",
+        "//src/mongo/db/query/write_ops:parsed_find_and_modify",
+        "//src/mongo/db/update:update_util",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:version_impl",
     ],

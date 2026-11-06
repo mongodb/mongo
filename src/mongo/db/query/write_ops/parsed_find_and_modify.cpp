@@ -76,8 +76,7 @@ BSONObj ParsedFindAndModify::serializeSort(const query_shape::SerializationOptio
         _parsedBranch);
 }
 
-BSONObj ParsedFindAndModify::serializeProjection(
-    const query_shape::SerializationOptions& opts) const {
+const projection_ast::Projection* ParsedFindAndModify::projection() const {
     if (!_projection && !_request->getFields().value_or(BSONObj()).isEmpty()) {
         auto projection = std::visit(
             [&](const auto& branch) {
@@ -95,7 +94,12 @@ BSONObj ParsedFindAndModify::serializeProjection(
         _expCtx->initializeReferencedSystemVariables();
         _projection = std::make_unique<projection_ast::Projection>(std::move(projection));
     }
-    return query_shape::serializeProjection(_projection.get(), opts);
+    return _projection.get();
+}
+
+BSONObj ParsedFindAndModify::serializeProjection(
+    const query_shape::SerializationOptions& opts) const {
+    return query_shape::serializeProjection(projection(), opts);
 }
 
 Value ParsedFindAndModify::serializeUpdate(const query_shape::SerializationOptions& opts) const {

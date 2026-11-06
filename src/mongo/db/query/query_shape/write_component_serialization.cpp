@@ -136,6 +136,29 @@ projection_ast::Projection parseFindAndModifyProjection(
         expCtx, rawProjection, filter, rawQuery, ProjectionPolicies::findProjectionPolicies());
 }
 
+BSONObj serializeFindAndModifyProjection(const ParsedFindCommand* parsedFind,
+                                         const BSONObj& rawQuery,
+                                         const BSONObj& rawProjection,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const ExtensionsCallback& extensionsCallback,
+                                         const SerializationOptions& opts) {
+    // An absent or empty 'fields' contributes nothing to the shape. Return before parsing so that
+    // the simple _id fast path does not parse the matcher solely for an empty projection.
+    if (rawProjection.isEmpty()) {
+        return BSONObj{};
+    }
+
+    auto projection = parseFindAndModifyProjection(
+        parsedFind, rawQuery, rawProjection, expCtx, extensionsCallback);
+
+    // Projection parsing can reference system variables that the parsed query did not (for
+    // example $$USER_ROLES in 'fields' only), so those are not yet initialized. Initialize them so
+    // serialization emits the variable's constant value rather than a reference.
+    expCtx->initializeReferencedSystemVariables();
+
+    return serializeProjection(&projection, opts);
+}
+
 Value serializeUpdate(const ParsedUpdate& parsedUpdate, const SerializationOptions& opts) {
     const auto modType = parsedUpdate.getRequest()->getUpdateModification().type();
     const auto* executor = parsedUpdate.getDriver()->getUpdateExecutor();
