@@ -226,7 +226,7 @@ public:
             ExpressionConstant::create(_expCtx.get(), Value(1)),
             std::vector<AccumulationStatement>{},
             /*shouldProduceBson=*/false,
-            std::vector<FieldPath>{FieldPath("a")});
+            OrderedPathSet{});
     }
 
     std::unique_ptr<UnpackTsBucketNode> makeUnpackTsBucket(
@@ -396,7 +396,9 @@ public:
         addExtended(makeGroup(std::make_unique<SentinelNode>()),
                     {QsnNodeCounter::kGroup, QsnNodeCounter::kCollscanNoFilter});
         add(makeStreamingGroup(makeCollScan()),
-            {QsnNodeCounter::kStreamingGroup, QsnNodeCounter::kCollscanNoFilter});
+            {QsnNodeCounter::kStreamingGroup,
+             QsnNodeCounter::kEligibleForStreamingGroup,
+             QsnNodeCounter::kCollscanNoFilter});
         add(makeUnpackTsBucket(makeCollScan()),
             {QsnNodeCounter::kUnpackTsBucket, QsnNodeCounter::kCollscanNoFilter});
         addExtended(makeEqLookup(/*withUnwind=*/false),

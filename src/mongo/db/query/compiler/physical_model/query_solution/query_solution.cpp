@@ -1924,7 +1924,6 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
         addIndent(ss, indent + 1);
         *ss << "eligibleForStreamingGroup = true" << '\n';
     }
-    appendSpecificToString(ss, indent);
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
     *ss << "Child:" << '\n';
@@ -1947,22 +1946,9 @@ std::unique_ptr<QuerySolutionNode> GroupNode::clone() const {
 /**
  * StreamingGroupNode.
  */
-void StreamingGroupNode::appendSpecificToString(str::stream* ss, int indent) const {
-    addIndent(ss, indent + 1);
-    *ss << "streamingKey = [";
-    for (size_t idx = 0; idx < streamingKey.size(); ++idx) {
-        if (idx > 0) {
-            *ss << ", ";
-        }
-        *ss << streamingKey[idx].fullPath();
-    }
-    *ss << "]" << '\n';
-}
-
 std::unique_ptr<QuerySolutionNode> StreamingGroupNode::clone() const {
     auto copy = std::make_unique<StreamingGroupNode>(
-        children[0]->clone(), groupByExpression, accumulators, shouldProduceBson, streamingKey);
-    copy->nonArrayIdFields = nonArrayIdFields;
+        children[0]->clone(), groupByExpression, accumulators, shouldProduceBson, nonArrayIdFields);
     copy->physicalProps = physicalProps;
     return copy;
 }

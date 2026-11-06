@@ -2084,8 +2084,9 @@ namespace {
 bool eligibleForStreamingGroup(const CanonicalQuery& query,
                                QuerySolutionNode& input,
                                const DocumentSourceGroup& group) {
-    if (!query.getExpCtx()->getIfrContext()->getSavedFlagValue(
-            feature_flags::gFeatureFlagStreamingGroupEligibilityCounter) ||
+    auto ifr = query.getExpCtx()->getIfrContext();
+    if (!(ifr->getSavedFlagValue(feature_flags::gFeatureFlagStreamingGroupEligibilityCounter) ||
+          ifr->getSavedFlagValue(feature_flags::gFeatureFlagSbeStreamingGroup)) ||
         group.doingMerge() || group.willBeMerged() || query.getCollator()) {
         return false;
     }
@@ -2143,15 +2144,27 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
 
         auto groupStage = dynamic_cast<DocumentSourceGroup*>(innerStage);
         if (groupStage) {
-            solnForAgg = std::make_unique<GroupNode>(
-                std::move(solnForAgg),
-                groupStage->getIdExpression(),
-                groupStage->getAccumulationStatements(),
-                groupStage->doingMerge(),
-                groupStage->willBeMerged(),
-                /*shouldProduceBson=*/isLastSource,
-                groupStage->getNonArrayIdFields(),
-                i == 0 && eligibleForStreamingGroup(query, *solution->root(), *groupStage));
+            const bool eligible =
+                i == 0 && eligibleForStreamingGroup(query, *solution->root(), *groupStage);
+            if (eligible &&
+                query.getExpCtx()->getIfrContext()->getSavedFlagValue(
+                    feature_flags::gFeatureFlagSbeStreamingGroup)) {
+                solnForAgg =
+                    std::make_unique<StreamingGroupNode>(std::move(solnForAgg),
+                                                         groupStage->getIdExpression(),
+                                                         groupStage->getAccumulationStatements(),
+                                                         /*shouldProduceBson=*/isLastSource,
+                                                         groupStage->getNonArrayIdFields());
+                continue;
+            }
+            solnForAgg = std::make_unique<GroupNode>(std::move(solnForAgg),
+                                                     groupStage->getIdExpression(),
+                                                     groupStage->getAccumulationStatements(),
+                                                     groupStage->doingMerge(),
+                                                     groupStage->willBeMerged(),
+                                                     /*shouldProduceBson=*/isLastSource,
+                                                     groupStage->getNonArrayIdFields(),
+                                                     eligible);
             continue;
         }
 

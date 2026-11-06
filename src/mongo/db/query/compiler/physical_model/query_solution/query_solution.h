@@ -1852,9 +1852,6 @@ struct GroupNode : public QuerySolutionNode {
 
     // TODO SERVER-138546: Remove the eligibility counter once streaming group runs.
     const bool eligibleForStreamingGroup;
-
-protected:
-    virtual void appendSpecificToString(str::stream* ss, int indent) const {}
 };
 
 // Group node that processes input clustered by the group key.
@@ -1863,32 +1860,20 @@ struct StreamingGroupNode : public GroupNode {
                        boost::intrusive_ptr<Expression> groupByExpression,
                        std::vector<AccumulationStatement> accs,
                        bool shouldProduceBson,
-                       std::vector<FieldPath> streamingKey)
+                       OrderedPathSet nonArrayIdFields)
         : GroupNode(std::move(child),
                     std::move(groupByExpression),
                     std::move(accs),
                     /*merging=*/false,
                     /*willBeMerged=*/false,
-                    shouldProduceBson),
-          streamingKey(std::move(streamingKey)) {}
+                    shouldProduceBson,
+                    std::move(nonArrayIdFields)) {}
 
     StageType getType() const override {
         return STAGE_STREAMING_GROUP;
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
-
-    void appendSpecificToString(str::stream* ss, int indent) const override;
-
-    void hash(absl::HashState h) const override {
-        for (const auto& path : streamingKey) {
-            h = absl::HashState::combine(std::move(h), path.fullPath());
-        }
-        GroupNode::hash(std::move(h));
-    }
-
-    // Field paths by which the child is clustered.
-    std::vector<FieldPath> streamingKey;
 };
 
 /**

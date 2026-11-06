@@ -51,3 +51,5 @@
 - featureFlagExtensionSearchIndexManagement
 # TODO SERVER-136310: Enable this feature flag once batched ixscan+fetch plans can run e2e.
 - featureFlagBatchedIndexScanFetch
+# TODO SERVER-138656
+- featureFlagSbeStreamingGroup

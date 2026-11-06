@@ -2057,7 +2057,7 @@ TEST(QuerySolutionTest, StreamingGroupNodeWithIndexScan) {
     scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
     auto groupByExpression =
         ExpressionFieldPath::parse(expCtx.get(), "$b", expCtx->variablesParseState);
-    StreamingGroupNode node(std::move(scanNode), groupByExpression, {}, false, {FieldPath("b")});
+    StreamingGroupNode node(std::move(scanNode), groupByExpression, {}, false, {});
     node.computeProperties();
 
     ASSERT_EQ(node.getType(), StageType::STAGE_STREAMING_GROUP);
@@ -2071,14 +2071,11 @@ TEST(QuerySolutionTest, StreamingGroupNodeWithIndexScan) {
 
     auto asString = node.toString();
     ASSERT_STRING_CONTAINS(asString, "STREAMING_GROUP");
-    ASSERT_STRING_CONTAINS(asString, "streamingKey = [b]");
 
     node.nonArrayIdFields = {"_id"};
     auto clone = node.clone();
     ASSERT_EQ(clone->getType(), StageType::STAGE_STREAMING_GROUP);
     auto* clonedStreamingGroup = static_cast<StreamingGroupNode*>(clone.get());
-    ASSERT_EQ(clonedStreamingGroup->streamingKey.size(), 1u);
-    ASSERT_EQ(clonedStreamingGroup->streamingKey[0].fullPath(), "b");
     ASSERT_EQ(clonedStreamingGroup->nonArrayIdFields, node.nonArrayIdFields);
 
     verifyClone(node);
@@ -2104,18 +2101,14 @@ TEST(QuerySolutionTest, StreamingGroupNodeToString) {
         expCtx->variablesParseState);
     auto cntAcc = AccumulationStatement::parseAccumulationStatement(
         expCtx.get(), BSON("cnt" << BSON("$sum" << 1)).firstElement(), expCtx->variablesParseState);
-    StreamingGroupNode node(std::move(scanNode),
-                            groupByExpression,
-                            {std::move(sumAcc), std::move(cntAcc)},
-                            false,
-                            {FieldPath("a"), FieldPath("b")});
+    StreamingGroupNode node(
+        std::move(scanNode), groupByExpression, {std::move(sumAcc), std::move(cntAcc)}, false, {});
     node.computeProperties();
 
     ASSERT_EQ(node.toString(),
               R"gold(STREAMING_GROUP
 ---key = {a: "$a", b: "$b"}
 ---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
----streamingKey = [a, b]
 ---nodeId = 0
 ---fetched = 1
 ---sortedByDiskLoc = 0
@@ -2927,7 +2920,7 @@ TEST(QuerySolutionTest, StreamingGroupNodeCloneKeepsPhysicalProps) {
                                              groupByExpression,
                                              std::vector<AccumulationStatement>{},
                                              /*shouldProduceBson=*/false,
-                                             std::vector<FieldPath>{FieldPath("a")}));
+                                             OrderedPathSet{}));
 }
 
 }  // namespace

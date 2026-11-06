@@ -614,6 +614,60 @@ TEST_F(StreamingGroupPlanningTest, IneligibleWithoutFeatureFlag) {
     ASSERT_EQ(rootNonArrayIdFields(*solution), OrderedPathSet{});
 }
 
+class StreamingGroupNodeTest : public StreamingGroupPlanningTest {
+protected:
+    unittest::ServerParameterGuard streamingGroupEnabled{"featureFlagSbeStreamingGroup", true};
+};
+
+TEST_F(StreamingGroupNodeTest, BuildsStreamingGroupNodeWhenEligible) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: {x: '$a', y: '$b'}, n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1, b: 1}")));
+    auto* root = solution->root();
+    ASSERT_EQUALS(root->getType(), StageType::STAGE_STREAMING_GROUP) << root->toString();
+}
+
+TEST_F(StreamingGroupNodeTest, BuildsGroupNodeWhenIneligible) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$b', total: {$sum: '$b'}}}")},
+                                  nonArray(fromjson("{a: 1, b: 1}")));
+    assertGroupRoot(*solution, false);
+}
+
+TEST_F(StreamingGroupNodeTest, BuildsGroupNodeWhenFlagOff) {
+    unittest::ServerParameterGuard disabled{"featureFlagSbeStreamingGroup", false};
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    assertGroupRoot(*solution, true);
+}
+
+TEST_F(StreamingGroupNodeTest, StreamingGroupNodeKeepsNonArrayIdFields) {
+    addIndex(fromjson("{a: 1}"));
+
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    ASSERT_EQUALS(solution->root()->getType(), StageType::STAGE_STREAMING_GROUP);
+    ASSERT_EQ(rootNonArrayIdFields(*solution), OrderedPathSet({"_id"}));
+}
+
+TEST_F(StreamingGroupNodeTest, BuildsGroupNodeForGroupAfterGroup) {
+    auto solution = planAggregate({fromjson("{$match: {_id: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: '$_id', n: {$sum: 1}}}"),
+                                   fromjson("{$group: {_id: '$_id', total: {$sum: '$n'}}}")},
+                                  nonArray(fromjson("{_id: 1}")));
+    assertGroupRoot(*solution, false);
+    ASSERT_EQUALS(solution->root()->children[0]->getType(), StageType::STAGE_STREAMING_GROUP)
+        << solution->root()->toString();
+}
+
 TEST_F(StreamingGroupEligibilityTest, EligibleAfterEqualityPrefix) {
     addIndex(fromjson("{a: 1, b: 1}"));
 

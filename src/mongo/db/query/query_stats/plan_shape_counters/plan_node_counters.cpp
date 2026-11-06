@@ -121,6 +121,7 @@ void QsnNodeCountAnalyzer::preVisit(const QuerySolutionNode& node) {
             break;
         case STAGE_STREAMING_GROUP:
             _counts.set(QsnNodeCounter::kStreamingGroup);
+            _counts.set(QsnNodeCounter::kEligibleForStreamingGroup);
             break;
         case STAGE_EQ_LOOKUP:
             _counts.set(QsnNodeCounter::kEqLookupNoUnwind);
