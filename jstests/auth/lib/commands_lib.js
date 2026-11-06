@@ -83,9 +83,10 @@ particular database.
 
 An array of privileges used when testing user-defined roles. The test case tests that a user with
 the specified privileges is authorized to run the command, and that having only a subset of the
-privileges causes an authorization failure. If an individual privilege specifies
-"removeWhenTestingAuthzFailure: false", then that privilege will not be removed when testing for
-authorization failure.
+privileges causes an authorization failure. The specified privileges MUST be the minimum sufficient 
+set of privileges to perform the action. If removing any one privilege does not result in an authorization 
+failure, the test case will fail. If an individual privilege specifies "removeWhenTestingAuthzFailure: 
+false", then that privilege will not be removed when testing for authorization failure.
 
 10) commandArgs
 
@@ -1393,8 +1394,9 @@ export const authCommandsLib = {
                     {
                         "op": "u",
                         "ns": firstDbName + ".x",
-                        "o2": {"_id": 1},
-                        "o": {"_id": 1, "data": 8},
+                        "o2": {"_id": 2},
+                        "o": {"_id": 2, "data": 8},
+                        "b": true,
                     },
                 ],
             },
@@ -6042,6 +6044,7 @@ export const authCommandsLib = {
         {
             testname: "getDiagnosticData",
             command: {getDiagnosticData: 1},
+            skipSharded: true,
             testcases: [
                 {
                     runOnDb: adminDbName,
@@ -6050,10 +6053,25 @@ export const authCommandsLib = {
                         {resource: {cluster: true}, actions: ["serverStatus"]},
                         {resource: {cluster: true}, actions: ["replSetGetStatus"]},
                         {resource: {db: "local", collection: "oplog.rs"}, actions: ["collStats"]},
-                        {
-                            resource: {cluster: true},
-                            actions: ["connPoolStats"],
-                        }, // Only needed against mongos
+                    ],
+                },
+                {runOnDb: firstDbName, roles: {}},
+                {runOnDb: secondDbName, roles: {}},
+            ],
+        },
+        {
+            testname: "getDiagnosticData_sharded",
+            command: {getDiagnosticData: 1},
+            skipUnlessSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_monitoring,
+                    privileges: [
+                        {resource: {cluster: true}, actions: ["serverStatus"]},
+                        {resource: {cluster: true}, actions: ["replSetGetStatus"]},
+                        {resource: {db: "local", collection: "oplog.rs"}, actions: ["collStats"]},
+                        {resource: {cluster: true}, actions: ["connPoolStats"]},
                     ],
                 },
                 {runOnDb: firstDbName, roles: {}},
@@ -8102,10 +8120,6 @@ export const authCommandsLib = {
                         {resource: {cluster: true}, actions: ["serverStatus"]},
                         {resource: {cluster: true}, actions: ["replSetGetStatus"]},
                         {resource: {db: "local", collection: "oplog.rs"}, actions: ["collStats"]},
-                        {
-                            resource: {cluster: true},
-                            actions: ["connPoolStats"],
-                        }, // Only needed against mongos
                     ],
                 },
                 {runOnDb: firstDbName, roles: {}},

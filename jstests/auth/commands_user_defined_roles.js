@@ -180,8 +180,17 @@ function runOneTest(conn, t) {
                 }
 
                 for (let k = 0; k < actions.length; k++) {
-                    const privDoc = {resource: resource, actions: [actions[k]]};
-                    msg = testInsufficientPrivileges(conn, t, testcase, [privDoc]);
+                    // Start from the full set of privileges and remove exactly one action.
+                    const remainingActions = actions.filter((_, idx) => idx !== k);
+                    const subset = testcase.privileges.flatMap((priv, idx) => {
+                        if (idx !== j) {
+                            return [priv];
+                        }
+                        return remainingActions.length > 0
+                            ? [Object.assign({}, priv, {actions: remainingActions})]
+                            : [];
+                    });
+                    msg = testInsufficientPrivileges(conn, t, testcase, subset);
                     if (msg) {
                         failures.push(t.testname + ": " + msg);
                     }
