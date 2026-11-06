@@ -55,6 +55,13 @@ DocumentSourceListLocalSessions::DocumentSourceListLocalSessions(
     : DocumentSource(kStageName, pExpCtx), _spec(spec) {}
 
 namespace {
+OperationContext* getCurrentOpCtx() {
+    tassert(13620200, "Expected a Client to be bound to the current thread", haveClient());
+    auto* opCtx = Client::getCurrent()->getOperationContext();
+    tassert(13620201, "Expected an OperationContext on the current Client", opCtx);
+    return opCtx;
+}
+
 ListSessionsUser getUserNameForLoggedInUser(const OperationContext* opCtx) {
     auto* client = opCtx->getClient();
 
@@ -93,8 +100,7 @@ mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(
         // parseSpec should ensure users is non-empty.
         tassert(11282986, "ListSessionsSpec is missing Users field", spec.getUsers());
 
-        const auto& myName =
-            getUserNameForLoggedInUser(Client::getCurrent()->getOperationContext());
+        const auto& myName = getUserNameForLoggedInUser(getCurrentOpCtx());
         const auto& users = spec.getUsers().value();
         return !std::all_of(
             users.cbegin(), users.cend(), [myName](const auto& name) { return myName == name; });
@@ -127,22 +133,21 @@ mongo::ListSessionsSpec mongo::listSessionsParseSpec(std::string_view stageName,
                           << " may not specify {allUsers:true} and {users:[...]} at the same time",
             !ret.getAllUsers() || !ret.getUsers() || ret.getUsers()->empty());
 
-    // Verify that the correct state is set on the client.
+    // Verify that a Client with the correct state is bound to the current thread.
     uassert(
         31106,
         str::stream() << "The " << DocumentSourceListLocalSessions::kStageName
                       << " stage is not allowed in this context :: missing an AuthorizationManager",
-        AuthorizationManager::get(Client::getCurrent()->getService()));
+        haveClient() && AuthorizationManager::get(getCurrentOpCtx()->getService()));
     uassert(
         31111,
         str::stream() << "The " << DocumentSourceListLocalSessions::kStageName
                       << " stage is not allowed in this context :: missing a LogicalSessionCache",
-        LogicalSessionCache::get(Client::getCurrent()->getOperationContext()));
+        LogicalSessionCache::get(getCurrentOpCtx()));
 
     if (!ret.getAllUsers() && (!ret.getUsers() || ret.getUsers()->empty())) {
         // Implicit request for self
-        const auto& userName =
-            getUserNameForLoggedInUser(Client::getCurrent()->getOperationContext());
+        const auto& userName = getUserNameForLoggedInUser(getCurrentOpCtx());
         ret.setUsers(std::vector<ListSessionsUser>({userName}));
     }
 
