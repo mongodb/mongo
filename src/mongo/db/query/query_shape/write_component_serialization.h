@@ -5,7 +5,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
@@ -14,6 +16,7 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_shape {
 
@@ -21,8 +24,29 @@ namespace mongo::query_shape {
 BSONObj serializeWriteQuery(const ParsedUpdate& parsedUpdate, const SerializationOptions& opts);
 BSONObj serializeWriteQuery(const ParsedDelete& parsedDelete, const SerializationOptions& opts);
 
+/**
+ * Serializes the findAndModify sort component. `$natural` is a hint, not a shape component, and
+ * serializes to an empty object.
+ */
+BSONObj serializeFindAndModifySort(const ParsedFindCommand* parsedFind,
+                                   const BSONObj& rawSort,
+                                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                   const SerializationOptions& opts);
+
 BSONObj serializeProjection(const projection_ast::Projection* projection,
                             const SerializationOptions& opts);
+
+/**
+ * Parses the findAndModify returned-document projection against the parsed filter. 'parsedFind'
+ * may be null on the simple _id fast path, in which case the raw query is parsed locally without
+ * canonicalizing or mutating the execution request.
+ */
+projection_ast::Projection parseFindAndModifyProjection(
+    const ParsedFindCommand* parsedFind,
+    const BSONObj& rawQuery,
+    const BSONObj& rawProjection,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExtensionsCallback& extensionsCallback);
 
 /** Serializes the update ('u') component, preserving its object/array/string BSON type. */
 Value serializeUpdate(const ParsedUpdate& parsedUpdate, const SerializationOptions& opts);

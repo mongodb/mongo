@@ -134,6 +134,22 @@ TEST_F(WriteComponentSerializationTest, SerializesDeleteQueriesIncludingIdFastPa
         serializeWriteQuery(parsedId, SerializationOptions::kDebugQueryShapeSerializeOptions));
 }
 
+TEST_F(WriteComponentSerializationTest, OmitsInvalidSortForIdFastPath) {
+    UpdateRequest request = makeUpdate(
+        fromjson("{_id: 42}"),
+        write_ops::UpdateModification::parseFromClassicUpdate(fromjson("{$set: {b: 1}}")));
+    request.setSort(fromjson("{a: {$meta: 'invalid'}}"));
+    auto parsed = parseUpdate(request);
+    ASSERT_FALSE(parsed.hasParsedFindCommand());
+
+    ASSERT_BSONOBJ_EQ(BSONObj{},
+                      serializeFindAndModifySort(
+                          parsed.parsedFind.get(),
+                          parsed.getRequest()->getSort(),
+                          _expCtx,
+                          SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
+}
+
 TEST_F(WriteComponentSerializationTest, SerializesReplacementAndModifierUpdates) {
     UpdateRequest replacementRequest = makeUpdate(
         fromjson("{a: 5}"),

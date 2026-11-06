@@ -33,6 +33,7 @@
 #include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
+#include "mongo/db/query/write_ops/delete_util.h"
 #include "mongo/db/query/write_ops/insert.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/update_result.h"
@@ -100,26 +101,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failAllFindAndModify);
 MONGO_FAIL_POINT_DEFINE(hangBeforeFindAndModifyPerformsUpdate);
-
-void makeDeleteRequest(OperationContext* opCtx,
-                       const write_ops::FindAndModifyCommandRequest& request,
-                       bool explain,
-                       DeleteRequest* requestOut) {
-    requestOut->setQuery(request.getQuery());
-    requestOut->setProj(request.getFields().value_or(BSONObj()));
-    requestOut->setLegacyRuntimeConstants(
-        request.getLegacyRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
-    requestOut->setLet(request.getLet());
-    requestOut->setSort(request.getSort().value_or(BSONObj()));
-    requestOut->setHint(request.getHint());
-    requestOut->setCollation(request.getCollation().value_or(BSONObj()));
-    requestOut->setMulti(false);
-    requestOut->setReturnDeleted(true);  // Always return the old value.
-    requestOut->setIsExplain(explain);
-
-    requestOut->setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
-    requestOut->setIsTimeseriesNamespace(request.getIsTimeseriesNamespace());
-}
 
 write_ops::FindAndModifyCommandReply buildResponse(
     const boost::optional<UpdateResult>& updateResult,
@@ -354,7 +335,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         auto deleteRequest = DeleteRequest{};
         deleteRequest.setNsString(nss);
         const bool isExplain = true;
-        makeDeleteRequest(opCtx, request, isExplain, &deleteRequest);
+        delete_util::makeDeleteRequest(opCtx, request, isExplain, &deleteRequest);
 
         if (isTimeseriesLogicalRequest) {
             timeseries::timeseriesRequestChecks<DeleteRequest>(
@@ -530,8 +511,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     auto doWork = [&] {
         if (req.getRemove().value_or(false)) {
             DeleteRequest deleteRequest;
-            makeDeleteRequest(opCtx, req, false, &deleteRequest);
             deleteRequest.setNsString(nsString);
+            delete_util::makeDeleteRequest(opCtx, req, false, &deleteRequest);
             if (opCtx->getTxnNumber()) {
                 deleteRequest.setStmtId(stmtId);
             }
