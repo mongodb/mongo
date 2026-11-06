@@ -2249,6 +2249,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildReplaceRoot(
     stage = std::move(outStage);
 
     auto resultSlot = outSlots[0];
+    // A later stage may not read the new root, but the check in it must still raise its error.
+    _state.blueprint().keepSlot(resultSlot.getId());
 
     // We just generated a check that will throw at run time if 'resultSlot' is set to Nothing
     // or to a non-object value. Therefore, if we reach this point in SBE tree, we know that
