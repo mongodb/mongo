@@ -1,0 +1,25 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/AddFieldsFieldThatFailsButIsProjectedOutIsRemoved
+Live slots: s6
+
+Before:
+[1] project [s6 = newBsonObj("b", s4)] 
+[1] project [s5 = 
+    if isNullish(s3) 
+    then null 
+    else 
+        if isNumber(s3) 
+        then (s3 / 0) 
+        else fail(14, "$divide only supports numeric types") 
+] 
+[1] project [s3 = getField(s1, "a"), s4 = getField(s1, "b")] 
+[1] scan generic [s1 = record, s2 = recordId] @"UUID" 
+
+After firing 1:
+[1] project [s6 = newBsonObj("b", s4)] 
+[1] project [s3 = getField(s1, "a"), s4 = getField(s1, "b")] 
+[1] scan generic [s1 = record, s2 = recordId] @"UUID" 
+
+After firing 2:
+[1] project [s6 = newBsonObj("b", s4)] 
+[1] project [s4 = getField(s1, "b")] 
+[1] scan generic [s1 = record, s2 = recordId] @"UUID" 

@@ -1,0 +1,10 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/DeadEntryBetweenLiveOnesIsRemoved
+Live slots: s4 s6
+
+Before:
+[1] project [s4 = (s3 + 1), s5 = (s3 + 2), s6 = (s3 + 3)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a] @"UUID" 
+
+After firing 1:
+[1] project [s4 = (s3 + 1), s6 = (s3 + 3)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a] @"UUID" 

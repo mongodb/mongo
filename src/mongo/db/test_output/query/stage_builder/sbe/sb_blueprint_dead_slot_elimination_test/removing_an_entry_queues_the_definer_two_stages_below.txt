@@ -1,0 +1,20 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/RemovingAnEntryQueuesTheDefinerTwoStagesBelow
+Live slots: s1 s6
+
+Before:
+[1] project [s6 = (s4 + 1), s7 = (s5 + 1)] 
+[1] filter {(s4 > 0)} 
+[1] project [s4 = (s3 + 1), s5 = (s3 + 2)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a] @"UUID" 
+
+After firing 1:
+[1] project [s6 = (s4 + 1)] 
+[1] filter {(s4 > 0)} 
+[1] project [s4 = (s3 + 1), s5 = (s3 + 2)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a] @"UUID" 
+
+After firing 2:
+[1] project [s6 = (s4 + 1)] 
+[1] filter {(s4 > 0)} 
+[1] project [s4 = (s3 + 1)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a] @"UUID" 

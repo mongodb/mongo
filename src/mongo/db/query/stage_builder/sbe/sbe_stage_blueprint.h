@@ -31,6 +31,7 @@
 #include "mongo/db/exec/sbe/stages/extract_field_paths.h"
 #include "mongo/db/exec/sbe/stages/fetch.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
+#include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/values/path_request.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -451,12 +452,14 @@ struct SbBlueprintFilter {
 };
 
 /**
- * ProjectStage. Each element of 'projects' is (expression, outSlot).
+ * ProjectStage. Each element of 'projects' is (expression, outSlot). With sequential binding, an
+ * expression may read the outSlots of the elements before it.
  */
 struct SbBlueprintProject {
     SbBlueprintNodeIdx child;
     PlanNodeId nodeId{kEmptyPlanNodeId};
     SbExprSlotVector projects;
+    sbe::ProjectStage::Binding binding{sbe::ProjectStage::Binding::kParallel};
 
     void def(SbSlotCollector& out) const {
         for (const auto& [expr, slot] : projects) {

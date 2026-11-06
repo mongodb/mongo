@@ -117,6 +117,7 @@ mongo_cc_library(
         "gen_projection.cpp",
         "gen_ts.cpp",
         "sbe_stage_blueprint.cpp",
+        "sbe_stage_blueprint_dead_slot_elimination.cpp",
         "sbe_stage_blueprint_rewrite.cpp",
         "sbe_stage_blueprint_slot_usage.cpp",
         "sbe_stage_lowering.cpp",

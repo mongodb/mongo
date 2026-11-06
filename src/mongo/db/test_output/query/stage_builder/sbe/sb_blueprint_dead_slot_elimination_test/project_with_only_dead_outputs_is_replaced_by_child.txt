@@ -1,0 +1,9 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/ProjectWithOnlyDeadOutputsIsReplacedByChild
+Live slots: s1
+
+Before:
+[1] project [s4 = (s3 + 1)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a] @"UUID" 
+
+After firing 1:
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a] @"UUID" 

@@ -1,0 +1,10 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/SequentialProjectEntryReadingAnEarlierOne
+Live slots: s1 s4
+
+Before:
+[1] project* [s4 = (s3 + 1), s5 = (s4 + 1), s6 = (s5 + 1)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a] @"UUID" 
+
+After firing 1:
+[1] project* [s4 = (s3 + 1)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a] @"UUID" 
