@@ -804,14 +804,17 @@ void _createTimeseriesBucketsCollection(
 
     CollectionWriter collectionWriter(opCtx, targetNs);
 
-    auto validatedCollator = collOptions.collation;
+    BSONObj validatedCollator;
     if (!collOptions.collation.isEmpty()) {
         auto swCollator = db->validateCollator(opCtx, collOptions);
 
         // The userCreateNS already has a uassertStatusOK and validateCollator is called in it,
         // so we should have the case that the status of the swCollator is ok.
         invariant(swCollator.getStatus());
-        validatedCollator = swCollator.getValue()->getSpec().toBSON();
+        // A null collator is the simple collation, whose stored form is an empty BSON object.
+        if (swCollator.getValue()) {
+            validatedCollator = swCollator.getValue()->getSpec().toBSON();
+        }
     }
 
     // We create the index on time and meta, which is used for query-based reopening, here for
@@ -1110,7 +1113,7 @@ Status _createCollection(
             CollectionWriter collWriter(opCtx, nss);
             invariant(collWriter->isNewTimeseriesWithoutView());
 
-            auto validatedCollator = collectionOptions.collation;
+            BSONObj validatedCollator;
             if (!collectionOptions.collation.isEmpty()) {
                 auto tmpOptions = collectionOptions;
                 auto swCollator = db->validateCollator(opCtx, tmpOptions);
@@ -1118,7 +1121,11 @@ Status _createCollection(
                 // The userCreateNS already has a uassertStatusOK and validateCollator is called in
                 // it, so we should have the case that the status of the swCollator is ok.
                 invariant(swCollator.getStatus());
-                validatedCollator = swCollator.getValue()->getSpec().toBSON();
+                // A null collator is the simple collation, whose stored form is an empty BSON
+                // object.
+                if (swCollator.getValue()) {
+                    validatedCollator = swCollator.getValue()->getSpec().toBSON();
+                }
             }
             uassertStatusOK(
                 timeseries::createDefaultTimeseriesIndex(opCtx, collWriter, validatedCollator));
