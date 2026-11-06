@@ -20,6 +20,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/timestamp_block.h"
+#include "mongo/db/replicated_fast_count/size_count_checkpoint_validator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_session_pool.h"
@@ -200,12 +201,15 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                     return repl::applyCommand_inlock(
                         opCtx, ApplierOperation{&op}, oplogApplicationMode);
                 }
-                return repl::applyOperation_inlock(opCtx,
-                                                   coll,
-                                                   ApplierOperation{&op},
-                                                   /*alwaysUpsert=*/false,
-                                                   oplogApplicationMode,
-                                                   /*isDataConsistent=*/true);
+                return repl::applyOperation_inlock(
+                    opCtx,
+                    coll,
+                    ApplierOperation{&op},
+                    /*alwaysUpsert=*/false,
+                    oplogApplicationMode,
+                    /*isDataConsistent=*/true,
+                    /*incrementOpsAppliedStats=*/{},
+                    repl::CheckpointDeltaRecording::kDeferredToCommit);
             }();
             if (!status.isOK()) {
                 return status;
@@ -373,6 +377,35 @@ Status _applyAbortTransaction(OperationContext* opCtx,
 
     return Status::OK();
 }
+
+/**
+ * Records the replicated metadata provided in `commitOp` in the `SizeCountCheckpointValidator`.
+ */
+void _recordPreparedTxnDeltasForCheckpointValidation(const OplogEntry& commitOp) {
+    const auto& sizeMd = commitOp.getSizeMetadata();
+    if (!sizeMd) {
+        return;
+    }
+    const auto* multiMd = std::get_if<std::vector<MultiOpSizeMetadata>>(&sizeMd.value());
+    tassert(13871900, "commitTransaction entry must carry MultiOpSizeMetadata", multiMd);
+    const Timestamp ts = commitOp.getOpTime().getTimestamp();
+    for (const auto& meta : *multiMd) {
+        replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
+            meta.getUuid(),
+            ts,
+            ReplicatedMetadataDelta{
+                // TODO(SERVER-138783): Track these sizes and counts independently during oplog
+                // application so we do not blindly adopt the metadata from the primary.
+                .metadata =
+                    {.sizeCount = CollectionSizeCount{.size = meta.getSz(), .count = meta.getCt()},
+                     // We set the collection's hash to boost::none because we do not track
+                     // prepared transactions' hashes independently during oplog application
+                     // and the primary does not write a hash in the commitTransaction oplog entry.
+                     // TODO(SERVER-138784): Do not invalidate the hash here.
+                     .hash = boost::none},
+                .state = DDLState::kNone});
+    }
+}
 }  // namespace
 
 Status applyCommitTransaction(OperationContext* opCtx,
@@ -404,8 +437,14 @@ Status applyCommitTransaction(OperationContext* opCtx,
                     // Checkout the session and apply non-split or top-level commit op.
                     invariant(!op.subSession);
                     invariant(!op.preparedTxnOps);
-                    return _applyCommitTransaction(
+                    Status status = _applyCommitTransaction(
                         opCtx, *op, *op->getSessionId(), *op->getTxnNumber(), commitTimestamp);
+                    if (status.isOK()) {
+                        // We only want to record the replicated metadata deltas once per operation,
+                        // so we record them here, at the top-level prepared transaction op.
+                        _recordPreparedTxnDeltasForCheckpointValidation(*op);
+                    }
+                    return status;
                 }
                 case repl::ApplicationInstruction::applySplitPreparedTxnOp: {
                     // Checkout the session and apply split commit op.

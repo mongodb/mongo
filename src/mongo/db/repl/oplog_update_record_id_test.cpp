@@ -51,7 +51,8 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                OplogApplication::Mode mode,
                                UpdateRequest request,
                                bool recordChangeStreamPreImage,
-                               BSONObj& preImage);
+                               BSONObj& preImage,
+                               CheckpointDeltaRecording deltaRecording);
 
 namespace {
 
@@ -911,7 +912,8 @@ TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints,
                                          OplogApplication::Mode::kSecondary,
                                          std::move(request),
                                          /*recordChangeStreamPreImage=*/false,
-                                         preImage),
+                                         preImage,
+                                         CheckpointDeltaRecording::kPerOperation),
                        DBException,
                        ErrorCodes::InvalidBSON);
 }

@@ -252,19 +252,34 @@ void logOplogConstraintViolation(OperationContext* opCtx,
 void resetOplogConstraintViolationLoggerForTest();
 
 /**
+ * Specifies the approach for recording deltas during oplog application for continuous internode
+ * validation.
+ */
+enum class CheckpointDeltaRecording {
+    // Record the delta for each CRUD or DDL operation.
+    kPerOperation,
+
+    // Do not record the delta until commit time. If an operation is committed some time after it is
+    // applied (e.g., prepared transactions), we cannot record the delta until it is committed.
+    kDeferredToCommit,
+};
+
+/**
  * Used for applying from an oplog entry or grouped inserts.
  * @param opOrGroupedInserts a single oplog entry or grouped inserts to be applied.
  * @param mode specifies what oplog application mode we are in
  * @param incrementOpsAppliedStats is called whenever an op is applied.
  * Returns failure status if the op was an update that could not be applied.
  */
-Status applyOperation_inlock(OperationContext* opCtx,
-                             CollectionAcquisition& collectionAcquisition,
-                             const OplogEntryOrGroupedInserts& opOrGroupedInserts,
-                             bool alwaysUpsert,
-                             OplogApplication::Mode mode,
-                             bool isDataConsistent,
-                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {});
+Status applyOperation_inlock(
+    OperationContext* opCtx,
+    CollectionAcquisition& collectionAcquisition,
+    const OplogEntryOrGroupedInserts& opOrGroupedInserts,
+    bool alwaysUpsert,
+    OplogApplication::Mode mode,
+    bool isDataConsistent,
+    IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {},
+    CheckpointDeltaRecording deltaRecording = CheckpointDeltaRecording::kPerOperation);
 
 /**
  * Atomically apply one or more container operations (insert, update, or delete). All ops must

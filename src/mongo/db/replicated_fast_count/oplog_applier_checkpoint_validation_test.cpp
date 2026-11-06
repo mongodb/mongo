@@ -9,9 +9,12 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
@@ -470,6 +473,530 @@ TEST_F(CheckpointHashValidationTest, CheckpointCarriesPrimaryHashForReshardingCo
         oplog, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1}, kDoc1UpdatedHash, uuid);
     ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
 }
+
+class PreparedTransactionHashValidationTest : public CheckpointValidationTest {
+protected:
+    void setUp() override {
+        CheckpointValidationTest::setUp();
+        createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+        createCollection(_opCtx.get(), _nss, {});
+        _uuid = getCollectionUUID(_opCtx.get(), _nss);
+        _lsid = makeLogicalSessionId(_opCtx.get());
+    }
+
+    // Returns a transaction operation on `nss` carrying a size delta and a document hash.
+    ReplOperation makeTxnOp(const NamespaceString& nss,
+                            UUID uuid,
+                            OpTypeEnum opType,
+                            const BSONObj& object,
+                            boost::optional<BSONObj> object2,
+                            const RecordId& rid,
+                            CollectionReplicatedMetadata delta) {
+        ReplOperation op;
+        op.setOpType(opType);
+        op.setNss(nss);
+        op.setUuid(uuid);
+        op.setObject(object);
+        if (object2) {
+            op.setObject2(*object2);
+        }
+        op.setRecordId(rid);
+        SingleOpSizeMetadata sizeMetadata;
+        sizeMetadata.setSz(delta.sizeCount.size);
+        sizeMetadata.setH(delta.hash);
+        op.setSizeMetadata(OplogEntrySizeMetadata{sizeMetadata});
+        return op;
+    }
+
+    static MultiOpSizeMetadata makeCommitMetadata(UUID uuid, CollectionSizeCount sizeCount) {
+        MultiOpSizeMetadata meta;
+        meta.setUuid(uuid);
+        meta.setSz(sizeCount.size);
+        meta.setCt(sizeCount.count);
+        return meta;
+    }
+
+    // Returns a commitTransaction oplog entry carrying `metadata` in its 'm' field.
+    OplogEntry makePreparedCommitEntry(const OpTime& prepareOpTime,
+                                       const std::vector<MultiOpSizeMetadata>& metadata) {
+        const OplogEntry commit = makeCommandOplogEntryWithSessionInfoAndStmtIds(
+            nextOpTime(),
+            _nss,
+            BSON("commitTransaction" << 1 << "commitTimestamp" << prepareOpTime.getTimestamp()),
+            _lsid,
+            _txnNum,
+            {StmtId(1)},
+            prepareOpTime);
+        BSONArrayBuilder m;
+        for (const auto& meta : metadata) {
+            m.append(meta.toBSON());
+        }
+        BSONObjBuilder builder(commit.getEntry().toBSON());
+        builder.append("m", m.arr());
+        return OplogEntry(builder.obj());
+    }
+
+    OperationSessionInfo sessionInfo() const {
+        OperationSessionInfo sessionInfo;
+        sessionInfo.setSessionId(_lsid);
+        sessionInfo.setTxnNumber(_txnNum);
+        return sessionInfo;
+    }
+
+    const BSONObj kDoc1 = BSON("_id" << 1 << "x" << 1);
+    const BSONObj kDoc2 = BSON("_id" << 2 << "x" << 2);
+    const BSONObj kDoc1Updated = BSON("_id" << 1 << "x" << 3 << "y" << 1);
+    const int64_t kDoc1Hash = computeDocValidationHash(kDoc1);
+    const int64_t kDoc2Hash = computeDocValidationHash(kDoc2);
+    const int64_t kUpdateHash = computeUpdateValidationHash(kDoc1, kDoc1Updated);
+
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("test.preparedTxnHash");
+    UUID _uuid = UUID::gen();
+    LogicalSessionId _lsid;
+    const TxnNumber _txnNum = 1;
+
+private:
+    unittest::ServerParameterGuard _enablePerCollectionValidation{
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true};
+    unittest::ServerParameterGuard _perDocumentMismatchNotFatal{
+        "continuousInternodeValidationFatalOnMismatch", false};
+};
+
+TEST_F(PreparedTransactionHashValidationTest, PreparedInsertSetsHashToNone) {
+    otel::metrics::OtelMetricsCapturer capturer;
+
+    const OplogEntry prepare = makeApplyOpsOplogEntry(
+        nextOpTime(),
+        {makeTxnOp(_nss,
+                   _uuid,
+                   OpTypeEnum::kInsert,
+                   kDoc1,
+                   boost::none,
+                   RecordId(1),
+                   {.sizeCount = {.size = kDoc1.objsize(), .count = 1}, .hash = kDoc1Hash})},
+        sessionInfo(),
+        Date_t::now(),
+        {StmtId(0)},
+        OpTime(),
+        /*multiOpType=*/boost::none,
+        ApplyOpsType::kPrepare);
+    ASSERT_OK(runThroughApplyOplogBatch({prepare}));
+
+    const OplogEntry commit = makePreparedCommitEntry(
+        prepare.getOpTime(),
+        {makeCommitMetadata(_uuid, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1})});
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    ASSERT_OK(runThroughApplyOplogBatch(
+        {commit,
+         makeWatermarkEntry(watermarkTs),
+         makeCheckpointEntry(
+             watermarkTs,
+             {{.uuid = _uuid,
+               .metadata = CollectionReplicatedMetadata{
+                   .sizeCount = CollectionSizeCount{.size = kDoc1.objsize(), .count = 1},
+                   // TODO(SERVER-138784): Expect a real hash here.
+                   .hash = boost::none}}})}));
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(PreparedTransactionHashValidationTest, PreparedUpdateSetsHashToNone) {
+    std::vector<OplogEntry> baseline;
+    baseline.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    baseline.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2), kDoc2Hash));
+    const Timestamp knownHashWatermarkTs = nextOpTime().getTimestamp();
+    baseline.push_back(makeWatermarkEntry(knownHashWatermarkTs));
+    baseline.push_back(makeCheckpointEntry(
+        knownHashWatermarkTs,
+        {{.uuid = _uuid,
+          .metadata = CollectionReplicatedMetadata{
+              .sizeCount =
+                  CollectionSizeCount{.size = kDoc1.objsize() + kDoc2.objsize(), .count = 2},
+              .hash = kDoc1Hash ^ kDoc2Hash}}}));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(baseline)));
+
+    otel::metrics::OtelMetricsCapturer capturer;
+
+    const OplogEntry prepare = makeApplyOpsOplogEntry(
+        nextOpTime(),
+        {makeTxnOp(_nss,
+                   _uuid,
+                   OpTypeEnum::kUpdate,
+                   kDoc1Updated,
+                   BSON("_id" << 1),
+                   RecordId(1),
+                   {.sizeCount = {.size = kDoc1Updated.objsize() - kDoc1.objsize(), .count = 0},
+                    .hash = kUpdateHash})},
+        sessionInfo(),
+        Date_t::now(),
+        {StmtId(0)},
+        OpTime(),
+        /*multiOpType=*/boost::none,
+        ApplyOpsType::kPrepare);
+    ASSERT_OK(runThroughApplyOplogBatch({prepare}));
+
+    const OplogEntry commit = makePreparedCommitEntry(
+        prepare.getOpTime(),
+        {makeCommitMetadata(
+            _uuid,
+            CollectionSizeCount{.size = kDoc1Updated.objsize() - kDoc1.objsize(), .count = 0})});
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    ASSERT_OK(runThroughApplyOplogBatch(
+        {commit,
+         makeWatermarkEntry(watermarkTs),
+         makeCheckpointEntry(watermarkTs,
+                             {{.uuid = _uuid,
+                               .metadata = CollectionReplicatedMetadata{
+                                   .sizeCount = CollectionSizeCount{.size = kDoc1Updated.objsize() +
+                                                                        kDoc2.objsize(),
+                                                                    .count = 2},
+                                   // TODO(SERVER-138784): Expect a real hash here.
+                                   .hash = boost::none}}})}));
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(PreparedTransactionHashValidationTest, PreparedDeleteSetsHashToNone) {
+    std::vector<OplogEntry> baseline;
+    baseline.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    baseline.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc2, RecordId(2), kDoc2Hash));
+    const Timestamp knownHashWatermarkTs = nextOpTime().getTimestamp();
+    baseline.push_back(makeWatermarkEntry(knownHashWatermarkTs));
+    baseline.push_back(makeCheckpointEntry(
+        knownHashWatermarkTs,
+        {{.uuid = _uuid,
+          .metadata = CollectionReplicatedMetadata{
+              .sizeCount =
+                  CollectionSizeCount{.size = kDoc1.objsize() + kDoc2.objsize(), .count = 2},
+              .hash = kDoc1Hash ^ kDoc2Hash}}}));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(baseline)));
+
+    otel::metrics::OtelMetricsCapturer capturer;
+
+    const OplogEntry prepare = makeApplyOpsOplogEntry(
+        nextOpTime(),
+        {makeTxnOp(_nss,
+                   _uuid,
+                   OpTypeEnum::kDelete,
+                   BSON("_id" << 2),
+                   boost::none,
+                   RecordId(2),
+                   {.sizeCount = {.size = -kDoc2.objsize(), .count = -1}, .hash = kDoc2Hash})},
+        sessionInfo(),
+        Date_t::now(),
+        {StmtId(0)},
+        OpTime(),
+        /*multiOpType=*/boost::none,
+        ApplyOpsType::kPrepare);
+    ASSERT_OK(runThroughApplyOplogBatch({prepare}));
+
+    const OplogEntry commit = makePreparedCommitEntry(
+        prepare.getOpTime(),
+        {makeCommitMetadata(_uuid, CollectionSizeCount{.size = -kDoc2.objsize(), .count = -1})});
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    ASSERT_OK(runThroughApplyOplogBatch(
+        {commit,
+         makeWatermarkEntry(watermarkTs),
+         makeCheckpointEntry(
+             watermarkTs,
+             {{.uuid = _uuid,
+               .metadata = CollectionReplicatedMetadata{
+                   .sizeCount = CollectionSizeCount{.size = kDoc1.objsize(), .count = 1},
+                   // TODO(SERVER-138784): Expect a real hash here.
+                   .hash = boost::none}}})}));
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(PreparedTransactionHashValidationTest, PreparedTxnOpDeltasNotCounted) {
+    otel::metrics::OtelMetricsCapturer capturer;
+
+    // We need a normal insert so the checkpoint is non-empty.
+    const OplogEntry normalInsert = makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash);
+    ASSERT_OK(runThroughApplyOplogBatch({normalInsert}));
+
+    const OplogEntry prepare = makeApplyOpsOplogEntry(
+        nextOpTime(),
+        // This op is ignored by the validator entirely.
+        {makeTxnOp(_nss,
+                   _uuid,
+                   OpTypeEnum::kInsert,
+                   kDoc2,
+                   boost::none,
+                   RecordId(2),
+                   {.sizeCount = {.size = kDoc2.objsize(), .count = 1}, .hash = kDoc2Hash})},
+        sessionInfo(),
+        Date_t::now(),
+        {StmtId(0)},
+        OpTime(),
+        /*multiOpType=*/boost::none,
+        ApplyOpsType::kPrepare);
+    ASSERT_OK(runThroughApplyOplogBatch({prepare}));
+
+    const Timestamp postPrepareWatermarkTs = nextOpTime().getTimestamp();
+    ASSERT_OK(runThroughApplyOplogBatch(
+        {makeWatermarkEntry(postPrepareWatermarkTs),
+         makeCheckpointEntry(
+             postPrepareWatermarkTs,
+             {{.uuid = _uuid,
+               .metadata = CollectionReplicatedMetadata{
+                   .sizeCount = CollectionSizeCount{.size = kDoc1.objsize(), .count = 1},
+                   .hash = kDoc1Hash}}})}));
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+
+    const OplogEntry commit = makePreparedCommitEntry(
+        prepare.getOpTime(),
+        // The validator adopts this arbitrary size and count blindly.
+        {makeCommitMetadata(_uuid, CollectionSizeCount{.size = 500, .count = 10})});
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    ASSERT_OK(runThroughApplyOplogBatch(
+        {commit,
+         makeWatermarkEntry(watermarkTs),
+         makeCheckpointEntry(
+             watermarkTs,
+             {{.uuid = _uuid,
+               .metadata = CollectionReplicatedMetadata{
+                   // TODO(SERVER-138783): Expect a real size and count here.
+                   .sizeCount = CollectionSizeCount{.size = kDoc1.objsize() + 500, .count = 11},
+                   // TODO(SERVER-138784): Expect a real hash here.
+                   .hash = boost::none}}})}));
+    expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 0, .validated = 2});
+}
+
+TEST_F(PreparedTransactionHashValidationTest, PreparedTxnOpsAndCommitInSameBatch) {
+    otel::metrics::OtelMetricsCapturer capturer;
+
+    const OplogEntry prepare = makeApplyOpsOplogEntry(
+        nextOpTime(),
+        {makeTxnOp(_nss,
+                   _uuid,
+                   OpTypeEnum::kInsert,
+                   kDoc1,
+                   boost::none,
+                   RecordId(1),
+                   {.sizeCount = {.size = kDoc1.objsize(), .count = 1}, .hash = kDoc1Hash})},
+        sessionInfo(),
+        Date_t::now(),
+        {StmtId(0)},
+        OpTime(),
+        /*multiOpType=*/boost::none,
+        ApplyOpsType::kPrepare);
+    const OplogEntry commit = makePreparedCommitEntry(
+        prepare.getOpTime(),
+        {makeCommitMetadata(_uuid, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1})});
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    ASSERT_OK(runThroughApplyOplogBatch(
+        {prepare,
+         commit,
+         makeWatermarkEntry(watermarkTs),
+         makeCheckpointEntry(
+             watermarkTs,
+             {{.uuid = _uuid,
+               .metadata = CollectionReplicatedMetadata{
+                   .sizeCount = CollectionSizeCount{.size = kDoc1.objsize(), .count = 1},
+                   // TODO(SERVER-138784): Expect a real hash here.
+                   .hash = boost::none}}})}));
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(PreparedTransactionHashValidationTest, AbortedPreparedTxnChangesNothing) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const NamespaceString nss2 =
+        NamespaceString::createNamespaceString_forTest("test.preparedTxnAbort2");
+    const UUID uuid2 = createCollectionWithUuid(_opCtx.get(), nss2);
+    const OplogEntry prepare =
+        makeApplyOpsOplogEntry(nextOpTime(),
+                               {makeTxnOp(_nss,
+                                          _uuid,
+                                          OpTypeEnum::kInsert,
+                                          kDoc1,
+                                          boost::none,
+                                          RecordId(3),
+                                          {.sizeCount = {.size = kDoc1.objsize(), .count = 1},
+                                           .hash = computeDocValidationHash(kDoc1)})},
+                               sessionInfo(),
+                               Date_t::now(),
+                               {StmtId(0)},
+                               OpTime(),
+                               /*multiOpType=*/boost::none,
+                               ApplyOpsType::kPrepare);
+    ASSERT_OK(runThroughApplyOplogBatch({prepare}));
+
+    const auto readSessionRecord = [this] {
+        BSONObjBuilder bob;
+        bob.append("_id", _lsid.toBSON());
+        const auto id = bob.obj();
+        Lock::GlobalLock lk(_opCtx.get(), MODE_IS);
+        return getStorageInterface()
+            ->findById(_opCtx.get(),
+                       NamespaceString::kSessionTransactionsTableNamespace,
+                       id.firstElement())
+            .getValue();
+    };
+    ASSERT_EQUALS(readSessionRecord().getField("state").str(), "prepared");
+
+    const OplogEntry abort =
+        makeCommandOplogEntryWithSessionInfoAndStmtIds(nextOpTime(),
+                                                       _nss,
+                                                       BSON("abortTransaction" << 1),
+                                                       _lsid,
+                                                       _txnNum,
+                                                       {StmtId(1)},
+                                                       prepare.getOpTime());
+    const OplogEntry doc2Insert = makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), nss2, uuid2, kDoc2, RecordId(1), computeDocValidationHash(kDoc2));
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    ASSERT_OK(runThroughApplyOplogBatch(
+        {abort,
+         doc2Insert,
+         makeWatermarkEntry(watermarkTs),
+         // _uuid is not present in the checkpoint.
+         makeCheckpointEntry(
+             watermarkTs,
+             {{.uuid = uuid2,
+               .metadata = CollectionReplicatedMetadata{
+                   .sizeCount = CollectionSizeCount{.size = kDoc2.objsize(), .count = 1},
+                   .hash = computeDocValidationHash(kDoc2)}}})}));
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+    ASSERT_EQUALS(readSessionRecord().getField("state").str(), "aborted");
+}
+
+TEST_F(PreparedTransactionHashValidationTest, MultiNamespacePreparedTxnChangesEachCollection) {
+    const NamespaceString nss2 =
+        NamespaceString::createNamespaceString_forTest("test.preparedTxnHash2");
+    const UUID uuid2 = createCollectionWithUuid(_opCtx.get(), nss2);
+
+    std::vector<OplogEntry> baseline;
+    baseline.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+        nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
+    const Timestamp baselineWatermarkTs = nextOpTime().getTimestamp();
+    baseline.push_back(makeWatermarkEntry(baselineWatermarkTs));
+    baseline.push_back(makeCheckpointEntry(
+        baselineWatermarkTs,
+        {{.uuid = _uuid,
+          .metadata = CollectionReplicatedMetadata{
+              .sizeCount = CollectionSizeCount{.size = kDoc1.objsize(), .count = 1},
+              .hash = kDoc1Hash}}}));
+    ASSERT_OK(runThroughApplyOplogBatch(std::move(baseline)));
+
+    otel::metrics::OtelMetricsCapturer capturer;
+
+    const BSONObj docY = BSON("_id" << 1 << "y" << 1);
+    const BSONObj docYUpdated = BSON("_id" << 1 << "y" << 1 << "z" << 1);
+    const OplogEntry prepare = makeApplyOpsOplogEntry(
+        nextOpTime(),
+        {makeTxnOp(_nss,
+                   _uuid,
+                   OpTypeEnum::kDelete,
+                   BSON("_id" << 1),
+                   boost::none,
+                   RecordId(1),
+                   {.sizeCount = {.size = -kDoc1.objsize(), .count = -1}, .hash = kDoc1Hash}),
+         makeTxnOp(_nss,
+                   _uuid,
+                   OpTypeEnum::kInsert,
+                   kDoc2,
+                   boost::none,
+                   RecordId(2),
+                   {.sizeCount = {.size = kDoc2.objsize(), .count = 1}, .hash = kDoc2Hash}),
+         makeTxnOp(nss2,
+                   uuid2,
+                   OpTypeEnum::kInsert,
+                   docY,
+                   boost::none,
+                   RecordId(1),
+                   {.sizeCount = {.size = docY.objsize(), .count = 1},
+                    .hash = computeDocValidationHash(docY)}),
+         makeTxnOp(nss2,
+                   uuid2,
+                   OpTypeEnum::kUpdate,
+                   docYUpdated,
+                   BSON("_id" << 1),
+                   RecordId(1),
+                   {.sizeCount = {.size = docYUpdated.objsize() - docY.objsize(), .count = 0},
+                    .hash = computeUpdateValidationHash(docY, docYUpdated)})},
+        sessionInfo(),
+        Date_t::now(),
+        {StmtId(0)},
+        OpTime(),
+        /*multiOpType=*/boost::none,
+        ApplyOpsType::kPrepare);
+    ASSERT_OK(runThroughApplyOplogBatch({prepare}));
+
+    const OplogEntry commit = makePreparedCommitEntry(
+        prepare.getOpTime(),
+        {makeCommitMetadata(
+             _uuid, CollectionSizeCount{.size = kDoc2.objsize() - kDoc1.objsize(), .count = 0}),
+         makeCommitMetadata(uuid2,
+                            CollectionSizeCount{.size = docYUpdated.objsize(), .count = 1})});
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    ASSERT_OK(runThroughApplyOplogBatch(
+        {commit,
+         makeWatermarkEntry(watermarkTs),
+         makeCheckpointEntry(
+             watermarkTs,
+             {{.uuid = _uuid,
+               .metadata =
+                   CollectionReplicatedMetadata{
+                       .sizeCount = CollectionSizeCount{.size = kDoc2.objsize(), .count = 1},
+                       // TODO(SERVER-138784): Expect a real hash here.
+                       .hash = boost::none}},
+              {.uuid = uuid2,
+               .metadata = CollectionReplicatedMetadata{
+                   .sizeCount = CollectionSizeCount{.size = docYUpdated.objsize(), .count = 1},
+                   // TODO(SERVER-138784): Expect a real hash here.
+                   .hash = boost::none}}})}));
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(PreparedTransactionHashValidationTest, PreparedTxnCommitWithoutApplierPrepare) {
+    otel::metrics::OtelMetricsCapturer capturer;
+
+    const OplogEntry prepare = makeApplyOpsOplogEntry(
+        nextOpTime(),
+        {makeTxnOp(_nss,
+                   _uuid,
+                   OpTypeEnum::kInsert,
+                   kDoc1,
+                   boost::none,
+                   RecordId(1),
+                   {.sizeCount = {.size = kDoc1.objsize(), .count = 1}, .hash = kDoc1Hash})},
+        sessionInfo(),
+        Date_t::now(),
+        {StmtId(0)},
+        OpTime(),
+        /*multiOpType=*/boost::none,
+        ApplyOpsType::kPrepare);
+    // Simulate the recovery path which initializes the prepared state of a transaction without
+    // using an oplog applier worker thread. The validator does not see this entry.
+    ASSERT_OK(
+        applyPrepareTransaction(_opCtx.get(),
+                                ApplierOperation{&prepare,
+                                                 ApplicationInstruction::applyTopLevelPreparedTxnOp,
+                                                 std::vector<OplogEntry>{}},
+                                OplogApplication::Mode::kSecondary));
+
+    // The validator does see this commit entry.
+    const OplogEntry commit = makePreparedCommitEntry(
+        prepare.getOpTime(),
+        {makeCommitMetadata(_uuid, CollectionSizeCount{.size = kDoc1.objsize(), .count = 1})});
+    const Timestamp watermarkTs = nextOpTime().getTimestamp();
+    ASSERT_OK(runThroughApplyOplogBatch(
+        {commit,
+         makeWatermarkEntry(watermarkTs),
+         makeCheckpointEntry(
+             watermarkTs,
+             {{.uuid = _uuid,
+               .metadata = CollectionReplicatedMetadata{
+                   .sizeCount = CollectionSizeCount{.size = kDoc1.objsize(), .count = 1},
+                   .hash = boost::none}}})}));
+    //...and successfuly validates it.
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
 
 TEST_F(SingleWorkerCheckpointValidationTest,
        CheckpointValidatesGroupedInsertsWithInterleavedWatermark) {

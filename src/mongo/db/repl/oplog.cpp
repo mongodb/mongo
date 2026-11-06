@@ -2069,7 +2069,8 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                OplogApplication::Mode mode,
                                UpdateRequest request,
                                bool recordChangeStreamPreImage,
-                               BSONObj& preImage) {
+                               BSONObj& preImage,
+                               CheckpointDeltaRecording deltaRecording) {
     const CollectionPtr& collPtr = coll.getCollectionPtr();
 
     tassert(7834903, "updateObjectByRid does not support upsert requests", !request.isUpsert());
@@ -2252,21 +2253,25 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                 redact(op.toBSONForLogging()).toString()),
                     actualDelta == oplogSz);
 
-                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                    [uuid = collPtr->uuid(),
-                     ts = op.getOpTime().getTimestamp(),
-                     actualDelta,
-                     localHash](OperationContext*, boost::optional<Timestamp>) {
-                        replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
-                            uuid,
-                            ts,
-                            ReplicatedMetadataDelta{
-                                .metadata = {.sizeCount = CollectionSizeCount{.size = actualDelta,
-                                                                              .count = 0},
-                                             .hash = localHash},
-                                .state = DDLState::kNone});
-                    });
-            } else if (singleOpMeta && singleOpMeta->getH()) {
+                if (deltaRecording == CheckpointDeltaRecording::kPerOperation) {
+                    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                        [uuid = collPtr->uuid(),
+                         ts = op.getOpTime().getTimestamp(),
+                         actualDelta,
+                         localHash](OperationContext*, boost::optional<Timestamp>) {
+                            replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
+                                uuid,
+                                ts,
+                                ReplicatedMetadataDelta{
+                                    .metadata = {.sizeCount =
+                                                     CollectionSizeCount{.size = actualDelta,
+                                                                         .count = 0},
+                                                 .hash = localHash},
+                                    .state = DDLState::kNone});
+                        });
+                }
+            } else if (singleOpMeta && singleOpMeta->getH() &&
+                       deltaRecording == CheckpointDeltaRecording::kPerOperation) {
                 shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                     [uuid = collPtr->uuid(), op, localHash](OperationContext*,
                                                             boost::optional<Timestamp>) {
@@ -2308,7 +2313,8 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                                const BSONElement& idField,
                                OplogApplication::Mode mode,
                                const DeleteRequest& request,
-                               bool recordChangeStreamPreImage) {
+                               bool recordChangeStreamPreImage,
+                               CheckpointDeltaRecording deltaRecording) {
     const CollectionPtr& collPtr = coll.getCollectionPtr();
 
     if (!collPtr) {
@@ -2472,26 +2478,31 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                                 redact(op.toBSONForLogging()).toString()),
                     actualDelta == oplogSz);
 
-                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                    [uuid = collPtr->uuid(),
-                     ts = op.getOpTime().getTimestamp(),
-                     actualDelta,
-                     localHash](OperationContext*, boost::optional<Timestamp>) {
-                        replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
-                            uuid,
-                            ts,
-                            ReplicatedMetadataDelta{
-                                .metadata = {.sizeCount = CollectionSizeCount{.size = actualDelta,
-                                                                              .count = -1},
-                                             .hash = localHash},
-                                .state = DDLState::kNone});
-                    });
+                if (deltaRecording == CheckpointDeltaRecording::kPerOperation) {
+                    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                        [uuid = collPtr->uuid(),
+                         ts = op.getOpTime().getTimestamp(),
+                         actualDelta,
+                         localHash](OperationContext*, boost::optional<Timestamp>) {
+                            replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
+                                uuid,
+                                ts,
+                                ReplicatedMetadataDelta{
+                                    .metadata = {.sizeCount =
+                                                     CollectionSizeCount{.size = actualDelta,
+                                                                         .count = -1},
+                                                 .hash = localHash},
+                                    .state = DDLState::kNone});
+                        });
+                }
             } else if (singleOpMeta && singleOpMeta->getH()) {
-                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                    [uuid = collPtr->uuid(), op, localHash](OperationContext*,
-                                                            boost::optional<Timestamp>) {
-                        recordHashOnlyDelta(uuid, op, localHash);
-                    });
+                if (deltaRecording == CheckpointDeltaRecording::kPerOperation) {
+                    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                        [uuid = collPtr->uuid(), op, localHash](OperationContext*,
+                                                                boost::optional<Timestamp>) {
+                            recordHashOnlyDelta(uuid, op, localHash);
+                        });
+                }
             }
         }
     }
@@ -2584,7 +2595,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
                              const bool isDataConsistent,
-                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
+                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
+                             CheckpointDeltaRecording deltaRecording) {
     // Get the single oplog entry to be applied or the first oplog entry of grouped inserts.
     const auto& op = *opOrGroupedInserts.getOp();
     LOGV2_DEBUG(21254,
@@ -2897,7 +2909,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     }
                 }
 
-                if (mode == repl::OplogApplication::Mode::kSecondary) {
+                if (mode == repl::OplogApplication::Mode::kSecondary &&
+                    deltaRecording == CheckpointDeltaRecording::kPerOperation) {
                     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                         [uuid = collection->uuid(),
                          insertObjs,
@@ -3023,7 +3036,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                                  *localHash,
                                                  op);
                         }
-                        if (mode == OplogApplication::Mode::kSecondary) {
+                        if (mode == OplogApplication::Mode::kSecondary &&
+                            deltaRecording == CheckpointDeltaRecording::kPerOperation) {
                             shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                                 [uuid = collection->uuid(), op, o, localHash](
                                     OperationContext*, boost::optional<Timestamp>) {
@@ -3303,7 +3317,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                                      mode,
                                                      request,
                                                      recordChangeStreamPreImage,
-                                                     changeStreamPreImage);
+                                                     changeStreamPreImage,
+                                                     deltaRecording);
                         } else {
                             bool recordPreImage =
                                 recordChangeStreamPreImage && request.shouldReturnNewDocs();
@@ -3525,7 +3540,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                                    idField,
                                                    mode,
                                                    request,
-                                                   recordChangeStreamPreImage);
+                                                   recordChangeStreamPreImage,
+                                                   deltaRecording);
                     } else {
                         // Run an Express delete by _id query.
                         result = deleteObject(opCtx, collectionAcquisition, request);
