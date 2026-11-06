@@ -342,8 +342,8 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
     // that every request attempts to make progress before the deadline can fire.
     ASSERT_FALSE(exec->enforceResponseDeadline());
 
-    // Attempt to produce a result. Whether the scan yields (and observes the deadline) or produces
-    // the document, at least one unit of work is attempted, which arms the batch-boundary check.
+    // Attempt to produce a result. The scan performs at least one unit of work, which arms the
+    // batch-boundary check. Any yield that fires before this work does not observe the deadline.
     BSONObj obj;
     exec->getNext(&obj, nullptr);
 
@@ -353,6 +353,96 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
     ASSERT_TRUE(exec->enforceResponseDeadline());
 
     // The executor is now interrupted, so the next getNext() returns IS_EOF without scanning.
+    ASSERT_EQ(PlanExecutor::IS_EOF, exec->getNext(&obj, nullptr));
+}
+
+// 'enforceResponseDeadline()' may fire between getNext() calls (for example at a batch boundary).
+// The executor must honor that interruption on the next getNext() even when the yield timer has not
+// elapsed, i.e. when no yield is due. The other tests use the auto-advancing clock, which makes a
+// yield due on every loop iteration and therefore masks this case.
+TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
+       ChangeStreamQuery_InterruptedWithoutYieldDue_ReturnsEOF) {
+    unittest::ServerParameterGuard knobController("internalOperationResponseMaxMS", 1LL);
+    // A yield period larger than the mock clock's per-call advance (5000 ms) ensures the yield
+    // timer never elapses during the test, so no yield is due after the first loop iteration.
+    unittest::ServerParameterGuard yieldPeriodController("internalQueryExecYieldPeriodMS",
+                                                         100000LL);
+
+    auto opCtx = operationContext();
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
+    DocumentSourceChangeStreamSpec spec;
+    expCtx->setChangeStreamSpec(spec);
+    expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+
+    auto [ws, mockStage] =
+        makeMockStageWithDocuments(expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)});
+
+    auto coll = acquireTestCollection();
+    auto exec = plan_executor_factory::make(expCtx,
+                                            std::move(ws),
+                                            std::move(mockStage),
+                                            coll,
+                                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                            QueryPlannerParams::DEFAULT);
+
+    auto* implExec = dynamic_cast<PlanExecutorImpl*>(exec.get());
+    ASSERT(implExec);
+    ASSERT_EQ(PlanExecutorImpl::ResponseDeadlineType::kInterruptWork,
+              implExec->getResponseDeadlineType_forTest());
+
+    // Produce the first document; this also arms the batch-boundary check.
+    BSONObj obj;
+    ASSERT_EQ(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), obj);
+
+    // Simulate a batch-boundary check between getNext() calls: the deadline has expired, so the
+    // executor is marked as interrupted.
+    ASSERT_TRUE(exec->enforceResponseDeadline());
+
+    // The next getNext() must return IS_EOF even though no yield is due.
+    ASSERT_EQ(PlanExecutor::IS_EOF, exec->getNext(&obj, nullptr));
+}
+
+// A yield that fires before the executor has attempted any work must not softly interrupt the
+// request. Setup, lock acquisition, or scheduling can consume the entire response budget (and the
+// yield period) before the first '_root->work()' call; if the yield path interrupted there, every
+// getMore would return an empty batch with an unchanged PBRT despite an oplog backlog. The deadline
+// may only be enforced once the scan has attempted at least one unit of work.
+TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
+       ChangeStreamQuery_DeadlineExpiredBeforeFirstWork_YieldDoesNotInterrupt) {
+    unittest::ServerParameterGuard controller("internalOperationResponseMaxMS", 1LL);
+
+    auto opCtx = operationContext();
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
+    DocumentSourceChangeStreamSpec spec;
+    expCtx->setChangeStreamSpec(spec);
+    expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+
+    // The auto-advancing clock (5000 ms per now() call) makes the yield policy request a yield on
+    // the very first loop iteration, i.e. before '_root->work()' has run.
+    auto [ws, mockStage] = makeMockStageWithDocuments(expCtx.get(), {BSON("_id" << 1)});
+
+    auto coll = acquireTestCollection();
+    auto exec = plan_executor_factory::make(expCtx,
+                                            std::move(ws),
+                                            std::move(mockStage),
+                                            coll,
+                                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                            QueryPlannerParams::DEFAULT);
+
+    auto* implExec = dynamic_cast<PlanExecutorImpl*>(exec.get());
+    ASSERT(implExec);
+    ASSERT_EQ(PlanExecutorImpl::ResponseDeadlineType::kInterruptWork,
+              implExec->getResponseDeadlineType_forTest());
+
+    // Even though the (auto-advancing) clock is already well past the 1 ms deadline and a yield
+    // fires before any work, the executor must still scan and return the first document rather than
+    // a synthetic IS_EOF.
+    BSONObj obj;
+    ASSERT_EQ(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), obj);
+
+    // Once work has been attempted, the deadline is enforced and the next getNext() returns IS_EOF.
     ASSERT_EQ(PlanExecutor::IS_EOF, exec->getNext(&obj, nullptr));
 }
 

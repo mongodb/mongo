@@ -252,72 +252,77 @@ describe("operationResponseMaxMS parameter", () => {
 
         assert.commandWorked(testDB.createCollection(watchedCollName));
 
-        // The $match rejects every change event, so the pipeline produces no results even though
-        // the oplog scan reads matching entries.
-        const aggRes = assert.commandWorked(
-            testDB.runCommand({
-                aggregate: watchedCollName,
-                pipeline: [{$changeStream: {}}, {$match: {operationType: "delete"}}],
-                cursor: {batchSize: 0},
-            }),
-        );
+        // Disable periodic yielding before the filtered change stream is opened. The yield policy
+        // captures 'internalQueryExecYieldPeriodMS' when the executor is constructed (at aggregate
+        // time), so setting it afterwards would have no effect on this cursor. With periodic
+        // yielding disabled, the response deadline can only be observed at the batch boundary.
+        runWithParamsAllNonConfigNodes(testDB, {internalQueryExecYieldPeriodMS: 100000}, () => {
+            // The $match rejects every change event, so the pipeline produces no results even though
+            // the oplog scan reads matching entries. Use the equivalent regex rather than an equality
+            // predicate: the change stream rewrite pushes 'operationType: "delete"' into the oplog
+            // filter as 'op: "d"', which would filter out the inserted events before they could fill
+            // the cursor's batches. A regex cannot be rewritten, so the events reach this $match and
+            // are rejected downstream, which is the behavior this case exercises.
+            const aggRes = assert.commandWorked(
+                testDB.runCommand({
+                    aggregate: watchedCollName,
+                    pipeline: [
+                        {$changeStream: {}},
+                        {$match: {operationType: {$regex: "^delete$"}}},
+                    ],
+                    cursor: {batchSize: 0},
+                }),
+            );
 
-        const cursorId = aggRes.cursor.id;
-        assert.neq(NumberLong(0), cursorId, "Expected an open change stream cursor", {aggRes});
+            const cursorId = aggRes.cursor.id;
+            assert.neq(NumberLong(0), cursorId, "Expected an open change stream cursor", {aggRes});
 
-        // Insert a backlog of events into the watched collection. They pass the change stream's
-        // oplog filter but are rejected by the downstream $match.
-        const kNumDocs = 500;
-        const watchedColl = testDB.getCollection(watchedCollName);
-        assert.commandWorked(
-            watchedColl.insertMany(Array.from({length: kNumDocs}, (_, i) => ({_id: i}))),
-        );
+            // Insert a backlog of events into the watched collection. They pass the change stream's
+            // oplog filter but are rejected by the downstream $match.
+            const kNumDocs = 500;
+            const watchedColl = testDB.getCollection(watchedCollName);
+            assert.commandWorked(
+                watchedColl.insertMany(Array.from({length: kNumDocs}, (_, i) => ({_id: i}))),
+            );
 
-        // Slow the scan so it runs past the response deadline, and disable periodic yielding so
-        // the deadline cannot be observed on a yield inside the scan: it can only be enforced at
-        // the batch boundary. This isolates the interaction the test targets.
-        const kDoWorkDelayMS = 50;
-        withFailPoint(
-            primary,
-            "hangCollScanDoWork",
-            () => {
-                runWithParamsAllNonConfigNodes(
-                    testDB,
-                    {internalQueryExecYieldPeriodMS: 100000},
-                    () => {
-                        const start = Date.now();
-                        const res = assert.commandWorked(
-                            testDB.runCommand({
-                                getMore: cursorId,
-                                collection: watchedCollName,
-                                maxTimeMS: kGetMoreMaxTimeMS,
-                            }),
-                        );
-                        const elapsed = Date.now() - start;
+            // Slow the scan so it runs past the response deadline.
+            const kDoWorkDelayMS = 50;
+            withFailPoint(
+                primary,
+                "hangCollScanDoWork",
+                () => {
+                    const start = Date.now();
+                    const res = assert.commandWorked(
+                        testDB.runCommand({
+                            getMore: cursorId,
+                            collection: watchedCollName,
+                            maxTimeMS: kGetMoreMaxTimeMS,
+                        }),
+                    );
+                    const elapsed = Date.now() - start;
 
-                        // All events are rejected downstream, so the batch is empty. The deadline
-                        // must still bound the getMore instead of letting it keep scanning.
-                        assert.eq(
-                            0,
-                            res.cursor.nextBatch.length,
-                            "Expected empty batch: all events rejected",
-                            {res},
-                        );
-                        assert.lt(
-                            elapsed,
-                            kMaxGetMoreDurationMS,
-                            "getMore must return near the response deadline even when a downstream filter rejects the batch",
-                            {elapsed},
-                        );
-                    },
-                );
-            },
-            {data: {delay: kDoWorkDelayMS}},
-        );
+                    // All events are rejected downstream, so the batch is empty. The deadline
+                    // must still bound the getMore instead of letting it keep scanning.
+                    assert.eq(
+                        0,
+                        res.cursor.nextBatch.length,
+                        "Expected empty batch: all events rejected",
+                        {res},
+                    );
+                    assert.lt(
+                        elapsed,
+                        kMaxGetMoreDurationMS,
+                        "getMore must return near the response deadline even when a downstream filter rejects the batch",
+                        {elapsed},
+                    );
+                },
+                {data: {delay: kDoWorkDelayMS}},
+            );
 
-        // Clean up the change stream cursor.
-        assert.commandWorked(
-            testDB.runCommand({killCursors: watchedCollName, cursors: [cursorId]}),
-        );
+            // Clean up the change stream cursor.
+            assert.commandWorked(
+                testDB.runCommand({killCursors: watchedCollName, cursors: [cursorId]}),
+            );
+        });
     });
 });

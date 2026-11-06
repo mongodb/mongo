@@ -155,8 +155,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_stream_operation_response_passthrough",
-    config = "//buildscripts/resmokeconfig:suites/change_stream_operation_response_passthrough.yml",
+    name = "change_streams_operation_response_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_operation_response_passthrough.yml",
     shard_count = 5,
     tags = [
         "change_streams",

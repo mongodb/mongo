@@ -442,10 +442,6 @@ PlanExecutor::ExecState PlanExecutorImpl::getNextDocument(Document& objOut) {
 PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordId* dlOut) {
     checkFailPointPlanExecAlwaysFails(nss());
 
-    // Record that the current request has attempted to produce a result. Used to avoid enforcing
-    // the response deadline at a batch boundary before any work has been attempted.
-    _didWorkSinceReattach = true;
-
     invariant(_currentState == kUsable);
     if (isMarkedAsKilled()) {
         uassertStatusOK(_killStatus);
@@ -476,7 +472,11 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
     const auto afterSnapshotAndLocksRelinquishedCb = [&]() {
         doWaitDuringYield();
 
-        if (_responseDeadlineType != ResponseDeadlineType::kNone) {
+        // Defer soft interruption until the scan has attempted at least one unit of work in this
+        // request. Setup, lock acquisition, or scheduling can consume the entire response budget
+        // before the first '_root->work()' call; without this guard the first yield would return an
+        // empty batch (with an unchanged PBRT) without ever attempting to scan.
+        if (_didWorkSinceReattach && _responseDeadlineType != ResponseDeadlineType::kNone) {
             // May set '_interrupted' to true if the response deadline is reached.
             _handleResponseDeadline();
         }
@@ -493,13 +493,22 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
                                                            afterSnapshotAndLocksRelinquishedCb,
                                                            RestoreContext::RestoreType::kYield,
                                                            _afterSnapshotAbandonFn));
-            if (_interrupted) {
-                return PlanExecutor::IS_EOF;
-            }
+        }
+
+        // Honor a soft interruption even when no yield is due. 'enforceResponseDeadline()' may have
+        // fired between getNext() calls (for example at a batch boundary), and the executor must
+        // then return EOF rather than resume scanning.
+        if (_interrupted) {
+            return PlanExecutor::IS_EOF;
         }
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState code = _root->work(&id);
+
+        // Record that the current request has attempted to produce a result. Deferring this until
+        // after the first work call prevents a yield that fires during setup (before any scan work)
+        // from softly interrupting the request before it can make progress.
+        _didWorkSinceReattach = true;
 
         if (code != PlanStage::NEED_YIELD) {
             retryState.writeConflictsInARow = 0;
@@ -748,10 +757,6 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
         return 0;
     }
 
-    // Record that the current request has attempted to produce a result. Used to avoid enforcing
-    // the response deadline at a batch boundary before any work has been attempted.
-    _didWorkSinceReattach = true;
-
     checkFailPointPlanExecAlwaysFails(nss());
     _checkIfKilled();
 
@@ -790,6 +795,11 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
         _checkIfMustYield(whileYieldingFn);
 
         PlanStage::StageState code = _root->work(&id);
+
+        // Record that the current request has attempted to produce a result. Deferring this until
+        // after the first work call prevents a batch-boundary check from enforcing the deadline
+        // before the executor has had a chance to make progress.
+        _didWorkSinceReattach = true;
 
         if (code != PlanStage::NEED_YIELD) {
             retryState.writeConflictsInARow = 0;
