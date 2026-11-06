@@ -740,6 +740,249 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsTracksMergedSpillBatches) {
     EXPECT_EQ(tracker.mergedSpills.loadRelaxed(), kExpectedMergedSpills);
 }
 
+template <typename Traits>
+class SorterFinalizeSpillsTest : public MakeFromExistingRangesTypedTestBase<Traits> {
+public:
+    // TODO (SERVER-116165): Remove.
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+};
+
+TYPED_TEST_SUITE(SorterFinalizeSpillsTest, MakeFromExistingRangesTypes);
+
+enum class SpillMode { kNone, kForced, kEveryAdd };
+
+constexpr int kFinalizeSpillsNumPairs = 5;
+
+/**
+ * With maxIteratorsMemoryUsagePercentage at 1.0, returns sort options under which every add()
+ * spills its own range and none of those spills merges ranges: all of the memory budget goes to
+ * iterators, with room for one more iterator than there are pairs.
+ */
+SortOptions makeSpillEveryAddOptions(size_t iteratorSizeBytes) {
+    return SortOptions().MaxMemoryUsageBytes((kFinalizeSpillsNumPairs + 1) * iteratorSizeBytes);
+}
+
+std::vector<std::string> getRanges(Spiller<IntWrapper, IntWrapper, IWComparator>& spiller) {
+    std::vector<std::string> ranges;
+    for (auto&& it : spiller.iterators()) {
+        ranges.push_back(it->getRange().toBSON().toString());
+    }
+    return ranges;
+}
+
+/**
+ * Adds pairs in descending order to a sorter with the given 'limit', spilling according to
+ * 'spillMode', then reads them back with done(), calling finalizeSpills() first if 'finalizeFirst'
+ * is true.
+ */
+template <typename Traits>
+std::vector<IWPair> sortPairs(Traits& storage,
+                              const boost::filesystem::path& spillDir,
+                              unsigned long long limit,
+                              SpillMode spillMode,
+                              bool finalizeFirst) {
+    auto opts = spillMode == SpillMode::kEveryAdd
+        ? makeSpillEveryAddOptions(storage.iteratorSizeBytes())
+        : SortOptions();
+    opts.Limit(limit);
+    auto sorter = IWSorter::make(opts, IWComparator(ASC), storage.makeSpiller(opts, spillDir), {});
+    for (int i = kFinalizeSpillsNumPairs; i > 0; --i) {
+        sorter->add(i, -i);
+    }
+    if (spillMode == SpillMode::kForced) {
+        sorter->spill();
+    }
+    if (finalizeFirst) {
+        sorter->finalizeSpills();
+    }
+
+    std::vector<IWPair> output;
+    auto it = sorter->done();
+    while (it->more()) {
+        output.push_back(it->next());
+    }
+    return output;
+}
+
+TYPED_TEST(SorterFinalizeSpillsTest, DoneAfterFinalizeSpillsMatchesDone) {
+    unittest::ServerParameterGuard iteratorsMemory{"maxIteratorsMemoryUsagePercentage", 1.0};
+    auto spillDir = makeSpillDir();
+
+    // LimitOneSorter never spills, so it is only checked without spilling.
+    for (unsigned long long limit : {0ULL, 1ULL, 2ULL}) {
+        for (auto spillMode : {SpillMode::kNone, SpillMode::kForced, SpillMode::kEveryAdd}) {
+            if (limit == 1 && spillMode != SpillMode::kNone) {
+                continue;
+            }
+            SCOPED_TRACE(fmt::format("limit: {}, spillMode: {}", limit, int(spillMode)));
+            auto expected = sortPairs(this->storage(), spillDir.path(), limit, spillMode, false);
+            auto actual = sortPairs(this->storage(), spillDir.path(), limit, spillMode, true);
+            ASSERT_EQ(expected.size(), limit ? limit : kFinalizeSpillsNumPairs);
+            ASSERT_EQ(actual.size(), expected.size());
+            for (size_t i = 0; i < expected.size(); ++i) {
+                EXPECT_EQ(actual[i].first, expected[i].first);
+                EXPECT_EQ(actual[i].second, expected[i].second);
+            }
+        }
+    }
+}
+
+TYPED_TEST(SorterFinalizeSpillsTest, FinalizeSpillsMergesSoDoneDoesNot) {
+    unittest::ServerParameterGuard iteratorsMemory{"maxIteratorsMemoryUsagePercentage", 1.0};
+    auto spillDir = makeSpillDir();
+
+    for (unsigned long long limit : {0ULL, 2ULL}) {
+        SCOPED_TRACE(fmt::format("limit: {}", limit));
+        auto opts = makeSpillEveryAddOptions(this->storage().iteratorSizeBytes()).Limit(limit);
+        auto spiller = this->storage().makeSpiller(opts, spillDir.path());
+        auto sorter = IWSorter::make(opts, IWComparator(ASC), spiller, {});
+        for (int i = kFinalizeSpillsNumPairs; i > 0; --i) {
+            sorter->add(i, -i);
+        }
+        ASSERT_EQ(spiller->iterators().size(), static_cast<size_t>(kFinalizeSpillsNumPairs));
+        ASSERT_EQ(sorter->stats().mergedSpills(), 0);
+
+        // No memory is left for buffering ranges, so the final merge goes down to two ranges.
+        sorter->finalizeSpills();
+        EXPECT_EQ(spiller->iterators().size(), 2);
+        const auto mergedSpills = sorter->stats().mergedSpills();
+        EXPECT_GT(mergedSpills, 0U);
+        const auto ranges = getRanges(*spiller);
+
+        auto it = sorter->done();
+        EXPECT_EQ(sorter->stats().mergedSpills(), mergedSpills);
+        EXPECT_EQ(getRanges(*spiller), ranges);
+        const int numExpected = limit ? limit : kFinalizeSpillsNumPairs;
+        for (int i = 1; i <= numExpected; ++i) {
+            ASSERT(it->more());
+            auto [key, value] = it->next();
+            EXPECT_EQ(key, IntWrapper(i));
+            EXPECT_EQ(value, IntWrapper(-i));
+        }
+        EXPECT_FALSE(it->more());
+    }
+}
+
+TYPED_TEST(SorterFinalizeSpillsTest, FinalizeSpillsKeepsUnspilledDataInMemory) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions();
+    auto spiller = this->storage().makeSpiller(opts, spillDir.path());
+    auto sorter = IWSorter::make(opts, IWComparator(ASC), spiller, {});
+    for (int i = kFinalizeSpillsNumPairs; i > 0; --i) {
+        sorter->add(i, -i);
+    }
+
+    sorter->finalizeSpills();
+    EXPECT_TRUE(spiller->iterators().empty());
+    EXPECT_EQ(sorter->stats().spilledRanges(), 0);
+
+    auto it = sorter->done();
+    EXPECT_TRUE(spiller->iterators().empty());
+    EXPECT_EQ(sorter->stats().spilledRanges(), 0);
+    for (int i = 1; i <= kFinalizeSpillsNumPairs; ++i) {
+        ASSERT(it->more());
+        EXPECT_EQ(it->next().first, IntWrapper(i));
+    }
+    EXPECT_FALSE(it->more());
+}
+
+TYPED_TEST(SorterFinalizeSpillsTest, FinalizeSpillsAfterForcedSpillKeepsOneRange) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions();
+    auto spiller = this->storage().makeSpiller(opts, spillDir.path());
+    auto sorter = IWSorter::make(opts, IWComparator(ASC), spiller, {});
+    for (int i = kFinalizeSpillsNumPairs; i > 0; --i) {
+        sorter->add(i, -i);
+    }
+    sorter->spill();
+    ASSERT_EQ(spiller->iterators().size(), 1);
+
+    sorter->finalizeSpills();
+    EXPECT_EQ(spiller->iterators().size(), 1);
+    EXPECT_EQ(sorter->stats().spilledRanges(), 1);
+    EXPECT_EQ(sorter->stats().mergedSpills(), 0);
+
+    auto it = sorter->done();
+    EXPECT_EQ(spiller->iterators().size(), 1);
+    EXPECT_EQ(sorter->stats().spilledRanges(), 1);
+    for (int i = 1; i <= kFinalizeSpillsNumPairs; ++i) {
+        ASSERT(it->more());
+        EXPECT_EQ(it->next().first, IntWrapper(i));
+    }
+    EXPECT_FALSE(it->more());
+}
+
+TYPED_TEST(SorterFinalizeSpillsTest, FinalizeSpillsPersistsInMemoryRemainder) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions();
+    auto sorter = IWSorter::make(
+        opts, IWComparator(ASC), this->storage().makeSpiller(opts, spillDir.path()), {});
+    for (int i = kFinalizeSpillsNumPairs; i > 2; --i) {
+        sorter->add(i, -i);
+    }
+    sorter->spill();
+    for (int i = 2; i > 0; --i) {
+        sorter->add(i, -i);
+    }
+
+    sorter->finalizeSpills();
+    auto state = sorter->getPersistedState();
+
+    auto expectAllPairs = [](IWSorter::Iterator& it) {
+        for (int i = 1; i <= kFinalizeSpillsNumPairs; ++i) {
+            ASSERT(it.more());
+            auto [key, value] = it.next();
+            EXPECT_EQ(key, IntWrapper(i));
+            EXPECT_EQ(value, IntWrapper(-i));
+        }
+        EXPECT_FALSE(it.more());
+    };
+    expectAllPairs(*sorter->done());
+    // The spill file is only guaranteed to be flushed once the sorter is destroyed.
+    sorter.reset();
+
+    auto resumed = IWSorter::template makeFromExistingRanges<IWComparator>(
+        state.storageIdentifier,
+        state.ranges,
+        opts,
+        IWComparator(ASC),
+        this->storage().makeSpillerForResume(opts,
+                                             spillDir.path(),
+                                             sorter::kLatestChecksumVersion,
+                                             state.storageIdentifier,
+                                             state.ranges),
+        /*settings=*/{});
+    expectAllPairs(*resumed->done());
+}
+
+TYPED_TEST(SorterFinalizeSpillsTest, DoneAfterFailedFinalizeSpillsReturnsAllPairs) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions();
+    auto sorter = IWSorter::make(
+        opts, IWComparator(ASC), this->storage().makeSpiller(opts, spillDir.path()), {});
+    for (int i = kFinalizeSpillsNumPairs; i > 2; --i) {
+        sorter->add(i, -i);
+    }
+    sorter->spill();
+    for (int i = 2; i > 0; --i) {
+        sorter->add(i, -i);
+    }
+
+    {
+        FailPointEnableBlock fp("simulateAvailableDiskSpace", BSON("bytes" << 0LL));
+        ASSERT_THROWS_CODE(sorter->finalizeSpills(), DBException, ErrorCodes::OutOfDiskSpace);
+    }
+
+    auto it = sorter->done();
+    for (int i = 1; i <= kFinalizeSpillsNumPairs; ++i) {
+        ASSERT(it->more());
+        auto [key, value] = it->next();
+        EXPECT_EQ(key, IntWrapper(i));
+        EXPECT_EQ(value, IntWrapper(-i));
+    }
+    EXPECT_FALSE(it->more());
+}
+
 TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDisjointRanges) {
     unittest::TempDir spillDir = makeSpillDir();
     auto opts = SortOptions();

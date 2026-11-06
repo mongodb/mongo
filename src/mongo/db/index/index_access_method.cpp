@@ -1199,7 +1199,7 @@ private:
     MultikeyPaths _indexMultikeyPaths;
 
     std::unique_ptr<Sorter> _sorter;
-    std::unique_ptr<Iterator> _sortedIterator;
+    bool _done = false;
     ContainerWriteBehavior _containerWriteBehavior;
     // We start out without a NonexistentKeyGuarantee because it's not safe to write blindly unless
     // we know for certain that we're inserting something that is definitely not already in the
@@ -1414,11 +1414,12 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
 
 void BulkBuilderImpl::done(bool forceSpill) {
     invariant(_sorter);
-    tassert(12723200, "BulkBuilder::done called more than once", !_sortedIterator);
+    tassert(12723200, "BulkBuilder::done called more than once", !_done);
     if (forceSpill) {
         _sorter->spill();
     }
-    _sortedIterator = _sorter->done();
+    _sorter->finalizeSpills();
+    _done = true;
     updateProcessedMetrics(IndexBuildPhaseEnum::kCollectionScan,
                            _timer,
                            &_keysInsertedCounted,
@@ -1443,12 +1444,12 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
                                const size_t keyBatchBytes) {
     uassert(
         ErrorCodes::BadValue, "onNKeysLoadedFnInterval must be >= 1", onNKeysLoadedFnInterval >= 1);
-    tassert(12723201, "BulkBuilder::done must be called before commit", _sortedIterator);
+    tassert(12723201, "BulkBuilder::done must be called before commit", _done);
     Timer timer;
     const auto phase = IndexBuildPhaseEnum::kBulkLoad;
 
     _ns = entry->getNSSFromCatalog(opCtx);
-    auto it = std::move(_sortedIterator);
+    auto it = _sorter->done();
 
     ProgressMeterHolder pm;
     {
@@ -1643,7 +1644,6 @@ IndexStateInfo BulkBuilderImpl::persistDataForShutdown() {
 }
 
 void BulkBuilderImpl::releaseSorter() {
-    _sortedIterator.reset();
     _sorter.reset();
 }
 

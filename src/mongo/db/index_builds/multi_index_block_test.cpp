@@ -3090,6 +3090,176 @@ TEST_F(MultiIndexBlockTest, SpillDoesNotSplitOneDocumentsKeysForMultipleIndexes)
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+TEST_F(MultiIndexBlockTest, LoadingMultipleSpilledIndexesInsertsAllKeys) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+
+    // The 1 MB budget below is split across the three indexes, so each sorter gets ~349 KB. Each
+    // document contributes 4 keys of ~32 KB per index, so every index spills several ranges.
+    constexpr int kNumDocuments = 12;
+    constexpr int kKeysPerDocument = 4;
+    constexpr size_t kElementSizeBytes = 32 * 1024;
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto& indexer = *getIndexer();
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    for (int doc = 0; doc < kNumDocuments; ++doc) {
+        auto makeArray = [&](std::string_view field) {
+            BSONArrayBuilder arr;
+            for (int i = 0; i < kKeysPerDocument; ++i) {
+                arr.append(
+                    fmt::format("{}{}_{}{}", field, doc, i, std::string(kElementSizeBytes, 'a')));
+            }
+            return arr.arr();
+        };
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(Helpers::insert(operationContext(),
+                                  coll.get(),
+                                  BSON("_id" << doc << "a" << makeArray("a") << "b"
+                                             << makeArray("b") << "c" << makeArray("c"))));
+        wuow.commit();
+    }
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto makeInfo = [&](std::string_view field, std::string_view ident) {
+        return IndexBuildInfo(BSON("key" << BSON(field << 1) << "name"
+                                         << (std::string(field) + "_1") << "v"
+                                         << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                              std::string(ident),
+                              engine);
+    };
+    std::vector<IndexBuildInfo> infos{
+        makeInfo("a", "index-1"), makeInfo("b", "index-2"), makeInfo("c", "index-3")};
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           infos,
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+    ru.abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        &engine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    EXPECT_EQ(resumeInfo->getIndexes().size(), infos.size());
+    for (auto&& indexState : resumeInfo->getIndexes()) {
+        ASSERT_TRUE(indexState.getRanges());
+        EXPECT_GT(indexState.getRanges()->size(), 1U) << indexState.getSpec()["name"].String();
+    }
+
+    for (auto&& info : infos) {
+        const auto indexName = info.spec["name"].String();
+        auto* entry = coll.get()->getIndexCatalog()->findIndexByName(
+            operationContext(), indexName, IndexCatalog::InclusionPolicy::kUnfinished);
+        ASSERT(entry) << indexName;
+        EXPECT_EQ(entry->accessMethod()->asSortedData()->getSortedDataInterface()->numEntries(
+                      operationContext(), ru),
+                  kNumDocuments * kKeysPerDocument)
+            << indexName;
+    }
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(MultiIndexBlockTest, LoadingMultipleUnspilledIndexesInsertsAllKeys) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+
+    constexpr int kNumDocuments = 12;
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto& indexer = *getIndexer();
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    for (int doc = 0; doc < kNumDocuments; ++doc) {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(Helpers::insert(operationContext(),
+                                  coll.get(),
+                                  BSON("_id" << doc << "a" << doc << "b" << doc << "c" << doc)));
+        wuow.commit();
+    }
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto makeInfo = [&](std::string_view field, std::string_view ident) {
+        return IndexBuildInfo(BSON("key" << BSON(field << 1) << "name"
+                                         << (std::string(field) + "_1") << "v"
+                                         << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                              std::string(ident),
+                              engine);
+    };
+    std::vector<IndexBuildInfo> infos{
+        makeInfo("a", "index-1"), makeInfo("b", "index-2"), makeInfo("c", "index-3")};
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           infos,
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+    ru.abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        &engine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    EXPECT_EQ(resumeInfo->getIndexes().size(), infos.size());
+    for (auto&& indexState : resumeInfo->getIndexes()) {
+        EXPECT_TRUE(!indexState.getRanges() || indexState.getRanges()->empty())
+            << indexState.getSpec()["name"].String();
+    }
+
+    for (auto&& info : infos) {
+        const auto indexName = info.spec["name"].String();
+        auto* entry = coll.get()->getIndexCatalog()->findIndexByName(
+            operationContext(), indexName, IndexCatalog::InclusionPolicy::kUnfinished);
+        ASSERT(entry) << indexName;
+        EXPECT_EQ(entry->accessMethod()->asSortedData()->getSortedDataInterface()->numEntries(
+                      operationContext(), ru),
+                  kNumDocuments)
+            << indexName;
+    }
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordIdForMultipleIndexes) {
     unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
     unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};

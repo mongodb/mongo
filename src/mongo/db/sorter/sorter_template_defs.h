@@ -448,6 +448,16 @@ public:
         return {this->_spiller->getStorage().getStorageIdentifier(), std::move(ranges)};
     }
 
+    void finalizeSpills() override {
+        invariant(!_done);
+        invariant(!_spillsFinalized);
+        if (_spiller && !_spiller->iterators().empty()) {
+            this->spill();
+            _mergeSpills();
+        }
+        _spillsFinalized = true;
+    }
+
 protected:
     /**
      * An implementation of a k-way merge sort.
@@ -495,6 +505,10 @@ protected:
     const Settings _settings;
 
     std::shared_ptr<Spiller<Key, Value, Comparator>> _spiller;
+
+    bool _done = false;
+    bool _spillsFinalized = false;
+
     /**
      * The size of the iterator for the underlying storage used by the spiller.
      * Only set if spiller != nullptr.
@@ -608,7 +622,8 @@ public:
 
     template <typename DataProducer>
     void addImpl(DataProducer dataProducer) {
-        invariant(!_done);
+        invariant(!this->_done);
+        invariant(!this->_spillsFinalized);
         invariant(!_paused);
 
         auto& keyVal = _data.emplace_back(dataProducer());
@@ -639,7 +654,7 @@ public:
     }
 
     std::unique_ptr<Iterator> done() override {
-        invariant(!std::exchange(_done, true));
+        invariant(!std::exchange(this->_done, true));
 
         if (!this->_spiller || this->_spiller->iterators().empty()) {
             sort();
@@ -650,14 +665,16 @@ public:
             return std::make_unique<InMemIterator<Key, Value, Comparator>>(_data, this->_spiller);
         }
 
-        spill();
-        this->_mergeSpills();
+        if (!this->_spillsFinalized) {
+            spill();
+            this->_mergeSpills();
+        }
 
         return sorter::merge<Key, Value>(this->_spiller->iterators(), this->_opts, this->_comp);
     }
 
     std::unique_ptr<Iterator> pause() override {
-        invariant(!_done);
+        invariant(!this->_done);
         invariant(!_paused);
 
         _paused = true;
@@ -755,7 +772,6 @@ private:
     }
 
     std::vector<Data> _data;  // Data that has not been spilled.
-    bool _done = false;
     bool _paused = false;
 };
 
@@ -813,6 +829,8 @@ public:
         }
     }
 
+    void finalizeSpills() override {}
+
     std::unique_ptr<Iterator> pause() override {
         if (_haveData) {
             // ok to return InMemIterator as this is a single value constructed from copy
@@ -864,7 +882,8 @@ public:
 
     template <typename DataProducer>
     void addImpl(const Key& key, DataProducer dataProducer) {
-        invariant(!_done);
+        invariant(!this->_done);
+        invariant(!this->_spillsFinalized);
         invariant(!_paused);
 
         this->_stats.incrementNumSorted();
@@ -937,15 +956,17 @@ public:
             return std::make_unique<InMemIterator<Key, Value, Comparator>>(_data, this->_spiller);
         }
 
-        spill();
-        this->_mergeSpills();
+        if (!this->_spillsFinalized) {
+            spill();
+            this->_mergeSpills();
+        }
 
-        _done = true;
+        this->_done = true;
         return sorter::merge<Key, Value>(this->_spiller->iterators(), this->_opts, this->_comp);
     }
 
     std::unique_ptr<Iterator> pause() override {
-        invariant(!_done);
+        invariant(!this->_done);
         invariant(!_paused);
         _paused = true;
 
@@ -1066,7 +1087,7 @@ private:
         if (_data.empty())
             return;
 
-        invariant(!_done);
+        invariant(!this->_done);
 
         if (this->_spiller == nullptr) {
             // This error message only applies to sorts from user queries made through the find or
@@ -1102,7 +1123,6 @@ private:
         }
     }
 
-    bool _done = false;
     bool _paused = false;
 
     // Data that has not been spilled. Organized as max-heap if size == limit.

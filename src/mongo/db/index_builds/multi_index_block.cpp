@@ -1434,6 +1434,12 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
         if (!status.isOK()) {
             return status;
         }
+
+        // Non-replicated sorters are kept because they're needed to persist resume state if the
+        // build is interrupted.
+        if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
+            _indexes[i].bulk->releaseSorter();
+        }
     }
 
     return Status::OK();
