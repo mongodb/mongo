@@ -13,6 +13,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/historical_catalogid_tracker.h"
+#include "mongo/db/shard_role/shard_catalog/inbound_foreign_keys.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/views_for_database.h"
 #include "mongo/db/tenant_id.h"
@@ -381,6 +382,14 @@ public:
     bool isLatestCollection(OperationContext* opCtx, const Collection* collection) const;
 
     /**
+     * Returns the inbound foreign key constraints of 'parent' in the latest catalog. Requires the
+     * latest instance of 'parent' and at least a MODE_IS lock on it, which keeps them unchanged
+     * until it is released.
+     */
+    static InboundForeignKeyConstraints getInboundForeignKeyConstraints(OperationContext* opCtx,
+                                                                        const Collection& parent);
+
+    /**
      * Verifies that the provided collection name doesn't exist in the catalog and is exclusively
      * present in the uncommitted updates of the operation. For the check to be meaningful it should
      * be performed against CollectionCatalog::latest.
@@ -653,6 +662,8 @@ public:
 
     bool isNamespaceOrUUIDCommitPending_forTest(const NamespaceStringOrUUID& nssOrUUID) const;
 
+    InboundForeignKeyConstraints getInboundForeignKeyConstraints_forTest(const UUID& parent) const;
+
     class BatchedCollectionWrite;
 
 private:
@@ -846,6 +857,16 @@ private:
                              std::shared_ptr<Collection> collection,
                              boost::optional<Timestamp> commitTime);
 
+    /**
+     * Removes "child" from the inbound foreign keys of collections referenced by "oldConstraints"
+     * but not referenced by "newConstraints". Adds "child", if not already present, to the inbound
+     * foreign keys of collections referenced by "newConstraints".
+     */
+    void _updateInboundForeignKeys(OperationContext* opCtx,
+                                   const UUID& child,
+                                   const std::vector<ForeignKeyConstraint>& oldConstraints,
+                                   const std::vector<ForeignKeyConstraint>& newConstraints);
+
     const Collection* _lookupSystemViews(OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
@@ -995,6 +1016,10 @@ private:
     CollectionCatalogMap _catalog;
     OrderedCollectionMap _orderedCollections;  // Ordered by <dbName, collUUID> pair
     NamespaceCollectionMap _collections;
+    // Reverse foreign key index: parent UUID -> UUIDs of the registered children that reference it.
+    // Only child registration and deregistration change entries, so an entry stays after its parent
+    // is dropped and can exist before its parent registers.
+    InboundForeignKeyMap _inboundForeignKeys;
     UncommittedViewsSet _uncommittedViews;
 
     // Namespaces and UUIDs in pending commit. The opened storage snapshot must be consulted to

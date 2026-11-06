@@ -121,6 +121,7 @@ mongo_cc_library(
     srcs = [
         "collection_catalog.cpp",
         "historical_catalogid_tracker.cpp",
+        "inbound_foreign_keys.cpp",
         "multikey_state.cpp",
         "server_parameters_gen",
         "txn_wildcard_multikey_paths.cpp",
@@ -500,6 +501,7 @@ mongo_cc_unit_test(
         "database_test.cpp",
         "drop_database_test.cpp",
         "historical_catalogid_tracker_test.cpp",
+        "inbound_foreign_keys_test.cpp",
         "index_catalog_entry_impl_test.cpp",
         "index_catalog_impl_test.cpp",
         "index_signature_test.cpp",

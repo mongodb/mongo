@@ -46,12 +46,15 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
 #include <algorithm>
+#include <initializer_list>
 #include <map>
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -698,6 +701,242 @@ TEST_F(CollectionCatalogTest, DropPendingDatabase) {
     ASSERT_FALSE(catalog.isDropPending(dbName));
 }
 
+// Adds foreign key helpers to a catalog test fixture that owns 'opCtx'.
+template <typename Base>
+class ForeignKeyFixture : public Base {
+protected:
+    // Returns options with one foreign key to each of 'parents'.
+    static CollectionOptions collectionOptionsWithForeignKeyConstraints(
+        std::initializer_list<UUID> parents) {
+        CollectionOptions options;
+        for (const auto& parent : parents) {
+            options.foreignKeyConstraints.emplace_back(
+                "fk_" + std::to_string(options.foreignKeyConstraints.size()),
+                std::vector<std::string>{"parentId"},
+                ForeignKeyConstraintReferences(parent, {"_id"}),
+                ForeignKeyConstraintStateEnum::kUnvalidated,
+                false);
+        }
+        return options;
+    }
+
+    // Asserts that 'inbound' holds exactly 'children'.
+    static void assertChildren(const InboundForeignKeyConstraints& inbound,
+                               std::initializer_list<UUID> children) {
+        ASSERT_EQ(inbound.children.size(), children.size());
+        for (const auto& uuid : children) {
+            ASSERT(inbound.children.count(uuid));
+        }
+    }
+};
+
+// Foreign key tests that register collections directly, as catalog loading does.
+class CollectionCatalogForeignKeyTest : public ForeignKeyFixture<CollectionCatalogTest> {
+protected:
+    // Registers 'testdb.<coll>' without foreign keys.
+    void registerCollection(const UUID& uuid, std::string_view coll) {
+        registerCollectionWithParents(uuid, coll, {});
+    }
+
+    // Registers 'testdb.<coll>' with foreign keys to 'parents' and returns its namespace.
+    NamespaceString registerCollectionWithParents(const UUID& uuid,
+                                                  std::string_view coll,
+                                                  std::initializer_list<UUID> parents) {
+        auto collNss = NamespaceString::createNamespaceString_forTest("testdb", coll);
+        catalog.registerCollection(
+            opCtx.get(),
+            std::make_shared<CollectionMock>(
+                uuid, collNss, nullptr, collectionOptionsWithForeignKeyConstraints(parents)),
+            boost::none);
+        return collNss;
+    }
+
+    void deregisterCollection(const UUID& uuid) {
+        catalog.deregisterCollection(opCtx.get(), uuid, boost::none);
+    }
+
+    // Checks the inbound constraints of 'parent' in the fixture's catalog.
+    void assertInbound(const UUID& parent, std::initializer_list<UUID> children) {
+        assertChildren(catalog.getInboundForeignKeyConstraints_forTest(parent), children);
+    }
+};
+
+TEST_F(CollectionCatalogForeignKeyTest, RegisterChildWithExistingParent) {
+    // The fixture already registered colUUID, which acts as the parent in this test.
+    const auto childUUID = UUID::gen();
+    registerCollectionWithParents(childUUID, "child", {colUUID});
+    assertInbound(colUUID, {childUUID});
+}
+
+TEST_F(CollectionCatalogForeignKeyTest, RegisterChildBeforeParent) {
+    const auto parentUUID = UUID::gen();
+    const auto childUUID = UUID::gen();
+    registerCollectionWithParents(childUUID, "child", {parentUUID});
+    ASSERT_FALSE(catalog.lookupCollectionByUUID(opCtx.get(), parentUUID));
+    // The reference is kept while the parent is missing and still applies once the parent
+    // registers.
+    assertInbound(parentUUID, {childUUID});
+    registerCollection(parentUUID, "parent");
+    assertInbound(parentUUID, {childUUID});
+}
+
+TEST_F(CollectionCatalogForeignKeyTest, RegisterSelfReferencingCollection) {
+    const auto uuid = UUID::gen();
+    // The collection is its own parent.
+    registerCollectionWithParents(uuid, "self", {uuid});
+    assertInbound(uuid, {uuid});
+}
+
+TEST_F(CollectionCatalogForeignKeyTest, UnregisterChild) {
+    const auto childUUID = UUID::gen();
+    const auto childNss = registerCollectionWithParents(childUUID, "child", {colUUID});
+    assertInbound(colUUID, {childUUID});
+
+    deregisterCollection(childUUID);
+    ASSERT_FALSE(catalog.lookupCollectionByUUID(opCtx.get(), childUUID));
+    ASSERT_FALSE(catalog.lookupCollectionByNamespace(opCtx.get(), childNss));
+    assertInbound(colUUID, {});
+}
+
+// Deregistering a parent must keep its inbound constraints, because the parent can be registered
+// again with the same UUID while its children stay registered. For example, repairing a collection.
+TEST_F(CollectionCatalogForeignKeyTest, UnregisterParentPreservesChildReferences) {
+    const auto childUUID = UUID::gen();
+    registerCollectionWithParents(childUUID, "child", {colUUID});
+    assertInbound(colUUID, {childUUID});
+
+    // Removing the parent must not remove constraints owned by the child.
+    deregisterCollection(colUUID);
+    ASSERT_FALSE(catalog.lookupCollectionByUUID(opCtx.get(), colUUID));
+    ASSERT_FALSE(catalog.lookupCollectionByNamespace(opCtx.get(), nss));
+    const auto* child = catalog.lookupCollectionByUUID(opCtx.get(), childUUID);
+    ASSERT(child);
+    const auto& constraints = child->getForeignKeyConstraints();
+    ASSERT_EQ(constraints.size(), 1U);
+    ASSERT_EQ(constraints.front().getReferences().getParentCollection(), colUUID);
+
+    // Restoring the same parent UUID must expose the surviving child's reference again.
+    registerCollection(colUUID, nss.coll());
+    assertInbound(colUUID, {childUUID});
+}
+
+TEST_F(CollectionCatalogForeignKeyTest, RegisterChildWithMultipleParents) {
+    const auto childUUID = UUID::gen();
+    registerCollection(nextUUID, "otherParent");
+    registerCollectionWithParents(childUUID, "child", {colUUID, nextUUID});
+    assertInbound(colUUID, {childUUID});
+    assertInbound(nextUUID, {childUUID});
+}
+
+TEST_F(CollectionCatalogForeignKeyTest, DeduplicateChildren) {
+    // Two constraints from one child to one parent must produce only one inbound child entry.
+    const auto childUUID = UUID::gen();
+    registerCollectionWithParents(childUUID, "child", {colUUID, colUUID});
+    assertInbound(colUUID, {childUUID});
+}
+
+TEST_F(CollectionCatalogForeignKeyTest, DroppingChildUpdatesAllParents) {
+    const auto childUUID = UUID::gen();
+    registerCollection(nextUUID, "otherParent");
+    registerCollectionWithParents(childUUID, "child", {colUUID, nextUUID});
+    assertInbound(colUUID, {childUUID});
+    assertInbound(nextUUID, {childUUID});
+
+    deregisterCollection(childUUID);
+    assertInbound(colUUID, {});
+    assertInbound(nextUUID, {});
+}
+
+TEST_F(CollectionCatalogForeignKeyTest, RegisterParentWithMultipleChildren) {
+    const auto parentUUID = UUID::gen();
+    const auto firstUUID = UUID::gen();
+    const auto secondUUID = UUID::gen();
+    registerCollectionWithParents(firstUUID, "first", {parentUUID});
+    registerCollectionWithParents(secondUUID, "second", {parentUUID});
+
+    // Both children precede the parent; the parent sees both references once it registers.
+    registerCollection(parentUUID, "parent");
+    assertInbound(parentUUID, {firstUUID, secondUUID});
+
+    // Removing one child must not discard the other child's reference.
+    deregisterCollection(firstUUID);
+    ASSERT_FALSE(catalog.lookupCollectionByUUID(opCtx.get(), firstUUID));
+    ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), secondUUID));
+    assertInbound(parentUUID, {secondUUID});
+    deregisterCollection(secondUUID);
+    assertInbound(parentUUID, {});
+}
+
+TEST_F(CollectionCatalogForeignKeyTest, ParentIdentityUsesUUIDNotNamespace) {
+    const auto parentUUID = UUID::gen();
+    const auto childUUID = UUID::gen();
+    registerCollection(parentUUID, "parent");
+    registerCollectionWithParents(childUUID, "child", {parentUUID});
+
+    // A replacement at the same namespace must not inherit references to the original UUID.
+    deregisterCollection(parentUUID);
+    const auto replacementUUID = UUID::gen();
+    registerCollection(replacementUUID, "parent");
+    assertInbound(replacementUUID, {});
+    deregisterCollection(replacementUUID);
+    // Only restoring the original UUID makes the child's reference apply again.
+    registerCollection(parentUUID, "parent");
+    assertInbound(parentUUID, {childUUID});
+}
+
+TEST_F(CollectionCatalogForeignKeyTest, DroppingChildRemovesMissingParentReferences) {
+    const auto parentUUID = UUID::gen();
+    const auto childUUID = UUID::gen();
+    registerCollectionWithParents(childUUID, "child", {parentUUID});
+
+    // Remove the child before its parent appears to check that no stale reverse-index entry
+    // survives.
+    deregisterCollection(childUUID);
+    registerCollection(parentUUID, "parent");
+    assertInbound(parentUUID, {});
+}
+
+TEST_F(CollectionCatalogForeignKeyTest, DropCollectionWithIncomingAndOutgoingReferences) {
+    const auto parentUUID = UUID::gen();
+    const auto childUUID = UUID::gen();
+    // Use the acyclic chain childUUID -> parentUUID -> colUUID to cover both FK directions.
+    registerCollectionWithParents(parentUUID, "parent", {colUUID});
+    registerCollectionWithParents(childUUID, "child", {parentUUID});
+    assertInbound(colUUID, {parentUUID});
+    assertInbound(parentUUID, {childUUID});
+
+    // Dropping the middle collection removes its outgoing edge but must preserve the child's
+    // incoming edge.
+    deregisterCollection(parentUUID);
+    assertInbound(colUUID, {});
+    ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), childUUID));
+    // Restore the middle UUID without outgoing constraints to isolate its surviving incoming edge.
+    registerCollection(parentUUID, "parent");
+    assertInbound(parentUUID, {childUUID});
+}
+
+TEST_F(CollectionCatalogForeignKeyTest, CatalogResetClearsAllReferences) {
+    const auto missingParentUUID = UUID::gen();
+    const auto childUUID = UUID::gen();
+    // Cover references to both a registered parent and a parent that has never been registered.
+    const auto childNss =
+        registerCollectionWithParents(childUUID, "child", {colUUID, missingParentUUID});
+    assertInbound(colUUID, {childUUID});
+
+    catalog.deregisterAllCollectionsAndViews(getServiceContext());
+    ASSERT_FALSE(catalog.lookupCollectionByUUID(opCtx.get(), colUUID));
+    ASSERT_FALSE(catalog.lookupCollectionByUUID(opCtx.get(), childUUID));
+    ASSERT_FALSE(catalog.lookupCollectionByNamespace(opCtx.get(), nss));
+    ASSERT_FALSE(catalog.lookupCollectionByNamespace(opCtx.get(), childNss));
+    ASSERT(catalog.range(nss.dbName()).empty());
+
+    // Re-register both parent UUIDs to expose any stale reverse-index entries left by the reset.
+    registerCollection(colUUID, nss.coll());
+    registerCollection(missingParentUUID, "parent");
+    assertInbound(colUUID, {});
+    assertInbound(missingParentUUID, {});
+}
+
 class ForEachCollectionFromDbTest : public CatalogTestFixture {
 public:
     void createTestData() {
@@ -1009,10 +1248,12 @@ public:
     UUID createCollection(OperationContext* opCtx,
                           const NamespaceString& nss,
                           Timestamp timestamp,
-                          bool allowMixedModeWrites = false) {
+                          bool allowMixedModeWrites = false,
+                          CollectionOptions options = {}) {
         _setupDDLOperation(opCtx, timestamp);
         WriteUnitOfWork wuow(opCtx);
-        UUID uuid = _createCollection(opCtx, nss, boost::none, allowMixedModeWrites);
+        UUID uuid =
+            _createCollection(opCtx, nss, boost::none, allowMixedModeWrites, std::move(options));
         wuow.commit();
         return uuid;
     }
@@ -1020,10 +1261,11 @@ public:
     void createCollectionWithUUID(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   Timestamp timestamp,
-                                  UUID uuid) {
+                                  UUID uuid,
+                                  CollectionOptions options = {}) {
         _setupDDLOperation(opCtx, timestamp);
         WriteUnitOfWork wuow(opCtx);
-        _createCollection(opCtx, nss, uuid, false);
+        _createCollection(opCtx, nss, uuid, false, std::move(options));
         wuow.commit();
     }
 
@@ -1031,10 +1273,11 @@ public:
                                                      const NamespaceString& nss,
                                                      Timestamp timestamp,
                                                      UUID uuid,
-                                                     boost::optional<WriteUnitOfWork>& wuow) {
+                                                     boost::optional<WriteUnitOfWork>& wuow,
+                                                     CollectionOptions options = {}) {
         _setupDDLOperation(opCtx, timestamp);
         wuow.emplace(opCtx);
-        _createCollection(opCtx, nss, uuid, false);
+        _createCollection(opCtx, nss, uuid, false, std::move(options));
     }
 
     void createCollectionWithUUIDAndCommitInNestedUnitOnly(OperationContext* opCtx,
@@ -1091,8 +1334,9 @@ public:
 
     void recreateCollectionWithUUIDInCurrentWUOW(OperationContext* opCtx,
                                                  const NamespaceString& nss,
-                                                 UUID uuid) {
-        _createCollection(opCtx, nss, uuid, false);
+                                                 UUID uuid,
+                                                 CollectionOptions options = {}) {
+        _createCollection(opCtx, nss, uuid, false, std::move(options));
     }
 
     void rollbackAfterCatalogPrecommit(boost::optional<WriteUnitOfWork>& wuow) {
@@ -1579,7 +1823,8 @@ private:
     UUID _createCollection(OperationContext* opCtx,
                            const NamespaceString& nss,
                            boost::optional<UUID> uuid = boost::none,
-                           bool allowMixedModeWrites = false) {
+                           bool allowMixedModeWrites = false,
+                           CollectionOptions options = {}) {
         auto acq = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
@@ -1587,7 +1832,6 @@ private:
         auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
         ASSERT(db);
 
-        CollectionOptions options;
         if (uuid) {
             options.uuid.emplace(*uuid);
         } else {
@@ -4612,6 +4856,274 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentRecreateWithReapedIdentDoesNotC
     }
 
     fp->setMode(FailPoint::off);
+}
+
+// Foreign key tests that create and drop collections through DDL write units of work.
+class CollectionCatalogForeignKeyTimestampTest
+    : public ForeignKeyFixture<CollectionCatalogTimestampTest> {
+protected:
+    // Commits a create of 'nss' with foreign keys to 'parents'.
+    UUID createCollectionWithParents(const NamespaceString& nss,
+                                     Timestamp timestamp,
+                                     std::initializer_list<UUID> parents) {
+        return createCollection(opCtx.get(),
+                                nss,
+                                timestamp,
+                                /*allowMixedModeWrites=*/false,
+                                collectionOptionsWithForeignKeyConstraints(parents));
+    }
+
+    // Reads the inbound constraints of 'parent' from the latest catalog under the caller's locks.
+    void assertInbound(const UUID& parent, std::initializer_list<UUID> children) {
+        const auto* collection =
+            CollectionCatalog::latest(opCtx.get())->lookupCollectionByUUID(opCtx.get(), parent);
+        ASSERT(collection);
+        assertChildren(CollectionCatalog::getInboundForeignKeyConstraints(opCtx.get(), *collection),
+                       children);
+    }
+
+    // Acquires 'nss' for read in MODE_IS and for write in any other mode.
+    CollectionAcquisition acquire(const NamespaceString& nss, LockMode mode) {
+        const auto operationType =
+            mode == MODE_IS ? AcquisitionPrerequisites::kRead : AcquisitionPrerequisites::kWrite;
+        return acquireCollection(
+            opCtx.get(),
+            CollectionAcquisitionRequest::fromOpCtx(opCtx.get(), nss, operationType),
+            mode);
+    }
+};
+
+TEST_F(CollectionCatalogForeignKeyTimestampTest, CreatePublishesOnlyOnCommit) {
+    const auto parentNss = NamespaceString::createNamespaceString_forTest("fk.parent");
+    const auto childNss = NamespaceString::createNamespaceString_forTest("fk.child");
+    const auto parentUUID = createCollection(opCtx.get(), parentNss, Timestamp(10, 10));
+    const auto childUUID = UUID::gen();
+    const auto parentAcquisition = acquire(parentNss, MODE_X);
+    const auto* parent =
+        CollectionCatalog::latest(opCtx.get())->lookupCollectionByUUID(opCtx.get(), parentUUID);
+
+    // Abort a create after catalog pre-commit; its inbound reference must not become visible.
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        createCollectionWithUUIDAndLeaveUncommitted(
+            opCtx.get(),
+            childNss,
+            Timestamp(20, 20),
+            childUUID,
+            wuow,
+            collectionOptionsWithForeignKeyConstraints({parentUUID}));
+        assertInbound(parentUUID, {});
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+    const auto afterAbort = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(afterAbort->lookupCollectionByUUID(opCtx.get(), childUUID));
+    assertInbound(parentUUID, {});
+
+    // A committed create publishes the reference.
+    createCollectionWithUUID(opCtx.get(),
+                             childNss,
+                             Timestamp(30, 30),
+                             childUUID,
+                             collectionOptionsWithForeignKeyConstraints({parentUUID}));
+    const auto afterCreate = CollectionCatalog::latest(opCtx.get());
+    assertInbound(parentUUID, {childUUID});
+    // Only the reverse index changes, so writes to the parent from an older catalog still pass
+    // isLatestCollection.
+    ASSERT_EQ(afterCreate->lookupCollectionByUUID(opCtx.get(), parentUUID), parent);
+    ASSERT(afterCreate->lookupCollectionByUUID(opCtx.get(), childUUID));
+}
+
+TEST_F(CollectionCatalogForeignKeyTimestampTest, CreateSelfReferencingCollection) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("fk_self.coll");
+    const auto uuid = UUID::gen();
+    {
+        // The collection is its own parent, so the create holds the parent lock on itself.
+        const auto acquisition = acquire(nss, MODE_X);
+        createCollectionWithUUID(opCtx.get(),
+                                 nss,
+                                 Timestamp(20, 20),
+                                 uuid,
+                                 collectionOptionsWithForeignKeyConstraints({uuid}));
+    }
+    const auto reader = acquire(nss, MODE_IS);
+    assertInbound(uuid, {uuid});
+}
+
+TEST_F(CollectionCatalogForeignKeyTimestampTest, ConcurrentCreatesPreserveInboundMap) {
+    const auto firstParentNss =
+        NamespaceString::createNamespaceString_forTest("fk_concurrent.parentA");
+    const auto secondParentNss =
+        NamespaceString::createNamespaceString_forTest("fk_concurrent.parentB");
+    const auto firstChildNss =
+        NamespaceString::createNamespaceString_forTest("fk_concurrent.childA");
+    const auto secondChildNss =
+        NamespaceString::createNamespaceString_forTest("fk_concurrent.childB");
+    const auto firstParentUUID = createCollection(opCtx.get(), firstParentNss, Timestamp(10, 10));
+    const auto secondParentUUID = createCollection(opCtx.get(), secondParentNss, Timestamp(11, 11));
+    const auto firstChildUUID = UUID::gen();
+
+    // Pause the first create after it prepares catalog state but before its durable commit.
+    boost::optional<ConcurrentDDL> firstCreate;
+    firstCreate.emplace(getServiceContext(), Timestamp(20, 20), [&](OperationContext* writeOpCtx) {
+        const auto parentAcquisition =
+            acquireCollection(writeOpCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  writeOpCtx, firstParentNss, AcquisitionPrerequisites::kWrite),
+                              MODE_X);
+        recreateCollectionWithUUIDInCurrentWUOW(
+            writeOpCtx,
+            firstChildNss,
+            firstChildUUID,
+            collectionOptionsWithForeignKeyConstraints({firstParentUUID}));
+    });
+    firstCreate->hangAfterPreCommit();
+
+    // Separate parent MODE_X locks let the second create commit while the first is paused.
+    const auto secondParentAcquisition = acquire(secondParentNss, MODE_X);
+    const auto secondChildUUID =
+        createCollectionWithParents(secondChildNss, Timestamp(30, 30), {secondParentUUID});
+    assertInbound(secondParentUUID, {secondChildUUID});
+
+    // Publishing the first create must merge its reference without losing the second create's
+    // entry.
+    firstCreate.reset();
+    const auto firstParentAcquisition = acquire(firstParentNss, MODE_X);
+    assertInbound(firstParentUUID, {firstChildUUID});
+    assertInbound(secondParentUUID, {secondChildUUID});
+
+    // Drop each child to check that each parent's entry changes on its own.
+    dropCollection(opCtx.get(), firstChildNss, Timestamp(40, 40));
+    assertInbound(firstParentUUID, {});
+    assertInbound(secondParentUUID, {secondChildUUID});
+
+    dropCollection(opCtx.get(), secondChildNss, Timestamp(50, 50));
+    assertInbound(firstParentUUID, {});
+    assertInbound(secondParentUUID, {});
+}
+
+TEST_F(CollectionCatalogForeignKeyTimestampTest, DropPublishesOnlyOnCommit) {
+    const auto parentNss = NamespaceString::createNamespaceString_forTest("fk.parent");
+    const auto childNss = NamespaceString::createNamespaceString_forTest("fk.child");
+    const auto parentUUID = createCollection(opCtx.get(), parentNss, Timestamp(10, 10));
+    const auto parentAcquisition = acquire(parentNss, MODE_X);
+    const auto childUUID = createCollectionWithParents(childNss, Timestamp(20, 20), {parentUUID});
+    assertInbound(parentUUID, {childUUID});
+
+    // Keep the child reference visible until the drop commits.
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        dropCollectionAndLeaveUncommitted(opCtx.get(), childNss, Timestamp(40, 40), wuow);
+        assertInbound(parentUUID, {childUUID});
+        wuow->commit();
+    }
+    const auto afterDrop = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(afterDrop->lookupCollectionByUUID(opCtx.get(), childUUID));
+    assertInbound(parentUUID, {});
+}
+
+TEST_F(CollectionCatalogForeignKeyTimestampTest, AbortedDropPreservesInboundState) {
+    const auto parentNss = NamespaceString::createNamespaceString_forTest("fk.parent");
+    const auto childNss = NamespaceString::createNamespaceString_forTest("fk.child");
+    const auto parentUUID = createCollection(opCtx.get(), parentNss, Timestamp(10, 10));
+    const auto parentAcquisition = acquire(parentNss, MODE_X);
+    const auto childUUID = createCollectionWithParents(childNss, Timestamp(20, 20), {parentUUID});
+    // A drop rolled back after catalog pre-commit must keep both the child and its parent's inbound
+    // reference.
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        dropCollectionAndLeaveUncommitted(opCtx.get(), childNss, Timestamp(30, 30), wuow);
+        assertInbound(parentUUID, {childUUID});
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+    const auto afterAbort = CollectionCatalog::latest(opCtx.get());
+    ASSERT(afterAbort->lookupCollectionByUUID(opCtx.get(), childUUID));
+    assertInbound(parentUUID, {childUUID});
+}
+
+TEST_F(CollectionCatalogForeignKeyTimestampTest, UpdateWithExclusiveParentCollectionLock) {
+    const auto parentNss = NamespaceString::createNamespaceString_forTest("fk_lock.parent");
+    const auto childNss = NamespaceString::createNamespaceString_forTest("fk_lock.child");
+    const auto parentUUID = createCollection(opCtx.get(), parentNss, Timestamp(10, 10));
+    // A collection MODE_X lock on the parent is sufficient; no global write lock is required.
+    const auto parentAcquisition = acquire(parentNss, MODE_X);
+    const auto childUUID = createCollectionWithParents(childNss, Timestamp(20, 20), {parentUUID});
+    assertInbound(parentUUID, {childUUID});
+    dropCollection(opCtx.get(), childNss, Timestamp(30, 30));
+    assertInbound(parentUUID, {});
+}
+
+TEST_F(CollectionCatalogForeignKeyTimestampTest, LookupReadsLatestCatalog) {
+    const auto parentNss = NamespaceString::createNamespaceString_forTest("fk_latest.parent");
+    const auto childNss = NamespaceString::createNamespaceString_forTest("fk_latest.child");
+    const auto parentUUID = createCollection(opCtx.get(), parentNss, Timestamp(10, 10));
+    const auto beforeCreate = CollectionCatalog::latest(opCtx.get());
+    const auto childUUID = [&] {
+        const auto parentAcquisition = acquire(parentNss, MODE_X);
+        return createCollectionWithParents(childNss, Timestamp(20, 20), {parentUUID});
+    }();
+
+    // A transaction stashes its catalog when it starts; the lookup must still read the latest
+    // catalog.
+    shard_role_details::getRecoveryUnit(opCtx.get())->preallocateSnapshot();
+    CollectionCatalog::stash(opCtx.get(), beforeCreate);
+    const auto reader = acquire(parentNss, MODE_IS);
+    ASSERT_EQ(CollectionCatalog::get(opCtx.get()), beforeCreate);
+    assertChildren(CollectionCatalog::getInboundForeignKeyConstraints(
+                       opCtx.get(), *reader.getCollectionPtr().get()),
+                   {childUUID});
+}
+
+TEST_F(CollectionCatalogForeignKeyTimestampTest, InboundForeignKeysRequireCollectionLock) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("fk.parent");
+    const auto uuid = createCollection(opCtx.get(), nss, Timestamp(10, 10));
+    // Direct catalog lookup does not acquire the collection lock required by the inbound getter.
+    const auto latest = CollectionCatalog::latest(opCtx.get());
+    ASSERT_TASSERT_CODE(CollectionCatalog::getInboundForeignKeyConstraints(
+                            opCtx.get(), *latest->lookupCollectionByUUID(opCtx.get(), uuid)),
+                        13719200);
+}
+
+TEST_F(CollectionCatalogForeignKeyTimestampTest, InboundForeignKeysRequireLatestInstance) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("fk_instance.parent");
+    createCollection(opCtx.get(), nss, Timestamp(10, 10));
+    const auto beforeIndex = CollectionCatalog::latest(opCtx.get());
+    const auto* staleParent = beforeIndex->lookupCollectionByNamespace(opCtx.get(), nss);
+    // Creating an index publishes a new instance of the collection.
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name" << "x_1" << "key" << BSON("x" << 1)),
+                Timestamp(20, 20));
+    const auto reader = acquire(nss, MODE_IS);
+    ASSERT_NE(reader.getCollectionPtr().get(), staleParent);
+    ASSERT_TASSERT_CODE(
+        CollectionCatalog::getInboundForeignKeyConstraints(opCtx.get(), *staleParent), 13719201);
+}
+
+using CollectionCatalogForeignKeyDeathTest = CollectionCatalogForeignKeyTimestampTest;
+
+DEATH_TEST_F(CollectionCatalogForeignKeyDeathTest,
+             CreatingForeignKeysRequiresExclusiveParentLock,
+             "requires the parent collection MODE_X lock") {
+    const auto parentNss = NamespaceString::createNamespaceString_forTest("fk_lock_create.parent");
+    const auto childNss = NamespaceString::createNamespaceString_forTest("fk_lock_create.child");
+    const auto parentUUID = createCollection(opCtx.get(), parentNss, Timestamp(10, 10));
+    const auto parentAcquisition = acquire(parentNss, MODE_IX);
+    createCollectionWithParents(childNss, Timestamp(20, 20), {parentUUID});
+}
+
+DEATH_TEST_F(CollectionCatalogForeignKeyDeathTest,
+             DroppingForeignKeysRequiresExclusiveParentLock,
+             "requires the parent collection MODE_X lock") {
+    const auto parentNss = NamespaceString::createNamespaceString_forTest("fk_lock_drop.parent");
+    const auto childNss = NamespaceString::createNamespaceString_forTest("fk_lock_drop.child");
+    const auto parentUUID = createCollection(opCtx.get(), parentNss, Timestamp(10, 10));
+    // Create the child with the required parent lock so setup does not trigger the assertion.
+    {
+        const auto parentAcquisition = acquire(parentNss, MODE_X);
+        createCollectionWithParents(childNss, Timestamp(20, 20), {parentUUID});
+    }
+    const auto parentAcquisition = acquire(parentNss, MODE_IX);
+    dropCollection(opCtx.get(), childNss, Timestamp(30, 30));
 }
 
 }  // namespace

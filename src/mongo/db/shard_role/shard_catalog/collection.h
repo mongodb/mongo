@@ -790,6 +790,10 @@ public:
      */
     virtual const CollectionOptions& getCollectionOptions() const = 0;
 
+    const std::vector<ForeignKeyConstraint>& getForeignKeyConstraints() const {
+        return getCollectionOptions().foreignKeyConstraints;
+    }
+
     /**
      * Fills in each index specification with collation information from this collection and returns
      * the new index specifications.

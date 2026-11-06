@@ -23,16 +23,20 @@ public:
         : CollectionMock(uuid, nss, std::unique_ptr<IndexCatalog>()) {}
     CollectionMock(const UUID& uuid,
                    const NamespaceString& nss,
-                   std::unique_ptr<IndexCatalog> indexCatalog)
-        : _uuid(uuid), _nss(nss), _indexCatalog(std::move(indexCatalog)) {}
+                   std::unique_ptr<IndexCatalog> indexCatalog,
+                   CollectionOptions options = {})
+        : _uuid(uuid),
+          _nss(nss),
+          _indexCatalog(std::move(indexCatalog)),
+          _options(std::move(options)) {}
     ~CollectionMock() override = default;
 
     std::shared_ptr<Collection> clone() const override {
         std::unique_ptr<IndexCatalog> indexCatalogCopy =
             _indexCatalog ? _indexCatalog->clone() : nullptr;
-        auto copy = std::make_shared<CollectionMock>(_uuid, _nss, std::move(indexCatalogCopy));
+        auto copy =
+            std::make_shared<CollectionMock>(_uuid, _nss, std::move(indexCatalogCopy), _options);
         copy->_committed = _committed;
-        copy->_options = _options;
         return copy;
     }
 

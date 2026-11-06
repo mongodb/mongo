@@ -511,6 +511,48 @@ Each `Collection` object owns an `IndexCatalog` object, which in turn has shared
 `IndexCatalogEntry` objects that each again own an `IndexDescriptor` containing an in-memory
 presentation of the data stored in the [durable catalog](#durable-catalog).
 
+### Foreign key metadata
+
+Foreign-key constraints are stored in the child collection's
+`CollectionOptions::foreignKeyConstraints` and exposed by `Collection::getForeignKeyConstraints()`.
+
+For example, the child's `_mdb_catalog` entry can contain this `md.options` fragment:
+
+```javascript
+{
+    uuid: UUID("00000000-0000-0000-0000-000000000001"),
+    foreignKeyConstraints: [{
+        name: "fk_parent",
+        fields: ["parentId"],
+        references: {
+            parentCollection: UUID("00000000-0000-0000-0000-000000000002"),
+            parentFields: ["_id"]
+        },
+        state: "unvalidated",
+        deferrable: false
+    }]
+}
+```
+
+`CollectionCatalog` also maintains an immutable, in-memory reverse index from parent UUID to the
+`InboundForeignKeyConstraints` of that parent. Registering or deregistering a child collection
+updates this index in the same catalog write. Parent `Collection` instances do not change.
+
+References to missing parents remain indexed while their declaring children exist. This permits
+child-first catalog loading during startup and rollback, and child-first creation during initial
+sync. A parent that registers later uses the existing entry; a collection with the same namespace
+but a different UUID does not.
+
+Updating the inbound constraints of a registered parent requires the parent collection lock in
+`MODE_X`. A database or global exclusive lock also satisfies this requirement. No lock is needed
+while the parent is not registered: a child can be registered before its parent when collections are
+registered in arbitrary order during startup, rollback or initial sync.
+
+`CollectionCatalog::getInboundForeignKeyConstraints()` returns the inbound constraints of a parent
+from the latest catalog. It requires the latest instance of the parent and at least a collection
+`MODE_IS` lock on it, so lock-free readers are not allowed. The lock keeps the latest entry
+unchanged until it is released.
+
 ## Catalog Changes, versioning and the Minimum Valid Snapshot
 
 Every catalog change has a corresponding write with a commit time. When registered `OpObserver`

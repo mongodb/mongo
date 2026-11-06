@@ -2316,6 +2316,20 @@ bool CollectionCatalog::isLatestCollection(OperationContext* opCtx,
     return coll->get() == collection;
 }
 
+InboundForeignKeyConstraints CollectionCatalog::getInboundForeignKeyConstraints(
+    OperationContext* opCtx, const Collection& parent) {
+    tassert(13719200,
+            "Inbound foreign key constraints require at least a collection MODE_IS lock",
+            shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(parent.ns(), MODE_IS));
+
+    // The parent lock keeps the latest set unchanged until the caller releases it.
+    const auto latestCatalog = latest(opCtx);
+    tassert(13719201,
+            "Inbound foreign key constraints require the latest collection instance",
+            latestCatalog->isLatestCollection(opCtx, &parent));
+    return latestCatalog->_inboundForeignKeys.get(parent.uuid());
+}
+
 void CollectionCatalog::ensureCollectionIsNew(OperationContext* opCtx,
                                               const NamespaceString& nss) const {
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
@@ -2713,6 +2727,8 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
     invariant(!_catalog.find(uuid));
     invariant(_orderedCollections.find(dbIdPair) == _orderedCollections.end());
 
+    _updateInboundForeignKeys(opCtx, uuid, /*oldConstraints=*/{}, coll->getForeignKeyConstraints());
+
     _catalog = _catalog.set(uuid, coll);
     _collections = _collections.set(nss, coll);
     _orderedCollections = _orderedCollections.set(dbIdPair, coll);
@@ -2760,6 +2776,8 @@ void CollectionCatalog::deregisterCollection(OperationContext* opCtx,
     _pendingCommitNamespaces = _pendingCommitNamespaces.erase(ns);
     _pendingCommitUUIDs = _pendingCommitUUIDs.erase(uuid);
 
+    _updateInboundForeignKeys(opCtx, uuid, coll->getForeignKeyConstraints(), /*newConstraints=*/{});
+
     _catalogIdTracker.drop(ns, uuid, commitTime);
 
     _stats.adjustOnCollectionRegistration(
@@ -2771,6 +2789,22 @@ void CollectionCatalog::deregisterCollection(OperationContext* opCtx,
 
     if (!storageGlobalParams.repair && coll->ns().isSystemDotViews()) {
         _viewsForDatabase = _viewsForDatabase.erase(coll->ns().dbName());
+    }
+}
+
+void CollectionCatalog::_updateInboundForeignKeys(
+    OperationContext* opCtx,
+    const UUID& child,
+    const std::vector<ForeignKeyConstraint>& oldConstraints,
+    const std::vector<ForeignKeyConstraint>& newConstraints) {
+    for (const auto& parent : _inboundForeignKeys.update(child, oldConstraints, newConstraints)) {
+        // Readers of a registered parent's inbound constraints hold at least MODE_IS on it.
+        const auto* registeredParent = parent == child ? nullptr : _catalog.find(parent);
+        invariant(!registeredParent ||
+                      shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                          (*registeredParent)->ns(), MODE_X),
+                  "Updating inbound foreign key constraints requires the parent collection "
+                  "MODE_X lock");
     }
 }
 
@@ -2880,6 +2914,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
     _collections = {};
     _orderedCollections = {};
     _catalog = {};
+    _inboundForeignKeys = {};
     _viewsForDatabase = {};
     _stats = {};
 
@@ -2963,6 +2998,11 @@ void CollectionCatalog::resetCatalogIdTracker(Timestamp oldest) {
 bool CollectionCatalog::isNamespaceOrUUIDCommitPending_forTest(
     const NamespaceStringOrUUID& nssOrUUID) const {
     return _findPendingCommitEntry(nssOrUUID) != nullptr;
+}
+
+InboundForeignKeyConstraints CollectionCatalog::getInboundForeignKeyConstraints_forTest(
+    const UUID& parent) const {
+    return _inboundForeignKeys.get(parent);
 }
 
 }  // namespace mongo

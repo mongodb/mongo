@@ -1253,8 +1253,7 @@ TEST(CollectionOptions, ForeignKeyConstraintsRoundTrip) {
     CollectionOptions options;
     options.foreignKeyConstraints.push_back(makeForeignKeyConstraint());
     options.foreignKeyConstraints.push_back(makeForeignKeyConstraint());
-    // Use distinct values to detect duplicated entries and exercise both states and deferrable
-    // values.
+    // Distinct entries cover both states and deferrable values and expose accidental duplication.
     auto& deferred = options.foreignKeyConstraints.back();
     deferred.setName("fk_deferred");
     deferred.setFields(std::vector<std::string>{"otherParentId"});
@@ -1284,6 +1283,7 @@ TEST(CollectionOptions, ForeignKeyConstraintsRoundTrip) {
 }
 
 TEST(CollectionOptions, ForeignKeyConstraintsEmptyStorageOptions) {
+    // An explicit empty array and an absent field must have the same stored representation.
     const auto absent =
         assertGet(CollectionOptions::parse(BSONObj(), CollectionOptions::parseForStorage));
     const auto empty = assertGet(CollectionOptions::parse(fromjson("{foreignKeyConstraints: []}"),
@@ -1295,6 +1295,8 @@ TEST(CollectionOptions, ForeignKeyConstraintsEmptyStorageOptions) {
 
 TEST(CollectionOptions, ForeignKeyConstraintsRejectedForCommand) {
     const auto constraints = BSON_ARRAY(makeForeignKeyConstraint().toBSON());
+    // Resolved UUID metadata is storage-only, whether or not the options include a create command
+    // name.
     for (const auto& options : {BSON("foreignKeyConstraints" << constraints),
                                 BSON("create" << 1 << "foreignKeyConstraints" << constraints)}) {
         ASSERT_EQ(CollectionOptions::parse(options, CollectionOptions::parseForCommand)
@@ -1311,6 +1313,8 @@ TEST(CollectionOptions, ForeignKeyConstraintsFieldSelection) {
     options.cappedSize = 4096;
     options.foreignKeyConstraints.push_back(makeForeignKeyConstraint());
 
+    // Selecting the FK field must exclude unrelated options; selecting another field must exclude
+    // FK metadata.
     ASSERT_BSONOBJ_EQ(
         options.toBSON(false, {"foreignKeyConstraints"}),
         BSON("foreignKeyConstraints" << BSON_ARRAY(makeForeignKeyConstraint().toBSON())));
@@ -1318,6 +1322,7 @@ TEST(CollectionOptions, ForeignKeyConstraintsFieldSelection) {
 }
 
 TEST(CollectionOptions, ForeignKeyConstraintsRejectMalformedStorageOptions) {
+    // Reject malformed array containers and entries before checking individual constraint fields.
     for (const auto& options : {fromjson("{foreignKeyConstraints: {}}"),
                                 fromjson("{foreignKeyConstraints: [1]}"),
                                 fromjson("{foreignKeyConstraints: [[]]}"),
@@ -1327,6 +1332,7 @@ TEST(CollectionOptions, ForeignKeyConstraintsRejectMalformedStorageOptions) {
     }
 
     const auto valid = makeForeignKeyConstraint().toBSON();
+    // Every stored constraint must include all required fields.
     for (const auto* fieldName : {"name", "fields", "references", "state", "deferrable"}) {
         ASSERT_NOT_OK(CollectionOptions::parse(
                           BSON("foreignKeyConstraints" << BSON_ARRAY(valid.removeField(fieldName))),
@@ -1334,6 +1340,8 @@ TEST(CollectionOptions, ForeignKeyConstraintsRejectMalformedStorageOptions) {
                           .getStatus());
     }
 
+    // Change one field at a time so malformed types, nested data, and unknown fields are tested in
+    // isolation.
     for (const auto& invalid :
          {fromjson("{name: 1}"),
           fromjson("{fields: 'parentId'}"),
@@ -1357,6 +1365,7 @@ TEST(CollectionOptions, ForeignKeyConstraintsRejectMalformedStorageOptions) {
 
 TEST(CollectionOptions, ForeignKeyConstraintsRejectUnpairedFields) {
     using Fields = std::vector<std::string>;
+    // Non-empty arrays of equal length are required to pair each child field with a parent field.
     for (const auto& [fields, parentFields] : {std::pair{Fields{}, Fields{}},
                                                {Fields{}, Fields{"_id"}},
                                                {Fields{"parentId"}, Fields{}},
@@ -1400,6 +1409,7 @@ TEST(CollectionOptions, ForeignKeyConstraintsMatchesStorageOptions) {
     auto other = options;
     ASSERT_TRUE(options.matchesStorageOptions(other, nullptr));
 
+    // State, parent identity, and constraint removal must each affect storage-option matching.
     other.foreignKeyConstraints.front().setState(ForeignKeyConstraintStateEnum::kValidated);
     ASSERT_FALSE(options.matchesStorageOptions(other, nullptr));
 
