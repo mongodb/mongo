@@ -129,6 +129,8 @@ structs:
                     any forward progress."
                 type: int
                 optional: true
+                validator:
+                    gte: 0
 
     ResumeIndexInfo:
         description: "Complete information needed to resume an index build."
