@@ -473,28 +473,6 @@ public:
                                   isTimeseries);
     }
 
-    void onImportCollection(OperationContext* opCtx,
-                            const UUID& importUUID,
-                            const NamespaceString& nss,
-                            long long numRecords,
-                            long long dataSize,
-                            const BSONObj& catalogEntry,
-                            const BSONObj& storageMetadata,
-                            bool isDryRun,
-                            bool isTimeseries) override {
-        ReservedTimes times{opCtx};
-        for (auto& o : _observers)
-            o->onImportCollection(opCtx,
-                                  importUUID,
-                                  nss,
-                                  numRecords,
-                                  dataSize,
-                                  catalogEntry,
-                                  storageMetadata,
-                                  isDryRun,
-                                  isTimeseries);
-    }
-
     repl::OpTime preRenameCollection(OperationContext* const opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,

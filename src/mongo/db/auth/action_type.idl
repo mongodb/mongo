@@ -79,7 +79,7 @@ enums:
             enableProfiler: "enableProfiler"
             enableSharding: "enableSharding"
             eseRotateActiveKEK: "eseRotateActiveKEK"
-            exportCollection: "exportCollection"
+            exportCollection: "exportCollection" # Removed (backwards compatibility)
             find: "find"
             flushRouterConfig: "flushRouterConfig"
             forceUUID: "forceUUID"
@@ -106,7 +106,7 @@ enums:
             grantRolesToUser: "grantRolesToUser" # ID only
             hostInfo: "hostInfo"
             impersonate: "impersonate"
-            importCollection: "importCollection"
+            importCollection: "importCollection" # Removed (backwards compatibility)
             indexStats: "indexStats"
             inprog: "inprog"
             insert: "insert"

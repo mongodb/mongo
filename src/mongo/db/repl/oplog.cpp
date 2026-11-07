@@ -22,7 +22,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
@@ -181,27 +180,6 @@ void abortIndexBuilds(OperationContext* opCtx,
 
         indexBuildsCoordinator->abortCollectionIndexBuilds(opCtx, nss, *collUUID, reason);
     }
-}
-
-void applyImportCollectionDefault(OperationContext* opCtx,
-                                  const UUID& importUUID,
-                                  const NamespaceString& nss,
-                                  long long numRecords,
-                                  long long dataSize,
-                                  const BSONObj& catalogEntry,
-                                  const BSONObj& storageMetadata,
-                                  bool isDryRun,
-                                  OplogApplication::Mode mode) {
-    LOGV2_FATAL_NOTRACE(5114200,
-                        "Applying importCollection is not supported with MongoDB Community "
-                        "Edition, please use MongoDB Enterprise Edition",
-                        "importUUID"_attr = importUUID,
-                        logAttrs(nss),
-                        "numRecords"_attr = numRecords,
-                        "dataSize"_attr = dataSize,
-                        "catalogEntry"_attr = redact(catalogEntry),
-                        "storageMetadata"_attr = redact(storageMetadata),
-                        "isDryRun"_attr = isDryRun);
 }
 
 std::string_view getInvalidatingReason(const OplogApplication::Mode mode,
@@ -428,12 +406,6 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
     return Status::OK();
 }
 }  // namespace internal
-
-ApplyImportCollectionFn applyImportCollection = applyImportCollectionDefault;
-
-void registerApplyImportCollectionFn(ApplyImportCollectionFn func) {
-    applyImportCollection = func;
-}
 
 void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
@@ -1354,33 +1326,14 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::NamespaceExists}}},
     {"importCollection",
-     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status {
-          const auto& entry = *op;
-          const auto tenantId = entry.getNss().tenantId();
-          const auto vts = tenantId
-              ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
-                    *tenantId,
-                    auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
-              : boost::none;
-          auto importEntry = mongo::ImportCollectionOplogEntry::parse(
-              entry.getObject(),
-              IDLParserContext("importCollectionOplogEntry",
-                               vts,
-                               tenantId,
-                               SerializationContext::stateDefault()));
-          applyImportCollection(opCtx,
-                                importEntry.getImportUUID(),
-                                importEntry.getImportCollection(),
-                                importEntry.getNumRecords(),
-                                importEntry.getDataSize(),
-                                importEntry.getCatalogEntry(),
-                                importEntry.getStorageMetadata(),
-                                importEntry.getDryRun(),
-                                mode);
-          return Status::OK();
-      },
-      {ErrorCodes::NamespaceExists}}},
+     {[](OperationContext*, const ApplierOperation& op, OplogApplication::Mode) -> Status {
+         const auto& entry = *op;
+         LOGV2_ERROR(11921200,
+                     "Ignoring importCollection oplog entry",
+                     "opTime"_attr = entry.getOpTime(),
+                     "entry"_attr = redact(entry.toBSONForLogging()));
+         return Status::OK();
+     }}},
     {"applyOps",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {

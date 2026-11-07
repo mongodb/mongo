@@ -210,21 +210,6 @@ void AuthOpObserver::onRenameCollection(OperationContext* const opCtx,
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }
 
-void AuthOpObserver::onImportCollection(OperationContext* opCtx,
-                                        const UUID& importUUID,
-                                        const NamespaceString& nss,
-                                        long long numRecords,
-                                        long long dataSize,
-                                        const BSONObj& catalogEntry,
-                                        const BSONObj& storageMetadata,
-                                        bool isDryRun,
-                                        bool isTimeseries) {
-
-    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
-    AuthorizationManager::get(opCtx->getService())
-        ->notifyDDLOperation(opCtx, "m", nss, catalogEntry, &storageMetadata);
-}
-
 void AuthOpObserver::onReplicationRollback(OperationContext* opCtx,
                                            const RollbackObserverInfo& rbInfo) {
     // Invalidate any in-memory auth data if necessary.

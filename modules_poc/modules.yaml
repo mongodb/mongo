@@ -907,7 +907,6 @@ storage_engine_integration:
     - src/mongo/db/mongod_options_storage*
     - src/mongo/db/dbhelpers*
     - src/mongo/db/dbcommands.idl
-    - src/mongo/db/import*
     - src/mongo/db/index_repair*
     - src/mongo/db/commands/fsync*
     - src/mongo/db/commands/dbcommands*
@@ -972,7 +971,6 @@ server_backup_restore:
     fully_marked: true
   files:
     - src/mongo/db/modules/enterprise/src/hot_backups
-    - src/mongo/db/modules/enterprise/src/live_import
     - src/mongo/db/storage/backup*
 
 cache_pressure:

@@ -203,10 +203,6 @@ void logCreateView(Client* client,
         ->logCreateView(client, nsname, viewOn, pipeline, code);
 }
 
-void logImportCollection(Client* client, const NamespaceString& nsname) {
-    AuditInterface::get(client->getServiceContext())->logImportCollection(client, nsname);
-}
-
 void logCreateDatabase(Client* client, const DatabaseName& dbname) {
     AuditInterface::get(client->getServiceContext())->logCreateDatabase(client, dbname);
 }

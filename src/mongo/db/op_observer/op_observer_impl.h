@@ -222,15 +222,6 @@ public:
                             bool stayTemp,
                             bool markFromMigrate,
                             bool isTimeseries) final;
-    void onImportCollection(OperationContext* opCtx,
-                            const UUID& importUUID,
-                            const NamespaceString& nss,
-                            long long numRecords,
-                            long long dataSize,
-                            const BSONObj& catalogEntry,
-                            const BSONObj& storageMetadata,
-                            bool isDryRun,
-                            bool isTimeseries) final;
     void onTransactionStart(OperationContext* opCtx) final;
     void onUnpreparedTransactionCommit(
         OperationContext* opCtx,

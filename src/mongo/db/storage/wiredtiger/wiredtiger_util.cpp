@@ -1422,61 +1422,6 @@ Status WiredTigerUtil::exportStatsBSONAndOTel(WiredTigerSession& session,
     return Status::OK();
 }
 
-StatusWith<std::string> WiredTigerUtil::generateImportString(std::string_view ident,
-                                                             const BSONObj& storageMetadata,
-                                                             bool panicOnCorruptWtMetadata,
-                                                             bool repair) {
-
-    if (!storageMetadata.hasField(ident)) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Missing the storage metadata for ident " << ident << " in "
-                                    << redact(storageMetadata));
-    }
-
-    if (storageMetadata.getField(ident).type() != BSONType::object) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "The storage metadata for ident " << ident
-                                    << " is not of type object but is of type "
-                                    << storageMetadata.getField(ident).type() << " in "
-                                    << redact(storageMetadata));
-    }
-
-    const BSONObj& identMd = storageMetadata.getField(ident).Obj();
-    if (!identMd.hasField("tableMetadata") || !identMd.hasField("fileMetadata")) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream()
-                          << "The storage metadata for ident " << ident
-                          << " is missing either the 'tableMetadata' or 'fileMetadata' field in "
-                          << redact(storageMetadata));
-    }
-
-    const BSONElement tableMetadata = identMd.getField("tableMetadata");
-    const BSONElement fileMetadata = identMd.getField("fileMetadata");
-
-    if (tableMetadata.type() != BSONType::string || fileMetadata.type() != BSONType::string) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "The storage metadata for ident " << ident
-                                    << " is not of type string for either the 'tableMetadata' or "
-                                       "'fileMetadata' field in "
-                                    << redact(storageMetadata));
-    }
-
-    std::stringstream ss;
-    ss << tableMetadata.String();
-    ss << ",import=(enabled=true,repair=false,";
-
-    if (!panicOnCorruptWtMetadata) {
-        invariant(!repair);
-        ss << "panic_corrupt=false,";
-    }
-    if (repair) {
-        ss << "repair=true,";
-    }
-    ss << "file_metadata=(" << fileMetadata.String() << "))";
-
-    return StatusWith<std::string>(ss.str());
-}
-
 std::string WiredTigerUtil::generateRestoreConfig() {
     std::stringstream ss;
     ss << "backup_restore_target=[";

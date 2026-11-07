@@ -12,7 +12,6 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/logical_time_validator.h"
@@ -2187,34 +2186,6 @@ void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
                         markFromMigrate,
                         isTimeseries);
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
-}
-void OpObserverImpl::onImportCollection(OperationContext* opCtx,
-                                        const UUID& importUUID,
-                                        const NamespaceString& nss,
-                                        long long numRecords,
-                                        long long dataSize,
-                                        const BSONObj& catalogEntry,
-                                        const BSONObj& storageMetadata,
-                                        bool isDryRun,
-                                        bool isTimeseries) {
-    assertBatchedDDLNotMixedWithCRUD(opCtx);
-    if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
-        return;
-    }
-
-    ImportCollectionOplogEntry importCollection(
-        nss, importUUID, numRecords, dataSize, catalogEntry, storageMetadata, isDryRun);
-
-    MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-
-    oplogEntry.setTid(nss.tenantId());
-    if (isTimeseries && shouldSetIsTimeseriesField(VersionContext::getDecoration(opCtx))) {
-        oplogEntry.setIsTimeseries();
-    }
-    oplogEntry.setNss(nss.getCommandNS());
-    oplogEntry.setObject(importCollection.toBSON());
-    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 namespace {

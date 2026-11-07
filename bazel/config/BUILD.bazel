@@ -3359,7 +3359,6 @@ ALL_ENTERPRISE_FEATURES = [
     "inmemory",
     "kerberos",
     "ldap",
-    "live_import",
     "magic_restore",
     "mongohouse",
     "queryable",

@@ -85,16 +85,6 @@ CollectionAcquisition acquireCollectionForRead(OperationContext* opCtx,
 
 class DurableCatalogTest : public CatalogTestFixture {
 public:
-    explicit DurableCatalogTest(Options options = {}) : _options(std::move(options)) {}
-
-    Options makeServiceContextOptions() override {
-        return std::move(_options);
-    }
-
-private:
-    Options _options;
-
-public:
     void setUp() override {
         CatalogTestFixture::setUp();
 
@@ -261,101 +251,6 @@ private:
     size_t _numIndexesCreated = 0;
 
     boost::optional<CollectionCatalogIdAndUUID> _collection;
-};
-
-class ImportCollectionTest : public DurableCatalogTest {
-public:
-    explicit ImportCollectionTest() : DurableCatalogTest(Options{}.inMemory(false)) {}
-
-protected:
-    void setUp() override {
-        DurableCatalogTest::setUp();
-
-        Lock::DBLock dbLock(operationContext(), nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(operationContext(), nss, MODE_IX);
-
-        WriteUnitOfWork wuow{operationContext()};
-
-        const auto generatedIdent = generateNewCollectionIdent(nss);
-        auto mdbCatalog = getMDBCatalog();
-        const auto catalogId = mdbCatalog->reserveCatalogId(operationContext());
-        unittest::assertGet(durable_catalog::createCollection(
-            operationContext(), catalogId, nss, generatedIdent, {}, mdbCatalog));
-        ident = getMDBCatalog()->getEntry(catalogId).ident;
-        EXPECT_EQ(generatedIdent, ident);
-
-        IndexDescriptor descriptor{"",
-                                   BSON(IndexDescriptor::kKeyPatternFieldName
-                                        << BSON("_id" << 1) << IndexDescriptor::kIndexNameFieldName
-                                        << IndexConstants::kIdIndexName
-                                        << IndexDescriptor::kIndexVersionFieldName << 2)};
-
-        idxIdent = generateNewIndexIdent(nss);
-        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
-        imd.spec = descriptor.infoObj();
-        imd.ready = true;
-
-        md = durable_catalog::getParsedCatalogEntry(operationContext(), catalogId, mdbCatalog)
-                 ->metadata;
-        md->insertIndex(std::move(imd));
-        durable_catalog::putMetaData(operationContext(),
-                                     catalogId,
-                                     *md,
-                                     mdbCatalog,
-                                     BSON(IndexConstants::kIdIndexName << idxIdent));
-
-        ASSERT_OK(durable_catalog::createIndex(operationContext(),
-                                               catalogId,
-                                               nss,
-                                               CollectionOptions{.uuid = UUID::gen()},
-                                               descriptor.toIndexConfig(),
-                                               idxIdent));
-
-        wuow.commit();
-
-        auto engine = storageEngine()->getEngine();
-        engine->checkpoint();
-
-        storageMetadata =
-            BSON(ident << unittest::assertGet(engine->getStorageMetadata(ident)) << idxIdent
-                       << unittest::assertGet(engine->getStorageMetadata(idxIdent)));
-
-        engine->dropIdentForImport(
-            *operationContext(), *shard_role_details::getRecoveryUnit(operationContext()), ident);
-        engine->dropIdentForImport(*operationContext(),
-                                   *shard_role_details::getRecoveryUnit(operationContext()),
-                                   idxIdent);
-    }
-
-    StatusWith<durable_catalog::ImportResult> importCollectionTest(const NamespaceString& nss,
-                                                                   const BSONObj& metadata,
-                                                                   const BSONObj& storageMetadata) {
-        Lock::DBLock dbLock(operationContext(), nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(operationContext(), nss, MODE_X);
-
-        uassert(ErrorCodes::NamespaceExists,
-                str::stream() << "Collection already exists. NS: " << nss.toStringForErrorMsg(),
-                !CollectionCatalog::get(operationContext())
-                     ->lookupCollectionByNamespace(operationContext(), nss));
-
-        WriteUnitOfWork wuow(operationContext());
-        auto res = durable_catalog::importCollection(operationContext(),
-                                                     nss,
-                                                     metadata,
-                                                     storageMetadata,
-                                                     /*generateNewUUID=*/true,
-                                                     getMDBCatalog());
-        if (res.isOK()) {
-            wuow.commit();
-        }
-        return res;
-    }
-
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("unittest", "import");
-    std::string ident;
-    std::string idxIdent;
-    std::shared_ptr<durable_catalog::CatalogEntryMetaData> md;
-    BSONObj storageMetadata;
 };
 
 TEST_F(DurableCatalogTest, MultikeyPathsForBtreeIndexInitializedToVectorOfEmptySets) {
@@ -816,71 +711,6 @@ DEATH_TEST_REGEX_F(DurableCatalogTestDeathTest,
     WriteUnitOfWork wuow(operationContext());
     collection->setIndexIsMultikey(
         operationContext(), indexEntry->descriptor()->indexName(), {{0U}, {0U}});
-}
-
-TEST_F(ImportCollectionTest, ImportCollection) {
-    // Import should fail with empty metadata.
-    ASSERT_THROWS_CODE(
-        importCollectionTest(nss, {}, storageMetadata), AssertionException, ErrorCodes::BadValue);
-
-    md->options.uuid = UUID::gen();
-    auto mdObj = md->toBSON();
-    auto idxIdentObj = BSON(IndexConstants::kIdIndexName << idxIdent);
-
-    // Import should fail with missing "md" field.
-    ASSERT_THROWS_CODE(
-        importCollectionTest(
-            nss,
-            BSON("idxIdent" << idxIdentObj << "ns" << nss.ns_forTest() << "ident" << ident),
-            storageMetadata),
-        AssertionException,
-        ErrorCodes::BadValue);
-
-    // Import should fail with missing "ident" field.
-    ASSERT_THROWS_CODE(importCollectionTest(nss,
-                                            BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns"
-                                                      << nss.ns_forTest()),
-                                            storageMetadata),
-                       AssertionException,
-                       ErrorCodes::BadValue);
-
-    // Import should success with validate inputs.
-    auto swImportResult =
-        importCollectionTest(nss,
-                             BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns"
-                                       << nss.ns_forTest() << "ident" << ident),
-                             storageMetadata);
-    ASSERT_OK(swImportResult.getStatus());
-    durable_catalog::ImportResult importResult = std::move(swImportResult.getValue());
-
-    Lock::GlobalLock globalLock{operationContext(), MODE_IS};
-
-    // Validate the catalog entry for the imported collection.
-    auto entry = getMDBCatalog()->getEntry(importResult.catalogId);
-    EXPECT_EQ(entry.nss, nss);
-    EXPECT_EQ(entry.ident, ident);
-    EXPECT_EQ(getMDBCatalog()->getIndexIdent(
-                  operationContext(), importResult.catalogId, IndexConstants::kIdIndexName),
-              idxIdent);
-
-    // Test that a collection UUID is generated for import.
-    EXPECT_NE(md->options.uuid.value(), importResult.uuid);
-    // Substitute in the generated UUID and check that the rest of fields in the catalog entry
-    // match.
-    md->options.uuid = importResult.uuid;
-    ASSERT_BSONOBJ_EQ(
-        getMDBCatalog()->getRawCatalogEntry(operationContext(), importResult.catalogId),
-        BSON("md" << md->toBSON() << "idxIdent" << idxIdentObj << "ns" << nss.ns_forTest()
-                  << "ident" << ident));
-}
-
-TEST_F(ImportCollectionTest, ImportCollectionNamespaceExists) {
-    createCollection(nss, {});
-
-    // Import should fail if the namespace already exists.
-    ASSERT_THROWS_CODE(importCollectionTest(ns(), {}, storageMetadata),
-                       AssertionException,
-                       ErrorCodes::NamespaceExists);
 }
 
 TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLatest) {

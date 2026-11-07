@@ -102,7 +102,6 @@ MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 MONGO_FAIL_POINT_DEFINE(WTRollbackToStableReturnOnEBUSY);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUnrecoverableRollbackError);
-MONGO_FAIL_POINT_DEFINE(WTFailImportSortedDataInterface);
 MONGO_FAIL_POINT_DEFINE(WTSetRecoveryCheckpointMetadataEBUSY);
 
 const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
@@ -1586,28 +1585,6 @@ Status WiredTigerKVEngine::_createRecordStore(const rss::PersistenceProvider& pr
     return WiredTigerUtil::createTable(wtRu, uri.c_str(), config.c_str());
 }
 
-Status WiredTigerKVEngine::importRecordStore(RecoveryUnit& ru,
-                                             std::string_view ident,
-                                             const BSONObj& storageMetadata,
-                                             bool panicOnCorruptWtMetadata,
-                                             bool repair) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
-    auto& session = *wtRu.getSessionNoTxn();
-
-    std::string config = uassertStatusOK(WiredTigerUtil::generateImportString(
-        ident, storageMetadata, panicOnCorruptWtMetadata, repair));
-
-    string uri = WiredTigerUtil::buildTableUri(ident);
-    LOGV2_DEBUG(5095102,
-                2,
-                "WiredTigerKVEngine::importRecordStore",
-                "uri"_attr = uri,
-                "config"_attr = config);
-
-    auto ensuredIdent = _ensureIdentPath(ident);
-    return wtRCToStatus(session.create(uri.c_str(), config.c_str()), session);
-}
-
 Status WiredTigerKVEngine::recoverOrphanedIdent(const rss::PersistenceProvider& provider,
                                                 RecoveryUnit& ru,
                                                 const NamespaceString& nss,
@@ -1799,28 +1776,6 @@ Status WiredTigerKVEngine::createSortedDataInterface(
         logAttrs(uuid),
         "ident"_attr = ident,
         "config"_attr = config);
-    auto ensuredIdent = _ensureIdentPath(ident);
-    return WiredTigerIndex::create(
-        WiredTigerRecoveryUnit::get(ru), WiredTigerUtil::buildTableUri(ident), config);
-}
-
-Status WiredTigerKVEngine::importSortedDataInterface(RecoveryUnit& ru,
-                                                     std::string_view ident,
-                                                     const BSONObj& storageMetadata,
-                                                     bool panicOnCorruptWtMetadata,
-                                                     bool repair) {
-
-    std::string config = uassertStatusOK(WiredTigerUtil::generateImportString(
-        ident, storageMetadata, panicOnCorruptWtMetadata, repair));
-
-    LOGV2_DEBUG(5095103,
-                2,
-                "WiredTigerKVEngine::importSortedDataInterface",
-                "ident"_attr = ident,
-                "config"_attr = config);
-    if (WTFailImportSortedDataInterface.shouldFail()) {
-        return Status(ErrorCodes::UnknownError, "WTFailImportSortedDataInterface Mock Error");
-    }
     auto ensuredIdent = _ensureIdentPath(ident);
     return WiredTigerIndex::create(
         WiredTigerRecoveryUnit::get(ru), WiredTigerUtil::buildTableUri(ident), config);
@@ -2032,50 +1987,6 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
     }
 
     return Status::OK();
-}
-
-void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
-                                            RecoveryUnit& ru,
-                                            std::string_view ident) {
-    const std::string uri = WiredTigerUtil::buildTableUri(ident);
-
-    WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(&ru);
-    wtRu->getSessionNoTxn()->closeAllCursors(uri);
-
-    // Use a separate session to avoid transactional issues, because a drop may impact the
-    // in-progress transaction.
-    WiredTigerSession session(_connection.get());
-
-    // Don't wait for the global checkpoint lock to be obtained in WiredTiger as it can take a
-    // substantial amount of time to be obtained if there is a concurrent checkpoint running. We
-    // will wait until we obtain exclusive access to the underlying table file though. As it
-    // isn't user visible at this stage in the import it should be readily available unless a
-    // backup cursor is open. In short, using "checkpoint_wait=false" and "lock_wait=true" means
-    // that we can potentially be waiting for a short period of time for WT_SESSION::drop() to
-    // run, but would rather get EBUSY than wait a long time for a checkpoint to complete.
-    const char* config = "checkpoint_wait=false,lock_wait=true,remove_files=false";
-    Status dropStatus = Status::OK();
-    size_t attempt = 0;
-    do {
-        Status interruptibleStatus = interruptible.checkForInterruptNoAssert();
-        if (interruptibleStatus.code() == ErrorCodes::InterruptedAtShutdown) {
-            return;
-        }
-
-        ++attempt;
-
-        dropStatus = _drop(session, uri.c_str(), config);
-        invariant(dropStatus != ErrorCodes::LockBusy);
-        logAndBackoff(5114600,
-                      ::mongo::logv2::LogComponent::kStorage,
-                      logv2::LogSeverity::Debug(1),
-                      attempt,
-                      "WiredTiger dropping ident for import",
-                      "uri"_attr = uri,
-                      "config"_attr = config,
-                      "status"_attr = dropStatus);
-    } while (dropStatus == ErrorCodes::ObjectIsBusy);
-    invariant(dropStatus);
 }
 
 void WiredTigerKVEngine::_checkpoint(WiredTigerSession& session, bool useTimestamp) {
@@ -3177,23 +3088,6 @@ void WiredTigerKVEngine::dump() const {
     } else {
         LOGV2(6117701, "WiredTigerKVEngine::dump() failed", "error"_attr = status);
     }
-}
-
-StatusWith<BSONObj> WiredTigerKVEngine::getStorageMetadata(std::string_view ident) const {
-    auto session = _connection->getUninterruptibleSession();
-
-    auto tableMetadata = WiredTigerUtil::getMetadata(*session, fmt::format("table:{}", ident));
-    if (!tableMetadata.isOK()) {
-        return tableMetadata.getStatus();
-    }
-
-    auto fileMetadata = WiredTigerUtil::getMetadata(*session, fmt::format("file:{}.wt", ident));
-    if (!fileMetadata.isOK()) {
-        return fileMetadata.getStatus();
-    }
-
-    return BSON("tableMetadata" << tableMetadata.getValue() << "fileMetadata"
-                                << fileMetadata.getValue());
 }
 
 KeyFormat WiredTigerKVEngine::getKeyFormat(RecoveryUnit& ru, std::string_view ident) const {

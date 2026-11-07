@@ -361,10 +361,6 @@ filters:
   - "collection_compact*":
     approvers:
       - 10gen/server-compact
-  - "import*":
-    approvers:
-      - 10gen/server-storage-engine-integration
-      - 10gen/server-catalog-and-routing-shard-catalog
   - "hasher*":
     approvers:
       - 10gen/query-execution-write-exec

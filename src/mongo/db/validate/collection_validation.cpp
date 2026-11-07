@@ -497,11 +497,10 @@ void _compareCollectionHash(OperationContext* opCtx,
         _expectedCollectionHash(opCtx, validateState.nss(), validateState.uuid());
     if (!expected) {
         results.setHashComparison(comparison);
-        // Collections imported with importCollection, written to by a prepared transaction, or
-        // written to while the per-document validation hash was disabled are eligible but
-        // legitimately have no hash. None of these is recorded in the catalog, so they cannot be
-        // told apart from a hash that was lost. An incomplete delta is the same loss before the
-        // next flush persists it.
+        // Collections written to by a prepared transaction, or written to while the per-document
+        // validation hash was disabled, are eligible but legitimately have no hash. Neither is
+        // recorded in the catalog, so they cannot be told apart from a hash that was lost. An
+        // incomplete delta is the same loss before the next flush persists it.
         // TODO SERVER-133292: Remove prepared transactions from this comment and the warning once
         // their commits carry the collection hash.
         const bool hashIsMissing =
@@ -516,8 +515,8 @@ void _compareCollectionHash(OperationContext* opCtx,
                           "hashComparison"_attr = toString(comparison));
             results.addWarning(
                 "The collection is eligible for a collection hash but it is missing or incomplete. "
-                "This is expected if the collection was imported, contains writes committed by a "
-                "prepared transaction, or was written to while continuous internode validation was "
+                "This is expected if the collection contains writes committed by a prepared "
+                "transaction, or was written to while continuous internode validation was "
                 "disabled.");
         }
         return;

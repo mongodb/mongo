@@ -5,7 +5,6 @@
 
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -716,12 +715,13 @@ repl::OplogEntry makeTruncateRangeOplogEntry(Timestamp ts,
     }};
 }
 
-repl::OplogEntry makeCreateOplogEntry(Timestamp ts, NsAndUUID userColl) {
+repl::OplogEntry makeCreateOplogEntry(Timestamp ts, NsAndUUID userColl, bool fromMigrate) {
     return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
         .opTime = repl::OpTime(ts, 1),
         .opType = repl::OpTypeEnum::kCommand,
         .nss = userColl.nss.getCommandNS(),
         .uuid = userColl.uuid,
+        .fromMigrate = fromMigrate ? boost::optional<bool>(true) : boost::none,
         // Replicated record IDs must be enabled for a collection while we use functions like
         // makeInsertOplogEntryWithRecordIdAndSizeMetadata(). Otherwise, we hit tassert 11454701.
         // TODO(SERVER-137466): Remove this recordIdsReplicated BSON field.
@@ -747,23 +747,6 @@ repl::OplogEntry makeWatermarkOplogEntry(Timestamp ts) {
         .opType = repl::OpTypeEnum::kNoop,
         .nss = NamespaceString{},
         .oField = BSON("msg" << kWatermarkMsg),
-        .wallClockTime = Date_t::now(),
-    }};
-}
-
-repl::OplogEntry makeImportCollectionOplogEntry(
-    Timestamp ts, NsAndUUID userColl, int64_t numRecords, int64_t dataSize, bool dryRun) {
-
-    const BSONObj catalogEntry = BSON("md" << BSON("options" << BSON("uuid" << userColl.uuid)));
-
-    ImportCollectionOplogEntry importEntry(
-        userColl.nss, UUID::gen(), numRecords, dataSize, catalogEntry, BSONObj{}, dryRun);
-
-    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
-        .opTime = repl::OpTime(ts, 1),
-        .opType = repl::OpTypeEnum::kCommand,
-        .nss = userColl.nss.getCommandNS(),
-        .oField = importEntry.toBSON(),
         .wallClockTime = Date_t::now(),
     }};
 }

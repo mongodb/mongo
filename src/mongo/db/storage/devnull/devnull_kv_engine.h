@@ -98,8 +98,6 @@ public:
         return Status::OK();
     }
 
-    void dropIdentForImport(Interruptible&, RecoveryUnit&, std::string_view ident) override {}
-
     bool isEphemeral() const override {
         return true;
     }

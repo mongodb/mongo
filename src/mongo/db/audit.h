@@ -307,11 +307,6 @@ void logCreateView(Client* client,
                    ErrorCodes::Error code);
 
 /**
- * Logs the result of an importCollection command.
- */
-void logImportCollection(Client* client, const NamespaceString& nsname);
-
-/**
  * Logs the result of a createDatabase command.
  */
 void logCreateDatabase(Client* client, const DatabaseName& dbname);

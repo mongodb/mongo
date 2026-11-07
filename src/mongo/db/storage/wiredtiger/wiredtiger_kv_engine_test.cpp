@@ -545,63 +545,6 @@ TEST_F(WiredTigerKVEngineTest, CreateRecordStoreFailsWithExistingIdent) {
     ASSERT_EQ(status.code(), ErrorCodes::ObjectAlreadyExists);
 }
 
-TEST_F(WiredTigerKVEngineTest, IdentDrop) {
-#ifdef _WIN32
-    // TODO SERVER-51595: to re-enable this test on Windows.
-    return;
-#endif
-
-    auto opCtxPtr = _makeOperationContext();
-
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
-    std::string ident = "collection-1234";
-    RecordStore::Options options;
-
-    auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
-    {
-        StorageWriteTransaction swt(ru);
-        ASSERT_OK(
-            _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
-        swt.commit();
-    }
-
-    const boost::optional<boost::filesystem::path> dataFilePath =
-        _helper->getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
-    ASSERT(dataFilePath);
-    ASSERT(boost::filesystem::exists(*dataFilePath));
-
-    _helper->getWiredTigerKVEngine()->dropIdentForImport(
-        *opCtxPtr.get(), *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident);
-    ASSERT(boost::filesystem::exists(*dataFilePath));
-
-    // Because the underlying file was not removed, it will be renamed out of the way by WiredTiger
-    // when creating a new table with the same ident.
-    {
-        StorageWriteTransaction swt(ru);
-        ASSERT_OK(
-            _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
-        swt.commit();
-    }
-
-    const boost::filesystem::path renamedFilePath = dataFilePath->generic_string() + ".1";
-    ASSERT(boost::filesystem::exists(*dataFilePath));
-    ASSERT(boost::filesystem::exists(renamedFilePath));
-
-    ASSERT_OK(_helper->getEngine()->dropIdent(
-        *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
-
-    // WiredTiger drops files asynchronously.
-    for (size_t check = 0; check < 30; check++) {
-        if (!boost::filesystem::exists(*dataFilePath))
-            break;
-        sleepsecs(1);
-    }
-
-    ASSERT(!boost::filesystem::exists(*dataFilePath));
-    ASSERT(boost::filesystem::exists(renamedFilePath));
-}
-
 TEST_F(WiredTigerKVEngineTest, TestBasicPinOldestTimestamp) {
     auto opCtxRaii = _makeOperationContext();
     const Timestamp initTs = Timestamp(1, 0);

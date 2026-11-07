@@ -997,21 +997,6 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, PreimagesTruncateRangeLeavesUserM
     EXPECT_EQ(oplogEntry->timestamp, validAsOf);
 }
 
-// An imported collection's existing documents were never hashed, so the entry it creates
-// carries a size and count but no hash.
-TEST_F(SizeCountCheckpointCoordinatorHashTest, ImportCollectionPersistsNoHash) {
-    writeOplogEntry(test_helpers::makeImportCollectionOplogEntry(
-        nextTs(), _collA, 3 /*numRecords=*/, 300 /*dataSize=*/));
-
-    const Timestamp expectedValidAsOf = flush();
-
-    const SizeCountStore::Entry expectedEntry{
-        .timestamp = expectedValidAsOf, .size = 300, .count = 3, .hash = boost::none};
-    const auto entry = readSizeCount(_collA.uuid);
-    ASSERT_TRUE(entry.has_value());
-    EXPECT_EQ(expectedEntry, *entry);
-}
-
 // A prepared transaction's per-operation hashes are dropped at the prepare, and its
 // `commitTransaction` entry summarizes only size and count, so the persisted hash is invalidated
 // while the size and count still advance.

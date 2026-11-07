@@ -37,7 +37,7 @@ private:
     const RecordId _catalogId;
 };
 
-MDBCatalog::MDBCatalog(RecordStore* rs, KVEngine* engine) : _rs(rs), _engine(engine) {}
+MDBCatalog::MDBCatalog(RecordStore* rs) : _rs(rs) {}
 
 void MDBCatalog::init(OperationContext* opCtx) {
     // No locking needed since called single threaded.
@@ -236,53 +236,6 @@ StatusWith<MDBCatalog::EntryIdentifier> MDBCatalog::addEntry(OperationContext* o
     return {{res.getValue(), ident, nss}};
 }
 
-StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> MDBCatalog::importCatalogEntry(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const UUID& uuid,
-    const RecordStore::Options& recordStoreOptions,
-    const BSONObj& catalogEntryObj,
-    const BSONObj& storageMetadata,
-    bool panicOnCorruptWtMetadata,
-    bool repair) {
-
-    StatusWith<EntryIdentifier> swEntry = _importEntry(opCtx, nss, catalogEntryObj);
-    if (!swEntry.isOK())
-        return swEntry.getStatus();
-    EntryIdentifier& entry = swEntry.getValue();
-    auto indexIdents = _getIndexIdents(catalogEntryObj);
-
-    auto ru = shard_role_details::getRecoveryUnit(opCtx);
-    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-        [catalog = this, ident = entry.ident, indexIdents = indexIdents, ru = ru](
-            OperationContext* opCtx) {
-            catalog->_engine->dropIdentForImport(*opCtx, *ru, ident);
-            for (const auto& indexIdent : indexIdents) {
-                catalog->_engine->dropIdentForImport(*opCtx, *ru, indexIdent);
-            }
-        });
-
-    Status status = _engine->importRecordStore(
-        *ru, entry.ident, storageMetadata, panicOnCorruptWtMetadata, repair);
-
-    if (!status.isOK())
-        return status;
-
-    for (const auto& indexIdent : indexIdents) {
-        status = _engine->importSortedDataInterface(
-            *ru, indexIdent, storageMetadata, panicOnCorruptWtMetadata, repair);
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-
-    auto rs = _engine->getRecordStore(opCtx, nss, entry.ident, recordStoreOptions, uuid);
-    invariant(rs);
-
-    return std::pair<RecordId, std::unique_ptr<RecordStore>>(entry.catalogId, std::move(rs));
-}
-
-
 Status MDBCatalog::removeEntry(OperationContext* opCtx, const RecordId& catalogId) {
     std::lock_guard<std::mutex> lk(_catalogIdToEntryMapLock);
     const auto it = _catalogIdToEntryMap.find(catalogId);
@@ -474,31 +427,6 @@ BSONObj MDBCatalog::_findRawEntry(SeekableRecordCursor& cursor, const RecordId& 
 
     return record->data.releaseToBson();
 }
-
-StatusWith<MDBCatalog::EntryIdentifier> MDBCatalog::_importEntry(OperationContext* opCtx,
-                                                                 const NamespaceString& nss,
-                                                                 const BSONObj& catalogEntry) {
-    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
-
-    auto ident = catalogEntry["ident"].String();
-    StatusWith<RecordId> res = _rs->insertRecord(opCtx,
-                                                 *shard_role_details::getRecoveryUnit(opCtx),
-                                                 catalogEntry.objdata(),
-                                                 catalogEntry.objsize(),
-                                                 Timestamp());
-    if (!res.isOK())
-        return res.getStatus();
-
-    std::lock_guard<std::mutex> lk(_catalogIdToEntryMapLock);
-    invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
-    _catalogIdToEntryMap[res.getValue()] = {res.getValue(), ident, nss};
-    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
-        std::make_unique<AddIdentChange>(this, res.getValue()));
-
-    LOGV2_DEBUG(5095101, 1, "imported meta data", logAttrs(nss), "metadata"_attr = res.getValue());
-    return {{res.getValue(), ident, nss}};
-}
-
 
 std::vector<std::string> MDBCatalog::_getIndexIdents(const BSONObj& rawCatalogEntry) {
     std::vector<std::string> idents;

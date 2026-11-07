@@ -478,28 +478,6 @@ public:
                                                                 KeyFormat keyFormat) override;
 
     /**
-     * panicOnCorruptWtMetadata - determines whether WT should panic or error upon corrupt metadata
-     * for a collection.
-     * true: WT will panic
-     * false: WT will error and the operation can be retried with repair=true
-     *
-     * repair - determines whether WT should try to reconstruct the collection metadata from the
-     * latest checkpoint. This requires reading the entire table and should only be used when
-     * absolutely required to ensure the import succeeds
-     */
-    Status importRecordStore(RecoveryUnit& ru,
-                             std::string_view ident,
-                             const BSONObj& storageMetadata,
-                             bool panicOnCorruptWtMetadata,
-                             bool repair) override;
-
-    Status importSortedDataInterface(RecoveryUnit&,
-                                     std::string_view ident,
-                                     const BSONObj& storageMetadata,
-                                     bool panicOnCorruptWtMetadata,
-                                     bool repair) override;
-
-    /**
      * Drops the specified ident for resumable index builds.
      */
     Status dropSortedDataInterface(RecoveryUnit&, std::string_view ident) override;
@@ -509,8 +487,6 @@ public:
                      bool identHasSizeInfo,
                      boost::optional<uint64_t> schemaEpoch,
                      bool waitForLocks) override;
-
-    void dropIdentForImport(Interruptible&, RecoveryUnit&, std::string_view ident) override;
 
     void alterIdentMetadata(RecoveryUnit&,
                             std::string_view ident,
@@ -769,8 +745,6 @@ public:
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override;
 
     void dump() const override;
-
-    StatusWith<BSONObj> getStorageMetadata(std::string_view ident) const override;
 
     KeyFormat getKeyFormat(RecoveryUnit&, std::string_view ident) const override;
 

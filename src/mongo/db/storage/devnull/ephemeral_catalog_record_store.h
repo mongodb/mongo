@@ -124,8 +124,7 @@ public:
     }
 
     void setApproximateSize(long long numRecords, long long dataSize) override {
-        // We should only be forcibly setting the size in certain situations (like collection
-        // imports) that don't currently make sense for ephemeral test-only collections.
+        // Forcibly setting the size does not make sense for ephemeral test-only collections.
         MONGO_UNIMPLEMENTED;
     }
 

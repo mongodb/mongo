@@ -142,16 +142,6 @@ public:
                             bool markFromMigrate,
                             bool isTimeseries) final;
 
-    void onImportCollection(OperationContext* opCtx,
-                            const UUID& importUUID,
-                            const NamespaceString& nss,
-                            long long numRecords,
-                            long long dataSize,
-                            const BSONObj& catalogEntry,
-                            const BSONObj& storageMetadata,
-                            bool isDryRun,
-                            bool isTimeseries) final;
-
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 
     // Noop operations below with explanations (don't perform any check).

@@ -3834,14 +3834,6 @@ mongo_cc_fuzzer_test_deprecated(
 )
 
 idl_generator(
-    name = "import_collection_oplog_entry_gen",
-    src = "//src/mongo/db:import_collection_oplog_entry.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-idl_generator(
     name = "cleanup_structured_encryption_data_coordinator_gen",
     src = "//src/mongo/db:cleanup_structured_encryption_data_coordinator.idl",
     deps = [
@@ -3869,16 +3861,6 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_first_group"],
     deps = [],
-)
-
-mongo_cc_library(
-    name = "import_collection_oplog_entry",
-    srcs = [
-        ":import_collection_oplog_entry_gen",
-    ],
-    deps = [
-        ":server_base",
-    ],
 )
 
 mongo_cc_library(

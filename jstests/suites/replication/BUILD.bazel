@@ -1218,7 +1218,6 @@ resmoke_suite_test(
         "//buildscripts/resmokeconfig:suites/concurrency_replication_for_backup_restore.yml",
         "//src/mongo/db/extension/test_examples:resmoke_data",
         "//src/mongo/db/modules/enterprise/jstests/hot_backups:backup_restore_backup_cursor.js",
-        "//src/mongo/db/modules/enterprise/jstests/live_import/libs:all_javascript_files",
     ],
     multiversion_deps = [
         "//bazel/resmoke/multiversion:last-continuous",

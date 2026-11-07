@@ -1148,14 +1148,7 @@ mongo_cc_library(
         "//src/mongo/executor:inline_executor",
         "//src/mongo/util:progress_meter",
         "//src/mongo/util/net:ssl_manager",
-    ] + select({
-        "//bazel/config:enterprise_feature_live_import_enabled": [
-            "//src/mongo/db/modules/enterprise/src/live_import/commands:export_collection_command",
-            "//src/mongo/db/modules/enterprise/src/live_import/commands:import_collection_command",
-            "//src/mongo/db/modules/enterprise/src/live_import/commands:vote_commit_import_collection_command",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 mongo_cc_unit_test(

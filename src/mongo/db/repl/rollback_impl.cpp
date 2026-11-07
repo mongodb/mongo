@@ -15,7 +15,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
-#include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/index_builds/index_build_attempts.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string_util.h"
@@ -1084,22 +1083,6 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             _countDiffs.erase(oplogEntry.getUuid().value());
             _pendingDrops.erase(oplogEntry.getUuid().value());
             _newCounts.erase(oplogEntry.getUuid().value());
-        } else if (oplogEntry.getCommandType() == OplogEntry::CommandType::kImportCollection) {
-            auto importEntry = mongo::ImportCollectionOplogEntry::parse(
-                oplogEntry.getObject(), IDLParserContext("importCollectionOplogEntry"));
-            // Nothing to roll back if this is a dryRun.
-            if (!importEntry.getDryRun()) {
-                const auto& catalogEntry = importEntry.getCatalogEntry();
-                auto importTargetUUID =
-                    invariant(UUID::parse(catalogEntry["md"]["options"]["uuid"]),
-                              str::stream() << "Oplog entry to roll back is unexpectedly missing "
-                                               "import collection UUID: "
-                                            << redact(oplogEntry.toBSONForLogging()));
-                // If we roll back an import, then we do not need to change the size of that uuid.
-                _countDiffs.erase(importTargetUUID);
-                _pendingDrops.erase(importTargetUUID);
-                _newCounts.erase(importTargetUUID);
-            }
         } else if (oplogEntry.getCommandType() == OplogEntry::CommandType::kDrop) {
             // The collection count at collection drop time is op-logged in the 'o2' field.
             // In the common case where the drop-pending collection is managed by the storage

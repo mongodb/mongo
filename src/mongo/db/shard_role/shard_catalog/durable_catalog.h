@@ -93,38 +93,6 @@ namespace durable_catalog {
                                          const IndexConfig& indexConfig,
                                          std::string_view ident);
 
-/**
- * Import a collection by inserting the given metadata into the durable catalog and instructing
- * the storage engine to import the corresponding idents. The metadata object should be a valid
- * catalog entry and contain the following fields:
- * "md": A document representing the durable_catalog::CatalogEntryMetaData of the collection.
- * "idxIdent": A document containing {<index_name>: <index_ident>} pairs for all indexes.
- * "nss": NamespaceString of the collection being imported.
- * "ident": Ident of the collection file.
- *
- * On success, returns an ImportResult structure containing the RecordId which identifies the
- * new record store in the durable catalog, ownership of the new RecordStore and the UUID of the
- * collection imported.
- *
- * The collection must be locked in MODE_X when calling this function.
- */
-struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ImportResult {
-    ImportResult(RecordId catalogId, std::unique_ptr<RecordStore> rs, UUID uuid)
-        : catalogId(std::move(catalogId)), rs(std::move(rs)), uuid(uuid) {}
-    RecordId catalogId;
-    std::unique_ptr<RecordStore> rs;
-    UUID uuid;
-};
-[[MONGO_MOD_NEEDS_REPLACEMENT]] StatusWith<ImportResult> importCollection(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const BSONObj& metadata,
-    const BSONObj& storageMetadata,
-    bool generateNewUUID,
-    MDBCatalog* mdbCatalog,
-    bool panicOnCorruptWtMetadata = true,
-    bool repair = false);
-
 [[MONGO_MOD_PRIVATE]] Status renameCollection(OperationContext* opCtx,
                                               const RecordId& catalogId,
                                               const NamespaceString& toNss,

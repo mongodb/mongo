@@ -917,8 +917,6 @@ const allCommands = {
     },
     hostInfo: {isAdminCommand: true, command: {hostInfo: 1}, shouldFail: false},
     httpClientRequest: {skip: isAnInternalCommand},
-    exportCollection: {skip: isAnInternalCommand},
-    importCollection: {skip: isAnInternalCommand},
     insert: {
         setUp: function (mongoS) {
             assert.commandWorked(mongoS.getDB(dbName).runCommand({create: collName}));
@@ -1469,7 +1467,6 @@ const allCommands = {
         shouldFail: true,
     },
     voteAbortIndexBuild: {skip: isAnInternalCommand},
-    voteCommitImportCollection: {skip: isAnInternalCommand},
     voteCommitIndexBuild: {skip: isAnInternalCommand},
     waitForFailPoint: {
         skip: isAnInternalCommand,

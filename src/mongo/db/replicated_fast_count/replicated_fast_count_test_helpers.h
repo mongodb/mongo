@@ -428,7 +428,7 @@ repl::OplogEntry makeTruncateRangeOplogEntry(Timestamp ts,
 /**
  * Generates a command oplog entry representing a collection create or drop for 'userColl'.
  */
-repl::OplogEntry makeCreateOplogEntry(Timestamp ts, NsAndUUID userColl);
+repl::OplogEntry makeCreateOplogEntry(Timestamp ts, NsAndUUID userColl, bool fromMigrate = false);
 repl::OplogEntry makeDropOplogEntry(Timestamp ts, NsAndUUID userColl);
 
 /**
@@ -436,13 +436,6 @@ repl::OplogEntry makeDropOplogEntry(Timestamp ts, NsAndUUID userColl);
  * `flusher::writeWatermark()`.
  */
 repl::OplogEntry makeWatermarkOplogEntry(Timestamp ts);
-
-/**
- * Generates an importCollection command oplog entry for 'userColl' with the inputted 'numRecords',
- * 'dataSize', and 'dryRun' values.
- */
-repl::OplogEntry makeImportCollectionOplogEntry(
-    Timestamp ts, NsAndUUID userColl, int64_t numRecords, int64_t dataSize, bool dryRun = false);
 
 /**
  * Inserts `oplogEntry` into the oplog collection.

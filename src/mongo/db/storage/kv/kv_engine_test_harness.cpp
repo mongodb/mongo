@@ -85,7 +85,7 @@ protected:
 
     // Callers are responsible for managing the lifetime of 'catalogRS'.
     std::unique_ptr<MDBCatalog> createMDBCatalog(RecordStore* catalogRS) {
-        return std::make_unique<MDBCatalog>(catalogRS, helper->getEngine());
+        return std::make_unique<MDBCatalog>(catalogRS);
     }
 
     std::unique_ptr<RecordStore> createCatalogRS() {

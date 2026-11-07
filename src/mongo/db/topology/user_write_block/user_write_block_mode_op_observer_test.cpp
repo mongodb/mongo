@@ -212,8 +212,6 @@ protected:
                                               /*stayTemp=*/false,
                                               /*markFromMigrate=*/false,
                                               /*isTimeseries=*/false);
-                opObserver.onImportCollection(
-                    opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false, false);
             } catch (...) {
                 // Make it easier to see that this is where we failed.
                 ASSERT_OK(exceptionToStatus());
@@ -288,9 +286,6 @@ protected:
                                                         /*stayTemp=*/false,
                                                         /*markFromMigrate=*/false,
                                                         /*isTimeseries=*/false),
-                          AssertionException);
-            ASSERT_THROWS(opObserver.onImportCollection(
-                              opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false, false),
                           AssertionException);
         }
     }

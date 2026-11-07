@@ -125,10 +125,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void dropIdentForImport(Interruptible&, RecoveryUnit&, std::string_view ident) override {
-        MONGO_UNREACHABLE;
-    }
-
     Timestamp getBackupCheckpointTimestamp() override {
         MONGO_UNREACHABLE
     }

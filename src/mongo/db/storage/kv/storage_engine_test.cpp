@@ -3,6 +3,7 @@
 
 #include "mongo/db/storage/storage_engine.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -36,6 +37,10 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/barrier.h"
@@ -1072,9 +1077,18 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
     auto collInfo = createCollection(opCtx.get(), collNs);
 
-    // Drop the ident from the storage engine but keep the underlying files.
-    _storageEngine->getEngine()->dropIdentForImport(
-        *opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), collInfo.ident);
+    // Drop the ident from the storage engine metadata but keep the underlying files.
+    auto* wtEngine = checked_cast<WiredTigerKVEngine*>(_storageEngine->getEngine());
+    // Flush the new table so the drop does not fail on dirty data, then let WiredTiger wait for
+    // the background checkpointer instead of racing it.
+    wtEngine->checkpoint();
+    const std::string uri = WiredTigerUtil::buildTableUri(collInfo.ident);
+    WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get()))
+        .getSessionNoTxn()
+        ->closeAllCursors(uri);
+    WiredTigerSession session(&wtEngine->getConnection());
+    ASSERT_EQ(0,
+              session.drop(uri.c_str(), "checkpoint_wait=true,lock_wait=true,remove_files=false"));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // After the catalog is reloaded, we expect that the ident has been recovered because the

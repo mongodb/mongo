@@ -47,7 +47,6 @@ NO_PASSTHROUGH_DATA = [
     "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_encrypt",
     "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_manage_key",
     "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_server",
-    "//src/mongo/db/modules/enterprise/jstests/live_import/libs:all_javascript_files",
     "//x509:apple_certs.json",
     "//x509:generate_main_certificates",
     "//x509:mkcert",

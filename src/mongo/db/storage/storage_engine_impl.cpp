@@ -223,7 +223,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
     LOGV2(9529901,
           "Initializing durable catalog",
           "approximateNumRecords"_attr = _catalogRecordStore->approximateNumRecords());
-    _catalog = std::make_unique<MDBCatalog>(_catalogRecordStore.get(), _engine.get());
+    _catalog = std::make_unique<MDBCatalog>(_catalogRecordStore.get());
     _catalog->init(opCtx);
 
     LOGV2(9529902, "Retrieving all idents from storage engine");

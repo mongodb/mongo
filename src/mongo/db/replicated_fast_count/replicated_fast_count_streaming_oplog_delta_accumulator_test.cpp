@@ -1059,26 +1059,6 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, NoopRepairHashSet_AfterCreateKeepsCre
     EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kSet);
 }
 
-// A set does not outlive the collection it was applied to: once the collection is dropped and a
-// collection with the same UUID is imported, the new collection starts from the import's absent
-// hash and folds as usual.
-TEST_F(StreamingOplogDeltaAccumulatorTest, NoopRepairHashSet_DropThenImportResetsToFold) {
-    const auto result = runAccumulatorRaw(
-        {makeNoopWithO2Bson(Timestamp(1, 1),
-                            BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
-                                        << BSON("hSet" << int64_t{0x0011223344556677}))),
-         test_helpers::makeDropOplogEntry(Timestamp(1, 2), collA).getEntry().toBSON(),
-         test_helpers::makeImportCollectionOplogEntry(
-             Timestamp(1, 3), collA, /*numRecords=*/1, /*dataSize=*/10)
-             .getEntry()
-             .toBSON()});
-    ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    const auto& delta = result.deltas.at(collA.uuid);
-    EXPECT_EQ(delta.state, DDLState::kDroppedAndRecreated);
-    EXPECT_EQ(delta.metadata.hash, boost::none);
-    EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kFold);
-}
-
 TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairHashDiffAndHashSet_Ignored) {
     const Timestamp ts{1, 1};
     const auto o2 =

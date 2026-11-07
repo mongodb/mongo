@@ -3,7 +3,6 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 
-#include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -109,37 +108,6 @@ void recordCollectionReplicatedMetadataDelta(
         // Entry exists, so update as needed.
         it->second.metadata = it->second.metadata + metadataDelta;
     }
-}
-
-// TODO(SERVER-119213): This function exists to help replicated fast count gain coverage in ASC
-// tests that use the importCollection command. Remove this function once the importCollection
-// command is removed.
-void recordCollectionImport(const UUID& uuid,
-                            const ImportCollectionOplogEntry& importEntry,
-                            ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
-
-    // Importing a collection means that we have a pre-existing collection without hashes, so we
-    // need to invalidate the collection hash.
-    const CollectionReplicatedMetadata importedMetadata{
-        .sizeCount = {.size = importEntry.getDataSize(), .count = importEntry.getNumRecords()},
-        .hash = boost::none};
-
-    auto it = replicatedMetadataDeltasOut.find(uuid);
-    if (it == replicatedMetadataDeltasOut.end()) {
-        replicatedMetadataDeltasOut.emplace(
-            uuid,
-            ReplicatedMetadataDelta{.metadata = importedMetadata, .state = DDLState::kCreated});
-        return;
-    }
-
-    // We expect to only see a pre-existing entry for this UUID if we had previously dropped it and
-    // then received an importCollection entry for that same uuid.
-    massert(12601900,
-            "Encountered writes to a collection before it was imported",
-            it->second.state == DDLState::kDropped);
-
-    it->second = ReplicatedMetadataDelta{.metadata = importedMetadata,
-                                         .state = DDLState::kDroppedAndRecreated};
 }
 
 void recordCollectionCreate(const UUID& uuid,
@@ -278,20 +246,6 @@ boost::optional<CollectionReplicatedMetadata> extractReplicatedMetadataForOpImpl
         .hash = perOpMd->getH()};
 }
 
-boost::optional<UUID> getUUIDFromOplogEntry(const repl::OplogEntry& oplogEntry) {
-    if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kImportCollection) {
-        const auto catalogEntry =
-            mongo::ImportCollectionOplogEntry::parse(oplogEntry.getObject(),
-                                                     IDLParserContext("importCollectionOplogEntry"))
-                .getCatalogEntry();
-        return invariant(UUID::parse(catalogEntry["md"]["options"]["uuid"]),
-                         str::stream()
-                             << "Oplog entry is unexpectedly missing import collection UUID: "
-                             << redact(oplogEntry.toBSONForLogging()));
-    }
-    return oplogEntry.getUuid();
-}
-
 // Unpacks MultiOpSizeMetadata from a commitTransaction entry and records per-collection deltas.
 int extractReplicatedMetadataDeltasForCommitTxn(
     const repl::OplogEntry& entry, ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
@@ -337,17 +291,8 @@ int processOplogEntry(const repl::OplogEntry& entry,
         return extractReplicatedMetadataDeltasForApplyOps(entry, replicatedMetadataDeltasOut);
     }
 
-    const auto& entryUuid = getUUIDFromOplogEntry(entry);
+    const auto& entryUuid = entry.getUuid();
     switch (entry.getCommandType()) {
-        case repl::OplogEntry::CommandType::kImportCollection: {
-            const auto importEntry = mongo::ImportCollectionOplogEntry::parse(
-                entry.getObject(), IDLParserContext("importCollectionOplogEntry"));
-            if (importEntry.getDryRun()) {
-                return 0;
-            }
-            recordCollectionImport(*entryUuid, importEntry, replicatedMetadataDeltasOut);
-            return 1;
-        }
         case repl::OplogEntry::CommandType::kTruncateRange: {
             const auto delta = extractSizeCountDeltaForTruncateRange(entry);
             if (!delta) {

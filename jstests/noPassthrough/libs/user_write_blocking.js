@@ -50,8 +50,6 @@ export const UserWriteBlockHelpers = (function () {
                             {role: "readWriteAnyDatabase", db: "admin"},
                             // Need for DDL operations
                             {role: "dbAdminAnyDatabase", db: "admin"},
-                            // Need for importCollection
-                            {role: "clusterAdmin", db: "admin"},
                         ],
                     }),
                 );

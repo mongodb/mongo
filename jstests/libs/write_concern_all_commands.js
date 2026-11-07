@@ -1994,8 +1994,6 @@ const wcCommandsTests = {
     hello: {skip: "does not accept write concern"},
     hostInfo: {skip: "does not accept write concern"},
     httpClientRequest: {skip: "does not accept write concern"},
-    exportCollection: {skip: "internal command"},
-    importCollection: {skip: "internal command"},
     insert: {
         // A no-op insert that returns success is not possible
         success: {
@@ -3577,7 +3575,6 @@ const wcCommandsTests = {
     validate: {skip: "does not accept write concern"},
     validateDBMetadata: {skip: "does not accept write concern"},
     voteAbortIndexBuild: {skip: "internal command"},
-    voteCommitImportCollection: {skip: "internal command"},
     voteCommitIndexBuild: {skip: "internal command"},
     waitForFailPoint: {skip: "test command"},
     getShardingReady: {skip: "internal command"},
@@ -4481,8 +4478,6 @@ const wcTimeseriesCommandsTests = {
     hello: {skip: "does not accept write concern"},
     hostInfo: {skip: "does not accept write concern"},
     httpClientRequest: {skip: "does not accept write concern"},
-    exportCollection: {skip: "internal command"},
-    importCollection: {skip: "internal command"},
     insert: {
         // A no-op insert that returns success is not possible
         success: {
@@ -4817,7 +4812,6 @@ const wcTimeseriesCommandsTests = {
     validate: {skip: "does not accept write concern"},
     validateDBMetadata: {skip: "does not accept write concern"},
     voteAbortIndexBuild: {skip: "internal command"},
-    voteCommitImportCollection: {skip: "internal command"},
     voteCommitIndexBuild: {skip: "internal command"},
     waitForFailPoint: {skip: "test command"},
     getShardingReady: {skip: "internal command"},

@@ -140,18 +140,6 @@ public:
                                                                  KeyFormat keyFormat) = 0;
 
     /**
-     * Similar to createRecordStore but this imports from an existing table with the provided ident
-     * instead of creating a new one.
-     */
-    virtual Status importRecordStore(RecoveryUnit& ru,
-                                     std::string_view ident,
-                                     const BSONObj& storageMetadata,
-                                     bool panicOnCorruptWtMetadata,
-                                     bool repair) {
-        MONGO_UNREACHABLE;
-    }
-
-    /**
      * When we write to an oplog, we call this so that that the storage engine can manage the
      * visibility of oplog entries to ensure they are ordered.
      *
@@ -226,18 +214,6 @@ public:
         const IndexConfig& indexConfig,
         const boost::optional<mongo::BSONObj>& storageEngineIndexOptions) = 0;
 
-    /**
-     * Similar to createSortedDataInterface but this imports from an existing table with the
-     * provided ident instead of creating a new one.
-     */
-    virtual Status importSortedDataInterface(RecoveryUnit&,
-                                             std::string_view ident,
-                                             const BSONObj& storageMetadata,
-                                             bool panicOnCorruptWtMetadata,
-                                             bool repair) {
-        MONGO_UNREACHABLE;
-    }
-
     virtual Status dropSortedDataInterface(RecoveryUnit&, std::string_view ident) = 0;
 
     virtual int64_t getIdentSize(RecoveryUnit&, std::string_view ident) = 0;
@@ -260,12 +236,6 @@ public:
                              bool identHasSizeInfo,
                              boost::optional<uint64_t> schemaEpoch = boost::none,
                              bool waitForLocks = true) = 0;
-
-    /**
-     * Removes any knowledge of the ident from the storage engines metadata without removing the
-     * underlying files belonging to the ident.
-     */
-    virtual void dropIdentForImport(Interruptible&, RecoveryUnit&, std::string_view ident) = 0;
 
     /**
      * Attempts to locate and recover a file that is "orphaned" from the storage engine's metadata,
@@ -632,10 +602,6 @@ public:
     virtual Status reconfigureLogging() {
         return Status::OK();
     }
-
-    virtual StatusWith<BSONObj> getStorageMetadata(std::string_view ident) const {
-        return BSONObj{};
-    };
 
     /**
      * Returns the 'KeyFormat' tied to 'ident'.

@@ -359,18 +359,6 @@ inline OplogSlot getNextOpTime(OperationContext* opCtx) {
     return slots.back();
 }
 
-using ApplyImportCollectionFn = std::function<void(OperationContext*,
-                                                   const UUID&,
-                                                   const NamespaceString&,
-                                                   long long,
-                                                   long long,
-                                                   const BSONObj&,
-                                                   const BSONObj&,
-                                                   bool,
-                                                   OplogApplication::Mode)>;
-
-void registerApplyImportCollectionFn(ApplyImportCollectionFn func);
-
 template <typename F>
 auto writeConflictRetryWithLimit(OperationContext* opCtx,
                                  std::string_view opStr,

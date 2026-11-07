@@ -5,6 +5,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
@@ -378,7 +379,7 @@ TEST(SizeCountCheckpointBufferTest, InternalOnlyScanProducesNoFlushableWork) {
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());
 }
 
-TEST(SizeCountCheckpointBufferTest, DropThenImportAcrossScansYieldsDroppedAndRecreated) {
+TEST(SizeCountCheckpointBufferTest, DropThenCreateAcrossScansYieldsDroppedAndRecreated) {
     const UUID oplogUuid = UUID::gen();
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("test", "collA"),
                          .uuid = UUID::gen()};
@@ -390,8 +391,7 @@ TEST(SizeCountCheckpointBufferTest, DropThenImportAcrossScansYieldsDroppedAndRec
     }
     const std::list<repl::OplogEntry> entries{
         test_helpers::makeDropOplogEntry(Timestamp(2, 1), coll),
-        test_helpers::makeImportCollectionOplogEntry(
-            Timestamp(2, 2), coll, /*numRecords=*/3, /*dataSize=*/90),
+        test_helpers::makeCreateOplogEntry(Timestamp(2, 2), coll, /*fromMigrate=*/true),
         makeWatermarkOplogEntry(Timestamp(2, 3))};
     {
         OplogCursorMock cursor(entries);
@@ -407,7 +407,8 @@ TEST(SizeCountCheckpointBufferTest, DropThenImportAcrossScansYieldsDroppedAndRec
             ReplicatedMetadataDeltas{
                 {coll.uuid,
                  ReplicatedMetadataDelta{
-                     .metadata = {.sizeCount = CollectionSizeCount{.size = 90, .count = 3}},
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                  .hash = kEmptyCollectionValidationHash},
                      .state = DDLState::kDroppedAndRecreated}},
                 {oplogUuid,
                  ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},

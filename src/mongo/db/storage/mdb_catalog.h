@@ -7,7 +7,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
 
@@ -55,7 +54,7 @@ public:
         NamespaceString nss;
     };
 
-    MDBCatalog(RecordStore* rs, KVEngine* engine);
+    MDBCatalog(RecordStore* rs);
 
     static MDBCatalog* get(OperationContext* opCtx) {
         return opCtx->getServiceContext()->getStorageEngine()->getMDBCatalog();
@@ -113,16 +112,6 @@ public:
                                                      const BSONObj& catalogEntryObj,
                                                      const RecordId& catalogId);
 
-    StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> importCatalogEntry(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const UUID& uuid,
-        const RecordStore::Options& recordStoreOptions,
-        const BSONObj& catalogEntry,
-        const BSONObj& storageMetadata,
-        bool panicOnCorruptWtMetadata,
-        bool repair);
-
     Status removeEntry(OperationContext* opCtx, const RecordId& catalogId);
 
     Status putRenamedEntry(OperationContext* opCtx,
@@ -150,10 +139,6 @@ private:
 
     BSONObj _findRawEntry(SeekableRecordCursor& cursor, const RecordId& catalogId) const;
 
-    StatusWith<EntryIdentifier> _importEntry(OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             const BSONObj& catalogEntry);
-
     std::vector<std::string> _getIndexIdents(const BSONObj& rawCatalogEntry);
 
     // TODO SERVER-105451 refactor to avoid the need for direct bson parsing
@@ -170,7 +155,5 @@ private:
 
     absl::flat_hash_map<RecordId, EntryIdentifier, RecordId::Hasher> _catalogIdToEntryMap;
     mutable std::mutex _catalogIdToEntryMapLock;
-
-    KVEngine* const _engine;
 };
 }  // namespace mongo

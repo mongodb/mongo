@@ -495,16 +495,6 @@ public:
                                     bool markFromMigrate,
                                     bool isTimeseries) = 0;
 
-    virtual void onImportCollection(OperationContext* opCtx,
-                                    const UUID& importUUID,
-                                    const NamespaceString& nss,
-                                    long long numRecords,
-                                    long long dataSize,
-                                    const BSONObj& catalogEntry,
-                                    const BSONObj& storageMetadata,
-                                    bool isDryRun,
-                                    bool isTimeseries) = 0;
-
     /**
      * The onTransaction Start method is called at the beginning of a multi-document transaction.
      * It must not be called when the transaction is already in progress.

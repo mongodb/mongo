@@ -35,8 +35,8 @@ using namespace std::literals::string_view_literals;
 // metadata object, and repairReplicatedMetadata noop entries. It computes the delta and records
 // it directly.
 //
-// Anything else (importCollection, kCreate-from-migrate, partial-txn chain members, malformed
-// entries) falls through to the Layer 3 OplogEntry::parse path inside DeltaAccumulator.
+// Anything else (kCreate-from-migrate, partial-txn chain members, malformed entries) falls
+// through to the Layer 3 OplogEntry::parse path inside DeltaAccumulator.
 
 // Helper used by the fast lanes to accumulate per-uuid deltas. Same semantics as the homonymous
 // helper in `replicated_fast_count_delta_utils.cpp` (private there); duplicated here to keep
@@ -118,7 +118,7 @@ enum class CommandKind {
     kApplyOps,
     kCommitTransaction,
     // Other commands processOplogEntry dispatches on (create, drop, renameCollection,
-    // truncateRange, importCollection): Layer 3 only.
+    // truncateRange): Layer 3 only.
     kInterestingOther,
     // Anything else (createIndexes, dropDatabase, collMod, etc.): produces no delta.
     kUnrelated,
@@ -134,7 +134,7 @@ CommandKind classifyCommand(BSONElement oElem, const BSONObj& raw) {
     if (first == "commitTransaction"sv)
         return CommandKind::kCommitTransaction;
     if (first == "create"sv || first == "drop"sv || first == "renameCollection"sv ||
-        first == "truncateRange"sv || first == "importCollection"sv) {
+        first == "truncateRange"sv) {
         return CommandKind::kInterestingOther;
     }
     // Anything else falls into the "produces no delta" bucket. This covers known no-delta

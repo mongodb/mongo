@@ -364,61 +364,6 @@ Status createIndex(OperationContext* opCtx,
         });
 }
 
-StatusWith<ImportResult> importCollection(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const BSONObj& metadata,
-                                          const BSONObj& storageMetadata,
-                                          bool generateNewUUID,
-                                          MDBCatalog* mdbCatalog,
-                                          bool panicOnCorruptWtMetadata,
-                                          bool repair) {
-    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X));
-    invariant(nss.coll().size() > 0);
-
-    // Ensure the 'md' can be parsed.
-    const BSONElement mdElement = metadata["md"];
-    uassert(ErrorCodes::BadValue, "Malformed catalog metadata", mdElement.isABSONObj());
-
-    durable_catalog::CatalogEntryMetaData md;
-    md.parse(mdElement.Obj());
-
-    uassert(ErrorCodes::BadValue,
-            "Attempted to import catalog entry without an ident",
-            metadata.hasField("ident"));
-
-    const auto& catalogEntry = [&] {
-        if (generateNewUUID) {
-            // Generate a new UUID for the collection.
-            md.options.uuid = UUID::gen();
-            BSONObjBuilder catalogEntryBuilder;
-            // Generate a new "md" field after setting the new UUID.
-            catalogEntryBuilder.append("md", md.toBSON());
-            // Append the rest of the metadata.
-            catalogEntryBuilder.appendElementsUnique(metadata);
-            return catalogEntryBuilder.obj();
-        }
-        return metadata;
-    }();
-    RecordStore::Options recordStoreOptions =
-        getRecordStoreOptions(nss, md.options, md.recordIdsReplicated);
-    auto importResult = mdbCatalog->importCatalogEntry(opCtx,
-                                                       nss,
-                                                       *md.options.uuid,
-                                                       recordStoreOptions,
-                                                       catalogEntry,
-                                                       storageMetadata,
-                                                       panicOnCorruptWtMetadata,
-                                                       repair);
-    if (!importResult.isOK()) {
-        return importResult.getStatus();
-    }
-    std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
-        std::move(importResult.getValue());
-    return ImportResult(std::move(catalogIdRecordStorePair.first),
-                        std::move(catalogIdRecordStorePair.second),
-                        md.options.uuid.value());
-}
-
 Status renameCollection(OperationContext* opCtx,
                         const RecordId& catalogId,
                         const NamespaceString& toNss,

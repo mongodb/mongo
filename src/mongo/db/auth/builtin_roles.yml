@@ -421,10 +421,6 @@ roles:
       - matchType: any_normal
         actions:
           - dropDatabase
-      - matchType: any
-        actions:
-          - importCollection
-          - exportCollection
 
   __queryableBackup:
     adminOnly: true

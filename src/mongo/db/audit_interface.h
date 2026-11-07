@@ -248,11 +248,6 @@ public:
                                ErrorCodes::Error code) const = 0;
 
     /**
-     * Logs the result of an importCollection command.
-     */
-    virtual void logImportCollection(Client* client, const NamespaceString& nsname) const = 0;
-
-    /**
      * Logs the result of a createDatabase command.
      */
     virtual void logCreateDatabase(Client* client, const DatabaseName& dbname) const = 0;
@@ -556,8 +551,6 @@ public:
                        const NamespaceString& viewOn,
                        BSONArray pipeline,
                        ErrorCodes::Error code) const override {};
-
-    void logImportCollection(Client* client, const NamespaceString& nsname) const override {};
 
     void logCreateDatabase(Client* client, const DatabaseName& dbname) const override {};
 

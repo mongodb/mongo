@@ -42,6 +42,9 @@ export const commandsRemovedFromMongodSinceLastLTS = [
     "_configsvrCleanupReshardCollection",
     "_shardsvrCleanupReshardCollection",
     "timeseriesCatalogBucketParamsChanged", // Removed in 9.0
+    "exportCollection", // Removed in 9.1
+    "importCollection", // Removed in 9.1
+    "voteCommitImportCollection", // Removed in 9.1
 ];
 
 // These commands were added in mongod since the last LTS version, so will not appear in the

@@ -21,7 +21,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/end_of_transaction_parameter.h"
-#include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
@@ -1683,91 +1682,6 @@ TEST_F(OpObserverTest, MustBePrimaryToWriteOplogEntries) {
     // No-op writes should be prohibited.
     ASSERT_THROWS_CODE(
         opObserver.onOpMessage(opCtx.get(), {}), DBException, ErrorCodes::NotWritablePrimary);
-}
-
-TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
-    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
-    auto opCtx = cc().makeOperationContext();
-
-    auto importUUID = UUID::gen();
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
-    long long numRecords = 1;
-    long long dataSize = 2;
-    // A dummy invalid catalog entry. We do not need a valid catalog entry for this test.
-    auto catalogEntry = BSON("ns" << nss.ns_forTest() << "ident"
-                                  << "collection-7-1792004489479993697");
-    auto storageMetadata = BSON("storage" << "metadata");
-    bool isDryRun = false;
-
-    // Write to the oplog.
-    {
-        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
-        WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onImportCollection(opCtx.get(),
-                                      importUUID,
-                                      nss,
-                                      numRecords,
-                                      dataSize,
-                                      catalogEntry,
-                                      storageMetadata,
-                                      isDryRun,
-                                      /*isTimeseries=*/false);
-        wunit.commit();
-    }
-
-    auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
-    OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
-    ASSERT_TRUE(repl::OpTypeEnum::kCommand == oplogEntry.getOpType());
-    ASSERT_TRUE(OplogEntry::CommandType::kImportCollection == oplogEntry.getCommandType());
-
-    ImportCollectionOplogEntry importCollection(
-        nss, importUUID, numRecords, dataSize, catalogEntry, storageMetadata, isDryRun);
-    ASSERT_BSONOBJ_EQ(importCollection.toBSON(), oplogEntry.getObject());
-}
-
-TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
-    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
-    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
-    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
-    auto opCtx = cc().makeOperationContext();
-
-    auto importUUID = UUID::gen();
-    TenantId tid{TenantId(OID::gen())};
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.coll");
-    long long numRecords = 1;
-    long long dataSize = 2;
-    // A dummy invalid catalog entry. We do not need a valid catalog entry for this test.
-    auto catalogEntry = BSON("ns" << nss.ns_forTest() << "ident"
-                                  << "collection-7-1792004489479993697");
-    auto storageMetadata = BSON("storage" << "metadata");
-    bool isDryRun = false;
-
-    // Write to the oplog.
-    {
-        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
-        WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onImportCollection(opCtx.get(),
-                                      importUUID,
-                                      nss,
-                                      numRecords,
-                                      dataSize,
-                                      catalogEntry,
-                                      storageMetadata,
-                                      isDryRun,
-                                      /*isTimeseries=*/false);
-        wunit.commit();
-    }
-
-    auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
-    OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
-    ASSERT_TRUE(repl::OpTypeEnum::kCommand == oplogEntry.getOpType());
-    ASSERT_TRUE(OplogEntry::CommandType::kImportCollection == oplogEntry.getCommandType());
-
-    ASSERT_EQUALS(tid, *oplogEntry.getTid());
-
-    ImportCollectionOplogEntry importCollection(
-        nss, importUUID, numRecords, dataSize, catalogEntry, storageMetadata, isDryRun);
-    ASSERT_BSONOBJ_EQ(importCollection.toBSON(), oplogEntry.getObject());
 }
 
 TEST_F(OpObserverTest, SingleStatementInsertTestIncludesTenantId) {

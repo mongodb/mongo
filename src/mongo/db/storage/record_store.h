@@ -389,8 +389,7 @@ public:
     [[MONGO_MOD_PUBLIC]] virtual void adoptSharedSizeState_forTest(const RecordStore& source) {}
 
     /**
-     * Override the approximate size of the collection (number of records and data size), required
-     * when creating a collection from pre-existing data.
+     * Override the approximate size of the collection (number of records and data size).
      */
     virtual void setApproximateSize(long long numRecords, long long dataSize) = 0;
 

@@ -146,17 +146,6 @@ public:
                                          FilterBehavior filterBehavior);
 
     /**
-     * Creates an import configuration string suitable for the 'config' parameter in
-     * WT_SESSION::create() given the storage engines metadata retrieved during the export.
-     *
-     * Returns the FailedToParse status if the storage engine metadata object is malformed.
-     */
-    static StatusWith<std::string> generateImportString(std::string_view ident,
-                                                        const BSONObj& storageMetadata,
-                                                        bool panicOnCorruptWtMetadata,
-                                                        bool repair);
-
-    /**
      * Creates the configuration string for the 'backup_restore_target' config option passed into
      * wiredtiger_open().
      *

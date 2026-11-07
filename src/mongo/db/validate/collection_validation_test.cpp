@@ -2768,34 +2768,6 @@ TEST_F(CollectionHashComparisonTest, ReportsIncompleteWhenAReplayedEntryCarriesN
     EXPECT_TRUE(results.getWarnings().empty());
 }
 
-TEST_F(CollectionHashComparisonTest, ReportsIncompleteWhenAnImportedCollectionHasNoHash) {
-    createFastCountContainers();
-    createIneligibleCollection();
-    const BSONObj doc = BSON("_id" << 1);
-    insertDocs({doc}, kIneligibleNss);
-
-    const auto uuid = collectionUuid(kIneligibleNss);
-    seedPersistedHash(uuid, 0x1234, /*writeBackingOplogEntry=*/true, kIneligibleNss);
-
-    // An import brings in a collection whose documents were never hashed, so its delta carries no
-    // hash and nothing folded over that range can be trusted.
-    replicated_fast_count::test_helpers::writeToOplog(
-        operationContext(),
-        replicated_fast_count::test_helpers::makeImportCollectionOplogEntry(
-            Timestamp(2, 1),
-            replicated_fast_count::test_helpers::NsAndUUID{kIneligibleNss, uuid},
-            /*numRecords=*/1,
-            /*dataSize=*/doc.objsize()));
-    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
-
-    // The collection does not replicate its record ids, so it is not eligible for a hash.
-    const auto results = hashValidate(kIneligibleNss);
-    ASSERT_TRUE(results.getHashComparison().has_value());
-    EXPECT_EQ(toString(*results.getHashComparison()), "incompleteDelta");
-    EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
-    EXPECT_TRUE(results.getWarnings().empty());
-}
-
 TEST_F(CollectionHashComparisonTest, AFailedComparisonDoesNotCutValidationShort) {
     createFastCountContainers();
     insertDocs({BSON("_id" << 1), BSON("_id" << 2)});

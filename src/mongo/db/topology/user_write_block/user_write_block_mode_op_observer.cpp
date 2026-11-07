@@ -235,18 +235,6 @@ void UserWriteBlockModeOpObserver::onRenameCollection(OperationContext* opCtx,
     _checkWriteAllowed(opCtx, toCollection);
 }
 
-void UserWriteBlockModeOpObserver::onImportCollection(OperationContext* opCtx,
-                                                      const UUID& importUUID,
-                                                      const NamespaceString& nss,
-                                                      long long numRecords,
-                                                      long long dataSize,
-                                                      const BSONObj& catalogEntry,
-                                                      const BSONObj& storageMetadata,
-                                                      bool isDryRun,
-                                                      bool isTimeseries) {
-    _checkWriteAllowed(opCtx, nss);
-}
-
 void UserWriteBlockModeOpObserver::_checkWriteAllowed(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
     // Evaluate write blocking only on replica set primaries.
