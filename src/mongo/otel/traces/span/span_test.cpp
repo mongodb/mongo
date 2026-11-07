@@ -9,6 +9,7 @@
 #include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/otel/traces/trace_sampling_parameters_gen.h"
 #include "mongo/unittest/server_parameter_guard.h"
 
 #include <string_view>
@@ -493,7 +494,9 @@ using IngressSpanTest = SpanTest;
 TEST_F(IngressSpanTest, ExternalTraceAcceptedBypassesSampling) {
     auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; },
                                            [] { return true; });
-    auto telemetryCtx = Span::createTelemetryContext();
+    BSONObj traceCtxBson =
+        BSON("traceparent" << "00-11111111111111111111111111111111-2222222222222222-01");
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(traceCtxBson);
     {
         auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
     }
@@ -503,6 +506,16 @@ TEST_F(IngressSpanTest, ExternalTraceAcceptedBypassesSampling) {
 TEST_F(IngressSpanTest, ExternalTraceNotAcceptedIsSampled) {
     auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; },
                                            [] { return false; });
+    auto telemetryCtx = Span::createTelemetryContext();
+    {
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+    }
+    EXPECT_TRUE(isEmpty());
+}
+
+TEST_F(IngressSpanTest, EmptyContextIsNotAnExternalTrace) {
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; },
+                                           [] { return true; });
     auto telemetryCtx = Span::createTelemetryContext();
     {
         auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
@@ -569,6 +582,163 @@ TEST_F(IngressSpanTest, RemoteParentNotAcceptedButSampledContinues) {
     ASSERT_FALSE(isEmpty());
     auto record = getSpan(0, span_names::kTest1);
     EXPECT_NE(record->parentId, opentelemetry::trace::SpanId());
+}
+
+TEST_F(IngressSpanTest, RemoteUnsampledParentDoesNotBypassSampling) {
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; },
+                                           [] { return true; });
+    BSONObj traceCtxBson =
+        BSON("traceparent" << "00-11111111111111111111111111111111-2222222222222222-00");
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(traceCtxBson);
+    {
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+    }
+    EXPECT_TRUE(isEmpty());
+}
+
+TEST_F(IngressSpanTest, RemoteUnsampledParentDoesNotConsumeExternalToken) {
+    int acceptCalls = 0;
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; },
+                                           [&] {
+                                               ++acceptCalls;
+                                               return true;
+                                           });
+    BSONObj traceCtxBson =
+        BSON("traceparent" << "00-11111111111111111111111111111111-2222222222222222-00");
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(traceCtxBson);
+    {
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+    }
+    EXPECT_EQ(acceptCalls, 0);
+}
+
+TEST_F(IngressSpanTest, RemoteUnsampledParentInternallySampledContinuesTrace) {
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; },
+                                           [] { return false; });
+    BSONObj traceCtxBson =
+        BSON("traceparent" << "00-11111111111111111111111111111111-2222222222222222-00");
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(traceCtxBson);
+    {
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+    }
+    ASSERT_FALSE(isEmpty());
+    auto record = getSpan(0, span_names::kTest1);
+    EXPECT_NE(record->parentId, opentelemetry::trace::SpanId());
+}
+
+const BSONObj kSampledTraceCtx =
+    BSON("traceparent" << "00-11111111111111111111111111111111-2222222222222222-01");
+
+TEST_F(IngressSpanTest, SampledExternalTraceIsNotTracedWithSamplingFlagDisabled) {
+    unittest::ServerParameterGuard samplingOff{"featureFlagOtelTraceSampling", false};
+    int acceptCalls = 0;
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; },
+                                           [&] {
+                                               ++acceptCalls;
+                                               return true;
+                                           });
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(kSampledTraceCtx);
+    {
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+    }
+    EXPECT_TRUE(isEmpty());
+    EXPECT_EQ(acceptCalls, 0);
+}
+
+TEST_F(IngressSpanTest, SampledExternalTraceIsNotTracedWithTracingFlagDisabled) {
+    unittest::ServerParameterGuard tracingOff{"featureFlagTracing", false};
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; },
+                                           [] { return true; });
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(kSampledTraceCtx);
+    {
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+    }
+    EXPECT_TRUE(isEmpty());
+}
+
+TEST_F(IngressSpanTest, AcceptedExternalTraceDoesNotUseInternalToken) {
+    int shouldSampleCalls = 0;
+    int acceptCalls = 0;
+    auto guard = setTraceSamplingFnForTest(
+        [&](std::string_view, double) {
+            ++shouldSampleCalls;
+            return true;
+        },
+        [&] {
+            ++acceptCalls;
+            return true;
+        });
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(kSampledTraceCtx);
+    {
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+    }
+    ASSERT_FALSE(isEmpty());
+    EXPECT_EQ(acceptCalls, 1);
+    EXPECT_EQ(shouldSampleCalls, 0);
+}
+
+TEST_F(IngressSpanTest, RateLimitedExternalTraceFallsBackToInternalSampling) {
+    int shouldSampleCalls = 0;
+    auto guard = setTraceSamplingFnForTest(
+        [&](std::string_view, double) {
+            ++shouldSampleCalls;
+            return true;
+        },
+        [] { return false; });
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(kSampledTraceCtx);
+    {
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+    }
+    ASSERT_FALSE(isEmpty());
+    EXPECT_EQ(shouldSampleCalls, 1);
+    EXPECT_NE(getSpan(0, span_names::kTest1)->parentId, opentelemetry::trace::SpanId());
+}
+
+/** Sets openTelemetryExternalTracing.enabled for the lifetime of the object. */
+class ScopedExternalTracingEnabled {
+public:
+    explicit ScopedExternalTracingEnabled(bool enabled) {
+        _set(enabled);
+    }
+    ~ScopedExternalTracingEnabled() {
+        _set(true);
+    }
+
+private:
+    static void _set(bool enabled) {
+        OpenTelemetryExternalTracingServerParameter param{"openTelemetryExternalTracing",
+                                                          ServerParameterType::kRuntimeOnly};
+        auto storage = BSON("v" << BSON("enabled" << enabled));
+        ASSERT_OK(param.set(storage.firstElement(), boost::none));
+    }
+};
+
+TEST_F(IngressSpanTest, DisabledExternalTracingDoesNotSpendExternalToken) {
+    ScopedExternalTracingEnabled disabled{false};
+    int acceptCalls = 0;
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return false; },
+                                           [&] {
+                                               ++acceptCalls;
+                                               return true;
+                                           });
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(kSampledTraceCtx);
+    {
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+    }
+    EXPECT_TRUE(isEmpty());
+    EXPECT_EQ(acceptCalls, 0);
+}
+
+TEST_F(IngressSpanTest, DisabledExternalTracingFallsBackToInternalSampling) {
+    ScopedExternalTracingEnabled disabled{false};
+    auto guard = setTraceSamplingFnForTest([](std::string_view, double) { return true; },
+                                           [] { return true; });
+    auto telemetryCtx = TelemetryContextSerializer::fromBSON(kSampledTraceCtx);
+    {
+        auto _ = Span::startIngressSpan(telemetryCtx, span_names::kTest1);
+    }
+    ASSERT_FALSE(isEmpty());
+    EXPECT_NE(getSpan(0, span_names::kTest1)->parentId, opentelemetry::trace::SpanId());
 }
 
 TEST_F(IngressSpanTest, RemoteParentGrandchildrenInheritHeadDecision) {

@@ -29,10 +29,19 @@ structs:
         description: "Specifies the configuration used for traces that were externally sampled"
         strict: false
         fields:
+            enabled:
+                description: >-
+                    Whether to continue traces whose sampled parent was started on a separate
+                    node, e.g. by a client. When false, such operations are sampled internally
+                    like any other. If omitted, the current value is kept.
+                type: bool
+                optional: true
             tokenBucketRateLimit:
-                description: The rate limit to apply to accepting an external trace.
+                description: >-
+                    The rate limit to apply to accepting an external trace. If omitted, the
+                    current rate limit is kept.
                 type: OpenTelemetryTracingTokenBucketRateLimit
-                default: true
+                optional: true
 
     OpenTelemetryTracingSamplingStrategy:
         description: "Describes how a set of spans should be sampled, e.g., the sampling rate."

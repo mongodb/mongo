@@ -112,10 +112,15 @@ default).
 
 ### Externally-initiated Traces (Ingress Spans)
 
-When an incoming command contains a trace context, the server will continue the trace, subject to a
-configurable rate limit. When the incoming command does not contain a trace context or the
-externally-initiated trace is rate limited, internal sampling may still choose to start or continue
-the trace.
+When an incoming command contains a trace context whose `traceparent` has the sampled flag set
+(trace-flags `01`), the server will continue the trace, subject to a configurable rate limit
+(`openTelemetryExternalTracing`). This lets a client request a trace for a specific command, even
+when internal sampling is disabled. Setting `enabled: false` in `openTelemetryExternalTracing` stops
+the server from continuing externally-initiated traces.
+
+When the incoming command does not contain a sampled trace context, external tracing is disabled, or
+the externally-initiated trace is rate limited, internal sampling may still choose to start or
+continue the trace.
 
 ### Egress Spans
 

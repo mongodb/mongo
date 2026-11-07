@@ -1,6 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/otel/traces/trace_sampling_parameters.h"
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -9,17 +11,35 @@
 #include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/sampler/sampling_config.h"
 #include "mongo/otel/traces/trace_sampling_parameters_gen.h"
+#include "mongo/platform/atomic.h"
+
+#include <mutex>
 
 namespace mongo::otel::traces {
 namespace {
+
+// Whether externally-initiated traces may be continued, per openTelemetryExternalTracing.enabled.
+Atomic<bool> externalTracingEnabled{true};
+
+// Guards the external config so that an update, which may set both fields, is never observed
+// half-applied by a concurrent update or by `append`.
+std::mutex externalConfigMutex;
 
 Status applyExternalConfig(const BSONObj& obj) {
     try {
         IDLParserContext ctx("openTelemetryExternalTracing");
         auto config = OpenTelemetryTracingExternalConfig::parse(obj, ctx);
-        const auto& rateLimit = config.getTokenBucketRateLimit();
-        TracingSampler::get().updateExternalConfig(
-            {rateLimit.getRefillRate(), rateLimit.getMaxTokens()});
+
+        std::lock_guard lk(externalConfigMutex);
+        // Fields that are omitted keep their current value, so a partial update such as a rate
+        // limit change does not re-enable tracing that an operator turned off.
+        if (const auto& rateLimit = config.getTokenBucketRateLimit()) {
+            TracingSampler::get().updateExternalConfig(
+                {rateLimit->getRefillRate(), rateLimit->getMaxTokens()});
+        }
+        if (const auto enabled = config.getEnabled()) {
+            externalTracingEnabled.store(*enabled);
+        }
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -138,14 +158,20 @@ void OpenTelemetryExternalTracingServerParameter::append(OperationContext*,
                                                          BSONObjBuilder* bob,
                                                          std::string_view name,
                                                          const boost::optional<TenantId>&) {
+    std::lock_guard lk(externalConfigMutex);
     auto rateLimits = TracingSampler::get().getConfig().externalRateLimits;
     OpenTelemetryTracingTokenBucketRateLimit rateLimit;
     rateLimit.setRefillRate(rateLimits.refillRate);
     rateLimit.setMaxTokens(rateLimits.maxTokens);
     OpenTelemetryTracingExternalConfig config;
+    config.setEnabled(externalTracingEnabled.load());
     config.setTokenBucketRateLimit(std::move(rateLimit));
     BSONObjBuilder sub(bob->subobjStart(name));
     config.serialize(&sub);
+}
+
+bool isExternalTracingEnabled() {
+    return externalTracingEnabled.loadRelaxed();
 }
 
 }  // namespace mongo::otel::traces

@@ -7,6 +7,7 @@
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
+#include "mongo/otel/traces/trace_sampling_parameters.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
 #include "mongo/otel/traces/tracing_feature_flags_gen.h"
 #include "mongo/otel/traces/tracing_utils.h"
@@ -124,11 +125,6 @@ Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
         return Span{};
     }
 
-    auto tracer = provider->GetTracer("mongodb");
-    if (!tracer) {
-        return Span{};
-    }
-
     ScopedSpan parentSpan = nullptr;
     bool hasParent = false;
     std::shared_ptr<SpanTelemetryContextImpl> spanCtx = nullptr;
@@ -146,8 +142,9 @@ Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
 
     const auto hasRemoteParent = hasParent && parentSpan->GetContext().IsRemote();
 
-    // If the parent span is remote, we generally want to bypass the internal sampling mechanism
-    // to respect the sampling decision made by the remote system.
+    // A remote parent that was sampled upstream bypasses internal sampling to respect that decision
+    // (subject to the external rate limit). A remote parent that was not sampled upstream still
+    // goes through internal sampling like a root span.
     if (!hasParent || hasRemoteParent) {
         // Drop if either feature flag is disabled or the sampler rejects it.
         // (Ignore FCV check) — no VersionContext is available in this path.
@@ -160,18 +157,38 @@ Span Span::_start(std::shared_ptr<TelemetryContext>& telemetryCtx,
             return Span{};
         }
 
-        // We need a telemetryCtx for sampling, but it is slightly expensive to create, so do so
-        // only if needed.
-        if (!telemetryCtx) {
-            spanCtx = std::make_shared<SpanTelemetryContextImpl>();
-            telemetryCtx = spanCtx;
-            parentSpan = spanCtx->getSpan();
-        }
+        auto& sampler = TracingSampler::get();
 
-        if (!config.bypassSampling &&
-            !TracingSampler::get().shouldSample(name.getName(), spanCtx->getSamplingValue())) {
-            return Span{};
+        // Only spend an external token on remote parents that were sampled upstream. If external
+        // tracing is disabled or the external rate limit rejects it, internal sampling may still
+        // choose to trace it.
+        // The external token is consumed last, so that it is only spent when every other condition
+        // for accepting the trace already holds.
+        const auto bypassInternalSampling = config.isIngress && isExternalTracingEnabled() &&
+            hasRemoteParent && parentSpan->GetContext().IsSampled() &&
+            sampler.shouldAcceptExternalTrace();
+
+        if (!bypassInternalSampling) {
+            // We need a telemetryCtx for sampling, but it is slightly expensive to create, so do
+            // so only if needed.
+            if (!telemetryCtx) {
+                spanCtx = std::make_shared<SpanTelemetryContextImpl>();
+                telemetryCtx = spanCtx;
+                parentSpan = spanCtx->getSpan();
+            }
+
+            if (!sampler.shouldSample(name.getName(), spanCtx->getSamplingValue())) {
+                return Span{};
+            }
         }
+    }
+
+    // GetTracer() takes a process-wide mutex, so it is only called for spans that will be recorded,
+    // after sampling has decided to keep them.
+    // TODO: Cache the tracer alongside the provider to avoid the lookup entirely.
+    auto tracer = provider->GetTracer("mongodb");
+    if (!tracer) {
+        return Span{};
     }
 
     opentelemetry::trace::StartSpanOptions opts;
@@ -216,9 +233,7 @@ Span Span::start(OperationContext* opCtx, SpanName name, SpanOptions options) {
 Span Span::startIngressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx,
                             SpanName name,
                             SpanOptions options) {
-    auto bypassSampling = telemetryCtx && TracingSampler::get().shouldAcceptExternalTrace();
-    return _start(
-        telemetryCtx, name, {.opts = std::move(options), .bypassSampling = bypassSampling});
+    return _start(telemetryCtx, name, {.opts = std::move(options), .isIngress = true});
 }
 
 Span Span::startEgressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx,

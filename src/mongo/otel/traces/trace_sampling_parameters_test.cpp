@@ -1,6 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/otel/traces/trace_sampling_parameters.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/otel/traces/sampler/sampler.h"
@@ -327,6 +329,7 @@ public:
                                                       ServerParameterType::kRuntimeOnly};
 
     void setUp() override {
+        ASSERT_OK(param.setFromString(R"({"enabled": true})", /*tenantId=*/boost::none));
         TracingSampler::get().updateExternalConfig({kDefaultRefillRate, kDefaultMaxTokens});
     }
 
@@ -365,6 +368,37 @@ TEST_F(TraceExternalTracingParametersTest, AppendAfterMultipleSetsReflectsLastVa
     param.append(nullptr, &bob, "openTelemetryExternalTracing"sv, /*tenantId=*/boost::none);
 
     EXPECT_THAT(readExternalRateLimit(bob.obj()), FieldsAre(4.0, 15));
+}
+
+TEST_F(TraceExternalTracingParametersTest, SetEnabledFalseDisablesExternalTraces) {
+    auto storage = BSON("v" << BSON("enabled" << false));
+    ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
+    EXPECT_FALSE(isExternalTracingEnabled());
+}
+
+TEST_F(TraceExternalTracingParametersTest, RateLimitOnlySetKeepsExternalTracingDisabled) {
+    ASSERT_OK(param.setFromString(R"({"enabled": false})", /*tenantId=*/boost::none));
+    ASSERT_OK(setRateLimit(2.0, 5));
+    EXPECT_FALSE(isExternalTracingEnabled());
+}
+
+TEST_F(TraceExternalTracingParametersTest, EnabledOnlySetKeepsRateLimit) {
+    ASSERT_OK(setRateLimit(3.0, 7));
+    ASSERT_OK(param.setFromString(R"({"enabled": false})", /*tenantId=*/boost::none));
+
+    BSONObjBuilder bob;
+    param.append(nullptr, &bob, "openTelemetryExternalTracing"sv, /*tenantId=*/boost::none);
+
+    EXPECT_THAT(readExternalRateLimit(bob.obj()), FieldsAre(3.0, 7));
+}
+
+TEST_F(TraceExternalTracingParametersTest, AppendReflectsEnabled) {
+    ASSERT_OK(param.setFromString(R"({"enabled": false})", /*tenantId=*/boost::none));
+
+    BSONObjBuilder bob;
+    param.append(nullptr, &bob, "openTelemetryExternalTracing"sv, /*tenantId=*/boost::none);
+
+    EXPECT_FALSE(bob.obj()["openTelemetryExternalTracing"]["enabled"].Bool());
 }
 
 TEST_F(TraceExternalTracingParametersTest, NonObjectElementFails) {

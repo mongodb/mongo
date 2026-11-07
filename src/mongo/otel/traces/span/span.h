@@ -79,9 +79,10 @@ public:
 
     /**
      * Starts a new Span from an ingress source, which may be sampled differently than an
-     * internally-started span (e.g. a separate rate limit). Uses the presence of `telemetryCtx` to
-     * determine if the ingress span is part of an external trace. Defaults to SERVER span kind. If
-     * a context is created during this, `telemetryCtx` is updated in place.
+     * internally-started span (e.g. a separate rate limit). The ingress span is part of an external
+     * trace only if `telemetryCtx` carries a remote parent whose sampled flag is set; unsampled
+     * remote parents are subject to internal sampling like any other root span. Defaults to SERVER
+     * span kind. If a context is created during this, `telemetryCtx` is updated in place.
      */
     static Span startIngressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx,
                                  SpanName name,
@@ -130,7 +131,8 @@ public:
 private:
     struct StartSpanConfig {
         SpanOptions opts;
-        bool bypassSampling = false;
+        // Whether this span is an ingress span, which may continue an external trace.
+        bool isIngress = false;
         bool preventSampling = false;
     };
 
