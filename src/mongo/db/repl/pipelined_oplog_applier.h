@@ -53,6 +53,8 @@ private:
      * otherwise dispatches the batch to the worker pool and returns immediately.
      * Expects that the batch has been processed by the OplogApplierBatcher
      * (i.e. DDL operations sit alone, etc).
+     * Returns early if a drain fails; the run loop observes the abandonment in the batch tracker
+     * and stops dispatching.
      */
     void _dispatchBatch(OperationContext* opCtx, std::vector<OplogEntry> ops);
 

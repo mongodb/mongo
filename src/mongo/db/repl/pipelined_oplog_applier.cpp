@@ -108,7 +108,27 @@ void PipelinedOplogApplier::_run(OplogBuffer* oplogBuffer) {
     // bound: it trails dispatch, since batches still on the workers have not been published yet.
     OpTime lastDispatchedOpTime = _replCoord->getMyLastAppliedOpTime();
 
+    // Set when the loop observes the tracker reporting an abandoned batch. The batcher thread
+    // blocks until every batch it produced has been taken, so the remaining batches are discarded
+    // without applying them until the batcher hands over its empty shutdown sentinel batch.
+    bool dispatchStopped = false;
+
     while (true) {
+        // Workers abandon the batch queue if they are interrupted by shutdown. Once any worker
+        // signals abandonment in the batch tracker, the front batch never completes and no later
+        // batch can publish, so the remaining batches are discarded instead of applied.
+        if (!dispatchStopped && _batchTracker.hasAbandonedBatch()) {
+            // Shutdown ordering never interrupts the applier's work, so this is not
+            // expected to be reached.
+            tassertNoThrow(
+                13605302, "Pipelined oplog applier observed a shutdown-related abandonment", false);
+            LOGV2_ERROR(13605300,
+                        "Pipelined oplog applier stopped dispatching after shutdown-related "
+                        "abandonment",
+                        "lastAppliedOpTime"_attr = _replCoord->getMyLastAppliedOpTime());
+            dispatchStopped = true;
+        }
+
         // An operation context is allocated per batch so that catalog lookups use the current
         // snapshot.
         const auto opCtxPtr = cc().getServiceContext()->makeKillOpsExemptOperationContext(&cc());
@@ -121,15 +141,21 @@ void PipelinedOplogApplier::_run(OplogBuffer* oplogBuffer) {
             if (batch.mustShutdown()) {
                 return;
             }
-            if (batch.termWhenExhausted()) {
+            if (batch.termWhenExhausted() && !dispatchStopped) {
                 // We need to wait for all in-flight work to finish before signaling that the
-                // applier has drained.
-                if (!_drainWorkers()) {
-                    // TODO(SERVER-136053): Propagate shutdown failure to `_run`.
-                    continue;
+                // applier has drained. Once dispatch stopped, a later term-exhausted batch must
+                // neither drain again nor signal drain completion.
+                if (_drainWorkers()) {
+                    _replCoord->signalApplierDrainComplete(opCtx, *batch.termWhenExhausted());
                 }
-                _replCoord->signalApplierDrainComplete(opCtx, *batch.termWhenExhausted());
             }
+            continue;
+        }
+
+        // A batch produced after dispatch stopped is dropped unapplied. The oplog batcher's
+        // contract requires that all queued ops are drained before the pipelined oplog applier can
+        // see the sentinal value that signals shutdown.
+        if (dispatchStopped) {
             continue;
         }
 
@@ -148,14 +174,25 @@ void PipelinedOplogApplier::_run(OplogBuffer* oplogBuffer) {
         const auto numOpsInBatch = batch.count();
         try {
             _dispatchBatch(opCtx, batch.releaseBatch());
+            lastDispatchedOpTime = lastOpTimeInBatch;
         } catch (const DBException& ex) {
-            LOGV2_FATAL(13322701,
-                        "Pipelined oplog applier failed to dispatch a batch",
-                        "error"_attr = redact(ex),
-                        "firstOpTimeInBatch"_attr = firstOpTimeInBatch,
-                        "numOperationsInBatch"_attr = numOpsInBatch);
+            if (ErrorCodes::isShutdownError(ex.code())) {
+                LOGV2_ERROR(13605301,
+                            "Pipelined oplog applier interrupted by shutdown while dispatching a "
+                            "batch",
+                            "error"_attr = redact(ex),
+                            "firstOpTimeInBatch"_attr = firstOpTimeInBatch,
+                            "numOperationsInBatch"_attr = numOpsInBatch,
+                            "lastAppliedOpTime"_attr = _replCoord->getMyLastAppliedOpTime());
+                dispatchStopped = true;
+            } else {
+                LOGV2_FATAL(13322701,
+                            "Pipelined oplog applier failed to dispatch a batch",
+                            "error"_attr = redact(ex),
+                            "firstOpTimeInBatch"_attr = firstOpTimeInBatch,
+                            "numOperationsInBatch"_attr = numOpsInBatch);
+            }
         }
-        lastDispatchedOpTime = lastOpTimeInBatch;
     }
 }
 
@@ -178,13 +215,13 @@ void PipelinedOplogApplier::_dispatchBatch(OperationContext* opCtx, std::vector<
     // expected if the lastApplied moves forward and the value passed in is stale.
     if (batchMustBeAppliedSerialized(
             getOptions().mode, _replCoord->getMyLastAppliedOpTime().getTimestamp(), ops)) {
+        // A failed drain returns without dispatching the batch; the run loop observes the
+        // abandonment in the batch tracker and stops dispatching.
         if (!_drainWorkers()) {
-            // TODO(SERVER-136053): Propagate shutdown failure to `_run`
             return;
         }
         _dispatchBatchToWorkers(opCtx, std::move(ops));
         if (!_drainWorkers()) {
-            // TODO(SERVER-136053): Propagate shutdown failure to `_run`
             return;
         }
     } else {

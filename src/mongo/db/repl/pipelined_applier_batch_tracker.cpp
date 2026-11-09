@@ -199,6 +199,11 @@ bool PipelinedApplierBatchTracker::isShutdown() const {
     return _shutdown;
 }
 
+bool PipelinedApplierBatchTracker::hasAbandonedBatch() const {
+    std::lock_guard lk(_mutex);
+    return _hasAbandonedBatch;
+}
+
 }  // namespace mongo::repl
 
 

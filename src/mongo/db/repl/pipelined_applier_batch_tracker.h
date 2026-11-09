@@ -94,6 +94,10 @@ public:
     // Returns whether consumer shutdown has been requested.
     bool isShutdown() const;
 
+    // Returns whether a worker abandoned a batch due to shutdown. Sticky once set: the front
+    // batch never completes afterwards.
+    bool hasAbandonedBatch() const;
+
 private:
     mutable std::mutex _mutex;
     stdx::condition_variable _cv;

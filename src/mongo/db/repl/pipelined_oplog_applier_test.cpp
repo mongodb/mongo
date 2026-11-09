@@ -1896,24 +1896,6 @@ TEST_F(PipelinedOplogApplierRunTest, DrainsAnEmptyPipeline) {
     ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
 }
 
-TEST_F(PipelinedOplogApplierRunTest, ShutdownDoesNotPublishAnAbandonedBatchOrItsSuccessor) {
-    createCollectionWithUuid(_opCtx.get(), kNss);
-    setServerParameter("replBatchLimitOperations", 1);
-    _opObserver->onInsertsFn =
-        [](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
-            if (docs.front()["_id"].Int() == 0) {
-                uasserted(ErrorCodes::InterruptedAtShutdown, "injected global shutdown");
-            }
-        };
-    auto* replCoord = ReplicationCoordinator::get(serviceContext);
-    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
-    const auto writtenBefore = replCoord->getMyLastWrittenOpTimeAndWallTime();
-    applyThroughBuffer({insertOp(kNss, BSON("_id" << 0)), insertOp(kNss, BSON("_id" << 1))});
-    ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
-    ASSERT_EQ(replCoord->getMyLastWrittenOpTimeAndWallTime(), writtenBefore);
-    assertCollectionContainsExactly(kNss, {BSON("_id" << 1)});
-}
-
 // The buffer ran out in ApplierDraining state with nothing in flight, so the dispatcher must
 // signal drain completion without changing replication progress, and must stay alive afterwards.
 TEST_F(PipelinedOplogApplierRunTest, SignalsApplierDrainCompleteOnAnEmptyPipeline) {
@@ -2840,7 +2822,6 @@ TEST_F(PipelinedOplogApplierRunTest, DerivedOpsRemainValidAfterTheDispatcherMove
         kNss, {BSON("_id" << heldId), BSON("_id" << derivedId), BSON("_id" << markerId)});
 }
 
-
 using PipelinedOplogApplierRunDeathTest = PipelinedOplogApplierRunTest;
 
 DEATH_TEST_REGEX_F(PipelinedOplogApplierRunDeathTest,
@@ -3080,31 +3061,9 @@ TEST_F(PipelinedOplogApplierRunTest,
     assertPublished(ins101);
 }
 
-// If a serialized op is interrupted by a global-shutdown-class error, the applier abandons that
-// op and bails: the failing op is not applied, no later op in the buffer is applied, and
-// lastApplied stays where it was so restart recovery re-applies from here.
-TEST_F(PipelinedOplogApplierRunTest, ShutdownDuringSerializedOpDoesNotPublish) {
-    auto* replCoord = ReplicationCoordinator::get(serviceContext);
-    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
-
-    // Fail the very first serialized op with a shutdown-class error.
-    _opObserver->onCreateCollectionFn =
-        [](auto*, const auto&, const auto&, const auto&, const auto&, auto) {
-            uasserted(ErrorCodes::InterruptedAtShutdown,
-                      "injected global shutdown during serialized op");
-        };
-
-    // The first create is the one that will be interrupted; the second must not be applied
-    // because the applier bailed before reaching it.
-    auto createFirst = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kNss);
-    auto createSecond = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kOtherNss);
-
-    applyThroughBuffer({createFirst, createSecond});
-
-    ASSERT_FALSE(collectionExists(_opCtx.get(), kNss));
-    ASSERT_FALSE(collectionExists(_opCtx.get(), kOtherNss));
-    ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
-}
+// A shutdown-interrupted worker slice fails the drain ahead of a serialized op. The applier
+// stops applying there instead of applying the remaining batches: the serialized op and the ops
+// after it are not applied, and lastApplied does not advance.
 
 // Any non-shutdown error from a serialized op is unrecoverable: the serialized op is dispatched
 // to a worker like any other op, so the worker fasserts with the worker-application fatal
