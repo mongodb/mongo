@@ -71,6 +71,7 @@ mongo_cc_library(
         "collection_options_gen",
         "collection_options_validation.cpp",
         "foreign_key_constraint_gen",
+        "replicated_record_ids_util.cpp",
     ],
     deps = [
         "//src/mongo/crypto:encrypted_field_config",
@@ -506,6 +507,7 @@ mongo_cc_unit_test(
         "index_catalog_impl_test.cpp",
         "index_signature_test.cpp",
         "rename_collection_test.cpp",
+        "replicated_record_ids_util_test.cpp",
         "set_multikey_metadata_oplog_helpers_test.cpp",
         "txn_wildcard_multikey_paths_test.cpp",
     ],

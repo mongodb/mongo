@@ -44,6 +44,7 @@
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/replicated_record_ids_util.h"
 #include "mongo/db/shard_role/shard_catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_impl.h"
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_options.h"
@@ -149,13 +150,7 @@ bool shouldSetRecordIdsReplicated(OperationContext* opCtx,
         return false;
     }
 
-    // The recordId is the '_id' for clustered collections - thus explicit recordId replication is
-    // unnecessary. Additionally, replicated recordIds only apply to explicitly replicated
-    // collections, since implicitly replicated collections don't guarantee CRUD ops are persisted
-    // through the oplog with the relevant 'rid' field.
-    if (bool collTypeSupportsExplicitlyReplicatedRecordIds = !collectionOptions.clusteredIndex &&
-            nss.isReplicated() && !nss.isImplicitlyReplicated();
-        !collTypeSupportsExplicitlyReplicatedRecordIds) {
+    if (!isReplicatedRecordIdsInScope(nss, collectionOptions.clusteredIndex.has_value())) {
         return false;
     }
 
