@@ -3579,8 +3579,10 @@ mongo_cc_library(
         "op_msg_fuzzer_shard_fixture.cpp",
     ],
     deps = [
+        ":read_write_concern_defaults",
         ":server_base",
         ":service_context_d",
+        ":wire_version",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/op_observer",
@@ -3655,6 +3657,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":op_msg_fuzzer_fixture",
+        ":read_write_concern_defaults",
         ":server_base",
         "//src/mongo/rpc",
     ],

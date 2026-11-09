@@ -11,6 +11,7 @@
 #include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -33,6 +34,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/assert_util.h"
@@ -83,6 +85,22 @@ OpMsgFuzzerShardFixture::OpMsgFuzzerShardFixture(bool skipGlobalInitializers)
     _serviceContext->getService()->setServiceEntryPoint(
         std::make_unique<ServiceEntryPointShardRole>());
 
+    // Match the wire versions of a mongod at the latest featureCompatibilityVersion, which the
+    // fixture sets below.
+    WireSpec::Specification spec;
+    spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
+    spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
+    spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
+    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
+    spec.isInternalClient = true;
+    WireSpec::getWireSpec(_serviceContext).initialize(std::move(spec));
+
+    // Commands read the cluster-wide read and write concern defaults. Like a new mongod, the
+    // fixture has none stored, so the lookup returns an empty default. Returning none instead
+    // would make each read repeat the lookup, because the cache does not keep none.
+    ReadWriteConcernDefaults::create(_serviceContext->getService(),
+                                     [](OperationContext*) { return RWConcernDefault{}; });
+
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
     _serviceContext->setOpObserver(std::move(observerRegistry));
 
@@ -121,6 +139,7 @@ OpMsgFuzzerShardFixture::OpMsgFuzzerShardFixture(bool skipGlobalInitializers)
 }
 
 OpMsgFuzzerShardFixture::~OpMsgFuzzerShardFixture() {
+    ReadWriteConcernDefaults::getDecoration(_serviceContext->getService()).reset();
     CollectionShardingStateFactory::clear(_serviceContext);
     DatabaseShardingStateFactory::clear(_serviceContext);
 
