@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -155,5 +155,19 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":client_cursor",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "exhaust_cursor_currentop_integration_test",
+    srcs = [
+        "exhaust_cursor_currentop_integration_test.cpp",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/executor:network_interface_fixture",
+        "//src/mongo/rpc:message",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/util:version_impl",
     ],
 )

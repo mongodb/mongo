@@ -3705,10 +3705,9 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_integration_test(
-    name = "db_integration_test",
+    name = "nesting_depth_integration_test",
     srcs = [
         "nesting_depth_test.cpp",
-        "//src/mongo/db/query/client_cursor:exhaust_cursor_currentop_integration_test.cpp",
     ],
     deps = [
         "//src/mongo/client:clientdriver_network",
