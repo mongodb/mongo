@@ -134,6 +134,14 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
     // UninterruptibleLockGuard.
     if (opCtx != _interruptionCtx &&
         !opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
+        // A killed operation must not register new intents: fail with its kill code so retry
+        // loops that swallow an interruption and re-acquire locks see the original error.
+        if (auto killCode = opCtx->getKillStatus(); killCode != ErrorCodes::OK) {
+            uasserted(killCode,
+                      fmt::format("Cannot register {} intent because the operation was killed.",
+                                  intentToString(intent)));
+        }
+
         auto validIntent = _validIntent(intent);
         if (_lastInterruption == InterruptionType::Shutdown) {
             if (!validIntent) {

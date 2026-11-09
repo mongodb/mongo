@@ -7,6 +7,7 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/fail_point.h"
 
 #include <chrono>
@@ -692,6 +693,47 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepDown) {
     };
     executePerIntent(assertRegistrySize);
     kill.get();
+}
+
+TEST_F(IntentRegistryTest, KilledOperationCannotRegisterIntentAfterTransitionCompletes) {
+    // A killed operation re-registers an intent after a stepdown completes (i.e.
+    // _lastInterruption has been reset to None). Registration must fail with the
+    // operation's kill code rather than a registry-specific error.
+    _intentRegistry->enable();
+    uint32_t timeout_sec = 10;
+    auto serviceContext = getServiceContext();
+
+    // The operation holds a Write intent when a stepdown starts.
+    auto client = serviceContext->getService()->makeClient("killedWriteClient");
+    auto opCtx = client->makeOperationContext();
+    IntentGuard writeGuard(IntentRegistry::Intent::Write, opCtx.get());
+
+    auto killerClient = serviceContext->getService()->makeClient("stepDownClient");
+    auto killerOpCtx = killerClient->makeOperationContext();
+    Notification<void> opsKilled;
+    auto transition = _intentRegistry->killConflictingOperations(
+        IntentRegistry::InterruptionType::StepDown,
+        killerOpCtx.get(),
+        [&] { opsKilled.set(); },
+        timeout_sec);
+
+    // Wait for the stepdown to kill the operation, then release the intent so the transition
+    // finishes and _lastInterruption resets to None. Release before asserting so a failure
+    // doesn't leave the transition's drain waiting on a held intent.
+    opsKilled.get();
+    writeGuard.reset();
+    ASSERT_EQUALS(ErrorCodes::InterruptedDueToReplStateChange, opCtx->getKillStatus());
+    transition.get().release();
+
+    // The killed operation re-registers a Write intent, as a retry loop would. It must fail
+    // with its kill code.
+    try {
+        IntentGuard retryGuard(IntentRegistry::Intent::Write, opCtx.get());
+        // Fail if construction succeeds, i.e. the killed operation registered a new intent.
+        ASSERT_TRUE(false);
+    } catch (const DBException& ex) {
+        ASSERT_EQUALS(ErrorCodes::InterruptedDueToReplStateChange, ex.code());
+    }
 }
 
 TEST_F(IntentRegistryTest, BlockingWriteRegisteredConcurrentlyWithStateTransitionIsDrained) {

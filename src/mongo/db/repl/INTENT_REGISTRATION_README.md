@@ -39,6 +39,7 @@ This invocation first conducts compatibility checks:
 - No intent is compatible with shutdown. `LocalWrite` is allowed during rollback. `Read`,
   `LocalWrite`, and `BlockingWrite` are permitted during stepdown.
 - If no interruptions are occurring, all intent types are allowed.
+- A killed operation cannot register any intent; registration fails with its kill code.
 - For `Write` intents, the intent registry verifies that the node is primary.
 - For `BlockingWrite`, the intent registry waits for the current state transition to finish killing
   operations.
