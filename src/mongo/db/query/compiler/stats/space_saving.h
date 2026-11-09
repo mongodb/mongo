@@ -10,6 +10,9 @@
 #include <string>
 #include <vector>
 
+#include <boost/intrusive/list.hpp>
+#include <boost/intrusive/list_hook.hpp>
+
 namespace mongo::stats {
 
 /**
@@ -68,8 +71,7 @@ public:
     // Copying would corrupt the copy's data structures.
     SpaceSavingSketch(const SpaceSavingSketch&) = delete;
     SpaceSavingSketch& operator=(const SpaceSavingSketch&) = delete;
-    // A defaulted move would leave the moved-from sketch holding raw pointers into the pool
-    // vectors the destination now owns, so using it would corrupt the destination's lists.
+    // A moved-from sketch would be unusable: its pools are empty but its counters are not.
     SpaceSavingSketch(SpaceSavingSketch&&) = delete;
     SpaceSavingSketch& operator=(SpaceSavingSketch&&) = delete;
 
@@ -93,44 +95,51 @@ public:
 private:
     struct Bucket;
 
-    // A counter. Lives in exactly one bucket's element queue; the most recently updated element is
-    // at the head. Counters are reused on eviction, never reallocated.
+    using Hook = boost::intrusive::list_member_hook<
+        boost::intrusive::link_mode<boost::intrusive::auto_unlink>>;
+
+    // A counter. Lives in exactly one bucket's element list; the most recently updated element is
+    // at the front. Counters are reused on eviction, never reallocated.
     struct Element {
         SBEValue _value;
         size_t _err = 0;
         Bucket* _bucket = nullptr;
-        Element* _prev = nullptr;  // Towards the head of the bucket.
-        Element* _next = nullptr;  // Towards the tail of the bucket.
+        Hook _hook;
     };
+    using ElementList =
+        boost::intrusive::list<Element,
+                               boost::intrusive::member_hook<Element, Hook, &Element::_hook>,
+                               boost::intrusive::constant_time_size<false>>;
 
-    // A bucket: all counters sharing one estimate value. The tail of the minimum bucket is the one
-    // evicted (the least recently updated element with the lowest count). Buckets are kept in a
-    // doubly linked list ordered by count ascending. Unused buckets are chained through '_next' on
-    // '_freeBuckets'.
+    // A bucket: all counters sharing one estimate value. The back of the minimum bucket's element
+    // list is the one evicted (the least recently updated element with the lowest count). A bucket
+    // is linked either into '_buckets' (ordered by count ascending) or into '_freeBuckets', never
+    // both, so one hook serves both lists.
     struct Bucket {
         size_t _count = 0;
-        Element* _head = nullptr;
-        Element* _tail = nullptr;
-        Bucket* _prev = nullptr;
-        Bucket* _next = nullptr;
+        ElementList _elements;
+        Hook _hook;
     };
+    using BucketList =
+        boost::intrusive::list<Bucket,
+                               boost::intrusive::member_hook<Bucket, Hook, &Bucket::_hook>,
+                               boost::intrusive::constant_time_size<false>>;
 
-    // Pushes 'element' at the head of the bucket for 'count'. 'before' must be the bucket that
-    // follows the position where 'count' belongs (nullptr for the end of the list): it is reused if
+    // Pushes 'element' at the front of the bucket for 'count'. 'before' must be the bucket that
+    // follows the position where 'count' belongs (end() for the end of the list): it is reused if
     // it has the same count, otherwise a bucket from the pool is linked in front of it.
-    void _insertIntoBucketBefore(Element* element, Bucket* before, size_t count);
+    void _insertIntoBucketBefore(Element* element, BucketList::iterator before, size_t count);
 
     // Removes 'element' from its bucket, releasing the bucket if it becomes empty.
     void _removeFromBucket(Element* element);
 
     size_t _k;
-    // Both vectors are sized once in the constructor and never reallocate, so the raw pointers
-    // above stay valid for the lifetime of the sketch.
+    // Both vectors are sized once in the constructor and never reallocate, so the pointers held by
+    // the lists and the hash table stay valid.
     std::vector<Element> _counters;
     std::vector<Bucket> _bucketPool;
-    Bucket* _freeBuckets = nullptr;
-    Bucket* _minBucket = nullptr;
-    Bucket* _maxBucket = nullptr;
+    BucketList _freeBuckets;
+    BucketList _buckets;  // Front = minimum count, back = maximum count.
     // Keys are non-owning views of the monitored Element's '_value'; an entry must be erased
     // before that value is overwritten.
     sbe::value::ValueMapType<Element*> _table;

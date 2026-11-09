@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <iomanip>
+#include <iterator>
 #include <limits>
 #include <sstream>
 #include <utility>
@@ -24,43 +25,30 @@ SpaceSavingSketch::SpaceSavingSketch(size_t k)
     _table.reserve(_k);
     // At most k non-empty buckets can exist at once, one per counter.
     _bucketPool.resize(_k);
-    for (auto& bucket : _bucketPool) {
-        bucket._next = _freeBuckets;
-        _freeBuckets = &bucket;
-    }
+    _freeBuckets.assign(_bucketPool.begin(), _bucketPool.end());
 }
 
-void SpaceSavingSketch::_insertIntoBucketBefore(Element* element, Bucket* before, size_t count) {
+void SpaceSavingSketch::_insertIntoBucketBefore(Element* element,
+                                                BucketList::iterator before,
+                                                size_t count) {
     Bucket* bucket;
-    if (before && before->_count == count) {
-        bucket = before;
+    if (before != _buckets.end() && before->_count == count) {
+        bucket = &*before;
     } else {
-        bucket = _freeBuckets;
-        _freeBuckets = bucket->_next;
+        bucket = &_freeBuckets.front();
         bucket->_count = count;
-        bucket->_head = bucket->_tail = nullptr;
-        bucket->_next = before;
-        bucket->_prev = before ? before->_prev : _maxBucket;
-        (bucket->_prev ? bucket->_prev->_next : _minBucket) = bucket;
-        (before ? before->_prev : _maxBucket) = bucket;
+        _buckets.splice(before, _freeBuckets, _freeBuckets.begin());
     }
     element->_bucket = bucket;
-    element->_prev = nullptr;
-    element->_next = bucket->_head;
-    (bucket->_head ? bucket->_head->_prev : bucket->_tail) = element;
-    bucket->_head = element;
+    bucket->_elements.push_front(*element);
 }
 
 void SpaceSavingSketch::_removeFromBucket(Element* element) {
     Bucket* bucket = element->_bucket;
-    (element->_prev ? element->_prev->_next : bucket->_head) = element->_next;
-    (element->_next ? element->_next->_prev : bucket->_tail) = element->_prev;
+    element->_hook.unlink();
     element->_bucket = nullptr;
-    if (!bucket->_head) {
-        (bucket->_prev ? bucket->_prev->_next : _minBucket) = bucket->_next;
-        (bucket->_next ? bucket->_next->_prev : _maxBucket) = bucket->_prev;
-        bucket->_next = _freeBuckets;
-        _freeBuckets = bucket;
+    if (bucket->_elements.empty()) {
+        _freeBuckets.splice(_freeBuckets.begin(), _buckets, _buckets.iterator_to(*bucket));
     }
 }
 
@@ -72,7 +60,7 @@ void SpaceSavingSketch::increment(const SBEValue& value) {
         Element* element = it->second;
         const size_t nextCount = element->_bucket->_count + 1;
         // Still valid if the element's bucket is released below.
-        Bucket* const next = element->_bucket->_next;
+        const auto next = std::next(_buckets.iterator_to(*element->_bucket));
         _removeFromBucket(element);
         _insertIntoBucketBefore(element, next, nextCount);
         return;
@@ -82,21 +70,24 @@ void SpaceSavingSketch::increment(const SBEValue& value) {
         // There are unused counters left: create a new counter with count 1 and no error.
         _counters.push_back(Element{SBEValue{value}});
         Element* element = &_counters.back();
-        _insertIntoBucketBefore(element, _minBucket, 1);
+        _insertIntoBucketBefore(element, _buckets.begin(), 1);
         _table.insert(element->_value.get(), element);
         return;
     }
 
-    // All k counters are used: evict the tail of the minimum-count bucket and reuse its counter for
+    // All k counters are used: evict the back of the minimum-count bucket and reuse its counter for
     // the newcomer. The estimate is set to the evicted count plus 1 and the error term is set to
     // the evicted count. The newcomer's true count is thereby bounded between 1 and the evicted
     // count + 1.
-    Element* reusedElement = _minBucket->_tail;
-    const size_t evictedCount = _minBucket->_count;
-    Bucket* const next = _minBucket->_next;
+    Bucket& minBucket = _buckets.front();
+    Element* reusedElement = &minBucket._elements.back();
+    const size_t evictedCount = minBucket._count;
+    const auto next = std::next(_buckets.begin());
+    // Copy first: it can throw, and nothing must be unlinked yet if it does.
+    SBEValue newValue{value};
     _table.erase(_table.find(reusedElement->_value.get()));
     _removeFromBucket(reusedElement);
-    reusedElement->_value = SBEValue{value};
+    reusedElement->_value = std::move(newValue);
     reusedElement->_err = evictedCount;
     _insertIntoBucketBefore(reusedElement, next, evictedCount + 1);
     _table.insert(reusedElement->_value.get(), reusedElement);
