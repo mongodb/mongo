@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: SSPL-1.0
 """Test cases for IDL compatibility checker."""
 
+import hashlib
 import sys
 import unittest
 from os import path
@@ -2294,6 +2295,138 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_OPTIONAL
         )
         self.assertRegex(str(new_error_reply_field_optional_error), "n/a")
+
+
+class TestIDLCompatibilityReport(unittest.TestCase):
+    """Test the Evergreen test-result report generated from compatibility errors."""
+
+    @staticmethod
+    def _h(msg: str) -> str:
+        return hashlib.sha1(msg.encode()).hexdigest()[:8]
+
+    def test_pass_emits_single_passing_entry(self):
+        results = idl_compatibility_errors.IDLCompatibilityErrorCollection().to_test_results(
+            "v8.0.4", "error_reply", 1.0, 2.0
+        )
+        self.assertEqual(
+            results,
+            [{"test_file": "v8.0.4/error_reply", "status": "pass", "start": 1.0, "end": 2.0}],
+        )
+
+    def test_one_failing_test_per_distinct_error_name(self):
+        errors = idl_compatibility_errors.IDLCompatibilityErrorCollection()
+        for cmd, error_id in [
+            ("foo", "ID0092"),
+            ("foo", "ID0092"),
+            ("bar", "ID0092"),
+            ("foo", "ID0001"),
+        ]:
+            errors.add(error_id, cmd, "msg %s" % cmd, "old", "new", "/tmp/xyz/file.idl")
+        results = errors.to_test_results("v8.0.4", "commands_and_parameters", 1.0, 2.0)
+        self.assertEqual(
+            sorted(r["test_file"] for r in results),
+            [
+                f"v8.0.4/commands_and_parameters/ID0001/foo#{self._h('msg foo')}",
+                f"v8.0.4/commands_and_parameters/ID0092/bar#{self._h('msg bar')}",
+                f"v8.0.4/commands_and_parameters/ID0092/foo#{self._h('msg foo')}",
+            ],
+        )
+        self.assertTrue(all(r["status"] == "fail" for r in results))
+        foo = next(r for r in results if "ID0092/foo#" in r["test_file"])
+        self.assertEqual(foo["log_raw"].count("ID0092"), 2)
+
+    def test_distinct_messages_for_same_id_and_command_stay_separate(self):
+        errors = idl_compatibility_errors.IDLCompatibilityErrorCollection()
+        errors.add("ID0092", "foo", "param a removed", "old", "new", "f.idl")
+        errors.add("ID0092", "foo", "param b removed", "old", "new", "f.idl")
+        errors.add("ID0092", "foo", "param b removed", "old", "new", "f.idl")
+        results = errors.to_test_results("v8.0.4", "commands_and_parameters", 1.0, 2.0)
+        names = sorted(r["test_file"] for r in results)
+        self.assertEqual(len(names), 2)
+        self.assertEqual(len(set(names)), 2)
+        for name in names:
+            self.assertRegex(name, r"^v8\.0\.4/commands_and_parameters/ID0092/foo#[0-9a-f]{8}$")
+        # The names are deterministic, so Evergreen can track them across runs.
+        again = errors.to_test_results("v8.0.4", "commands_and_parameters", 3.0, 4.0)
+        self.assertEqual(names, sorted(r["test_file"] for r in again))
+
+    def test_name_is_stable_when_sibling_errors_come_and_go(self):
+        def names(*msgs):
+            errors = idl_compatibility_errors.IDLCompatibilityErrorCollection()
+            for msg in msgs:
+                errors.add("ID0092", "foo", msg, "old", "new", "f.idl")
+            return {r["test_file"] for r in errors.to_test_results("v8.0.4", "s", 1.0, 2.0)}
+
+        only_a = names("param a removed")
+        both = names("param a removed", "param b removed")
+        self.assertEqual(len(only_a), 1)
+        self.assertTrue(only_a < both)
+
+    def test_same_error_in_different_sections_has_different_names(self):
+        def names(section):
+            errors = idl_compatibility_errors.IDLCompatibilityErrorCollection()
+            errors.add("ID0092", "foo", "msg", "old", "new", "f.idl")
+            return [r["test_file"] for r in errors.to_test_results("v8.0.4", section, 1.0, 2.0)]
+
+        self.assertNotEqual(names("error_reply"), names("generic_arguments"))
+
+    def test_abort_with_collected_errors_is_reported_per_error(self):
+        errors = idl_compatibility_errors.IDLCompatibilityErrorCollection()
+        errors.add("ID0100", "foo", "invalid type", "old", "new", "f.idl")
+
+        def aborts():
+            raise idl_compatibility_errors.IDLCompatibilityAbort(errors)
+
+        results: list[dict] = []
+        self.assertTrue(
+            idl_check_compatibility.run_report_section("v8.0.4", "error_reply", aborts, results)
+        )
+        self.assertEqual(
+            [(r["test_file"], r["status"]) for r in results],
+            [(f"v8.0.4/error_reply/ID0100/foo#{self._h('invalid type')}", "fail")],
+        )
+        self.assertIn("invalid type", results[0]["log_raw"])
+
+    def test_abort_is_still_a_system_exit_with_status_1(self):
+        abort = idl_compatibility_errors.IDLCompatibilityAbort(
+            idl_compatibility_errors.IDLCompatibilityErrorCollection()
+        )
+        self.assertIsInstance(abort, SystemExit)
+        self.assertEqual(abort.code, 1)
+
+    def test_crashed_section_is_reported_as_failure(self):
+        def crash():
+            raise ValueError("Cannot parse foo.idl")
+
+        def exits():
+            sys.exit(1)
+
+        results: list[dict] = []
+        self.assertTrue(
+            idl_check_compatibility.run_report_section("v8.0.4", "error_reply", crash, results)
+        )
+        self.assertTrue(
+            idl_check_compatibility.run_report_section(
+                "v8.0.4", "generic_arguments", exits, results
+            )
+        )
+        self.assertEqual(
+            [(r["test_file"], r["status"]) for r in results],
+            [("v8.0.4/error_reply", "fail"), ("v8.0.4/generic_arguments", "fail")],
+        )
+        self.assertIn("Cannot parse foo.idl", results[0]["log_raw"])
+        self.assertIn("status 1", results[1]["log_raw"])
+
+    def test_clean_section_is_not_a_failure(self):
+        results: list[dict] = []
+        failed = idl_check_compatibility.run_report_section(
+            "v8.0.4",
+            "error_reply",
+            idl_compatibility_errors.IDLCompatibilityErrorCollection,
+            results,
+        )
+        self.assertFalse(failed)
+        self.assertEqual([r["status"] for r in results], ["pass"])
 
 
 if __name__ == "__main__":

@@ -6,6 +6,9 @@ filters:
   - "/bazel*":
     approvers:
       - 10gen/devprod-build
+  - "/check_idl_compat.sh":
+    approvers:
+      - 10gen/query-optimization
   - "/compile*":
     approvers:
       - 10gen/devprod-build

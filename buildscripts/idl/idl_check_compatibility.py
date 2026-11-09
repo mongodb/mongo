@@ -13,9 +13,13 @@ directories containing the old IDL files from previous releases.
 """
 
 import argparse
+import json
 import os
 import re
 import sys
+import time
+import traceback
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -24,7 +28,11 @@ from typing import Optional, Union
 import yaml
 from idl import common, errors, parser, syntax
 from idl.compiler import CompilerImportResolver
-from idl_compatibility_errors import IDLCompatibilityContext, IDLCompatibilityErrorCollection
+from idl_compatibility_errors import (
+    IDLCompatibilityAbort,
+    IDLCompatibilityContext,
+    IDLCompatibilityErrorCollection,
+)
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -559,11 +567,11 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext, field_pair: FieldCompa
     if old_field_type is None:
         ctxt.add_reply_field_type_invalid_error(cmd_name, field_name, old_field.idl_file_path)
         ctxt.errors.dump_errors()
-        sys.exit(1)
+        raise IDLCompatibilityAbort(ctxt.errors)
     if new_field_type is None:
         ctxt.add_reply_field_type_invalid_error(cmd_name, field_name, new_field.idl_file_path)
         ctxt.errors.dump_errors()
-        sys.exit(1)
+        raise IDLCompatibilityAbort(ctxt.errors)
 
     ignore_list_name: str = cmd_name + "-reply-" + field_name
 
@@ -1101,13 +1109,13 @@ def check_param_or_command_type(
             cmd_name, old_field.idl_file_path, field_pair.field_name, is_command_parameter
         )
         ctxt.errors.dump_errors()
-        sys.exit(1)
+        raise IDLCompatibilityAbort(ctxt.errors)
     if new_type is None:
         ctxt.add_command_or_param_type_invalid_error(
             cmd_name, new_field.idl_file_path, field_pair.field_name, is_command_parameter
         )
         ctxt.errors.dump_errors()
-        sys.exit(1)
+        raise IDLCompatibilityAbort(ctxt.errors)
 
     ignore_list_name: str = cmd_name + "-param-" + field_name
 
@@ -1959,6 +1967,46 @@ def check_generic_arguments_compatibility(
     return ctxt.errors
 
 
+def run_report_section(
+    label: str,
+    section: str,
+    check: Callable[[], IDLCompatibilityErrorCollection],
+    results: list[dict],
+) -> bool:
+    """
+    Run one check section, append its Evergreen test results to `results`, and return True if it
+    failed.
+
+    A check that aborts with the errors it had collected (IDLCompatibilityAbort) is reported like
+    any other failure, one test per error. Any other crash (an exception, or a bare sys.exit()) is
+    recorded as a failing '<label>/<section>' test with the traceback, rather than propagated, so
+    that the remaining sections still run and the report is still written.
+    """
+    start = time.time()
+    try:
+        error_coll = check()
+    except IDLCompatibilityAbort as abort:
+        results.extend(abort.errors.to_test_results(label, section, start, time.time()))
+        return True
+    except (Exception, SystemExit) as exc:
+        if isinstance(exc, SystemExit):
+            log = f"Section exited unexpectedly with status {exc.code!r}"
+        else:
+            log = traceback.format_exc()
+        results.append(
+            {
+                "test_file": f"{label}/{section}",
+                "status": "fail",
+                "start": start,
+                "end": time.time(),
+                "log_raw": log,
+            }
+        )
+        return True
+    results.extend(error_coll.to_test_results(label, section, start, time.time()))
+    return error_coll.has_errors()
+
+
 def main():
     """Run the script."""
     arg_parser = argparse.ArgumentParser(description=__doc__)
@@ -1985,13 +2033,31 @@ def main():
     arg_parser.add_argument(
         "new_idl_dir", metavar="NEW_IDL_DIR", help="Directory where new IDL files are located"
     )
+    arg_parser.add_argument(
+        "--report-file",
+        dest="report_file",
+        type=str,
+        default=None,
+        help="Write an Evergreen attach.results JSON report with one test per distinct error",
+    )
+    arg_parser.add_argument(
+        "--report-label",
+        dest="report_label",
+        type=str,
+        default=None,
+        help="Prefix for test names in the report (default: release directory name)",
+    )
     args = arg_parser.parse_args()
 
-    error_coll = check_compatibility(
-        args.old_idl_dir, args.new_idl_dir, args.old_include, args.new_include
+    label = args.report_label or os.path.basename(
+        os.path.dirname(os.path.normpath(args.old_idl_dir))
     )
-    if error_coll.has_errors():
-        sys.exit(1)
+    results: list[dict] = []
+    failed = False
+
+    def run_section(section: str, check: Callable[[], IDLCompatibilityErrorCollection]) -> None:
+        nonlocal failed
+        failed = run_report_section(label, section, check, results) or failed
 
     def locate_basic_types_idl(base_idl_dir):
         path_under_idl = os.path.join(base_idl_dir, "mongo/idl/basic_types.idl")
@@ -1999,20 +2065,39 @@ def main():
             return path_under_idl
         return os.path.join(base_idl_dir, "mongo/db/basic_types.idl")
 
-    old_basic_types_path = locate_basic_types_idl(args.old_idl_dir)
-    new_basic_types_path = locate_basic_types_idl(args.new_idl_dir)
-    error_reply_coll = check_error_reply(
-        old_basic_types_path, new_basic_types_path, args.old_include, args.new_include
+    run_section(
+        "commands_and_parameters",
+        lambda: check_compatibility(
+            args.old_idl_dir, args.new_idl_dir, args.old_include, args.new_include
+        ),
     )
-    if error_reply_coll.has_errors():
-        sys.exit(1)
+    run_section(
+        "error_reply",
+        lambda: check_error_reply(
+            locate_basic_types_idl(args.old_idl_dir),
+            locate_basic_types_idl(args.new_idl_dir),
+            args.old_include,
+            args.new_include,
+        ),
+    )
+    run_section(
+        "generic_arguments",
+        lambda: check_generic_arguments_compatibility(
+            os.path.join(args.old_idl_dir, "mongo/idl/generic_argument.idl"),
+            os.path.join(args.new_idl_dir, "mongo/idl/generic_argument.idl"),
+            args.old_include,
+            args.new_include,
+        ),
+    )
 
-    old_generic_args_path = os.path.join(args.old_idl_dir, "mongo/idl/generic_argument.idl")
-    new_generic_args_path = os.path.join(args.new_idl_dir, "mongo/idl/generic_argument.idl")
-    error_gen_args_coll = check_generic_arguments_compatibility(
-        old_generic_args_path, new_generic_args_path, args.old_include, args.new_include
-    )
-    if error_gen_args_coll.has_errors():
+    if args.report_file:
+        # Write atomically so that a checker killed mid-write cannot leave a truncated report.
+        tmp_report_file = f"{args.report_file}.tmp"
+        with open(tmp_report_file, "w") as report:
+            json.dump({"results": results}, report)
+        os.replace(tmp_report_file, args.report_file)
+
+    if failed:
         sys.exit(1)
 
 

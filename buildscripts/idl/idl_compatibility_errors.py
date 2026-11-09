@@ -7,6 +7,7 @@ Common error handling code for IDL compatibility checker.
 - Error codes used by the IDL compatibility checker.
 """
 
+import hashlib
 import inspect
 import sys
 from typing import Optional
@@ -217,6 +218,45 @@ class IDLCompatibilityErrorCollection(object):
         """Get all the errors in the error collection with the command command_name."""
         return [a for a in self._errors if a.command_name == command_name]
 
+    def to_test_results(self, label: str, section: str, start: float, end: float) -> list[dict]:
+        """
+        Return Evergreen attach.results entries, one test per distinct error.
+
+        Test names are '<label>/<section>/<error_id>/<command_name>#<hash of message>' and
+        deliberately contain no paths, line numbers or counts, so that Evergreen can track each
+        failure across runs. The message hash is always present, so a name depends only on its own
+        error and does not change when other errors on the same command appear or are fixed. The
+        section keeps the same error on the same command in different sections apart.
+        If no errors were found, a single passing '<label>/<section>' entry is returned.
+        """
+        if not self._errors:
+            return [
+                {
+                    "test_file": f"{label}/{section}",
+                    "status": "pass",
+                    "start": start,
+                    "end": end,
+                }
+            ]
+        # (error_id, command_name, message) -> full error strings, in first-seen order.
+        grouped: dict[tuple[str, str, str], list[str]] = {}
+        for error in self._errors:
+            key = (error.error_id, error.command_name, error.msg)
+            grouped.setdefault(key, []).append(str(error))
+        results = []
+        for (error_id, command_name, msg), errors in grouped.items():
+            msg_hash = hashlib.sha1(msg.encode()).hexdigest()[:8]
+            results.append(
+                {
+                    "test_file": f"{label}/{section}/{error_id}/{command_name}#{msg_hash}",
+                    "status": "fail",
+                    "start": start,
+                    "end": end,
+                    "log_raw": "\n\n".join(errors),
+                }
+            )
+        return results
+
     def to_list(self) -> list[str]:
         """Return a list of formatted error messages."""
         return [str(error) for error in self._errors]
@@ -239,6 +279,19 @@ class IDLCompatibilityErrorCollection(object):
     def __str__(self) -> str:
         """Return a list of errors."""
         return ", ".join(self.to_list())
+
+
+class IDLCompatibilityAbort(SystemExit):
+    """
+    Raised when the checker cannot continue (e.g. a field has an invalid type).
+
+    It is a SystemExit with status 1, so callers that don't care behave exactly as before, but it
+    carries the errors collected so far so that the Evergreen report can include them.
+    """
+
+    def __init__(self, errors: IDLCompatibilityErrorCollection) -> None:
+        super().__init__(1)
+        self.errors = errors
 
 
 class IDLCompatibilityContext(object):
@@ -439,7 +492,7 @@ class IDLCompatibilityContext(object):
                 ERROR_ID_COMMAND_TYPE_VALIDATORS_NOT_EQUAL,
                 command_name,
                 "Validator for field '%s' in type '%s' in old definition of command '%s' or its "
-                "sub-struct is not equal to the validator in the new defition of the command/struct."
+                "sub-struct is not equal to the validator in the new definition of the command/struct."
                 % (field_name, type_name, command_name),
                 file,
             )
