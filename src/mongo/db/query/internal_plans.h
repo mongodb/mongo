@@ -37,6 +37,7 @@ class BSONObj;
 class Collection;
 class CollectionPtr;
 class IndexCatalogEntry;
+class MultipleCollectionAccessor;
 class OperationContext;
 class PlanStage;
 class CollectionAcquisition;
@@ -122,6 +123,15 @@ public:
         OperationContext* opCtx,
         const CollectionAcquisition& collection,
         const CollectionScanParams& params,
+        PlanYieldPolicy::YieldPolicy yieldPolicy);
+
+    /**
+     * Returns an unfiltered SBE forward scan of the entire non-oplog main collection as BSON.
+     * 'collections' must outlive the executor.
+     */
+    static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> collectionScanSbe(
+        OperationContext* opCtx,
+        const MultipleCollectionAccessor& collections,
         PlanYieldPolicy::YieldPolicy yieldPolicy);
 
     /**

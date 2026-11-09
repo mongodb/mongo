@@ -164,31 +164,6 @@ void maybeInjectProjection(const SampleSpec& spec,
 }
 
 /**
- * This helper creates a CanonicalQuery for the sampling plan. This CanonicalQuery is "empty"
- * because its sole purpose is to be passed to 'prepareSlotBasedExecutableTree()' as part of
- * preparing the sampling plan for execution in SBE. That function uses the CanonicalQuery to
- * bind input parameters, but this is a no-op for sampling CE.
- */
-std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(
-    const NamespaceString& nss,
-    OperationContext* opCtx,
-    boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx) {
-    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
-    ExpressionContextBuilder builder;
-    builder.fromRequest(opCtx, *findCommand);
-    if (customerQueryExpCtx) {
-        builder.pathArraynessFrom(*customerQueryExpCtx)
-            .nonArrayPathsForNssFrom(*customerQueryExpCtx);
-    }
-    auto samplingQueryExpCtx = builder.build();
-    auto statusWithCQ = CanonicalQuery::make(
-        {.expCtx = samplingQueryExpCtx,
-         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)}});
-
-    return std::move(statusWithCQ.getValue());
-}
-
-/**
  * Builds the sampling plan and returns the sample.
  */
 std::vector<BSONObj> executeSamplingQueryAndSample(
@@ -225,7 +200,7 @@ std::vector<BSONObj> executeSamplingQueryAndSample(
                                                    nss,
                                                    std::move(sbeYieldPolicy),
                                                    /*isFromPlanCache=*/false,
-                                                   /*cachedPlanHash=*/false);
+                                                   /*cachedPlanHash=*/boost::none);
 
     std::vector<BSONObj> docs;
     BSONObj obj;
@@ -487,7 +462,7 @@ OnTheFlySampleLoader::OnTheFlySampleLoader(
       _technique(technique) {}
 
 StatusWith<Sample> OnTheFlySampleLoader::tryLoad(const SampleSpec& spec) {
-    auto cq = makeEmptyCanonicalQuery(spec.nss, _opCtx, _customerQueryExpCtx);
+    auto cq = CanonicalQuery::makeEmpty(_opCtx, spec.nss, _customerQueryExpCtx);
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, spec.nss);
     auto plan = makeSamplingPlan(
         spec, _collections.lookupCollection(spec.nss), _opCtx, _technique, sbeYieldPolicy.get());

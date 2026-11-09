@@ -99,7 +99,7 @@ describe("analyze NDV direct scan", function () {
 
     it("aborts when killed during the scan", function () {
         assertAnalyzeAborted(this.coll, {
-            failPoint: "hangCollScanDoWork",
+            failPoint: "hangGenericScanGetNext",
             whilePaused: () => {
                 const [op] = waitForCurOpByFilter(this.db, {
                     "command.analyze": this.coll.getName(),

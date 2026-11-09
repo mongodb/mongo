@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
@@ -597,4 +598,16 @@ TEST(SbeNumericCastTest, TagValueViewOverload) {
     TagValueView vDec{dec.tag(), dec.value()};
     ASSERT_EQ(numericCast<Decimal128>(vDec), Decimal128("3.14"));
 }
+
+TEST(SbeBsonConversionTest, ConvertToViewPreservesDbPointerNamespaceWithEmbeddedNul) {
+    BSONObjBuilder builder;
+    builder.appendDBRef("a", std::string_view("db\0suffix", 9), OID("507f1f77bcf86cd799439011"));
+    const auto doc = builder.obj();
+
+    const auto view = sbe::bson::convertToView(doc.firstElement());
+
+    ASSERT_EQ(view.tag, value::TypeTags::bsonDBPointer);
+    ASSERT_EQ(value::getBsonDBPointerView(view.value).ns, std::string_view("db\0suffix", 9));
+}
+
 }  // namespace mongo::sbe

@@ -14,8 +14,15 @@
 #include "mongo/db/exec/classic/update_stage.h"
 #include "mongo/db/exec/classic/upsert_stage.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/stage_builder/sbe/builder.h"
+#include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
@@ -239,6 +246,41 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
                                        coll,
                                        yieldPolicy,
                                        false /* whether owned BSON must be returned */);
+}
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScanSbe(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    PlanYieldPolicy::YieldPolicy yieldPolicy) {
+    tassert(13794502,
+            "SBE collection scan requires an existing main collection",
+            collections.hasMainCollection());
+    const auto nss = collections.getMainCollection()->ns();
+
+    auto cq = CanonicalQuery::makeEmpty(opCtx, nss);
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, nss);
+
+    QuerySolution solution;
+    solution.setRoot(std::make_unique<CollectionScanNode>(nss));
+    auto plan = stage_builder::buildSlotBasedExecutableTree(
+        opCtx, collections, *cq, solution, sbeYieldPolicy.get());
+    stage_builder::prepareSlotBasedExecutableTree(opCtx,
+                                                  plan.first.get(),
+                                                  &plan.second,
+                                                  *cq,
+                                                  collections,
+                                                  sbeYieldPolicy.get(),
+                                                  /*preparingFromSbeCache=*/false);
+    return plan_executor_factory::make(opCtx,
+                                       std::move(cq),
+                                       /*solution=*/nullptr,
+                                       std::move(plan),
+                                       collections,
+                                       QueryPlannerParams::DEFAULT,
+                                       nss,
+                                       std::move(sbeYieldPolicy),
+                                       /*isFromPlanCache=*/false,
+                                       /*cachedPlanHash=*/boost::none);
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithCollectionScan(

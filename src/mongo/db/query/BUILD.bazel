@@ -1036,6 +1036,19 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "internal_plans_test",
+    srcs = ["internal_plans_test.cpp"],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/repl:storage_interface",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "plan_executor_impl_response_deadline_test",
     srcs = [
         "plan_executor_impl_response_deadline_test.cpp",

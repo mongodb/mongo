@@ -9,6 +9,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
@@ -65,6 +66,26 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::make(CanonicalQueryP
     } catch (const DBException& e) {
         return e.toStatus();
     }
+}
+
+// static
+std::unique_ptr<CanonicalQuery> CanonicalQuery::makeEmpty(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx) {
+    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
+
+    ExpressionContextBuilder expCtxBuilder;
+    expCtxBuilder.fromRequest(opCtx, *findCommand);
+    if (customerQueryExpCtx) {
+        expCtxBuilder.pathArraynessFrom(*customerQueryExpCtx)
+            .nonArrayPathsForNssFrom(*customerQueryExpCtx);
+    }
+    auto expCtx = expCtxBuilder.build();
+
+    return uassertStatusOK(
+        make({.expCtx = std::move(expCtx),
+              .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)}}));
 }
 
 CanonicalQuery::CanonicalQuery(CanonicalQueryParams&& params) {

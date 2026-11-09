@@ -65,6 +65,17 @@ public:
     static StatusWith<std::unique_ptr<CanonicalQuery>> make(CanonicalQueryParams&& params);
 
     /**
+     * Creates a CanonicalQuery that matches every document of 'nss': no filter, projection or sort.
+     * Intended for internally built plans that need a CanonicalQuery only to be prepared and
+     * executed, e.g. for binding input parameters. If 'customerQueryExpCtx' is provided, the path
+     * arrayness information is inherited from it.
+     */
+    static std::unique_ptr<CanonicalQuery> makeEmpty(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx = nullptr);
+
+    /**
      * Used for creating sub-queries from an existing CanonicalQuery, only for use by
      * 'makeForSubplanner()'.
      */

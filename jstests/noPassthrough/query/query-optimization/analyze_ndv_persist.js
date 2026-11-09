@@ -267,15 +267,10 @@ describe("analyze mode: ndv", function () {
         assert.eq(this.statsDocs(), before, "previous stats doc must remain");
     });
 
-    it("rejects array values and keeps previous stats intact on failure", function () {
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a"}));
-        const before = this.statsDocs();
-        assert.eq(before.length, 1);
-
-        assert.commandWorked(this.coll.insert({a: [1, 2]}));
-        assert.commandFailedWithCode(this.analyze({mode: "ndv", key: "a"}), 13175701);
-        // A failed rebuild must not destroy the previous statistics.
-        assert.eq(this.statsDocs(), before, "stats doc must survive a failed analyze");
+    it("excludes multikey documents from persisted NDV", function () {
+        assert.commandWorked(this.coll.insert({a: [{b: 2}, {b: 3}]}));
+        assert.commandWorked(this.analyze({mode: "ndv", key: "a.b"}));
+        assert.eq(this.fieldStats.findOne().ndv.sketches[0].ndv, NumberLong(2));
     });
 
     it("rejects user $merge into the stats collection", function () {

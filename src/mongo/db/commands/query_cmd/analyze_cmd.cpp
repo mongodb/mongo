@@ -35,12 +35,13 @@
 #include "mongo/db/query/compiler/ce/sampling/on_the_fly_sample_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_manager.h"
 #include "mongo/db/query/compiler/stats/ce_histogram.h"
+#include "mongo/db/query/compiler/stats/field_values.h"
 #include "mongo/db/query/compiler/stats/max_diff.h"
-#include "mongo/db/query/compiler/stats/scalar_field_values.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
 #include "mongo/db/query/compiler/stats/stats_catalog.h"
 #include "mongo/db/query/compiler/stats/stats_for_histograms_gen.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -249,10 +250,12 @@ void runNdvMode(OperationContext* opCtx,
     {
         // Release the source acquisition and executor before writing statistics.
         auto coll = acquireAndValidateCollection(opCtx, nss, 13175802);
+        const auto& collectionPtr = coll.getCollectionPtr();
         uassert(13175804,
                 str::stream() << nss.toStringForErrorMsg()
                               << " is not a normal or clustered collection",
-                nss.isNormalCollection() || coll.getCollectionPtr()->isClustered());
+                (nss.isNormalCollection() || collectionPtr->isClustered()) && !nss.isOplog() &&
+                    !collectionPtr->isTimeseriesCollection());
         // system.stats.field_stats is shard-local and invisible through mongos.
         // TODO SERVER-133119: Support NDV statistics for sharded collections.
         uassert(13175803,
@@ -264,8 +267,9 @@ void runNdvMode(OperationContext* opCtx,
 
         // TODO SERVER-132681: Consider using a covered IXSCAN instead of the collection scan.
         // Full scans can exceed five minutes, so periodically release the source snapshot.
-        auto exec =
-            InternalPlanner::collectionScan(opCtx, coll, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+        MultipleCollectionAccessor collections(std::move(coll));
+        auto exec = InternalPlanner::collectionScanSbe(
+            opCtx, collections, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         BSONObj doc;
         if (exec->getNext(&doc, nullptr) == PlanExecutor::IS_EOF) {
             // Keep previous statistics after an empty scan; the read path guards against staleness.
@@ -275,12 +279,13 @@ void runNdvMode(OperationContext* opCtx,
         ce::NdvSketchBuilder builder(paths.size());
         do {
             opCtx->checkForInterrupt();
-            const auto values = stats::extractScalarFieldValues(
-                {sbe::value::TypeTags::bsonObject,
-                 sbe::value::bitcastFrom<const char*>(doc.objdata())},
-                paths);
-            builder.accumulateTuple(values);
-            // TODO: integrate MCV here
+            const auto [tuples, hasNonScalar] = stats::extractFieldValues(doc, paths);
+            if (!hasNonScalar) {
+                for (const auto& tuple : tuples) {
+                    builder.accumulateTuple(tuple);
+                }
+                // TODO: integrate MCV here
+            }
         } while (exec->getNext(&doc, nullptr) == PlanExecutor::ADVANCED);
 
         document.set_id(ce::makeFieldStatsId(collUuid, keyPaths));

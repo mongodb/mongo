@@ -123,7 +123,7 @@ filters:
   - "index_multikey_helpers.h":
     approvers:
       - 10gen/query-optimization
-  - "internal_plans.*":
+  - "internal_plans*.*":
     approvers:
       - 10gen/query-optimization
   - "lru_key_value*":
