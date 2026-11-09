@@ -1675,6 +1675,7 @@ public:
         const std::type_info* typeInfo = nullptr;
         boost::optional<SourceLocation> location;
         std::string expr;
+        std::function<bool()> isReplacedByExtension;
     };
 
     class EntryBuilder;
@@ -1688,7 +1689,7 @@ public:
     }
 
     /**
-     * Adds to the specified `registry` an instance of all apppriate Command types in this plan.
+     * Adds to the specified `registry` an instance of all appropriate Command types in this plan.
      * Appropriate is determined by the Entry data members, and by the specified `pred`.
      *
      * There are some server-wide criteria applied automatically:
@@ -1696,6 +1697,9 @@ public:
      *   - FeatureFlag-enabled commands are filtered out according to flag settings.
      *
      *   - testOnly registrations are only created if the server is in testOnly mode.
+     *
+     *   - Commands whose `isReplacedByExtension` predicate return true are filtered out, leaving
+     *     their name to be registered by an extension-provided counterpart.
      *
      * Other criteria can be applied via the caller-supplied `pred`. A `Command`
      * will only be created for an `entry` if the `pred(entry)` passes.
@@ -1779,6 +1783,21 @@ public:
     /** Add the router server role. */
     EntryBuilder forRouter() && {
         return std::move(*this).addRoles(ClusterRole::RouterServer);
+    }
+
+    /**
+     * If no replacement function `canReplace` is specified or it returns false, then the
+     * corresponding command will be registered. Otherwise, if the replacement function returns
+     * true, then the corresponding command will not be registered in favor of an extension-defined
+     * command with the same name that will be registered later at extension load time.
+     *
+     * `canReplace`'s evaluation must be fixed at startup time and for the entire process. This
+     * means its evaluation cannot be contingent upon Incremental Rollout Feature flag values and
+     * such.
+     */
+    EntryBuilder deferToExtensionIf(std::function<bool()> canReplace) && {
+        _entry->isReplacedByExtension = std::move(canReplace);
+        return std::move(*this);
     }
 
     /**

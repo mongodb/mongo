@@ -1275,6 +1275,14 @@ void CommandConstructionPlan::execute(CommandRegistry* registry,
             LOGV2_DEBUG(8043403, 3, "Skipping command for failed predicate", "entry"_attr = *entry);
             continue;
         }
+        // An unset predicate means the command never opted in to being replaced.
+        if (entry->isReplacedByExtension && entry->isReplacedByExtension()) {
+            LOGV2_DEBUG(13691500,
+                        3,
+                        "Skipping command in favor of its extension-defined counterpart",
+                        "entry"_attr = *entry);
+            continue;
+        }
         auto c = entry->construct();
         {
             const std::string& name = c->getName();

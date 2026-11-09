@@ -545,6 +545,34 @@ public:
     }
 };
 
+/**
+ * Distinct command types that deliberately share a command name, standing in for a built-in
+ * command and its extension-provided counterpart.
+ */
+template <int n>
+class SameNameNopCommand : public BasicCommand {
+public:
+    static std::string makeName() {
+        return "sameNameNopCommand";
+    }
+
+    SameNameNopCommand() : BasicCommand{makeName()} {}
+    bool run(OperationContext*, const DatabaseName&, const BSONObj&, BSONObjBuilder&) override {
+        return true;
+    }
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return true;
+    }
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+};
+
 using TypeInfoSet = std::set<const std::type_info*>;
 
 TypeInfoSet getPlanEntryTypes(CommandConstructionPlan& plan) {
@@ -558,6 +586,42 @@ TypeInfoSet getCommandTypes(const CommandRegistry& reg) {
     TypeInfoSet res;
     reg.forEachCommand([&](Command* cmd) { ASSERT_TRUE(res.insert(&typeid(*cmd)).second); });
     return res;
+}
+
+struct ExtensionReplacementNoops {
+    /** Every command added to the plan. */
+    TypeInfoSet inPlan;
+    /** The commands that must survive the extension-replacement filter. */
+    TypeInfoSet registered;
+};
+
+/**
+ * Populates `plan` with three noop commands configured for `role`, one per extension-replacement
+ * outcome: predicate true (skipped), predicate false (registered), and never opted in (registered).
+ */
+ExtensionReplacementNoops registerExtensionReplacementNoops(CommandConstructionPlan& plan,
+                                                            ClusterRole role) {
+    // Replaced by an extension, so it must be absent from the registry.
+    *CommandConstructionPlan::EntryBuilder::make<TrivialNopCommand<0>>()
+         .addRoles(role)
+         .deferToExtensionIf([] { return true; })
+         .setPlan_forTest(&plan);
+    // Predicate is false, so it is registered as before.
+    *CommandConstructionPlan::EntryBuilder::make<TrivialNopCommand<1>>()
+         .addRoles(role)
+         .deferToExtensionIf([] { return false; })
+         .setPlan_forTest(&plan);
+    // Never opted in, so it is registered as before.
+    *CommandConstructionPlan::EntryBuilder::make<TrivialNopCommand<2>>()
+         .addRoles(role)
+         .setPlan_forTest(&plan);
+
+    return {
+        .inPlan = {&typeid(TrivialNopCommand<0>),
+                   &typeid(TrivialNopCommand<1>),
+                   &typeid(TrivialNopCommand<2>)},
+        .registered = {&typeid(TrivialNopCommand<1>), &typeid(TrivialNopCommand<2>)},
+    };
 }
 
 class CommandConstructionPlanTest : public unittest::Test {
@@ -601,6 +665,34 @@ TEST_F(CommandConstructionPlanTest, ExecutePlanPredicateFalse) {
     CommandRegistry reg;
     plan.execute(&reg, nullptr, [](auto&&) { return false; });
     ASSERT_EQ(getCommandTypes(reg), TypeInfoSet{});
+}
+
+TEST_F(CommandConstructionPlanTest, ExecutePlanSkipsCommandsReplacedByExtension) {
+    CommandConstructionPlan plan;
+    auto expected = registerExtensionReplacementNoops(plan, ClusterRole::ShardServer);
+    ASSERT_EQ(getPlanEntryTypes(plan), expected.inPlan);
+
+    CommandRegistry reg;
+    plan.execute(&reg, nullptr, [](auto&&) { return true; });
+    ASSERT_EQ(getCommandTypes(reg), expected.registered);
+}
+
+TEST_F(CommandConstructionPlanTest, ReplacedCommandFreesItsNameForTheReplacement) {
+    CommandConstructionPlan plan;
+
+    // Two commands share a name: the first represents the built-in and the second represents the
+    // extension-provided counterpart. The built-in opts in to being replaced by its counterpart.
+    // Skipping the built-in keeps the duplicate-command check in `execute` from tripping.
+    *CommandConstructionPlan::EntryBuilder::make<SameNameNopCommand<0>>()
+         .deferToExtensionIf([] { return true; })
+         .setPlan_forTest(&plan);
+    *CommandConstructionPlan::EntryBuilder::make<SameNameNopCommand<1>>().setPlan_forTest(&plan);
+
+    ASSERT_EQ(getPlanEntryTypes(plan).size(), 2u);
+
+    CommandRegistry reg;
+    plan.execute(&reg, nullptr, [](auto&&) { return true; });
+    ASSERT_EQ(getCommandTypes(reg), TypeInfoSet{&typeid(SameNameNopCommand<1>)});
 }
 
 /** Create a ServiceContext for each supported ClusterRole mask. */
@@ -672,6 +764,13 @@ TEST_F(RouterCommandRegistryTest, ExecutePlanForService) {
     ASSERT_EQ(result.commandTypes, result.fullSet);
 }
 
+TEST_F(RouterCommandRegistryTest, ExecutePlanSkipsCommandsReplacedByExtension) {
+    CommandConstructionPlan plan;
+    auto expected = registerExtensionReplacementNoops(plan, ClusterRole::RouterServer);
+    ASSERT_EQ(getPlanEntryTypes(plan), expected.inPlan);
+    ASSERT_EQ(getCommandsForRole(plan, ClusterRole::RouterServer), expected.registered);
+}
+
 /**
  * Check that all mongos commands are sampled by default, as a proxy for the entry points of sharded
  * operations.
@@ -709,6 +808,13 @@ TEST_F(ShardCommandRegistryTest, ServicesInit) {
 TEST_F(ShardCommandRegistryTest, ShardExecutePlanForService) {
     auto result = testExecutePlanForService(ClusterRole::ShardServer);
     ASSERT_EQ(result.commandTypes, result.fullSet);
+}
+
+TEST_F(ShardCommandRegistryTest, ExecutePlanSkipsCommandsReplacedByExtension) {
+    CommandConstructionPlan plan;
+    auto expected = registerExtensionReplacementNoops(plan, ClusterRole::ShardServer);
+    ASSERT_EQ(getPlanEntryTypes(plan), expected.inPlan);
+    ASSERT_EQ(getCommandsForRole(plan, ClusterRole::ShardServer), expected.registered);
 }
 
 }  // namespace
