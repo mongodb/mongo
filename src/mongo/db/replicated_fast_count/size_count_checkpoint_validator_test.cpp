@@ -734,31 +734,34 @@ TEST_F(SizeCountCheckpointValidatorRecoveryTest, SingleCheckpointBatchAdopted) {
         operationContext(),
         *sizeCountStore,
         uuid,
-        SizeCountStore::Entry{.timestamp = kT2, .size = 10, .count = 1});
-    applyBatch(
-        validator,
-        {makeWatermarkEntry(kT2),
-         makeCheckpointEntry(kT2,
-                             {{uuid,
-                               CollectionReplicatedMetadata{
-                                   .sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}})},
-        // This delta is ignored.
-        {{.ts = kT1,
-          .uuid = uuid,
-          .delta = ReplicatedMetadataDelta{
-              .metadata = {.sizeCount = CollectionSizeCount{.size = 7, .count = 3}}}}});
-    applyBatch(
-        validator,
-        {makeWatermarkEntry(kEnd),
-         makeCheckpointEntry(kEnd,
-                             {{uuid,
-                               CollectionReplicatedMetadata{
-                                   .sizeCount = CollectionSizeCount{.size = 15, .count = 1}}}})},
-        // This delta is not ignored!
-        {{.ts = kT3,
-          .uuid = uuid,
-          .delta = ReplicatedMetadataDelta{
-              .metadata = {.sizeCount = CollectionSizeCount{.size = 5, .count = 0}}}}});
+        SizeCountStore::Entry{.timestamp = kT2, .size = 10, .count = 1, .hash = 0b0011});
+    applyBatch(validator,
+               {makeWatermarkEntry(kT2),
+                makeCheckpointEntry(kT2,
+                                    {{uuid,
+                                      CollectionReplicatedMetadata{
+                                          .sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                          .hash = 0b0011}}})},
+               // This delta is ignored.
+               {{.ts = kT1,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 7, .count = 3},
+                                  .hash = 0b1111}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 1, .validated = 0});
+    applyBatch(validator,
+               {makeWatermarkEntry(kEnd),
+                makeCheckpointEntry(kEnd,
+                                    {{uuid,
+                                      CollectionReplicatedMetadata{
+                                          .sizeCount = CollectionSizeCount{.size = 15, .count = 1},
+                                          .hash = 0b0011 ^ 0b0101}}})},
+               // This delta is not ignored!
+               {{.ts = kT3,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 5, .count = 0},
+                                  .hash = 0b0101}}}});
     expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 1, .validated = 1});
 }
 
@@ -1244,6 +1247,57 @@ TEST_F(SizeCountCheckpointValidatorTest, ResetWithPendingIntervalsIncrementsWate
     expectValidatorMetrics(capturer, {.recorded = 3, .evicted = 3, .skipped = 0, .validated = 0});
 }
 
+TEST_F(SizeCountCheckpointValidatorTest, ResetBetweenSecondaryTermsAdoptsFreshHashBaseline) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    applyBatch(validator,
+               {makeWatermarkEntry(kT1)},
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta =
+                     ReplicatedMetadataDelta{
+                         .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                      .hash = 0b0011}}},
+                {.ts = kT2,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 1},
+                                  .hash = 0b0101}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 0, .skipped = 0, .validated = 0});
+
+    // Between secondary terms, reset clears the validator's in-memory baseline, watermarks, and
+    // deltas, not the persisted metadata. Validation must adopt a fresh checkpoint before resuming.
+    validator.reset();
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 0});
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        *sizeCountStore,
+        uuid,
+        SizeCountStore::Entry{.timestamp = kT3, .size = 40, .count = 2, .hash = 0b1000});
+    applyBatch(validator,
+               {makeWatermarkEntry(kT3),
+                makeCheckpointEntry(kT3,
+                                    {{uuid,
+                                      CollectionReplicatedMetadata{
+                                          .sizeCount = CollectionSizeCount{.size = 40, .count = 2},
+                                          .hash = 0b1000}}})},
+               {});
+    expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 1, .validated = 0});
+    applyBatch(validator,
+               {makeWatermarkEntry(kEnd),
+                makeCheckpointEntry(kEnd,
+                                    {{uuid,
+                                      CollectionReplicatedMetadata{
+                                          .sizeCount = CollectionSizeCount{.size = 45, .count = 3},
+                                          .hash = 0b1000 ^ 0b0010}}})},
+               {{.ts = kT4,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 5, .count = 1},
+                                  .hash = 0b0010}}}});
+    expectValidatorMetrics(capturer, {.recorded = 3, .evicted = 3, .skipped = 1, .validated = 1});
+}
+
 TEST_F(SizeCountCheckpointValidatorTest, DeltaAfterNewestWatermarkCarriesIntoNextInterval) {
     otel::metrics::OtelMetricsCapturer capturer;
     const UUID uuid = UUID::gen();
@@ -1379,6 +1433,7 @@ DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest, WrongHashInCheckpointFassert
 }
 
 TEST_F(SizeCountCheckpointValidatorTest, HashesFoldAcrossDeltasAndCheckpoints) {
+    otel::metrics::OtelMetricsCapturer capturer;
     const UUID uuid = UUID::gen();
     const std::vector<repl::OplogEntry> ops{
         makeWatermarkEntry(kT1),
@@ -1413,9 +1468,11 @@ TEST_F(SizeCountCheckpointValidatorTest, HashesFoldAcrossDeltasAndCheckpoints) {
                     .delta = ReplicatedMetadataDelta{
                         .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
                                      .hash = 0b1000}}}});
+    expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 0, .validated = 2});
 }
 
 TEST_F(SizeCountCheckpointValidatorTest, HashesFoldAcrossIntervalsForLaterCheckpoint) {
+    otel::metrics::OtelMetricsCapturer capturer;
     const UUID uuid = UUID::gen();
     const std::vector<repl::OplogEntry> ops{
         makeWatermarkEntry(kT1),
@@ -1439,9 +1496,11 @@ TEST_F(SizeCountCheckpointValidatorTest, HashesFoldAcrossIntervalsForLaterCheckp
                     .delta = ReplicatedMetadataDelta{
                         .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 1},
                                      .hash = 0b0101}}}});
+    expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 0, .validated = 1});
 }
 
 TEST_F(SizeCountCheckpointValidatorTest, HashesFoldAcrossBatchesBeforeWatermark) {
+    otel::metrics::OtelMetricsCapturer capturer;
     const UUID uuid = UUID::gen();
     applyBatch(validator,
                /*ops=*/{},
@@ -1457,6 +1516,7 @@ TEST_F(SizeCountCheckpointValidatorTest, HashesFoldAcrossBatchesBeforeWatermark)
                     .delta = ReplicatedMetadataDelta{
                         .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 1},
                                      .hash = 0b0101}}}});
+    expectValidatorMetrics(capturer, {.recorded = 0, .evicted = 0, .skipped = 0, .validated = 0});
     // The delta past the watermark belongs to a later checkpoint.
     const std::vector<repl::OplogEntry> ops{
         makeWatermarkEntry(kT1),
@@ -1473,9 +1533,11 @@ TEST_F(SizeCountCheckpointValidatorTest, HashesFoldAcrossBatchesBeforeWatermark)
                     .delta = ReplicatedMetadataDelta{
                         .metadata = {.sizeCount = CollectionSizeCount{.size = 40, .count = 1},
                                      .hash = 0b1000}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
 }
 
 TEST_F(SizeCountCheckpointValidatorTest, HashesValidatePerCollection) {
+    otel::metrics::OtelMetricsCapturer capturer;
     const UUID uuidA = UUID::gen();
     const UUID uuidB = UUID::gen();
     const std::vector<repl::OplogEntry> ops{
@@ -1502,6 +1564,7 @@ TEST_F(SizeCountCheckpointValidatorTest, HashesValidatePerCollection) {
                     .delta = ReplicatedMetadataDelta{
                         .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 1},
                                      .hash = 0b0101}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
 }
 
 DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,

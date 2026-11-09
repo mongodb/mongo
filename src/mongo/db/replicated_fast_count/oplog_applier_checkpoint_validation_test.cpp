@@ -278,6 +278,7 @@ TEST_F(CheckpointValidationTest, CheckpointValidatesCrudDeltas) {
 }
 
 TEST_F(CheckpointHashValidationTest, CheckpointValidatesCrudHashes) {
+    otel::metrics::OtelMetricsCapturer capturer;
     std::vector<OplogEntry> oplog;
     oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
         nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
@@ -292,9 +293,11 @@ TEST_F(CheckpointHashValidationTest, CheckpointValidatesCrudHashes) {
     appendCheckpoint(
         oplog, CollectionSizeCount{.size = kDoc1Updated.objsize(), .count = 1}, kDoc1UpdatedHash);
     ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
 }
 
 TEST_F(SingleWorkerCheckpointHashValidationTest, CheckpointValidatesGroupedInsertHashes) {
+    otel::metrics::OtelMetricsCapturer capturer;
     std::vector<OplogEntry> oplog;
     oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
         nextOpTime(), _nss, _uuid, kDoc1, RecordId(1), kDoc1Hash));
@@ -304,6 +307,7 @@ TEST_F(SingleWorkerCheckpointHashValidationTest, CheckpointValidatesGroupedInser
                      CollectionSizeCount{.size = kDoc1.objsize() + kDoc2.objsize(), .count = 2},
                      kDoc1Hash ^ kDoc2Hash);
     ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
 }
 
 TEST_F(SingleWorkerCheckpointHashValidationTest, GroupedInsertWithHashOnlyOnFirstEntry) {
@@ -332,6 +336,7 @@ TEST_F(SingleWorkerCheckpointHashValidationTest, GroupedInsertWithHashOnlyOnLast
 
 TEST_F(SingleWorkerCheckpointHashValidationTest,
        GroupedInsertComputesHashesWhenPerDocumentVerificationDisabled) {
+    otel::metrics::OtelMetricsCapturer capturer;
     unittest::ServerParameterGuard disableContinuousInternodeValidation(
         "disableContinuousInternodeValidation", true);
     std::vector<OplogEntry> oplog;
@@ -343,6 +348,7 @@ TEST_F(SingleWorkerCheckpointHashValidationTest,
                      CollectionSizeCount{.size = kDoc1.objsize() + kDoc2.objsize(), .count = 2},
                      kDoc1Hash ^ kDoc2Hash);
     ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
 }
 
 DEATH_TEST_F(CheckpointHashValidationDeathTest,
@@ -1718,10 +1724,11 @@ TEST_F(CheckpointValidationTest, CheckpointValidationAfterStepdownResetAdoptsChe
     const UUID uuid = getCollectionUUID(_opCtx.get(), nss);
 
     const BSONObj doc1 = BSON("_id" << 1);
+    const int64_t doc1Hash = computeDocValidationHash(doc1);
     {
         std::vector<OplogEntry> oplog;
-        oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
-            nextOpTime(), nss, uuid, doc1, RecordId(1)));
+        oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+            nextOpTime(), nss, uuid, doc1, RecordId(1), doc1Hash));
         const Timestamp watermarkTs = nextOpTime().getTimestamp();
         oplog.push_back(makeWatermarkEntry(watermarkTs));
         oplog.push_back(makeCheckpointEntry(
@@ -1729,7 +1736,7 @@ TEST_F(CheckpointValidationTest, CheckpointValidationAfterStepdownResetAdoptsChe
             {{.uuid = uuid,
               .metadata = CollectionReplicatedMetadata{
                   .sizeCount = CollectionSizeCount{.size = doc1.objsize(), .count = 1},
-                  .hash = boost::none}}}));
+                  .hash = doc1Hash}}}));
         ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
     }
     expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
@@ -1737,10 +1744,13 @@ TEST_F(CheckpointValidationTest, CheckpointValidationAfterStepdownResetAdoptsChe
     oplogApplier->resetCheckpointValidator();
 
     const BSONObj doc2 = BSON("_id" << 2);
+    // Deliberately skew the adopted hash as well as the size. The next checkpoint must use this
+    // new baseline rather than retain the pre-reset hash.
+    const int64_t adoptedHash = doc1Hash ^ computeDocValidationHash(doc2) ^ int64_t { 1 };
     {
         std::vector<OplogEntry> oplog;
-        oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
-            nextOpTime(), nss, uuid, doc2, RecordId(2)));
+        oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+            nextOpTime(), nss, uuid, doc2, RecordId(2), computeDocValidationHash(doc2)));
         const Timestamp watermarkTs = nextOpTime().getTimestamp();
         oplog.push_back(makeWatermarkEntry(watermarkTs));
         // The validator adopts this checkpoint without validating it.
@@ -1750,16 +1760,17 @@ TEST_F(CheckpointValidationTest, CheckpointValidationAfterStepdownResetAdoptsChe
               .metadata = CollectionReplicatedMetadata{
                   .sizeCount = CollectionSizeCount{.size = doc1.objsize() + doc2.objsize() + 100,
                                                    .count = 2},
-                  .hash = boost::none}}}));
+                  .hash = adoptedHash}}}));
         ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
     }
     expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 1, .validated = 1});
 
     const BSONObj doc3 = BSON("_id" << 3);
+    const int64_t doc3Hash = computeDocValidationHash(doc3);
     {
         std::vector<OplogEntry> oplog;
-        oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
-            nextOpTime(), nss, uuid, doc3, RecordId(3)));
+        oplog.push_back(makeInsertOplogEntryWithRecordIdSizeMetadataAndHash(
+            nextOpTime(), nss, uuid, doc3, RecordId(3), doc3Hash));
         const Timestamp watermarkTs = nextOpTime().getTimestamp();
         oplog.push_back(makeWatermarkEntry(watermarkTs));
         oplog.push_back(makeCheckpointEntry(
@@ -1769,7 +1780,7 @@ TEST_F(CheckpointValidationTest, CheckpointValidationAfterStepdownResetAdoptsChe
                   .sizeCount = CollectionSizeCount{.size = doc1.objsize() + doc2.objsize() +
                                                        doc3.objsize() + 100,
                                                    .count = 3},
-                  .hash = boost::none}}}));
+                  .hash = adoptedHash ^ doc3Hash}}}));
         ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
     }
     expectValidatorMetrics(capturer, {.recorded = 3, .evicted = 3, .skipped = 1, .validated = 2});
