@@ -1355,9 +1355,9 @@ bool accsSupportBlockMode(const GroupNode* groupNode) {
  * the following translated sbe::PlanStage tree. In this example, we assume that the $group pipeline
  * spec is {"_id": "$a", "x": {"$min": "$b"}, "y": {"$first": "$b"}}.
  *
- * [2] mkbson s12 [_id = s8, x = s11, y = s10] true false
+ * [2] mkbson s12 [_id = s13, x = s11, y = s10] true false
  * [2] project [s11 = (s9 ?: null)]
- * [2] group [s8] [s9 = min(
+ * [2] group [s8] [s13 = s8] [s9 = min(
  *   let [
  *      l1.0 = s5
  *  ]

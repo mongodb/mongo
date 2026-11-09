@@ -911,17 +911,20 @@ struct SbBlueprintHashAggAccumulator {
 };
 
 /**
- * HashAggStage (group-by aggregation). 'groupBySlots' must already be de-duplicated.
+ * HashAggStage (group-by aggregation). 'groupBySlots' must already be de-duplicated. The stage
+ * exposes the group-by keys above it through 'groupByOutSlots', parallel to 'groupBySlots'.
  */
 struct SbBlueprintHashAgg {
     SbBlueprintNodeIdx child;
     PlanNodeId nodeId{kEmptyPlanNodeId};
     sbe::value::SlotVector groupBySlots;
+    sbe::value::SlotVector groupByOutSlots;
     std::vector<SbBlueprintHashAggAccumulator> accumulators;
     boost::optional<sbe::value::SlotId> collatorSlot;
     bool forceIncreasedSpilling{false};
 
     void def(SbSlotCollector& out) const {
+        out.add(groupByOutSlots);
         for (const auto& acc : accumulators) {
             out.add(acc.outSlot);
             // The stage fills the spill slot with a partial aggregate recovered from a spill.

@@ -348,8 +348,11 @@ public:
                 makeFunction(EFn::kLast, makeE<EVariable>(docSlot)),
                 makeFunction(EFn::kLast, makeE<EVariable>(lastSpillSlot))));
 
+        // The slots that hold the group keys above the stage.
+        value::SlotVector keyOutSlots;
         std::unique_ptr<PlanStage> stage;
         if (streaming) {
+            keyOutSlots = keySlots;
             stage = makeS<StreamingAggStage>(std::move(scanStage),
                                              keySlots,
                                              clusterKeySlots,
@@ -357,8 +360,12 @@ public:
                                              std::move(accumulators),
                                              kEmptyPlanNodeId);
         } else {
+            for (size_t i = 0; i < keySlots.size(); ++i) {
+                keyOutSlots.push_back(generateSlotId());
+            }
             stage = makeS<HashAggStage>(std::move(scanStage),
                                         keySlots,
+                                        keyOutSlots,
                                         std::move(accumulators),
                                         true,
                                         boost::none,
@@ -370,7 +377,7 @@ public:
         // Replace missing key slots with a placeholder so the output rows are comparable
         SlotExprPairVector outFields;
         value::SlotVector slots;
-        for (const auto keySlot : keySlots) {
+        for (const auto keySlot : keyOutSlots) {
             auto outSlot = generateSlotId();
             outFields.emplace_back(outSlot,
                                    makeE<EPrimBinary>(EPrimBinary::fillEmpty,

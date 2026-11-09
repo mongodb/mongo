@@ -41,6 +41,12 @@ namespace sbe {
  * from the 'input' tree are not visible higher in tree. Stages higher in the tree can only see the
  * slots holding the group-by keys as well as those holding the corresponding aggregate values.
  *
+ * The group-by keys are visible above the stage through the slots 'gbsOut', parallel to 'gbs'.
+ * 'gbsOut[i]' holds the key stored for the group: the first value of 'gbs[i]' seen for the group,
+ * or if the stage spilled, the one read back from the spill table. It can differ from the value of
+ * 'gbs[i]' in other rows of the group, for example under a case-insensitive collation, or for
+ * numbers of different types that compare equal.
+ *
  * The optional 'seekKeys', if provided, limit the results returned from the hash table only to
  * those equal to seekKeys.
  *
@@ -67,8 +73,9 @@ namespace sbe {
  *
  * Debug string representation:
  *
- *  group [<group by slots>] [slot_1 = expr_1, ..., slot_n = expr_n] [<seek slots>]?
- *      spillSlots[slot_1, ..., slot_n] mergingExprs[expr_1, ..., expr_n] reopen? collatorSlot?
+ *  group [<group by slots>] [gbsOut_1 = gbs_1, ..., gbsOut_k = gbs_k]
+ *      [slot_1 = expr_1, ..., slot_n = expr_n] spillSlots[slot_1, ..., slot_n]
+ *      mergingExprs[expr_1, ..., expr_n] reopen? collatorSlot?
  *  childStage
  */
 class HashAggStage final : public HashAggBaseStage<HashAggStage> {
@@ -77,6 +84,7 @@ class HashAggStage final : public HashAggBaseStage<HashAggStage> {
 public:
     HashAggStage(std::unique_ptr<PlanStage> input,
                  value::SlotVector gbs,
+                 value::SlotVector gbsOut,
                  std::vector<std::unique_ptr<HashAggAccumulator>> accumulatorList,
                  bool optimizedClose,
                  boost::optional<value::SlotId> collatorSlot,
@@ -168,6 +176,8 @@ private:
     TableType::iterator _htIt;
 
     const value::SlotVector _gbs;
+    // The slots that expose the group-by keys above this stage, parallel to '_gbs'.
+    const value::SlotVector _gbsOut;
 
     /**
      * Each entry of this list has an "out slot," which binds the accumulator state during
@@ -195,7 +205,7 @@ private:
 
     // Each accessor in '_outHashKeyAccessors' references one of the keys for a hash agg result
     // produced by a 'getNext()' call and is bound by this stage to the corresponding slot in the
-    // '_gbs' array. These accessors are "switch" accessors that reference different sources
+    // '_gbsOut' array. These accessors are "switch" accessors that reference different sources
     // depending on whether results were spilled to disk.
     //
     // If no spilling was necessary, the '_outKeyAccessors' are switched to

@@ -325,6 +325,7 @@ void checkMergeJoin(SlotMembershipChecker& c) {
 
 void checkHashAgg(SlotMembershipChecker& c) {
     auto groupBy = c.slot();
+    auto groupByOut = c.slot();
     auto collator = c.slot();
     auto compiledOut = c.slot();
     auto compiledSpill = c.slot();
@@ -340,6 +341,7 @@ void checkHashAgg(SlotMembershipChecker& c) {
     auto [maxSize, maxSizeSlot] = c.expr();
     SbBlueprintHashAgg hashAgg;
     hashAgg.groupBySlots = {groupBy};
+    hashAgg.groupByOutSlots = {groupByOut};
     hashAgg.collatorSlot = collator;
     hashAgg.accumulators.emplace_back(
         compiledOut,
@@ -356,7 +358,7 @@ void checkHashAgg(SlotMembershipChecker& c) {
         SbHashAggMinMaxNAccumulator<sbe::MinNHashAggAccumulator>{
             std::move(minNTransform), std::move(maxSize), 0 /* memLimit */});
     c.check(hashAgg,
-            {compiledOut, compiledSpill, nativeOut, nativeSpill, minNOut, minNSpill},
+            {groupByOut, compiledOut, compiledSpill, nativeOut, nativeSpill, minNOut, minNSpill},
             {groupBy,
              collator,
              initSlot,

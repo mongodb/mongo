@@ -1,10 +1,10 @@
 # Golden test output of SbeTimeseriesTest/TestGroupSum
-$$RESULT=s18 env: { s10 = Nothing (nothing) }
-[4] sort [s19] [asc] [s18] 9223372036854775807ll 
-[4] project [s19 = getSortKeyAsc(s17)] 
-[3] project [s18 = newBsonObj("_id", s16, "sum", s17)] 
-[3] project [s17 = doubleDoubleSumFinalize(s15)] 
-[3] group [s16] [s15 = aggDoubleDoubleSum(s11)] spillSlots[s14] mergingExprs[aggMergeDoubleDoubleSums(s14)] 
+$$RESULT=s19 env: { s10 = Nothing (nothing) }
+[4] sort [s20] [asc] [s19] 9223372036854775807ll 
+[4] project [s20 = getSortKeyAsc(s18)] 
+[3] project [s19 = newBsonObj("_id", s17, "sum", s18)] 
+[3] project [s18 = doubleDoubleSumFinalize(s15)] 
+[3] group [s16] [s17 = s16] [s15 = aggDoubleDoubleSum(s11)] spillSlots[s14] mergingExprs[aggMergeDoubleDoubleSums(s14)] 
 [3] project [s16 = (s13 ?: null)] 
 [3] extract_field_paths inputs[s11 = Get(a)/Id, s12 = Get(b)/Id] outputs[s13 = Get(b)/Traverse/Get(a)/Traverse/Get(b)/Id] 
 [2] block_to_row blocks[s5, s6] row[s11, s12] s9 

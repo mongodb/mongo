@@ -39,6 +39,9 @@
 #include <string_view>
 #include <variant>
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
+
 namespace mongo::stage_builder {
 namespace {
 
@@ -728,20 +731,20 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
         _state.expCtx->getQueryKnobConfiguration().getSbeHashAggIncreasedSpillingMode());
 
 
-    // For normal (non-block) HashAggStage, the group by "out" slots are the same as the incoming
-    // group by slots.
-    SbSlotVector groupByOutSlots = gbs;
-
-    // Copy unique slot IDs from 'gbs' to 'groupBySlots'.
+    // Copy unique slot IDs from 'gbs' to 'groupBySlots', giving each one a new output slot.
+    // 'groupByOutSlots' is parallel to 'gbs'.
     sbe::value::SlotVector groupBySlots;
-    absl::flat_hash_set<sbe::value::SlotId> dedup;
-
+    sbe::value::SlotVector groupByOutSlotIds;
+    SbSlotVector groupByOutSlots;
+    absl::flat_hash_map<sbe::value::SlotId, sbe::value::SlotId> outSlotIds;
     for (const auto& sbSlot : gbs) {
-        auto slotId = sbSlot.getId();
-
-        if (dedup.insert(slotId).second) {
-            groupBySlots.emplace_back(slotId);
+        auto [it, inserted] = outSlotIds.try_emplace(sbSlot.getId());
+        if (inserted) {
+            it->second = _state.slotId();
+            groupBySlots.push_back(sbSlot.getId());
+            groupByOutSlotIds.push_back(it->second);
         }
+        groupByOutSlots.emplace_back(it->second, sbSlot.getTypeSignature());
     }
 
     using AccumulatorImpl = decltype(SbHashAggAccumulator::implementation);
@@ -782,6 +785,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
                          SbBlueprintHashAgg{.child = stage.release(),
                                             .nodeId = _nodeId,
                                             .groupBySlots = std::move(groupBySlots),
+                                            .groupByOutSlots = std::move(groupByOutSlotIds),
                                             .accumulators = std::move(accumulators),
                                             .collatorSlot = collatorSlot,
                                             .forceIncreasedSpilling = forceIncreasedSpilling},

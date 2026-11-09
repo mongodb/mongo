@@ -334,6 +334,7 @@ struct Lowerer {
 
         return sbe::makeS<sbe::HashAggStage>(std::move(child),
                                              std::move(node.groupBySlots),
+                                             std::move(node.groupByOutSlots),
                                              std::move(loweredAccumulators),
                                              true /* optimized close */,
                                              node.collatorSlot,

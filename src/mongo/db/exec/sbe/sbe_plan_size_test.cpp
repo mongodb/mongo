@@ -128,6 +128,7 @@ TEST_F(PlanSizeTest, HashAgg) {
     auto stage = makeS<HashAggStage>(
         mockS(),
         mockSV(),
+        mockSV(),
         makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                                        generateSlotId(), generateSlotId(), mockE(), mockE()),
                                    std::make_unique<ArithmeticAverageHashAggAccumulatorTerminal>(

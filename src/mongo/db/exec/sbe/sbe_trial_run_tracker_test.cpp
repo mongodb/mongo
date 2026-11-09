@@ -242,6 +242,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
+            makeSV(generateSlotId()),
             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                 countsSlot,
                 generateSlotId(),

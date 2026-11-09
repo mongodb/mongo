@@ -29,6 +29,7 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
@@ -60,6 +61,7 @@ public:
         auto stage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
+            makeSV(generateSlotId()),
             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                 countsSlot,
                 spillSlot,
@@ -156,6 +158,7 @@ public:
             auto hashAggStage = makeS<HashAggStage>(
                 std::move(scanStage),
                 makeSV(scanSlot),
+                makeSV(generateSlotId()),
                 makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                     countsSlot,
                     spillSlot,
@@ -208,6 +211,7 @@ void HashAggStageTest::performHashAggWithSpillChecking(
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
+            makeSV(generateSlotId()),
             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                 countsSlot,
                 spillSlot,
@@ -349,6 +353,7 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(),
+            makeSV(),
             makeHashAggAccumulatorList(
                 std::make_unique<CompiledHashAggAccumulator>(
                     minSlot,
@@ -429,6 +434,7 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
         auto hashAggSlot = generateSlotId();
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
+            makeSV(),
             makeSV(),
             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                 hashAggSlot,
@@ -511,6 +517,45 @@ TEST_F(HashAggStageTest, HashAggCollationTest) {
     performHashAggWithSpillChecking(inputArr, nonCollatorExpectedOutputArr);
 }
 
+using HashAggStageDeathTest = HashAggStageTest;
+
+DEATH_TEST_REGEX_F(HashAggStageDeathTest,
+                   GroupByOutputSlotsMustMatchGroupBySlots,
+                   "Tripwire assertion.*13871410") {
+    auto [scanSlot, scanStage] = generateVirtualScan(
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2))));
+    makeS<HashAggStage>(std::move(scanStage),
+                        makeSV(scanSlot),
+                        makeSV(),
+                        makeHashAggAccumulatorList(),
+                        true,
+                        boost::none,
+                        /*allowDiskUse=*/false,
+                        /*yieldPolicy=*/nullptr,
+                        kEmptyPlanNodeId);
+}
+
+DEATH_TEST_REGEX_F(HashAggStageDeathTest,
+                   GroupByOutputSlotsMustNotRepeat,
+                   "Tripwire assertion.*7039551") {
+    auto [scanSlots, scanStage] =
+        generateVirtualScanMulti(2,
+                                 value::TagValueOwned::fromRaw(stage_builder::makeValue(
+                                     BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON_ARRAY(3 << 4)))));
+    auto outSlot = generateSlotId();
+    auto stage = makeS<HashAggStage>(std::move(scanStage),
+                                     scanSlots,
+                                     makeSV(outSlot, outSlot),
+                                     makeHashAggAccumulatorList(),
+                                     true,
+                                     boost::none,
+                                     /*allowDiskUse=*/false,
+                                     /*yieldPolicy=*/nullptr,
+                                     kEmptyPlanNodeId);
+    auto ctx = makeCompileCtx();
+    prepareTree(ctx.get(), stage.get(), outSlot);
+}
+
 TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     // We shouldn't spill to disk if memory is plentiful (which by default it is), even if we are
     // allowed to.
@@ -529,6 +574,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
                             makeSV(scanSlot),
+                            makeSV(generateSlotId()),
                             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                                 countsSlot,
                                 spillSlot,
@@ -584,6 +630,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
                             makeSV(scanSlot),
+                            makeSV(generateSlotId()),
                             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                                 countsSlot,
                                 spillSlot,
@@ -666,6 +713,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
                             makeSV(scanSlot),
+                            makeSV(generateSlotId()),
                             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                                 countsSlot,
                                 spillSlot,
@@ -738,6 +786,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
                             makeSV(scanSlot),
+                            makeSV(generateSlotId()),
                             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                                 countsSlot,
                                 spillSlot,
@@ -798,6 +847,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
                             makeSV(scanSlot),
+                            makeSV(generateSlotId()),
                             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                                 countsSlot,
                                 spillSlot,
@@ -860,6 +910,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
     auto spillSlot = generateSlotId();
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
+                            makeSV(),
                             makeSV(),
                             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                                 countsSlot,
@@ -924,6 +975,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
                             makeSV(scanSlot),
+                            makeSV(generateSlotId()),
                             makeHashAggAccumulatorList(
                                 std::make_unique<CompiledHashAggAccumulator>(
                                     countsSlot,
@@ -1000,6 +1052,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
                             makeSV(scanSlot),
+                            makeSV(generateSlotId()),
                             makeHashAggAccumulatorList(
                                 std::make_unique<CompiledHashAggAccumulator>(
                                     countsSlot,
@@ -1071,6 +1124,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
                             makeSV(scanSlot),
+                            makeSV(generateSlotId()),
                             makeHashAggAccumulatorList(
                                 std::make_unique<CompiledHashAggAccumulator>(
                                     countsSlot,
@@ -1170,6 +1224,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
                             makeSV(scanSlot),
+                            makeSV(generateSlotId()),
                             makeHashAggAccumulatorList(
                                 std::make_unique<CompiledHashAggAccumulator>(
                                     countsSlot,
@@ -1259,11 +1314,13 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
         generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a sum for each group.
+    auto groupByOutSlot = generateSlotId();
     auto sumsSlot = generateSlotId();
     auto spillSlot = generateSlotId();
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
                             makeSV(scanSlot),
+                            makeSV(groupByOutSlot),
                             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                                 sumsSlot,
                                 spillSlot,
@@ -1276,7 +1333,7 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
-    auto resultAccessors = prepareTree(ctx.get(), stage.get(), makeSV(scanSlot, sumsSlot));
+    auto resultAccessors = prepareTree(ctx.get(), stage.get(), makeSV(groupByOutSlot, sumsSlot));
 
     while (stage->getNext() == PlanState::ADVANCED) {
         auto [resGroupByTag, resGroupByVal] = resultAccessors[0]->getViewOfValue();
@@ -1307,11 +1364,13 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
         generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
+    auto groupByOutSlot = generateSlotId();
     auto countsSlot = generateSlotId();
     auto spillSlot = generateSlotId();
     auto stage =
         makeS<HashAggStage>(std::move(scanStage),
                             makeSV(scanSlot),
+                            makeSV(groupByOutSlot),
                             makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
                                 countsSlot,
                                 spillSlot,
@@ -1326,7 +1385,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
-    auto resultAccessors = prepareTree(ctx.get(), stage.get(), makeSV(scanSlot, countsSlot));
+    auto resultAccessors = prepareTree(ctx.get(), stage.get(), makeSV(groupByOutSlot, countsSlot));
 
     // Read in all of the results.
     std::map<int64_t /*id*/, int64_t /*count*/> results;

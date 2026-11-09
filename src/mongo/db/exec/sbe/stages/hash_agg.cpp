@@ -31,6 +31,7 @@ namespace sbe {
 using namespace std::literals::string_view_literals;
 HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
                            value::SlotVector gbs,
+                           value::SlotVector gbsOut,
                            std::vector<std::unique_ptr<HashAggAccumulator>> accumulatorList,
                            bool optimizedClose,
                            boost::optional<value::SlotId> collatorSlot,
@@ -47,10 +48,14 @@ HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
                        allowDiskUse,
                        forceIncreasedSpilling),
       _gbs(std::move(gbs)),
+      _gbsOut(std::move(gbsOut)),
       _accumulatorList(std::move(accumulatorList)),
       _collatorSlot(collatorSlot),
       _optimizedClose(optimizedClose) {
     _children.emplace_back(std::move(input));
+    tassert(13871410,
+            "HashAggStage needs one output slot for each group-by slot",
+            _gbsOut.size() == _gbs.size());
 }
 
 std::unique_ptr<PlanStage> HashAggStage::clone() const {
@@ -62,6 +67,7 @@ std::unique_ptr<PlanStage> HashAggStage::clone() const {
 
     return std::make_unique<HashAggStage>(_children[0]->clone(),
                                           _gbs,
+                                          _gbsOut,
                                           std::move(clonedAccumulators),
                                           _optimizedClose,
                                           _collatorSlot,
@@ -91,8 +97,10 @@ void HashAggStage::prepare(CompileCtx& ctx) {
 
     size_t accIdx = 0;
     // Process group by columns.
-    for (auto& slot : _gbs) {
+    for (size_t i = 0; i < _gbs.size(); ++i) {
+        auto slot = _gbs[i];
         throwIfDupSlot(slot);
+        throwIfDupSlot(_gbsOut[i]);
 
         _inKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
 
@@ -111,7 +119,7 @@ void HashAggStage::prepare(CompileCtx& ctx) {
             std::make_unique<value::SwitchAccessor>(std::vector<value::SlotAccessor*>{
                 _outHashKeyAccessors.back().get(), _outRecordStoreKeyAccessors.back().get()}));
 
-        _outAccessors[slot] = _outKeyAccessors.back().get();
+        _outAccessors[_gbsOut[i]] = _outKeyAccessors.back().get();
 
         ++accIdx;
     }
@@ -447,6 +455,7 @@ std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) co
         DebugPrinter printer;
         BSONObjBuilder bob;
         bob.append("groupBySlots", _gbs.begin(), _gbs.end());
+        bob.append("groupByOutSlots", _gbsOut.begin(), _gbsOut.end());
         if (!_accumulatorList.empty()) {
             BSONObjBuilder exprBuilder(bob.subobjStart("expressions"));
 
@@ -551,6 +560,18 @@ void HashAggStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back(DebugPrinter::Block("[`"));
+    for (size_t idx = 0; idx < _gbs.size(); ++idx) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
+
+        DebugPrinter::addIdentifier(ret, _gbsOut[idx]);
+        ret.emplace_back("=");
+        DebugPrinter::addIdentifier(ret, _gbs[idx]);
+    }
+    ret.emplace_back(DebugPrinter::Block("`]"));
+
+    ret.emplace_back(DebugPrinter::Block("[`"));
     bool first = true;
     for (const auto& accumulator : _accumulatorList) {
         if (!first) {
@@ -617,6 +638,7 @@ size_t HashAggStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
     size += size_estimator::estimate(_children);
     size += size_estimator::estimate(_gbs);
+    size += size_estimator::estimate(_gbsOut);
     size += size_estimator::estimate(_accumulatorList);
     return size;
 }
