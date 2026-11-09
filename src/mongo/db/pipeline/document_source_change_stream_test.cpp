@@ -3260,6 +3260,88 @@ TEST_F(ChangeStreamStageTest, ClassicOperationTypeFilterIncludesEndOfTransaction
             /*includeEndOfTransaction=*/true)));
 }
 
+TEST_F(ChangeStreamStageTest, CommitCommandEndOfTransactionMarkerOnObject2EmitsEvent) {
+    // The 'allowEndOfTransaction' marker for a prepared (replica-set or single-shard) transaction
+    // is carried on the commit entry's 'o2' rather than on its 'o', so that older binaries that
+    // parse the commitTransaction 'o' strictly do not reject the entry. The unwind stage must read
+    // the marker from 'o2' and synthesize the endOfTransaction event.
+    unittest::ServerParameterGuard eotFlag("featureFlagEndOfTransactionChangeEventSynthesis", true);
+    unittest::ServerParameterGuard eotParam("allowEndOfTransaction", true);
+    unittest::ServerParameterGuard v2Flag("featureFlagChangeStreamReaderV2", true);
+    unittest::ServerParameterGuard preciseShardTargeting(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+    const auto spec =
+        BSON(DSChangeStream::kStageName << BSON("showEndOfTransaction" << "whenAvailable"));
+
+    // The transaction's operations live in a prepared applyOps entry.
+    Document preparedApplyOps{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"sv},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}}}}},
+        {"prepare", true},
+    };
+    repl::OpTime applyOpsOpTime(Timestamp(99, 1), 1);
+    auto preparedTransaction = makeOplogEntry(OpTypeEnum::kCommand,
+                                              nss.getCommandNS(),
+                                              preparedApplyOps.toBson(),
+                                              testUuid(),
+                                              boost::none,  // fromMigrate
+                                              boost::none,  // o2
+                                              applyOpsOpTime);
+
+    // The commit entry carries the marker on 'o2' and links back to the prepared applyOps entry.
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setTxnNumber(1);
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+    auto commitEntry = repl::DurableOplogEntry(
+        kDefaultOpTime,                   // optime
+        OpTypeEnum::kCommand,             // opType
+        nss.getCommandNS(),               // namespace
+        boost::none,                      // uuid
+        boost::none,                      // fromMigrate
+        boost::none,                      // checkExistenceForDiffInsert
+        boost::none,                      // versionContext
+        repl::OplogEntry::kOplogVersion,  // version
+        BSON("commitTransaction" << 1 << "commitTimestamp" << kDefaultCommitTs),  // o
+        BSON("allowEndOfTransaction" << true),                                    // o2
+        sessionInfo,                                                              // sessionInfo
+        boost::none,                                                              // upsert
+        Date_t(),                                                                 // wall clock time
+        {},                                                                       // statement ids
+        applyOpsOpTime,  // optime of previous write within same transaction
+        boost::none,     // pre-image optime
+        boost::none,     // post-image optime
+        boost::none,     // ShardId of resharding recipient
+        boost::none,     // _id
+        boost::none);    // needsRetryImage
+
+    auto execPipeline = makeExecPipeline(commitEntry, spec);
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>(
+        std::vector<repl::OplogEntry>{preparedTransaction}));
+
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
+
+    std::vector<Document> results;
+    for (auto next = transform->getNext(); next.isAdvanced(); next = transform->getNext()) {
+        results.push_back(next.releaseDocument());
+    }
+
+    // The transaction's insert is followed by the synthesized endOfTransaction event.
+    ASSERT_EQ(results.size(), 2u);
+    ASSERT_EQ(results[0][DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kInsertOpType);
+    ASSERT_EQ(results[1][DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kEndOfTransactionOpType);
+}
+
 TEST_F(ChangeStreamStageTest, TransformApplyOpsWithEntriesOnDifferentNs) {
     // Doesn't use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.

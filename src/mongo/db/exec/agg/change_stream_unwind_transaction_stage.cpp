@@ -225,8 +225,10 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
 
     auto commandObj = input[FieldAccessors::kObject].getDocument();
     Value applyOps = commandObj["applyOps"sv];
+    const bool isApplyOpsEntry = !applyOps.missing();
+    const bool isCommitTransactionEntry = !commandObj["commitTransaction"sv].missing();
 
-    if (!applyOps.missing()) {
+    if (isApplyOpsEntry) {
         // We found an applyOps that implicitly commits a transaction. We include it in the
         // '_txnOplogEntries' stack of applyOps entries that the change stream should process as
         // part of this transaction. There may be additional applyOps entries linked through the
@@ -243,7 +245,7 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
         tassert(5543803,
                 str::stream() << "Unexpected op at "
                               << input[FieldAccessors::kTimestamp].getTimestamp().toString(),
-                !commandObj["commitTransaction"].missing());
+                isCommitTransactionEntry);
 
         if (auto commitTimestamp = commandObj["commitTimestamp"]; !commitTimestamp.missing()) {
             // Track commit timestamp of the prepared transaction if it's present in the oplog
@@ -252,21 +254,64 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
         }
     }
 
-    // An endOfTransaction event is synthesized for an unprepared multi-document transaction: an
-    // applyOps with an lsid and txnNumber, but not a retryable-write applyOps. The behavior was
-    // resolved once when the stage was created:
-    //  - 'kLegacy' synthesizes the event for every such transaction, and
-    //  - 'kNew' additionally requires the 'allowEndOfTransaction' marker on the final applyOps
-    //    entry, which records that the write path was enabled when the transaction committed, so a
-    //    transaction committed while the kill switch was off never yields an event.
+    // An endOfTransaction event is synthesized for a committed multi-document transaction that
+    // carries an 'lsid' and 'txnNumber' and is not a retryable-write applyOps. Such a transaction
+    // commits through one of the following oplog shapes. Only the commit entry opens the
+    // transaction context here: the oplog match filters out the prepare entry, and the iterator
+    // then walks 'prevOpTime' to collect the transaction's operations.
+    //
+    //  - Unprepared (replica set, or a single shard committed by the router): the operations are
+    //    one or more 'applyOps' entries chained through 'prevOpTime', and the final entry
+    //    implicitly commits the transaction. Each entry carries 'lsid', 'txnNumber' and
+    //    'o.applyOps'; the final entry additionally carries 'o.allowEndOfTransaction: true' when
+    //    the write path was enabled at commit time. There is no 'commitTransaction' entry.
+    //  - Prepared (replica set, or a single shard committed locally): the operations are written
+    //    by a prepare entry, an 'applyOps' entry carrying 'o.prepare: true'. The commit is a
+    //    standalone 'commitTransaction' entry carrying 'lsid', 'txnNumber', 'prevOpTime' pointing
+    //    at the prepare entry, 'o.commitTransaction: 1', 'o.commitTimestamp', and
+    //    'o2.allowEndOfTransaction: true' when the write path was enabled at commit time.
+    //  - Coordinated (multi-shard) participant commit: a write participant shard writes a
+    //    'commitTransaction' entry of the prepared shape, plus the coordinator's
+    //    'o.endOfTransactionScopes' accounting metadata. Its user-visible event is produced by the
+    //    router from the coordinator's accounting control event, a no-op ('n') entry carrying
+    //    'o2.endOfTransaction', so this stage must neither synthesize an event for it nor treat it
+    //    as ineligible.
+    //
+    // The behavior was resolved once when the stage was created:
+    //  - 'kLegacy' synthesizes the event for every unprepared transaction, and
+    //  - 'kNew' additionally requires the 'allowEndOfTransaction' marker, which records that the
+    //    write path was enabled when the transaction committed, so a transaction committed while
+    //    the kill switch was off never yields an event.
     // TODO SERVER-138462 Remove feature flag for legacy endOfTransaction behavior.
-    const bool markerPresent = commandObj["allowEndOfTransaction"sv].coerceToBool();
-    const bool endOfTransactionCandidate =
-        !applyOps.missing() && !isRetryableApplyOps && _lsid.has_value() && _txnNumber.has_value();
-    _shouldEmitEndOfTransaction = endOfTransactionCandidate &&
-        (_endOfTransactionBehavior == change_stream::EndOfTransactionBehavior::kLegacy ||
-         (_endOfTransactionBehavior == change_stream::EndOfTransactionBehavior::kNew &&
-          markerPresent));
+    Value o2 = input[FieldAccessors::kObject2];
+    const bool hasAllowEndOfTransaction =
+        (isApplyOpsEntry && commandObj["allowEndOfTransaction"sv].coerceToBool()) ||
+        (isCommitTransactionEntry && !o2.missing() &&
+         o2.getDocument()["allowEndOfTransaction"sv].coerceToBool());
+    const bool hasEndOfTransactionScopes =
+        isCommitTransactionEntry && !commandObj["endOfTransactionScopes"sv].missing();
+
+    // Check if the behavior allows emitting an "endOfTransaction" change event from this stage:
+    // For the legacy mode, only "applyOps" entries qualify. Commit events for coordinated
+    // transactions are ignored in legacy mode, because the legacy mode writes a separate
+    // "endOfTransaction" oplog entry on the coordinator, which is emitted directly and not from
+    // here. In the new mode, we only emit an "endOfTransaction" change event from here for the
+    // final entry in an "applyOps" oplog entry. The path for emitting an "endOfTransaction" control
+    // event from a "commitTransaction" oplog entry is not added here yet.
+    // TODO SERVER-138751 Add "endOfTransaction" control event emission for coordinated
+    // transactions.
+    const bool behaviorAllowsEmit =
+        _endOfTransactionBehavior == change_stream::EndOfTransactionBehavior::kLegacy
+        ? isApplyOpsEntry
+        : (_endOfTransactionBehavior == change_stream::EndOfTransactionBehavior::kNew &&
+           hasAllowEndOfTransaction);
+
+    // Check if the oplog entry is a candidate for emitting an "endOfTransaction" change event from
+    // this stage.
+    const bool endOfTransactionCandidate = (isApplyOpsEntry || isCommitTransactionEntry) &&
+        !isRetryableApplyOps && _lsid.has_value() && _txnNumber.has_value();
+    _shouldEmitEndOfTransaction =
+        endOfTransactionCandidate && behaviorAllowsEmit && !hasEndOfTransactionScopes;
 
     // A 'required' stream must fail rather than silently omit an endOfTransaction event. An event
     // can only be synthesized for a transaction that carries the 'allowEndOfTransaction' marker,
@@ -274,9 +319,11 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
     // transaction is ineligible and no event can ever be produced, so the guarantee cannot be met:
     // record that here so the iterator fails the stream if the transaction touches the watched
     // namespace. When the marker is present the event is emitted normally via
-    // '_shouldEmitEndOfTransaction' and no failure is needed.
-    _requireEndOfTransaction =
-        requireEndOfTransaction && endOfTransactionCandidate && !markerPresent;
+    // '_shouldEmitEndOfTransaction' and no failure is needed. A transaction that carries
+    // 'endOfTransactionScopes' is not ineligible: its event is produced from the accounting
+    // metadata by the router, so it must never fail a 'required' stream.
+    _requireEndOfTransaction = requireEndOfTransaction && endOfTransactionCandidate &&
+        !hasAllowEndOfTransaction && !hasEndOfTransactionScopes;
 
     // When operations span multiple applyOps entries linked by 'prevOpTime', walk that chain to
     // gather them all. kApplyOpsAppliedSeparately entries are standalone, so there is no chain to

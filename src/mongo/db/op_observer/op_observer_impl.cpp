@@ -2763,6 +2763,12 @@ void OpObserverImpl::onPreparedTransactionCommit(OperationContext* opCtx,
     }
     oplogEntry.setObject(cmdObj.toBSON());
 
+    // Mark the commit entry as an end-of-transaction candidate so that a change stream can
+    // synthesize an end-of-transaction event from it.
+    if (isEndOfTransactionWritePathEnabled()) {
+        oplogEntry.setObject2(BSON("allowEndOfTransaction" << true));
+    }
+
     if (auto sizeMetadata = getPreparedSizeMetadataForPersistence(opCtx)) {
         oplogEntry.setSizeMetadata(repl::OplogEntrySizeMetadata{std::move(*sizeMetadata)});
     }

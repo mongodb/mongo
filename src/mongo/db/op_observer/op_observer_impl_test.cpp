@@ -7811,6 +7811,76 @@ TEST_P(OpObserverMultiEntryTransactionEndOfTransactionTest, UnpreparedTransactio
     ASSERT_BSONOBJ_EQ(withEndOfTransactionMarker(oExpected), oplogEntries[0].getObject());
 }
 
+TEST_P(OpObserverMultiEntryTransactionEndOfTransactionTest,
+       CommitPreparedTransactionWritesEndOfTransactionMarker) {
+    // A replica-set prepared transaction commits through a standalone 'commitTransaction' entry
+    // rather than an applyOps entry, and has no coordinator-supplied accounting metadata. The write
+    // path records the 'allowEndOfTransaction' marker on that entry's 'o2' (never on its strictly
+    // parsed 'o') only while the parameter is enabled, so a change stream can synthesize an
+    // end-of-transaction event for the transaction.
+    unittest::ServerParameterGuard allowEndOfTransactionGuard("allowEndOfTransaction", GetParam());
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+
+    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+
+    std::vector<InsertStatement> inserts1;
+    inserts1.emplace_back(0,
+                          BSON("_id" << 0 << "data"
+                                     << "x"));
+    inserts1.emplace_back(1,
+                          BSON("_id" << 1 << "data"
+                                     << "y"));
+
+    opObserver().onInserts(opCtx(),
+                           *autoColl1,
+                           inserts1.begin(),
+                           inserts1.end(),
+                           /*recordIds=*/{},
+                           /*fromMigrate=*/std::vector<bool>(inserts1.size(), false),
+                           /*defaultFromMigrate=*/false);
+
+    auto reservedSlots = prepareTransaction();
+    auto prepareTimestamp = reservedSlots.back().getTimestamp();
+
+    txnParticipant.stashTransactionResources(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+
+    // Reserve the oplog entry for the commit oplog entry.
+    OplogSlot commitSlot = reserveOpTimeInSideTransaction(opCtx());
+
+    // Mimic committing the transaction.
+    shard_role_details::setWriteUnitOfWork(opCtx(), nullptr);
+    shard_role_details::getLocker(opCtx())->unsetMaxLockTimeout();
+
+    // commitTimestamp must be greater than the prepareTimestamp.
+    auto commitTimestamp = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
+
+    {
+        Lock::GlobalLock lk(opCtx(), MODE_IX);
+        opObserver().onPreparedTransactionCommit(opCtx(), commitSlot, commitTimestamp);
+    }
+
+    // The oplog holds the insert, the implicit prepare entry, and the commit entry.
+    auto commitOplogObj = getNOplogEntries(opCtx(), 3).back();
+    checkSessionAndTransactionFields(commitOplogObj);
+    auto commitEntry = assertGet(OplogEntry::parse(commitOplogObj));
+
+    // The marker is never written on the commit entry's 'o', so that older binaries that parse 'o'
+    // strictly do not reject the entry.
+    auto oExpected = BSON("commitTransaction" << 1 << "commitTimestamp" << commitTimestamp);
+    ASSERT_BSONOBJ_EQ(oExpected, commitEntry.getObject());
+
+    // The marker is written on the commit entry's 'o2' only while the parameter is enabled.
+    if (GetParam()) {
+        ASSERT_TRUE(commitEntry.getObject2().has_value());
+        ASSERT_BSONOBJ_EQ(BSON("allowEndOfTransaction" << true), *commitEntry.getObject2());
+    } else {
+        ASSERT_FALSE(commitEntry.getObject2().has_value());
+    }
+}
+
 INSTANTIATE_TEST_SUITE_P(AllowEndOfTransaction,
                          OpObserverMultiEntryTransactionEndOfTransactionTest,
                          testing::Bool());

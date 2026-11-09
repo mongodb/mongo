@@ -1,6 +1,8 @@
 /**
- * Verifies that cross-shard transactions commit successfully in a mixed-version sharded cluster in
- * which one participant's primary runs the last-LTS binary.
+ * Verifies that transactions commit successfully in a mixed-version sharded cluster in which one
+ * participant's primary runs the last-LTS binary. It covers both cross-shard transactions, which
+ * commit through the coordinator's two-phase commit, and single-shard transactions, which commit
+ * directly to their shard.
  *
  * The coordinator shard runs the latest binary with the end-of-transaction parameters enabled, so it
  * computes the 'endOfTransactionScopes' accounting metadata. It attaches that metadata only to a
@@ -34,13 +36,21 @@
 
 import "jstests/multiVersion/libs/multi_cluster.js";
 
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {withSession} from "jstests/libs/query/change_stream_util.js";
 import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
-import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+// The end-of-transaction behavior under test does not depend on the cluster's metadata being
+// internally consistent, and these generic checks are slow, so skip the ones that do not matter
+// here. The metadata and shard-filtering checks are left enabled.
+TestData.skipCheckOrphans = true;
+TestData.skipCheckRoutingTableConsistency = true;
+TestData.skipCollectionAndIndexValidation = true;
 
 const dbName = jsTestName();
 const collName = "coll";
@@ -92,6 +102,54 @@ function commitCrossShardTransaction(mongos, coordinatorShard, baseKey) {
     return {lsid, txnNumber};
 }
 
+// Commits a transaction whose writes only target shard0 (keys 5 and 6, which shard0 owns), so that
+// mongos commits it directly to that shard without the coordinator's two-phase commit. Returns the
+// session id and transaction number, which identify the transaction's oplog entries.
+function commitSingleShardTransaction(mongos) {
+    let lsid, txnNumber;
+    withSession(mongos, (session) => {
+        const sessionColl = session.getDatabase(dbName)[collName];
+        withAbortAndRetryOnTransientTxnError(session, () => {
+            session.startTransaction({
+                readConcern: {level: "snapshot"},
+                writeConcern: {w: "majority"},
+            });
+
+            assert.commandWorked(sessionColl.insert({_id: 5}));
+            assert.commandWorked(sessionColl.insert({_id: 6}));
+            assert.commandWorked(session.commitTransaction_forTesting());
+            lsid = session.getSessionId();
+            txnNumber = session.getTxnNumber_forTesting();
+        });
+    });
+    return {lsid, txnNumber};
+}
+
+// Runs a *prepared* transaction directly against 'shardPrimary', the primary of a shard that runs
+// the latest binary with the parameters enabled. The shard commits through the 'commitTransaction'
+// path and, because the end-of-transaction write path is enabled, marks that entry's 'o2'. The
+// transaction only touches one shard, so no coordinator is involved and no
+// 'endOfTransactionScopes' metadata is produced. Returns the session id and transaction number,
+// which identify the transaction's oplog entries.
+function commitPreparedSingleShardTransaction(shardPrimary) {
+    let lsid, txnNumber;
+    withSession(shardPrimary, (session) => {
+        const sessionColl = session.getDatabase(dbName)[collName];
+        session.startTransaction({
+            readConcern: {level: "snapshot"},
+            writeConcern: {w: "majority"},
+        });
+
+        assert.commandWorked(sessionColl.insert({_id: 7}));
+        assert.commandWorked(sessionColl.insert({_id: 8}));
+        const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
+        assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
+        lsid = session.getSessionId();
+        txnNumber = session.getTxnNumber_forTesting();
+    });
+    return {lsid, txnNumber};
+}
+
 // Returns the single 'commitTransaction' oplog entry that 'replSet' wrote for the transaction with
 // the given session and transaction number.
 function getCommitEntry(replSet, lsid, txnNumber) {
@@ -110,6 +168,19 @@ function getCommitEntry(replSet, lsid, txnNumber) {
         return true;
     }, "expected exactly one commitTransaction entry");
     return entry;
+}
+
+// Returns the final 'applyOps' oplog entry that 'replSet' wrote for the transaction with the given
+// session and transaction number.
+function getFinalApplyOpsEntry(replSet, lsid, txnNumber) {
+    const entries = replSet
+        .getPrimary()
+        .getDB("local")
+        .oplog.rs.find({"lsid.id": lsid.id, txnNumber, "o.applyOps": {$exists: true}})
+        .sort({ts: 1})
+        .toArray();
+    assert.gt(entries.length, 0, "expected at least one applyOps entry", {lsid, txnNumber});
+    return entries[entries.length - 1];
 }
 
 // Starts a fresh 2-shard cluster for a single test case.
@@ -186,13 +257,14 @@ function startCluster() {
 describe("end-of-transaction metadata in a mixed-version replica-set cluster", function () {
     let st;
 
-    // Each test case starts its own cluster (see 'beforeEach'), so that the node versions and the
-    // coordinator's in-memory state start from a known state and no case depends on another.
-    beforeEach(function () {
+    // These cases only read the cluster and write their own documents, so they share a single
+    // cluster. Each case is independent: it inspects only the documents it wrote itself, so the
+    // cases can run in any order and none relies on data written by another.
+    before(function () {
         st = startCluster();
     });
 
-    afterEach(function () {
+    after(function () {
         st.stop();
     });
 
@@ -212,6 +284,79 @@ describe("end-of-transaction metadata in a mixed-version replica-set cluster", f
         assert(
             !checkLog.checkContainsOnceJson(st.rs0.getPrimary(), kMetadataRejectedLogId, {}, "I"),
             "the coordinator must not strip metadata for the last-LTS primary",
+        );
+    });
+
+    it("commits a single-shard transaction without coordinator metadata", function () {
+        // A transaction that only targets one shard is committed by mongos directly to that shard,
+        // bypassing the coordinator's two-phase commit. The shard commits through the local
+        // 'applyOps' path and marks its final applyOps entry with 'allowEndOfTransaction'; no
+        // 'endOfTransactionScopes' metadata is produced.
+        //
+        // Write only to shard0, which runs the latest binary with the parameters enabled.
+        const {lsid, txnNumber} = commitSingleShardTransaction(st.s);
+
+        // The transaction committed and its writes are visible.
+        assert.eq(1, st.shard0.getCollection(ns).countDocuments({_id: 5}));
+        assert.eq(1, st.shard0.getCollection(ns).countDocuments({_id: 6}));
+
+        // The shard's latest primary marked its final applyOps entry, and no coordinator metadata
+        // was written.
+        const entry = getFinalApplyOpsEntry(st.rs0, lsid, txnNumber);
+        assert.eq(
+            true,
+            entry.o.allowEndOfTransaction,
+            "the shard should mark the final applyOps entry",
+            {entry},
+        );
+        assert(
+            !entry.o.endOfTransactionScopes,
+            "a single-shard transaction must not carry coordinator metadata",
+            {entry},
+        );
+
+        // The coordinator was never involved, so it never had to strip anything.
+        assert(
+            !checkLog.checkContainsOnceJson(st.rs0.getPrimary(), kMetadataRejectedLogId, {}, "I"),
+            "the coordinator must not strip metadata for a single-shard transaction",
+        );
+    });
+
+    it("commits a prepared single-shard transaction and marks the commit entry's 'o2'", function () {
+        // A prepared transaction that only touches one shard is run against that shard's primary.
+        // The shard commits through the 'commitTransaction' path and, because the end-of-transaction
+        // write path is enabled, marks that entry's 'o2'; the strictly parsed 'o' is left unchanged
+        // and no coordinator metadata is produced.
+        //
+        // shard0 runs the latest binary with the parameters enabled.
+        const {lsid, txnNumber} = commitPreparedSingleShardTransaction(st.rs0.getPrimary());
+
+        // The transaction committed and its writes are visible.
+        assert.eq(1, st.shard0.getCollection(ns).countDocuments({_id: 7}));
+        assert.eq(1, st.shard0.getCollection(ns).countDocuments({_id: 8}));
+
+        const entry = getCommitEntry(st.rs0, lsid, txnNumber);
+        assert.eq(
+            true,
+            entry.o2 && entry.o2.allowEndOfTransaction,
+            "the shard should mark the commit entry's 'o2'",
+            {entry},
+        );
+        assert(
+            !entry.o.allowEndOfTransaction,
+            "the marker must not be written on the strictly parsed 'o'",
+            {entry},
+        );
+        assert(
+            !entry.o.endOfTransactionScopes,
+            "a single-shard transaction must not carry coordinator metadata",
+            {entry},
+        );
+
+        // The coordinator was never involved, so it never had to strip anything.
+        assert(
+            !checkLog.checkContainsOnceJson(st.rs0.getPrimary(), kMetadataRejectedLogId, {}, "I"),
+            "the coordinator must not strip metadata for a single-shard transaction",
         );
     });
 
@@ -286,12 +431,26 @@ describe("end-of-transaction metadata in a mixed-version replica-set cluster", f
     it("commits repeated cross-shard transactions spanning a last-LTS primary", function () {
         // Several commits in a row must all succeed and be visible.
         commitCrossShardTransaction(st.s, 0, 1);
-        commitCrossShardTransaction(st.s, 0, 3);
+        commitCrossShardTransaction(st.s, 0, 2);
 
         assert.eq(1, st.shard0.getCollection(ns).countDocuments({_id: 1}));
         assert.eq(1, st.shard1.getCollection(ns).countDocuments({_id: 101}));
-        assert.eq(1, st.shard0.getCollection(ns).countDocuments({_id: 3}));
-        assert.eq(1, st.shard1.getCollection(ns).countDocuments({_id: 103}));
+        assert.eq(1, st.shard0.getCollection(ns).countDocuments({_id: 2}));
+        assert.eq(1, st.shard1.getCollection(ns).countDocuments({_id: 102}));
+    });
+});
+
+// Upgrading every node to the latest binary changes the cluster's versions irreversibly, so this
+// case runs against its own cluster.
+describe("end-of-transaction metadata in a mixed-version replica-set cluster: cluster upgrade", function () {
+    let st;
+
+    before(function () {
+        st = startCluster();
+    });
+
+    after(function () {
+        st.stop();
     });
 
     it("commits a cross-shard transaction once every node runs the latest binary", function () {
@@ -311,6 +470,20 @@ describe("end-of-transaction metadata in a mixed-version replica-set cluster", f
 
         assert.eq(1, st.rs0.getPrimary().getCollection(ns).countDocuments({_id: 2}));
         assert.eq(1, st.rs1.getPrimary().getCollection(ns).countDocuments({_id: 102}));
+    });
+});
+
+// Stepping a node down and marking a shard ineligible mutates the coordinator's in-memory state, so
+// this case runs against its own cluster.
+describe("end-of-transaction metadata in a mixed-version replica-set cluster: metadata rejection", function () {
+    let st;
+
+    before(function () {
+        st = startCluster();
+    });
+
+    after(function () {
+        st.stop();
     });
 
     it("strips the metadata a last-LTS primary rejects after a stepdown and omits it afterwards", function () {

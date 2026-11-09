@@ -57,7 +57,7 @@ filters:
   - "*change_stream*":
     approvers:
       - 10gen/query-execution-change-streams
-  - "end_of_transaction_apply_ops_marker.js":
+  - "end_of_transaction*":
     approvers:
       - 10gen/query-execution-change-streams
   - "v2_delta_oplog_entries.js":
