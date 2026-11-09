@@ -9,6 +9,7 @@
 #include "mongo/db/exec/sbe/stages/compact_hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/stages/compact_hash_agg_state.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/value_size.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
@@ -18,6 +19,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <new>
 #include <string>
 #include <utility>
 #include <vector>
@@ -162,6 +164,27 @@ protected:
         return run(accumulator, inputs);
     }
 
+    TagValueOwned vmPush(const Sequence& inputs, int32_t sizeCap = kNoCap) {
+        auto state = TagValueOwned::nothing();
+        for (const auto& input : inputs) {
+            state = vm::ByteCode::builtinAddToArrayCappedImpl(
+                        std::move(state), input.view().copy(), sizeCap)
+                        .moveToOwned();
+        }
+        return value::getArrayViewChecked(state)
+            ->getAt(static_cast<size_t>(vm::AggArrayWithSize::kValues))
+            .copy();
+    }
+
+    CompactPushHashAggAccumulator pushAccumulator(int32_t sizeCap = kNoCap) {
+        return {_outSlot, makeVariable(_inSlot), sizeCap};
+    }
+
+    TagValueOwned compactPush(const Sequence& inputs, int32_t sizeCap = kNoCap) {
+        auto accumulator = pushAccumulator(sizeCap);
+        return run(accumulator, inputs);
+    }
+
     static CompactStateLayout layoutOf(CompactHashAggAccumulator& accumulator) {
         CompactStateLayout layout;
         accumulator.addState(layout);
@@ -172,7 +195,7 @@ protected:
     auto withState(CompactHashAggAccumulator& accumulator, Body body) {
         accumulator.prepare(_ctx);
         auto layout = layoutOf(accumulator);
-        CompactStateTable table{layout};
+        CompactStateTable table{std::move(layout)};
         return body(insertGroup(table));
     }
 
@@ -199,7 +222,7 @@ protected:
         CompactStateLayout layout;
         first.addState(layout);
         second.addState(layout);
-        CompactStateTable table{layout};
+        CompactStateTable table{std::move(layout)};
         std::byte* buffer = insertGroup(table);
         vm::ByteCode bytecode;
         for (const auto& input : inputs) {
@@ -213,6 +236,8 @@ protected:
         second.finalize(buffer, secondResult);
         return {firstResult.copyOrMoveValue(), secondResult.copyOrMoveValue()};
     }
+
+    static constexpr int32_t kNoCap = std::numeric_limits<int32_t>::max();
 
 private:
     TagValueOwned run(CompactHashAggAccumulator& accumulator, const Sequence& inputs) {
@@ -291,6 +316,89 @@ TEST_F(CompactHashAggAccumulatorTest, SumMatchesVm) {
                 << expected.view() << " != " << actual.view();
         }
     }
+}
+
+TEST_F(CompactHashAggAccumulatorTest, Push) {
+    auto push = pushAccumulator();
+    ASSERT_FALSE(layoutOf(push).triviallyDestructible());
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONArray()), toBson(compactPush({}).view()));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONArray()),
+                      toBson(compactPush(sequence({TagValueView::nothing()})).view()));
+    auto inputs = sequence({TagValueView::numberInt32(1), TagValueView::nothing()});
+    inputs.push_back(TagValueOwned::fromRaw(value::makeNewString("a long string")));
+    inputs.push_back(array({TagValueView::numberDouble(2.5), TagValueView::null()}));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSON_ARRAY(1 << "a long string" << BSON_ARRAY(2.5 << BSONNULL))),
+                      toBson(compactPush(inputs).view()));
+}
+
+TEST_F(CompactHashAggAccumulatorTest, PushMatchesVm) {
+    for (const auto& inputs : sequences()) {
+        if (inputs.empty()) {
+            continue;
+        }
+        auto expected = vmPush(inputs);
+        auto actual = compactPush(inputs);
+        ASSERT_TRUE(identical(expected.view(), actual.view()))
+            << expected.view() << " != " << actual.view();
+    }
+}
+
+TEST_F(CompactHashAggAccumulatorTest, PushSizeCap) {
+    auto inputs = sequence({TagValueView::numberInt32(1), TagValueView::numberInt32(2)});
+    int32_t cap = 2 * value::getApproximateSize(value::TypeTags::NumberInt32, 0);
+    ASSERT_THROWS_CODE(vmPush(inputs, cap), DBException, ErrorCodes::ExceededMemoryLimit);
+    ASSERT_THROWS_CODE(compactPush(inputs, cap), DBException, ErrorCodes::ExceededMemoryLimit);
+    ASSERT_BSONOBJ_EQ(BSON("" << BSON_ARRAY(1 << 2)), toBson(compactPush(inputs, cap + 1).view()));
+}
+
+TEST_F(CompactHashAggAccumulatorTest, PushHeapMemUsage) {
+    auto accumulator = pushAccumulator();
+    withState(accumulator, [&](std::byte* buffer) {
+        CompactStateLayout single;
+        const auto& values = single.add<CompactPushState>()(buffer).values;
+        auto slots = [&] {
+            return values.values().capacity() * sizeof(std::pair<value::TypeTags, value::Value>);
+        };
+        ASSERT_EQ(0u, accumulator.heapMemUsage(buffer));
+
+        accumulate(accumulator,
+                   buffer,
+                   sequence({TagValueView::numberInt32(1),
+                             TagValueView::nothing(),
+                             TagValueView::numberDouble(2.5)}));
+        ASSERT_EQ(2u, values.size());
+        ASSERT_EQ(slots(), accumulator.heapMemUsage(buffer));
+
+        Sequence strings;
+        strings.push_back(TagValueOwned::fromRaw(value::makeNewString(std::string(1000, 'x'))));
+        size_t payload = value::getApproximateSize(strings[0].tag(), strings[0].value()) -
+            (sizeof(value::TypeTags) + sizeof(value::Value));
+        accumulate(accumulator, buffer, strings);
+        ASSERT_EQ(slots() + payload, accumulator.heapMemUsage(buffer));
+    });
+}
+
+TEST_F(CompactHashAggAccumulatorTest, PushHeapMemUsageIsZeroAfterFinalize) {
+    auto accumulator = pushAccumulator();
+    withState(accumulator, [&](std::byte* buffer) {
+        accumulate(accumulator, buffer, sequence({TagValueView::numberInt32(1)}));
+        value::OwnedValueAccessor result;
+        accumulator.finalize(buffer, result);
+        ASSERT_EQ(0u, accumulator.heapMemUsage(buffer));
+    });
+}
+
+TEST_F(CompactHashAggAccumulatorTest, PushEstimateSizeCountsTheConcreteAccumulator) {
+    auto push = pushAccumulator();
+    ASSERT_EQ(sizeof(CompactPushHashAggAccumulator) + inputSize(), push.estimateSize());
+}
+
+TEST_F(CompactHashAggAccumulatorTest, SumAndPushLayout) {
+    CompactStateLayout layout;
+    ASSERT_EQ(0u, layout.add<value::DoubleDoubleSumState>().offset());
+    ASSERT_EQ(40u, layout.add<CompactPushState>().offset());
+    ASSERT_EQ(72u, layout.size());
+    ASSERT_FALSE(layout.triviallyDestructible());
 }
 
 }  // namespace
