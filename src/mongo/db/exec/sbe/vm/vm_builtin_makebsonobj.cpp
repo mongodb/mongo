@@ -9,9 +9,9 @@ namespace mongo::sbe::vm {
 value::TagValueMaybeOwned ByteCode::builtinMakeBsonObj(ArityType arity, const CodeFragment* code) {
     tassert(6897002,
             str::stream() << "Unsupported number of args passed to makeBsonObj(): " << arity,
-            arity >= 2);
+            arity >= MakeObjSpec::kFirstActionArgPos);
 
-    const int argsStackOff = 2;
+    const int argsStackOff = MakeObjSpec::kFirstActionArgPos;
     const auto impl = MakeObjImpl{*this, argsStackOff, code};
 
     return impl.makeObj<BsonObjWriter, BsonArrWriter>();

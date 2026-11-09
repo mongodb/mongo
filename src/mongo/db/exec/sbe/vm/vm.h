@@ -5,6 +5,7 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/column_op.h"
@@ -1116,17 +1117,17 @@ public:
 
 protected:
     MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> getSpec() const {
-        return bc.getFromStack(0);
+        return bc.getFromStack(MakeObjSpec::kSpecArgPos);
     }
 
     MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> getInputObject()
         const {
-        return bc.getFromStack(1);
+        return bc.getFromStack(MakeObjSpec::kInputArgPos);
     }
 
     MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> extractInputObject()
         const {
-        return bc.moveFromStack(1);
+        return bc.moveFromStack(MakeObjSpec::kInputArgPos);
     }
 
     MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> getArg(

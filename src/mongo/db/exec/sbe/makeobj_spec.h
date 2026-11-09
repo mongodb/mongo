@@ -187,6 +187,12 @@ struct MakeObjSpec {
 
     MakeObjSpec& operator=(MakeObjSpec&&) = delete;
 
+    // A makeObj() or makeBsonObj() call takes, in order, its spec, its input, and the arguments
+    // that SetArg, AddArg and LambdaArg actions refer to by index.
+    static constexpr size_t kSpecArgPos = 0;
+    static constexpr size_t kInputArgPos = 1;
+    static constexpr size_t kFirstActionArgPos = 2;
+
     std::unique_ptr<MakeObjSpec> clone() const {
         return std::make_unique<MakeObjSpec>(*this);
     }
