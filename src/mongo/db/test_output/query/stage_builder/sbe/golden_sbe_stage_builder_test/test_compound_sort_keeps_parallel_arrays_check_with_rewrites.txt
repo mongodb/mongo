@@ -1,0 +1,7 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestCompoundSortKeepsParallelArraysCheckWithRewrites
+$$RESULT=s2 env: {  }
+[2] sort [s5, s6] [asc, asc] [s2] 9223372036854775807ll 
+[2] project [s5 = getSortKeyAsc(s3), s6 = getSortKeyAsc(s4), s7 = ((!((isArray(s3) ?: false)) || !((isArray(s4) ?: false))) || fail(2, "cannot sort with keys that are parallel arrays"))] 
+[1] project [s3 = getField(s2, "a"), s4 = getField(s2, "b")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : 1, "b" : 2}], [{"a" : 2, "b" : 1}], [{"a" : 2, "b" : 0}]]} 

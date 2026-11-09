@@ -4,6 +4,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -21,6 +23,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -254,6 +257,42 @@ TEST_F(SbeStageBuilderTest, VirtualScanWithFilter) {
     ASSERT_EQ(index, 3);
 }
 
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+using SbeStageBuilderDeathTest = SbeStageBuilderTest;
+
+DEATH_TEST_F(SbeStageBuilderDeathTest, BlueprintRewriteBudgetExhaustionFails, "13627005") {
+    unittest::ServerParameterGuard rewritesFlag{"featureFlagSbeBlueprintRewrites", true};
+    unittest::ServerParameterGuard firingBudget{"internalQuerySbeBlueprintRewriteMaxFirings", 1};
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(int64_t{0} << BSON("a" << 1))};
+    auto scan = std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, true);
+
+    // Removing the unused record-id projection exhausts the single-firing budget.
+    buildPlanStage(makeQuerySolution(std::move(scan)), /*hasRecordId=*/false, nullptr);
+}
+#else
+TEST_F(SbeStageBuilderTest, BlueprintRewriteBudgetExhaustionLogsAndReturnsResults) {
+    unittest::ServerParameterGuard rewritesFlag{"featureFlagSbeBlueprintRewrites", true};
+    unittest::ServerParameterGuard firingBudget{"internalQuerySbeBlueprintRewriteMaxFirings", 1};
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(int64_t{0} << BSON("a" << 1))};
+    auto scan = std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, true);
+
+    // Removing the unused record-id projection exhausts the single-firing budget. In release
+    // builds the builder should warn, but still lower and execute the valid rewritten plan.
+    unittest::LogCaptureGuard logs;
+    auto [resultSlots, stage, data, _] =
+        buildPlanStage(makeQuerySolution(std::move(scan)), /*hasRecordId=*/false, nullptr);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13627006)), 1);
+
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
+    ASSERT_EQ(resultAccessors.size(), 1u);
+    auto results =
+        sbe::value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessors[0]));
+    auto expected =
+        sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(BSON("a" << 1))));
+    ASSERT_SBE_VALUE_EQ(results.view(), expected.view());
+}
+#endif
+
 class GoldenSbeStageBuilderTest : public GoldenSbeStageBuilderTestFixture {
 public:
     void setUp() override {
@@ -351,6 +390,25 @@ TEST_F(GoldenSbeStageBuilderTest, TestSort) {
     auto sortNode = std::make_unique<SortNodeDefault>(
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
         /*pattern=*/BSON("a" << -1),
+        /*limit=*/-1,
+        LimitSkipParameterization::Disabled,
+        kSortMaxMemoryUsageBytes);
+    runTest(std::move(sortNode), expected);
+}
+
+TEST_F(GoldenSbeStageBuilderTest, TestCompoundSortKeepsParallelArraysCheckWithRewrites) {
+    // Nothing reads the slot that checks the sort keys for parallel arrays, but dead slot
+    // elimination must keep it, since the check raises an error.
+    unittest::ServerParameterGuard rewritesFlag{"featureFlagSbeBlueprintRewrites", true};
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 0))};
+    auto expected = BSON_ARRAY(BSON("a" << 1 << "b" << 2)
+                               << BSON("a" << 2 << "b" << 0) << BSON("a" << 2 << "b" << 1));
+
+    auto sortNode = std::make_unique<SortNodeDefault>(
+        std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
+        /*pattern=*/BSON("a" << 1 << "b" << 1),
         /*limit=*/-1,
         LimitSkipParameterization::Disabled,
         kSortMaxMemoryUsageBytes);
@@ -471,6 +529,32 @@ TEST_F(GoldenSbeStageBuilderTest, TestMergeSort) {
     runTest(std::move(node), expected);
 }
 
+TEST_F(GoldenSbeStageBuilderTest, TestUnusedProjectionRemovedOnlyWithRewrites) {
+    auto runWithRewrites = [&](bool enabled) {
+        unittest::ServerParameterGuard rewritesFlag{"featureFlagSbeBlueprintRewrites", enabled};
+        auto docs = std::vector<BSONArray>{
+            BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 2)), BSON_ARRAY(BSON("a" << 3))};
+        auto projectNode = makeProjNode<ProjectionNodeDefault>(
+            _expCtx,
+            std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
+            fromjson("{_id: 0, ok: {$literal: 1}}"));
+        return runPlan(makeQuerySolution(std::move(projectNode)));
+    };
+
+    auto withoutRewrites = runWithRewrites(false);
+    auto withRewrites = runWithRewrites(true);
+
+    // The virtual scan projects getElement() to unpack each document, but the constant projection
+    // above it never reads that slot. Only blueprint rewrites should remove this ordinary project.
+    ASSERT_STRING_CONTAINS(withoutRewrites.explain, "getElement(");
+    ASSERT_EQ(withRewrites.explain.find("getElement("), std::string::npos);
+
+    auto expected = sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(BSON("ok" << 1) << BSON("ok" << 1) << BSON("ok" << 1))));
+    ASSERT_SBE_VALUE_EQ(withoutRewrites.results.view(), expected.view());
+    ASSERT_SBE_VALUE_EQ(withRewrites.results.view(), withoutRewrites.results.view());
+}
+
 TEST_F(GoldenSbeStageBuilderTest, TestMatch) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 2)),
@@ -556,6 +640,20 @@ TEST_F(GoldenSbeStageBuilderTest, TestReplaceRoot) {
         ExpressionFieldPath::createPathFromString(
             _expCtx.get(), "a", _expCtx->variablesParseState));
     runTest(std::move(replaceNode), BSON_ARRAY(BSON("a" << 1) << BSON("a" << 2) << BSON("a" << 3)));
+}
+
+TEST_F(GoldenSbeStageBuilderTest, TestUnreadReplaceRootKeepsItsCheckWithRewrites) {
+    // Nothing reads the new root of the $replaceRoot, but dead slot elimination must keep it, since
+    // its check raises an error when the new root is not a document.
+    unittest::ServerParameterGuard rewritesFlag{"featureFlagSbeBlueprintRewrites", true};
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(fromjson("{a: {a: 1}}"))};
+    auto replaceNode = std::make_unique<ReplaceRootNode>(
+        std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
+        ExpressionFieldPath::createPathFromString(
+            _expCtx.get(), "a", _expCtx->variablesParseState));
+    auto projectNode = makeProjNode<ProjectionNodeDefault>(
+        _expCtx, std::move(replaceNode), fromjson("{_id: 0, ok: {$literal: 1}}"));
+    runTest(std::move(projectNode), BSON_ARRAY(fromjson("{ok: 1}")));
 }
 
 TEST_F(GoldenSbeStageBuilderTest, TestShardFilter) {

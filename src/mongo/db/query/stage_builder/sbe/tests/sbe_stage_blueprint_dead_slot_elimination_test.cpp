@@ -37,7 +37,7 @@ protected:
         auto usage = SbBlueprintSlotUsage::build(blueprint(), root.idx(), liveSlots);
         SbBlueprintRewriteRules rules;
         rules.push_back(makeDeadSlotEliminationRule());
-        auto result = rewriteSbeBlueprint(
+        auto result = runSbeBlueprintRewrites(
             _state->opCtx, &blueprint(), &usage, root.release(), rules, maxFirings);
         ASSERT_TRUE(usage == SbBlueprintSlotUsage::build(blueprint(), result.root, liveSlots));
         return result;

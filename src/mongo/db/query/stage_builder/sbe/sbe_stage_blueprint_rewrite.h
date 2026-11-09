@@ -132,7 +132,7 @@ public:
     void enqueue(SbBlueprintNodeIdx node);
 
     /**
-     * Returns the slot summary of the tree that the caller of rewriteSbeBlueprint() supplied. A
+     * Returns the slot summary of the tree that the caller of runSbeBlueprintRewrites() supplied. A
      * rule that changes slot definitions or reads must update it.
      */
     SbBlueprintSlotUsage& slotUsage() {
@@ -190,12 +190,12 @@ struct SbBlueprintRewriteResult {
  * Applies 'rules' to the tree rooted at 'root' until none fires or 'maxFirings' rules have fired.
  * 'slotUsage', if not null, is the slot summary of the tree, which the rules keep up to date.
  */
-SbBlueprintRewriteResult rewriteSbeBlueprint(OperationContext* opCtx,
-                                             SbBlueprint* blueprint,
-                                             SbBlueprintSlotUsage* slotUsage,
-                                             SbBlueprintNodeIdx root,
-                                             const SbBlueprintRewriteRules& rules,
-                                             size_t maxFirings);
+SbBlueprintRewriteResult runSbeBlueprintRewrites(OperationContext* opCtx,
+                                                 SbBlueprint* blueprint,
+                                                 SbBlueprintSlotUsage* slotUsage,
+                                                 SbBlueprintNodeIdx root,
+                                                 const SbBlueprintRewriteRules& rules,
+                                                 size_t maxFirings);
 
 /**
  * Checks that 'result' converged. A plan that does not converge is still valid and runnable, so

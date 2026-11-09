@@ -53,6 +53,8 @@
 #include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
 #include "mongo/db/query/stage_builder/sbe/gen_projection.h"
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint_dead_slot_elimination.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint_rewrite.h"
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint_slot_usage.h"
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_lowering.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
@@ -1028,12 +1030,31 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildTree() {
 void SlotBasedStageBuilder::checkSlotsDefined(SbBlueprintNodeIdx root,
                                               const sbe::value::SlotVector& rootUses) {
     if constexpr (kDebugBuild) {
-        auto usage = SbBlueprintSlotUsage::build(_state.blueprint(), root, rootUses);
+        checkSlotsDefined(SbBlueprintSlotUsage::build(_state.blueprint(), root, rootUses));
+    }
+}
+
+void SlotBasedStageBuilder::checkSlotsDefined(const SbBlueprintSlotUsage& usage) {
+    if constexpr (kDebugBuild) {
         usage.forEachUndefinedUse([&](sbe::value::SlotId slot) {
             tassert(13627004,
                     str::stream() << "Blueprint slot " << slot << " is used but defined by no node",
                     _state.env->isSlotRegistered(slot));
         });
+    }
+}
+
+void SlotBasedStageBuilder::checkBlueprintRewrite(const SbBlueprintRewriteResult& rewrite,
+                                                  const SbBlueprintSlotUsage& expectedUsage,
+                                                  const sbe::value::SlotVector& rootUses) {
+    checkSbeBlueprintRewriteConverged(rewrite);
+
+    if constexpr (kDebugBuild) {
+        auto actualUsage = SbBlueprintSlotUsage::build(_state.blueprint(), rewrite.root, rootUses);
+        checkSlotsDefined(actualUsage);
+        tassert(13867000,
+                "SBE blueprint rewrite left a slot summary that does not match the plan",
+                actualUsage == expectedUsage);
     }
 }
 
@@ -1110,8 +1131,18 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     checkSlotsDefined(stage.idx(), rootUses);
 
     if (_state.ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagSbeBlueprintRewrites)) {
-        // TODO SERVER-136270: Run the rewrite rules over the blueprint tree here, then check its
-        // slots again.
+        auto usage = SbBlueprintSlotUsage::build(_state.blueprint(), stage.idx(), rootUses);
+        SbBlueprintRewriteRules rules;
+        rules.push_back(makeDeadSlotEliminationRule());
+        auto rewrite = runSbeBlueprintRewrites(
+            _state.opCtx,
+            &_state.blueprint(),
+            &usage,
+            stage.release(),
+            rules,
+            _state.expCtx->getQueryKnobConfiguration().getSbeBlueprintRewriteMaxFirings());
+        checkBlueprintRewrite(rewrite, usage, rootUses);
+        stage = SbStage{rewrite.root};
     }
 
     // The whole blueprint tree has been built; lower it to sbe::PlanStages.

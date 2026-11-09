@@ -365,12 +365,12 @@ void SbDetachedNode::setChild(size_t childIdx, SbDetachedNode child) {
     _rewriter->setChild(get(), childIdx, std::move(child));
 }
 
-SbBlueprintRewriteResult rewriteSbeBlueprint(OperationContext* opCtx,
-                                             SbBlueprint* blueprint,
-                                             SbBlueprintSlotUsage* slotUsage,
-                                             SbBlueprintNodeIdx root,
-                                             const SbBlueprintRewriteRules& rules,
-                                             size_t maxFirings) {
+SbBlueprintRewriteResult runSbeBlueprintRewrites(OperationContext* opCtx,
+                                                 SbBlueprint* blueprint,
+                                                 SbBlueprintSlotUsage* slotUsage,
+                                                 SbBlueprintNodeIdx root,
+                                                 const SbBlueprintRewriteRules& rules,
+                                                 size_t maxFirings) {
     return SbBlueprintRewriter{blueprint, slotUsage, root, rules, maxFirings}.run(opCtx);
 }
 

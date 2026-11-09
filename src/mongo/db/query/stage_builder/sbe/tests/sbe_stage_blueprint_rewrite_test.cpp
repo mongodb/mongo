@@ -44,7 +44,8 @@ protected:
                                std::unique_ptr<SbBlueprintRewriteRule> rule) {
         SbBlueprintRewriteRules rules;
         rules.push_back(std::move(rule));
-        return rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, root, rules, 10000).root;
+        return runSbeBlueprintRewrites(_state->opCtx, &blueprint(), nullptr, root, rules, 10000)
+            .root;
     }
 };
 
@@ -206,7 +207,7 @@ TEST_F(SbBlueprintRewriteTest, NodesAddedUnderTheReplacementAreRewritten) {
     rules.push_back(std::make_unique<WrapInLimitAndFilterOnceRule>(*_state));
     rules.push_back(std::make_unique<DropFiltersRule>());
     auto newRoot =
-        rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, root, rules, 10000).root;
+        runSbeBlueprintRewrites(_state->opCtx, &blueprint(), nullptr, root, rules, 10000).root;
 
     ASSERT_EQ(newRoot, root);
     auto wrapper = std::get<SbBlueprintLimitSkip>(node(root)).child;
@@ -379,7 +380,7 @@ TEST_F(SbBlueprintRewriteTest, ChangeTwoLevelsDownRewritesTheNodeAgain) {
     rules.push_back(std::make_unique<SwapFilterAndLimitRule>());
     rules.push_back(std::make_unique<DropUniqueOverTwoLimitsRule>());
     auto newRoot =
-        rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, unique, rules, 10000).root;
+        runSbeBlueprintRewrites(_state->opCtx, &blueprint(), nullptr, unique, rules, 10000).root;
 
     ASSERT_EQ(newRoot, upper);
     ASSERT_TRUE(std::holds_alternative<SbBlueprintLowered>(node(unique)));
@@ -424,7 +425,7 @@ TEST_F(SbBlueprintRewriteTest, InPlaceRuleFiresUntilItStops) {
     SbBlueprintRewriteRules rules;
     rules.push_back(std::make_unique<FireNTimesRule>(8));
 
-    auto result = rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, root, rules, 10000);
+    auto result = runSbeBlueprintRewrites(_state->opCtx, &blueprint(), nullptr, root, rules, 10000);
     ASSERT_EQ(result.root, root);
     ASSERT_EQ(result.firings, 8);
     ASSERT_TRUE(result.converged);
@@ -436,7 +437,7 @@ TEST_F(SbBlueprintRewriteTest, StoppingAtTheFiringBudgetDoesNotConverge) {
     SbBlueprintRewriteRules rules;
     rules.push_back(std::make_unique<FireNTimesRule>(8));
 
-    auto result = rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, root, rules, 5);
+    auto result = runSbeBlueprintRewrites(_state->opCtx, &blueprint(), nullptr, root, rules, 5);
     ASSERT_EQ(result.firings, 5);
     ASSERT_FALSE(result.converged);
     lowerSbeBlueprint(blueprint(), result.root, *_state);
@@ -508,7 +509,7 @@ TEST_F(SbBlueprintRewriteTest, EnqueueRewritesANodeAgain) {
     rules.push_back(
         std::make_unique<DropMarkedRule>(static_cast<const MarkChildAndEnqueueRule&>(*rules[0])));
     auto newRoot =
-        rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, filter, rules, 10000).root;
+        runSbeBlueprintRewrites(_state->opCtx, &blueprint(), nullptr, filter, rules, 10000).root;
 
     // The LimitSkip was dropped only because the filter's rule queued it again.
     ASSERT_EQ(newRoot, filter);
@@ -601,7 +602,7 @@ TEST_F(SbBlueprintRewriteTest, RulesShareAndUpdateTheSuppliedSlotSummary) {
     SbBlueprintRewriteRules rules;
     rules.push_back(std::make_unique<DropFiltersAndTheirReadsRule>());
     rules.push_back(std::make_unique<RecordUsesAtLimitRule>(s.getId()));
-    auto result = rewriteSbeBlueprint(_state->opCtx, &blueprint(), &usage, root, rules, 10000);
+    auto result = runSbeBlueprintRewrites(_state->opCtx, &blueprint(), &usage, root, rules, 10000);
 
     const auto& dropFilters = static_cast<const DropFiltersAndTheirReadsRule&>(*rules[0]);
     const auto& recordUses = static_cast<const RecordUsesAtLimitRule&>(*rules[1]);
@@ -719,8 +720,8 @@ DEATH_TEST_F(SbBlueprintRewriteDeathTest, NewNodeNeedsOneChildPerChildField, "13
 DEATH_TEST_F(SbBlueprintRewriteDeathTest, RuleOverTheFiringBudgetFails, "13627005") {
     SbBlueprintRewriteRules rules;
     rules.push_back(std::make_unique<FireNTimesRule>(8));
-    checkSbeBlueprintRewriteConverged(
-        rewriteSbeBlueprint(_state->opCtx, &blueprint(), nullptr, limitOne(coscan()), rules, 5));
+    checkSbeBlueprintRewriteConverged(runSbeBlueprintRewrites(
+        _state->opCtx, &blueprint(), nullptr, limitOne(coscan()), rules, 5));
 }
 #endif
 }  // namespace

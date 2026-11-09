@@ -45,8 +45,10 @@ namespace mongo::stage_builder {
 
 class PlanStageReqs;
 class PlanStageSlots;
+class SbBlueprintSlotUsage;
 
 struct PlanStageData;
+struct SbBlueprintRewriteResult;
 
 /**
  * Returns a vector of the unique slot IDs needed by 'reqs', ordered by slot ID, and metadata slots.
@@ -854,6 +856,20 @@ private:
      * of the tree or registered in the RuntimeEnvironment.
      */
     void checkSlotsDefined(SbBlueprintNodeIdx root, const sbe::value::SlotVector& rootUses);
+
+    /**
+     * In debug builds, checks that every undefined slot in 'usage' is registered in the
+     * RuntimeEnvironment.
+     */
+    void checkSlotsDefined(const SbBlueprintSlotUsage& usage);
+
+    /**
+     * Checks convergence and, in debug builds, verifies slot definitions and the rewritten tree's
+     * slot summary against 'expectedUsage'.
+     */
+    void checkBlueprintRewrite(const SbBlueprintRewriteResult& rewrite,
+                               const SbBlueprintSlotUsage& expectedUsage,
+                               const sbe::value::SlotVector& rootUses);
 
     inline void analyzeTree() {
         _qsnAnalysis.analyzeTree(_root);
