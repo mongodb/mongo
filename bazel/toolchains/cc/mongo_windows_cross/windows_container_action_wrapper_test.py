@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import pathlib
@@ -10,11 +11,13 @@ import signal
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
+from types import SimpleNamespace
 from unittest import mock
 
 from bazel.toolchains.cc.mongo_windows_cross import windows_container_action_wrapper as wrapper
@@ -42,16 +45,19 @@ class FakeDocker:
     them. Output only becomes visible through ``docker cp`` once the command "ran".
     """
 
-    def __init__(self, records=None, running=(), existing=()):
+    def __init__(self, records=None, running=(), existing=(), busy=(), unmanaged=()):
         self.records = dict(records or {})
         self.running = set(running)
         self.existing = set(existing) | set(running)
         self.files: dict[str, str] = {}
         self.calls: list[list[str]] = []
         self.environments: list[str] = []
+        self.uploaded_paths: list[str] = []
         self.env_file_unsupported = False
+        self.busy = set(busy)
+        self.unmanaged = set(unmanaged)
 
-    def __call__(self, args, *, stdout=None, stderr=None, timeout=None):
+    def __call__(self, args, *, stdout=None, stderr=None, timeout=None, input=None, text=True):
         args = list(args)
         self.calls.append(args)
 
@@ -71,12 +77,23 @@ class FakeDocker:
                     return done(returncode=1, err=f"Error: No such object: {name}\n")
                 if template == "{{.State.Running}}":
                     return done(out="true\n" if name in self.running else "false\n")
+                if "com.mongodb.windows-container-actions.activity-version" in template:
+                    return done(out="" if name in self.unmanaged else "1\n")
                 if template == "{{.Id}}":
                     return done(out=f"id-{name}\n")
+                if template == "{{.Id}} {{.State.Running}} {{.State.StartedAt}}":
+                    return done(
+                        out=f"id-{name} {'true' if name in self.running else 'false'} started\n"
+                    )
                 return done(out=f"running image=image {name}\n")
             return done() if name in self.existing else done(returncode=1)
         if command == "ps":
-            return done(out="")
+            return done(out="\n".join(sorted(self.existing)))
+        if command == "top":
+            rows = "PID PPID COMMAND\n10 1 docker-init\n11 10 bash\n12 11 sleep\n"
+            if args[2] in self.busy:
+                rows += "13 10 bash\n14 13 clang\n"
+            return done(out=rows)
         if command == "run":
             name = args[args.index("--name") + 1]
             if "--privileged" in args:
@@ -88,6 +105,8 @@ class FakeDocker:
             self.running.add(args[-1])
             return done()
         if command == "rm":
+            if "-f" not in args and args[-1] in self.running:
+                return done(returncode=1, err="Cannot remove a running container\n")
             self.existing.discard(args[-1])
             self.running.discard(args[-1])
             return done()
@@ -121,7 +140,14 @@ class FakeDocker:
         if command == "cp":
             if not args[2].startswith(tuple(f"{name}:" for name in self.existing)):
                 destination = args[3].split(":", 1)[1]
-                self.files[destination] = pathlib.Path(args[2]).read_text(encoding="utf-8")
+                if args[2] == "-":
+                    with tarfile.open(fileobj=io.BytesIO(input)) as tar:
+                        member = tar.getmembers()[0]
+                        destination = str(pathlib.PurePosixPath(destination) / member.name)
+                        self.files[destination] = tar.extractfile(member).read().decode()
+                else:
+                    self.files[destination] = pathlib.Path(args[2]).read_text(encoding="utf-8")
+                self.uploaded_paths.append(destination)
                 if destination.endswith(shared.ACTION_CANCEL_SUFFIX):
                     # A rejected pre-exec launch has no process to stop. A cancellation
                     # request acknowledges that state, just as a supervisor does after
@@ -130,13 +156,16 @@ class FakeDocker:
                     self.files[log_path + shared.ACTION_EXIT_FILE_SUFFIX] = "125\n"
                 return done()
             source = args[2].split(":", 1)[1]
-            destination = pathlib.Path(args[3])
             if source not in self.files:
                 return done(returncode=1, err="Could not find the file\n")
-            (destination / pathlib.PurePosixPath(source).name).write_text(
-                self.files[source], encoding="utf-8"
-            )
-            return done()
+            archive = io.BytesIO()
+            with tarfile.open(fileobj=archive, mode="w") as tar:
+                data = self.files[source].encode("utf-8")
+                member = tarfile.TarInfo(pathlib.PurePosixPath(source).name)
+                member.size = len(data)
+                tar.addfile(member, io.BytesIO(data))
+            assert text is False
+            return done(out=archive.getvalue())
         return done()
 
     def commands(self, name: str) -> list[list[str]]:
@@ -215,6 +244,24 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             wrapper._container_path("/mnt/z/already/posix")
 
+    def test_mount_paths_include_repository_junction_targets_without_unused_system_drive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            output_base = root / "output"
+            external = output_base / "external"
+            external.mkdir(parents=True)
+            cached_repository = root / "repository-cache" / "rules_python"
+            cached_repository.mkdir(parents=True)
+            (external / "rules_python+").symlink_to(cached_repository, target_is_directory=True)
+            with (
+                mock.patch.object(
+                    wrapper, "os", SimpleNamespace(name="nt", environ={"SystemDrive": "E:"})
+                ),
+            ):
+                paths = wrapper._mount_paths(self._config(mount_paths=[]), output_base)
+            self.assertIn(str(cached_repository.resolve()), paths)
+            self.assertNotIn("E:\\", paths)
+
     def test_container_mounts_expose_whole_drives_read_only_and_sandbox_writable(self):
         mounts = wrapper._container_mounts(self._config(), pathlib.PureWindowsPath("Z:\\b\\b"))
 
@@ -231,6 +278,56 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
                 "/mnt/z/b/b-mongo-shared-install:/mnt/z/b/b-mongo-shared-install",
             ],
         )
+
+    def test_repository_scan_preserves_readable_targets_after_resolution_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            external = root / "external"
+            external.mkdir()
+            good = external / "good"
+            good.mkdir()
+            bad = external / "bad"
+            bad.mkdir()
+            resolve = pathlib.Path.resolve
+
+            def resolve_repository(path, *args, **kwargs):
+                if path == bad:
+                    raise OSError("repository I/O failure")
+                return resolve(path, *args, **kwargs)
+
+            with (
+                mock.patch.object(
+                    wrapper,
+                    "os",
+                    SimpleNamespace(name="nt", environ={}, PathLike=os.PathLike, fspath=os.fspath),
+                ),
+                mock.patch.object(pathlib.Path, "resolve", resolve_repository),
+                mock.patch("sys.stderr", new_callable=io.StringIO) as stderr,
+            ):
+                paths = wrapper._mount_paths(self._config(), root)
+            self.assertIn(str(good.resolve()), paths)
+            self.assertIn("repository I/O failure", stderr.getvalue())
+            self.assertIn(str(bad), stderr.getvalue())
+
+    def test_repository_enumeration_error_preserves_configured_mounts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / "external").mkdir()
+            with (
+                mock.patch.object(
+                    wrapper,
+                    "os",
+                    SimpleNamespace(name="nt", environ={}, PathLike=os.PathLike, fspath=os.fspath),
+                ),
+                mock.patch.object(pathlib.Path, "iterdir", side_effect=PermissionError("denied")),
+                mock.patch("sys.stderr", new_callable=io.StringIO) as stderr,
+            ):
+                config = self._config()
+                paths = wrapper._mount_paths(config, root)
+                name = wrapper._container_name(config, root)
+            self.assertTrue(set(config["mount_paths"]).issubset(paths))
+            self.assertTrue(name)
+            self.assertIn("denied", stderr.getvalue())
 
     def test_source_entrypoints_import_shared_module_in_runfiles_layout(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -627,6 +724,146 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
             )
         )
 
+    def test_new_repository_cache_drive_starts_another_container_and_preserves_running_actions(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as directory:
+            config_path, config = self._write_config(pathlib.Path(directory))
+            output_base = config_path.parent
+            mount_paths = ["Z:/b/b", "C:/cache"]
+            docker = FakeDocker()
+            with (
+                mock.patch.object(
+                    wrapper, "_mount_paths", side_effect=lambda *_: list(mount_paths)
+                ),
+                mock.patch.object(wrapper, "_mount_host_drives"),
+                mock.patch.object(wrapper, "_writable_paths", return_value=[]),
+                mock.patch.object(shared, "run", side_effect=docker),
+            ):
+                original = wrapper._container_name(config, output_base)
+                wrapper._start_container(["docker"], config, original, output_base)
+                docker.busy.add(original)
+                mount_paths.append("D:/repository-cache/rules_python")
+                updated = wrapper._container_name(config, output_base)
+                wrapper._start_container(["docker"], config, updated, output_base)
+
+        self.assertNotEqual(original, updated)
+        self.assertEqual(docker.running, {original, updated})
+        launches = docker.commands("run")
+        self.assertEqual(len(launches), 2)
+        self.assertNotIn("/mnt/d:/mnt/d:ro", launches[0])
+        self.assertIn("/mnt/d:/mnt/d:ro", launches[1])
+
+    def test_stale_container_cleanup_removes_only_stopped_containers(self):
+        docker = FakeDocker(running={"active", "keep"}, existing={"stopped"}, busy={"active"})
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.object(shared, "run", side_effect=docker):
+                wrapper._remove_stale_containers(
+                    ["docker"], "workspace", "keep", pathlib.Path(directory)
+                )
+
+        self.assertEqual(docker.existing, {"active", "keep"})
+        self.assertEqual(docker.running, {"active", "keep"})
+        self.assertFalse(any("-f" in call for call in docker.commands("rm")))
+
+    def test_stale_container_cleanup_removes_idle_running_containers(self):
+        docker = FakeDocker(running={"idle", "keep"})
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.object(shared, "run", side_effect=docker):
+                wrapper._remove_stale_containers(
+                    ["docker"], "workspace", "keep", pathlib.Path(directory)
+                )
+        self.assertEqual(docker.running, {"keep"})
+        self.assertEqual(docker.existing, {"keep"})
+
+    def test_stale_container_cleanup_preserves_running_containers_from_older_runners(self):
+        docker = FakeDocker(running={"legacy", "keep"}, unmanaged={"legacy"})
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.object(shared, "run", side_effect=docker):
+                wrapper._remove_stale_containers(
+                    ["docker"], "workspace", "keep", pathlib.Path(directory)
+                )
+        self.assertEqual(docker.running, {"legacy", "keep"})
+
+    def test_retired_container_waits_for_all_host_owners_to_finish(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            config_path, config = self._write_config(root)
+            mount_paths = ["Z:/b/b", "C:/cache"]
+            docker = FakeDocker()
+            with (
+                mock.patch.object(
+                    wrapper, "_mount_paths", side_effect=lambda *_: list(mount_paths)
+                ),
+                mock.patch.object(wrapper, "_mount_host_drives"),
+                mock.patch.object(wrapper, "_container_mounts", return_value=[]),
+                mock.patch.object(shared, "run", side_effect=docker),
+            ):
+                with wrapper._container_use(["docker"], config, config_path.parent) as original:
+                    with wrapper._container_use(["docker"], config, config_path.parent) as same:
+                        self.assertEqual(original, same)
+                        mount_paths.append("D:/cache")
+                        with wrapper._container_use(
+                            ["docker"], config, config_path.parent
+                        ) as updated:
+                            self.assertNotEqual(original, updated)
+                            self.assertEqual(docker.running, {original, updated})
+                        self.assertIn(original, docker.running)
+                    self.assertIn(original, docker.running)
+                self.assertEqual(docker.running, {updated})
+
+    def test_retirement_preserves_containers_when_processes_cannot_be_inspected(self):
+        for response in (
+            subprocess.CompletedProcess([], 1, "", "unavailable"),
+            subprocess.CompletedProcess([], 0, "unexpected output", ""),
+        ):
+            with self.subTest(response=response), tempfile.TemporaryDirectory() as directory:
+                docker = FakeDocker(running={"old", "keep"})
+
+                def run(args, **kwargs):
+                    return response if args[1] == "top" else docker(args, **kwargs)
+
+                with mock.patch.object(shared, "run", side_effect=run):
+                    wrapper._remove_stale_containers(
+                        ["docker"], "workspace", "keep", pathlib.Path(directory)
+                    )
+                self.assertEqual(docker.running, {"old", "keep"})
+
+    def test_retirement_waits_for_detached_cleanup_to_exit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            activity = pathlib.Path(directory) / "idle"
+            activity.mkdir()
+            (activity / "retired").touch()
+            docker = FakeDocker(running={"idle"})
+            with (
+                mock.patch.object(shared, "run", side_effect=docker),
+                mock.patch.object(wrapper, "_container_idle", side_effect=[False, True]),
+                mock.patch.object(wrapper.time, "sleep") as sleep,
+            ):
+                wrapper._retire_container(["docker"], "idle", activity, wait_seconds=5)
+            sleep.assert_called_once()
+            self.assertFalse(docker.running)
+            self.assertFalse(activity.exists())
+
+    def test_sandbox_root_change_preserves_old_action_until_output_is_consumed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            config_path, config = self._write_config(root)
+            updated_config = {**config, "sandbox_base": str(root / "other-sandbox")}
+            docker = FakeDocker()
+            with (
+                mock.patch.object(wrapper, "_container_mounts", return_value=[]),
+                mock.patch.object(wrapper, "_mount_host_drives"),
+                mock.patch.object(shared, "run", side_effect=docker),
+            ):
+                with wrapper._container_use(["docker"], config, config_path.parent) as original:
+                    with wrapper._container_use(
+                        ["docker"], updated_config, config_path.parent
+                    ) as updated:
+                        self.assertEqual(docker.running, {original, updated})
+                    self.assertIn(original, docker.running)
+                self.assertEqual(docker.running, {updated})
+
     def test_read_config_rejects_incomplete_configs(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = pathlib.Path(temp_dir) / "config.json"
@@ -924,9 +1161,7 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
             self.assertIn("PWD=/mnt/z/sandbox/execroot/_main", launches[1])
             self.assertNotIn("SYSTEMROOT=C:\\Windows", launches[1])
             cancellations = [
-                call
-                for call in docker.commands("cp")
-                if call[3].endswith(shared.ACTION_CANCEL_SUFFIX)
+                path for path in docker.uploaded_paths if path.endswith(shared.ACTION_CANCEL_SUFFIX)
             ]
             self.assertEqual(len(cancellations), 1)
 
@@ -1033,8 +1268,8 @@ class WindowsContainerActionWrapperTest(unittest.TestCase):
             self.assertFalse([call for call in docker.commands("run") if "--privileged" in call])
             # Probe files are cleaned up again.
             self.assertEqual(
-                [path.name for path in config_path.parent.iterdir()],
-                ["mongo_linux_container_actions.json"],
+                sorted(path.name for path in config_path.parent.iterdir()),
+                ["mongo_linux_container_actions.json", wrapper._RUNNER_SCRATCH_DIRNAME],
             )
             self.assertEqual(
                 sorted(path.name for path in (root / "sandbox").iterdir()),

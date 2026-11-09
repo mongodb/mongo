@@ -142,6 +142,13 @@ py_test(
 )
 
 py_test(
+    name = "bazelrc_test",
+    srcs = ["hermetic_container/bazelrc_test.py"],
+    main = "hermetic_container/bazelrc_test.py",
+    deps = [":wrapper_hook"],
+)
+
+py_test(
     name = "container_actions_test",
     srcs = ["hermetic_container/container_actions_test.py"],
     main = "hermetic_container/container_actions_test.py",

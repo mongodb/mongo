@@ -18,6 +18,7 @@ from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing import suite as under_test
 from buildscripts.resmokelib.testing.suite import EqualRuntime
 from buildscripts.resmokelib.testing.testcases.interface import TestCase
+from buildscripts.tests.shell import bash_executable
 
 
 class TestBypassEnvironmentTransport(unittest.TestCase):
@@ -112,7 +113,7 @@ class TestBypassEnvironmentTransport(unittest.TestCase):
                     captured_file = workdir / "src/captured.json"
                     captured_file.unlink(missing_ok=True)
                     result = subprocess.run(
-                        ["bash", script.relative_to(workdir).as_posix()],
+                        [bash_executable(), script.relative_to(workdir).as_posix()],
                         cwd=workdir,
                         text=True,
                         capture_output=True,

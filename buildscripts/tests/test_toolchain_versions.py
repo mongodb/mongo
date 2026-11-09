@@ -8,6 +8,7 @@ from buildscripts.package_test.toolchain_versions import (
     should_require_production_toolchain,
     validate_toolchain_versions,
 )
+from buildscripts.tests.shell import bash_executable
 
 
 class ToolchainVersionsTest(unittest.TestCase):
@@ -72,11 +73,11 @@ class ToolchainVersionsTest(unittest.TestCase):
             with self.subTest(environment=environment):
                 flags = subprocess.check_output(
                     [
-                        "bash",
+                        bash_executable(),
                         "-c",
                         'source "$1"; bazel_evergreen_shutils::maybe_release_flag ""',
                         "bash",
-                        str(helper),
+                        helper.as_posix(),
                     ],
                     env={**os.environ, **environment, "MONGO_VERSION_OVERRIDE": ""},
                     text=True,

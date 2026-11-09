@@ -30,11 +30,19 @@ if [ -f .git/shallow ]; then
     # fetched, so a commit-graph written here would reference missing objects and
     # break later git commands.
     no_commit_graph="-c gc.writeCommitGraph=false -c fetch.writeCommitGraph=false"
+    history_filter="blob:none"
     if [ "$(printf '%s\n' "$required_version" "$git_version" | sort -V | head -n1)" = "$required_version" ]; then
-        $retry_git $no_commit_graph fetch origin --filter=tree:0 --unshallow --tags --quiet
-    else
-        $retry_git $no_commit_graph fetch origin --filter=blob:none --unshallow --tags --quiet
+        history_filter="tree:0"
     fi
+    case "$(uname -s)" in
+    CYGWIN* | MINGW* | MSYS*)
+        # Git on the WSL-capable Windows image crashes in pack-objects when a
+        # treeless fetch repacks links to missing historical trees. Keep trees
+        # locally while still avoiding the cost of fetching historical blobs.
+        history_filter="blob:none"
+        ;;
+    esac
+    $retry_git $no_commit_graph fetch origin --filter="$history_filter" --unshallow --tags --quiet
 
     # If describing the commit still fails after restoring history, refetch tags.
     # Don't use `quiet` here to show more because it's our last fallback.

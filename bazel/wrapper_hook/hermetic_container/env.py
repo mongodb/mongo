@@ -59,6 +59,7 @@ CROSS_HOST_FLAGS_WITH_SEPARATE_VALUE = frozenset(
         "--extra_execution_platforms",
         "--jobs",
         "--platforms",
+        "--remote_executor",
         "--repo_env",
         "--target_pattern_file",
         "--test_tag_filters",

@@ -573,6 +573,17 @@ sh_binary(
     srcs = ["restore_git_history_and_tags.sh"],
 )
 
+sh_test(
+    name = "restore_git_history_and_tags_test",
+    srcs = ["restore_git_history_and_tags_test.sh"],
+    data = [
+        "restore_git_history_and_tags.sh",
+        "retry_git.sh",
+    ],
+    tags = ["no-remote"],  # Exercises fetches with the host's Git installation.
+    target_compatible_with = ["@platforms//os:linux"],
+)
+
 sh_binary(
     name = "run_python_script",
     srcs = ["run_python_script.sh"],

@@ -2,6 +2,18 @@ load("//bazel/uv:defs.bzl", "dependency")
 load("//bazel:mongo_script_rules.bzl", "mongo_toolchain_py_cxx_test")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
+py_library(
+    name = "shell",
+    srcs = ["shell.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "test_shell",
+    srcs = ["test_shell.py"],
+    deps = [":shell"],
+)
+
 py_test(
     name = "test_task_artifacts",
     srcs = ["test_task_artifacts.py"],
@@ -10,6 +22,7 @@ py_test(
         "//evergreen:upload_task_artifact.sh",
     ],
     deps = [
+        ":shell",
         "//buildscripts:task_artifacts",
         dependency(
             "botocore",
@@ -27,7 +40,10 @@ py_test(
     size = "small",
     srcs = ["test_toolchain_versions.py"],
     data = ["//evergreen:bazel_evergreen_shutils.sh"],
-    deps = ["//buildscripts/package_test:toolchain_versions"],
+    deps = [
+        ":shell",
+        "//buildscripts/package_test:toolchain_versions",
+    ],
 )
 
 mongo_toolchain_py_cxx_test(

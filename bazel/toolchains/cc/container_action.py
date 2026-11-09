@@ -1,6 +1,6 @@
 """Docker primitives and supervised action transport shared by cross-build runners.
 
-Callers supply the resolved container working directory and host scratch root.
+Callers supply the resolved container working directory.
 Container startup, mount policy, and tool preparation remain in platform runners.
 """
 
@@ -14,7 +14,6 @@ import json
 import os
 import pathlib
 import re
-import shutil
 import signal
 import subprocess
 import sys
@@ -49,7 +48,6 @@ CONTAINER_EXEC_FAILURE_CODES = frozenset({125, 126, 127})
 # redirect its output to a container-side file, have the shell record the exit
 # status next to it, and copy those files back to the host.
 ACTION_OUTPUT_LOG_ENV = "MONGO_CROSS_ACTION_OUTPUT_LOG"
-ACTION_OUTPUT_LOG_DIRNAME = "action-output"
 ACTION_EXIT_FILE_SUFFIX = ".exit"
 # The status and log files live on the container's own filesystem and are read
 # back with ``docker cp`` (a plain HTTP request), so this channel works even when
@@ -81,7 +79,7 @@ ACTION_COMPLETION_TIMEOUT_ENV = "MONGO_CROSS_ACTION_TIMEOUT_SECONDS"
 ACTION_COMPLETION_TIMEOUT_DEFAULT_SECONDS = 10800.0
 ACTION_COMPLETION_POLL_SECONDS = 0.25
 DOCKER_REQUEST_TIMEOUT_SECONDS = 30.0
-ACTION_LOG_TIMEOUT_SECONDS = 5.0
+ACTION_LOG_TIMEOUT_SECONDS = 30.0
 CONTAINER_IDENTITY_CHECK_INTERVAL_POLLS = 8
 
 
@@ -283,15 +281,23 @@ def container_exists(docker: Sequence[str], name: str) -> bool:
 
 
 @contextlib.contextmanager
-def exclusive_file_lock(lock_path: pathlib.Path, *, required: bool = False) -> Iterator[None]:
-    """Acquire a process lock for container startup on Unix and Windows."""
+def exclusive_file_lock(
+    lock_path: pathlib.Path, *, required: bool = False, blocking: bool = True
+) -> Iterator[bool]:
+    """Acquire a process lock on Unix and Windows, yielding whether it was acquired."""
 
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+b") as lock_file:
         if fcntl is not None:
-            fcntl.flock(lock_file, fcntl.LOCK_EX)
             try:
-                yield
+                fcntl.flock(lock_file, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
+            except OSError as exc:
+                if not blocking and exc.errno in {errno.EACCES, errno.EAGAIN}:
+                    yield False
+                    return
+                raise
+            try:
+                yield True
             finally:
                 fcntl.flock(lock_file, fcntl.LOCK_UN)
             return
@@ -304,6 +310,8 @@ def exclusive_file_lock(lock_path: pathlib.Path, *, required: bool = False) -> I
             lock_file.seek(0)
             lock_mode = getattr(msvcrt, "LK_NBLCK", None)
             if lock_mode is None:
+                if not blocking:
+                    raise RuntimeError("no nonblocking Windows file locking primitive is available")
                 lock_mode = msvcrt.LK_LOCK
             while True:
                 try:
@@ -316,9 +324,12 @@ def exclusive_file_lock(lock_path: pathlib.Path, *, required: bool = False) -> I
                         errno.EDEADLK,
                     } and getattr(exc, "winerror", None) not in {33, 36}:
                         raise
+                    if not blocking:
+                        yield False
+                        return
                     time.sleep(0.1)
             try:
-                yield
+                yield True
             finally:
                 lock_file.seek(0)
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
@@ -326,7 +337,7 @@ def exclusive_file_lock(lock_path: pathlib.Path, *, required: bool = False) -> I
 
         if required:
             raise RuntimeError(f"no file locking primitive is available for {lock_path}")
-        yield
+        yield False
 
 
 def _run_helper_container(
@@ -436,12 +447,9 @@ def action_completion_timeout() -> float:
         return ACTION_COMPLETION_TIMEOUT_DEFAULT_SECONDS
 
 
-def _read_exit_file(exit_file: pathlib.Path) -> int | None:
+def _parse_exit_status(contents: bytes) -> int | None:
     """Returns the recorded exit status, or ``None`` while the command is still running."""
-    try:
-        text = exit_file.read_text(encoding="utf-8", errors="replace").strip()
-    except (OSError, subprocess.TimeoutExpired):
-        return None
+    text = contents.decode("utf-8", errors="replace").strip()
     if not text:
         # The shell has created the file but the status has not been flushed yet.
         return None
@@ -480,17 +488,28 @@ def _write_container_action_state(
     docker: Sequence[str],
     name: str,
     container_file: pathlib.PurePosixPath,
-    host_dir: pathlib.Path,
     deadline: float,
 ) -> bool:
     """Publish a fresh lease or cancellation marker with an ordinary Docker HTTP request."""
-    host_file = host_dir / container_file.name
-    host_file.write_text(uuid.uuid4().hex + "\n", encoding="utf-8")
+    # Host writes can stall beyond the lease while Windows/WSL builds saturate
+    # the shared disk. Stream the tiny marker from memory, like the input probe.
+    marker = (uuid.uuid4().hex + "\n").encode()
+    archive = io.BytesIO()
+    with tarfile.open(fileobj=archive, mode="w") as tar:
+        member = tarfile.TarInfo(container_file.name)
+        member.size = len(marker)
+        # docker cp creates root-owned files; the action supervisor must read it.
+        member.mode = 0o644
+        tar.addfile(member, io.BytesIO(marker))
+    if time.monotonic() >= deadline:
+        raise subprocess.TimeoutExpired("Docker action marker upload", 0)
     result = run(
-        [*docker, "cp", str(host_file), f"{name}:{container_file.as_posix()}"],
+        [*docker, "cp", "-", f"{name}:{container_file.parent.as_posix()}"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         timeout=_request_timeout(deadline),
+        input=archive.getvalue(),
+        text=False,
     )
     return result.returncode == 0
 
@@ -500,7 +519,6 @@ def _cancel_container_action(
     docker: Sequence[str],
     name: str,
     container_log: pathlib.PurePosixPath,
-    host_dir: pathlib.Path,
 ) -> None:
     """Wait for this action's supervisor to stop the tool; never kill a shared container."""
     cancel_file = pathlib.PurePosixPath(str(container_log) + ACTION_CANCEL_SUFFIX)
@@ -509,13 +527,13 @@ def _cancel_container_action(
     # the action. Otherwise the tool could still modify outputs after Bazel sees failure.
     deadline = time.monotonic() + ACTION_LEASE_SECONDS + ACTION_TERMINATION_GRACE_SECONDS + 2
     try:
-        _write_container_action_state(docker, name, cancel_file, host_dir, deadline)
+        _write_container_action_state(docker, name, cancel_file, deadline)
     except (OSError, subprocess.TimeoutExpired) as exc:
         print(f"WARNING: could not publish cancellation of {container_log}: {exc}", file=sys.stderr)
     while time.monotonic() < deadline:
         try:
-            copied = _copy_from_container(docker, name, exit_file, host_dir, deadline)
-            if copied is not None and _read_exit_file(copied) is not None:
+            copied = _read_container_file(docker, name, exit_file, deadline)
+            if _parse_exit_status(copied) is not None:
                 return
         except (OSError, subprocess.TimeoutExpired):
             pass
@@ -532,14 +550,11 @@ def run_container_command(
     container_cwd: pathlib.PurePosixPath,
     env_args: Sequence[str],
     command: Sequence[str],
-    host_state_root: pathlib.Path,
     timeout: float | None = None,
 ) -> tuple[int, str, list[str]]:
     """Run an owned container action, cleaning it up when the host runner is interrupted."""
     with _action_interrupt_handlers():
-        return _run_container_command_impl(
-            docker, name, container_cwd, env_args, command, host_state_root, timeout
-        )
+        return _run_container_command_impl(docker, name, container_cwd, env_args, command, timeout)
 
 
 def _run_container_command_impl(
@@ -548,7 +563,6 @@ def _run_container_command_impl(
     container_cwd: pathlib.PurePosixPath,
     env_args: Sequence[str],
     command: Sequence[str],
-    host_state_root: pathlib.Path,
     timeout: float | None,
 ) -> tuple[int, str, list[str]]:
     """Runs ``command`` in the action container without relying on the exec stream.
@@ -557,7 +571,8 @@ def _run_container_command_impl(
     command line that launched it. The exit status is 125 when the exec could not
     be created or when the command did not report completion within the timeout.
     """
-    host_dir, container_log = _action_state_paths(host_state_root)
+    identity = f"{os.getpid()}-{uuid.uuid4().hex}"
+    container_log = CONTAINER_ACTION_STATE_DIR / f"{identity}.log"
     container_exit_file = container_log.with_name(container_log.name + ACTION_EXIT_FILE_SUFFIX)
     capture_environment, capture_command = _action_output_capture(container_log, command)
     launch = [
@@ -576,6 +591,7 @@ def _run_container_command_impl(
     preserve_log = False
     timeout = timeout if timeout is not None else action_completion_timeout()
     deadline = time.monotonic() + timeout
+    launch_started = time.monotonic()
     try:
         # An interrupted CLI can start its detached exec before reporting success.
         launched = True
@@ -583,7 +599,16 @@ def _run_container_command_impl(
             launch,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            timeout=_request_timeout(deadline),
+            # Detached launch can take longer than a polling request under load.
+            # Reserve time to renew the earliest possible supervisor lease, and
+            # never retry the launch: the daemon may have started it already.
+            timeout=max(
+                0.001,
+                min(
+                    ACTION_LEASE_SECONDS - 2 * ACTION_HEARTBEAT_INTERVAL_SECONDS,
+                    deadline - launch_started,
+                ),
+            ),
         )
         if started.returncode != 0:
             detail = ((started.stderr or "") + (started.stdout or "")).strip()
@@ -594,49 +619,24 @@ def _run_container_command_impl(
                 launch,
             )
 
-        container_state = _container_state(docker, name, deadline)
+        container_state = None
         polls = 0
-        next_heartbeat = 0.0
+        next_heartbeat = launch_started + ACTION_HEARTBEAT_INTERVAL_SECONDS
+        # Retry transient Docker requests while the supervisor's lease is live.
+        # Leave one request interval to cancel before it can expire. A failed
+        # heartbeat never extends this deadline.
+        lease_deadline = min(
+            deadline, launch_started + ACTION_LEASE_SECONDS - ACTION_HEARTBEAT_INTERVAL_SECONDS
+        )
         while True:
-            exit_file = _copy_from_container(docker, name, container_exit_file, host_dir, deadline)
-            exit_code = _read_exit_file(exit_file) if exit_file is not None else None
-            if exit_code is not None:
-                completed = True
-                break
-            polls += 1
-            if polls % CONTAINER_IDENTITY_CHECK_INTERVAL_POLLS == 0:
-                current_state = _container_state(docker, name, deadline)
-                failure = None
-                if current_state is None:
-                    failure = "could not be inspected"
-                elif not current_state.running:
-                    failure = "stopped"
-                elif container_state is not None:
-                    if current_state.identity != container_state.identity:
-                        failure = "was replaced"
-                    elif current_state.started_at != container_state.started_at:
-                        failure = "restarted"
-                if failure is not None:
-                    # Stop, restart, or replacement proves the old process is gone.
-                    # A failed inspect may only mean connection loss, so wait out its lease.
-                    completed = current_state is not None
-                    return (
-                        125,
-                        f"the action container {name} {failure} while {command[0]} was "
-                        "running; retry the action",
-                        launch,
-                    )
-                container_state = current_state
             if time.monotonic() >= deadline:
-                _cancel_container_action(docker, name, container_log, host_dir)
+                _cancel_container_action(docker, name, container_log)
                 completed = True
-                output = _collect_action_output(docker, name, container_log, host_dir)
-                preserve_log = output is None
-                output = (
-                    output
-                    if output is not None
-                    else f"could not retrieve action output; log retained at {name}:{container_log}"
-                )
+                try:
+                    output = _collect_action_output(docker, name, container_log)
+                except OSError as exc:
+                    preserve_log = True
+                    output = f"could not retrieve action output: {exc}; log retained at {name}:{container_log}"
                 return (
                     125,
                     output.rstrip()
@@ -644,23 +644,69 @@ def _run_container_command_impl(
                     f"its exit status file {container_exit_file} never appeared in the container",
                     launch,
                 )
-            if time.monotonic() >= next_heartbeat:
-                _write_container_action_state(
-                    docker,
-                    name,
-                    pathlib.PurePosixPath(str(container_log) + ACTION_HEARTBEAT_SUFFIX),
-                    host_dir,
-                    deadline,
+            try:
+                if time.monotonic() >= lease_deadline:
+                    raise subprocess.TimeoutExpired(
+                        "Docker action lease renewal", ACTION_LEASE_SECONDS
+                    )
+                # Renew before polling so a slow exit/inspect request cannot
+                # repeatedly defer the heartbeat.
+                if time.monotonic() >= next_heartbeat:
+                    renewal_started = time.monotonic()
+                    renewed = _write_container_action_state(
+                        docker,
+                        name,
+                        pathlib.PurePosixPath(str(container_log) + ACTION_HEARTBEAT_SUFFIX),
+                        lease_deadline,
+                    )
+                    if renewed:
+                        next_heartbeat = time.monotonic() + ACTION_HEARTBEAT_INTERVAL_SECONDS
+                        lease_deadline = min(
+                            deadline,
+                            renewal_started
+                            + ACTION_LEASE_SECONDS
+                            - ACTION_HEARTBEAT_INTERVAL_SECONDS,
+                        )
+                if polls % CONTAINER_IDENTITY_CHECK_INTERVAL_POLLS == 0:
+                    current_state = _container_state(docker, name, lease_deadline)
+                    if current_state is None:
+                        raise OSError(f"the action container {name} could not be inspected")
+                    failure = None
+                    if not current_state.running:
+                        failure = "stopped"
+                    elif container_state is not None:
+                        if current_state.identity != container_state.identity:
+                            failure = "was replaced"
+                        elif current_state.started_at != container_state.started_at:
+                            failure = "restarted"
+                    if failure is not None:
+                        completed = True
+                        return (
+                            125,
+                            f"the action container {name} {failure} while {command[0]} was running; retry the action",
+                            launch,
+                        )
+                    container_state = current_state
+                polls += 1
+                exit_contents = _read_container_file(
+                    docker, name, container_exit_file, lease_deadline
                 )
-                next_heartbeat = time.monotonic() + ACTION_HEARTBEAT_INTERVAL_SECONDS
+                exit_code = _parse_exit_status(exit_contents)
+                if exit_code is not None:
+                    completed = True
+                    break
+            except (OSError, subprocess.TimeoutExpired):
+                if time.monotonic() >= lease_deadline:
+                    raise
             time.sleep(ACTION_COMPLETION_POLL_SECONDS)
 
-        output = _collect_action_output(docker, name, container_log, host_dir)
-        preserve_log = output is None
-        if preserve_log:
+        try:
+            output = _collect_action_output(docker, name, container_log)
+        except OSError as exc:
+            preserve_log = True
             return (
                 125,
-                f"could not retrieve action output (tool exited {exit_code}); log retained at {name}:{container_log}",
+                f"could not retrieve action output (tool exited {exit_code}): {exc}; log retained at {name}:{container_log}",
                 launch,
             )
         return exit_code, output, launch
@@ -674,7 +720,7 @@ def _run_container_command_impl(
     finally:
         with _action_interrupt_handlers(cleanup=True):
             if launched and not completed:
-                _cancel_container_action(docker, name, container_log, host_dir)
+                _cancel_container_action(docker, name, container_log)
             if launched and not preserve_log:
                 try:
                     run(
@@ -696,7 +742,6 @@ def _run_container_command_impl(
                     )
                 except (OSError, subprocess.TimeoutExpired):
                     pass
-            shutil.rmtree(host_dir, ignore_errors=True)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -722,59 +767,58 @@ def _container_state(docker: Sequence[str], name: str, deadline: float) -> _Cont
     return _ContainerState(fields[0], fields[1] == "true", fields[2])
 
 
-def _action_state_paths(
-    host_state_root: pathlib.Path,
-) -> tuple[pathlib.Path, pathlib.PurePosixPath]:
-    """Returns a fresh host scratch directory and the container-side log path for one command.
-
-    The log and its exit-status file are written to the container's own
-    filesystem and copied out with ``docker cp``; the host directory only holds
-    the copies while they are read.
-    """
-    identity = f"{os.getpid()}-{uuid.uuid4().hex}"
-    host_dir = host_state_root / identity
-    host_dir.mkdir(parents=True, exist_ok=True)
-    return host_dir, CONTAINER_ACTION_STATE_DIR / f"{identity}.log"
-
-
-def _copy_from_container(
+def _read_container_file(
     docker: Sequence[str],
     name: str,
     container_path: pathlib.PurePosixPath,
-    host_dir: pathlib.Path,
     deadline: float,
-) -> pathlib.Path | None:
-    """Copies one file out of the container, returning the host copy or ``None`` if absent."""
+) -> bytes:
+    """Read one regular file through Docker's archive stream, without host disk writes."""
     result = run(
-        [*docker, "cp", f"{name}:{container_path.as_posix()}", str(host_dir)],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        [*docker, "cp", f"{name}:{container_path.as_posix()}", "-"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         timeout=_request_timeout(deadline),
+        text=False,
     )
     if result.returncode != 0:
-        return None
-    copied = host_dir / container_path.name
-    return copied if copied.is_file() else None
+        detail = result.stderr or b""
+        if isinstance(detail, bytes):
+            detail = detail.decode("utf-8", errors="replace")
+        detail = detail.strip()
+        raise OSError(f"docker cp exited {result.returncode}: {detail or '<no detail>'}")
+    try:
+        with tarfile.open(fileobj=io.BytesIO(result.stdout), mode="r:*") as tar:
+            member = tar.getmember(container_path.name)
+            if not member.isfile():
+                raise OSError(f"Docker returned a non-regular file for {container_path}")
+            contents = tar.extractfile(member)
+            if contents is None:
+                raise OSError(f"Docker returned no contents for {container_path}")
+            return contents.read()
+    except (KeyError, ValueError, tarfile.TarError) as exc:
+        raise OSError(f"invalid Docker archive for {container_path}: {exc}") from exc
 
 
 def _collect_action_output(
     docker: Sequence[str],
     name: str,
     container_log: pathlib.PurePosixPath,
-    host_dir: pathlib.Path,
-) -> str | None:
+) -> str:
     """Retry failed log requests; an empty log is different from a failed copy."""
     deadline = time.monotonic() + ACTION_LOG_TIMEOUT_SECONDS
     while True:
         try:
-            log_file = _copy_from_container(docker, name, container_log, host_dir, deadline)
-            if log_file is not None:
-                return log_file.read_text(encoding="utf-8", errors="replace")
-        except (OSError, subprocess.TimeoutExpired):
-            pass
+            return _read_container_file(docker, name, container_log, deadline).decode(
+                "utf-8", errors="replace"
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            last_error = exc
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            return None
+            raise OSError(
+                f"log retrieval failed after {ACTION_LOG_TIMEOUT_SECONDS:g}s: {last_error}"
+            )
         time.sleep(min(ACTION_COMPLETION_POLL_SECONDS, remaining))
 
 

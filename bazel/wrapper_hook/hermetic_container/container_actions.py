@@ -195,7 +195,7 @@ def publish_container_actions_config(
 def persistent_container_options(output_base: pathlib.Path, runner: pathlib.Path) -> list[str]:
     """Build the common protocol options before platform-specific action strategies."""
     sandbox_base = _linux_action_sandbox_base(output_base)
-    return [
+    options = [
         "--experimental_enable_persistent_container_sandbox",
         f"--experimental_persistent_container_python={sys.executable}",
         f"--experimental_persistent_container_runner={runner}",
@@ -203,6 +203,11 @@ def persistent_container_options(output_base: pathlib.Path, runner: pathlib.Path
         f"--experimental_persistent_container_worker_dir={sandbox_base / 'persistent-workers'}",
         f"--sandbox_base={sandbox_base}",
     ]
+    if isinstance(output_base, pathlib.PureWindowsPath):
+        # Linux tools can leave WSL reparse points in a stashed sandbox. Windows
+        # cannot inspect or replace those as NTFS links when reusing the tree.
+        options.append("--noexperimental_reuse_sandbox_directories")
+    return options
 
 
 def preflight_container_runner(

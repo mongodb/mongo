@@ -41,6 +41,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
 
@@ -49,8 +50,9 @@ from bazel.hermetic_container import container_paths
 from bazel.toolchains.cc import container_action as shared
 from bazel.toolchains.cc import container_engine as engine
 
-_CONTAINER_LAYOUT_VERSION = "windows-v3"
+_CONTAINER_LAYOUT_VERSION = "windows-v5"
 _WORKSPACE_LABEL = "com.mongodb.windows-container-actions.workspace"
+_ACTIVITY_LABEL = "com.mongodb.windows-container-actions.activity-version"
 _ACTION_CONTAINER_ENV = "MONGO_LINUX_ACTION_CONTAINER"
 _DEFAULT_DRIVE_MOUNT_PREFIX = "/mnt"
 _DEFAULT_DOCKER_HOST = "tcp://127.0.0.1:2375"
@@ -264,6 +266,25 @@ def _mount_paths(config: Mapping[str, object], output_base: pathlib.Path) -> lis
     extra = config.get("mount_paths") or []
     if isinstance(extra, list):
         paths.extend(str(path) for path in extra if path)
+    if os.name == "nt":
+        # Repository-cache junctions can leave the drive containing the execroot.
+        # Include their physical drives in the container identity so repositories
+        # hydrated after preflight select a container with the required mounts.
+        external = pathlib.Path(str(output_base)) / "external"
+        try:
+            if external.is_dir():
+                for repository in external.iterdir():
+                    try:
+                        paths.append(str(repository.resolve()))
+                    except OSError as exc:
+                        print(
+                            f"WARNING: could not resolve repository {repository}: {exc}",
+                            file=sys.stderr,
+                        )
+        except OSError as exc:
+            print(
+                f"WARNING: could not scan repository directory {external}: {exc}", file=sys.stderr
+            )
     return paths
 
 
@@ -312,6 +333,7 @@ def _container_name(config: Mapping[str, object], output_base: pathlib.Path) -> 
         "image": config.get("image", ""),
         "layout": config.get("container_layout_version", ""),
         "mount_paths": sorted(str(path) for path in (config.get("mount_paths") or [])),
+        "mount_drives": _drive_letters(_mount_paths(config, output_base)),
         "network": config.get("network", ""),
         "output_base": str(output_base),
         "output_base_generation": config.get("output_base_generation", ""),
@@ -337,13 +359,88 @@ def _scratch_root(config: Mapping[str, object]) -> pathlib.Path:
 
 
 @contextlib.contextmanager
-def _start_lock(config: Mapping[str, object]) -> Iterator[None]:
-    lock_path = _scratch_root(config) / _START_LOCK_FILENAME
+def _start_lock(output_base: pathlib.Path) -> Iterator[None]:
+    lock_path = _container_activity_root(output_base) / _START_LOCK_FILENAME
     with shared.exclusive_file_lock(lock_path, required=True):
         yield
 
 
-def _remove_stale_containers(docker: Sequence[str], workspace: str, keep: str) -> None:
+def _container_activity_root(output_base: pathlib.Path) -> pathlib.Path:
+    # Configurations with different sandbox roots still share one admission lock.
+    return output_base / _RUNNER_SCRATCH_DIRNAME / "container-activity"
+
+
+def _container_idle(docker: Sequence[str], name: str) -> bool:
+    """Recognize only the init/bash/sleep process tree used by our container entrypoint.
+
+    Host locks also protect actions before launch and while retrieving their output.
+    Process inspection protects supervisors left behind by a killed host runner.
+    Older containers cannot be reclaimed while running: their runners do not
+    participate in our admission lock, and could launch after an idle check.
+    """
+    ownership = shared.run(
+        [*docker, "inspect", "-f", f'{{{{index .Config.Labels "{_ACTIVITY_LABEL}"}}}}', name],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if ownership.returncode or (ownership.stdout or "").strip() != "1":
+        return False
+    result = shared.run(
+        [*docker, "top", name, "-eo", "pid,ppid,comm"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode:
+        return False
+    rows = [row.split() for row in (result.stdout or "").splitlines()[1:]]
+    if not rows or any(len(row) != 3 for row in rows):
+        return False
+    init = [row for row in rows if row[2] == "docker-init"]
+    if len(init) != 1:
+        return False
+    shells = [row for row in rows if row[1] == init[0][0] and row[2] == "bash"]
+    if len(shells) != 1:
+        return False
+    other = [row for row in rows if row not in (init[0], shells[0])]
+    return not other or (len(other) == 1 and other[0][1] == shells[0][0] and other[0][2] == "sleep")
+
+
+def _retire_container(
+    docker: Sequence[str], name: str, activity: pathlib.Path, *, wait_seconds: float = 0
+) -> None:
+    """Reclaim an idle container while the workspace startup/admission lock is held."""
+    with contextlib.ExitStack() as locks:
+        owners = [path for path in activity.iterdir() if path.suffix == ".lock"]
+        for owner in owners:
+            if not locks.enter_context(
+                shared.exclusive_file_lock(owner, required=True, blocking=False)
+            ):
+                return
+        result = shared.run(
+            [*docker, "rm", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        if result.returncode:
+            deadline = time.monotonic() + wait_seconds
+            while not _container_idle(docker, name):
+                if time.monotonic() >= deadline:
+                    return
+                # The transport removes status files with detached exec. Let that
+                # last cleanup process exit before reclaiming the container.
+                time.sleep(0.1)
+            result = shared.run(
+                [*docker, "rm", "-f", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+        if result.returncode:
+            return
+    for owner in owners:
+        owner.unlink(missing_ok=True)
+    (activity / "retired").unlink(missing_ok=True)
+    activity.rmdir()
+
+
+def _remove_stale_containers(
+    docker: Sequence[str], workspace: str, keep: str, activity_root: pathlib.Path
+) -> None:
     result = shared.run(
         [
             *docker,
@@ -361,9 +458,13 @@ def _remove_stale_containers(docker: Sequence[str], workspace: str, keep: str) -
         return
     for name in (result.stdout or "").split():
         if name and name != keep:
-            shared.run(
-                [*docker, "rm", "-f", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
+            try:
+                activity = activity_root / name
+                activity.mkdir(parents=True, exist_ok=True)
+                (activity / "retired").touch()
+                _retire_container(docker, name, activity)
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                print(f"WARNING: could not retire action container {name}: {exc}", file=sys.stderr)
 
 
 def _mount_host_drives(
@@ -430,7 +531,7 @@ def _start_container(
     _mount_host_drives(docker, config, output_base)
 
     workspace = _workspace_digest(config, output_base)
-    _remove_stale_containers(docker, workspace, keep=name)
+    _remove_stale_containers(docker, workspace, name, _container_activity_root(output_base))
 
     command = [
         *docker,
@@ -441,6 +542,8 @@ def _start_container(
         name,
         "--label",
         f"{_WORKSPACE_LABEL}={workspace}",
+        "--label",
+        f"{_ACTIVITY_LABEL}=1",
         # Every exec sets its own working directory. Do not point the container at a
         # drive path here: Docker would try to create it, which fails on the read-only
         # drive mounts when the WSL distribution has not mounted the drive yet, hiding
@@ -487,16 +590,40 @@ def _start_container(
         raise SystemExit(1)
 
 
-def _ensure_container(
+@contextlib.contextmanager
+def _container_use(
     docker: Sequence[str], config: Mapping[str, object], output_base: pathlib.Path
-) -> str:
-    name = _container_name(config, output_base)
-    with _start_lock(config):
-        if not engine.start_container_with_recovery(
-            docker, lambda: _start_container(docker, config, name, output_base)
-        ):
-            raise SystemExit(125)
-    return name
+) -> Iterator[str]:
+    """Register ownership atomically with startup, through output retrieval and cleanup."""
+    with contextlib.ExitStack() as locks:
+        with _start_lock(output_base):
+            name = _container_name(config, output_base)
+            activity = _container_activity_root(output_base) / name
+            owner = activity / f"{uuid.uuid4().hex}.lock"
+            locks.enter_context(shared.exclusive_file_lock(owner, required=True))
+            (activity / "retired").unlink(missing_ok=True)
+        try:
+            if not shared.container_running(docker, name):
+                with _start_lock(output_base):
+                    if not engine.start_container_with_recovery(
+                        docker, lambda: _start_container(docker, config, name, output_base)
+                    ):
+                        raise SystemExit(125)
+            yield name
+        finally:
+            locks.close()
+            try:
+                with _start_lock(output_base):
+                    owner.unlink(missing_ok=True)
+                    if (activity / "retired").exists():
+                        _retire_container(
+                            docker,
+                            name,
+                            activity,
+                            wait_seconds=shared.ACTION_HEARTBEAT_INTERVAL_SECONDS,
+                        )
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                print(f"WARNING: could not retire action container {name}: {exc}", file=sys.stderr)
 
 
 def _remove_container(docker: Sequence[str], name: str) -> None:
@@ -565,7 +692,6 @@ def _mount_problems(
                 _container_path(link_probe, prefix).as_posix() if link_probe is not None else "",
                 expected_target,
             ],
-            _scratch_root(config) / shared.ACTION_OUTPUT_LOG_DIRNAME,
             timeout=_PREFLIGHT_COMMAND_TIMEOUT_SECONDS,
         )
     finally:
@@ -608,8 +734,8 @@ def _ensure_preflight_container(config: Mapping[str, object], config_path: pathl
     _verify_engine(docker)
     problems = ""
     for attempt in range(2):
-        name = _ensure_container(docker, config, output_base)
-        problems = _mount_problems(docker, config, name, output_base)
+        with _container_use(docker, config, output_base) as name:
+            problems = _mount_problems(docker, config, name, output_base)
         if not problems:
             print(
                 f"INFO: action container {name} sees the Bazel workspace, output base, and sandbox",
@@ -713,7 +839,6 @@ def _emit_failure_diagnostics(
         container_cwd,
         [],
         ["/bin/sh", "-c", _DIAGNOSTICS_SCRIPT, "diagnostics", container_cwd.as_posix(), tool],
-        _scratch_root(config) / shared.ACTION_OUTPUT_LOG_DIRNAME,
         timeout=_DIAGNOSTIC_COMMAND_TIMEOUT_SECONDS,
     )
     for line in output.rstrip().splitlines():
@@ -967,11 +1092,23 @@ def _run_in_container(
         print(f"ERROR: {exc}", file=sys.stderr)
         return 125
 
-    name = _container_name(config, output_base)
-    if not shared.container_running(docker, name):
-        # The preflight normally leaves the container running; recover if it was stopped or
-        # removed while Bazel was running.
-        name = _ensure_container(docker, config, output_base)
+    with _container_use(docker, config, output_base) as name:
+        return _run_owned_container(
+            config, docker, name, output_base, container_cwd, real_tool, tool_args
+        )
+
+
+def _run_owned_container(
+    config: Mapping[str, object],
+    docker: Sequence[str],
+    name: str,
+    output_base: pathlib.Path,
+    container_cwd: pathlib.PurePosixPath,
+    real_tool: str,
+    tool_args: Sequence[str],
+) -> int:
+    prefix = _drive_mount_prefix(config)
+    cwd = pathlib.Path.cwd()
 
     tool = _container_tool(real_tool, prefix)
     scratch_root = _scratch_root(config)
@@ -1013,7 +1150,6 @@ def _run_in_container(
             container_cwd,
             ["--env-file", str(env_file)],
             command,
-            scratch_root / shared.ACTION_OUTPUT_LOG_DIRNAME,
         )
         if exit_code == 125 and _ENV_FILE_UNSUPPORTED_MARKER in output:
             exit_code, output, launch = shared.run_container_command(
@@ -1022,7 +1158,6 @@ def _run_in_container(
                 container_cwd,
                 _env_args(environment),
                 command,
-                scratch_root / shared.ACTION_OUTPUT_LOG_DIRNAME,
             )
     finally:
         if env_file is not None:

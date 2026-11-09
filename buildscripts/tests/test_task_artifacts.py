@@ -25,6 +25,7 @@ from buildscripts.task_artifacts import (
     main,
     upload_artifact,
 )
+from buildscripts.tests.shell import bash_executable
 
 
 class TaskArtifactsTest(unittest.TestCase):
@@ -54,11 +55,11 @@ class TaskArtifactsTest(unittest.TestCase):
             )
             executable.chmod(0o755)
             shell_workdir = subprocess.check_output(
-                ["bash", "-c", "pwd"], cwd=root, text=True
+                [bash_executable(), "-c", "pwd"], cwd=root, text=True
             ).strip()
             related = '["src/a/file with spaces", "src/b/file with spaces"]'
             subprocess.run(
-                ["bash", str(script)],
+                [bash_executable(), script.as_posix()],
                 cwd=root,
                 env={
                     **os.environ,

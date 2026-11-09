@@ -247,7 +247,6 @@ def _run_in_container(real_tool: pathlib.Path, tool_args: Sequence[str]) -> int:
         pathlib.PurePosixPath(str(mirror_cwd)),
         _exec_env(mirror_cwd),
         [str(real_tool.resolve()), *tool_args],
-        repo_root / ".tmp" / "hermetic_container",
     )
     if output:
         sys.stdout.write(output)

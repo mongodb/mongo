@@ -265,6 +265,11 @@ def _linux_action_sandbox_base(output_base: pathlib.Path) -> pathlib.Path:
     """Return a writable sandbox path that does not overlap the read-only output base."""
     if not output_base.name:
         raise ValueError("Bazel output base cannot be the filesystem root")
+    if isinstance(output_base, pathlib.PureWindowsPath):
+        # Bazel adds a 64-character identity and each input's full execpath.
+        # WSL drive mounts can reject the resulting NTFS symlinks at MAX_PATH,
+        # even when Bazel uses an extended-length Windows path.
+        return output_base.with_name(f"{output_base.name}-s")
     return output_base.with_name(f"{output_base.name}-mongo-action-sandbox")
 
 

@@ -948,11 +948,17 @@ class TestEvergreenYML(unittest.TestCase):
             if unit_test_string in task.name:
                 unit_test_tasks.append(task.name)
 
-        # as of the time of writing this there are 16 different "unit_test_group" task definitions
-        self.assertGreaterEqual(
-            len(unit_test_tasks),
-            16,
-            "Something changed about unittest tasks, please make sure the spawnhost is also updated and update this test after.",
+        # Spawnhost extracts both the split-group archives and shared Bazel outputs.
+        expected_tasks = {
+            f"unit_test_group{group}{suffix}"
+            for group in range(1, 9)
+            for suffix in ("", "_no_sandbox")
+        }
+        self.assertEqual(set(unit_test_tasks), expected_tasks)
+        self.assertTrue(
+            {"unit_tests", "unit_tests_remote_exec_incompatible"}.issubset(
+                {task.name for task in tasks}
+            )
         )
 
 

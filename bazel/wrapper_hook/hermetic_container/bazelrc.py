@@ -271,6 +271,8 @@ def _bazelrc_tokens(
     path: pathlib.Path,
     repo_root: pathlib.Path,
     active_paths: set[pathlib.Path] | None = None,
+    *,
+    excluded_workspace_options: frozenset[tuple[str, ...]] = frozenset(),
 ) -> list[list[str]]:
     """Reads an rc file and its in-place import/try-import directives."""
     try:
@@ -295,7 +297,21 @@ def _bazelrc_tokens(
                 continue
             if tokens and tokens[0] in {"import", "try-import"} and len(tokens) == 2:
                 imported = _resolve_bazelrc_path(tokens[1], repo_root, path.parent)
-                result.extend(_bazelrc_tokens(imported, repo_root, active_paths))
+                result.extend(
+                    _bazelrc_tokens(
+                        imported,
+                        repo_root,
+                        active_paths,
+                        excluded_workspace_options=excluded_workspace_options,
+                    )
+                )
+            elif (
+                resolved == (repo_root / ".bazelrc").resolve()
+                and tuple(tokens) in excluded_workspace_options
+            ):
+                # Ignore only the requested defaults from the workspace RC;
+                # identical options in imported RCs retain their user intent.
+                continue
             elif tokens:
                 result.append(tokens)
     finally:
@@ -320,34 +336,70 @@ def _bazel_effective_options(
     env: Mapping[str, str],
     repo_root: pathlib.Path,
     include_command_line: bool = True,
+    *,
+    excluded_workspace_options: frozenset[tuple[str, ...]] = frozenset(),
+    platform_specific_config: str | None = None,
+    platform_specific_only: bool = False,
 ) -> list[str]:
     """Return Bazel options after applying RC files and config aliases in order.
 
     Bazel reads system, workspace, home, and explicit --bazelrc files in that order.
     Config sections are collected from those files, while ordinary options and config
-    selections are expanded at their original locations. This mirrors the subset of
+    selections are expanded at their original locations within each command scope.
+    Inherited scopes precede more specific scopes, as in Bazel. This mirrors the subset of
     Bazel RC behavior needed before starting Bazel itself.
+
+    A requested platform-specific config expands only when enabled by the effective
+    options. platform_specific_only returns that expansion for callers materializing it.
     """
     command = _bazel_command(args)
-    config_options: dict[str, list[str]] = {}
-    rc_options: list[str] = []
+    scopes = ["common"]
+    if command in {
+        "aquery",
+        "canonicalize-flags",
+        "clean",
+        "coverage",
+        "cquery",
+        "fetch",
+        "info",
+        "mobile-install",
+        "print_action",
+        "run",
+        "test",
+        "vendor",
+    }:
+        scopes.append("build")
+    if command in {"coverage", "cquery", "fetch", "vendor"}:
+        scopes.append("test")
+    if command and command != "common":
+        scopes.append(command)
+    config_options_by_scope: dict[str, dict[str, list[str]]] = {scope: {} for scope in scopes}
+    rc_options_by_scope: dict[str, list[str]] = {scope: [] for scope in scopes}
 
     for path in _bazelrc_paths(args, env, repo_root):
-        for tokens in _bazelrc_tokens(path, repo_root):
+        for tokens in _bazelrc_tokens(
+            path, repo_root, excluded_workspace_options=excluded_workspace_options
+        ):
             if not tokens:
                 continue
 
             scope = tokens[0]
-            if scope in {"common", command}:
-                rc_options.extend(tokens[1:])
+            if scope in rc_options_by_scope:
+                rc_options_by_scope[scope].extend(tokens[1:])
                 continue
 
             # A bare --config=... line in the repository RC declares a config name;
             # it does not select that config. Only command/common lines contribute
             # active options here.
             config_scope, separator, config_name = scope.partition(":")
-            if separator and config_scope in {"common", command}:
-                config_options.setdefault(config_name, []).extend(tokens[1:])
+            if separator and config_scope in config_options_by_scope:
+                config_options_by_scope[config_scope].setdefault(config_name, []).extend(tokens[1:])
+
+    rc_options = [option for scope in scopes for option in rc_options_by_scope[scope]]
+    config_options: dict[str, list[str]] = {}
+    for scope in scopes:
+        for config_name, options in config_options_by_scope[scope].items():
+            config_options.setdefault(config_name, []).extend(options)
 
     def expand(options: Sequence[str], active_configs: frozenset[str] = frozenset()) -> list[str]:
         expanded: list[str] = []
@@ -372,8 +424,10 @@ def _bazel_effective_options(
 
     effective = expand(rc_options)
     command_line_options = _bazel_command_line_options(args)
+    expanded_command_line = expand(command_line_options)
+    all_options = [*effective, *expanded_command_line]
     if include_command_line:
-        effective.extend(expand(command_line_options))
+        effective.extend(expanded_command_line)
     else:
         # RC-only callers still need command-line config selections to expand the
         # corresponding RC aliases, while ordinary command-line options retain their
@@ -389,6 +443,22 @@ def _bazel_effective_options(
                 index += 1
             index += 1
         effective.extend(expand(command_line_configs))
+    if platform_specific_only:
+        effective = []
+    if platform_specific_config is not None:
+        enabled = False
+        for option in all_options:
+            if option == "--enable_platform_specific_config":
+                enabled = True
+            elif option == "--noenable_platform_specific_config":
+                enabled = False
+            elif option.startswith("--enable_platform_specific_config="):
+                enabled = option.split("=", 1)[1].lower() in {"true", "1", "yes", "t", "y"}
+        if enabled:
+            # Bazel expands the automatic host config after explicit options.
+            # Callers opt into this when checking host-specific selections; cross
+            # execution planning must not inherit native host execution defaults.
+            effective.extend(expand([f"--config={platform_specific_config}"]))
     return effective
 
 

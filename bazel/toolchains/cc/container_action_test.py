@@ -7,7 +7,6 @@ import io
 import json
 import os
 import pathlib
-import shutil
 import signal
 import subprocess
 import tarfile
@@ -23,14 +22,52 @@ from bazel.toolchains.cc import container_action as shared
 
 class ContainerActionTest(unittest.TestCase):
     @staticmethod
+    def _state_upload_name(args, kwargs):
+        if args[1:3] != ["cp", "-"]:
+            return ""
+        with tarfile.open(fileobj=io.BytesIO(kwargs["input"])) as tar:
+            return tar.getmembers()[0].name
+
+    def test_action_markers_stream_without_accessing_the_host_filesystem(self):
+        markers = []
+
+        def upload(args, **kwargs):
+            self.assertEqual(args, ["docker", "cp", "-", "container:/tmp/actions"])
+            self.assertFalse(kwargs["text"])
+            with tarfile.open(fileobj=io.BytesIO(kwargs["input"])) as tar:
+                member = tar.getmembers()[0]
+                self.assertEqual(member.mode, 0o644)
+                markers.append((member.name, tar.extractfile(member).read()))
+            return subprocess.CompletedProcess(args, 0)
+
+        with (
+            mock.patch.object(shared, "run", side_effect=upload),
+            mock.patch.object(pathlib.Path, "write_text", side_effect=OSError("slow host disk")),
+        ):
+            for suffix in (shared.ACTION_HEARTBEAT_SUFFIX, shared.ACTION_CANCEL_SUFFIX):
+                for _ in range(2):
+                    self.assertTrue(
+                        shared._write_container_action_state(
+                            ["docker"],
+                            "container",
+                            pathlib.PurePosixPath("/tmp/actions/1.log" + suffix),
+                            time.monotonic() + 5,
+                        )
+                    )
+        self.assertEqual(
+            [name for name, _ in markers], ["1.log.heartbeat"] * 2 + ["1.log.cancel"] * 2
+        )
+        self.assertEqual(len({content for _, content in markers}), 4)
+
+    @staticmethod
     def _container_user_result(args, user=""):
         return subprocess.CompletedProcess(args, 0, json.dumps(user).encode(), b"")
 
     @staticmethod
-    def _probe_archive(contents: bytes) -> bytes:
+    def _probe_archive(contents: bytes, name: str = "result") -> bytes:
         archive = io.BytesIO()
         with tarfile.open(fileobj=archive, mode="w") as tar:
-            member = tarfile.TarInfo("result")
+            member = tarfile.TarInfo(name)
             member.size = len(contents)
             tar.addfile(member, io.BytesIO(contents))
         return archive.getvalue()
@@ -386,7 +423,7 @@ class ContainerActionTest(unittest.TestCase):
                 }
                 interrupt_signal = signal.SIGTERM if "terminate" in failure else signal.SIGINT
 
-                def fake_run(args, *, stdout=None, stderr=None, timeout=None):
+                def fake_run(args, *, stdout=None, stderr=None, timeout=None, **kwargs):
                     nonlocal interrupted, cancellation_sent
                     if args[1] == "exec":
                         index = args.index("container") + 1
@@ -430,14 +467,20 @@ class ContainerActionTest(unittest.TestCase):
                                     interrupted = True
                                     os.kill(os.getpid(), interrupt_signal)
                                 return subprocess.CompletedProcess(args, 1, "", "")
-                            shutil.copyfile(source, pathlib.Path(args[3]) / source.name)
+                            return subprocess.CompletedProcess(
+                                args, 0, self._probe_archive(source.read_bytes(), source.name), b""
+                            )
                         else:
-                            if args[3].endswith(shared.ACTION_CANCEL_SUFFIX):
+                            member_name = self._state_upload_name(args, kwargs)
+                            if member_name.endswith(shared.ACTION_CANCEL_SUFFIX):
                                 if failure.startswith("repeated-"):
                                     os.kill(os.getpid(), signal.SIGINT)
                                     os.kill(os.getpid(), signal.SIGTERM)
                                 cancellation_sent = True
-                            shutil.copyfile(args[2], args[3].split(":", 1)[1])
+                            with tarfile.open(fileobj=io.BytesIO(kwargs["input"])) as tar:
+                                member = tar.getmembers()[0]
+                                destination = pathlib.Path(args[3].split(":", 1)[1]) / member.name
+                                destination.write_bytes(tar.extractfile(member).read())
                     return subprocess.CompletedProcess(args, 0, "", "")
 
                 try:
@@ -479,7 +522,7 @@ class ContainerActionTest(unittest.TestCase):
                             }
                             with self.assertRaises(exception) as caught:
                                 shared.run_container_command(
-                                    ["docker"], "container", root, [], command, root
+                                    ["docker"], "container", root, [], command
                                 )
                             if exception is SystemExit:
                                 self.assertEqual(caught.exception.code, 128 + signal.SIGTERM)
@@ -488,7 +531,7 @@ class ContainerActionTest(unittest.TestCase):
                                 self.assertEqual(signal.getsignal(signum), handler)
                         else:
                             result = shared.run_container_command(
-                                ["docker"], "container", root, [], command, root, timeout=0
+                                ["docker"], "container", root, [], command, timeout=0
                             )
                             self.assertEqual(result[0], 1 if failure == "launch-error" else 125)
                     for process in processes:
@@ -545,7 +588,6 @@ class ContainerActionTest(unittest.TestCase):
             now += seconds
 
         with (
-            tempfile.TemporaryDirectory() as temp_dir,
             mock.patch.object(shared, "run", side_effect=OSError("connection lost")),
             mock.patch.object(shared.time, "monotonic", side_effect=lambda: now),
             mock.patch.object(shared.time, "sleep", side_effect=sleep),
@@ -555,7 +597,6 @@ class ContainerActionTest(unittest.TestCase):
                 ["docker"],
                 "container",
                 pathlib.PurePosixPath("/tmp/action.log"),
-                pathlib.Path(temp_dir),
             )
         self.assertGreaterEqual(
             now,
@@ -576,7 +617,6 @@ class ContainerActionTest(unittest.TestCase):
             signum: signal.getsignal(signum) for signum in (signal.SIGINT, signal.SIGTERM)
         }
         with (
-            tempfile.TemporaryDirectory() as directory,
             mock.patch.object(shared, "run", side_effect=OSError("connection lost")),
             mock.patch.object(shared.time, "monotonic", side_effect=lambda: now),
             mock.patch.object(shared.time, "sleep", side_effect=sleep),
@@ -586,7 +626,6 @@ class ContainerActionTest(unittest.TestCase):
                 ["docker"],
                 "container",
                 pathlib.PurePosixPath("/tmp/action.log"),
-                pathlib.Path(directory),
             )
         self.assertGreaterEqual(
             now, shared.ACTION_LEASE_SECONDS + shared.ACTION_TERMINATION_GRACE_SECONDS
@@ -602,7 +641,7 @@ class ContainerActionTest(unittest.TestCase):
             nonlocal now
             now += seconds
 
-        def stalled(args, *, stdout=None, stderr=None, timeout=None):
+        def stalled(args, *, stdout=None, stderr=None, timeout=None, **kwargs):
             nonlocal now
             self.assertIsNotNone(timeout)
             self.assertGreater(timeout, 0)
@@ -612,7 +651,6 @@ class ContainerActionTest(unittest.TestCase):
             raise subprocess.TimeoutExpired(args, timeout)
 
         with (
-            tempfile.TemporaryDirectory() as directory,
             mock.patch.object(shared, "run", side_effect=stalled),
             mock.patch.object(shared.time, "monotonic", side_effect=lambda: now),
             mock.patch.object(shared.time, "sleep", side_effect=sleep),
@@ -624,7 +662,6 @@ class ContainerActionTest(unittest.TestCase):
                 pathlib.PurePosixPath("/"),
                 [],
                 ["/tool"],
-                pathlib.Path(directory),
                 timeout=0.5,
             )
         self.assertEqual(status, 125)
@@ -635,19 +672,26 @@ class ContainerActionTest(unittest.TestCase):
 
     def test_stalled_polling_cancels_action_and_cleanup_does_not_mask_error(self):
         for stalled_request in ("inspect", "exit", "heartbeat"):
-            with self.subTest(request=stalled_request), tempfile.TemporaryDirectory() as directory:
+            with self.subTest(request=stalled_request):
+                now = 0.0
 
-                def fake_run(args, *, stdout=None, stderr=None, timeout=None):
+                def sleep(seconds):
+                    nonlocal now
+                    now += seconds
+
+                def fake_run(args, *, stdout=None, stderr=None, timeout=None, **kwargs):
+                    nonlocal now
                     self.assertGreater(timeout, 0)
-                    self.assertLessEqual(timeout, 5)
+                    self.assertLessEqual(timeout, 10 if "exec" in args and "-d" in args else 5)
                     is_exit = "cp" in args and args[2].endswith(".exit")
-                    is_heartbeat = "cp" in args and args[3].endswith(".heartbeat")
+                    is_heartbeat = self._state_upload_name(args, kwargs).endswith(".heartbeat")
                     if (
                         args[1] == stalled_request
                         or (stalled_request == "exit" and is_exit)
                         or (stalled_request == "heartbeat" and is_heartbeat)
                         or "/bin/rm" in args
                     ):
+                        now += timeout
                         raise subprocess.TimeoutExpired(args, timeout)
                     return subprocess.CompletedProcess(
                         args, 1 if "cp" in args else 0, "id true started", ""
@@ -655,6 +699,8 @@ class ContainerActionTest(unittest.TestCase):
 
                 with (
                     mock.patch.object(shared, "run", side_effect=fake_run),
+                    mock.patch.object(shared.time, "monotonic", side_effect=lambda: now),
+                    mock.patch.object(shared.time, "sleep", side_effect=sleep),
                     mock.patch.object(shared, "_cancel_container_action") as cancel,
                 ):
                     status, output, _ = shared.run_container_command(
@@ -663,19 +709,178 @@ class ContainerActionTest(unittest.TestCase):
                         pathlib.PurePosixPath("/"),
                         [],
                         ["/tool"],
-                        pathlib.Path(directory),
                         timeout=10,
                     )
                 self.assertEqual(status, 125)
                 self.assertIn("Docker request", output)
                 cancel.assert_called_once()
 
+    def test_slow_detached_launch_renews_its_original_lease_without_relaunching(self):
+        runtime, calls, files = self._fake_container_runtime({"/tool": ("compiled\n", 0)})
+        now = 0.0
+        events = []
+
+        def slow_launch(args, **kwargs):
+            nonlocal now
+            if shared.ACTION_OUTPUT_CAPTURE_SCRIPT in args:
+                self.assertGreater(kwargs["timeout"], 12)
+                self.assertLess(kwargs["timeout"], shared.ACTION_LEASE_SECONDS)
+                now += 12
+                events.append("launch")
+            elif self._state_upload_name(args, kwargs).endswith(".heartbeat"):
+                events.append("heartbeat")
+                return subprocess.CompletedProcess(args, 0, "", "")
+            elif args[1] == "cp" and args[2].endswith(".exit"):
+                events.append("poll")
+            return runtime(args, **kwargs)
+
+        with (
+            mock.patch.object(shared, "run", side_effect=slow_launch),
+            mock.patch.object(shared.time, "monotonic", side_effect=lambda: now),
+            mock.patch.object(shared, "_cancel_container_action") as cancel,
+        ):
+            status, output, _ = shared.run_container_command(
+                ["docker"],
+                "container",
+                pathlib.PurePosixPath("/"),
+                [],
+                ["/tool"],
+                timeout=60,
+            )
+        self.assertEqual(status, 0, output)
+        self.assertEqual(output, "compiled\n")
+        self.assertEqual(events[:3], ["launch", "heartbeat", "poll"])
+        self.assertEqual(events.count("launch"), 1)
+        cancel.assert_not_called()
+
+    def test_missing_exit_files_preserve_the_container_inspection_interval(self):
+        runtime, calls, _ = self._fake_container_runtime({"/tool": ("compiled\n", 0)})
+        exit_polls = 0
+
+        def running_tool(args, **kwargs):
+            nonlocal exit_polls
+            if args[1] == "cp" and args[2].endswith(".exit"):
+                exit_polls += 1
+                if exit_polls <= 16:
+                    return subprocess.CompletedProcess(args, 1, b"", b"Could not find the file")
+            return runtime(args, **kwargs)
+
+        with (
+            mock.patch.object(shared, "run", side_effect=running_tool),
+            mock.patch.object(shared.time, "sleep"),
+        ):
+            status, output, _ = shared.run_container_command(
+                ["docker"], "container", pathlib.PurePosixPath("/"), [], ["/tool"]
+            )
+
+        self.assertEqual((status, output), (0, "compiled\n"))
+        self.assertEqual(exit_polls, 17)
+        self.assertEqual(sum(call[1] == "inspect" for call in calls), 3)
+
+    def test_transient_polling_timeouts_preserve_the_running_action(self):
+        for request in ("inspect", "exit", "heartbeat"):
+            with self.subTest(request=request):
+                runtime, calls, files = self._fake_container_runtime({"/tool": ("linked\n", 0)})
+                failures = 2
+                now = 0.0
+                exit_polls = 0
+                heartbeats = []
+
+                def sleep(seconds):
+                    nonlocal now
+                    now += seconds
+
+                def flaky(args, **kwargs):
+                    nonlocal failures, now, exit_polls
+                    is_exit = args[1] == "cp" and args[2].endswith(".exit")
+                    is_heartbeat = self._state_upload_name(args, kwargs).endswith(".heartbeat")
+                    if failures and (
+                        (request == "inspect" and args[1] == "inspect")
+                        or (request == "exit" and is_exit)
+                        or (request == "heartbeat" and is_heartbeat)
+                    ):
+                        failures -= 1
+                        now += kwargs["timeout"]
+                        raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+                    if is_heartbeat:
+                        heartbeats.append(now)
+                        return subprocess.CompletedProcess(args, 0, "", "")
+                    if is_exit:
+                        exit_polls += 1
+                        if exit_polls < 32:
+                            return subprocess.CompletedProcess(args, 1, "", "")
+                    return runtime(args, **kwargs)
+
+                with (
+                    mock.patch.object(shared, "run", side_effect=flaky),
+                    mock.patch.object(shared.time, "monotonic", side_effect=lambda: now),
+                    mock.patch.object(shared.time, "sleep", side_effect=sleep),
+                    mock.patch.object(shared, "_cancel_container_action") as cancel,
+                ):
+                    status, output, _ = shared.run_container_command(
+                        ["docker"],
+                        "container",
+                        pathlib.PurePosixPath("/"),
+                        [],
+                        ["/tool"],
+                        timeout=60,
+                    )
+                self.assertEqual(status, 0, output)
+                self.assertEqual(output, "linked\n")
+                self.assertEqual(failures, 0)
+                self.assertTrue(heartbeats)
+                cancel.assert_not_called()
+                self.assertEqual(
+                    sum(shared.ACTION_OUTPUT_CAPTURE_SCRIPT in call for call in calls), 1
+                )
+
+    def test_failed_heartbeats_cannot_extend_the_supervisor_lease(self):
+        for times_out in (False, True):
+            with self.subTest(times_out=times_out):
+                now = 0.0
+                heartbeats = []
+
+                def sleep(seconds):
+                    nonlocal now
+                    now += seconds
+
+                def fake_run(args, **kwargs):
+                    nonlocal now
+                    if self._state_upload_name(args, kwargs).endswith(".heartbeat"):
+                        heartbeats.append(now)
+                        if times_out:
+                            now += kwargs["timeout"]
+                            raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+                        return subprocess.CompletedProcess(args, 1, "", "")
+                    return subprocess.CompletedProcess(
+                        args, 1 if args[1] == "cp" else 0, "id true started", ""
+                    )
+
+                with (
+                    mock.patch.object(shared, "run", side_effect=fake_run),
+                    mock.patch.object(shared.time, "monotonic", side_effect=lambda: now),
+                    mock.patch.object(shared.time, "sleep", side_effect=sleep),
+                    mock.patch.object(shared, "_cancel_container_action") as cancel,
+                ):
+                    status, output, _ = shared.run_container_command(
+                        ["docker"],
+                        "container",
+                        pathlib.PurePosixPath("/"),
+                        [],
+                        ["/tool"],
+                        timeout=60,
+                    )
+                self.assertEqual(status, 125)
+                self.assertIn("Docker request", output)
+                self.assertGreater(len(heartbeats), 1)
+                self.assertLessEqual(now, shared.ACTION_LEASE_SECONDS)
+                cancel.assert_called_once()
+
     def test_output_copy_retries_and_retains_unrecoverable_logs(self):
-        for failures in (0, 1, 100):
+        for failures in (0, 1, 1000):
             for output in ("", "compiler diagnostic\n"):
                 with (
                     self.subTest(failures=failures, output=output),
-                    tempfile.TemporaryDirectory() as directory,
                 ):
                     runtime, calls, files = self._fake_container_runtime({"/tool": (output, 0)})
                     remaining_failures = failures
@@ -689,7 +894,7 @@ class ContainerActionTest(unittest.TestCase):
                         nonlocal remaining_failures
                         if "cp" in args and args[2].endswith(".log") and remaining_failures:
                             remaining_failures -= 1
-                            return subprocess.CompletedProcess(args, 1, "", "connection reset")
+                            return subprocess.CompletedProcess(args, 1, b"", b"connection reset")
                         return runtime(args, **kwargs)
 
                     with (
@@ -703,11 +908,11 @@ class ContainerActionTest(unittest.TestCase):
                             pathlib.PurePosixPath("/"),
                             [],
                             ["/tool"],
-                            pathlib.Path(directory),
                         )
-                    if failures == 100:
+                    if failures == 1000:
                         self.assertEqual(status, 125)
                         self.assertIn("log retained at container:", actual_output)
+                        self.assertIn("connection reset", actual_output)
                         self.assertFalse(any("/bin/rm" in call for call in calls))
                         self.assertEqual(now, shared.ACTION_LOG_TIMEOUT_SECONDS)
                     else:
@@ -715,11 +920,64 @@ class ContainerActionTest(unittest.TestCase):
                         self.assertEqual(actual_output, output)
                         self.assertTrue(any("/bin/rm" in call for call in calls))
 
+    def test_completed_action_retries_slow_log_transfers(self):
+        runtime, _, _ = self._fake_container_runtime({"/tool": ("diagnostic\n", 7)})
+        now = 0.0
+        failures = 2
+
+        def flaky(args, **kwargs):
+            nonlocal now, failures
+            if args[1] == "cp" and args[2].endswith(".log") and failures:
+                failures -= 1
+                now += kwargs["timeout"]
+                raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+            return runtime(args, **kwargs)
+
+        def sleep(seconds):
+            nonlocal now
+            now += seconds
+
+        with (
+            mock.patch.object(shared, "run", side_effect=flaky),
+            mock.patch.object(shared.time, "monotonic", side_effect=lambda: now),
+            mock.patch.object(shared.time, "sleep", side_effect=sleep),
+        ):
+            status, output, _ = shared.run_container_command(
+                ["docker"], "container", pathlib.PurePosixPath("/"), [], ["/tool"]
+            )
+        self.assertEqual((status, output), (7, "diagnostic\n"))
+        self.assertGreater(now, 5)
+        self.assertEqual(failures, 0)
+
+    def test_container_file_stream_rejects_invalid_archives(self):
+        path = pathlib.PurePosixPath("/tmp/result")
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w") as tar:
+            member = tarfile.TarInfo("result")
+            member.type = tarfile.DIRTYPE
+            tar.addfile(member)
+        for archive in (b"not a tar", buffer.getvalue()):
+            with mock.patch.object(
+                shared, "run", return_value=subprocess.CompletedProcess([], 0, archive, b"")
+            ):
+                with self.assertRaises(OSError):
+                    shared._read_container_file(["docker"], "container", path, time.monotonic() + 5)
+
+    def test_container_output_replaces_invalid_utf8(self):
+        archive = self._probe_archive(b"compiler: \xff\n", "result")
+        with mock.patch.object(
+            shared, "run", return_value=subprocess.CompletedProcess([], 0, archive, b"")
+        ):
+            output = shared._collect_action_output(
+                ["docker"], "container", pathlib.PurePosixPath("/tmp/result")
+            )
+        self.assertEqual(output, "compiler: \ufffd\n")
+
     def test_helper_start_inspect_logs_and_cleanup_use_deadlines(self):
         for failure in ("run", "inspect", "logs", "rm"):
             calls = []
 
-            def fake_run(args, *, stdout=None, stderr=None, timeout=None):
+            def fake_run(args, *, stdout=None, stderr=None, timeout=None, **kwargs):
                 self.assertIsNotNone(timeout)
                 self.assertGreater(timeout, 0)
                 self.assertLessEqual(timeout, 0.5 if args[1] != "rm" else 5)
@@ -791,7 +1049,7 @@ class ContainerActionTest(unittest.TestCase):
         calls: list[list[str]] = []
         capture_script = shared.ACTION_OUTPUT_CAPTURE_SCRIPT
 
-        def fake_run(args, *, stdout=None, stderr=None, timeout=None):
+        def fake_run(args, *, stdout=None, stderr=None, timeout=None, **kwargs):
             calls.append(list(args))
             if "info" in args:
                 return subprocess.CompletedProcess(
@@ -808,16 +1066,20 @@ class ContainerActionTest(unittest.TestCase):
                 container_files[f"{log_path}.exit"] = f"{status}\n"
                 return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
             if "cp" in args:
+                if not args[2].startswith("container:"):
+                    return subprocess.CompletedProcess(args, 0, "", "")
                 source = args[args.index("cp") + 1].split(":", 1)[1]
-                destination = pathlib.Path(args[args.index("cp") + 2])
                 if source not in container_files:
                     return subprocess.CompletedProcess(
                         args=args, returncode=1, stdout="", stderr="Could not find the file\n"
                     )
-                (destination / pathlib.PurePosixPath(source).name).write_text(
-                    container_files[source], encoding="utf-8"
-                )
-                return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+                archive = io.BytesIO()
+                with tarfile.open(fileobj=archive, mode="w") as tar:
+                    data = container_files[source].encode("utf-8")
+                    member = tarfile.TarInfo(pathlib.PurePosixPath(source).name)
+                    member.size = len(data)
+                    tar.addfile(member, io.BytesIO(data))
+                return subprocess.CompletedProcess(args, 0, archive.getvalue(), b"")
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
 
         return fake_run, calls, container_files
@@ -829,14 +1091,19 @@ class ContainerActionTest(unittest.TestCase):
                 {"/z/toolchain/llvm/bin/lld": ("lld: error while loading shared libraries\n", 127)}
             )
 
-            with mock.patch.object(shared, "run", side_effect=fake_run):
+            with (
+                mock.patch.object(shared, "run", side_effect=fake_run),
+                mock.patch.object(pathlib.Path, "mkdir", side_effect=OSError("busy host disk")),
+                mock.patch.object(
+                    pathlib.Path, "write_text", side_effect=OSError("busy host disk")
+                ),
+            ):
                 exit_code, output, launch = shared.run_container_command(
                     ["docker"],
                     "container",
                     pathlib.Path("/mongo-execroot"),
                     ["-e", "LIB=/z/lib"],
                     ["/z/toolchain/llvm/bin/lld", "-flavor", "link", "@params"],
-                    repo_root,
                 )
 
             self.assertEqual(exit_code, 127)
@@ -851,55 +1118,51 @@ class ContainerActionTest(unittest.TestCase):
                 any(
                     "cp" in call
                     and call[call.index("cp") + 1].startswith("container:/tmp/mongo-cross-actions/")
+                    and call[-1] == "-"
                     for call in calls
                 )
             )
-            # The host scratch directory is removed again.
+            # Action results never create files in the host directory.
             log_dir = repo_root
             self.assertEqual(list(log_dir.iterdir()), [])
 
     def test_run_container_command_reports_exec_start_failures_and_timeouts(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo_root = pathlib.Path(temp_dir).resolve()
+        with mock.patch.object(
+            shared,
+            "run",
+            return_value=subprocess.CompletedProcess(
+                args=[], returncode=1, stdout="", stderr="Error: No such container: x\n"
+            ),
+        ):
+            with mock.patch.object(shared, "_cancel_container_action") as cancel:
+                exit_code, output, _ = shared.run_container_command(
+                    ["docker"], "x", pathlib.Path("/"), [], ["/tool"]
+                )
+            cancel.assert_called_once()
+        self.assertEqual(exit_code, 1)
+        self.assertIn("No such container", output)
 
-            with mock.patch.object(
-                shared,
-                "run",
-                return_value=subprocess.CompletedProcess(
-                    args=[], returncode=1, stdout="", stderr="Error: No such container: x\n"
-                ),
-            ):
-                with mock.patch.object(shared, "_cancel_container_action") as cancel:
-                    exit_code, output, _ = shared.run_container_command(
-                        ["docker"], "x", pathlib.Path("/"), [], ["/tool"], repo_root
-                    )
-                cancel.assert_called_once()
-            self.assertEqual(exit_code, 1)
-            self.assertIn("No such container", output)
+        def never_completes(args, *, stdout=None, stderr=None, timeout=None, **kwargs):
+            # exec -d succeeds, but docker cp never finds the status file.
+            if "cp" in args:
+                return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="")
+            if "inspect" in args:
+                return subprocess.CompletedProcess(args, 0, "container-id true started\n", "")
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
 
-            def never_completes(args, *, stdout=None, stderr=None, timeout=None):
-                # exec -d succeeds, but docker cp never finds the status file.
-                if "cp" in args:
-                    return subprocess.CompletedProcess(
-                        args=args, returncode=1, stdout="", stderr=""
-                    )
-                if "inspect" in args:
-                    return subprocess.CompletedProcess(args, 0, "container-id true started\n", "")
-                return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
-
-            with mock.patch.object(shared, "run", side_effect=never_completes):
-                with mock.patch.object(shared, "_cancel_container_action") as cancel:
-                    exit_code, output, _ = shared.run_container_command(
-                        ["docker"], "x", pathlib.Path("/"), [], ["/tool"], repo_root, timeout=0.0
-                    )
-                cancel.assert_called_once()
-            self.assertEqual(exit_code, 125)
-            self.assertIn("did not report completion", output)
+        with mock.patch.object(shared, "run", side_effect=never_completes):
+            with mock.patch.object(shared, "_cancel_container_action") as cancel:
+                exit_code, output, _ = shared.run_container_command(
+                    ["docker"], "x", pathlib.Path("/"), [], ["/tool"], timeout=0.0
+                )
+            cancel.assert_called_once()
+        self.assertEqual(exit_code, 125)
+        self.assertIn("did not report completion", output)
 
     def test_mount_windows_drives_in_docker_vm_uses_a_privileged_helper(self):
         calls: list[list[str]] = []
 
-        def fake_run(args, *, stdout=None, stderr=None, timeout=None):
+        def fake_run(args, *, stdout=None, stderr=None, timeout=None, **kwargs):
             calls.append(list(args))
             if "run" in args:
                 return subprocess.CompletedProcess(
@@ -974,7 +1237,7 @@ class ContainerActionTest(unittest.TestCase):
             )
 
     def test_mount_windows_drives_in_docker_vm_reports_failures(self):
-        def fake_run(args, *, stdout=None, stderr=None, timeout=None):
+        def fake_run(args, *, stdout=None, stderr=None, timeout=None, **kwargs):
             if "run" in args:
                 return subprocess.CompletedProcess(
                     args=args, returncode=0, stdout="abc123\n", stderr=""
@@ -1000,31 +1263,27 @@ class ContainerActionTest(unittest.TestCase):
         self.assertIn("unknown filesystem type", detail)
 
     def test_run_container_command_stops_when_the_container_is_replaced(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo_root = pathlib.Path(temp_dir).resolve()
-            identities = iter(["sha256:old", "sha256:new"])
+        identities = iter(["sha256:old", "sha256:new"])
 
-            def fake_run(args, *, stdout=None, stderr=None, timeout=None):
-                if "inspect" in args:
-                    return subprocess.CompletedProcess(
-                        args=args,
-                        returncode=0,
-                        stdout=next(identities, "sha256:new") + " true started\n",
-                        stderr="",
-                    )
-                if "cp" in args:
-                    return subprocess.CompletedProcess(
-                        args=args, returncode=1, stdout="", stderr=""
-                    )
-                return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
-
-            with (
-                mock.patch.object(shared, "run", side_effect=fake_run),
-                mock.patch.object(shared, "ACTION_COMPLETION_POLL_SECONDS", 0.0),
-            ):
-                exit_code, output, _ = shared.run_container_command(
-                    ["docker"], "x", pathlib.Path("/"), [], ["/tool"], repo_root, timeout=30.0
+        def fake_run(args, *, stdout=None, stderr=None, timeout=None, **kwargs):
+            if "inspect" in args:
+                return subprocess.CompletedProcess(
+                    args=args,
+                    returncode=0,
+                    stdout=next(identities, "sha256:new") + " true started\n",
+                    stderr="",
                 )
+            if "cp" in args:
+                return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="")
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(shared, "run", side_effect=fake_run),
+            mock.patch.object(shared, "ACTION_COMPLETION_POLL_SECONDS", 0.0),
+        ):
+            exit_code, output, _ = shared.run_container_command(
+                ["docker"], "x", pathlib.Path("/"), [], ["/tool"], timeout=30.0
+            )
         self.assertEqual(exit_code, 125)
         self.assertIn("was replaced", output)
 
@@ -1033,7 +1292,7 @@ class ContainerActionTest(unittest.TestCase):
             ("container-id false started", "stopped"),
             ("container-id true restarted", "restarted"),
         ):
-            with self.subTest(state=state), tempfile.TemporaryDirectory() as directory:
+            with self.subTest(state=state):
                 now = 0.0
                 states = iter(["container-id true started", state])
 
@@ -1059,22 +1318,15 @@ class ContainerActionTest(unittest.TestCase):
                         pathlib.PurePosixPath("/"),
                         [],
                         ["/tool"],
-                        pathlib.Path(directory),
                     )
                 self.assertEqual(status, 125)
                 self.assertIn(detail, output)
                 cancel.assert_not_called()
 
-    def test_read_exit_file(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            exit_file = pathlib.Path(temp_dir) / "action.log.exit"
-            self.assertIsNone(shared._read_exit_file(exit_file))
-            exit_file.write_text("", encoding="utf-8")
-            self.assertIsNone(shared._read_exit_file(exit_file))
-            exit_file.write_text("3\n", encoding="utf-8")
-            self.assertEqual(shared._read_exit_file(exit_file), 3)
-            exit_file.write_text("garbage\n", encoding="utf-8")
-            self.assertEqual(shared._read_exit_file(exit_file), 125)
+    def test_parse_exit_status(self):
+        self.assertIsNone(shared._parse_exit_status(b""))
+        self.assertEqual(shared._parse_exit_status(b"3\n"), 3)
+        self.assertEqual(shared._parse_exit_status(b"garbage\n"), 125)
 
     def test_read_and_remove_output_log(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1125,6 +1377,32 @@ class ContainerActionTest(unittest.TestCase):
                 shared.exclusive_file_lock(pathlib.Path(temp_dir) / "config.lock", required=True),
             ):
                 self.fail("Required locking must not silently continue")
+
+    @unittest.skipIf(shared.fcntl is None, "POSIX lock contention test")
+    def test_nonblocking_lock_reports_contention_and_can_be_reacquired(self):
+        with tempfile.TemporaryDirectory() as directory:
+            lock = pathlib.Path(directory) / "action.lock"
+            with shared.exclusive_file_lock(lock, required=True):
+                with shared.exclusive_file_lock(lock, required=True, blocking=False) as acquired:
+                    self.assertFalse(acquired)
+            with shared.exclusive_file_lock(lock, required=True, blocking=False) as acquired:
+                self.assertTrue(acquired)
+
+    def test_nonblocking_windows_lock_does_not_wait_or_unlock_another_owner(self):
+        runtime = mock.Mock(LK_NBLCK=3, LK_UNLCK=2)
+        runtime.locking.side_effect = OSError(errno.EACCES, "locked")
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                mock.patch.object(shared, "fcntl", None),
+                mock.patch.object(shared, "msvcrt", runtime),
+                mock.patch.object(shared.time, "sleep") as sleep,
+                shared.exclusive_file_lock(
+                    pathlib.Path(directory) / "action.lock", required=True, blocking=False
+                ) as acquired,
+            ):
+                self.assertFalse(acquired)
+        sleep.assert_not_called()
+        self.assertEqual(runtime.locking.call_count, 1)
 
     def test_windows_lock_does_not_retry_permanent_errors(self):
         runtime = mock.Mock(LK_NBLCK=3, LK_UNLCK=2)

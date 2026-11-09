@@ -11,10 +11,25 @@ from io import StringIO
 from unittest import mock
 
 from bazel.toolchains.cc import container_action
-from bazel.wrapper_hook.hermetic_container import container_actions
+from bazel.wrapper_hook.hermetic_container import container_actions, fsutil
 
 
 class ContainerActionsTest(unittest.TestCase):
+    def test_windows_sandbox_keeps_toolchain_input_paths_below_max_path(self):
+        output_base = pathlib.PureWindowsPath("Z:/b/b")
+        sandbox = fsutil._linux_action_sandbox_base(output_base)
+        input_path = (
+            sandbox
+            / ("bazel-sandbox." + "a" * 64)
+            / "persistent-container/999/execroot/_main/external/+setup_mongo_windows_cross_toolchain_extension+mongo_windows_cross_toolchain_files/case_insensitive_vfs.yaml"
+        )
+        self.assertLess(len(str(input_path)), 260)
+        self.assertEqual(sandbox.parent, output_base.parent)
+        self.assertNotEqual(sandbox, output_base)
+        self.assertNotEqual(
+            sandbox, fsutil._linux_action_sandbox_base(output_base.with_name("other"))
+        )
+
     def test_config_lock_requires_a_locking_api(self):
         with tempfile.TemporaryDirectory() as temporary:
             with (
@@ -71,6 +86,19 @@ class ContainerActionsTest(unittest.TestCase):
                 f"--experimental_persistent_container_worker_dir={sandbox / 'persistent-workers'}",
                 f"--sandbox_base={sandbox}",
             ],
+        )
+
+    def test_windows_sandboxes_do_not_reuse_linux_reparse_points(self):
+        output_base = pathlib.PureWindowsPath("Z:/b/b")
+        options = container_actions.persistent_container_options(
+            output_base, pathlib.Path("runner.py")
+        )
+        self.assertIn("--noexperimental_reuse_sandbox_directories", options)
+        self.assertNotIn(
+            "--noexperimental_reuse_sandbox_directories",
+            container_actions.persistent_container_options(
+                pathlib.Path("/b/b"), pathlib.Path("runner.py")
+            ),
         )
 
     def test_preflight_preserves_platform_output_policy(self):

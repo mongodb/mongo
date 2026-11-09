@@ -63,6 +63,7 @@ py_test(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts/resmokelib",
+        "//buildscripts/tests:shell",
         dependency(
             "mock",
             group = "testing",
