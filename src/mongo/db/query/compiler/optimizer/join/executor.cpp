@@ -4,7 +4,6 @@
 #include "mongo/db/query/compiler/optimizer/join/executor.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/namespace_string_util.h"
@@ -12,15 +11,14 @@
 #include "mongo/db/pipeline/document_source_internal_join_hint.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
-#include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
 #include "mongo/db/query/compiler/optimizer/join/fallback_reason.h"
 #include "mongo/db/query/compiler/optimizer/join/hint.h"
-#include "mongo/db/query/compiler/optimizer/join/index_fingerprint.h"
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
+#include "mongo/db/query/compiler/optimizer/join/join_plan_cache_util.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 #include "mongo/db/query/compiler/optimizer/join/server_status_metrics.h"
@@ -34,8 +32,6 @@
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_join_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/sbe_plan_ranker.h"
-#include "mongo/db/query/sbe_trial_runtime_executor.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -47,6 +43,7 @@
 #include "mongo/util/timer.h"
 
 #include <algorithm>
+#include <variant>
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryJoin
 
 namespace mongo::join_ordering {
@@ -60,33 +57,6 @@ MONGO_FAIL_POINT_DEFINE(sleepWhileLoweringJoinPlanToSbe);
 MONGO_FAIL_POINT_DEFINE(sleepWhileEnumeratingJoinPlans);
 
 namespace {
-/**
- * Number of times a usable plan was found in the join plan cache. Exposed in serverStatus as
- * 'metrics.query.planCache.join.hits'.
- */
-auto& joinPlanCacheHits = *MetricBuilder<Counter64>{"query.planCache.join.hits"};
-
-/**
- * Number of times no usable plan was found in the join plan cache (either absent or stale).
- * Exposed in serverStatus as 'metrics.query.planCache.join.misses'.
- */
-auto& joinPlanCacheMisses = *MetricBuilder<Counter64>{"query.planCache.join.misses"};
-
-/**
- * Number of times a cached plan was found but had gone stale and was evicted, a subset of
- * 'joinPlanCacheMisses'. Exposed in serverStatus as
- * 'metrics.query.planCache.join.invalidations'.
- */
-auto& joinPlanCacheInvalidations = *MetricBuilder<Counter64>{"query.planCache.join.invalidations"};
-
-/** Number of plans not cached because their baseline exceeded the cache-eligibility threshold. */
-auto& joinPlanCacheBaselineOverThreshold =
-    *MetricBuilder<Counter64>{"query.planCache.join.baselineOverThreshold"};
-
-/** Number of plans not cached because their baseline trial hit the stash byte cap. */
-auto& joinPlanCacheBaselineOverStashMemoryLimit =
-    *MetricBuilder<Counter64>{"query.planCache.join.baselineOverStashMemoryLimit"};
-
 PlanTreeShape getPlanTreeShape(JoinPlanTreeShapeEnum shape) {
     switch (shape) {
         case JoinPlanTreeShapeEnum::kLeftDeep:
@@ -355,8 +325,8 @@ lowerToSbePlanStageTree(OperationContext* opCtx,
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, mca, baseNss);
     auto planStagesAndData = stage_builder::buildSlotBasedExecutableTree(
         opCtx, mca, baseCQ, soln, sbeYieldPolicy.get(), estimates);
+    // Skipped for explain's rejected plans and for plans that runJoinTrial() prepares instead.
     if (prepare) {
-        // We don't need to prepare plans if we're not planning to execute them.
         stage_builder::prepareSlotBasedExecutableTree(opCtx,
                                                       planStagesAndData.first.get(),
                                                       &planStagesAndData.second,
@@ -367,51 +337,6 @@ lowerToSbePlanStageTree(OperationContext* opCtx,
                                                       /*remoteCursors=*/nullptr);
     }
     return std::make_pair(std::move(planStagesAndData), std::move(sbeYieldPolicy));
-}
-
-/**
- * Prepares an SBE plan, and runs it as a trial of up to 'maxNumResults' documents with 'tracker'
- * attached, buffering the results into the returned candidate. Throws if the plan fails during the
- * trial.
- */
-sbe::plan_ranker::CandidatePlan runJoinTrial(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& mca,
-    const CanonicalQuery& baseCQ,
-    PlanYieldPolicySBE* yieldPolicy,
-    std::unique_ptr<QuerySolution> soln,
-    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> planStagesAndData,
-    std::unique_ptr<TrialRunTracker> tracker,
-    size_t maxNumResults) {
-    sbe::plan_ranker::CandidatePlan candidate{
-        .solution = std::move(soln),
-        .root = std::move(planStagesAndData.first),
-        .data = sbe::plan_ranker::CandidatePlanData{std::move(planStagesAndData.second)},
-        .status = Status::OK(),
-        .fromPlanCache = false};
-    // TrialRuntimeExecutor reads the tracker through the candidate, so the candidate must own it.
-    candidate.data.tracker = std::move(tracker);
-    candidate.root->attachToTrialRunTracker(candidate.data.tracker.get());
-    ON_BLOCK_EXIT([rootPtr = candidate.root.get()] { rootPtr->detachFromTrialRunTracker(); });
-
-    // Never fires here: nothing yields before the check. DDL during the trial is caught on restore.
-    const AllIndicesRequiredChecker indexExistenceChecker{mca};
-    sbe::TrialRuntimeExecutor trialExecutor{
-        opCtx,
-        mca,
-        baseCQ,
-        yieldPolicy,
-        indexExistenceChecker,
-        static_cast<size_t>(
-            baseCQ.getExpCtx()->getQueryKnobConfiguration().getSbePlanEvaluationMaxMemoryBytes())};
-
-    trialExecutor.prepareCandidate(&candidate, /*preparingFromCache=*/false);
-    while (trialExecutor.fetchNextDocument(&candidate, maxNumResults)) {
-    }
-
-    // The trial executor reports recoverable failures through the status instead of throwing.
-    uassertStatusOK(candidate.status);
-    return candidate;
 }
 
 /**
@@ -513,172 +438,77 @@ MultipleCollectionAccessor makeGraphOnlyCollectionAccessor(const MultipleCollect
     return MultipleCollectionAccessor(std::move(mainAcq), std::move(secondaries), false);
 }
 
+struct LoweredJoinPlan {
+    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> planStagesAndData;
+    std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
+    size_t plannerOptions;
+};
+
 /**
- * Returns true if the cached entry 'hit' can still be used against the current catalog, and false
- * if it is stale and the query must be replanned.
- *
- * 'planCacheKeyHex' is an output parameter, left empty on the fast 'kCurrent' path and otherwise
- * filled lazily with the formatted plan cache key once a log line fires.
- *
- * A bumped collection version alone is not enough to reject the entry. The DDL responsible may have
- * touched an index this plan could never use, or one it considered but did not choose; neither can
- * change which plan the optimizer would pick now. The per-node index fingerprints tell the two
- * cases apart from an index change that does matter.
+ * Lowers a winning join plan rooted at 'baseNode' to SBE, shared by the cache hit and miss paths.
  */
-bool validateCacheEntry(JoinPlanCacheEntry& hit,
-                        const MultipleCollectionAccessor& graphOnlyMca,
-                        const AggJoinModel& model,
-                        const AvailableIndexes& perCollIdxs,
-                        const JoinPlanCacheKey& cacheKey,
-                        std::string& planCacheKeyHex) {
-    auto cachedTags = hit.getCollectionTags();
-    auto validation = classifyCollectionTags(cachedTags, graphOnlyMca);
+LoweredJoinPlan lowerWinningJoinPlan(OperationContext* opCtx,
+                                     const AggJoinModel& model,
+                                     const MultipleCollectionAccessor& mca,
+                                     PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                     NodeId baseNode,
+                                     const QuerySolution& soln,
+                                     const cost_based_ranker::EstimateMap* estimates,
+                                     bool prepare,
+                                     OpDebug::JoinOptimizationMetrics& metrics) {
+    // Merge join-field non-array path learnings into the chosen base node's expCtx so the
+    // PathArraynessChecker monitors them during execution yields.
+    auto* baseExpCtx = model.getGraph().accessPathAt(baseNode)->getExpCtx().get();
+    baseExpCtx->mergeNonArrayPathsForNss(model.getJoinExpCtx()->getNonArrayPathsForNss());
+    baseExpCtx->mergeSchemaTypeInfoUsageFrom(*model.getJoinExpCtx());
 
-    // The formatted plan cache key costs a hash pass over the whole key plus an allocation, so only
-    // compute it when a log line will actually be emitted; the value lands in 'planCacheKeyHex' so
-    // this function's reason logs and the caller's removal log share it instead of hashing twice.
-    const auto getPlanCacheKeyHex = [&]() -> const std::string& {
-        if (planCacheKeyHex.empty()) {
-            planCacheKeyHex = joinPlanCacheKeyForLog(cacheKey);
-        }
-        return planCacheKeyHex;
-    };
+    auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(
+        opCtx, model.getGraph(), yieldPolicy, mca, baseNode, soln, estimates, prepare, metrics);
 
-    switch (validation.status) {
-        case CollectionTagStatus::kCurrent:
-            // Nothing has changed since the entry was cached, so no fingerprinting is needed.
-            return true;
-        case CollectionTagStatus::kStale:
-            // A stale tag can mean a dropped collection or a sample refresh.
-            if (validation.droppedCollectionUuid) {
-                LOGV2(12926600,
-                      "Join plan cache entry references a collection which no longer exists",
-                      "planCacheKey"_attr = getPlanCacheKeyHex(),
-                      "planShape"_attr = hit.joinTree ? hit.joinTree->toBSONForLog() : BSONObj(),
-                      "uuid"_attr = *validation.droppedCollectionUuid);
-            }
-            return false;
-        case CollectionTagStatus::kNeedsIndexRevalidation:
-            LOGV2_DEBUG(13445403,
-                        5,
-                        "the entry against the current indexes",
-                        "planCacheKey"_attr = getPlanCacheKeyHex());
-            break;
+    // If there is a pipeline suffix, then that suffix will execute inside a
+    // PlanExecutorPipeline, which expects to received owned BSON objects from the inner
+    // PlanExecutor.
+    size_t plannerOptions = QueryPlannerParams::DEFAULT;
+    if (model.getSuffix() && model.getSuffix()->peekFront()) {
+        plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
-
-    tassert(13036801,
-            "Cached join plan must have one index fingerprint per join graph node",
-            hit.nodeFingerprints.size() == model.getGraph().numNodes());
-
-    auto currentFingerprints = makeNodeFingerprints(
-        model.getGraph(), model.getResolvedPaths(), perCollIdxs, *hit.joinTree);
-    for (size_t node = 0; node < hit.nodeFingerprints.size(); ++node) {
-        if (!canReuseNodeFingerprint(hit.nodeFingerprints[node], currentFingerprints[node])) {
-            LOGV2(13036802,
-                  "Join plan cache entry invalidated by a DDL",
-                  "planCacheKey"_attr = getPlanCacheKeyHex(),
-                  "planShape"_attr = hit.joinTree ? hit.joinTree->toBSONForLog() : BSONObj(),
-                  "node"_attr = static_cast<int>(node),
-                  "nss"_attr = redact(toStringForLogging(
-                      model.getGraph().getNode(static_cast<NodeId>(node)).collectionName)),
-                  "cachedUsedFingerprint"_attr =
-                      static_cast<unsigned long long>(hit.nodeFingerprints[node].usedFingerprint),
-                  "currentUsedFingerprint"_attr =
-                      static_cast<unsigned long long>(currentFingerprints[node].usedFingerprint),
-                  "cachedRelevantIndexCount"_attr =
-                      static_cast<int>(hit.nodeFingerprints[node].relevantIndexHashes.size()),
-                  "currentRelevantIndexCount"_attr =
-                      static_cast<int>(currentFingerprints[node].relevantIndexHashes.size()));
-            return false;
-        }
-    }
-
-    // The catalog change either left the relevant indexes untouched or only dropped ones this plan
-    // does not use, so the entry is valid against the current collection state. Adopt that state's
-    // version tags so subsequent lookups take the fast path above instead of re-fingerprinting on
-    // every query.
-    auto currentTags = makeCollectionTags(graphOnlyMca);
-    hit.refreshCollectionTags(currentTags);
-
-    LOGV2_DEBUG(13036803,
-                5,
-                "Join plan cache entry revalidated: the catalog change did not affect any index "
-                "this plan relies on",
-                "cachedVersions"_attr = collectionVersionsForLog(cachedTags),
-                "currentVersions"_attr = collectionVersionsForLog(currentTags));
-    return true;
+    return LoweredJoinPlan{.planStagesAndData = std::move(planStagesAndData),
+                           .sbeYieldPolicy = std::move(sbeYieldPolicy),
+                           .plannerOptions = plannerOptions};
 }
 
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
+/**
+ * Builds an executor for a join plan cache hit whose entry was validated against the catalog.
+ */
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> buildExecutorFromCachedPlan(
     OperationContext* opCtx,
-    const JoinPlanCacheKey& cacheKey,
+    const JoinPlanCacheEntry& hit,
     const MultipleCollectionAccessor& mca,
     const MultipleCollectionAccessor& graphOnlyMca,
     const AggJoinModel& model,
     const AvailableIndexes& perCollIdxs,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     OpDebug::JoinOptimizationMetrics& metrics) {
-    auto& cache = JoinPlanCache::get(opCtx->getServiceContext());
-    auto hit = cache.lookup(cacheKey);
-    if (!hit) {
-        return nullptr;
-    }
-
-    // validateCacheEntry fills 'planCacheKeyHex' lazily while deciding the entry is stale, so the
-    // failure path below reuses it instead of hashing the key a second time.
-    std::string planCacheKeyHex;
-    if (!validateCacheEntry(*hit, graphOnlyMca, model, perCollIdxs, cacheKey, planCacheKeyHex)) {
-        if (planCacheKeyHex.empty()) {
-            planCacheKeyHex = joinPlanCacheKeyForLog(cacheKey);
-        }
-        if (cache.removeIfMatches(cacheKey, hit)) {
-            joinPlanCacheInvalidations.increment(1);
-            LOGV2(13445401, "Join plan cache entry removed", "planCacheKey"_attr = planCacheKeyHex);
-        } else {
-            LOGV2_DEBUG(13445402,
-                        2,
-                        "Join plan cache entry invalidated but already removed or replaced by "
-                        "another operation; no removal performed",
-                        "planCacheKey"_attr = planCacheKeyHex);
-        }
-        return nullptr;
-    }
-
     LOGV2_DEBUG(11083906, 5, "Join plan cache hit, skipping join optimization");
     auto qsn =
-        fromCachedJoinPlan(opCtx, model.getGraph(), graphOnlyMca, perCollIdxs, *hit->joinTree);
+        fromCachedJoinPlan(opCtx, model.getGraph(), graphOnlyMca, perCollIdxs, *hit.joinTree);
     auto winnerSoln = std::make_unique<QuerySolution>();
     winnerSoln->setRoot(std::move(qsn));
 
     // Use 'mca' instead of 'graphOnlyMca' for SBE lowering because non-join eligible stages may
     // reference other collections.
-    pushDownSbeEligibleSuffix(opCtx, mca, model, hit->baseNode, winnerSoln, metrics);
+    pushDownSbeEligibleSuffix(opCtx, mca, model, hit.baseNode, winnerSoln, metrics);
 
-    // Merge join-field non-array path learnings into the chosen base node's expCtx so the
-    // PathArraynessChecker monitors them during execution yields.
-    model.getGraph()
-        .accessPathAt(hit->baseNode)
-        ->getExpCtx()
-        ->mergeNonArrayPathsForNss(model.getJoinExpCtx()->getNonArrayPathsForNss());
-    model.getGraph()
-        .accessPathAt(hit->baseNode)
-        ->getExpCtx()
-        ->mergeSchemaTypeInfoUsageFrom(*model.getJoinExpCtx());
-
-    auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(opCtx,
-                                                                       model.getGraph(),
-                                                                       yieldPolicy,
-                                                                       mca,
-                                                                       hit->baseNode,
-                                                                       *winnerSoln,
-                                                                       /*estimates=*/nullptr,
-                                                                       /*prepare=*/true,
-                                                                       metrics);
-
-    size_t plannerOptions = QueryPlannerParams::DEFAULT;
-    if (model.getSuffix() && model.getSuffix()->peekFront()) {
-        plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
-    }
+    auto [planStagesAndData, sbeYieldPolicy, plannerOptions] =
+        lowerWinningJoinPlan(opCtx,
+                             model,
+                             mca,
+                             yieldPolicy,
+                             hit.baseNode,
+                             *winnerSoln,
+                             /*estimates=*/nullptr,
+                             /*prepare=*/true,
+                             metrics);
     auto exec = plan_executor_factory::make(opCtx,
                                             /*cq=*/nullptr,
                                             std::move(winnerSoln),
@@ -800,32 +630,21 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     const auto qkc = expCtx->getQueryKnobConfiguration();
 
-    // Consult the join plan cache before running single-table access planning.
-    const bool useJoinPlanCache = !hintedStrat &&
-        qkc.getJoinReorderMode() != JoinReorderModeEnum::kRandom && qkc.getEnableJoinPlanCache() &&
-        !expCtx->getExplain().has_value();
-
-    // Set iff 'useJoinPlanCache' is true.
-    boost::optional<JoinPlanCacheKey> cacheKey;
-    // Set iff 'useJoinPlanCache' is true and the lookup missed.
-    boost::optional<std::vector<CollectionTag>> collectionTags;
-
     const auto eligibleIdxs = extractINLJEligibleIndexes(model.getGraph(), graphOnlyMca);
 
-    if (useJoinPlanCache) {
-        cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), graphOnlyMca);
-        auto exec = checkPlanCacheForPlan(
-            opCtx, *cacheKey, mca, graphOnlyMca, model, eligibleIdxs, yieldPolicy, metrics);
-        if (exec) {
-            joinPlanCacheHits.increment(1);
+    // Consult the join plan cache before running single-table access planning. Set iff the cache
+    // is in use and the lookup missed.
+    boost::optional<JoinPlanCacheMiss> cacheMiss;
+    if (canUseJoinPlanCache(qkc, hintedStrat.has_value(), expCtx->getExplain().has_value())) {
+        auto lookup = lookupInJoinPlanCache(opCtx, graphOnlyMca, model, eligibleIdxs);
+        if (auto* hit = std::get_if<JoinPlanCacheHit>(&lookup)) {
+            auto exec = buildExecutorFromCachedPlan(
+                opCtx, *hit->entry, mca, graphOnlyMca, model, eligibleIdxs, yieldPolicy, metrics);
+            recordJoinPlanCacheHit();
             return JoinReorderedExecutorResult{.executor = std::move(exec),
                                                .model = std::move(model)};
         }
-        // Capture the tags before sampling: a yield re-acquires collections from the latest
-        // catalog, which would tag the entry with a newer state than the plan is built from.
-        collectionTags = makeCollectionTags(graphOnlyMca);
-        joinPlanCacheMisses.increment(1);
-        LOGV2_DEBUG(11083907, 5, "Join plan cache miss, running optimization");
+        cacheMiss = std::get<JoinPlanCacheMiss>(std::move(lookup));
     }
 
     // Initialize enumeration metrics if we're here- we don't want to do this on cache hits/
@@ -846,12 +665,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     }
     auto singleTableAccess = std::move(swAccessPlans.getValue());
 
-    // A trivially false predicate yields an EOF access plan, which carries no 'SolutionCacheData'
-    // and therefore cannot be serialized into the join plan cache.
-    const bool cacheWinningPlan = useJoinPlanCache &&
-        std::all_of(singleTableAccess.cbrCqQsns.cbegin(),
-                    singleTableAccess.cbrCqQsns.cend(),
-                    [](const auto& cqQsn) { return cqQsn.second->cacheData != nullptr; });
+    const bool cacheWinningPlan = cacheMiss && canCacheAccessPlans(singleTableAccess);
     PerCollUniqueFieldInfo uniqueFieldInfo;
     if (qkc.getEnableJoinOptimizationUseIndexUniqueness()) {
         uniqueFieldInfo = buildUniqueFieldInfo(eligibleIdxs);
@@ -941,28 +755,21 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // Test hook: all sampling and join reordering is complete at this point.
     hangAfterJoinModelConstruction.pauseWhileSet(opCtx);
 
-    auto& baseNodeCQ = *model.getGraph().accessPathAt(reordered.baseNode);
-
-    // Merge join-field non-array path learnings into the chosen base node's expCtx so the
-    // PathArraynessChecker monitors them during execution yields.
-    baseNodeCQ.getExpCtx()->mergeNonArrayPathsForNss(
-        model.getJoinExpCtx()->getNonArrayPathsForNss());
-    baseNodeCQ.getExpCtx()->mergeSchemaTypeInfoUsageFrom(*model.getJoinExpCtx());
-
     // A cacheable plan runs a trial to establish its baseline before the executor is built.
     const bool runBaselineTrial = cacheWinningPlan && reordered.cachedJoinPlan;
 
     // Lower to SBE. A plan that will run a trial is prepared by the trial instead.
-    auto [planStagesAndData, sbeYieldPolicy] =
-        lowerToSbePlanStageTree(opCtx,
-                                model.getGraph(),
-                                yieldPolicy,
-                                mca,
-                                reordered.baseNode,
-                                *reordered.soln,
-                                &reordered.estimates,
-                                /*prepare=*/!runBaselineTrial,
-                                metrics);
+    auto [planStagesAndData, sbeYieldPolicy, plannerOptions] =
+        lowerWinningJoinPlan(opCtx,
+                             model,
+                             mca,
+                             yieldPolicy,
+                             reordered.baseNode,
+                             *reordered.soln,
+                             &reordered.estimates,
+                             /*prepare=*/!runBaselineTrial,
+                             metrics);
+    auto& baseNodeCQ = *model.getGraph().accessPathAt(reordered.baseNode);
 
     sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(11083905,
@@ -971,14 +778,6 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                 "sbePlan"_attr =
                     sbe::DebugPrinter{}.print(planStagesAndData.first->debugPrint(debugPrintInfo)),
                 "sbePlanStageData"_attr = planStagesAndData.second.debugString());
-
-    // If there is a pipeline suffix, then that suffix will execute inside a
-    // PlanExecutorPipeline, which expects to received owned BSON objects from the inner
-    // PlanExecutor.
-    size_t plannerOptions = QueryPlannerParams::DEFAULT;
-    if (model.getSuffix() && model.getSuffix()->peekFront()) {
-        plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
-    }
 
     // Prepare rejected plans if any.
     std::vector<JoinOptPlan> rejectedPlans;
@@ -1018,11 +817,10 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         }
         // Compute the join plan cache key hash for explain regardless of whether the join plan
         // cache is enabled.
-        if (!cacheKey.has_value()) {
-            cacheKey =
-                makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), graphOnlyMca);
-        }
-        explainData.joinPlanCacheKeyHash = canonical_query_encoder::computeHash(*cacheKey);
+        explainData.joinPlanCacheKeyHash = canonical_query_encoder::computeHash(
+            cacheMiss
+                ? cacheMiss->key
+                : makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), graphOnlyMca));
         // The join-reordering estimates cover the winning and the rejected plans, and are only
         // serialized by explain. The rejected plans were lowered above, so the map can be moved.
         explainData.estimates = std::move(reordered.estimates);
@@ -1054,10 +852,10 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         return JoinReorderedExecutorResult{.executor = std::move(exec), .model = std::move(model)};
     }
 
-    tassert(
-        13036804,
-        "Join plan cache key and collection tags must be set when the join plan cache is in use",
-        cacheKey.has_value() && collectionTags.has_value());
+    tassert(13036804,
+            "Join plan cache key and collection tags must be set when the join plan cache is "
+            "in use",
+            cacheMiss.has_value());
     // Explain disables the join plan cache, so a trialed plan never carries explain-only data.
     tassert(13673702,
             "A join plan that runs a baseline trial must not carry explain data",
@@ -1069,90 +867,27 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // TODO(SERVER-136925): consider taking min(limit, joinPlanCacheTrialWindow), as the classic
     // multi-planner does.
     const size_t maxTrialResults = static_cast<size_t>(qkc.getJoinPlanCacheTrialWindow());
+    auto [candidate, baseline] = runJoinTrial(opCtx,
+                                              mca,
+                                              baseNodeCQ,
+                                              sbeYieldPolicy.get(),
+                                              std::move(reordered.soln),
+                                              std::move(planStagesAndData),
+                                              makeBaselineTracker(),
+                                              maxTrialResults);
 
-    auto candidate = runJoinTrial(opCtx,
-                                  mca,
-                                  baseNodeCQ,
-                                  sbeYieldPolicy.get(),
-                                  std::move(reordered.soln),
-                                  std::move(planStagesAndData),
-                                  TrialRunTracker::makeUncapped(),
-                                  maxTrialResults);
-
-    // Read before the candidate, which owns the tracker, is moved into the executor.
-    const auto& tracker = *candidate.data.tracker;
-    const JoinPlanBaseline baseline{
-        .numReads = tracker.getMetric<TrialRunTracker::kNumReads>(),
-        .numIntermediateRows = tracker.getMetric<TrialRunTracker::kNumIntermediateRows>(),
-        .spilled = tracker.getMetric<TrialRunTracker::kNumSpills>() > 0,
-        .numResults = candidate.results.size(),
-    };
-
-    // A yield may have occurred during execution above. Re-check CollectionTags and skip
-    // caching if the live CollectionTags have advanced.
-    if (classifyCollectionTags(*collectionTags, graphOnlyMca).status !=
-        CollectionTagStatus::kCurrent) {
-        LOGV2_DEBUG(135049,
-                    5,
-                    "Skipping join plan cache write: index DDL occurred during planning",
-                    "planCacheKey"_attr = joinPlanCacheKeyForLog(*cacheKey));
-    } else if (candidate.stopCondition == MultiPlannerStopCondition::kStashSizeLimit) {
-        // Don't cache a plan whose trial stash hit the byte cap. We assume a plan producing this
-        // much output is likely long-running anyway.
-        joinPlanCacheBaselineOverStashMemoryLimit.increment(1);
-        LOGV2_DEBUG(13673703,
-                    5,
-                    "Skipping join plan cache write: baseline trial hit the stash byte cap",
-                    "planCacheKey"_attr = joinPlanCacheKeyForLog(*cacheKey),
-                    "baseline"_attr = baseline.toBSON());
-    } else if (baseline.numReads + baseline.numIntermediateRows >
-               static_cast<size_t>(qkc.getJoinPlanCacheMaxReadsAndIntermediateRows())) {
-        // Only cache inexpensive plans, where optimization time is a large share of total execution
-        // time. An expensive plan is re-optimized on every run instead since the time a cache hit
-        // would save is small next to its execution and thus, fresh optimization guards against
-        // potentially re-using a bad plan and paying the high price of replanning an expensive
-        // query.
-        joinPlanCacheBaselineOverThreshold.increment(1);
-        LOGV2_DEBUG(
-            12501501,
-            5,
-            "Skipping join plan cache write: baseline exceeds the cache-eligibility threshold",
-            "planCacheKey"_attr = joinPlanCacheKeyForLog(*cacheKey),
-            "baseline"_attr = baseline.toBSON());
-    } else {
-        auto fingerprints = makeNodeFingerprints(
-            model.getGraph(), model.getResolvedPaths(), eligibleIdxs, *reordered.cachedJoinPlan);
-        const auto& currentTags = *collectionTags;
-        const auto planCacheKeyHex = joinPlanCacheKeyForLog(*cacheKey);
-        // 'serializeForLogging()' handles redaction of user content per the
-        // 'redactClientLogData' policy.
-        const auto queryShapeForLog = pipeline.serializeForLogging();
-        const NamespaceString baseNss = model.getGraph().getNode(reordered.baseNode).collectionName;
-        const auto logVersions = collectionVersionsForLog(currentTags);
-
-        auto entry = std::make_unique<JoinPlanCacheEntry>(std::move(reordered.cachedJoinPlan),
-                                                          reordered.baseNode,
-                                                          currentTags,
-                                                          std::move(fingerprints),
-                                                          baseline);
-        const BSONObj planShapeForLog =
-            entry->joinTree ? entry->joinTree->toBSONForLog() : BSONObj();
-        const long long estimatedSizeBytes = static_cast<long long>(entry->estimatedEntrySizeBytes);
-        const size_t numEntriesEvicted = JoinPlanCache::get(opCtx->getServiceContext())
-                                             .put(std::move(*cacheKey), std::move(entry));
-
-        LOGV2(13445400,
-              "Join plan cache entry put",
-              "planCacheKey"_attr = planCacheKeyHex,
-              "queryShape"_attr = queryShapeForLog,
-              "planShape"_attr = planShapeForLog,
-              "nss"_attr = redact(toStringForLogging(baseNss)),
-              "baseNode"_attr = static_cast<int>(reordered.baseNode),
-              "estimatedSizeBytes"_attr = estimatedSizeBytes,
-              "collections"_attr = logVersions,
-              "baseline"_attr = baseline.toBSON(),
-              "entriesEvicted"_attr = static_cast<long long>(numEntriesEvicted));
-    }
+    tryInsertIntoJoinPlanCache(
+        opCtx,
+        std::move(*cacheMiss),
+        graphOnlyMca,
+        model,
+        eligibleIdxs,
+        pipeline,
+        std::move(reordered.cachedJoinPlan),
+        reordered.baseNode,
+        baseline,
+        candidate.stopCondition == MultiPlannerStopCondition::kStashSizeLimit,
+        static_cast<size_t>(qkc.getJoinPlanCacheMaxReadsAndIntermediateRows()));
 
     // The executor serves the results buffered during the trial before pulling more from the plan.
     auto exec = plan_executor_factory::make(opCtx,

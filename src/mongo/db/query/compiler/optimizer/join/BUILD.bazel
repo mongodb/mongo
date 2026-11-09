@@ -7,6 +7,8 @@ exports_files([
     "agg_join_model.cpp",
     "executor.h",
     "executor.cpp",
+    "join_plan_cache_util.h",
+    "join_plan_cache_util.cpp",
     "server_status_metrics.h",
     "server_status_metrics.cpp",
     "single_table_access.cpp",
@@ -184,6 +186,19 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_interface",
         "//src/mongo/db/query/compiler/dependency_analysis",
         "//src/mongo/db/query/plan_cache:join_plan_cache",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "join_plan_cache_util_test",
+    srcs = [
+        "join_plan_cache_util_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
     ],
 )
 
