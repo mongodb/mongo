@@ -16,10 +16,12 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_control.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
@@ -1017,6 +1019,145 @@ TEST_F(IndexBuildsCoordinatorMongodStandaloneRecoveryTest,
 
     applyAbort(makeAbortOplogEntry(buildUUID, indexes));
     ASSERT_EQ(std::vector<std::string>{}, nonIdIndexNames());
+}
+
+class IndexBuildAttemptLimitAbortTest : public CatalogTestFixture {
+protected:
+    class Coordinator : public IndexBuildsCoordinatorMongod {
+    public:
+        using IndexBuildsCoordinator::_signalPrimaryForAbortIfOverAttemptLimit;
+    };
+
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        CollectionOptions options;
+        options.uuid = replState.collectionUUID;
+        ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+        index_builds::build_attempts::two_phase::createCollection(operationContext());
+        ASSERT_OK(storageInterface()->putSingleton(
+            operationContext(),
+            NamespaceString::kLocalIndexBuildsNamespace,
+            BSON("_id" << replState.buildUUID),
+            {BSON("$set" << BSON("numAttemptsAfterUncleanShutdown" << 2)), Timestamp()}));
+        replState.completeSetup();
+        builderClient = getServiceContext()->getService()->makeClient("attemptLimitBuilder");
+        builderOpCtx = builderClient->makeOperationContext();
+    }
+
+    void tearDown() override {
+        if (builder.joinable()) {
+            {
+                std::lock_guard<Client> lk(*builderOpCtx->getClient());
+                builderOpCtx->markKilled(ErrorCodes::Interrupted);
+            }
+            builder.join();
+        }
+        builderOpCtx.reset();
+        builderClient.reset();
+        CatalogTestFixture::tearDown();
+    }
+
+    void startBuilder(BSONObj response) {
+        auto replCoord = dynamic_cast<repl::ReplicationCoordinatorMock*>(
+            repl::ReplicationCoordinator::get(operationContext()));
+        replCoord->setRunCmdOnPrimaryAndAwaitResponseFunction(
+            [this,
+             response = std::move(response)](OperationContext*,
+                                             const DatabaseName&,
+                                             const BSONObj& cmd,
+                                             repl::ReplicationCoordinator::OnRemoteCmdScheduledFn,
+                                             repl::ReplicationCoordinator::OnRemoteCmdCompleteFn) {
+                EXPECT_EQ("voteAbortIndexBuild", cmd.firstElementFieldNameStringData());
+                if (++votes == 1) {
+                    voted.promise.emplaceValue();
+                }
+                return response;
+            });
+
+        builder = stdx::thread([this] {
+            Status status = Status::OK();
+            try {
+                replState.onThreadScheduled(builderOpCtx.get());
+                replState.setInProgress(builderOpCtx.get());
+                coordinator._signalPrimaryForAbortIfOverAttemptLimit(builderOpCtx.get(), replState);
+            } catch (const DBException& ex) {
+                status = ex.toStatus();
+                // Match _runIndexBuildInner's exception handling.
+                replState.setPostFailureState(status);
+            }
+            finished.promise.setFrom(std::move(status));
+        });
+    }
+
+    void assertWaitingWithoutFailure() {
+        // Wait until voting starts so an earlier journal-flush wait cannot satisfy the check.
+        operationContext()->runWithDeadline(Date_t::now() + Seconds(10),
+                                            ErrorCodes::MaxTimeMSExpired,
+                                            [&] { voted.future.get(operationContext()); });
+        const auto deadline = Date_t::now() + Seconds(10);
+        while (!builderOpCtx->isWaitingForConditionOrInterrupt() && !finished.future.isReady() &&
+               Date_t::now() < deadline) {
+            sleepFor(Milliseconds(10));
+        }
+        EXPECT_TRUE(builderOpCtx->isWaitingForConditionOrInterrupt());
+        EXPECT_FALSE(finished.future.isReady());
+        ASSERT_OK(replState.getAbortStatus());
+        ASSERT_FALSE(replState.isAwaitingPrimaryAbort());
+    }
+
+    Status joinBuilder() {
+        operationContext()->runWithDeadline(Date_t::now() + Seconds(10),
+                                            ErrorCodes::MaxTimeMSExpired,
+                                            [&] { finished.future.wait(operationContext()); });
+        builder.join();
+        return finished.future.getNoThrow();
+    }
+
+    unittest::ServerParameterGuard limit{"maxIndexBuildAttemptsAfterUncleanShutdown", 1};
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("test.attempt_limit");
+    Coordinator coordinator;
+    ReplIndexBuildState replState{
+        UUID::gen(), UUID::gen(), nss.dbName(), {}, IndexBuildProtocol::kTwoPhase, Date_t::now()};
+    ServiceContext::UniqueClient builderClient;
+    ServiceContext::UniqueOperationContext builderOpCtx;
+    stdx::thread builder;
+    PromiseAndFuture<void> voted = makePromiseFuture<void>();
+    PromiseAndFuture<void> finished = makePromiseFuture<void>();
+    size_t votes = 0;
+};
+
+TEST_F(IndexBuildAttemptLimitAbortTest, AcceptedAbortVoteWaitsForExternalAbort) {
+    startBuilder(BSON("ok" << 1));
+    assertWaitingWithoutFailure();
+
+    {
+        AutoGetCollection coll(operationContext(), nss, MODE_X);
+        ASSERT_EQ(ReplIndexBuildState::TryAbortResult::kContinueAbort,
+                  replState.tryAbort(operationContext(),
+                                     IndexBuildAction::kOplogAbort,
+                                     {ErrorCodes::IndexBuildAborted, "primary aborted"}));
+    }
+    const auto status = joinBuilder();
+
+    EXPECT_EQ(1U, votes);
+    EXPECT_EQ(ErrorCodes::Interrupted, status.code());
+    EXPECT_TRUE(replState.isExternalAbort());
+    EXPECT_EQ(ErrorCodes::IndexBuildAborted, replState.getAbortStatus().code());
+}
+
+TEST_F(IndexBuildAttemptLimitAbortTest, RefusedAbortVoteCanStillAllowCommit) {
+    startBuilder(
+        BSON("ok" << 0 << "code" << 7329202 << "errmsg" << "Index build cannot be aborted"));
+    assertWaitingWithoutFailure();
+
+    ASSERT_TRUE(replState.tryCommit(operationContext()));
+    const auto status = joinBuilder();
+
+    EXPECT_EQ(1U, votes);
+    EXPECT_OK(status);
+    EXPECT_OK(replState.getAbortStatus());
+    EXPECT_EQ(IndexBuildAction::kOplogCommit, replState.getNextActionNoWait());
 }
 
 }  // namespace

@@ -3712,25 +3712,22 @@ void IndexBuildsCoordinator::_signalPrimaryForAbortIfOverAttemptLimit(
     // Count before voting, since the primary's abort can kill this operation mid-vote.
     indexBuildsSSS.exceededAttemptLimit.addAndFetch(1);
 
-    switch (index_builds::votes::runVoteAbortCommand(opCtx, replState, reason)) {
-        case index_builds::votes::AbortVoteResult::kAccepted:
-            // TODO SERVER-138112: The failure path votes to abort again. Skip that second vote.
-            uasserted(ErrorCodes::IndexBuildAborted, reason);
-        case index_builds::votes::AbortVoteResult::kRefused:
-            // The primary also refuses once it has aborted, so wait for its commit or abort.
-            LOGV2(13756404,
-                  "Index build: the primary refused to abort, waiting for its commit or abort",
-                  "buildUUID"_attr = replState.buildUUID,
-                  "collectionUUID"_attr = replState.collectionUUID);
-            replState.getNextActionFuture().wait(opCtx);
-            break;
-        case index_builds::votes::AbortVoteResult::kSignaled:
-            break;
+    index_builds::votes::runVoteAbortCommand(opCtx, replState, reason);
+
+    // Wait for the primary's decision - an abort interrupts this operation, while a commit requires
+    // the node to finish building the index.
+    auto nextActionFuture = replState.getNextActionFuture();
+    if (!nextActionFuture.isReady()) {
+        LOGV2(13756404,
+              "Index build: waiting for the primary's commit or abort after exceeding the attempt "
+              "limit",
+              "buildUUID"_attr = replState.buildUUID,
+              "collectionUUID"_attr = replState.collectionUUID);
     }
+    const auto nextAction = nextActionFuture.get(opCtx);
     // An abort kills this operation before signaling the build, so past this check the build has
     // committed.
     opCtx->checkForInterrupt();
-    const auto nextAction = replState.getNextActionNoWait();
     tassert(13756402,
             "Expected a commit signal before scanning past the index build attempt limit",
             nextAction == IndexBuildAction::kOplogCommit ||

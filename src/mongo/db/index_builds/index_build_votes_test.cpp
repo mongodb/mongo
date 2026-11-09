@@ -49,10 +49,9 @@ protected:
             });
     }
 
-    AbortVoteResult runAbortVote(std::vector<BSONObj> responses,
-                                 std::function<void()> beforeResponse = {}) {
+    void runAbortVote(std::vector<BSONObj> responses, std::function<void()> beforeResponse = {}) {
         scriptResponses("voteAbortIndexBuild", std::move(responses), std::move(beforeResponse));
-        return runVoteAbortCommand(operationContext(), replState, "test");
+        runVoteAbortCommand(operationContext(), replState, "test");
     }
 
     void runCommitVote(std::vector<BSONObj> responses, std::function<void()> beforeResponse = {}) {
@@ -80,30 +79,28 @@ const auto kCannotAbort =
     BSON("ok" << 0 << "code" << 7329202 << "errmsg" << "Index build cannot be aborted");
 
 TEST_F(IndexBuildVotesTest, AbortVoteAccepted) {
-    EXPECT_EQ(AbortVoteResult::kAccepted, runAbortVote({BSON("ok" << 1)}));
+    runAbortVote({BSON("ok" << 1)});
     EXPECT_EQ(1U, attempts);
 }
 
-TEST_F(IndexBuildVotesTest, AbortVoteAcceptedDespiteWriteConcernError) {
-    EXPECT_EQ(AbortVoteResult::kAccepted, runAbortVote({kWriteConcernError}));
+TEST_F(IndexBuildVotesTest, AbortVoteStopsDespiteWriteConcernError) {
+    runAbortVote({kWriteConcernError});
     EXPECT_EQ(1U, attempts);
 }
 
 TEST_F(IndexBuildVotesTest, AbortVoteRetriesAfterPrimaryChange) {
-    EXPECT_EQ(AbortVoteResult::kAccepted, runAbortVote({kNotPrimary, BSON("ok" << 1)}));
+    runAbortVote({kNotPrimary, BSON("ok" << 1)});
     EXPECT_EQ(2U, attempts);
 }
 
 TEST_F(IndexBuildVotesTest, AbortVoteStopsAtRefusal) {
-    EXPECT_EQ(AbortVoteResult::kRefused, runAbortVote({kCannotAbort}));
+    runAbortVote({kCannotAbort});
     EXPECT_EQ(1U, attempts);
 }
 
 TEST_F(IndexBuildVotesTest, AbortVoteEndsWhenBuildIsSignaled) {
     // A commit can reach this node before the primary answers. The vote is not retried.
-    EXPECT_EQ(AbortVoteResult::kSignaled, runAbortVote({kNotPrimary}, [&] {
-                  replState.setCommitQuorumSatisfied(operationContext());
-              }));
+    runAbortVote({kNotPrimary}, [&] { replState.setCommitQuorumSatisfied(operationContext()); });
     EXPECT_EQ(1U, attempts);
 }
 

@@ -18,15 +18,6 @@
 [[MONGO_MOD_PUBLIC]];
 namespace mongo::index_builds::votes {
 
-enum class AbortVoteResult {
-    // The primary aborted the build.
-    kAccepted,
-    // The primary refused, because it is committing the build or no longer running it.
-    kRefused,
-    // The build got a commit or abort signal before the primary answered.
-    kSignaled,
-};
-
 /**
  * Sends the command from 'generateCommand' to the primary until 'isDone' accepts a response or the
  * build gets a commit or abort signal. Call without holding locks.
@@ -40,9 +31,9 @@ void runVoteCommand(OperationContext* opCtx,
  * Sends 'voteAbortIndexBuild' to the primary with write concern 'majority'. Retries after primary
  * changes until the primary answers or the build gets a signal.
  */
-AbortVoteResult runVoteAbortCommand(OperationContext* opCtx,
-                                    ReplIndexBuildState& replState,
-                                    std::string_view reason);
+void runVoteAbortCommand(OperationContext* opCtx,
+                         ReplIndexBuildState& replState,
+                         std::string_view reason);
 
 /**
  * Sends 'voteCommitIndexBuild' to the primary with write concern 'majority'. Retries any error

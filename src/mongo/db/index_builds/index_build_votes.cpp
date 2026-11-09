@@ -99,21 +99,18 @@ void runVoteCommand(OperationContext* opCtx,
     }
 }
 
-AbortVoteResult runVoteAbortCommand(OperationContext* opCtx,
-                                    ReplIndexBuildState& replState,
-                                    std::string_view reason) {
-    auto result = AbortVoteResult::kSignaled;
-
+void runVoteAbortCommand(OperationContext* opCtx,
+                         ReplIndexBuildState& replState,
+                         std::string_view reason) {
     const auto generateCmd = [reason](const UUID& uuid, const std::string& address) {
         return BSON("voteAbortIndexBuild" << uuid << "hostAndPort" << address << "reason" << reason
                                           << "writeConcern" << BSON("w" << "majority"));
     };
 
-    const auto isDone = [&result](const BSONObj& response, const UUID& indexBuildUUID) {
+    const auto isDone = [](const BSONObj& response, const UUID& indexBuildUUID) {
         auto commandStatus = getStatusFromCommandResult(response);
         auto wcStatus = getWriteConcernStatusFromCommandResult(response);
         if (commandStatus.isOK() && wcStatus.isOK()) {
-            result = AbortVoteResult::kAccepted;
             return true;
         }
         if (!commandStatus.isA<ErrorCategory::NotPrimaryError>()) {
@@ -128,8 +125,6 @@ AbortVoteResult runVoteAbortCommand(OperationContext* opCtx,
                   "is in the process of committing. The command won't be retried.",
                   "buildUUID"_attr = indexBuildUUID,
                   "responseStatus"_attr = response);
-            // A write concern error alone still means the primary aborted the build.
-            result = commandStatus.isOK() ? AbortVoteResult::kAccepted : AbortVoteResult::kRefused;
             return true;
         }
 
@@ -143,7 +138,6 @@ AbortVoteResult runVoteAbortCommand(OperationContext* opCtx,
     };
 
     runVoteCommand(opCtx, replState, generateCmd, isDone);
-    return result;
 }
 
 void runVoteCommitCommand(OperationContext* opCtx, ReplIndexBuildState& replState) {
