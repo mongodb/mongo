@@ -189,7 +189,9 @@ fi
 echo "Compiling user model file into Coverity xmldb format"
 # cov-analyze picks up the xmldb from <covIdir>/config/user_models.xmldb automatically
 # as its default model location, so no --model-file flag is needed in coverity.yml.
+# --concurrency is required because the model file declares concurrency primitives.
 if "$workdir/coverity/bin/cov-make-library" \
+    --concurrency \
     --output-file "$covIdir/config/user_models.xmldb" \
     "etc/coverity_models/mongo_models.cpp"; then
     echo "cov-make-library was successful: $covIdir/config/user_models.xmldb"

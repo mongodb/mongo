@@ -244,3 +244,78 @@ public:
 };
 
 }  // namespace mongo
+
+// ---------------------------------------------------------------------------
+// mongo::synchronized_value<T> — RAII mutex-guarded value
+//
+// synchronize() hands out an UpdateGuard whose std::unique_lock is released by
+// the guard's implicit destructor. Coverity does not follow that release, so it
+// considers the guarded mutex held for the rest of the enclosing function. The
+// consequences are LOCK "destroy held lock" on the synchronized_value itself,
+// and fabricated ORDER_REVERSAL pairs against any other lock taken later in the
+// same function.
+//
+// Template models are written as nontemplate stubs inside the marker namespace
+// __coverity_template__. Place the marker at the class's own namespace level
+// (mongo::__coverity_template__) so the stub binds to mongo::synchronized_value<T>.
+// Acquire in the guard's constructor and release in its destructor so the lock's
+// lifetime is the guard's lifetime, as in the real code.
+//
+// Reference: src/mongo/util/synchronized_value.h — synchronize() / UpdateGuard
+// ---------------------------------------------------------------------------
+
+namespace mongo {
+namespace __coverity_template__ {
+
+class synchronized_value {
+public:
+    class UpdateGuard {
+    public:
+        explicit UpdateGuard(synchronized_value* sv) : _sv(sv) {
+            __coverity_lock_alias__(this, _sv);
+            __coverity_exclusive_lock_acquire__(this);
+        }
+
+        // The real guard owns a std::unique_lock, so a move transfers the lock
+        // instead of releasing it: the moved-from guard must release nothing.
+        UpdateGuard(UpdateGuard&& other) noexcept : _sv(other._sv) {
+            if (_sv) {
+                __coverity_lock_alias__(this, _sv);
+            }
+            other._sv = nullptr;
+        }
+
+        ~UpdateGuard() {
+            if (_sv) {
+                __coverity_exclusive_lock_release__(this);
+            }
+        }
+
+        UpdateGuard(const UpdateGuard&) = delete;
+        UpdateGuard& operator=(const UpdateGuard&) = delete;
+        UpdateGuard& operator=(UpdateGuard&&) = delete;
+
+        void* operator->() {
+            return _sv;
+        }
+        void* operator*() {
+            return _sv;
+        }
+
+    private:
+        synchronized_value* _sv;
+    };
+
+    UpdateGuard synchronize() {
+        return UpdateGuard(this);
+    }
+    UpdateGuard operator->() {
+        return UpdateGuard(this);
+    }
+    UpdateGuard operator*() {
+        return UpdateGuard(this);
+    }
+};
+
+}  // namespace __coverity_template__
+}  // namespace mongo
