@@ -95,7 +95,7 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceSt
         auto* clusterCardinalityParam =
             clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
                 "shardedClusterCardinalityForDirectConns");
-        return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
+        return clusterCardinalityParam->getValue().getHasTwoOrMoreShards();
     }();
     if (clusterHasTwoOrMoreShards || directConnectionChecksWithSingleShard.load()) {
         // Internal lock acquisitions don't set authentication info on the opCtx, so we rely on

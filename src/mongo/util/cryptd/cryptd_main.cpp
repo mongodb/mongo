@@ -240,11 +240,11 @@ int CryptDMain(int argc, char** argv) {
     // number of connections that can be accepted by the server).
     uassertStatusOK(ServerParameterSet::getNodeParameterSet()
                         ->get("capMemoryConsumptionForPreAuthBuffers")
-                        ->set(BSON("" << 100).firstElement(), boost::none));
-    uassertStatusOK(ServerParameterSet::getNodeParameterSet()
-                        ->get("preAuthMaximumMessageSizeBytes")
-                        ->set(BSON("" << static_cast<int64_t>(MaxMessageSizeBytes)).firstElement(),
-                              boost::none));
+                        ->set(BSON("" << 100).firstElement()));
+    uassertStatusOK(
+        ServerParameterSet::getNodeParameterSet()
+            ->get("preAuthMaximumMessageSizeBytes")
+            ->set(BSON("" << static_cast<int64_t>(MaxMessageSizeBytes)).firstElement()));
 
     auto serviceContextHolder = ServiceContext::make();
     setGlobalServiceContext(std::move(serviceContextHolder));

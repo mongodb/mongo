@@ -12,8 +12,7 @@
 #include <fmt/core.h>
 
 namespace mongo {
-inline Status validateChunkMigrationFetcherMaxBufferedSizeBytesPerThread(
-    const int& maxSize, const boost::optional<TenantId>&) {
+inline Status validateChunkMigrationFetcherMaxBufferedSizeBytesPerThread(const int& maxSize) {
     if (maxSize == 0) {
         return Status::OK();
     }

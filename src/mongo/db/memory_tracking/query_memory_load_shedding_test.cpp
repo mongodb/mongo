@@ -163,12 +163,12 @@ TEST(QueryMemoryLoadSheddingValidation, LowMarkMustStayBelowHighMark) {
     gQueryMemoryLoadSheddingHighMarkPercent.store(85);
 
     // -1 disables the feature: no relationship is enforced.
-    ASSERT_OK(validateQueryMemoryLoadSheddingLowMark(-1, boost::none));
+    ASSERT_OK(validateQueryMemoryLoadSheddingLowMark(-1));
     // Enabled and strictly below the high mark: accepted.
-    ASSERT_OK(validateQueryMemoryLoadSheddingLowMark(70, boost::none));
+    ASSERT_OK(validateQueryMemoryLoadSheddingLowMark(70));
     // Enabled and at/above the high mark: rejected, since it would silently disarm shedding.
-    ASSERT_NOT_OK(validateQueryMemoryLoadSheddingLowMark(85, boost::none));
-    ASSERT_NOT_OK(validateQueryMemoryLoadSheddingLowMark(90, boost::none));
+    ASSERT_NOT_OK(validateQueryMemoryLoadSheddingLowMark(85));
+    ASSERT_NOT_OK(validateQueryMemoryLoadSheddingLowMark(90));
 }
 
 TEST(QueryMemoryLoadSheddingValidation, HighMarkMustStayAboveLowMark) {
@@ -176,13 +176,13 @@ TEST(QueryMemoryLoadSheddingValidation, HighMarkMustStayAboveLowMark) {
 
     // Feature disabled (low = -1): any legal high mark is accepted.
     gQueryMemoryLoadSheddingLowMarkPercent.store(-1);
-    ASSERT_OK(validateQueryMemoryLoadSheddingHighMark(10, boost::none));
+    ASSERT_OK(validateQueryMemoryLoadSheddingHighMark(10));
 
     // Feature enabled (low = 70): the high mark must stay strictly above the low mark.
     gQueryMemoryLoadSheddingLowMarkPercent.store(70);
-    ASSERT_OK(validateQueryMemoryLoadSheddingHighMark(85, boost::none));
-    ASSERT_NOT_OK(validateQueryMemoryLoadSheddingHighMark(70, boost::none));
-    ASSERT_NOT_OK(validateQueryMemoryLoadSheddingHighMark(60, boost::none));
+    ASSERT_OK(validateQueryMemoryLoadSheddingHighMark(85));
+    ASSERT_NOT_OK(validateQueryMemoryLoadSheddingHighMark(70));
+    ASSERT_NOT_OK(validateQueryMemoryLoadSheddingHighMark(60));
 }
 
 // Drives queryMemoryCheckLoadShedding() end-to-end against an operation with a memory tracker,

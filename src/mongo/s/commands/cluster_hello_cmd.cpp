@@ -303,7 +303,7 @@ public:
 
         if (auto sp = ServerParameterSet::getNodeParameterSet()->getIfExists(
                 kAutomationServiceDescriptorFieldName)) {
-            sp->append(opCtx, &result, kAutomationServiceDescriptorFieldName, boost::none);
+            sp->append(opCtx, &result, kAutomationServiceDescriptorFieldName);
         }
 
         if (opCtx->isExhaust()) {

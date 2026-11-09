@@ -56,27 +56,21 @@ public:
         : ServerParameter(name, ServerParameterType::kRuntimeOnly) {
         this->validateImpl = validateImpl;
     }
-    void append(OperationContext* opCtx,
-                BSONObjBuilder* b,
-                std::string_view name,
-                const boost::optional<TenantId>&) override {}
+    void append(OperationContext* opCtx, BSONObjBuilder* b, std::string_view name) override {}
 
     void appendSupportingRoundtrip(OperationContext* opCtx,
                                    BSONObjBuilder* b,
-                                   std::string_view name,
-                                   const boost::optional<TenantId>&) override {}
+                                   std::string_view name) override {}
 
-    Status set(const BSONElement& newValueElement,
-               const boost::optional<TenantId>& tenantId) override {
+    Status set(const BSONElement& newValueElement) override {
         return Status(ErrorCodes::BadValue, "Should not call set() in this test");
     }
 
-    Status setFromString(std::string_view str, const boost::optional<TenantId>& tenantId) override {
+    Status setFromString(std::string_view str) override {
         return Status(ErrorCodes::BadValue, "Should not call setFromString() in this test");
     }
 
-    Status validate(const BSONElement& newValueElement,
-                    const boost::optional<TenantId>& tenantId) const override {
+    Status validate(const BSONElement& newValueElement) const override {
         return validateImpl(newValueElement);
     }
 

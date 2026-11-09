@@ -806,7 +806,7 @@ private:
                                         ->get<IDLServerParameterWithStorage<
                                             ServerParameterType::kStartupAndRuntime,
                                             long long>>("heapProfilingSampleIntervalBytes")
-                                        ->setValue(0, boost::none));
+                                        ->setValue(0));
                     disabled = true;
                 }
             });

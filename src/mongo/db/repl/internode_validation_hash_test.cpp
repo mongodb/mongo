@@ -606,9 +606,8 @@ TEST_F(ProviderDrivenValidationTest, PerCollectionOverrideEnableAtRuntimeAllowed
         "disableContinuousInternodeValidationPerCollection");
     ASSERT_FALSE(disableContinuousInternodeValidationPerCollection.load());
 
-    ASSERT_OK(
-        param->set(BSON("disableContinuousInternodeValidationPerCollection" << true).firstElement(),
-                   boost::none));
+    ASSERT_OK(param->set(
+        BSON("disableContinuousInternodeValidationPerCollection" << true).firstElement()));
     ON_BLOCK_EXIT([] { disableContinuousInternodeValidationPerCollection.store(false); });
 
     ASSERT_TRUE(disableContinuousInternodeValidationPerCollection.load());
@@ -619,14 +618,12 @@ TEST_F(ProviderDrivenValidationTest, PerCollectionOverrideDisableAtRuntimeReject
         "disableContinuousInternodeValidationPerCollection");
     ASSERT_FALSE(disableContinuousInternodeValidationPerCollection.load());
 
-    ASSERT_OK(
-        param->set(BSON("disableContinuousInternodeValidationPerCollection" << true).firstElement(),
-                   boost::none));
+    ASSERT_OK(param->set(
+        BSON("disableContinuousInternodeValidationPerCollection" << true).firstElement()));
     ON_BLOCK_EXIT([] { disableContinuousInternodeValidationPerCollection.store(false); });
 
     const Status status = param->set(
-        BSON("disableContinuousInternodeValidationPerCollection" << false).firstElement(),
-        boost::none);
+        BSON("disableContinuousInternodeValidationPerCollection" << false).firstElement());
     ASSERT_EQ(status.code(), ErrorCodes::BadValue);
     ASSERT_TRUE(disableContinuousInternodeValidationPerCollection.load());
 }

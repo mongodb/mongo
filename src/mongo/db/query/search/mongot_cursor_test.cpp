@@ -79,11 +79,8 @@ public:
         std::unique_ptr<MongotTaskExecutorCursorGetMoreStrategy> mongotGetMoreStrategy;
 
         if (startingBatchSize || searchIdLookupMetrics) {
-            mongotGetMoreStrategy =
-                std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(startingBatchSize,
-                                                                          bounds,
-                                                                          /*tenantId=*/boost::none,
-                                                                          searchIdLookupMetrics);
+            mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(
+                startingBatchSize, bounds, searchIdLookupMetrics);
         } else {
             // If we have no starting batchSize or idLookupMetrics, use the default GetMoreStrategy.
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>();

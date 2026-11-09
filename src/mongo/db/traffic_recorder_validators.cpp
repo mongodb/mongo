@@ -7,11 +7,10 @@
 #include "mongo/util/str.h"
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-Status validateTrafficRecordDestination(const std::string& path, const boost::optional<TenantId>&) {
+Status validateTrafficRecordDestination(const std::string& path) {
     if (!path.empty() && !boost::filesystem::is_directory(path)) {
         return Status(ErrorCodes::FileNotOpen,
                       str::stream()

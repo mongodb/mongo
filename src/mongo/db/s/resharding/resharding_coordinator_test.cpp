@@ -160,7 +160,7 @@ protected:
         cardinality.setHasTwoOrMoreShards(true);
         auto param = ServerParameterSet::getClusterParameterSet()->get(
             "shardedClusterCardinalityForDirectConns");
-        ASSERT_OK(param->set(cardinality.toBSON(), boost::none));
+        ASSERT_OK(param->set(cardinality.toBSON()));
     }
 
     ReshardingCoordinatorDocument makeCoordinatorDoc(

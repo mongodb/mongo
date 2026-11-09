@@ -12,7 +12,6 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
@@ -27,7 +26,6 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -351,13 +349,11 @@ FailPointServerParameter::FailPointServerParameter(std::string_view name, Server
 
 void FailPointServerParameter::append(OperationContext* opCtx,
                                       BSONObjBuilder* b,
-                                      std::string_view name,
-                                      const boost::optional<TenantId>&) {
+                                      std::string_view name) {
     *b << name << _data->toBSON();
 }
 
-Status FailPointServerParameter::setFromString(std::string_view str,
-                                               const boost::optional<TenantId>&) {
+Status FailPointServerParameter::setFromString(std::string_view str) {
     BSONObj failPointOptions;
     try {
         failPointOptions = fromjson(str);

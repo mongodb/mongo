@@ -21,7 +21,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
@@ -137,37 +136,29 @@ public:
         return (_type != ServerParameterType::kClusterWide);
     }
 
-    virtual void append(OperationContext* opCtx,
-                        BSONObjBuilder* b,
-                        std::string_view name,
-                        const boost::optional<TenantId>& tenantId) = 0;
+    virtual void append(OperationContext* opCtx, BSONObjBuilder* b, std::string_view name) = 0;
 
-    virtual void appendDetails(OperationContext* opCtx,
-                               BSONObjBuilder* detailsBuilder,
-                               const boost::optional<TenantId>& tenantId) {}
+    virtual void appendDetails(OperationContext* opCtx, BSONObjBuilder* detailsBuilder) {}
 
     virtual void appendSupportingRoundtrip(OperationContext* opCtx,
                                            BSONObjBuilder* b,
-                                           std::string_view name,
-                                           const boost::optional<TenantId>& tenantId) {
-        append(opCtx, b, name, tenantId);
+                                           std::string_view name) {
+        append(opCtx, b, name);
     }
 
-    virtual Status validate(const BSONElement& newValueElement,
-                            const boost::optional<TenantId>& tenantId) const {
+    virtual Status validate(const BSONElement& newValueElement) const {
         return Status::OK();
     }
 
-    Status validate(const BSONObj& newValueObj, const boost::optional<TenantId>& tenantId) const {
-        return validate(BSON("" << newValueObj).firstElement(), tenantId);
+    Status validate(const BSONObj& newValueObj) const {
+        return validate(BSON("" << newValueObj).firstElement());
     }
 
     /**
      * This base implementation calls `setFromString(coerceToString(newValueElement))`.
      * Derived classes may customize the behavior by specifying `override_set` in IDL.
      */
-    virtual Status set(const BSONElement& newValueElement,
-                       const boost::optional<TenantId>& tenantId);
+    virtual Status set(const BSONElement& newValueElement);
 
     /**
      * This method will reset the server parameter's value back to its default. This is currently
@@ -181,7 +172,7 @@ public:
      * method. If it is called without being implemented, it will return an error via the inherited
      * method below.
      */
-    virtual Status reset(const boost::optional<TenantId>& tenantId) {
+    virtual Status reset() {
         return Status{ErrorCodes::OperationFailed,
                       str::stream()
                           << "Parameter reset not implemented for server parameter: " << name()};
@@ -191,12 +182,11 @@ public:
      * Overload of set() that accepts BSONObjs instead of BSONElements. This is currently only used
      * for cluster server parameters but can be used for node-only server parameters.
      */
-    Status set(const BSONObj& newValueObj, const boost::optional<TenantId>& tenantId) {
-        return set(BSON("" << newValueObj).firstElement(), tenantId);
+    Status set(const BSONObj& newValueObj) {
+        return set(BSON("" << newValueObj).firstElement());
     }
 
-    virtual Status setFromString(std::string_view str,
-                                 const boost::optional<TenantId>& tenantId) = 0;
+    virtual Status setFromString(std::string_view str) = 0;
 
     /**
      * Simply returns the uninitialized/default-constructed LogicalTime by default.
@@ -206,7 +196,7 @@ public:
      * implement a mechanism for atomically setting the clusterParameterTime in the set() method and
      * retrieving it via this method.
      */
-    virtual LogicalTime getClusterParameterTime(const boost::optional<TenantId>& tenantId) const {
+    virtual LogicalTime getClusterParameterTime() const {
         return LogicalTime::kUninitialized;
     }
 
@@ -466,13 +456,10 @@ class [[MONGO_MOD_PUBLIC]] IDLServerParameterDeprecatedAlias : public ServerPara
 public:
     IDLServerParameterDeprecatedAlias(std::string_view name, ServerParameter* sp);
 
-    void append(OperationContext* opCtx,
-                BSONObjBuilder* b,
-                std::string_view name,
-                const boost::optional<TenantId>& tenantId) final;
-    Status reset(const boost::optional<TenantId>& tenantId) final;
-    Status set(const BSONElement& newValueElement, const boost::optional<TenantId>& tenantId) final;
-    Status setFromString(std::string_view str, const boost::optional<TenantId>& tenantId) final;
+    void append(OperationContext* opCtx, BSONObjBuilder* b, std::string_view name) final;
+    Status reset() final;
+    Status set(const BSONElement& newValueElement) final;
+    Status setFromString(std::string_view str) final;
 
     /**
      * This function generates "deprecated" warning log message.
@@ -520,6 +507,4 @@ coerceFromString<std::vector<std::string>>(std::string_view str) {
     return v;
 }
 
-template <typename U>
-using TenantIdMap [[MONGO_MOD_PUBLIC]] = std::map<boost::optional<TenantId>, U>;
 }  // namespace mongo

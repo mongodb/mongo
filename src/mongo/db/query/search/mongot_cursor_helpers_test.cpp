@@ -234,7 +234,6 @@ TEST_F(MongotCursorHelpersTest, QueryHasExtractableLimitAndNotAllDocsFoundInLook
         MongotTaskExecutorCursorGetMoreStrategy(
             startingBatchSize,
             DocsNeededBounds(extractableLimit, extractableLimit),
-            /*tenantId=*/boost::none,
             searchIdLookupMetrics);
 
     ASSERT_EQ(startingBatchSize, getMoreStrategy.getCurrentBatchSize());

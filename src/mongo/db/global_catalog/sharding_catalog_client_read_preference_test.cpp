@@ -74,7 +74,7 @@ protected:
         updatedParam.setMustAlwaysUseNearest(mustAlwaysUseNearest);
         auto param = ServerParameterSet::getClusterParameterSet()->get(
             "configServerReadPreferenceForCatalogQueries");
-        ASSERT_OK(param->set(updatedParam.toBSON(), boost::none));
+        ASSERT_OK(param->set(updatedParam.toBSON()));
 
         _assertClusterParameter(mustAlwaysUseNearest);
     }
@@ -82,7 +82,7 @@ protected:
     void resetClusterParameter() {
         auto param = ServerParameterSet::getClusterParameterSet()->get(
             "configServerReadPreferenceForCatalogQueries");
-        ASSERT_OK(param->reset(boost::none));
+        ASSERT_OK(param->reset());
     }
 
     void assertReadPreferenceForCatalogQuery(ReadPreference expectedReadPreference) {
@@ -155,8 +155,7 @@ private:
                     "configServerReadPreferenceForCatalogQueries");
         ASSERT(param != nullptr);
 
-        ASSERT(expectedMustAlwaysUseNearest ==
-               param->getValue(boost::none).getMustAlwaysUseNearest());
+        ASSERT(expectedMustAlwaysUseNearest == param->getValue().getMustAlwaysUseNearest());
     }
 };
 

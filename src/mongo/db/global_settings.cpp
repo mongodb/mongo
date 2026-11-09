@@ -13,14 +13,11 @@
 #include "mongo/db/mongod_options_general_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/decorable.h"
 
 #include <mutex>
 #include <string_view>
 #include <utility>
-
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -51,8 +48,7 @@ void ClusterNetworkRestrictionManager::set(
 
 void AllowListedClusterNetworkSetting::append(OperationContext*,
                                               BSONObjBuilder* b,
-                                              std::string_view name,
-                                              const boost::optional<TenantId>&) {
+                                              std::string_view name) {
     auto allowlistedClusterNetwork =
         std::atomic_load(&mongodGlobalParams.allowlistedClusterNetwork);  // NOLINT
     if (allowlistedClusterNetwork) {
@@ -66,8 +62,7 @@ void AllowListedClusterNetworkSetting::append(OperationContext*,
     }
 }
 
-Status AllowListedClusterNetworkSetting::set(const mongo::BSONElement& e,
-                                             const boost::optional<TenantId>&) {
+Status AllowListedClusterNetworkSetting::set(const mongo::BSONElement& e) {
     std::shared_ptr<std::vector<std::string>> allowlistedClusterNetwork;
     if (e.isNull()) {
         // noop
@@ -95,8 +90,7 @@ Status AllowListedClusterNetworkSetting::set(const mongo::BSONElement& e,
     return Status::OK();
 }
 
-Status AllowListedClusterNetworkSetting::setFromString(std::string_view s,
-                                                       const boost::optional<TenantId>&) {
+Status AllowListedClusterNetworkSetting::setFromString(std::string_view s) {
     return {ErrorCodes::InternalError, "Cannot invoke this method"};
 }
 

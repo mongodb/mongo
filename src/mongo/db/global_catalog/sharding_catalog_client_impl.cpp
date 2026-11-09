@@ -103,8 +103,7 @@ bool forceUsageOfNearestReadPreference() {
         return false;
     }
 
-    return configServerReadPreferenceForCatalogQueriesParam->getValue(boost::none)
-        .getMustAlwaysUseNearest();
+    return configServerReadPreferenceForCatalogQueriesParam->getValue().getMustAlwaysUseNearest();
 }
 
 /**

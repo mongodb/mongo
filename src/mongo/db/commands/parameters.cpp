@@ -27,7 +27,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
@@ -44,7 +43,6 @@
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -280,13 +278,13 @@ public:
 
             if (options.getShowDetails()) {
                 BSONObjBuilder detailBob(result.subobjStart(i->second->name()));
-                i->second->append(opCtx, &detailBob, "value", boost::none);
+                i->second->append(opCtx, &detailBob, "value");
                 detailBob.appendBool("settableAtRuntime", i->second->allowedToChangeAtRuntime());
                 detailBob.appendBool("settableAtStartup", i->second->allowedToChangeAtStartup());
-                i->second->appendDetails(opCtx, &detailBob, boost::none);
+                i->second->appendDetails(opCtx, &detailBob);
                 detailBob.doneFast();
             } else {
-                i->second->append(opCtx, &result, i->second->name(), boost::none);
+                i->second->append(opCtx, &result, i->second->name());
             }
 
             foundFlag = true;
@@ -447,7 +445,7 @@ public:
             auto oldValueObj = ([&] {
                 BSONObjBuilder bb;
                 if (numSet == 0) {
-                    foundParameter->second->append(opCtx, &bb, "was", boost::none);
+                    foundParameter->second->append(opCtx, &bb, "was");
                 }
                 return bb.obj();
             })();
@@ -464,7 +462,7 @@ public:
             const bool forceRedact = foundParameter->second->isRedact();
 
             try {
-                uassertStatusOK(foundParameter->second->set(parameter, boost::none));
+                uassertStatusOK(foundParameter->second->set(parameter));
             } catch (const DBException& ex) {
                 LOGV2(20496,
                       "Error setting parameter to new value",
@@ -510,8 +508,7 @@ MONGO_REGISTER_COMMAND(CmdSet).forRouter().forShard();
 
 void LogLevelServerParameter::append(OperationContext*,
                                      BSONObjBuilder* builder,
-                                     std::string_view name,
-                                     const boost::optional<TenantId>&) {
+                                     std::string_view name) {
     builder->append(name,
                     logv2::LogManager::global()
                         .getGlobalSettings()
@@ -519,8 +516,7 @@ void LogLevelServerParameter::append(OperationContext*,
                         .toInt());
 }
 
-Status LogLevelServerParameter::set(const BSONElement& newValueElement,
-                                    const boost::optional<TenantId>&) {
+Status LogLevelServerParameter::set(const BSONElement& newValueElement) {
     int newValue;
     Status coercionStatus = newValueElement.tryCoerce(&newValue);
     if (!coercionStatus.isOK() || newValue < 0) {
@@ -534,8 +530,7 @@ Status LogLevelServerParameter::set(const BSONElement& newValueElement,
     return Status::OK();
 }
 
-Status LogLevelServerParameter::setFromString(std::string_view strLevel,
-                                              const boost::optional<TenantId>&) {
+Status LogLevelServerParameter::setFromString(std::string_view strLevel) {
     int newValue;
     Status status = NumberParser{}(strLevel, &newValue);
     if (!status.isOK())
@@ -552,15 +547,13 @@ Status LogLevelServerParameter::setFromString(std::string_view strLevel,
 
 void LogComponentVerbosityServerParameter::append(OperationContext*,
                                                   BSONObjBuilder* builder,
-                                                  std::string_view name,
-                                                  const boost::optional<TenantId>&) {
+                                                  std::string_view name) {
     BSONObj currentSettings;
     getLogComponentVerbosity(&currentSettings);
     builder->append(name, currentSettings);
 }
 
-Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElement,
-                                                 const boost::optional<TenantId>&) {
+Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElement) {
     if (!newValueElement.isABSONObj()) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream()
@@ -569,8 +562,7 @@ Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElem
     return setLogComponentVerbosity(newValueElement.Obj());
 }
 
-Status LogComponentVerbosityServerParameter::setFromString(std::string_view str,
-                                                           const boost::optional<TenantId>&) try {
+Status LogComponentVerbosityServerParameter::setFromString(std::string_view str) try {
     return setLogComponentVerbosity(fromjson(str));
 } catch (const DBException& ex) {
     return ex.toStatus();
@@ -578,25 +570,22 @@ Status LogComponentVerbosityServerParameter::setFromString(std::string_view str,
 
 void AutomationServiceDescriptorServerParameter::append(OperationContext*,
                                                         BSONObjBuilder* builder,
-                                                        std::string_view name,
-                                                        const boost::optional<TenantId>&) {
+                                                        std::string_view name) {
     const std::lock_guard<std::mutex> lock(autoServiceDescriptorMutex);
     if (!autoServiceDescriptorValue.empty()) {
         builder->append(name, autoServiceDescriptorValue);
     }
 }
 
-Status AutomationServiceDescriptorServerParameter::set(const BSONElement& newValueElement,
-                                                       const boost::optional<TenantId>&) {
+Status AutomationServiceDescriptorServerParameter::set(const BSONElement& newValueElement) {
     if (newValueElement.type() != BSONType::string) {
         return {ErrorCodes::TypeMismatch,
                 "Value for parameter automationServiceDescriptor must be of type 'string'"};
     }
-    return setFromString(newValueElement.String(), boost::none);
+    return setFromString(newValueElement.String());
 }
 
-Status AutomationServiceDescriptorServerParameter::setFromString(std::string_view str,
-                                                                 const boost::optional<TenantId>&) {
+Status AutomationServiceDescriptorServerParameter::setFromString(std::string_view str) {
     auto kMaxSize = 64U;
     if (str.size() > kMaxSize)
         return {ErrorCodes::Overflow,

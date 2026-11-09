@@ -44,20 +44,20 @@ void runAppendTest(T param, std::string_view name, size_t value, const F& setTcm
     ASSERT_DOES_NOT_THROW(setTcmallocValue(name, value));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "test", boost::none);
+    param.append(nullptr, &bob, "test");
     ASSERT_TRUE(bob.hasField("test"));
 
     ASSERT_DOES_NOT_THROW(setTcmallocValue(name, value + 1));
 
     BSONObjBuilder subBob = bob.subobjStart("sub_doc");
-    param.append(nullptr, &subBob, "sub_test", boost::none);
+    param.append(nullptr, &subBob, "sub_test");
     ASSERT_TRUE(subBob.hasField("sub_test"));
     subBob.doneFast();
 
     ASSERT_TRUE(bob.hasField("sub_doc"));
 
     ASSERT_FALSE(bob.hasField(""));
-    param.append(nullptr, &bob, "", boost::none);
+    param.append(nullptr, &bob, "");
     ASSERT_TRUE(bob.hasField(""));
 
     auto obj = bob.obj();
@@ -89,7 +89,7 @@ void runAppendTest(T param, std::string_view name, size_t value, const F& setTcm
 template <typename T, typename F>
 void runSetTest(T param, std::string_view name, int value, const F& getTcmallocValue) {
     BSONElement emptyElem;
-    ASSERT_EQ(ErrorCodes::TypeMismatch, param.set(emptyElem, boost::none));
+    ASSERT_EQ(ErrorCodes::TypeMismatch, param.set(emptyElem));
 
     BSONObjBuilder bob;
     bob.appendNumber("a", -1);
@@ -97,10 +97,10 @@ void runSetTest(T param, std::string_view name, int value, const F& getTcmallocV
     BSONObj obj = bob.obj();
 
     BSONElement negVal = obj.getField("a");
-    ASSERT_EQ(ErrorCodes::BadValue, param.set(negVal, boost::none));
+    ASSERT_EQ(ErrorCodes::BadValue, param.set(negVal));
 
     BSONElement val = obj.getField("b");
-    ASSERT_OK(param.set(val, boost::none));
+    ASSERT_OK(param.set(val));
 
     size_t actualVal = getTcmallocValue(name);
     ASSERT_EQ(actualVal, value);
@@ -124,10 +124,10 @@ void runSetFromStringTest(T param,
     int intVal;
     ASSERT_OK(NumberParser{}(value, &intVal));
 
-    ASSERT_EQ(ErrorCodes::FailedToParse, param.setFromString("", boost::none));
-    ASSERT_NOT_OK(param.setFromString("-1", boost::none));
-    ASSERT_EQ(ErrorCodes::Overflow, param.setFromString(std::string(359, '9'), boost::none));
-    ASSERT_OK(param.setFromString(value, boost::none));
+    ASSERT_EQ(ErrorCodes::FailedToParse, param.setFromString(""));
+    ASSERT_NOT_OK(param.setFromString("-1"));
+    ASSERT_EQ(ErrorCodes::Overflow, param.setFromString(std::string(359, '9')));
+    ASSERT_OK(param.setFromString(value));
 
     size_t actualVal = getTcmallocValue(name);
     ASSERT_EQ(actualVal, intVal);
@@ -142,7 +142,7 @@ void runSetFromStringTest(T param,
 template <typename T>
 void runNoOpAppendTest(T param) {
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "test", boost::none);
+    param.append(nullptr, &bob, "test");
     ASSERT_FALSE(bob.hasField("test"));
 }
 
@@ -165,7 +165,7 @@ void runNoOpSetTest(T param, std::string_view name, const F& getTcmallocValue) {
     // BSONObj must outlive BSONElement. See BSONElement, BSONObj::getField().
     auto obj = bob.obj();
     BSONElement val = obj.getField("a");
-    ASSERT_OK(param.set(val, boost::none));
+    ASSERT_OK(param.set(val));
 }
 
 /**
@@ -182,7 +182,7 @@ template <typename T, typename F>
 void runNoOpSetFromStringTest(T param, std::string_view name, const F& getTcmallocValue) {
     ASSERT_THROWS_CODE(
         getTcmallocValue(name), ExceptionFor<ErrorCodes::InternalError>, ErrorCodes::InternalError);
-    ASSERT_OK(param.setFromString("1", boost::none));
+    ASSERT_OK(param.setFromString("1"));
 }
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE

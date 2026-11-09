@@ -14,7 +14,7 @@ namespace mongo {
 namespace {
 
 using TestParameter = ClusterParameterWithStorage<ClusterServerParameterTest>;
-using ParameterStorage = TenantIdMap<ClusterServerParameterTest>;
+using ParameterStorage = ClusterServerParameterTest;
 
 struct StorageAndParameter {
     StorageAndParameter(std::string_view name,
@@ -29,7 +29,7 @@ struct StorageAndParameter {
         values.setClusterServerParameter(base);
         values.setIntValue(intValue);
         values.setStrValue(stringValue);
-        storage[boost::none] = values;
+        storage = values;
     }
 
     ParameterStorage storage;
@@ -63,7 +63,7 @@ protected:
     }
 
     BSONObj serializeParameter(TestParameter* parameter) {
-        return parameter->getValue(boost::none).toBSON();
+        return parameter->getValue().toBSON();
     }
 
     ServerParameterSet _parameterSet;
@@ -118,7 +118,7 @@ TEST_F(ClusterParameterServerStatusTest, DoNotReportDisabledParameters) {
 
 TEST_F(ClusterParameterServerStatusTest, DoNotReportUnsetParameters) {
     auto& parameter = _testParameters[0]->parameter;
-    ASSERT_OK(parameter->reset(boost::none));
+    ASSERT_OK(parameter->reset());
     _parameterSet.add(std::move(parameter));
     ASSERT_BSONOBJ_EQ(getReport(), BSONObj::kEmptyObject);
 }

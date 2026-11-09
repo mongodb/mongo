@@ -709,7 +709,7 @@ private:
         OpenTelemetryExternalTracingServerParameter param{"openTelemetryExternalTracing",
                                                           ServerParameterType::kRuntimeOnly};
         auto storage = BSON("v" << BSON("enabled" << enabled));
-        ASSERT_OK(param.set(storage.firstElement(), boost::none));
+        ASSERT_OK(param.set(storage.firstElement()));
     }
 };
 

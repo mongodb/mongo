@@ -50,15 +50,13 @@ std::once_flag warnForSSLMode;
 
 void SSLModeServerParameter::append(OperationContext*,
                                     BSONObjBuilder* builder,
-                                    std::string_view fieldName,
-                                    const boost::optional<TenantId>&) {
+                                    std::string_view fieldName) {
     builder->append(fieldName, SSLParams::sslModeFormat(sslGlobalParams.sslMode.load()));
 }
 
 void TLSModeServerParameter::append(OperationContext*,
                                     BSONObjBuilder* builder,
-                                    std::string_view fieldName,
-                                    const boost::optional<TenantId>&) {
+                                    std::string_view fieldName) {
     builder->append(
         fieldName,
         SSLParams::tlsModeFormat(static_cast<SSLParams::SSLModes>(sslGlobalParams.sslMode.load())));
@@ -72,8 +70,7 @@ void SSLModeServerParameter::warnIfDeprecated(std::string_view action) {
     });
 }
 
-Status SSLModeServerParameter::setFromString(std::string_view strMode,
-                                             const boost::optional<TenantId>&) {
+Status SSLModeServerParameter::setFromString(std::string_view strMode) {
     auto swNewMode = checkTLSModeTransition(
         SSLParams::sslModeFormat, SSLParams::sslModeParse, "sslMode", strMode);
     if (!swNewMode.isOK()) {
@@ -83,8 +80,7 @@ Status SSLModeServerParameter::setFromString(std::string_view strMode,
     return Status::OK();
 }
 
-Status TLSModeServerParameter::setFromString(std::string_view strMode,
-                                             const boost::optional<TenantId>&) {
+Status TLSModeServerParameter::setFromString(std::string_view strMode) {
     auto swNewMode = checkTLSModeTransition(
         SSLParams::tlsModeFormat, SSLParams::tlsModeParse, "tlsMode", strMode);
     if (!swNewMode.isOK()) {
@@ -94,10 +90,7 @@ Status TLSModeServerParameter::setFromString(std::string_view strMode,
     return Status::OK();
 }
 
-void TLSCATrustsSetParameter::append(OperationContext*,
-                                     BSONObjBuilder* b,
-                                     std::string_view name,
-                                     const boost::optional<TenantId>&) {
+void TLSCATrustsSetParameter::append(OperationContext*, BSONObjBuilder* b, std::string_view name) {
     if (!sslGlobalParams.tlsCATrusts) {
         b->appendNull(name);
         return;
@@ -151,8 +144,7 @@ void TLSCATrustsSetParameter::append(OperationContext*,
  *   { role: "read", db: "" }      // May grant 'read' role on any DB.
  *   { role: "", db: "" }          // May grant any role on any DB.
  */
-Status TLSCATrustsSetParameter::set(const BSONElement& element,
-                                    const boost::optional<TenantId>&) try {
+Status TLSCATrustsSetParameter::set(const BSONElement& element) try {
     if ((element.type() != BSONType::object) || !element.Obj().couldBeArray()) {
         return {ErrorCodes::BadValue, "Value must be an array"};
     }
@@ -181,17 +173,15 @@ Status TLSCATrustsSetParameter::set(const BSONElement& element,
     return exceptionToStatus();
 }
 
-Status TLSCATrustsSetParameter::setFromString(std::string_view json,
-                                              const boost::optional<TenantId>&) try {
-    return set(BSON("" << fromjson(json)).firstElement(), boost::none);
+Status TLSCATrustsSetParameter::setFromString(std::string_view json) try {
+    return set(BSON("" << fromjson(json)).firstElement());
 } catch (...) {
     return exceptionToStatus();
 }
 
 void ClusterAuthX509OverrideParameter::append(OperationContext* opCtx,
                                               BSONObjBuilder* bob,
-                                              std::string_view name,
-                                              const boost::optional<TenantId>&) {
+                                              std::string_view name) {
     ClusterAuthX509Override currentValue;
     if (!sslGlobalParams.clusterAuthX509OverrideAttributes.empty()) {
         currentValue.setAttributes(sslGlobalParams.clusterAuthX509OverrideAttributes);
@@ -205,8 +195,7 @@ void ClusterAuthX509OverrideParameter::append(OperationContext* opCtx,
     subObjBuilder.doneFast();
 }
 
-Status ClusterAuthX509OverrideParameter::set(const BSONElement& element,
-                                             const boost::optional<TenantId>&) try {
+Status ClusterAuthX509OverrideParameter::set(const BSONElement& element) try {
     if ((element.type() != BSONType::object)) {
         return {ErrorCodes::BadValue, "Value must be an object"};
     }
@@ -233,17 +222,15 @@ Status ClusterAuthX509OverrideParameter::set(const BSONElement& element,
     return exceptionToStatus();
 }
 
-Status ClusterAuthX509OverrideParameter::setFromString(std::string_view json,
-                                                       const boost::optional<TenantId>&) try {
-    return set(BSON("" << fromjson(json)).firstElement(), boost::none);
+Status ClusterAuthX509OverrideParameter::setFromString(std::string_view json) try {
+    return set(BSON("" << fromjson(json)).firstElement());
 } catch (...) {
     return exceptionToStatus();
 }
 
 }  // namespace mongo
 
-mongo::Status mongo::validateOpensslCipherConfig(const std::string&,
-                                                 const boost::optional<TenantId>&) {
+mongo::Status mongo::validateOpensslCipherConfig(const std::string&) {
     if (sslGlobalParams.sslCipherConfig != kSSLCipherConfigDefault) {
         return {ErrorCodes::BadValue,
                 "opensslCipherConfig setParameter is incompatible with net.tls.tlsCipherConfig"};
@@ -258,8 +245,7 @@ mongo::Status mongo::validateOpensslCipherConfig(const std::string&,
     return Status::OK();
 }
 
-mongo::Status mongo::validateDisableNonTLSConnectionLogging(const bool&,
-                                                            const boost::optional<TenantId>&) {
+mongo::Status mongo::validateDisableNonTLSConnectionLogging(const bool&) {
     if (sslGlobalParams.disableNonSSLConnectionLoggingSet) {
         return {ErrorCodes::BadValue,
                 "Error parsing command line: Multiple occurrences of option "

@@ -6,14 +6,11 @@
 #include "mongo/base/status.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
-
-#include <boost/optional/optional.hpp>
 
 
 namespace mongo::query_stats_util {
@@ -21,7 +18,7 @@ namespace mongo::query_stats_util {
 Status onQueryStatsStoreSizeUpdate(const std::string& str);
 
 
-Status validateQueryStatsStoreSize(const std::string& str, const boost::optional<TenantId>&);
+Status validateQueryStatsStoreSize(const std::string& str);
 
 Status onQueryStatsRateLimitUpdate(int requestLimit);
 

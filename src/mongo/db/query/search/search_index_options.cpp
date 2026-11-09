@@ -12,7 +12,7 @@ namespace mongo {
 
 SearchIndexParams globalSearchIndexParams;
 
-Status SearchIndexParams::onValidateHost(std::string_view str, const boost::optional<TenantId>&) {
+Status SearchIndexParams::onValidateHost(std::string_view str) {
     // Unset value is OK
     if (str.empty()) {
         return Status::OK();

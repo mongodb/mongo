@@ -20,8 +20,7 @@ const HttpHeaderMap& getMetricsHttpExportHeaders() {
     return httpExportHeaders();
 }
 
-Status OpenTelemetryMetricsHttpExportHeaders::set(const BSONElement& newValueElement,
-                                                  const boost::optional<TenantId>&) {
+Status OpenTelemetryMetricsHttpExportHeaders::set(const BSONElement& newValueElement) {
     auto new_headers = parseHttpHeadersFromBson(newValueElement);
     if (!new_headers.isOK()) {
         // Status is refcounted so this is "cheap" (though a move API would be great)
@@ -32,11 +31,10 @@ Status OpenTelemetryMetricsHttpExportHeaders::set(const BSONElement& newValueEle
     return Status::OK();
 }
 
-Status OpenTelemetryMetricsHttpExportHeaders::setFromString(
-    std::string_view s, const boost::optional<TenantId>& tenant) {
+Status OpenTelemetryMetricsHttpExportHeaders::setFromString(std::string_view s) {
     try {
         auto b = BSON("v" << fromjson(s));
-        return set(b.firstElement(), tenant);
+        return set(b.firstElement());
     } catch (std::exception& e) {
         return Status(ErrorCodes::BadValue,
                       fmt::format("Failed to convert string to BSON object: {}", e.what()));

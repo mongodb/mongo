@@ -1620,14 +1620,11 @@ public:
         TestServerParameter(std::string_view name, ServerParameterType spt, int x)
             : ServerParameter(name, spt), val{x} {}
 
-        void append(OperationContext*,
-                    BSONObjBuilder* bob,
-                    std::string_view name,
-                    const boost::optional<TenantId>&) final {
+        void append(OperationContext*, BSONObjBuilder* bob, std::string_view name) final {
             bob->append(name, val);
         }
 
-        Status setFromString(std::string_view str, const boost::optional<TenantId>&) final {
+        Status setFromString(std::string_view str) final {
             int value;
             Status status = NumberParser{}(str, &value);
             if (!status.isOK())

@@ -948,7 +948,7 @@ void processFLECompactV2(OperationContext* opCtx,
         const double anchorPaddingFactor = request.getAnchorPaddingFactor().get_value_or(
             ServerParameterSet::getClusterParameterSet()
                 ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-                ->getValue(namespaces.escNss.tenantId())
+                ->getValue()
                 .getCompactAnchorPaddingFactor()
                 .get_value_or(kDefaultAnchorPaddingFactor));
         for (const auto& [fieldPath, rangeField] : rangeFields) {

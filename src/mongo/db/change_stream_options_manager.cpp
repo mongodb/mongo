@@ -66,23 +66,18 @@ const LogicalTime& ChangeStreamOptionsManager::getClusterParameterTime() const {
 }
 
 // The following methods are for the 'ChangeStreamOptionsParameter' server parameter type which is
-// defined via IDL ('in file src/mongo/db/change_stream_options_parameter.idl'). The 'TenantId'
-// parameters in the following methods do nothing, but they are required because the IDL generator
-// generates method signatures including 'TenantId' parameters.
-// TODO SERVER-103953: remove TenantId parameters from the signatures below.
+// defined via IDL (in file src/mongo/db/change_stream_options_parameter.idl).
 
 void ChangeStreamOptionsParameter::append(OperationContext* opCtx,
                                           BSONObjBuilder* bob,
-                                          std::string_view name,
-                                          const boost::optional<TenantId>&) {
+                                          std::string_view name) {
     ChangeStreamOptionsManager& changeStreamOptionsManager =
         ChangeStreamOptionsManager::get(getGlobalServiceContext());
     bob->append("_id"sv, name);
     bob->appendElementsUnique(changeStreamOptionsManager.getOptions(opCtx).toBSON());
 }
 
-Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement,
-                                         const boost::optional<TenantId>&) {
+Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement) {
     try {
         ChangeStreamOptionsManager& changeStreamOptionsManager =
             ChangeStreamOptionsManager::get(getGlobalServiceContext());
@@ -97,8 +92,7 @@ Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement,
     }
 }
 
-Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement,
-                                              const boost::optional<TenantId>&) const {
+Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement) const {
     try {
         BSONObj changeStreamOptionsObj = newValueElement.Obj();
         Status validateStatus = Status::OK();
@@ -144,7 +138,7 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
     }
 }
 
-Status ChangeStreamOptionsParameter::reset(const boost::optional<TenantId>&) {
+Status ChangeStreamOptionsParameter::reset() {
     // Replace the current changeStreamOptions with a default-constructed one, which should
     // automatically set preAndPostImages.expirationSeconds to 'off' by default.
     ChangeStreamOptionsManager& changeStreamOptionsManager =
@@ -154,8 +148,7 @@ Status ChangeStreamOptionsParameter::reset(const boost::optional<TenantId>&) {
         .getStatus();
 }
 
-LogicalTime ChangeStreamOptionsParameter::getClusterParameterTime(
-    const boost::optional<TenantId>&) const {
+LogicalTime ChangeStreamOptionsParameter::getClusterParameterTime() const {
     ChangeStreamOptionsManager& changeStreamOptionsManager =
         ChangeStreamOptionsManager::get(getGlobalServiceContext());
     return changeStreamOptionsManager.getClusterParameterTime();

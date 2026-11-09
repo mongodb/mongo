@@ -103,7 +103,7 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     serverParameter->warnIfDeprecated("setClusterParameter");
 
     BSONObjBuilder oldValueBob;
-    serverParameter->append(opCtx, &oldValueBob, std::string{parameterName}, tenantId);
+    serverParameter->append(opCtx, &oldValueBob, std::string{parameterName});
     audit::logSetClusterParameter(opCtx->getClient(), oldValueBob.obj(), update, tenantId);
 
     LOGV2_DEBUG(
@@ -187,7 +187,7 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     BSONObj query = queryBuilder.obj();
 
     if (!skipValidation) {
-        uassertStatusOK(sp->validate(update, tenantId));
+        uassertStatusOK(sp->validate(update));
     }
 
     return {query, update};

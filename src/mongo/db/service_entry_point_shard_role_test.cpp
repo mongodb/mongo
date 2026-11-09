@@ -444,7 +444,7 @@ public:
         WriteThrottlerAdmissionContext::get(opCtx).recordStorageWrites(10);
         auto* enabledParameter =
             ServerParameterSet::getNodeParameterSet()->get("writeThrottlerEnabled");
-        uassertStatusOK(enabledParameter->setFromString("false", boost::none));
+        uassertStatusOK(enabledParameter->setFromString("false"));
         return true;
     }
 };

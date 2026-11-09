@@ -6,22 +6,18 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/tenant_id.h"
 
 #include <string_view>
 
-#include <boost/optional/optional.hpp>
 namespace mongo {
 
-Status CollectionValidateOptionsServerParameter::setFromString(std::string_view value,
-                                                               const boost::optional<TenantId>&) {
+Status CollectionValidateOptionsServerParameter::setFromString(std::string_view value) {
     _data = CollectionValidateOptions::parse(fromjson(value),
                                              IDLParserContext("collection validate options"));
     return Status::OK();
 }
 
-Status CollectionValidateOptionsServerParameter::set(const BSONElement& newValueElement,
-                                                     const boost::optional<TenantId>&) {
+Status CollectionValidateOptionsServerParameter::set(const BSONElement& newValueElement) {
     _data = CollectionValidateOptions::parse(newValueElement.Obj(),
                                              IDLParserContext("collection validate options"));
     return Status::OK();
@@ -29,8 +25,7 @@ Status CollectionValidateOptionsServerParameter::set(const BSONElement& newValue
 
 void CollectionValidateOptionsServerParameter::append(OperationContext*,
                                                       BSONObjBuilder* bob,
-                                                      std::string_view name,
-                                                      const boost::optional<TenantId>&) {
+                                                      std::string_view name) {
     auto subBob = BSONObjBuilder(bob->subobjStart(name));
     _data.serialize(&subBob);
 }

@@ -14,7 +14,7 @@
 
 namespace mongo {
 
-Status validateTestIntKnobCallback(const int& value, const boost::optional<TenantId>&) {
+Status validateTestIntKnobCallback(const int& value) {
     if (value == 13) {
         return Status(ErrorCodes::BadValue, "13 is a forbidden sentinel value for testing");
     }
@@ -25,14 +25,11 @@ namespace test_knobs {
 REGISTER_QUERY_KNOBS(TestKnobs, MONGO_EXPAND_QUERY_KNOBS_TEST)
 }  // namespace test_knobs
 
-void TestEnumKnob::append(OperationContext*,
-                          BSONObjBuilder* b,
-                          std::string_view name,
-                          const boost::optional<TenantId>&) {
+void TestEnumKnob::append(OperationContext*, BSONObjBuilder* b, std::string_view name) {
     *b << name << idl::serialize(_data.get());
 }
 
-Status TestEnumKnob::setFromString(std::string_view value, const boost::optional<TenantId>&) {
+Status TestEnumKnob::setFromString(std::string_view value) {
     _data = idl::deserialize<TestKnobModeEnum>(value, IDLParserContext("testEnumKnob"));
     return Status::OK();
 }

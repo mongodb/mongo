@@ -11,7 +11,6 @@
 #include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -72,9 +71,9 @@ public:
         static Status updateConcurrentWriteTransactions(const int32_t& newWriteTransactions);
         static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
         [[MONGO_MOD_PRIVATE]] static Status validateConcurrentWriteTransactions(
-            const int32_t& newWriteTransactions, boost::optional<TenantId>);
+            const int32_t& newWriteTransactions);
         [[MONGO_MOD_PRIVATE]] static Status validateConcurrentReadTransactions(
-            const int32_t& newReadTransactions, boost::optional<TenantId>);
+            const int32_t& newReadTransactions);
     };
 
     /**
@@ -87,13 +86,13 @@ public:
         static Status updateConcurrentWriteTransactions(const int32_t& newWriteTransactions);
         static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
         [[MONGO_MOD_PRIVATE]] static Status validateConcurrentWriteTransactions(
-            const int32_t& newWriteTransactions, boost::optional<TenantId>);
+            const int32_t& newWriteTransactions);
         [[MONGO_MOD_PRIVATE]] static Status validateConcurrentReadTransactions(
-            const int32_t& newReadTransactions, boost::optional<TenantId>);
+            const int32_t& newReadTransactions);
     };
 
     [[MONGO_MOD_PRIVATE]] static Status validateConcurrencyAdjustmentAlgorithm(
-        const std::string& name, const boost::optional<TenantId>&);
+        const std::string& name);
 
     static Status updateConcurrencyAdjustmentAlgorithm(std::string newAlgorithm);
 

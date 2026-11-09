@@ -10,53 +10,38 @@
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_join_optimization_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <string_view>
 
-#include <boost/optional/optional.hpp>
-
 namespace mongo {
 
-void CBRSamplingCEMethod::append(OperationContext*,
-                                 BSONObjBuilder* b,
-                                 std::string_view name,
-                                 const boost::optional<TenantId>&) {
+void CBRSamplingCEMethod::append(OperationContext*, BSONObjBuilder* b, std::string_view name) {
     *b << name << idl::serialize(_data.get());
 }
 
-Status CBRSamplingCEMethod::setFromString(std::string_view value,
-                                          const boost::optional<TenantId>&) {
+Status CBRSamplingCEMethod::setFromString(std::string_view value) {
     _data = idl::deserialize<SamplingCEMethodEnum>(
         value, IDLParserContext("internalQuerySamplingCEMethod"));
     return Status::OK();
 }
 
-void PersistentSampleCEMethod::append(OperationContext*,
-                                      BSONObjBuilder* b,
-                                      std::string_view name,
-                                      const boost::optional<TenantId>&) {
+void PersistentSampleCEMethod::append(OperationContext*, BSONObjBuilder* b, std::string_view name) {
     *b << name << idl::serialize(_data.get());
 }
 
-Status PersistentSampleCEMethod::setFromString(std::string_view value,
-                                               const boost::optional<TenantId>&) {
+Status PersistentSampleCEMethod::setFromString(std::string_view value) {
     _data = idl::deserialize<SamplingCEMethodEnum>(
         value, IDLParserContext("internalQuerySamplingCEMethodForPersistentSamples"));
     return Status::OK();
 }
 
-void JoinSamplingCEMethod::append(OperationContext*,
-                                  BSONObjBuilder* b,
-                                  std::string_view name,
-                                  const boost::optional<TenantId>&) {
+void JoinSamplingCEMethod::append(OperationContext*, BSONObjBuilder* b, std::string_view name) {
     *b << name << idl::serialize(_data.get());
 }
 
-Status JoinSamplingCEMethod::setFromString(std::string_view value,
-                                           const boost::optional<TenantId>&) {
+Status JoinSamplingCEMethod::setFromString(std::string_view value) {
     _data = idl::deserialize<SamplingCEMethodEnum>(
         value, IDLParserContext("internalJoinOptimizationSamplingCEMethod"));
     return Status::OK();

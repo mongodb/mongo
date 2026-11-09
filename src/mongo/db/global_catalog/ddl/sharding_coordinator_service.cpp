@@ -494,7 +494,7 @@ void ShardingCoordinatorService::checkIfConflictsWithOtherInstances(
                 ServerParameterSet::getClusterParameterSet()
                     ->get<ClusterParameterWithStorage<AddOrRemoveShardInProgressParam>>(
                         "addOrRemoveShardInProgress");
-            return clusterParameter->getValue(boost::none).getInProgress();
+            return clusterParameter->getValue().getInProgress();
         }();
 
         uassert(ErrorCodes::AddOrRemoveShardInProgress,
@@ -507,7 +507,7 @@ void ShardingCoordinatorService::checkIfConflictsWithOtherInstances(
                     ->get<
                         ClusterParameterWithStorage<PlacementHistoryInitializationInProgressParam>>(
                         "placementHistoryInitializationInProgress");
-            return clusterParameter->getValue(boost::none).getInProgress();
+            return clusterParameter->getValue().getInProgress();
         }();
 
         uassert(ErrorCodes::PlacementHistoryInitializationInProgress,

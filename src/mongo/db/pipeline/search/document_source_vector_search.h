@@ -154,7 +154,7 @@ public:
             ServerParameterSet::getClusterParameterSet()
                 ->get<ClusterParameterWithStorage<InternalVectorSearchStoredSource>>(
                     "internalVectorSearchStoredSource")
-                ->getValue(getExpCtx()->getNamespaceString().tenantId())
+                ->getValue()
                 .getEnabled();
         return isVectorSearchStoredSourceEnabled
             ? _stageSpec.getBoolField(kReturnStoredSourceFieldName)

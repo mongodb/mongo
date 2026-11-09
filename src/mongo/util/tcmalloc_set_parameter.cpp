@@ -17,7 +17,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/config.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
@@ -29,7 +28,6 @@
 #include <limits>
 #include <string_view>
 
-#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 #include <valgrind/valgrind.h>
 
@@ -185,15 +183,13 @@ Status doSetPropertyFromString(std::string_view str) {
 
 void TCMallocMaxPerCPUCacheSizeServerParameter::append(OperationContext*,
                                                        BSONObjBuilder* b,
-                                                       std::string_view name,
-                                                       const boost::optional<TenantId>&) {
+                                                       std::string_view name) {
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
     doAppendProperty<TCMallocMaxPerCPUCacheSizeServerParameter>(b, name);
 #endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 }
 
-Status TCMallocMaxPerCPUCacheSizeServerParameter::set(const BSONElement& newValueElement,
-                                                      const boost::optional<TenantId>&) {
+Status TCMallocMaxPerCPUCacheSizeServerParameter::set(const BSONElement& newValueElement) {
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
     return doSetProperty<TCMallocMaxPerCPUCacheSizeServerParameter>(name(), newValueElement);
 #endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
@@ -205,8 +201,7 @@ Status TCMallocMaxPerCPUCacheSizeServerParameter::set(const BSONElement& newValu
     return Status::OK();
 }
 
-Status TCMallocMaxPerCPUCacheSizeServerParameter::setFromString(std::string_view str,
-                                                                const boost::optional<TenantId>&) {
+Status TCMallocMaxPerCPUCacheSizeServerParameter::setFromString(std::string_view str) {
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
     return doSetPropertyFromString<TCMallocMaxPerCPUCacheSizeServerParameter>(str);
 #endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
@@ -220,15 +215,13 @@ Status TCMallocMaxPerCPUCacheSizeServerParameter::setFromString(std::string_view
 
 void TCMallocMaxTotalThreadCacheBytesServerParameter::append(OperationContext*,
                                                              BSONObjBuilder* b,
-                                                             std::string_view name,
-                                                             const boost::optional<TenantId>&) {
+                                                             std::string_view name) {
 #ifdef MONGO_CONFIG_TCMALLOC_GPERF
     doAppendProperty<TCMallocMaxTotalThreadCacheBytesServerParameter>(b, name);
 #endif  // MONGO_CONFIG_TCMALLOC_GPERF
 }
 
-Status TCMallocMaxTotalThreadCacheBytesServerParameter::set(const BSONElement& newValueElement,
-                                                            const boost::optional<TenantId>&) {
+Status TCMallocMaxTotalThreadCacheBytesServerParameter::set(const BSONElement& newValueElement) {
 #ifdef MONGO_CONFIG_TCMALLOC_GPERF
     return doSetProperty<TCMallocMaxTotalThreadCacheBytesServerParameter>(name(), newValueElement);
 #endif  // MONGO_CONFIG_TCMALLOC_GPERF
@@ -240,8 +233,7 @@ Status TCMallocMaxTotalThreadCacheBytesServerParameter::set(const BSONElement& n
     return Status::OK();
 }
 
-Status TCMallocMaxTotalThreadCacheBytesServerParameter::setFromString(
-    std::string_view str, const boost::optional<TenantId>&) {
+Status TCMallocMaxTotalThreadCacheBytesServerParameter::setFromString(std::string_view str) {
 #ifdef MONGO_CONFIG_TCMALLOC_GPERF
     return doSetPropertyFromString<TCMallocMaxTotalThreadCacheBytesServerParameter>(str);
 #endif  // MONGO_CONFIG_TCMALLOC_GPERF
@@ -255,15 +247,13 @@ Status TCMallocMaxTotalThreadCacheBytesServerParameter::setFromString(
 
 void TCMallocAggressiveMemoryDecommitServerParameter::append(OperationContext*,
                                                              BSONObjBuilder* b,
-                                                             std::string_view name,
-                                                             const boost::optional<TenantId>&) {
+                                                             std::string_view name) {
 #ifdef MONGO_CONFIG_TCMALLOC_GPERF
     doAppendProperty<TCMallocAggressiveMemoryDecommitServerParameter>(b, name);
 #endif  //  MONGO_CONFIG_TCMALLOC_GPERF
 }
 
-Status TCMallocAggressiveMemoryDecommitServerParameter::set(const BSONElement& newValueElement,
-                                                            const boost::optional<TenantId>&) {
+Status TCMallocAggressiveMemoryDecommitServerParameter::set(const BSONElement& newValueElement) {
 #ifdef MONGO_CONFIG_TCMALLOC_GPERF
     return doSetProperty<TCMallocAggressiveMemoryDecommitServerParameter>(name(), newValueElement);
 #endif  //  MONGO_CONFIG_TCMALLOC_GPERF
@@ -275,8 +265,7 @@ Status TCMallocAggressiveMemoryDecommitServerParameter::set(const BSONElement& n
     return Status::OK();
 }
 
-Status TCMallocAggressiveMemoryDecommitServerParameter::setFromString(
-    std::string_view str, const boost::optional<TenantId>&) {
+Status TCMallocAggressiveMemoryDecommitServerParameter::setFromString(std::string_view str) {
 #ifdef MONGO_CONFIG_TCMALLOC_GPERF
     return doSetPropertyFromString<TCMallocAggressiveMemoryDecommitServerParameter>(str);
 #endif  //  MONGO_CONFIG_TCMALLOC_GPERF
@@ -290,13 +279,11 @@ Status TCMallocAggressiveMemoryDecommitServerParameter::setFromString(
 
 void TCMallocReleaseRateServerParameter::append(OperationContext*,
                                                 BSONObjBuilder* builder,
-                                                std::string_view fieldName,
-                                                const boost::optional<TenantId>&) {
+                                                std::string_view fieldName) {
     builder->append(fieldName, getMemoryReleaseRate());
 }
 
-Status TCMallocReleaseRateServerParameter::setFromString(std::string_view tcmallocReleaseRate,
-                                                         const boost::optional<TenantId>&) {
+Status TCMallocReleaseRateServerParameter::setFromString(std::string_view tcmallocReleaseRate) {
     double value;
     Status status = NumberParser{}(tcmallocReleaseRate, &value);
     if (!status.isOK()) {
@@ -329,8 +316,7 @@ Status onUpdateHeapProfilingSampleIntervalBytes(long long newValue) {
     return Status::OK();
 }
 
-Status validateHeapProfilingSampleIntervalBytes(long long newValue,
-                                                const boost::optional<TenantId>& tenantId) {
+Status validateHeapProfilingSampleIntervalBytes(long long newValue) {
     const long long heapProfilerMinRate = 10000;  // 10kB
     if (newValue == 0 || newValue >= heapProfilerMinRate) {
         return Status::OK();

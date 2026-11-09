@@ -26,14 +26,11 @@ public:
     using ServerParameter::ServerParameter;
     using OnUpdateFn = WithOnUpdateHook<synchronized_value<int>>::OnUpdateFn;
 
-    void append(OperationContext*,
-                BSONObjBuilder* b,
-                std::string_view name,
-                const boost::optional<TenantId>&) override {
+    void append(OperationContext*, BSONObjBuilder* b, std::string_view name) override {
         *b << name << _data.get();
     }
 
-    Status setFromString(std::string_view str, const boost::optional<TenantId>&) override {
+    Status setFromString(std::string_view str) override {
         // _data = value triggers WithOnUpdateHook::operator=, which uasserts on hook error.
         _data = std::stoi(std::string(str));
         return Status::OK();
@@ -179,9 +176,8 @@ TEST_F(WithOnUpdateHookTest, HookErrorPropagatesThroughSetParameter) {
 
     // This is the same call the setParameter command makes (parameters.cpp).
     auto* sp = ServerParameterSet::getNodeParameterSet()->get(kParamName);
-    ASSERT_THROWS_CODE(sp->set(BSON("" << 42).firstElement(), boost::none),
-                       DBException,
-                       ErrorCodes::InternalError);
+    ASSERT_THROWS_CODE(
+        sp->set(BSON("" << 42).firstElement()), DBException, ErrorCodes::InternalError);
 }
 
 TEST_F(WithOnUpdateHookTest, HookFiredViaRaiiController) {

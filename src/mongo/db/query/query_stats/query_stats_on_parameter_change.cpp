@@ -13,8 +13,6 @@
 #include <climits>
 #include <utility>
 
-#include <boost/optional/optional.hpp>
-
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -55,7 +53,7 @@ Status onQueryStatsStoreSizeUpdate(const std::string& str) {
     return Status::OK();
 }
 
-Status validateQueryStatsStoreSize(const std::string& str, const boost::optional<TenantId>&) {
+Status validateQueryStatsStoreSize(const std::string& str) {
     return memory_util::MemorySize::parse(str).getStatus();
 }
 

@@ -13,7 +13,6 @@
 #include <string_view>
 #include <utility>
 
-#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -41,9 +40,8 @@ ServerParameter::ServerParameter(const ServerParameter& other) {
     this->_state.store(other._state.load());
 }
 
-Status ServerParameter::set(const BSONElement& newValueElement,
-                            const boost::optional<TenantId>& tenantId) {
-    auto validateStatus = validate(newValueElement, tenantId);
+Status ServerParameter::set(const BSONElement& newValueElement) {
+    auto validateStatus = validate(newValueElement);
     if (!validateStatus.isOK()) {
         return validateStatus;
     }
@@ -51,7 +49,7 @@ Status ServerParameter::set(const BSONElement& newValueElement,
     auto swValue = _coerceToString(newValueElement);
     if (!swValue.isOK())
         return swValue.getStatus();
-    return setFromString(swValue.getValue(), boost::none);
+    return setFromString(swValue.getValue());
 }
 
 ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
@@ -171,23 +169,20 @@ void IDLServerParameterDeprecatedAlias::warnIfDeprecated(std::string_view action
 
 void IDLServerParameterDeprecatedAlias::append(OperationContext* opCtx,
                                                BSONObjBuilder* b,
-                                               std::string_view fieldName,
-                                               const boost::optional<TenantId>& tenantId) {
-    _sp->append(opCtx, b, fieldName, tenantId);
+                                               std::string_view fieldName) {
+    _sp->append(opCtx, b, fieldName);
 }
 
-Status IDLServerParameterDeprecatedAlias::reset(const boost::optional<TenantId>& tenantId) {
-    return _sp->reset(tenantId);
+Status IDLServerParameterDeprecatedAlias::reset() {
+    return _sp->reset();
 }
 
-Status IDLServerParameterDeprecatedAlias::set(const BSONElement& newValueElement,
-                                              const boost::optional<TenantId>& tenantId) {
-    return _sp->set(newValueElement, tenantId);
+Status IDLServerParameterDeprecatedAlias::set(const BSONElement& newValueElement) {
+    return _sp->set(newValueElement);
 }
 
-Status IDLServerParameterDeprecatedAlias::setFromString(std::string_view str,
-                                                        const boost::optional<TenantId>& tenantId) {
-    return _sp->setFromString(str, tenantId);
+Status IDLServerParameterDeprecatedAlias::setFromString(std::string_view str) {
+    return _sp->setFromString(str);
 }
 
 void ServerParameterSet::disableTestParameters() {

@@ -7,7 +7,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -116,10 +115,8 @@ Status onUpdateQueryMemoryLoadSheddingEnablement(std::int32_t newPercent);
  * Cross-validators for the water marks: when enabled (low >= 0) the low mark must stay below the
  * high mark, so a setting like low=90/high=85 cannot silently disarm shedding.
  */
-Status validateQueryMemoryLoadSheddingLowMark(std::int32_t lowMarkPercent,
-                                              const boost::optional<TenantId>&);
-Status validateQueryMemoryLoadSheddingHighMark(std::int32_t highMarkPercent,
-                                               const boost::optional<TenantId>&);
+Status validateQueryMemoryLoadSheddingLowMark(std::int32_t lowMarkPercent);
+Status validateQueryMemoryLoadSheddingHighMark(std::int32_t highMarkPercent);
 
 namespace query_memory_load_shedding_detail {
 /**

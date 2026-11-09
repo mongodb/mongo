@@ -36,75 +36,63 @@ using namespace std::literals::string_view_literals;
 const TenantId ClusterServerParameterTestBase::kTenantId =
     TenantId(OID("123456789012345678901234"sv));
 
-void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId) {
-    const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w" << "majority"));
-
+void upsert(BSONObj doc) {
     auto uniqueOpCtx = cc().makeOperationContext();
     auto* opCtx = uniqueOpCtx.get();
-    auth::ValidatedTenancyScopeGuard::runAsTenant(opCtx, tenantId, [&]() {
-        DBDirectClient client(opCtx);
+    DBDirectClient client(opCtx);
 
-        auto opMsgRequest = OpMsgRequestBuilder::create(
-            auth::ValidatedTenancyScope::get(opCtx),
-            DatabaseName::createDatabaseName_forTest(tenantId, "config"),
-            [&] {
-                write_ops::UpdateCommandRequest updateOp(
-                    NamespaceString::makeClusterParametersNSS(tenantId));
-                updateOp.setUpdates({[&] {
-                    write_ops::UpdateOpEntry entry;
-                    entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
-                    entry.setU(
-                        write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << doc)));
-                    entry.setMulti(false);
-                    entry.setUpsert(true);
-                    return entry;
-                }()});
-                updateOp.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
-                return updateOp.toBSON();
-            }());
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx), DatabaseName::kConfig, [&] {
+            write_ops::UpdateCommandRequest updateOp(NamespaceString::kClusterParametersNamespace);
+            updateOp.setUpdates({[&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
+                entry.setU(
+                    write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << doc)));
+                entry.setMulti(false);
+                entry.setUpsert(true);
+                return entry;
+            }()});
+            updateOp.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
+            return updateOp.toBSON();
+        }());
 
-        auto res = client.runCommand(opMsgRequest)->getCommandReply();
+    auto res = client.runCommand(opMsgRequest)->getCommandReply();
 
-        BatchedCommandResponse response;
-        std::string errmsg;
-        if (!response.parseBSON(res, &errmsg)) {
-            uasserted(ErrorCodes::FailedToParse, str::stream() << "Failure: " << errmsg);
-        }
+    BatchedCommandResponse response;
+    std::string errmsg;
+    if (!response.parseBSON(res, &errmsg)) {
+        uasserted(ErrorCodes::FailedToParse, str::stream() << "Failure: " << errmsg);
+    }
 
-        uassertStatusOK(response.toStatus());
-        uassert(ErrorCodes::OperationFailed, "No documents upserted", response.getN());
-    });
+    uassertStatusOK(response.toStatus());
+    uassert(ErrorCodes::OperationFailed, "No documents upserted", response.getN());
 }
 
-void remove(const boost::optional<TenantId>& tenantId) {
+void remove() {
     auto uniqueOpCtx = cc().makeOperationContext();
     auto* opCtx = uniqueOpCtx.get();
-    auth::ValidatedTenancyScopeGuard::runAsTenant(opCtx, tenantId, [&]() {
-        auto opMsgRequest = OpMsgRequestBuilder::create(
-            auth::ValidatedTenancyScope::get(opCtx),
-            DatabaseName::createDatabaseName_forTest(tenantId, "config"),
-            [&] {
-                write_ops::DeleteCommandRequest deleteOp(
-                    NamespaceString::makeClusterParametersNSS(tenantId));
-                deleteOp.setDeletes({[] {
-                    write_ops::DeleteOpEntry entry;
-                    entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
-                    entry.setMulti(true);
-                    return entry;
-                }()});
-                return deleteOp.toBSON();
-            }());
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx), DatabaseName::kConfig, [&] {
+            write_ops::DeleteCommandRequest deleteOp(NamespaceString::kClusterParametersNamespace);
+            deleteOp.setDeletes({[] {
+                write_ops::DeleteOpEntry entry;
+                entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
+                entry.setMulti(true);
+                return entry;
+            }()});
+            return deleteOp.toBSON();
+        }());
 
-        auto res = DBDirectClient(opCtx).runCommand(opMsgRequest)->getCommandReply();
+    auto res = DBDirectClient(opCtx).runCommand(opMsgRequest)->getCommandReply();
 
-        BatchedCommandResponse response;
-        std::string errmsg;
-        if (!response.parseBSON(res, &errmsg)) {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "Failed to parse reply to delete command: " << errmsg);
-        }
-        uassertStatusOK(response.toStatus());
-    });
+    BatchedCommandResponse response;
+    std::string errmsg;
+    if (!response.parseBSON(res, &errmsg)) {
+        uasserted(ErrorCodes::FailedToParse,
+                  str::stream() << "Failed to parse reply to delete command: " << errmsg);
+    }
+    uassertStatusOK(response.toStatus());
 }
 
 BSONObj makeClusterParametersDoc(const LogicalTime& cpTime,

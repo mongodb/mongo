@@ -198,7 +198,7 @@ WriteOp::TargetWritesResult WriteOp::targetWrites(OperationContext* opCtx,
                                              OnlyTargetDataOwningShardsForMultiWritesParam>>(
                                              "onlyTargetDataOwningShardsForMultiWrites");
                 // Return false if cluster param is enabled, otherwise return true.
-                return !clusterParam->getValue(boost::none).getEnabled();
+                return !clusterParam->getValue().getEnabled();
             }
             return true;
         }();

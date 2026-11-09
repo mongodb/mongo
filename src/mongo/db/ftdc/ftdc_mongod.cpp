@@ -38,12 +38,11 @@
 
 namespace mongo {
 
-Status validateCollectionStatsNamespaces(const std::vector<std::string> value,
-                                         const boost::optional<TenantId>& tenantId) {
+Status validateCollectionStatsNamespaces(const std::vector<std::string> value) {
     try {
         for (const auto& nsStr : value) {
             const auto ns = NamespaceStringUtil::deserialize(
-                tenantId, nsStr, SerializationContext::stateDefault());
+                boost::none, nsStr, SerializationContext::stateDefault());
 
             if (!ns.isValid()) {
                 return Status(ErrorCodes::BadValue,

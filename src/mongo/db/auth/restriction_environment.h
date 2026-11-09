@@ -4,7 +4,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/sockaddr.h"
 
@@ -14,8 +13,7 @@
 
 namespace mongo {
 
-inline Status validateClientSourceAuthenticationRestrictionMode(std::string_view mode,
-                                                                const boost::optional<TenantId>&) {
+inline Status validateClientSourceAuthenticationRestrictionMode(std::string_view mode) {
     if (mode != "origin" && mode != "peer") {
         return Status(ErrorCodes::BadValue,
                       "Unable to set value for clientSourceAuthenticationRestrictionMode. Valid "

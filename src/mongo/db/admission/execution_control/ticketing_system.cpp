@@ -173,7 +173,7 @@ Status TicketingSystem::NormalPrioritySettings::updateConcurrentReadTransactions
 }
 
 Status TicketingSystem::NormalPrioritySettings::validateConcurrentWriteTransactions(
-    const int32_t& newWriteTransactions, const boost::optional<TenantId>) {
+    const int32_t& newWriteTransactions) {
     if (!getTestCommandsEnabled() && newWriteTransactions < 5) {
         return Status(ErrorCodes::BadValue,
                       "Concurrent write transactions limit must be greater than or equal to 5.");
@@ -182,7 +182,7 @@ Status TicketingSystem::NormalPrioritySettings::validateConcurrentWriteTransacti
 }
 
 Status TicketingSystem::NormalPrioritySettings::validateConcurrentReadTransactions(
-    const int32_t& newReadTransactions, const boost::optional<TenantId>) {
+    const int32_t& newReadTransactions) {
     if (!getTestCommandsEnabled() && newReadTransactions < 5) {
         return Status(ErrorCodes::BadValue,
                       "Concurrent read transactions limit must be greater than or equal to 5.");
@@ -190,8 +190,7 @@ Status TicketingSystem::NormalPrioritySettings::validateConcurrentReadTransactio
     return Status::OK();
 }
 
-Status TicketingSystem::validateConcurrencyAdjustmentAlgorithm(
-    const std::string& name, const boost::optional<TenantId>&) try {
+Status TicketingSystem::validateConcurrencyAdjustmentAlgorithm(const std::string& name) try {
     idl::deserialize<ExecutionControlConcurrencyAdjustmentAlgorithmEnum>(
         name, IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
     return Status::OK();
@@ -252,7 +251,7 @@ Status TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions(
 }
 
 Status TicketingSystem::LowPrioritySettings::validateConcurrentWriteTransactions(
-    const int32_t& newWriteTransactions, const boost::optional<TenantId>) {
+    const int32_t& newWriteTransactions) {
     if (newWriteTransactions < 0 &&
         newWriteTransactions != TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue) {
         return Status(ErrorCodes::BadValue,
@@ -263,7 +262,7 @@ Status TicketingSystem::LowPrioritySettings::validateConcurrentWriteTransactions
 }
 
 Status TicketingSystem::LowPrioritySettings::validateConcurrentReadTransactions(
-    const int32_t& newReadTransactions, const boost::optional<TenantId>) {
+    const int32_t& newReadTransactions) {
     if (newReadTransactions < 0 &&
         newReadTransactions != TicketingSystem::kUnsetLowPriorityConcurrentTransactionsValue) {
         return Status(ErrorCodes::BadValue,
@@ -810,21 +809,18 @@ void TicketingSystem::TicketingState::appendStats(BSONObjBuilder& b) const {
 
 void ExecutionControlDeprioritizationExemptions::append(OperationContext*,
                                                         BSONObjBuilder* bob,
-                                                        std::string_view name,
-                                                        const boost::optional<TenantId>&) {
+                                                        std::string_view name) {
     admission::appendAppNameExemptionList(
         executionControlDeprioritizationExemptions.makeSnapshot(), bob, name);
 }
 
-Status ExecutionControlDeprioritizationExemptions::set(const BSONElement& value,
-                                                       const boost::optional<TenantId>&) {
+Status ExecutionControlDeprioritizationExemptions::set(const BSONElement& value) {
     executionControlDeprioritizationExemptions.update(
         admission::parseAppNameExemptionList(value.Obj()));
     return Status::OK();
 }
 
-Status ExecutionControlDeprioritizationExemptions::setFromString(std::string_view str,
-                                                                 const boost::optional<TenantId>&) {
+Status ExecutionControlDeprioritizationExemptions::setFromString(std::string_view str) {
     executionControlDeprioritizationExemptions.update(
         admission::parseAppNameExemptionList(fromjson(str)));
     return Status::OK();

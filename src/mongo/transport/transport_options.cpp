@@ -19,18 +19,15 @@ namespace mongo::transport {
 // TODO: SERVER-106468 Define CIDRRangeListParameter and remove this glue code
 void MaxIncomingConnectionsOverrideServerParameter::append(OperationContext*,
                                                            BSONObjBuilder* bob,
-                                                           std::string_view name,
-                                                           const boost::optional<TenantId>&) {
+                                                           std::string_view name) {
     appendCIDRRangeListParameter(serverGlobalParams.maxIncomingConnsOverride, bob, name);
 }
 
-Status MaxIncomingConnectionsOverrideServerParameter::set(const BSONElement& value,
-                                                          const boost::optional<TenantId>&) {
+Status MaxIncomingConnectionsOverrideServerParameter::set(const BSONElement& value) {
     return setCIDRRangeListParameter(serverGlobalParams.maxIncomingConnsOverride, value.Obj());
 }
 
-Status MaxIncomingConnectionsOverrideServerParameter::setFromString(
-    std::string_view str, const boost::optional<TenantId>&) {
+Status MaxIncomingConnectionsOverrideServerParameter::setFromString(std::string_view str) {
     return setCIDRRangeListParameter(serverGlobalParams.maxIncomingConnsOverride, fromjson(str));
 }
 

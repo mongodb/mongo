@@ -21,7 +21,6 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/serialization_context.h"
@@ -137,8 +136,7 @@ public:
 
         // Set the new 'clusterParamValue' for "querySettings" cluster parameter.
         const auto clusterParamValue = makeQuerySettingsClusterParameter(configsWithTs);
-        ASSERT_OK(
-            sp->set(BSON("" << clusterParamValue).firstElement(), /* tenantId */ boost::none));
+        ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement()));
 
         // Assert that parsing after transforming invalid settings (if any) works.
         ASSERT_EQ(expectedQueryShapeConfigurations,
@@ -161,14 +159,11 @@ TEST_F(QuerySettingsClusterParameterTest, QuerySettingsClusterParameterSetReset)
 
     // Ensure no clusterParameterTime is specified for "querySettings" cluster parameter, if no
     // settings are specified.
-    ASSERT_EQ(sp->getClusterParameterTime(/* tenantId */ boost::none), LogicalTime());
+    ASSERT_EQ(sp->getClusterParameterTime(), LogicalTime());
     ASSERT_EQ(service().getClusterParameterTime(), LogicalTime());
     {
         BSONObjBuilder bob;
-        sp->append(opCtx(),
-                   &bob,
-                   QuerySettingsService::getQuerySettingsClusterParameterName(),
-                   /* tenantId */ boost::none);
+        sp->append(opCtx(), &bob, QuerySettingsService::getQuerySettingsClusterParameterName());
         ASSERT_BSONOBJ_EQ(
             bob.done(), makeQuerySettingsClusterParameter(QueryShapeConfigurationsWithTimestamp()));
     }
@@ -186,34 +181,28 @@ TEST_F(QuerySettingsClusterParameterTest, QuerySettingsClusterParameterSetReset)
     // Ensure that after parameter is set, the query shape configurations are present in the
     // QuerySettingsService.
     const auto clusterParamValue = makeQuerySettingsClusterParameter(configsWithTs);
-    ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement(), /* tenantId */ boost::none));
+    ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement()));
     ASSERT_EQ(service().getAllQueryShapeConfigurations(), configsWithTs);
-    ASSERT_EQ(sp->getClusterParameterTime(/* tenantId */ boost::none), clusterParameterTime);
+    ASSERT_EQ(sp->getClusterParameterTime(), clusterParameterTime);
     ASSERT_EQ(service().getClusterParameterTime(), clusterParameterTime);
 
     // Ensure the serialized parameter value contains 'settingsArray' with 'config' as value as well
     // parameter id and clusterParameterTime.
     {
         BSONObjBuilder bob;
-        sp->append(opCtx(),
-                   &bob,
-                   QuerySettingsService::getQuerySettingsClusterParameterName(),
-                   /* tenantId */ boost::none);
+        sp->append(opCtx(), &bob, QuerySettingsService::getQuerySettingsClusterParameterName());
         ASSERT_BSONOBJ_EQ(bob.done(), clusterParamValue);
     }
 
     // Ensure that after parameter is reset, no query shape configurations are present in the
     // QuerySettingsService and clusterParameterTime is reset.
-    ASSERT_OK(sp->reset(/* tenantId */ boost::none));
+    ASSERT_OK(sp->reset());
     ASSERT(service().getAllQueryShapeConfigurations().queryShapeConfigurations.empty());
-    ASSERT_EQ(sp->getClusterParameterTime(/* tenantId */ boost::none), LogicalTime());
+    ASSERT_EQ(sp->getClusterParameterTime(), LogicalTime());
     ASSERT_EQ(service().getClusterParameterTime(), LogicalTime());
     {
         BSONObjBuilder bob;
-        sp->append(opCtx(),
-                   &bob,
-                   QuerySettingsService::getQuerySettingsClusterParameterName(),
-                   /* tenantId */ boost::none);
+        sp->append(opCtx(), &bob, QuerySettingsService::getQuerySettingsClusterParameterName());
         ASSERT_BSONOBJ_EQ(
             bob.done(), makeQuerySettingsClusterParameter(QueryShapeConfigurationsWithTimestamp()));
     }
@@ -225,7 +214,6 @@ TEST_F(QuerySettingsClusterParameterTest, QuerySettingsClusterParameterSetReset)
  * accepted, and that the field does not round-trip back into the serialized parameter.
  */
 TEST_F(QuerySettingsClusterParameterTest, LegacyInlineRepresentativeQueryIsIgnored) {
-    boost::optional<TenantId> tenantId;
     auto sp = std::make_unique<QuerySettingsClusterParameter>(
         QuerySettingsService::getQuerySettingsClusterParameterName(),
         ServerParameterType::kClusterWide);
@@ -244,12 +232,10 @@ TEST_F(QuerySettingsClusterParameterTest, LegacyInlineRepresentativeQueryIsIgnor
             clusterParameterTime: Timestamp(1, 2)
         }
     })")
-                          .firstElement(),
-                      tenantId));
+                          .firstElement()));
 
     BSONObjBuilder bob;
-    sp->append(
-        opCtx(), &bob, QuerySettingsService::getQuerySettingsClusterParameterName(), tenantId);
+    sp->append(opCtx(), &bob, QuerySettingsService::getQuerySettingsClusterParameterName());
     ASSERT_BSONOBJ_EQ_UNORDERED(bob.done(), fromjson(R"({
         _id: "querySettings",
         settingsArray: [{
@@ -289,7 +275,7 @@ TEST_F(QuerySettingsClusterParameterTest,
     // Assert that parsing after transforming invalid settings (if any) works.
     const auto clusterParamValue =
         makeQuerySettingsClusterParameter({{config}, LogicalTime(Timestamp(3, 4))});
-    ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement(), /* tenantId */ boost::none));
+    ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement()));
     ASSERT(service().getAllQueryShapeConfigurations().queryShapeConfigurations.empty());
 }
 
@@ -391,8 +377,7 @@ TEST_F(QuerySettingsClusterParameterTest, SetClearsKnobOverrideErrorsAfterLoggin
         // value is (re-)applied; testIntKnobWire remains valid.
         FailPointEnableBlock fp("failQueryKnobOverridesParsing",
                                 BSON("name" << "testBoolKnobWire"));
-        ASSERT_OK(
-            sp->set(BSON("" << clusterParamValue).firstElement(), /* tenantId */ boost::none));
+        ASSERT_OK(sp->set(BSON("" << clusterParamValue).firstElement()));
     }
 
     auto storedConfigs = service().getAllQueryShapeConfigurations().queryShapeConfigurations;

@@ -18,7 +18,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
@@ -35,8 +34,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
@@ -98,23 +95,18 @@ struct storage_wrapper;
 
 template <typename U>
 struct storage_wrapper<Atomic<U>> {
-    static constexpr bool isTenantAware = false;
-
     using type = U;
     storage_wrapper(Atomic<U>& storage) : _storage(storage), _defaultValue(storage.load()) {}
 
-    void store(const U& value, const boost::optional<TenantId>& id) {
-        invariant(!id.is_initialized());
+    void store(const U& value) {
         _storage.store(value);
     }
 
-    U load(const boost::optional<TenantId>& id) const {
-        invariant(!id.is_initialized());
+    U load() const {
         return _storage.load();
     }
 
-    void reset(const boost::optional<TenantId>& id) {
-        invariant(!id.is_initialized());
+    void reset() {
         _storage.store(_defaultValue);
     }
 
@@ -134,23 +126,18 @@ private:
 
 template <typename U>
 struct storage_wrapper<synchronized_value<U>> {
-    static constexpr bool isTenantAware = false;
-
     using type = U;
     storage_wrapper(synchronized_value<U>& storage) : _storage(storage), _defaultValue(*storage) {}
 
-    void store(const U& value, const boost::optional<TenantId>& id) {
-        invariant(!id.is_initialized());
+    void store(const U& value) {
         *_storage = value;
     }
 
-    U load(const boost::optional<TenantId>& id) const {
-        invariant(!id.is_initialized());
+    U load() const {
         return *_storage;
     }
 
-    void reset(const boost::optional<TenantId>& id) {
-        invariant(!id.is_initialized());
+    void reset() {
         *_storage = _defaultValue;
     }
 
@@ -167,69 +154,23 @@ private:
     U _defaultValue;
 };
 
-template <typename U>
-struct storage_wrapper<TenantIdMap<U>> {
-    static constexpr bool isTenantAware = true;
-
-    using type = U;
-    storage_wrapper(TenantIdMap<U>& storage) : _storage(storage) {}
-
-    void store(const U& value, const boost::optional<TenantId>& id) {
-        std::lock_guard<std::mutex> lg(_storageMutex);
-        _storage[id] = value;
-    }
-
-    U load(const boost::optional<TenantId>& id) const {
-        std::lock_guard<std::mutex> lg(_storageMutex);
-        auto it = _storage.find(id);
-        if (it != _storage.end()) {
-            return it->second;
-        } else {
-            return _defaultValue;
-        }
-    }
-
-    void reset(const boost::optional<TenantId>& id) {
-        std::lock_guard<std::mutex> lg(_storageMutex);
-        _storage.erase(id);
-    }
-
-    // Not thread-safe, will only be called once at most per ServerParameter in its initialization
-    // block.
-    void setDefault(const U& value) {
-        _defaultValue = value;
-    }
-
-private:
-    mutable std::mutex _storageMutex;
-    TenantIdMap<U>& _storage;
-
-    // Copy of original value to be read from during resets.
-    U _defaultValue;
-};
-
 // All other types will use a mutex to synchronize in a threadsafe manner.
 template <typename U>
 struct storage_wrapper {
-    static constexpr bool isTenantAware = false;
-
     using type = U;
     storage_wrapper(U& storage) : _storage(storage), _defaultValue(storage) {}
 
-    void store(const U& value, const boost::optional<TenantId>& id) {
-        invariant(!id.is_initialized());
+    void store(const U& value) {
         std::lock_guard<std::mutex> lg(_storageMutex);
         _storage = value;
     }
 
-    U load(const boost::optional<TenantId>& id) const {
-        invariant(!id.is_initialized());
+    U load() const {
         std::lock_guard<std::mutex> lg(_storageMutex);
         return _storage;
     }
 
-    void reset(const boost::optional<TenantId>& id) {
-        invariant(!id.is_initialized());
+    void reset() {
         std::lock_guard<std::mutex> lg(_storageMutex);
         _storage = _defaultValue;
     }
@@ -262,9 +203,6 @@ private:
 public:
     using element_type = typename SW::type;
 
-    // Cluster parameters must be tenant-aware.
-    static_assert(SW::isTenantAware || paramType != SPT::kClusterWide);
-
     // Compile-time assertion to ensure that IDL-defined in-memory storage for CSPs are
     // chained to the ClusterServerParameter base type.
     static_assert((paramType != SPT::kClusterWide) ||
@@ -274,10 +212,9 @@ public:
     IDLServerParameterWithStorage(std::string_view name, T& storage)
         : ServerParameter(name, paramType), _storage(storage) {}
 
-    Status validateValue(const element_type& newValue,
-                         const boost::optional<TenantId>& tenantId) const {
+    Status validateValue(const element_type& newValue) const {
         for (const auto& validator : _validators) {
-            auto status = validator(newValue, tenantId);
+            auto status = validator(newValue);
             if (!status.isOK()) {
                 return status;
             }
@@ -288,15 +225,15 @@ public:
     /**
      * Convenience wrapper for storing a value.
      */
-    Status setValue(const element_type& newValue, const boost::optional<TenantId>& tenantId) {
+    Status setValue(const element_type& newValue) {
         // For cluster parameters, validation must be separated from setting.
         if constexpr (paramType != SPT::kClusterWide) {
-            if (auto status = validateValue(newValue, tenantId); !status.isOK()) {
+            if (auto status = validateValue(newValue); !status.isOK()) {
                 return status;
             }
         }
 
-        _storage.store(newValue, tenantId);
+        _storage.store(newValue);
 
         if (_onUpdate) {
             return _onUpdate(newValue);
@@ -308,8 +245,8 @@ public:
     /**
      * Convenience wrapper for fetching value from storage.
      */
-    element_type getValue(const boost::optional<TenantId>& tenantId) const {
-        return _storage.load(tenantId);
+    element_type getValue() const {
+        return _storage.load();
     }
 
     /**
@@ -326,7 +263,7 @@ public:
 
             // Update the actual storage, performing validation and any post-update functions as
             // necessary.
-            status = reset(boost::none);
+            status = reset();
         });
         return status;
     }
@@ -337,17 +274,14 @@ public:
      * Typically invoked by {getParameter:...} or {getClusterParameter:...} to produce a dictionary
      * of SCP settings.
      */
-    void append(OperationContext* opCtx,
-                BSONObjBuilder* b,
-                std::string_view name,
-                const boost::optional<TenantId>& tenantId) final {
+    void append(OperationContext* opCtx, BSONObjBuilder* b, std::string_view name) final {
         if (isRedact()) {
             b->append(name, "###");
         } else if constexpr (paramType == SPT::kClusterWide) {
             b->append("_id"sv, name);
-            b->appendElementsUnique(getValue(tenantId).toBSON());
+            b->appendElementsUnique(getValue().toBSON());
         } else {
-            b->append(name, getValue(tenantId));
+            b->append(name, getValue());
         }
     }
 
@@ -371,14 +305,13 @@ public:
         return newValue;
     }
 
-    Status validate(const BSONElement& newValueElement,
-                    const boost::optional<TenantId>& tenantId) const final {
+    Status validate(const BSONElement& newValueElement) const final {
         StatusWith<element_type> swNewValue = parseElement(newValueElement);
         if (!swNewValue.isOK()) {
             return swNewValue.getStatus();
         }
 
-        return validateValue(swNewValue.getValue(), tenantId);
+        return validateValue(swNewValue.getValue());
     }
 
     /**
@@ -387,23 +320,22 @@ public:
      * Allows setting non-basic values (e.g. vector<string>)
      * via the {setParameter: ...} call or {setClusterParameter: ...} call.
      */
-    Status set(const BSONElement& newValueElement,
-               const boost::optional<TenantId>& tenantId) final {
+    Status set(const BSONElement& newValueElement) final {
         StatusWith<element_type> swNewValue = parseElement(newValueElement);
         if (!swNewValue.isOK()) {
             return swNewValue.getStatus();
         }
 
-        return setValue(swNewValue.getValue(), tenantId);
+        return setValue(swNewValue.getValue());
     }
 
     /**
      * Resets the current storage value in storage_wrapper with the default value.
      */
-    Status reset(const boost::optional<TenantId>& tenantId) final {
-        _storage.reset(tenantId);
+    Status reset() final {
+        _storage.reset();
         if (_onUpdate) {
-            return _onUpdate(_storage.load(tenantId));
+            return _onUpdate(_storage.load());
         }
 
         return Status::OK();
@@ -415,7 +347,7 @@ public:
      * Typically invoked from commandline --setParameter usage. Prohibited for cluster server
      * parameters.
      */
-    Status setFromString(std::string_view str, const boost::optional<TenantId>& tenantId) final {
+    Status setFromString(std::string_view str) final {
         if constexpr (paramType == SPT::kClusterWide) {
             return {ErrorCodes::BadValue,
                     "Unable to set a cluster-wide server parameter from the command line or config "
@@ -426,7 +358,7 @@ public:
                 return swNewValue.getStatus();
             }
 
-            return setValue(swNewValue.getValue(), tenantId);
+            return setValue(swNewValue.getValue());
         }
     }
 
@@ -434,9 +366,9 @@ public:
      * Retrieves the cluster parameter time from the chained ClusterServerParameter struct in
      * storage. All other server parameters simply return the uninitialized LogicalTime.
      */
-    LogicalTime getClusterParameterTime(const boost::optional<TenantId>& tenantId) const final {
+    LogicalTime getClusterParameterTime() const final {
         if constexpr (idl_server_parameter_detail::hasClusterServerParameter<element_type>) {
-            return getValue(tenantId).getClusterParameterTime();
+            return getValue().getClusterParameterTime();
         }
 
         return LogicalTime::kUninitialized;
@@ -457,7 +389,7 @@ public:
      *
      * Callback should return Status::OK() or ErrorCodes::BadValue.
      */
-    using validator_t = Status(const element_type&, const boost::optional<TenantId>& tenantId);
+    using validator_t = Status(const element_type&);
     void addValidator(std::function<validator_t> validator) {
         _validators.push_back(std::move(validator));
     }
@@ -468,16 +400,15 @@ public:
     template <class predicate>
     void addBound(const element_type& bound) {
         _bounds.push_back({predicate::kind, bound});
-        addValidator(
-            [bound, spname = name()](const element_type& value, const boost::optional<TenantId>&) {
-                if (!predicate::evaluate(value, bound)) {
-                    return Status(ErrorCodes::BadValue,
-                                  str::stream()
-                                      << "Invalid value for parameter " << spname << ": " << value
-                                      << " is not " << predicate::description << " " << bound);
-                }
-                return Status::OK();
-            });
+        addValidator([bound, spname = name()](const element_type& value) {
+            if (!predicate::evaluate(value, bound)) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream()
+                                  << "Invalid value for parameter " << spname << ": " << value
+                                  << " is not " << predicate::description << " " << bound);
+            }
+            return Status::OK();
+        });
     }
 
     void appendConstraints(BSONObjBuilder* b) const {
@@ -508,5 +439,5 @@ private:
 
 template <typename Storage>
 using ClusterParameterWithStorage [[MONGO_MOD_PUBLIC]] =
-    IDLServerParameterWithStorage<ServerParameterType::kClusterWide, TenantIdMap<Storage>>;
+    IDLServerParameterWithStorage<ServerParameterType::kClusterWide, Storage>;
 }  // namespace mongo

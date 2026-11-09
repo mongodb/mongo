@@ -355,7 +355,7 @@ TEST_F(OtelMetricsInitializationTest, HeadersWithoutHttpExporterLogsWarning) {
                                                        ServerParameterType::kStartupOnly};
     auto setHeaders = [&](BSONObj doc) {
         auto storage = BSON("v" << doc);
-        return headersParam.set(storage.firstElement(), /*tenantId=*/boost::none);
+        return headersParam.set(storage.firstElement());
     };
     ASSERT_OK(setHeaders(BSON("Authorization" << "Bearer ignored-token")));
     ON_BLOCK_EXIT([&] { invariant(setHeaders(BSONObj{})); });

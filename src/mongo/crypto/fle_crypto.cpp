@@ -3691,7 +3691,7 @@ void EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(
         ServerParameterSet::getClusterParameterSet()
             ->get<ClusterParameterWithStorage<FLEOverrideTagOverheadData>>(
                 "fleAllowTotalTagOverheadToExceedBSONLimit")
-            ->getValue(boost::none)
+            ->getValue()
             .getShouldOverride();
     uassert(
         10431800,
@@ -3773,7 +3773,7 @@ void EncryptionInformationHelpers::checkSubstringPreviewParameterLimitsNotExceed
     if (ServerParameterSet::getClusterParameterSet()
             ->get<ClusterParameterWithStorage<FLEOverrideSubstringPreviewLimits>>(
                 "fleDisableSubstringPreviewParameterLimits")
-            ->getValue(boost::none)
+            ->getValue()
             .getShouldOverride()) {
         return;
     }

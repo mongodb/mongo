@@ -70,7 +70,7 @@ public:
                 };
             } else {
                 readGlobal = [param]() -> QueryKnobValue {
-                    return param->getValue(/*tenantId=*/boost::none);
+                    return param->getValue();
                 };
                 appendConstraints = [param](BSONObjBuilder* bob) {
                     param->appendConstraints(bob);

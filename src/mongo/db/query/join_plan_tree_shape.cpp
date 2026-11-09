@@ -8,24 +8,18 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_join_optimization_knobs_gen.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <string_view>
 
-#include <boost/optional/optional.hpp>
-
 namespace mongo {
 
-void JoinPlanTreeShape::append(OperationContext*,
-                               BSONObjBuilder* b,
-                               std::string_view name,
-                               const boost::optional<TenantId>&) {
+void JoinPlanTreeShape::append(OperationContext*, BSONObjBuilder* b, std::string_view name) {
     *b << name << idl::serialize(_data.get());
 }
 
-Status JoinPlanTreeShape::setFromString(std::string_view value, const boost::optional<TenantId>&) {
+Status JoinPlanTreeShape::setFromString(std::string_view value) {
     _data = idl::deserialize<JoinPlanTreeShapeEnum>(value, IDLParserContext("JoinPlanTreeShape"));
     return Status::OK();
 }

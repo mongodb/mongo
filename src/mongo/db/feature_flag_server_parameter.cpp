@@ -11,7 +11,6 @@
 
 #include <string_view>
 
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -23,27 +22,23 @@ FeatureFlagServerParameter::FeatureFlagServerParameter(std::string_view name, Fe
 
 void FeatureFlagServerParameter::append(OperationContext* opCtx,
                                         BSONObjBuilder* b,
-                                        std::string_view name,
-                                        const boost::optional<TenantId>&) {
+                                        std::string_view name) {
     BSONObjBuilder flagBuilder(b->subobjStart(name));
     _flag->appendFlagValueAndMetadata(flagBuilder);
 }
 
 void FeatureFlagServerParameter::appendDetails(OperationContext* opCtx,
-                                               BSONObjBuilder* detailsBuilder,
-                                               const boost::optional<TenantId>&) {
+                                               BSONObjBuilder* detailsBuilder) {
     _flag->appendFlagDetails(*detailsBuilder);
 }
 
 void FeatureFlagServerParameter::appendSupportingRoundtrip(OperationContext* opCtx,
                                                            BSONObjBuilder* b,
-                                                           std::string_view name,
-                                                           const boost::optional<TenantId>&) {
+                                                           std::string_view name) {
     b->append(name, _flag->getForServerParameter());
 }
 
-Status FeatureFlagServerParameter::set(const BSONElement& newValueElement,
-                                       const boost::optional<TenantId>&) {
+Status FeatureFlagServerParameter::set(const BSONElement& newValueElement) {
     try {
         bool newValue = [&]() {
             if (newValueElement.isABSONObj()) {
@@ -69,8 +64,7 @@ Status FeatureFlagServerParameter::set(const BSONElement& newValueElement,
     return Status::OK();
 }
 
-Status FeatureFlagServerParameter::setFromString(std::string_view str,
-                                                 const boost::optional<TenantId>&) {
+Status FeatureFlagServerParameter::setFromString(std::string_view str) {
     auto swNewValue = coerceFromString<bool>(str);
     if (!swNewValue.isOK()) {
         return swNewValue.getStatus();

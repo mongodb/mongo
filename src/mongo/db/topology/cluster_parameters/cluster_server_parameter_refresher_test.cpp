@@ -4,16 +4,24 @@
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_refresher.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/client.h"
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/topology/cluster_parameters/cluster_server_parameter_test_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 #include <string_view>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -251,7 +259,7 @@ TEST_F(ClusterServerParameterRefresherTest, GetFCVAndClusterParamsFunctionRetrie
 
     auto future = launchAsync([&] {
         multiversion::FeatureCompatibilityVersion fcv;
-        TenantIdMap<StringMap<BSONObj>> tenantParameterDocs;
+        std::map<boost::optional<TenantId>, StringMap<BSONObj>> tenantParameterDocs;
 
         std::tie(fcv, tenantParameterDocs) = getFCVAndClusterParametersFromConfigServer();
 
@@ -268,6 +276,76 @@ TEST_F(ClusterServerParameterRefresherTest, GetFCVAndClusterParamsFunctionRetrie
     mockFCVAndClusterParametersResponses();
 
     future.default_timed_get();
+}
+
+// With multitenancy enabled the config server can return cluster parameter documents for tenants.
+// The in-memory cache is single-valued, so only the tenantless documents may be applied to it.
+TEST_F(ClusterServerParameterRefresherTest, RefreshIgnoresTenantScopedParameters) {
+    const auto oldMultitenancySupport = std::exchange(gMultitenancySupport, true);
+    ON_BLOCK_EXIT([&] { gMultitenancySupport = oldMultitenancySupport; });
+
+    // A full refresh visits every cluster parameter, and the change stream options parameter
+    // requires its manager to exist.
+    ChangeStreamOptionsManager::create(getServiceContext());
+
+    auto* sp = ServerParameterSet::getClusterParameterSet()
+                   ->get<ClusterParameterWithStorage<ClusterServerParameterTest>>("cspTest");
+    ASSERT(sp != nullptr);
+
+    const auto kGlobalIntValue = 11;
+    const auto kTenantIntValue = 22;
+    const auto tenantOid = OID::gen();
+    const auto atClusterTime = Timestamp(10, 3);
+
+    auto makeDoc = [&](int intValue) {
+        return BSON("_id" << "cspTest"
+                          << "clusterParameterTime" << Timestamp(5, 1) << "intValue" << intValue
+                          << "strValue" << "x");
+    };
+    auto clusterParametersFindResponse = [&](BSONObj doc) {
+        return BSON(
+            "ok" << 1 << "cursor"
+                 << BSON("firstBatch"
+                         << BSON_ARRAY(doc) << "id" << 0LL << "ns"
+                         << NamespaceString::kClusterParametersNamespace.toString_forTest()));
+    };
+
+    auto future = launchAsync([&] {
+        // Resetting some cluster parameters uses the thread's client, so this thread needs one.
+        ThreadClient threadClient(getServiceContext()->getService());
+        auto opCtx = threadClient->makeOperationContext();
+        ASSERT_OK(_refresher->refreshParameters(opCtx.get()));
+    });
+
+    // List of tenants that have a config database: tenantless first, then one tenant.
+    onCommand([&](const executor::RemoteCommandRequest&) {
+        return BSON("ok" << 1 << "databases"
+                         << BSON_ARRAY(BSON("name" << "config")
+                                       << BSON("name" << "config"
+                                                      << "tenantId" << tenantOid)));
+    });
+    // FCV find.
+    onCommand([&](const executor::RemoteCommandRequest&) {
+        return BSON(
+            "ok" << 1 << "cursor"
+                 << BSON("firstBatch"
+                         << BSON_ARRAY(BSON("_id" << "featureCompatibilityVersion"
+                                                  << "version" << multiversion::toString(_fcv)))
+                         << "atClusterTime" << atClusterTime << "id" << 0LL << "ns"
+                         << NamespaceString::kServerConfigurationNamespace.toString_forTest()));
+    });
+    // Cluster parameters for the tenantless config database, then for the tenant. The tenant is
+    // read last, so it would win if tenant documents were applied to the single cached value.
+    onCommand([&](const executor::RemoteCommandRequest&) {
+        return clusterParametersFindResponse(makeDoc(kGlobalIntValue));
+    });
+    onCommand([&](const executor::RemoteCommandRequest&) {
+        return clusterParametersFindResponse(makeDoc(kTenantIntValue));
+    });
+
+    future.default_timed_get();
+
+    ASSERT_EQ(sp->getValue().getIntValue(), kGlobalIntValue);
 }
 
 }  // namespace

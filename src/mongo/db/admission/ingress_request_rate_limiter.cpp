@@ -134,39 +134,33 @@ bool ClientAdmissionControlState::isExempted(Client* client) {
 // TODO: SERVER-106468 Define CIDRRangeListParameter and remove this glue code
 void IngressRequestRateLimiterIPExemptions::append(OperationContext*,
                                                    BSONObjBuilder* bob,
-                                                   std::string_view name,
-                                                   const boost::optional<TenantId>&) {
+                                                   std::string_view name) {
     transport::appendCIDRRangeListParameter(ingressRequestRateLimiterIPExemptions, bob, name);
 }
 
-Status IngressRequestRateLimiterIPExemptions::set(const BSONElement& value,
-                                                  const boost::optional<TenantId>&) {
+Status IngressRequestRateLimiterIPExemptions::set(const BSONElement& value) {
     return transport::setCIDRRangeListParameter(ingressRequestRateLimiterIPExemptions, value.Obj());
 }
 
-Status IngressRequestRateLimiterIPExemptions::setFromString(std::string_view str,
-                                                            const boost::optional<TenantId>&) {
+Status IngressRequestRateLimiterIPExemptions::setFromString(std::string_view str) {
     return transport::setCIDRRangeListParameter(ingressRequestRateLimiterIPExemptions,
                                                 fromjson(str));
 }
 
 void IngressRequestRateLimiterAppExemptions::append(OperationContext*,
                                                     BSONObjBuilder* bob,
-                                                    std::string_view name,
-                                                    const boost::optional<TenantId>&) {
+                                                    std::string_view name) {
     admission::appendAppNameExemptionList(
         ingressRequestRateLimiterAppExemptions.makeSnapshot(), bob, name);
 }
 
-Status IngressRequestRateLimiterAppExemptions::set(const BSONElement& value,
-                                                   const boost::optional<TenantId>&) {
+Status IngressRequestRateLimiterAppExemptions::set(const BSONElement& value) {
     ingressRequestRateLimiterAppExemptions.update(
         admission::parseAppNameExemptionList(value.Obj()));
     return Status::OK();
 }
 
-Status IngressRequestRateLimiterAppExemptions::setFromString(std::string_view str,
-                                                             const boost::optional<TenantId>&) {
+Status IngressRequestRateLimiterAppExemptions::setFromString(std::string_view str) {
     ingressRequestRateLimiterAppExemptions.update(
         admission::parseAppNameExemptionList(fromjson(str)));
     return Status::OK();

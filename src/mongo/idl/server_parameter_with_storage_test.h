@@ -6,14 +6,11 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_with_storage_test_structs_gen.h"
 #include "mongo/platform/atomic.h"
 
 #include <cstddef>
 #include <cstdint>
-
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace test {
@@ -37,15 +34,14 @@ inline Status validateOdd(const std::int32_t& value) {
     return (value & 1) ? Status::OK() : Status(ErrorCodes::BadValue, "Must be odd");
 }
 
-inline Status validateOddSP(const std::int32_t& value, const boost::optional<TenantId>&) {
+inline Status validateOddSP(const std::int32_t& value) {
     return validateOdd(value);
 }
 
 /**
  * Validates that the new expireAfterSeconds is non-negative.
  */
-inline Status validateNonNegativeExpireAfterSeconds(const TestClusterParamStruct& newVal,
-                                                    const boost::optional<TenantId>& tenantId) {
+inline Status validateNonNegativeExpireAfterSeconds(const TestClusterParamStruct& newVal) {
     if (newVal.getPreAndPostImages().getExpireAfterSeconds() < 0) {
         return Status(ErrorCodes::BadValue, "Should be non-negative value only");
     }

@@ -15,7 +15,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_types.h"
@@ -91,13 +90,11 @@ Service::ConstructorActionRegisterer createAuthorizationManager(
 
 void AuthzVersionParameter::append(OperationContext* opCtx,
                                    BSONObjBuilder* b,
-                                   std::string_view name,
-                                   const boost::optional<TenantId>&) {
+                                   std::string_view name) {
     b->append(name, AuthorizationManager::schemaVersion28SCRAM);
 }
 
-Status AuthzVersionParameter::setFromString(std::string_view newValueString,
-                                            const boost::optional<TenantId>&) {
+Status AuthzVersionParameter::setFromString(std::string_view newValueString) {
     return {ErrorCodes::InternalError, "set called on unsettable server parameter"};
 }
 

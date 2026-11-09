@@ -43,7 +43,7 @@ protected:
         _opCtxPtr = _client->makeOperationContext();
         ASSERT_OK(ServerParameterSet::getNodeParameterSet()
                       ->get("featureFlagExposeClientIpInAuditLogs")
-                      ->setFromString("true", boost::none));
+                      ->setFromString("true"));
     }
 
     OperationContext* opCtx() const {
@@ -272,7 +272,7 @@ TEST_F(AuditMetadataTest, WriteAuditMetadataDisableFF) {
     // $impersonatedClient field.
     ASSERT_OK(ServerParameterSet::getNodeParameterSet()
                   ->get("featureFlagExposeClientIpInAuditLogs")
-                  ->setFromString("false", boost::none));
+                  ->setFromString("false"));
 
     setUpTestData();
 

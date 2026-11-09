@@ -4,12 +4,11 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
 
 // Rejects the sentinel value 13 to exercise callback validators in QueryKnob unit tests.
-Status validateTestIntKnobCallback(const int& value, const boost::optional<TenantId>&);
+Status validateTestIntKnobCallback(const int& value);
 
 }  // namespace mongo

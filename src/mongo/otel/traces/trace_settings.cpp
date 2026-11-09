@@ -36,8 +36,7 @@ const AttributeMap& getTracingResourceAttributes() {
     return attributeMap();
 }
 
-Status OpenTelemetryTracingHttpExportHeaders::set(const BSONElement& newValueElement,
-                                                  const boost::optional<TenantId>&) {
+Status OpenTelemetryTracingHttpExportHeaders::set(const BSONElement& newValueElement) {
     auto new_headers = parseHttpHeadersFromBson(newValueElement);
     if (!new_headers.isOK()) {
         // Status is refcounted so this is "cheap" (though a move API would be great)
@@ -48,11 +47,10 @@ Status OpenTelemetryTracingHttpExportHeaders::set(const BSONElement& newValueEle
     return Status::OK();
 }
 
-Status OpenTelemetryTracingHttpExportHeaders::setFromString(
-    std::string_view s, const boost::optional<TenantId>& tenant) {
+Status OpenTelemetryTracingHttpExportHeaders::setFromString(std::string_view s) {
     try {
         auto b = BSON("v" << fromjson(s));
-        return set(b.firstElement(), tenant);
+        return set(b.firstElement());
     } catch (std::exception& e) {
         return Status(ErrorCodes::BadValue,
                       fmt::format("Failed to convert string to BSON object: {}", e.what()));
@@ -61,16 +59,14 @@ Status OpenTelemetryTracingHttpExportHeaders::setFromString(
 
 void OpenTelemetryTracingResourceAttributes::append(OperationContext*,
                                                     BSONObjBuilder* bob,
-                                                    std::string_view name,
-                                                    const boost::optional<TenantId>&) {
+                                                    std::string_view name) {
     BSONObjBuilder sub(bob->subobjStart(name));
     for (auto& [k, v] : attributeMap()) {
         sub.append(k, v);
     }
 }
 
-Status OpenTelemetryTracingResourceAttributes::set(const BSONElement& newValueElement,
-                                                   const boost::optional<TenantId>&) {
+Status OpenTelemetryTracingResourceAttributes::set(const BSONElement& newValueElement) {
     if (newValueElement.type() != BSONType::object) {
         return Status(ErrorCodes::BadValue,
                       "openTelemetryTracingResourceAttributes must be a BSON document");
@@ -94,11 +90,10 @@ Status OpenTelemetryTracingResourceAttributes::set(const BSONElement& newValueEl
     return Status::OK();
 }
 
-Status OpenTelemetryTracingResourceAttributes::setFromString(
-    std::string_view s, const boost::optional<TenantId>& tenant) {
+Status OpenTelemetryTracingResourceAttributes::setFromString(std::string_view s) {
     try {
         auto b = BSON("v" << fromjson(s));
-        return set(b.firstElement(), tenant);
+        return set(b.firstElement());
     } catch (std::exception& e) {
         return Status(ErrorCodes::BadValue,
                       fmt::format("Failed to convert string to BSON object: {}", e.what()));

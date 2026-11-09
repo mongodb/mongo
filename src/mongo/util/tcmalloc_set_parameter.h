@@ -4,7 +4,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
@@ -31,8 +30,7 @@ TcmallocReleaseRateT getMemoryReleaseRate();
 void setMemoryReleaseRate(TcmallocReleaseRateT val);
 
 Status onUpdateHeapProfilingSampleIntervalBytes(long long newValue);
-Status validateHeapProfilingSampleIntervalBytes(long long newValue,
-                                                const boost::optional<TenantId>& tenantId);
+Status validateHeapProfilingSampleIntervalBytes(long long newValue);
 Status onUpdateHeapProfilingMaxObjects(long long newValue);
 
 // Allows heap_profiler.cpp to register a callback for updating max sampled objects.

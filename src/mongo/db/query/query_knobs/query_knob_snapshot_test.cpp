@@ -394,7 +394,7 @@ TEST(QueryKnobSnapshotCacheTest, ThreadLocalCacheSurvivesManyUpdates) {
     auto setValue = [&](int value) {
         BSONObjBuilder b;
         b.append("testIntKnob", value);
-        uassertStatusOK(serverParam->set(b.obj().firstElement(), boost::none));
+        uassertStatusOK(serverParam->set(b.obj().firstElement()));
     };
 
     ON_BLOCK_EXIT([&] { setValue(initialValue); });

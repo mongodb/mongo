@@ -41,7 +41,7 @@ std::mutex threadCountParamsMutex;
 boost::optional<std::unique_lock<std::mutex>> threadCountParamsLocker;
 }  // namespace
 
-Status validateUpdateReplWriterThreadCount(const int count, const boost::optional<TenantId>&) {
+Status validateUpdateReplWriterThreadCount(const int count) {
     // This range check must be the same as in the repl_writer_thread_pool_server_parameters.idl
     // file. We validate it here to avoid locking the mutex if the value is out of range.
     if (count <= 0) {
@@ -82,7 +82,7 @@ Status validateUpdateReplWriterThreadCount(const int count, const boost::optiona
     return Status::OK();
 }
 
-Status validateUpdateReplWriterMinThreadCount(const int count, const boost::optional<TenantId>&) {
+Status validateUpdateReplWriterMinThreadCount(const int count) {
     // This range check must be the same as in the repl_writer_thread_pool_server_parameters.idl
     // file. We validate it here to avoid locking the mutex if the value is out of range.
     if (count < 0) {

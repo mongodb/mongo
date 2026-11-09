@@ -45,7 +45,6 @@
 #include <variant>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 
@@ -190,7 +189,7 @@ void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
     auto tagsPerDelete =
         ServerParameterSet::getClusterParameterSet()
             ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-            ->getValue(boost::none)
+            ->getValue()
             .getMaxESCEntriesPerCompactionDelete();
 
     // Run the anchor cleanups in CollectionRouters to force refresh of catalog cache entries
@@ -235,7 +234,7 @@ bool doRenameOperation(OperationContext* opCtx,
             auto memoryLimit =
                 ServerParameterSet::getClusterParameterSet()
                     ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-                    ->getValue(boost::none)
+                    ->getValue()
                     .getMaxCompactionSize();
 
             *escDeleteSet =
@@ -292,7 +291,7 @@ FLECleanupESCDeleteQueue doCleanupOperation(OperationContext* opCtx,
     auto pqMemLimit =
         ServerParameterSet::getClusterParameterSet()
             ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-            ->getValue(boost::none)
+            ->getValue()
             .getMaxAnchorCompactionSize();
 
     auto pq = processFLECleanup(opCtx,
@@ -311,7 +310,7 @@ FLECleanupESCDeleteQueue doCleanupOperation(OperationContext* opCtx,
     auto tagsPerDelete =
         ServerParameterSet::getClusterParameterSet()
             ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-            ->getValue(boost::none)
+            ->getValue()
             .getMaxESCEntriesPerCompactionDelete();
 
     cleanupESCNonAnchors(opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, escStats);

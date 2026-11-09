@@ -18,13 +18,11 @@ namespace executor {
 MongotTaskExecutorCursorGetMoreStrategy::MongotTaskExecutorCursorGetMoreStrategy(
     boost::optional<long long> startingBatchSize,
     DocsNeededBounds docsNeededBounds,
-    boost::optional<TenantId> tenantId,
     std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
         searchIdLookupMetrics)
     : _currentBatchSize(startingBatchSize),
       _docsNeededBounds(docsNeededBounds),
       _batchSizeHistory({}),
-      _tenantId(tenantId),
       _searchIdLookupMetrics(searchIdLookupMetrics) {
     if (startingBatchSize.has_value()) {
         _batchSizeHistory.emplace_back(*startingBatchSize);
@@ -59,7 +57,7 @@ long long MongotTaskExecutorCursorGetMoreStrategy::_getNextBatchSize(
     auto internalSearchOptions =
         ServerParameterSet::getClusterParameterSet()
             ->get<ClusterParameterWithStorage<InternalSearchOptions>>("internalSearchOptions")
-            ->getValue(_tenantId);
+            ->getValue();
 
     // The maximum size we will allow the batch to grow to in a single growth step.
     // In case the growth factor is small enough that the next batchSize rounds back to the

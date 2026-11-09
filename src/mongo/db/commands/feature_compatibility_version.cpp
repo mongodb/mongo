@@ -34,7 +34,6 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/version_context_feature_flags_gen.h"
@@ -907,8 +906,7 @@ void FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp() {
 
 void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
                                                   BSONObjBuilder* b,
-                                                  std::string_view name,
-                                                  const boost::optional<TenantId>&) {
+                                                  std::string_view name) {
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     uassert(ErrorCodes::UnknownFeatureCompatibilityVersion,
             str::stream() << name << " is not yet known.",
@@ -955,8 +953,7 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
     }
 }
 
-Status FeatureCompatibilityVersionParameter::setFromString(std::string_view,
-                                                           const boost::optional<TenantId>&) {
+Status FeatureCompatibilityVersionParameter::setFromString(std::string_view) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter. See "
                           << feature_compatibility_version_documentation::compatibilityLink()

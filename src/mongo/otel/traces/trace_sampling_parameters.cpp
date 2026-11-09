@@ -80,16 +80,14 @@ Status applySamplingConfig(const BSONObj& obj) {
 
 }  // namespace
 
-Status OpenTelemetryTracingSamplingServerParameter::set(const BSONElement& newValueElement,
-                                                        const boost::optional<TenantId>&) {
+Status OpenTelemetryTracingSamplingServerParameter::set(const BSONElement& newValueElement) {
     if (newValueElement.type() != BSONType::object) {
         return Status(ErrorCodes::BadValue, "openTelemetryTracingSampling must be a BSON document");
     }
     return applySamplingConfig(newValueElement.Obj());
 }
 
-Status OpenTelemetryTracingSamplingServerParameter::setFromString(
-    std::string_view str, const boost::optional<TenantId>&) {
+Status OpenTelemetryTracingSamplingServerParameter::setFromString(std::string_view str) {
     try {
         return applySamplingConfig(fromjson(str));
     } catch (const DBException& ex) {
@@ -99,8 +97,7 @@ Status OpenTelemetryTracingSamplingServerParameter::setFromString(
 
 void OpenTelemetryTracingSamplingServerParameter::append(OperationContext*,
                                                          BSONObjBuilder* bob,
-                                                         std::string_view name,
-                                                         const boost::optional<TenantId>&) {
+                                                         std::string_view name) {
     auto config = TracingSampler::get().getConfig();
 
     OpenTelemetryTracingSamplingStrategy defaultStrategy;
@@ -137,16 +134,14 @@ void OpenTelemetryTracingSamplingServerParameter::append(OperationContext*,
     idlConfig.serialize(&sub);
 }
 
-Status OpenTelemetryExternalTracingServerParameter::set(const BSONElement& newValueElement,
-                                                        const boost::optional<TenantId>&) {
+Status OpenTelemetryExternalTracingServerParameter::set(const BSONElement& newValueElement) {
     if (newValueElement.type() != BSONType::object) {
         return Status(ErrorCodes::BadValue, "openTelemetryExternalTracing must be a BSON document");
     }
     return applyExternalConfig(newValueElement.Obj());
 }
 
-Status OpenTelemetryExternalTracingServerParameter::setFromString(
-    std::string_view str, const boost::optional<TenantId>&) {
+Status OpenTelemetryExternalTracingServerParameter::setFromString(std::string_view str) {
     try {
         return applyExternalConfig(fromjson(str));
     } catch (const DBException& ex) {
@@ -156,8 +151,7 @@ Status OpenTelemetryExternalTracingServerParameter::setFromString(
 
 void OpenTelemetryExternalTracingServerParameter::append(OperationContext*,
                                                          BSONObjBuilder* bob,
-                                                         std::string_view name,
-                                                         const boost::optional<TenantId>&) {
+                                                         std::string_view name) {
     std::lock_guard lk(externalConfigMutex);
     auto rateLimits = TracingSampler::get().getConfig().externalRateLimits;
     OpenTelemetryTracingTokenBucketRateLimit rateLimit;

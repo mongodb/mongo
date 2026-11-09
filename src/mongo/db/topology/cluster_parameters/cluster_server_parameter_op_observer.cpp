@@ -31,6 +31,16 @@ bool isConfigNamespace(const NamespaceString& nss) {
     return nss == NamespaceString::makeClusterParametersNSS(nss.dbName().tenantId());
 }
 
+// Cluster parameters hold a single in-memory value, so a tenant-scoped write, delete or drop must
+// not be allowed to modify it. A tenant ID can only be present when the deprecated
+// multitenancySupport option is enabled. This must run before the on-commit handler is registered,
+// so that throwing aborts the write rather than leaving the cache out of sync with storage.
+void uassertNotTenantScoped(const boost::optional<TenantId>& tenantId) {
+    uassert(ErrorCodes::IllegalOperation,
+            "Cluster parameters cannot be modified in a tenant-scoped namespace",
+            !tenantId);
+}
+
 }  // namespace
 
 void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
@@ -51,10 +61,12 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
         return;
     }
 
+    const auto tenantId = coll->ns().dbName().tenantId();
+    uassertNotTenantScoped(tenantId);
+
     for (auto it = first; it != last; ++it) {
         auto& doc = it->doc;
-        auto tenantId = coll->ns().dbName().tenantId();
-        cluster_parameters::validateParameter(doc, tenantId);
+        cluster_parameters::validateParameter(doc);
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [doc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
                 cluster_parameters::updateParameter(opCtx, doc, kOplog, tenantId);
@@ -75,8 +87,10 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
         return;
     }
 
-    auto tenantId = args.coll->ns().dbName().tenantId();
-    cluster_parameters::validateParameter(updatedDoc, tenantId);
+    const auto tenantId = args.coll->ns().dbName().tenantId();
+    uassertNotTenantScoped(tenantId);
+
+    cluster_parameters::validateParameter(updatedDoc);
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [updatedDoc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
             cluster_parameters::updateParameter(opCtx, updatedDoc, kOplog, tenantId);
@@ -111,10 +125,12 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
+    const auto tenantId = nss.dbName().tenantId();
+    uassertNotTenantScoped(tenantId);
+
     // Store the tenantId associated with the doc to be deleted.
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [doc = doc.getOwned(), tenantId = nss.dbName().tenantId()](OperationContext* opCtx,
-                                                                   boost::optional<Timestamp>) {
+        [doc = doc.getOwned(), tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
             cluster_parameters::clearParameter(opCtx, doc[kIdField].valueStringData(), tenantId);
         });
 }
@@ -131,9 +147,12 @@ void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,
         return;
     }
 
+    const auto tenantId = dbName.tenantId();
+    uassertNotTenantScoped(tenantId);
+
     // Entire config DB deleted, reset to default state.
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [tenantId = dbName.tenantId()](OperationContext* opCtx, boost::optional<Timestamp>) {
+        [tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
             cluster_parameters::clearAllTenantParameters(opCtx, tenantId);
         });
 }
@@ -154,10 +173,12 @@ repl::OpTime ClusterServerParameterOpObserver::onDropCollection(
         return {};
     }
 
+    const auto tenantId = collectionName.dbName().tenantId();
+    uassertNotTenantScoped(tenantId);
+
     // Entire collection deleted, reset to default state.
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [tenantId = collectionName.dbName().tenantId()](OperationContext* opCtx,
-                                                        boost::optional<Timestamp>) {
+        [tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
             cluster_parameters::clearAllTenantParameters(opCtx, tenantId);
         });
 
@@ -168,6 +189,12 @@ void ClusterServerParameterOpObserver::onReplicationRollback(OperationContext* o
                                                              const RollbackObserverInfo& rbInfo) {
     for (const auto& nss : rbInfo.rollbackNamespaces) {
         if (!isConfigNamespace(nss)) {
+            continue;
+        }
+
+        // The in-memory cache is single-valued, so tenant-scoped namespaces are never loaded into
+        // it and there is nothing to resynchronize.
+        if (nss.tenantId()) {
             continue;
         }
 

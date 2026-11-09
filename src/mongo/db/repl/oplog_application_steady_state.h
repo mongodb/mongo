@@ -4,7 +4,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
@@ -24,7 +23,7 @@ namespace repl {
     bool newValue);
 
 [[MONGO_MOD_PARENT_PRIVATE]] Status validateDisableContinuousInternodeValidationPerCollection(
-    const bool& newValue, const boost::optional<TenantId>& tenantId);
+    const bool& newValue);
 
 }  // namespace repl
 }  // namespace mongo

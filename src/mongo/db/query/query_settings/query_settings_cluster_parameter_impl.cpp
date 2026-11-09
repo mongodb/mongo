@@ -40,8 +40,7 @@ void logQueryKnobOverrideErrors(std::vector<QueryShapeConfiguration>& settingsAr
 
 void QuerySettingsClusterParameter::append(OperationContext* opCtx,
                                            BSONObjBuilder* bob,
-                                           std::string_view name,
-                                           const boost::optional<TenantId>&) {
+                                           std::string_view name) {
     auto& querySettingsService = QuerySettingsService::get(getGlobalServiceContext());
     auto config = querySettingsService.getAllQueryShapeConfigurations();
 
@@ -58,8 +57,7 @@ void QuerySettingsClusterParameter::append(OperationContext* opCtx,
                 config.clusterParameterTime.asTimestamp());
 }
 
-Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
-                                          const boost::optional<TenantId>&) {
+Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement) {
     auto* serviceContext = getGlobalServiceContext();
     auto& querySettingsService = QuerySettingsService::get(serviceContext);
     auto newSettings = QuerySettingsClusterParameterValue::parse(
@@ -102,14 +100,13 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
     return Status::OK();
 }
 
-Status QuerySettingsClusterParameter::reset(const boost::optional<TenantId>&) {
+Status QuerySettingsClusterParameter::reset() {
     auto& querySettingsService = QuerySettingsService::get(getGlobalServiceContext());
     querySettingsService.removeAllQueryShapeConfigurations();
     return Status::OK();
 }
 
-LogicalTime QuerySettingsClusterParameter::getClusterParameterTime(
-    const boost::optional<TenantId>&) const {
+LogicalTime QuerySettingsClusterParameter::getClusterParameterTime() const {
     auto& querySettingsService = QuerySettingsService::get(getGlobalServiceContext());
     return querySettingsService.getClusterParameterTime();
 }

@@ -20,7 +20,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
@@ -61,16 +60,13 @@ synchronized_value<boost::filesystem::path> ftdcDirectoryPathParameter;
 
 FTDCStartupParams ftdcStartupParams;
 
-void DiagnosticDataCollectionDirectoryPathServerParameter::append(
-    OperationContext* opCtx,
-    BSONObjBuilder* b,
-    std::string_view name,
-    const boost::optional<TenantId>&) {
+void DiagnosticDataCollectionDirectoryPathServerParameter::append(OperationContext* opCtx,
+                                                                  BSONObjBuilder* b,
+                                                                  std::string_view name) {
     b->append(name, ftdcDirectoryPathParameter->generic_string());
 }
 
-Status DiagnosticDataCollectionDirectoryPathServerParameter::setFromString(
-    std::string_view str, const boost::optional<TenantId>&) {
+Status DiagnosticDataCollectionDirectoryPathServerParameter::setFromString(std::string_view str) {
     if (!hasGlobalServiceContext()) {
         ftdcDirectoryPathParameter = std::string{str};
         return Status::OK();
@@ -202,8 +198,7 @@ Status onUpdateFTDCMaxThreads(std::int32_t potentialNewValue) {
     return Status::OK();
 }
 
-Status validateSampleTimeoutMillis(std::int32_t potentialNewValue,
-                                   const boost::optional<TenantId>&) {
+Status validateSampleTimeoutMillis(std::int32_t potentialNewValue) {
     if (hasGlobalServiceContext()) {
         auto controller = getFTDCController(getGlobalServiceContext());
         double numCollectors = controller->getNumAsyncPeriodicCollectors();

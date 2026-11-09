@@ -3,8 +3,9 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/config.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -19,7 +20,6 @@
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/modules.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl_options.h"
@@ -47,12 +47,12 @@ const std::string getSSLVersion(const std::string& prefix, const std::string& su
 /**
  * Validation callback for setParameter 'opensslCipherConfig'.
  */
-Status validateOpensslCipherConfig(const std::string&, const boost::optional<TenantId>&);
+Status validateOpensslCipherConfig(const std::string&);
 
 /**
  * Validation callback for setParameter 'disableNonTLSConnectionLogging'.
  */
-Status validateDisableNonTLSConnectionLogging(const bool&, const boost::optional<TenantId>&);
+Status validateDisableNonTLSConnectionLogging(const bool&);
 }  // namespace mongo
 
 #ifdef MONGO_CONFIG_SSL

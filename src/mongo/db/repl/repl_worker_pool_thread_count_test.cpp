@@ -29,14 +29,14 @@ public:
 
 protected:
     void setMinThreadCount(int newValue) {
-        ASSERT_OK(validateUpdateReplWriterMinThreadCount(newValue, boost::none));
+        ASSERT_OK(validateUpdateReplWriterMinThreadCount(newValue));
         replWriterMinThreadCount = newValue;
         ASSERT_OK(onUpdateReplWriterMinThreadCount(newValue));
         ASSERT_EQ(newValue, getMinThreadCountForReplWorkerPool());
     }
 
     void setMaxThreadCount(int newValue) {
-        ASSERT_OK(validateUpdateReplWriterThreadCount(newValue, boost::none));
+        ASSERT_OK(validateUpdateReplWriterThreadCount(newValue));
         replWriterThreadCount = newValue;
         ASSERT_OK(onUpdateReplWriterThreadCount(newValue));
         ASSERT_EQ(std::min(newValue, _threadCountCap), getThreadCountForReplWorkerPool());
@@ -66,22 +66,22 @@ TEST_F(ReplWorkerPoolThreadCountParamsTest, SetFailure) {
     setMinThreadCount(2);
 
     // max < min
-    ASSERT_NOT_OK(validateUpdateReplWriterThreadCount(1, boost::none));
+    ASSERT_NOT_OK(validateUpdateReplWriterThreadCount(1));
 
     // min > max
-    ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(17, boost::none));
-    ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(_threadCountCap + 1, boost::none));
+    ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(17));
+    ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(_threadCountCap + 1));
 
     // max out of bound
-    ASSERT_NOT_OK(validateUpdateReplWriterThreadCount(-1, boost::none));
-    ASSERT_NOT_OK(validateUpdateReplWriterThreadCount(0, boost::none));
-    ASSERT_NOT_OK(validateUpdateReplWriterThreadCount(257, boost::none));
-    ASSERT_NOT_OK(validateUpdateReplWriterThreadCount(1000, boost::none));
+    ASSERT_NOT_OK(validateUpdateReplWriterThreadCount(-1));
+    ASSERT_NOT_OK(validateUpdateReplWriterThreadCount(0));
+    ASSERT_NOT_OK(validateUpdateReplWriterThreadCount(257));
+    ASSERT_NOT_OK(validateUpdateReplWriterThreadCount(1000));
 
     // min out of bound
-    ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(-1, boost::none));
-    ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(257, boost::none));
-    ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(1000, boost::none));
+    ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(-1));
+    ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(257));
+    ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(1000));
 }
 
 TEST_F(ReplWorkerPoolThreadCountParamsTest, SetConcurrentSuccess) {
@@ -89,14 +89,14 @@ TEST_F(ReplWorkerPoolThreadCountParamsTest, SetConcurrentSuccess) {
     const int newMaxValue = _threadCountCap;
 
     // Start setting the min (this takes the lock)
-    ASSERT_OK(validateUpdateReplWriterMinThreadCount(newMinValue, boost::none));
+    ASSERT_OK(validateUpdateReplWriterMinThreadCount(newMinValue));
 
     stdx::thread setMaxThread([&] {
         // Set the max
 
         // This should block until the min has finished being set and the lock has been released.
         // This will take the lock.
-        ASSERT_OK(validateUpdateReplWriterThreadCount(newMaxValue, boost::none));
+        ASSERT_OK(validateUpdateReplWriterThreadCount(newMaxValue));
         // Now the min should have finished being set.
         ASSERT_EQ(newMinValue, getMinThreadCountForReplWorkerPool());
 
@@ -122,7 +122,7 @@ TEST_F(ReplWorkerPoolThreadCountParamsTest, SetConcurrentFailure) {
     const int newMaxValue = 2;
 
     // Start setting the max (this takes the lock)
-    ASSERT_OK(validateUpdateReplWriterThreadCount(newMaxValue, boost::none));
+    ASSERT_OK(validateUpdateReplWriterThreadCount(newMaxValue));
 
     stdx::thread setMinThread([&] {
         // Try setting the min
@@ -130,7 +130,7 @@ TEST_F(ReplWorkerPoolThreadCountParamsTest, SetConcurrentFailure) {
         // This should block until the max has finished being set and the lock has been released.
         // This will take the lock and immediately release it since the validation should fail.
         // This should fail as min > max.
-        ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(newMinValue, boost::none));
+        ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(newMinValue));
         // Now the max should have been set.
         ASSERT_EQ(newMaxValue, getThreadCountForReplWorkerPool());
     });

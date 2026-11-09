@@ -68,10 +68,8 @@ public:
     }
 
     static constexpr auto kInitialIntValue = 123;
-    static constexpr auto kInitialTenantIntValue = 456;
     static constexpr auto kDefaultIntValue = 42;
     static constexpr auto kInitialStrValue = "initialState"sv;
-    static constexpr auto kInitialTenantStrValue = "initialStateTenant"sv;
     static constexpr auto kDefaultStrValue = ""sv;
 
     static const TenantId kTenantId;
@@ -85,8 +83,8 @@ private:
     }
 };
 
-void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId = boost::none);
-void remove(const boost::optional<TenantId>& tenantId = boost::none);
+void upsert(BSONObj doc);
+void remove();
 BSONObj makeClusterParametersDoc(const LogicalTime& cpTime,
                                  int intValue,
                                  std::string_view strValue,

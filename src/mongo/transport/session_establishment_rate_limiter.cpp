@@ -24,18 +24,15 @@ thread_local VersionedValue<CIDRList>::Snapshot maxEstablishingConnsOverrideSnap
 // TODO: SERVER-106468 Define CIDRRangeListParameter and remove this glue code
 void MaxEstablishingConnectionsOverrideServerParameter::append(OperationContext*,
                                                                BSONObjBuilder* bob,
-                                                               std::string_view name,
-                                                               const boost::optional<TenantId>&) {
+                                                               std::string_view name) {
     appendCIDRRangeListParameter(maxEstablishingConnsOverride, bob, name);
 }
 
-Status MaxEstablishingConnectionsOverrideServerParameter::set(const BSONElement& value,
-                                                              const boost::optional<TenantId>&) {
+Status MaxEstablishingConnectionsOverrideServerParameter::set(const BSONElement& value) {
     return setCIDRRangeListParameter(maxEstablishingConnsOverride, value.Obj());
 }
 
-Status MaxEstablishingConnectionsOverrideServerParameter::setFromString(
-    std::string_view str, const boost::optional<TenantId>&) {
+Status MaxEstablishingConnectionsOverrideServerParameter::setFromString(std::string_view str) {
     return setCIDRRangeListParameter(maxEstablishingConnsOverride, fromjson(str));
 }
 

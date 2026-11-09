@@ -202,14 +202,14 @@ void updateShardIdentity(OperationContext* opCtx, const ShardIdentityType& ident
 void setClusterParametersOnReplicaSet(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
-    const TenantIdMap<std::vector<BSONObj>>& allClusterParameters,
+    const std::map<boost::optional<TenantId>, std::vector<BSONObj>>& allClusterParameters,
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor);
 
 /**
  * Gets the cluster parameters set on the shard and then saves them locally.
  */
-TenantIdMap<std::vector<BSONObj>> getClusterParametersFromReplicaSet(
+std::map<boost::optional<TenantId>, std::vector<BSONObj>> getClusterParametersFromReplicaSet(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
     std::shared_ptr<executor::TaskExecutor> executor);
@@ -217,10 +217,12 @@ TenantIdMap<std::vector<BSONObj>> getClusterParametersFromReplicaSet(
 /**
  * Given a vector of cluster parameters in disk format, sets them locally.
  */
-void setClusterParametersLocally(OperationContext* opCtx,
-                                 const TenantIdMap<std::vector<BSONObj>>& parameters);
+void setClusterParametersLocally(
+    OperationContext* opCtx,
+    const std::map<boost::optional<TenantId>, std::vector<BSONObj>>& parameters);
 
-TenantIdMap<std::vector<BSONObj>> getClusterParametersLocally(OperationContext* opCtx);
+std::map<boost::optional<TenantId>, std::vector<BSONObj>> getClusterParametersLocally(
+    OperationContext* opCtx);
 
 /*
  * Runs a count with the given query against the localConfigShard. Returns the result of that count

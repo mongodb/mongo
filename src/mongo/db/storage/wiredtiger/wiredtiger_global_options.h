@@ -4,7 +4,6 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/options_parser/environment.h"
 
@@ -54,8 +53,7 @@ public:
     std::string statisticsSetting;
 
     static Status validateWiredTigerCompressor(const std::string&);
-    static Status validateSpillWiredTigerCompressor(const std::string&,
-                                                    const boost::optional<TenantId>&);
+    static Status validateSpillWiredTigerCompressor(const std::string&);
     static Status validateWiredTigerLiveRestoreReadSizeMB(int);
     static Status validateStatisticsSetting(const std::string&);
     static Status validateWiredTigerConfigString(const std::string&);

@@ -11,7 +11,6 @@
 
 #include <string_view>
 
-#include <boost/optional.hpp>
 #include <gmock/gmock.h>
 
 namespace mongo::otel::traces {
@@ -46,7 +45,7 @@ public:
 
     Status setHeaders(BSONObj doc) {
         auto storage = BSON("v" << doc);
-        return headers.set(storage.firstElement(), /*tenantId=*/boost::none);
+        return headers.set(storage.firstElement());
     }
 };
 
@@ -67,12 +66,12 @@ TEST_F(HttpHeadersTest, HttpExportHeadersSetFromBson) {
 
 TEST_F(HttpHeadersTest, HttpExportHeadersSetFromString) {
     // Verify setFromString behavior
-    ASSERT_OK(headers.setFromString("{\"Authorization\": \"Bearer tok\"}", boost::none));
+    ASSERT_OK(headers.setFromString("{\"Authorization\": \"Bearer tok\"}"));
     EXPECT_THAT(getTracingHttpExportHeaders(), SizeIs(1));
     EXPECT_THAT(getTracingHttpExportHeaders(),
                 ElementsAre(Pair("Authorization", ElementsAre("Bearer tok"))));
 
-    EXPECT_THAT(headers.setFromString("{\"BadBson\":", boost::none),
+    EXPECT_THAT(headers.setFromString("{\"BadBson\":"),
                 StatusIs(ErrorCodes::BadValue, HasSubstr("convert string to BSON")));
 }
 
@@ -100,12 +99,12 @@ public:
 
     Status setAttrs(BSONObj doc) {
         auto storage = BSON("v" << doc);
-        return attrs.set(storage.firstElement(), /*tenantId=*/boost::none);
+        return attrs.set(storage.firstElement());
     }
 
     Status setAttrs(int v) {
         auto storage = BSON("v" << v);
-        return attrs.set(storage.firstElement(), /*tenantId=*/boost::none);
+        return attrs.set(storage.firstElement());
     }
 
 private:
@@ -149,18 +148,17 @@ TEST_F(ResourceAttributesTest, DuplicateKeyFails) {
 }
 
 TEST_F(ResourceAttributesTest, SetFromStringParsesJson) {
-    ASSERT_OK(attrs.setFromString("{\"env\": \"prod\"}", /*tenantId=*/boost::none));
+    ASSERT_OK(attrs.setFromString("{\"env\": \"prod\"}"));
     EXPECT_THAT(getTracingResourceAttributes(), ElementsAre(Pair("env", "prod")));
 }
 
 TEST_F(ResourceAttributesTest, SetFromStringRejectsInvalidJson) {
-    EXPECT_THAT(attrs.setFromString("{\"BadBson\":", /*tenantId=*/boost::none),
+    EXPECT_THAT(attrs.setFromString("{\"BadBson\":"),
                 StatusIs(ErrorCodes::BadValue, HasSubstr("convert string to BSON")));
 }
 
 TEST_F(ResourceAttributesTest, SetFromStringRejectsNonStringValues) {
-    EXPECT_THAT(attrs.setFromString("{\"service.version\": 3}", /*tenantId=*/boost::none),
-                Not(StatusIsOK()));
+    EXPECT_THAT(attrs.setFromString("{\"service.version\": 3}"), Not(StatusIsOK()));
 }
 
 TEST_F(ResourceAttributesTest, AppendRoundTrip) {
@@ -168,7 +166,7 @@ TEST_F(ResourceAttributesTest, AppendRoundTrip) {
         setAttrs(BSON("deployment.environment" << "staging" << "service.version" << "2.0.0")));
 
     BSONObjBuilder out;
-    attrs.append(nullptr, &out, "attrs"sv, /*tenantId=*/boost::none);
+    attrs.append(nullptr, &out, "attrs"sv);
     BSONObj result = out.obj();
 
     EXPECT_THAT(result["attrs"],

@@ -1370,7 +1370,7 @@ void updateShardIdentity(OperationContext* opCtx, const ShardIdentityType& ident
 void setClusterParametersOnReplicaSet(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
-    const TenantIdMap<std::vector<BSONObj>>& allClusterParameters,
+    const std::map<boost::optional<TenantId>, std::vector<BSONObj>>& allClusterParameters,
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor) {
     // First, remove all existing parameters from the new shard.
@@ -1402,8 +1402,9 @@ void setClusterParametersOnReplicaSet(
     }
 }
 
-void setClusterParametersLocally(OperationContext* opCtx,
-                                 const TenantIdMap<std::vector<BSONObj>>& parameters) {
+void setClusterParametersLocally(
+    OperationContext* opCtx,
+    const std::map<boost::optional<TenantId>, std::vector<BSONObj>>& parameters) {
     for (const auto& tenantIdWithParameters : parameters) {
         auto& tenantId = tenantIdWithParameters.first;
         auto& parameterSet = tenantIdWithParameters.second;
@@ -1441,7 +1442,7 @@ void setClusterParametersLocally(OperationContext* opCtx,
     }
 }
 
-TenantIdMap<std::vector<BSONObj>> getClusterParametersFromReplicaSet(
+std::map<boost::optional<TenantId>, std::vector<BSONObj>> getClusterParametersFromReplicaSet(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
     std::shared_ptr<executor::TaskExecutor> executor) {
@@ -1455,7 +1456,7 @@ TenantIdMap<std::vector<BSONObj>> getClusterParametersFromReplicaSet(
     std::map<boost::optional<TenantId>, std::pair<std::unique_ptr<Fetcher>, Status>> fetchers;
     // If for some reason the callback never gets invoked, we will return this status in
     // response.
-    TenantIdMap<std::vector<BSONObj>> allParameters;
+    std::map<boost::optional<TenantId>, std::vector<BSONObj>> allParameters;
 
     for (const auto& tenantId : tenantIds) {
         auto fetcher = createFindFetcher(
@@ -1495,11 +1496,12 @@ TenantIdMap<std::vector<BSONObj>> getClusterParametersFromReplicaSet(
     return allParameters;
 }
 
-TenantIdMap<std::vector<BSONObj>> getClusterParametersLocally(OperationContext* opCtx) {
+std::map<boost::optional<TenantId>, std::vector<BSONObj>> getClusterParametersLocally(
+    OperationContext* opCtx) {
     auto localConfigShard = ShardingCatalogManager::get(opCtx)->localConfigShard();
     auto tenantIds =
         uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, *localConfigShard.get()));
-    TenantIdMap<std::vector<BSONObj>> configSvrClusterParameterDocs;
+    std::map<boost::optional<TenantId>, std::vector<BSONObj>> configSvrClusterParameterDocs;
     for (const auto& tenantId : tenantIds) {
         auto findResponse = uassertStatusOK(localConfigShard->exhaustiveFindOnConfig(
             opCtx,

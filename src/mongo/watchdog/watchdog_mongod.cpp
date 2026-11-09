@@ -32,7 +32,6 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -49,7 +48,7 @@ bool watchdogEnabled{true};
 
 }  // namespace
 
-Status validateWatchdogPeriodSeconds(const int& value, const boost::optional<TenantId>&) {
+Status validateWatchdogPeriodSeconds(const int& value) {
     const bool shouldSkipValidateForTest =
         TestingProctor::instance().isInitialized() && TestingProctor::instance().isEnabled();
     if (!shouldSkipValidateForTest && value < 60 && value != -1) {

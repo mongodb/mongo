@@ -77,7 +77,8 @@ Seconds loadInterval() {
 
 }  // namespace
 
-std::pair<multiversion::FeatureCompatibilityVersion, TenantIdMap<StringMap<BSONObj>>>
+std::pair<multiversion::FeatureCompatibilityVersion,
+          std::map<boost::optional<TenantId>, StringMap<BSONObj>>>
 getFCVAndClusterParametersFromConfigServer() {
     // Use an alternative client region, because we call refreshParameters both from the internal
     // refresher process and from getClusterParameter.
@@ -132,7 +133,7 @@ getFCVAndClusterParametersFromConfigServer() {
 
             // Fetch the cluster parameters for each tenant using a snapshotRead concern with the
             // atClusterTime of the FCV find.
-            TenantIdMap<StringMap<BSONObj>> allDocs;
+            std::map<boost::optional<TenantId>, StringMap<BSONObj>> allDocs;
             for (const auto& tenant : tenantIds) {
                 FindCommandRequest findClusterParametersTenant{
                     NamespaceString::makeClusterParametersNSS(tenant)};
@@ -279,7 +280,7 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
 
     invariant(serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
     multiversion::FeatureCompatibilityVersion fcv;
-    TenantIdMap<StringMap<BSONObj>> clusterParameterDocs;
+    std::map<boost::optional<TenantId>, StringMap<BSONObj>> clusterParameterDocs;
 
     try {
         std::tie(fcv, clusterParameterDocs) = getFCVAndClusterParametersFromConfigServer();
@@ -308,6 +309,12 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
     allUpdatedParameters.reserve(clusterParameterDocs.size());
 
     for (const auto& [tenantId, tenantParamDocs] : clusterParameterDocs) {
+        // The in-memory cache is single-valued, so tenant-scoped documents must never be applied
+        // to it: they would overwrite or reset the value used by every other caller.
+        if (tenantId) {
+            continue;
+        }
+
         std::vector<BSONObj> updatedParameters;
         updatedParameters.reserve(tenantParamDocs.size());
         for (const auto& [name, sp] : clusterParameterCache->getMap()) {
@@ -342,16 +349,16 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
 
             // Continue refreshing any parameters that are enabled.
             BSONObjBuilder oldClusterParameterBob;
-            sp->append(opCtx, &oldClusterParameterBob, name, tenantId);
+            sp->append(opCtx, &oldClusterParameterBob, name);
 
             auto it = tenantParamDocs.find(name);
             if (it == tenantParamDocs.end()) {
                 // Reset the local parameter to its default value.
-                status = sp->reset(tenantId);
+                status = sp->reset();
             } else {
                 // Set the local parameter to the pulled value.
                 const auto& clusterParameterDoc = it->second;
-                status = sp->set(clusterParameterDoc, tenantId);
+                status = sp->set(clusterParameterDoc);
             }
 
             if (!status.isOK()) {
@@ -365,7 +372,7 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
             }
 
             BSONObjBuilder updatedClusterParameterBob;
-            sp->append(opCtx, &updatedClusterParameterBob, name, tenantId);
+            sp->append(opCtx, &updatedClusterParameterBob, name);
             BSONObj updatedClusterParameterBSON = updatedClusterParameterBob.obj().getOwned();
 
             audit::logUpdateCachedClusterParameter(opCtx->getClient(),

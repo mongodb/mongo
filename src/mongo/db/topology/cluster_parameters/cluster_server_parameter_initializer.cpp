@@ -3,12 +3,9 @@
 
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_initializer.h"
 
-#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_parameters/cluster_parameter_synchronization_helpers.h"
@@ -16,7 +13,6 @@
 #include "mongo/util/decorable.h"
 
 #include <memory>
-#include <set>
 #include <string_view>
 #include <utility>
 
@@ -75,18 +71,8 @@ void ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(Operati
         }
     };
 
-    if (gMultitenancySupport) {
-        std::set<TenantId> tenantIds;
-        auto catalog = CollectionCatalog::get(opCtx);
-        {
-            Lock::GlobalLock lk(opCtx, MODE_IS);
-            tenantIds = catalog->getAllTenants();
-        }
-
-        for (const auto& tenantId : tenantIds) {
-            initializeTenantParameters(tenantId);
-        }
-    }
+    // The in-memory cache is single-valued, so only the tenantless parameters are loaded.
+    // Tenant-scoped cluster parameter collections are ignored.
     initializeTenantParameters(boost::none);
 }
 

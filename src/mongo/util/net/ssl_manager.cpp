@@ -381,16 +381,14 @@ SSLManagerCoordinator::SSLManagerCoordinator()
 
 void ClusterAuthDNOverrideParameter::append(OperationContext* opCtx,
                                             BSONObjBuilder* b,
-                                            std::string_view name,
-                                            const boost::optional<TenantId>&) {
+                                            std::string_view name) {
     auto value = clusterAuthDNOverride.get();
     if (value) {
         b->append(name, value->toString());
     }
 }
 
-Status ClusterAuthDNOverrideParameter::setFromString(std::string_view str,
-                                                     const boost::optional<TenantId>&) {
+Status ClusterAuthDNOverrideParameter::setFromString(std::string_view str) {
     if (str.empty()) {
         *clusterAuthDNOverride = boost::none;
         return Status::OK();

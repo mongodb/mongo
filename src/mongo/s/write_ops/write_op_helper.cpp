@@ -22,7 +22,7 @@ bool isOnlyTargetDataOwningShardsForMultiWritesEnabled() {
         ServerParameterSet::getClusterParameterSet()
             ->get<ClusterParameterWithStorage<OnlyTargetDataOwningShardsForMultiWritesParam>>(
                 "onlyTargetDataOwningShardsForMultiWrites");
-    return clusterParam->getValue(boost::none).getEnabled();
+    return clusterParam->getValue().getEnabled();
 }
 
 bool isCollUUIDMismatchWithoutActualNamespace(const Status& status) {

@@ -29,8 +29,7 @@ Status onOplogApplicationEnforcesSteadyStateConstraintsUpdate(bool) {
     return Status::OK();
 }
 
-Status validateDisableContinuousInternodeValidationPerCollection(const bool& newValue,
-                                                                 const boost::optional<TenantId>&) {
+Status validateDisableContinuousInternodeValidationPerCollection(const bool& newValue) {
     if (disableContinuousInternodeValidationPerCollection.load() && !newValue) {
         return {ErrorCodes::BadValue,
                 "disableContinuousInternodeValidationPerCollection cannot be disabled at runtime; "

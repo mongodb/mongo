@@ -1076,32 +1076,24 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             self.write_empty_line()
 
             self._writer.write_line(
-                "void append(OperationContext*, BSONObjBuilder*, std::string_view, const boost::optional<TenantId>&) final;"
+                "void append(OperationContext*, BSONObjBuilder*, std::string_view) final;"
             )
             if cls.override_set:
-                self._writer.write_line(
-                    "Status set(const BSONElement&, const boost::optional<TenantId>&) final;"
-                )
+                self._writer.write_line("Status set(const BSONElement&) final;")
             if cls.override_warn_if_deprecated:
                 self._writer.write_line("void warnIfDeprecated(std::string_view action) final;")
-            self._writer.write_line(
-                "Status setFromString(std::string_view, const boost::optional<TenantId>&) final;"
-            )
+            self._writer.write_line("Status setFromString(std::string_view) final;")
 
             # If override_validate is set, provide an override definition. Otherwise, it will inherit
             # from the base ServerParameter implementation.
             if cls.override_validate:
-                self._writer.write_line(
-                    "Status validate(const BSONElement&, const boost::optional<TenantId>& tenantId) const final;"
-                )
+                self._writer.write_line("Status validate(const BSONElement&) const final;")
 
             # The reset() and getClusterParameterTime() methods must be custom implemented for
             # specialized cluster server parameters. Provide the declarations here.
             if scp.set_at == "ServerParameterType::kClusterWide":
-                self._writer.write_line("Status reset(const boost::optional<TenantId>&) final;")
-                self._writer.write_line(
-                    "LogicalTime getClusterParameterTime(const boost::optional<TenantId>&) const final;"
-                )
+                self._writer.write_line("Status reset() final;")
+                self._writer.write_line("LogicalTime getClusterParameterTime() const final;")
 
             if cls.data is not None:
                 self.write_empty_line()
@@ -3275,7 +3267,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         if param.redact:
             with self._block(
-                "void %s::append(OperationContext*, BSONObjBuilder* b, std::string_view name, const boost::optional<TenantId>& tenantId) {"
+                "void %s::append(OperationContext*, BSONObjBuilder* b, std::string_view name) {"
                 % (cls.name),
                 "}",
             ):
@@ -3285,8 +3277,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # Specialized cluster parameters should also provide the implementation of setFromString().
         if is_cluster_param:
             with self._block(
-                "Status %s::setFromString(std::string_view str, const boost::optional<TenantId>& tenantId) {"
-                % (cls.name),
+                "Status %s::setFromString(std::string_view str) {" % (cls.name),
                 "}",
             ):
                 self._writer.write_line(

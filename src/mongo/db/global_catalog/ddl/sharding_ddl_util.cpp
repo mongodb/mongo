@@ -885,7 +885,7 @@ void assertDataMovementAllowed() {
         auto* clusterCardinalityParam =
             clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
                 "shardedClusterCardinalityForDirectConns");
-        return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
+        return clusterCardinalityParam->getValue().getHasTwoOrMoreShards();
     }();
 
     uassert(ErrorCodes::IllegalOperation,

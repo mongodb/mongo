@@ -45,12 +45,12 @@ public:
         Timestamp now(time(nullptr));
         auto doc = makeClusterParametersDoc(LogicalTime(now), kInitialIntValue, kInitialStrValue);
 
-        upsert(doc, boost::none);
+        upsert(doc);
     }
 
     void tearDown() final {
         // Delete all cluster server parameter documents written and refresh in-memory state.
-        remove(boost::none);
+        remove();
         auto opCtx = cc().makeOperationContext();
         const auto coll = acquireCollection(
             opCtx.get(),
@@ -92,7 +92,7 @@ TEST_F(ClusterServerParameterInitializerTest, OnInitialSync) {
     // value.
     auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
-    ClusterServerParameterTest cspTest = sp->getValue(boost::none);
+    ClusterServerParameterTest cspTest = sp->getValue();
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
 
@@ -101,7 +101,7 @@ TEST_F(ClusterServerParameterInitializerTest, OnInitialSync) {
     doInitialSync();
     sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
-    cspTest = sp->getValue(boost::none);
+    cspTest = sp->getValue();
     ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
 }
@@ -110,7 +110,7 @@ TEST_F(ClusterServerParameterInitializerTest, OnStartupRecovery) {
     // Retrieve the test cluster server parameter and ensure it's set to the default value.
     auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
-    ClusterServerParameterTest cspTest = sp->getValue(boost::none);
+    ClusterServerParameterTest cspTest = sp->getValue();
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
 
@@ -119,7 +119,7 @@ TEST_F(ClusterServerParameterInitializerTest, OnStartupRecovery) {
     doStartupRecovery();
     sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
-    cspTest = sp->getValue(boost::none);
+    cspTest = sp->getValue();
     ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
 }

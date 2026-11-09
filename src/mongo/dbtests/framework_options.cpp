@@ -170,7 +170,7 @@ MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) try {
             uassert({ErrorCodes::BadValue,
                      fmt::format("Cannot use --setParameter to set {:?} at startup", name)},
                     parameter->allowedToChangeAtStartup());
-            if (auto err = parameter->setFromString(value, boost::none); !err.isOK()) {
+            if (auto err = parameter->setFromString(value); !err.isOK()) {
                 uasserted({ErrorCodes::BadValue,
                            fmt::format("Bad value for parameter {:?}: {}", name, err.reason())});
             }

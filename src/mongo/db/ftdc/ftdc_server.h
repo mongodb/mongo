@@ -133,7 +133,7 @@ Status onUpdateFTDCPerInterimUpdate(std::int32_t value);
 Status onUpdateFTDCSampleTimeout(std::int32_t value);
 Status onUpdateFTDCMinThreads(std::int32_t value);
 Status onUpdateFTDCMaxThreads(std::int32_t value);
-Status validateSampleTimeoutMillis(std::int32_t, const boost::optional<TenantId>&);
+Status validateSampleTimeoutMillis(std::int32_t);
 
 /**
  * Server Parameter accessors

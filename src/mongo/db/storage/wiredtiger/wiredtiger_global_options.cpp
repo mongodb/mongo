@@ -9,7 +9,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -18,7 +17,6 @@
 
 #include <wiredtiger.h>
 
-#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -62,8 +60,7 @@ Status WiredTigerGlobalOptions::validateWiredTigerCompressor(const std::string& 
     return Status::OK();
 }
 
-Status WiredTigerGlobalOptions::validateSpillWiredTigerCompressor(
-    const std::string& value, const boost::optional<TenantId>&) {
+Status WiredTigerGlobalOptions::validateSpillWiredTigerCompressor(const std::string& value) {
     return validateWiredTigerCompressor(value);
 }
 
@@ -86,20 +83,17 @@ Status WiredTigerGlobalOptions::validateWiredTigerLiveRestoreReadSizeMB(const in
 
 void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
                                                     BSONObjBuilder* b,
-                                                    std::string_view name,
-                                                    const boost::optional<TenantId>&) {
+                                                    std::string_view name) {
     *b << name << **_data.first;
 }
 
 void SpillWiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
                                                          BSONObjBuilder* b,
-                                                         std::string_view name,
-                                                         const boost::optional<TenantId>&) {
+                                                         std::string_view name) {
     *b << name << **_data.first;
 }
 
-Status validateExtraDiagnostics(const std::vector<std::string>& value,
-                                const boost::optional<TenantId>& tenantId) {
+Status validateExtraDiagnostics(const std::vector<std::string>& value) {
     try {
         std::set<std::string> flagArr = {"all",
                                          "concurrent_access",
@@ -174,8 +168,7 @@ Status setFromStringImpl(T& data, std::string_view str) {
     return Status::OK();
 }
 
-Status WiredTigerEngineRuntimeConfigParameter::setFromString(std::string_view str,
-                                                             const boost::optional<TenantId>&) {
+Status WiredTigerEngineRuntimeConfigParameter::setFromString(std::string_view str) {
     if (auto s = validateNoNullCharacter(str); !s.isOK())
         return s;
 
@@ -187,8 +180,7 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(std::string_view st
     return setFromStringImpl(_data, str);
 }
 
-Status SpillWiredTigerEngineRuntimeConfigParameter::setFromString(
-    std::string_view str, const boost::optional<TenantId>&) {
+Status SpillWiredTigerEngineRuntimeConfigParameter::setFromString(std::string_view str) {
     if (auto s = validateNoNullCharacter(str); !s.isOK())
         return s;
 
@@ -200,15 +192,13 @@ Status SpillWiredTigerEngineRuntimeConfigParameter::setFromString(
     return setFromStringImpl(_data, str);
 }
 
-Status WiredTigerDirectoryForIndexesParameter::setFromString(std::string_view,
-                                                             const boost::optional<TenantId>&) {
+Status WiredTigerDirectoryForIndexesParameter::setFromString(std::string_view) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter"};
 };
 void WiredTigerDirectoryForIndexesParameter::append(OperationContext* opCtx,
                                                     BSONObjBuilder* builder,
-                                                    std::string_view name,
-                                                    const boost::optional<TenantId>&) {
+                                                    std::string_view name) {
     builder->append(name, wiredTigerGlobalOptions.directoryForIndexes);
 }
 

@@ -158,8 +158,7 @@ must be unique across the server instance. More information on the specific fiel
   limits or expression maps which evaluate to numeric values. For all other validation cases,
   specify callback as a C++ function or static method. Note that validation rules (including
   callback) may run in any order. To perform an action after all validation rules have completed,
-  `on_update` should be preferred instead. Callback prototype:
-  `Status(const cpp_vartype&, const boost::optional<TenantId>&);`
+  `on_update` should be preferred instead. Callback prototype: `Status(const cpp_vartype&);`
 
 - `is_deprecated`: Mark the server parameter as deprecated. Warns users if the server parameter is
   ever used. Defaults to false.
@@ -239,7 +238,7 @@ to any other work, this custom constructor must invoke its parent's constructor.
 `override_set`: If `true`, the implementer must provide a `set` member function as:
 
 ```cpp
-Status {name}::set(const BSONElement& val, const boost::optional<TenantId>& tenantId);
+Status {name}::set(const BSONElement& val);
 ```
 
 Otherwise the base class implementation `ServerParameter::set` is used. It invokes `setFromString`
@@ -248,7 +247,7 @@ using a string representation of `val`, if the `val` is holding one of the suppo
 `override_validate`: If `true`, the implementer must provide a `validate` member function as:
 
 ```cpp
-Status {name}::validate(const BSONElement& newValueElement, const boost::optional<TenantId>& tenantId);
+Status {name}::validate(const BSONElement& newValueElement) const;
 ```
 
 Otherwise, the base class implementation `ServerParameter::validate` is used. This simply returns
@@ -259,7 +258,7 @@ injects a placeholder value. If `param.redact` was not specified as `true`, then
 must be provided with the following signature:
 
 ```cpp
-Status {name}::append(OperationContext*, BSONObjBuilder*, StringData, const boost::optional<TenantId>& tenantId);
+void {name}::append(OperationContext*, BSONObjBuilder*, std::string_view name);
 ```
 
 `override_warn_if_deprecated`: If `true`, allows a custom warnIfDeprecated() method to be defined,
@@ -268,7 +267,7 @@ defaults to `false`.
 Lastly, a `setFromString` method must always be provided with the following signature:
 
 ```cpp
-Status {name}::setFromString(StringData value, const boost::optional<TenantId>& tenantId);
+Status {name}::setFromString(std::string_view value);
 ```
 
 The following table summarizes `ServerParameter` method override rules.
@@ -282,10 +281,6 @@ The following table summarizes `ServerParameter` method override rules.
 | `append() // redact=false` | Required | None, won't compile without implementation.                          |
 | `validate()`               | Optional | Returns `Status::OK()` without any checks.                           |
 | `warnIfDeprecated()`       | Optional | If deprecated, warns on first use.                                   |
-
-Note that by default, server parameters are not tenant-aware and thus will always have `boost::none`
-provided as `tenantId`, unless defined as cluster server parameters (discussed
-[below](#cluster-server-parameters)).
 
 Each server parameter encountered will produce a block of code to run at process startup similar to
 the following:
@@ -394,13 +389,9 @@ corresponding to the current version of the cluster server parameter.
 Tue `reset()` method must be implemented and should update the cluster server parameter back to its
 default value.
 
-All cluster server parameters are tenant-aware, meaning that on serverless clusters, each tenant has
-an isolated set of parameters. The `setClusterParameter` and `getClusterParameter` commands will
-pass the `tenantId` on the command request to the `ServerParameter`'s methods. On dedicated
-(non-serverless) clusters, `boost::none` will be passed. IDL-defined cluster server parameters will
-handle the passed-in `tenantId` automatically and store separate parameter values per-tenant.
-Specialized server parameters will have to take care to correctly handle the passed-in `tenantId`
-and to enforce tenant isolation.
+Each cluster server parameter holds a single value for the whole cluster. IDL-defined cluster server
+parameters store that value in the variable named by `cpp_varname`, and specialized cluster server
+parameters are responsible for storing their own value.
 
 Like normal server parameters, cluster server parameters can be defined to be dependent on a minimum
 FCV version or a specific feature flag using the `condition.min_fcv` and `condition.feature_flag`

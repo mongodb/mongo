@@ -29,11 +29,11 @@ TEST(ThroughputProbingParameterTest, InitialConcurrency) {
     // The validator intentionally performs no validation and always returns OK. Validation is
     // deferred to _initState() to avoid startup failures due to parameter ordering issues.
     // All values should pass validation.
-    ASSERT_OK(validateInitialConcurrency(0, {}));
-    ASSERT_OK(validateInitialConcurrency(gMinConcurrency.load() * 2, {}));
-    ASSERT_OK(validateInitialConcurrency(gMaxConcurrency.load() * 2, {}));
-    ASSERT_OK(validateInitialConcurrency(1, {}));                           // Below minimum
-    ASSERT_OK(validateInitialConcurrency(gMaxConcurrency.load() * 3, {}));  // Above maximum
+    ASSERT_OK(validateInitialConcurrency(0));
+    ASSERT_OK(validateInitialConcurrency(gMinConcurrency.load() * 2));
+    ASSERT_OK(validateInitialConcurrency(gMaxConcurrency.load() * 2));
+    ASSERT_OK(validateInitialConcurrency(1));                           // Below minimum
+    ASSERT_OK(validateInitialConcurrency(gMaxConcurrency.load() * 3));  // Above maximum
 }
 
 class InitStateWarningTest : public ServiceContextTest {
@@ -135,16 +135,16 @@ TEST_F(InitStateWarningTest, WarningForAboveMaximum) {
 }
 
 TEST(ThroughputProbingParameterTest, MinConcurrency) {
-    ASSERT_OK(validateMinConcurrency(5, {}));
-    ASSERT_OK(validateMinConcurrency(gMaxConcurrency.load(), {}));
-    ASSERT_NOT_OK(validateMinConcurrency(0, {}));
-    ASSERT_NOT_OK(validateMinConcurrency(gMaxConcurrency.load() + 1, {}));
+    ASSERT_OK(validateMinConcurrency(5));
+    ASSERT_OK(validateMinConcurrency(gMaxConcurrency.load()));
+    ASSERT_NOT_OK(validateMinConcurrency(0));
+    ASSERT_NOT_OK(validateMinConcurrency(gMaxConcurrency.load() + 1));
 }
 
 TEST(ThroughputProbingParameterTest, MaxConcurrency) {
-    ASSERT_OK(validateMaxConcurrency(gMinConcurrency.load(), {}));
-    ASSERT_OK(validateMaxConcurrency(256, {}));
-    ASSERT_NOT_OK(validateMaxConcurrency(gMinConcurrency.load() - 1, {}));
+    ASSERT_OK(validateMaxConcurrency(gMinConcurrency.load()));
+    ASSERT_OK(validateMaxConcurrency(256));
+    ASSERT_NOT_OK(validateMaxConcurrency(gMinConcurrency.load() - 1));
 }
 
 class ThroughputProbingTest : public ServiceContextTest {

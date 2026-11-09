@@ -9,13 +9,11 @@
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
 #include "mongo/db/server_options.h"
 
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 Status validateChangeStreamsClusterParameter(
-    const ChangeStreamsClusterParameterStorage& clusterParameter,
-    const boost::optional<TenantId>&) {
+    const ChangeStreamsClusterParameterStorage& clusterParameter) {
     if (clusterParameter.getExpireAfterSeconds() <= 0) {
         return Status(ErrorCodes::BadValue,
                       "Expected a positive integer for 'expireAfterSeconds' field");

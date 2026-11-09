@@ -626,7 +626,7 @@ public:
 
         if (auto param = ServerParameterSet::getNodeParameterSet()->getIfExists(
                 kAutomationServiceDescriptorFieldName)) {
-            param->append(opCtx, &result, kAutomationServiceDescriptorFieldName, boost::none);
+            param->append(opCtx, &result, kAutomationServiceDescriptorFieldName);
         }
 
         if (opCtx->isExhaust()) {

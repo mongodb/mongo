@@ -34,7 +34,6 @@
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/initialize_server_global_state_gen.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/util/assert_util.h"
@@ -474,8 +473,7 @@ MONGO_INITIALIZER_GENERAL(MungeUmask, ("EndStartupOptionHandling"), ("ServerLogR
 #endif
 
 // --setParameter honorSystemUmask
-Status HonorSystemUMaskServerParameter::setFromString(std::string_view value,
-                                                      const boost::optional<TenantId>&) {
+Status HonorSystemUMaskServerParameter::setFromString(std::string_view value) {
 #ifndef _WIN32
     if ((value == "0") || (value == "false")) {
         // false may be specified with processUmask
@@ -502,16 +500,14 @@ Status HonorSystemUMaskServerParameter::setFromString(std::string_view value,
 
 void HonorSystemUMaskServerParameter::append(OperationContext*,
                                              BSONObjBuilder* b,
-                                             std::string_view name,
-                                             const boost::optional<TenantId>&) {
+                                             std::string_view name) {
 #ifndef _WIN32
     *b << name << honorSystemUmask;
 #endif
 }
 
 // --setParameter processUmask
-Status ProcessUMaskServerParameter::setFromString(std::string_view value,
-                                                  const boost::optional<TenantId>&) {
+Status ProcessUMaskServerParameter::setFromString(std::string_view value) {
 #ifndef _WIN32
     if (honorSystemUmask) {
         return {ErrorCodes::BadValue,
@@ -543,8 +539,7 @@ Status ProcessUMaskServerParameter::setFromString(std::string_view value,
 
 void ProcessUMaskServerParameter::append(OperationContext*,
                                          BSONObjBuilder* b,
-                                         std::string_view name,
-                                         const boost::optional<TenantId>&) {
+                                         std::string_view name) {
 #ifndef _WIN32
     *b << name << static_cast<int>(getUmaskOverride());
 #endif

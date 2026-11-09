@@ -85,24 +85,24 @@ public:
         if constexpr (server_parameter_guard_detail::IsBSONAppendable<T>) {
             // If the parameter is serialized via BSONObjBuilder::append(), then we can just save
             // the BSONObj as-is in the format {name: <parameter>}.
-            serverParam->appendSupportingRoundtrip(nullptr, &oldParamBuilder, name, boost::none);
+            serverParam->appendSupportingRoundtrip(nullptr, &oldParamBuilder, name);
             _oldValue = oldParamBuilder.obj();
 
             // Correspondingly, the new parameter value can be set just by synthesizing a BSONObj in
             // the format {name: <value>} and then retrieving the first BSONElement.
             newParamBuilder.append(name, value);
-            uassertStatusOK(serverParam->set(newParamBuilder.obj().firstElement(), boost::none));
+            uassertStatusOK(serverParam->set(newParamBuilder.obj().firstElement()));
         } else if constexpr (server_parameter_guard_detail::HasToBSON<T>) {
             // If the parameter is serialized via T::toBSON(), then we need to manually add the
             // synthesized BSONObj as a value keyed by "name".
-            serverParam->appendSupportingRoundtrip(nullptr, &oldParamBuilder, name, boost::none);
+            serverParam->appendSupportingRoundtrip(nullptr, &oldParamBuilder, name);
             _oldValue = BSON(name << oldParamBuilder.obj());
 
             // Correspondingly, the new parameter value needs to be set by synthesizing a BSONObj
             // that independently includes the name under the _id field.
             newParamBuilder.append("_id", name);
             newParamBuilder.appendElementsUnique(value.toBSON());
-            uassertStatusOK(serverParam->set(newParamBuilder.obj(), boost::none));
+            uassertStatusOK(serverParam->set(newParamBuilder.obj()));
         }
     }
 
@@ -117,7 +117,7 @@ public:
 
         // Reset to the old value.
         auto elem = _oldValue.firstElement();
-        uassertStatusOK(serverParam->set(elem, boost::none));
+        uassertStatusOK(serverParam->set(elem));
     }
 
 private:

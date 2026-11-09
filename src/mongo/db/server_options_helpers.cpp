@@ -33,8 +33,6 @@
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 
@@ -288,13 +286,13 @@ StatusWith<BSONObj> applySetParameterOptions(const std::map<std::string, std::st
             return Status(ErrorCodes::BadValue,
                           fmt::format("Cannot use --setParameter to set \"{}\" at startup", name));
         BSONObjBuilder sub(summaryBuilder.subobjStart(name));
-        sp->append(nullptr, &sub, "default", boost::none);
+        sp->append(nullptr, &sub, "default");
         sp->warnIfDeprecated("setAtStartup");
-        Status status = sp->setFromString(value, boost::none);
+        Status status = sp->setFromString(value);
         if (!status.isOK())
             return Status(ErrorCodes::BadValue,
                           fmt::format("Bad value for parameter \"{}\": {}", name, status.reason()));
-        sp->append(nullptr, &sub, "value", boost::none);
+        sp->append(nullptr, &sub, "value");
     }
     return summaryBuilder.obj();
 }

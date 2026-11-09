@@ -325,8 +325,7 @@ void publishRssSample(ServiceContext* serviceContext) {
 
 }  // namespace
 
-Status validateQueryMemoryLoadSheddingLowMark(std::int32_t lowMarkPercent,
-                                              const boost::optional<TenantId>&) {
+Status validateQueryMemoryLoadSheddingLowMark(std::int32_t lowMarkPercent) {
     // -1 disables the feature, so there is no relationship to enforce.
     if (lowMarkPercent >= 0 && lowMarkPercent >= gQueryMemoryLoadSheddingHighMarkPercent.load()) {
         return {ErrorCodes::BadValue,
@@ -336,8 +335,7 @@ Status validateQueryMemoryLoadSheddingLowMark(std::int32_t lowMarkPercent,
     return Status::OK();
 }
 
-Status validateQueryMemoryLoadSheddingHighMark(std::int32_t highMarkPercent,
-                                               const boost::optional<TenantId>&) {
+Status validateQueryMemoryLoadSheddingHighMark(std::int32_t highMarkPercent) {
     const std::int32_t low = gQueryMemoryLoadSheddingLowMarkPercent.load();
     if (low >= 0 && highMarkPercent <= low) {
         return {ErrorCodes::BadValue,

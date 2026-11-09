@@ -9,7 +9,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/logv2/logv2_options_gen.h"
 #include "mongo/logv2/ramlog.h"
@@ -18,7 +17,6 @@
 
 #include <string_view>
 
-#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -56,13 +54,11 @@ size_t getValueFromString(std::string_view strVal, std::string_view tag) {
 
 void RedactEncryptedFields::append(OperationContext* opCtx,
                                    BSONObjBuilder* b,
-                                   std::string_view name,
-                                   const boost::optional<TenantId>&) {
+                                   std::string_view name) {
     *b << name << logv2::shouldRedactBinDataEncrypt();
 }
 
-Status RedactEncryptedFields::set(const BSONElement& newValueElement,
-                                  const boost::optional<TenantId>&) {
+Status RedactEncryptedFields::set(const BSONElement& newValueElement) {
     bool newVal;
     if (!newValueElement.coerce(&newVal)) {
         return {ErrorCodes::BadValue,
@@ -73,8 +69,7 @@ Status RedactEncryptedFields::set(const BSONElement& newValueElement,
     return Status::OK();
 }
 
-Status RedactEncryptedFields::setFromString(std::string_view str,
-                                            const boost::optional<TenantId>&) {
+Status RedactEncryptedFields::setFromString(std::string_view str) {
     if (str == "true" || str == "1") {
         logv2::setShouldRedactBinDataEncrypt(true);
     } else if (str == "false" || str == "0") {
@@ -86,45 +81,36 @@ Status RedactEncryptedFields::setFromString(std::string_view str,
     return Status::OK();
 }
 
-void RamLogMaxLines::append(OperationContext* opCtx,
-                            BSONObjBuilder* b,
-                            std::string_view name,
-                            const boost::optional<TenantId>&) {
+void RamLogMaxLines::append(OperationContext* opCtx, BSONObjBuilder* b, std::string_view name) {
     *b << name << static_cast<long long>(logv2::RamLog::getGlobalMaxLines());
 }
 
-Status RamLogMaxLines::set(const BSONElement& newValueElement,
-                           const boost::optional<TenantId>&) try {
+Status RamLogMaxLines::set(const BSONElement& newValueElement) try {
     logv2::RamLog::setGlobalMaxLines(getValue(newValueElement, "ramLogMaxLines"));
     return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Status RamLogMaxLines::setFromString(std::string_view str, const boost::optional<TenantId>&) try {
+Status RamLogMaxLines::setFromString(std::string_view str) try {
     logv2::RamLog::setGlobalMaxLines(getValueFromString(str, "ramLogMaxLines"));
     return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-void RamLogMaxSizeBytes::append(OperationContext* opCtx,
-                                BSONObjBuilder* b,
-                                std::string_view name,
-                                const boost::optional<TenantId>&) {
+void RamLogMaxSizeBytes::append(OperationContext* opCtx, BSONObjBuilder* b, std::string_view name) {
     *b << name << static_cast<long long>(logv2::RamLog::getGlobalMaxSizeBytes());
 }
 
-Status RamLogMaxSizeBytes::set(const BSONElement& newValueElement,
-                               const boost::optional<TenantId>&) try {
+Status RamLogMaxSizeBytes::set(const BSONElement& newValueElement) try {
     logv2::RamLog::setGlobalMaxSizeBytes(getValue(newValueElement, "ramLogMaxSizeBytes"));
     return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Status RamLogMaxSizeBytes::setFromString(std::string_view str,
-                                         const boost::optional<TenantId>&) try {
+Status RamLogMaxSizeBytes::setFromString(std::string_view str) try {
     logv2::RamLog::setGlobalMaxSizeBytes(getValueFromString(str, "ramLogMaxSizeBytes"));
     return Status::OK();
 } catch (const DBException& ex) {

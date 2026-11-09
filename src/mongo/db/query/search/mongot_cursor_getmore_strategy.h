@@ -28,7 +28,6 @@ public:
         boost::optional<long long> startingBatchSize = mongot_cursor::kDefaultMongotBatchSize,
         DocsNeededBounds docsNeededBounds = DocsNeededBounds(docs_needed_bounds::Unknown(),
                                                              docs_needed_bounds::Unknown()),
-        boost::optional<TenantId> tenantId = boost::none,
         std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
             searchIdLookupMetrics = nullptr);
 
@@ -88,9 +87,6 @@ private:
 
     // Tracks all batchSizes sent to mongot, to be included in the $search explain execution stats.
     std::vector<long long> _batchSizeHistory;
-
-    // The TenantId is necessary when retrieving the InternalSearchOptions cluster parameter value.
-    boost::optional<TenantId> _tenantId;
 
     // These metrics are updated in the DocumentSourceInternalSearchIdLookUp and shared with this
     // class. We read the metrics in this class to to tune the batch size in some cases.

@@ -4,23 +4,20 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/tenant_id.h"
 
 #include <string>
-
-#include <boost/optional.hpp>
 
 namespace mongo {
 
 /**
  * Validation callback for setParameter 'opensslCipherConfig'.
  */
-Status validateOpensslCipherConfig(const std::string&, const boost::optional<TenantId>&);
+Status validateOpensslCipherConfig(const std::string&);
 
 /**
  * Validation callback for setParameter 'disableNonTLSConnectionLogging'.
  */
-Status validateDisableNonTLSConnectionLogging(const bool&, const boost::optional<TenantId>&);
+Status validateDisableNonTLSConnectionLogging(const bool&);
 
 /**
  * Records that disableNonTLSConnectionLogging has been set.

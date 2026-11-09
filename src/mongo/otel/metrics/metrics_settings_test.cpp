@@ -32,7 +32,7 @@ public:
 
     Status setHeaders(BSONObj doc) {
         auto storage = BSON("v" << doc);
-        return headers.set(storage.firstElement(), boost::none);
+        return headers.set(storage.firstElement());
     }
 };
 
@@ -53,12 +53,12 @@ TEST_F(OtelMetricsHttpExportHeadersTest, HttpExportHeadersSetFromBson) {
 
 TEST_F(OtelMetricsHttpExportHeadersTest, HttpExportHeadersSetFromString) {
     // Verify setFromString behavior
-    ASSERT_OK(headers.setFromString("{\"Authorization\": \"Bearer tok\"}", boost::none));
+    ASSERT_OK(headers.setFromString("{\"Authorization\": \"Bearer tok\"}"));
     EXPECT_THAT(getMetricsHttpExportHeaders(), SizeIs(1));
     EXPECT_THAT(getMetricsHttpExportHeaders(),
                 ElementsAre(Pair("Authorization", ElementsAre("Bearer tok"))));
 
-    EXPECT_THAT(headers.setFromString("{\"BadBson\":", boost::none),
+    EXPECT_THAT(headers.setFromString("{\"BadBson\":"),
                 StatusIs(ErrorCodes::BadValue, HasSubstr("convert string to BSON")));
 }
 

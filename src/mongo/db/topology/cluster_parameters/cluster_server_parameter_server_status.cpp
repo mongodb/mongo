@@ -19,7 +19,7 @@ bool isParameterSet(OperationContext* opCtx, ServerParameter* param) {
     if (!param->isEnabled(VersionContext::getDecoration(opCtx))) {
         return false;
     }
-    if (param->getClusterParameterTime(boost::none) == LogicalTime::kUninitialized) {
+    if (param->getClusterParameterTime() == LogicalTime::kUninitialized) {
         return false;
     }
     return true;
@@ -51,7 +51,7 @@ BSONObj ClusterServerParameterServerStatus::_getParametersToReport(OperationCont
             continue;
         }
         BSONObjBuilder elementBuilder(mapBuilder.subobjStart(name));
-        param->append(opCtx, &elementBuilder, name, boost::none);
+        param->append(opCtx, &elementBuilder, name);
     }
     return mapBuilder.obj();
 }

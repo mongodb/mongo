@@ -383,8 +383,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
             ->get<ClusterParameterWithStorage<InternalQueryCutoffForSampleFromRandomCursorStorage>>(
                 "internalQueryCutoffForSampleFromRandomCursor");
 
-    auto maxSampleRatioClusterParameter =
-        randomCursorSampleRatioParam->getValue(expCtx->getNamespaceString().tenantId());
+    auto maxSampleRatioClusterParameter = randomCursorSampleRatioParam->getValue();
 
     const double kMaxSampleRatioForRandCursor = maxSampleRatioClusterParameter.getSampleCutoff();
 

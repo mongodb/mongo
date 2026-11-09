@@ -13,7 +13,6 @@
 #include "mongo/client/hedging_mode_gen.h"
 #include "mongo/client/read_preference_gen.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
@@ -32,7 +31,7 @@ using ReadPreference = ReadPreferenceEnum;
 /**
  * Validate a ReadPreference string. This is intended for use as an IDL validator callback.
  */
-Status validateReadPreferenceMode(const std::string& prefStr, const boost::optional<TenantId>&);
+Status validateReadPreferenceMode(const std::string& prefStr);
 
 /**
  * A simple object for representing the list of tags requested by a $readPreference.

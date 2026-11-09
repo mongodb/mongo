@@ -25,7 +25,7 @@ StatusWith<HostAndPort> HostAndPort::parse(std::string_view text) {
     return StatusWith<HostAndPort>(result);
 }
 
-Status validateHostAndPort(std::string_view hostAndPortStr, const boost::optional<TenantId>&) {
+Status validateHostAndPort(std::string_view hostAndPortStr) {
     if (hostAndPortStr.empty()) {
         return Status::OK();
     }

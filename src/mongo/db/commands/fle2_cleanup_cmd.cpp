@@ -58,7 +58,6 @@
 #include <variant>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -224,7 +223,7 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
     auto tagsPerDelete =
         ServerParameterSet::getClusterParameterSet()
             ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-            ->getValue(boost::none)
+            ->getValue()
             .getMaxESCEntriesPerCompactionDelete();
 
     bool createEcoc = false;
@@ -261,7 +260,7 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
             auto memoryLimit =
                 ServerParameterSet::getClusterParameterSet()
                     ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-                    ->getValue(boost::none)
+                    ->getValue()
                     .getMaxCompactionSize();
             escDeleteSet =
                 readRandomESCNonAnchorIds(opCtx, namespaces.escNss, memoryLimit, &stats.getEsc());
@@ -303,7 +302,7 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
         auto pqMemLimit =
             ServerParameterSet::getClusterParameterSet()
                 ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-                ->getValue(boost::none)
+                ->getValue()
                 .getMaxAnchorCompactionSize();
 
         // Clean up entries for each encrypted field in compactionTokens

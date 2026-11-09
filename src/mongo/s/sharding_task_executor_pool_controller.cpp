@@ -20,7 +20,6 @@
 #include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
 #include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kConnectionPool
 
@@ -49,8 +48,7 @@ bool isConfigServer(const ShardRegistry* sr, const HostAndPort& peer) {
 
 }  // namespace
 
-Status ShardingTaskExecutorPoolController::validateHostTimeout(const int& hostTimeoutMS,
-                                                               const boost::optional<TenantId>&) {
+Status ShardingTaskExecutorPoolController::validateHostTimeout(const int& hostTimeoutMS) {
     auto toRefreshTimeoutMS = gParameters.toRefreshTimeoutMS.load();
     auto pendingTimeoutMS = gParameters.pendingTimeoutMS.load();
     if (hostTimeoutMS >= (toRefreshTimeoutMS + pendingTimeoutMS)) {
@@ -64,8 +62,7 @@ Status ShardingTaskExecutorPoolController::validateHostTimeout(const int& hostTi
     return Status(ErrorCodes::BadValue, msg);
 }
 
-Status ShardingTaskExecutorPoolController::validatePendingTimeout(
-    const int& pendingTimeoutMS, const boost::optional<TenantId>&) {
+Status ShardingTaskExecutorPoolController::validatePendingTimeout(const int& pendingTimeoutMS) {
     auto toRefreshTimeoutMS = gParameters.toRefreshTimeoutMS.load();
     if (pendingTimeoutMS < toRefreshTimeoutMS) {
         return Status::OK();

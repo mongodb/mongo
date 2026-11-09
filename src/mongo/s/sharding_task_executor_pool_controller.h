@@ -5,7 +5,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/replica_set_change_notifier.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/unordered_map.h"
@@ -120,13 +119,12 @@ public:
      * Validate that hostTimeoutMS is greater than the sum of pendingTimeoutMS and
      * toRefreshTimeoutMS
      */
-    static Status validateHostTimeout(const int& hostTimeoutMS, const boost::optional<TenantId>&);
+    static Status validateHostTimeout(const int& hostTimeoutMS);
 
     /**
      * Validate that pendingTimeoutMS is less than toRefreshTimeoutMS
      */
-    static Status validatePendingTimeout(const int& pendingTimeoutMS,
-                                         const boost::optional<TenantId>&);
+    static Status validatePendingTimeout(const int& pendingTimeoutMS);
 
     /**
      *  Matches the matching strategy string against a set of literals

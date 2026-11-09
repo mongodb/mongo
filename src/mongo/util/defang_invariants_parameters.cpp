@@ -70,14 +70,12 @@ Status setDefangedInvariants(const BSONObj& obj) {
 
 void DefangedInvariantsServerParameter::append(OperationContext*,
                                                BSONObjBuilder* b,
-                                               std::string_view name,
-                                               const boost::optional<TenantId>&) {
+                                               std::string_view name) {
     auto _ = std::shared_lock{defangedInvariantsMutex};
     b->append(name, defangedInvariantsAllVersions);
 }
 
-Status DefangedInvariantsServerParameter::set(const BSONElement& newValueElement,
-                                              const boost::optional<TenantId>&) {
+Status DefangedInvariantsServerParameter::set(const BSONElement& newValueElement) {
     if (!newValueElement.isABSONObj()) {
         return Status(
             ErrorCodes::TypeMismatch,
@@ -89,8 +87,7 @@ Status DefangedInvariantsServerParameter::set(const BSONElement& newValueElement
     return setDefangedInvariants(newValueElement.Obj());
 }
 
-Status DefangedInvariantsServerParameter::setFromString(std::string_view str,
-                                                        const boost::optional<TenantId>&) try {
+Status DefangedInvariantsServerParameter::setFromString(std::string_view str) try {
     return setDefangedInvariants(fromjson(str));
 } catch (const DBException& ex) {
     return ex.toStatus();

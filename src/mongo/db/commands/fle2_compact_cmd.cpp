@@ -58,7 +58,6 @@
 #include <variant>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -190,7 +189,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
             auto memoryLimit =
                 ServerParameterSet::getClusterParameterSet()
                     ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-                    ->getValue(boost::none)
+                    ->getValue()
                     .getMaxCompactionSize();
 
             escDeleteSet =
@@ -281,7 +280,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     auto tagsPerDelete =
         ServerParameterSet::getClusterParameterSet()
             ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-            ->getValue(boost::none)
+            ->getValue()
             .getMaxESCEntriesPerCompactionDelete();
     cleanupESCNonAnchors(opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, &stats.getEsc());
 

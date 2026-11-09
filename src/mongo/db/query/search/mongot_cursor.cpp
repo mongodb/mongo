@@ -97,7 +97,7 @@ long long computeInitialBatchSize(const boost::intrusive_ptr<ExpressionContext>&
         oversubscriptionFactor =
             ServerParameterSet::getClusterParameterSet()
                 ->get<ClusterParameterWithStorage<InternalSearchOptions>>("internalSearchOptions")
-                ->getValue(expCtx->getNamespaceString().tenantId())
+                ->getValue()
                 .getOversubscriptionFactor();
     }
 
@@ -216,7 +216,6 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
         batchSize,
         bounds.value_or(
             DocsNeededBounds(docs_needed_bounds::Unknown(), docs_needed_bounds::Unknown())),
-        expCtx->getNamespaceString().tenantId(),
         searchIdLookupMetrics);
 
     // If it turns out that this stage is not running on a sharded collection, we don't want

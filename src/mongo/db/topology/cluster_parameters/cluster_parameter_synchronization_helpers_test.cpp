@@ -27,13 +27,13 @@ class ClusterServerParameterSynchronizationHelpersTest : public ClusterServerPar
 TEST_F(ClusterServerParameterSynchronizationHelpersTest, ValidateGoodClusterParameter) {
     BSONObj clusterParamDoc = BSON("_id" << kCSPTest);
 
-    ASSERT_DOES_NOT_THROW(cluster_parameters::validateParameter(clusterParamDoc, boost::none));
+    ASSERT_DOES_NOT_THROW(cluster_parameters::validateParameter(clusterParamDoc));
 }
 
 TEST_F(ClusterServerParameterSynchronizationHelpersTest, ValidateBadClusterParameterNameType) {
     BSONObj clusterParamDoc = BSON("_id" << 12345);
 
-    ASSERT_THROWS_CODE(cluster_parameters::validateParameter(clusterParamDoc, boost::none),
+    ASSERT_THROWS_CODE(cluster_parameters::validateParameter(clusterParamDoc),
                        DBException,
                        ErrorCodes::OperationFailed);
 }
@@ -41,7 +41,7 @@ TEST_F(ClusterServerParameterSynchronizationHelpersTest, ValidateBadClusterParam
 TEST_F(ClusterServerParameterSynchronizationHelpersTest, ValidateUnknownClusterParameterName) {
     BSONObj clusterParamDoc = BSON("_id" << "testUnknown");
 
-    ASSERT_THROWS_CODE(cluster_parameters::validateParameter(clusterParamDoc, boost::none),
+    ASSERT_THROWS_CODE(cluster_parameters::validateParameter(clusterParamDoc),
                        DBException,
                        ErrorCodes::OperationFailed);
 }

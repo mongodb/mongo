@@ -47,7 +47,7 @@ TagSet defaultTagSetForMode(ReadPreference mode) {
 
 const BSONArray TagSet::kMatchAny = BSON_ARRAY(BSONObj());
 
-Status validateReadPreferenceMode(const std::string& prefStr, const boost::optional<TenantId>&) {
+Status validateReadPreferenceMode(const std::string& prefStr) {
     try {
         idl::deserialize<ReadPreferenceEnum>(prefStr, IDLParserContext(kModeFieldName));
     } catch (DBException& e) {

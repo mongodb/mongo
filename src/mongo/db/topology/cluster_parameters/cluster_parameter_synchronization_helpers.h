@@ -16,8 +16,7 @@
 namespace mongo {
 namespace cluster_parameters {
 
-[[MONGO_MOD_PRIVATE]] void validateParameter(BSONObj doc,
-                                             const boost::optional<TenantId>& tenantId);
+[[MONGO_MOD_PRIVATE]] void validateParameter(BSONObj doc);
 
 [[MONGO_MOD_PRIVATE]] void updateParameter(OperationContext* opCtx,
                                            BSONObj doc,

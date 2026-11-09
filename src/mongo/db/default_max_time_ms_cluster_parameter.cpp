@@ -39,20 +39,10 @@ std::pair<boost::optional<Milliseconds>, bool> getRequestOrDefaultMaxTimeMS(
     auto* defaultMaxTimeMSParam =
         clusterParameters->get<ClusterParameterWithStorage<DefaultMaxTimeMSParam>>(
             "defaultMaxTimeMS");
-    // Uses the tenant specific default value if one was set.
-    if (tenantId) {
-        auto tenantDefaultReadMaxTimeMS =
-            defaultMaxTimeMSParam->getValue(tenantId).getReadOperations();
-        if (tenantDefaultReadMaxTimeMS) {
-            return {Milliseconds{tenantDefaultReadMaxTimeMS}, true};
-        }
-    }
-
-    // Uses the global default maxTimeMS for read operations.
-    auto globalDefaultReadMaxTimeMS =
-        defaultMaxTimeMSParam->getValue(boost::none).getReadOperations();
-    if (globalDefaultReadMaxTimeMS) {
-        return {Milliseconds{globalDefaultReadMaxTimeMS}, true};
+    // Uses the default maxTimeMS for read operations.
+    auto defaultReadMaxTimeMS = defaultMaxTimeMSParam->getValue().getReadOperations();
+    if (defaultReadMaxTimeMS) {
+        return {Milliseconds{defaultReadMaxTimeMS}, true};
     }
 
     return {boost::none, false};

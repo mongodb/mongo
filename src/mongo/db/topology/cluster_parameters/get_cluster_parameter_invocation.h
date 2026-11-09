@@ -32,12 +32,11 @@ public:
 
 private:
     // Parses the command body and retrieves the BSON representation and names of the requested
-    // cluster parameters for the given tenant.
+    // cluster parameters.
     std::pair<std::vector<std::string>, std::vector<BSONObj>> retrieveRequestedParameters(
         OperationContext* opCtx,
         const CmdBody& cmdBody,
         bool shouldOmitInFTDC,
-        const boost::optional<TenantId>& tenantId,
         bool excludeClusterParameterTime);
 };
 

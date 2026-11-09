@@ -8,7 +8,6 @@
 #include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -18,8 +17,6 @@
 #include <cstdint>
 #include <mutex>
 
-#include <boost/optional/optional.hpp>
-
 namespace mongo {
 namespace admission {
 namespace execution_control {
@@ -28,12 +25,9 @@ namespace [[MONGO_MOD_PUBLIC]] throughput_probing {
 class [[MONGO_MOD_PRIVATE]] ThroughputProbingTest;
 class [[MONGO_MOD_PRIVATE]] InitStateWarningTest;
 
-[[MONGO_MOD_PRIVATE]] Status validateInitialConcurrency(int32_t concurrency,
-                                                        const boost::optional<TenantId>&);
-[[MONGO_MOD_PRIVATE]] Status validateMinConcurrency(int32_t concurrency,
-                                                    const boost::optional<TenantId>&);
-[[MONGO_MOD_PRIVATE]] Status validateMaxConcurrency(int32_t concurrency,
-                                                    const boost::optional<TenantId>&);
+[[MONGO_MOD_PRIVATE]] Status validateInitialConcurrency(int32_t concurrency);
+[[MONGO_MOD_PRIVATE]] Status validateMinConcurrency(int32_t concurrency);
+[[MONGO_MOD_PRIVATE]] Status validateMaxConcurrency(int32_t concurrency);
 
 /**
  * on_update callback for the throughputProbingConcurrencyAdjustmentIntervalMillis parameter.

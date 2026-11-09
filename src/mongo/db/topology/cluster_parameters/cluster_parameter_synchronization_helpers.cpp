@@ -33,7 +33,7 @@ constexpr auto kOplog = "oplog"sv;
 void clearParameter(OperationContext* opCtx,
                     ServerParameter* sp,
                     const boost::optional<TenantId>& tenantId) {
-    if (sp->getClusterParameterTime(tenantId) == LogicalTime::kUninitialized) {
+    if (sp->getClusterParameterTime() == LogicalTime::kUninitialized) {
         // Nothing to clear.
         return;
     }
@@ -45,12 +45,12 @@ void clearParameter(OperationContext* opCtx,
     UninterruptibleLockGuard ulg(opCtx);  // NOLINT (ResourceMutex acquisition)
 
     BSONObjBuilder oldValueBob;
-    sp->append(opCtx, &oldValueBob, sp->name(), tenantId);
+    sp->append(opCtx, &oldValueBob, sp->name());
 
-    uassertStatusOK(sp->reset(tenantId));
+    uassertStatusOK(sp->reset());
 
     BSONObjBuilder newValueBob;
-    sp->append(opCtx, &newValueBob, sp->name(), tenantId);
+    sp->append(opCtx, &newValueBob, sp->name());
 
     audit::logUpdateCachedClusterParameter(
         opCtx->getClient(), oldValueBob.obj(), newValueBob.obj(), tenantId);
@@ -78,7 +78,7 @@ void doLoadAllTenantParametersFromCollection(
     for (auto doc = cursor->next(); doc; doc = cursor->next()) {
         try {
             auto data = doc.get().data.toBson();
-            validateParameter(data, coll.ns().tenantId());
+            validateParameter(data);
             onEntry(opCtx, data, mode, coll.ns().tenantId());
         } catch (const DBException& ex) {
             failures.push_back(ex.toStatus());
@@ -100,7 +100,7 @@ void doLoadAllTenantParametersFromCollection(
 
 }  // namespace
 
-void validateParameter(BSONObj doc, const boost::optional<TenantId>& tenantId) {
+void validateParameter(BSONObj doc) {
     auto nameElem = doc[kIdField];
     uassert(ErrorCodes::OperationFailed,
             "Validate with invalid parameter name",
@@ -108,7 +108,7 @@ void validateParameter(BSONObj doc, const boost::optional<TenantId>& tenantId) {
     auto name = nameElem.valueStringData();
     auto* sp = ServerParameterSet::getClusterParameterSet()->getIfExists(name);
     uassert(ErrorCodes::OperationFailed, "Validate on unknown cluster parameter", sp);
-    uassertStatusOK(sp->validate(doc, tenantId));
+    uassertStatusOK(sp->validate(doc));
 }
 
 void updateParameter(OperationContext* opCtx,
@@ -150,7 +150,7 @@ void updateParameter(OperationContext* opCtx,
         return;
     }
 
-    uassertStatusOK(sp->validate(doc, tenantId));
+    uassertStatusOK(sp->validate(doc));
 
     // Callback handlers of the ServerParameters take operation context and are allowed to acquire
     // Shared and ExclusiveLock (ResourceMutex). These mutex acquisitions are not allowed to throw
@@ -159,10 +159,10 @@ void updateParameter(OperationContext* opCtx,
     UninterruptibleLockGuard ulg(opCtx);  // NOLINT (ResourceMutex acquisition)
 
     BSONObjBuilder oldValueBob;
-    sp->append(opCtx, &oldValueBob, std::string{name}, tenantId);
+    sp->append(opCtx, &oldValueBob, std::string{name});
     audit::logUpdateCachedClusterParameter(opCtx->getClient(), oldValueBob.obj(), doc, tenantId);
 
-    uassertStatusOK(sp->set(doc, tenantId));
+    uassertStatusOK(sp->set(doc));
 }
 
 void clearParameter(OperationContext* opCtx,

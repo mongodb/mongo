@@ -507,7 +507,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture,
 BSONObj appendFcvParameter(OperationContext* opCtx) {
     auto* sp = ServerParameterSet::getNodeParameterSet()->get(multiversion::kParameterName);
     BSONObjBuilder b;
-    sp->append(opCtx, &b, sp->name(), boost::none);
+    sp->append(opCtx, &b, sp->name());
     return b.obj().getObjectField(sp->name()).getOwned();
 }
 

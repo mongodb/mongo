@@ -4,14 +4,12 @@
 #pragma once
 
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
 #include <string_view>
 
-#include <boost/optional.hpp>
 #include <fmt/format.h>
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
@@ -24,7 +22,7 @@ class StatusWith;
  * Validate that a string is either empty or is parseable to a HostAndPort. This is intended for use
  * as an IDL validator callback.
  */
-Status validateHostAndPort(std::string_view hostAndPortStr, const boost::optional<TenantId>&);
+Status validateHostAndPort(std::string_view hostAndPortStr);
 
 /**
  * Name of a process on the network.

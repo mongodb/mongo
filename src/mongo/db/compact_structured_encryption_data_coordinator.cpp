@@ -41,7 +41,6 @@
 #include <variant>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 
@@ -174,7 +173,7 @@ bool doRenameOperation(OperationContext* opCtx,
             auto memoryLimit =
                 ServerParameterSet::getClusterParameterSet()
                     ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-                    ->getValue(boost::none)
+                    ->getValue()
                     .getMaxCompactionSize();
 
             *escDeleteSet =
@@ -261,7 +260,7 @@ void doCompactOperation(OperationContext* opCtx,
     auto tagsPerDelete =
         ServerParameterSet::getClusterParameterSet()
             ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-            ->getValue(boost::none)
+            ->getValue()
             .getMaxESCEntriesPerCompactionDelete();
 
     cleanupESCNonAnchors(opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, escStats);

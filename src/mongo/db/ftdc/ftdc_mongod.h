@@ -5,14 +5,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
-
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -30,7 +26,6 @@ namespace mongo {
 /**
  * Validation callback for setParameter
  */
-[[MONGO_MOD_PUBLIC]] Status validateCollectionStatsNamespaces(
-    std::vector<std::string> value, const boost::optional<TenantId>& tenantId);
+[[MONGO_MOD_PUBLIC]] Status validateCollectionStatsNamespaces(std::vector<std::string> value);
 
 }  // namespace mongo

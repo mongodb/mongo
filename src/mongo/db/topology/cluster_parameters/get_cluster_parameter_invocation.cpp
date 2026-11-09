@@ -29,12 +29,10 @@ namespace mongo {
 using namespace std::literals::string_view_literals;
 
 std::pair<std::vector<std::string>, std::vector<BSONObj>>
-GetClusterParameterInvocation::retrieveRequestedParameters(
-    OperationContext* opCtx,
-    const CmdBody& cmdBody,
-    bool shouldOmitInFTDC,
-    const boost::optional<TenantId>& tenantId,
-    bool excludeClusterParameterTime) {
+GetClusterParameterInvocation::retrieveRequestedParameters(OperationContext* opCtx,
+                                                           const CmdBody& cmdBody,
+                                                           bool shouldOmitInFTDC,
+                                                           bool excludeClusterParameterTime) {
     ServerParameterSet* clusterParameters = ServerParameterSet::getClusterParameterSet();
     std::vector<std::string> parameterNames;
     std::vector<BSONObj> parameterValues;
@@ -74,7 +72,7 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
         }
 
         BSONObjBuilder bob;
-        requestedParameter->append(opCtx, &bob, requestedParameter->name(), tenantId);
+        requestedParameter->append(opCtx, &bob, requestedParameter->name());
         auto paramObj = bob.obj().getOwned();
         if (excludeClusterParameterTime) {
             parameterValues.push_back(
@@ -126,8 +124,8 @@ GetClusterParameterInvocation::Reply GetClusterParameterInvocation::getCachedPar
     bool isStandalone = repl && !repl->getSettings().isReplSet() &&
         serverGlobalParams.clusterRole.has(ClusterRole::None);
 
-    auto [parameterNames, parameterValues] = retrieveRequestedParameters(
-        opCtx, cmdBody, shouldOmitInFTDC, request.getDbName().tenantId(), isStandalone);
+    auto [parameterNames, parameterValues] =
+        retrieveRequestedParameters(opCtx, cmdBody, shouldOmitInFTDC, isStandalone);
 
     LOGV2_DEBUG(6226100,
                 2,

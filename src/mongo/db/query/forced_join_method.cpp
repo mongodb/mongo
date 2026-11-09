@@ -6,24 +6,18 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_join_optimization_knobs_gen.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <string_view>
 
-#include <boost/optional/optional.hpp>
-
 namespace mongo {
 
-void ForcedJoinMethod::append(OperationContext*,
-                              BSONObjBuilder* b,
-                              std::string_view name,
-                              const boost::optional<TenantId>&) {
+void ForcedJoinMethod::append(OperationContext*, BSONObjBuilder* b, std::string_view name) {
     *b << name << idl::serialize(_data.get());
 }
 
-Status ForcedJoinMethod::setFromString(std::string_view value, const boost::optional<TenantId>&) {
+Status ForcedJoinMethod::setFromString(std::string_view value) {
     _data = idl::deserialize<ForcedJoinMethodEnum>(value, IDLParserContext("ForcedJoinMethod"));
     return Status::OK();
 }

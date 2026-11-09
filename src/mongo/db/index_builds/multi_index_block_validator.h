@@ -5,14 +5,11 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
 #include <cmath>
-
-#include <boost/optional/optional.hpp>
 
 
 namespace mongo {
@@ -22,8 +19,7 @@ constexpr const double kMinIndexBuildMemSizeLimitBytes = kMinIndexBuildMemSizeLi
 constexpr const double kMaxIndexBuildMemSizeLimitPercent = 0.8;
 
 
-inline Status validateMaxIndexBuildMemoryUsageMegabytesSetting(const double& limit,
-                                                               const boost::optional<TenantId>&) {
+inline Status validateMaxIndexBuildMemoryUsageMegabytesSetting(const double& limit) {
     if (std::isnan(limit)) {
         return Status(ErrorCodes::BadValue,
                       str::stream()

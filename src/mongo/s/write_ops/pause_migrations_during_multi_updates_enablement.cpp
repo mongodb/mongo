@@ -20,7 +20,7 @@ bool readPauseMigrationsEnablement() {
     auto* clusterPauseMigrationsParam = clusterParameters->get<ClusterParameterWithStorage<
         migration_blocking_operation::PauseMigrationsDuringMultiUpdatesParam>>(
         "pauseMigrationsDuringMultiUpdates");
-    auto clusterParameterEnabled = clusterPauseMigrationsParam->getValue(boost::none).getEnabled();
+    auto clusterParameterEnabled = clusterPauseMigrationsParam->getValue().getEnabled();
 
     returnRandomPauseMigrationsDuringMultiUpdatesParameter.execute([&](const auto& data) {
         std::mt19937 gen(time(nullptr));

@@ -21,7 +21,6 @@
 #include "mongo/db/repl/hello/topology_version_observer.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_controllers.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -546,21 +545,18 @@ Status setMirrorReadsParameter(const BSONObj& param) try {
 
 void MirroredReadsServerParameter::append(OperationContext*,
                                           BSONObjBuilder* bob,
-                                          std::string_view name,
-                                          const boost::optional<TenantId>&) {
+                                          std::string_view name) {
     auto subBob = BSONObjBuilder(bob->subobjStart(name));
     _data->serialize(&subBob);
 }
 
-Status MirroredReadsServerParameter::set(const BSONElement& value,
-                                         const boost::optional<TenantId>&) try {
+Status MirroredReadsServerParameter::set(const BSONElement& value) try {
     return setMirrorReadsParameter(value.Obj());
 } catch (const AssertionException& e) {
     return e.toStatus();
 }
 
-Status MirroredReadsServerParameter::setFromString(std::string_view str,
-                                                   const boost::optional<TenantId>&) try {
+Status MirroredReadsServerParameter::setFromString(std::string_view str) try {
     return setMirrorReadsParameter(fromjson(str));
 } catch (const AssertionException& e) {
     return e.toStatus();
