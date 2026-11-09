@@ -235,6 +235,15 @@ public:
     // Emitted when showErrorsAsEvents:true and a recoverable per-document error occurs.
     static constexpr std::string_view kErrorOpType{"error"};
 
+    // Field names of the top-level operationType:"error" event and its nested 'error' document.
+    static constexpr std::string_view kErrorField{"error"};
+    static constexpr std::string_view kErrorSourceField{"source"};
+    static constexpr std::string_view kErrorCodeField{"code"};
+    static constexpr std::string_view kErrorCodeNameField{"codeName"};
+    static constexpr std::string_view kErrorMessageField{"message"};
+    // Shard that reported the failure; set only on sharded clusters.
+    static constexpr std::string_view kShardIdField{"shardId"};
+
     // Throws QueryFeatureNotAllowed if 'spec' opts into 'showErrorsAsEvents' while the feature
     // flag is disabled at the current FCV. Checked where the user's $changeStream is parsed and
     // again on each shard when it parses the forwarded spec: mongos always runs at the latest FCV,

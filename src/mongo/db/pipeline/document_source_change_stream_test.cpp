@@ -1764,8 +1764,20 @@ TEST_F(ChangeStreamTransformRecordsEventTest, RecordsBuiltEventWhenOptionIsOn) {
 
     const auto& recorded = getExpCtx()->getActiveChangeStreamEvent();
     ASSERT_TRUE(recorded);
-    ASSERT_DOCUMENT_EQ(*recorded, next.getDocument());
-    ASSERT_VALUE_EQ(recorded->metadata().getSortKey(), next.getDocument().metadata().getSortKey());
+    // The recorded state is the event-identity snapshot (not the full document): the fields needed
+    // to rebuild an error event plus the resume-token sort key.
+    const auto& live = next.getDocument();
+    ASSERT_VALUE_EQ(recorded->getField(DSChangeStream::kIdField),
+                    live.getField(DSChangeStream::kIdField));
+    ASSERT_VALUE_EQ(recorded->getField(DSChangeStream::kClusterTimeField),
+                    live.getField(DSChangeStream::kClusterTimeField));
+    ASSERT_VALUE_EQ(recorded->getField(DSChangeStream::kWallTimeField),
+                    live.getField(DSChangeStream::kWallTimeField));
+    ASSERT_VALUE_EQ(recorded->getField(DSChangeStream::kNamespaceField),
+                    live.getField(DSChangeStream::kNamespaceField));
+    ASSERT_VALUE_EQ(recorded->getField(DSChangeStream::kDocumentKeyField),
+                    live.getField(DSChangeStream::kDocumentKeyField));
+    ASSERT_VALUE_EQ(recorded->metadata().getSortKey(), live.metadata().getSortKey());
 }
 
 // The transform records only the change events it produces; a pause-execution result is passed

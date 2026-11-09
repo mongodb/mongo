@@ -3,16 +3,39 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/change_stream_error_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <exception>
+#include <string>
 #include <string_view>
 
+#include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+
+namespace mongo {
+
+// Builds an operationType:"error" change stream event from the exception 'ex' being handled, using
+// the failing change event in flight ('sourceEvent', the recorded identity of the error; its
+// sort-key metadata provides the resume token, which user stages cannot modify). Fails closed with
+// ChangeStreamFatalError if '_id' was modified, and rethrows 'ex' if 'sourceEvent' has no resume
+// token. 'shardId', when set, is recorded under error.shardId.
+Document makeChangeStreamErrorEvent(const DBException& ex,
+                                    ChangeStreamErrorSource source,
+                                    const Document& sourceEvent,
+                                    boost::optional<ShardId> shardId = boost::none);
+
+}  // namespace mongo
 
 namespace mongo::change_stream {
 
@@ -99,6 +122,79 @@ inline bool changeStreamShowsErrorsAsEvents(const boost::intrusive_ptr<Expressio
  */
 void recordActiveEventIdentity(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                const Document& doc);
+
+// Builds an operationType:"error" event for a recoverable failure, using the identity and error
+// source recorded on 'expCtx'. Returns boost::none when the stream is not opted in, no identity is
+// recorded, or the error is not convertible (the caller rethrows). Pure: it does not mutate
+// 'expCtx'; the caller owns clearing the recorded identity/source slots.
+boost::optional<Document> tryBuildErrorEvent(const DBException& ex,
+                                             const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+// Transient infrastructure failures (stale routing, snapshot, write conflict, lock, shard
+// availability, oplog position, cancellation) always propagate, also with showErrorsAsEvents:true:
+// converting one would skip an event that a resume would deliver.
+inline bool isTransientChangeStreamError(ErrorCodes::Error code) {
+    if (ErrorCodes::isA<ErrorCategory::SnapshotError>(code) ||
+        ErrorCodes::isA<ErrorCategory::CancellationError>(code) ||
+        ErrorCodes::isA<ErrorCategory::NotPrimaryError>(code) ||
+        ErrorCodes::isA<ErrorCategory::ShutdownError>(code) ||
+        ErrorCodes::isA<ErrorCategory::StaleShardVersionError>(code))
+        return true;
+    switch (code) {
+        case ErrorCodes::StaleDbVersion:
+        case ErrorCodes::ShardNotFound:
+        case ErrorCodes::MovePrimaryInProgress:
+        case ErrorCodes::ShardCannotRefreshDueToLocksHeld:
+        case ErrorCodes::FailedToSatisfyReadPreference:
+        case ErrorCodes::WriteConflict:
+        case ErrorCodes::TemporarilyUnavailable:
+        case ErrorCodes::LockBusy:
+        case ErrorCodes::CappedPositionLost:
+        case ErrorCodes::OplogQueryMinTsMissing:
+            return true;
+        default:
+            return false;
+    }
+}
+
+// Returns true if a document-scoped failure may be converted into an operationType:"error" event
+// when showErrorsAsEvents:true. False for infrastructure errors that must propagate regardless of
+// the option, and for server-internal errors that must never reach the client as an event.
+inline bool isConvertibleChangeStreamError(ErrorCodes::Error code) {
+    if (ErrorCodes::isA<ErrorCategory::Interruption>(code))
+        return false;
+    if (ErrorCodes::isA<ErrorCategory::RetriableError>(code))
+        return false;
+    if (ErrorCodes::isA<ErrorCategory::NetworkError>(code))
+        return false;
+    if (ErrorCodes::isA<ErrorCategory::NeedRetargettingError>(code))
+        return false;
+    if (ErrorCodes::isA<ErrorCategory::CursorInvalidatedError>(code))
+        return false;
+    if (ErrorCodes::isA<ErrorCategory::ExceededTimeLimitError>(code))
+        return false;
+    if (isTransientChangeStreamError(code))
+        return false;
+    // InternalOnly codes must never be returned to the client, so they must never be embedded in
+    // an error event. SystemOverloadedError is transient infrastructure pressure, not a
+    // document-scoped failure. InternalError is a server bug.
+    if (ErrorCodes::isA<ErrorCategory::InternalOnly>(code))
+        return false;
+    if (ErrorCodes::isA<ErrorCategory::SystemOverloadedError>(code))
+        return false;
+    if (code == ErrorCodes::InternalError)
+        return false;
+    // Within NonResumableChangeStreamError, only these two are truly unrecoverable:
+    if (code == ErrorCodes::ChangeStreamFatalError)
+        return false;
+    if (code == ErrorCodes::ShardRemovedError)
+        return false;
+    // Change stream control flow; never thrown by user stages.
+    if (code == ErrorCodes::RetryChangeStream || code == ErrorCodes::ChangeStreamInvalidated ||
+        code == ErrorCodes::ChangeStreamStartAfterInvalidate)
+        return false;
+    return true;
+}
 
 /**
  * Creates endOfTransaction no-op oplog entry

@@ -1429,5 +1429,16 @@ error_codes:
       categories: [InternalOnly],
       extra: ChangeStreamEndOfTransactionBackfillRequiredInfo,
     }
+
+  # Reported in an operationType:"error" resume-gap event when a showErrorsAsEvents change stream
+  # resumes from a token that is not found in the resumed stream (e.g. it was filtered out by a user
+  # $match). Only reported inside the event; never thrown to the client as a command error.
+  - {code: 539, name: ChangeStreamResumedTokenFilteredOut}
+
+  # Thrown internally by the router change stream resume stage to move an operationType:"error"
+  # event past user stages that could not be pushed to the shards. Caught and turned back into an
+  # event by the router's top-level pipeline; never surfaced to a client.
+  - {code: 540, name: ChangeStreamErrorEventBypass, categories: [InternalOnly]}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
