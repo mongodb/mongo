@@ -451,9 +451,12 @@ TEST_F(EgressPoolRateLimiterResilienceTest, RejectionWithNoEstablishedConnection
         [&](const BSONObj& rl) { return rl["rejected"].numberLong() > baselineRejected; },
         "rejected increased from baseline");
 
+    // Collect results while the failpoint is still active: requests that reach the pool after an
+    // earlier establishment failure would otherwise be served once admission is re-enabled.
+    assertAllRequestsFailed(futures);
+
     hangFP.disable();
     disableRateLimiter();
-    assertAllRequestsFailed(futures);
 }
 
 // ---------------------------------------------------------------------------
@@ -483,9 +486,12 @@ TEST_F(EgressPoolRateLimiterResilienceTest, TimeoutWithNoEstablishedConnection) 
         },
         "interruptedDueToClientDisconnect increased from baseline");
 
+    // Collect results while the failpoint is still active: requests that reach the pool after an
+    // earlier establishment failure would otherwise be served once admission is re-enabled.
+    assertAllRequestsFailed(futures);
+
     hangFP.disable();
     disableRateLimiter();
-    assertAllRequestsFailed(futures);
 }
 
 }  // namespace
