@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
 
 #include <cstddef>
@@ -65,8 +66,13 @@ public:
     /**
      * Creates a sketch holding at most 'k' counters. Values of 'k' below kMinNumCounters
      * are clamped up to it, so the sketch always holds at least kMinNumCounters counters.
+     *
+     * If 'collator' is non-null, strings are compared and hashed under it, so values that are
+     * equal under the collation share one counter. The reported value is then an arbitrary
+     * representative of its equivalence class (the one that arrived when the counter was created
+     * or last reused). 'collator' is not owned and must outlive the sketch.
      */
-    explicit SpaceSavingSketch(size_t k);
+    SpaceSavingSketch(size_t k, const CollatorInterface* collator);
 
     // Copying would corrupt the copy's data structures.
     SpaceSavingSketch(const SpaceSavingSketch&) = delete;
@@ -134,6 +140,7 @@ private:
     void _removeFromBucket(Element* element);
 
     size_t _k;
+    const CollatorInterface* _collator;
     // Both vectors are sized once in the constructor and never reallocate, so the pointers held by
     // the lists and the hash table stay valid.
     std::vector<Element> _counters;
@@ -154,9 +161,12 @@ struct MostCommonValues {
      * Given an array of values (treated as a stream in array order), compute the top-k most
      * frequent values with the Space-Saving algorithm. Values of 'k' below kMinNumCounters are
      * clamped up to it. If k is at least the number of distinct values, all values are returned
-     * with exact counts.
+     * with exact counts. If 'collator' is non-null, values are compared under it (see
+     * SpaceSavingSketch).
      */
-    static MostCommonValues make(const std::vector<SBEValue>& values, size_t k);
+    static MostCommonValues make(const std::vector<SBEValue>& values,
+                                 size_t k,
+                                 const CollatorInterface* collator = nullptr);
 
     /**
      * Returns the sum of the entries' guaranteed lower bounds (estFreq - err).

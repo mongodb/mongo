@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/stats/space_saving.h"
 
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
 #include "mongo/unittest/unittest.h"
 
@@ -62,7 +63,8 @@ size_t trueFreqOf(const std::vector<std::pair<SBEValue, size_t>>& freqs, const S
 TEST(SpaceSavingTest, TopKSmallKnownInput) {
     // 11 distinct values with k = kMinNumCounters forces one eviction. Values 1 and 2 are
     // monitored with counts 2 and 3; when the 11th distinct value arrives, the minimum-count
-    // bucket's tail (value 3) is reused with estimate 2 (evicted count 1 plus 1) and error 1.
+    // bucket's back element (value 3) is reused with estimate 2 (evicted count 1 plus 1) and
+    // error 1.
     std::vector<SBEValue> input = {intValue(1),
                                    intValue(1),
                                    intValue(2),
@@ -112,7 +114,7 @@ TEST(SpaceSavingTest, KGreaterThanDistinctCountReturnsAllValuesExactly) {
 TEST(SpaceSavingTest, PaperExampleEvictionErrorTerm) {
     // Stream: values 1..kMinNumCounters each 3 times, then an 11th value once, with
     // k = kMinNumCounters. All counters reach count 3; when the 11th value arrives, the
-    // minimum-count bucket's tail is the least recently updated counter (value 1), which is
+    // minimum-count bucket's back element is the least recently updated counter (value 1), which is
     // reused with estimate 4 and error 3.
     std::vector<SBEValue> input;
     for (int32_t i = 1; i <= static_cast<int32_t>(kMinNumCounters); ++i) {
@@ -189,7 +191,7 @@ TEST(SpaceSavingTest, SmallKIsClampedToMinimum) {
     for (int32_t i = 0; i < 30; ++i) {
         input.push_back(intValue(i));
     }
-    SpaceSavingSketch sketch(1);
+    SpaceSavingSketch sketch(1, nullptr);
     for (const auto& value : input) {
         sketch.increment(value);
     }
@@ -328,5 +330,63 @@ TEST(SpaceSavingTest, GuaranteedTopKResumesAfterWeakEntry) {
         {MCVEntry{intValue(1), 10, 3}, MCVEntry{intValue(2), 7, 0}, MCVEntry{intValue(3), 6, 0}}};
     ASSERT_EQ(result.getGuaranteedTopK(), 2);
 }
+TEST(SpaceSavingTest, CollatorMergesEquivalentStrings) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    SpaceSavingSketch sketch(kMinNumCounters, &collator);
+    for (const char* s : {"a", "A", "a", "B"}) {
+        sketch.increment(stringValue(s));
+    }
+    const auto top = sketch.getTopK();
+    ASSERT_EQ(top.size(), 2u);
+    ASSERT_EQ(top[0].estFreq, 3u);
+    ASSERT_EQ(top[0].err, 0u);
+    ASSERT_EQ(top[1].estFreq, 1u);
+}
+
+TEST(SpaceSavingTest, WithoutCollatorCaseDiffers) {
+    SpaceSavingSketch sketch(kMinNumCounters, nullptr);
+    for (const char* s : {"a", "A", "a", "B"}) {
+        sketch.increment(stringValue(s));
+    }
+    ASSERT_EQ(sketch.getTopK().size(), 3u);
+}
+
+TEST(SpaceSavingTest, CollatorAlwaysEqualCollapsesToOneCounter) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const auto result = MostCommonValues::make(
+        {stringValue("x"), stringValue("y"), stringValue("z")}, kMinNumCounters, &collator);
+    ASSERT_EQ(result._entries.size(), 1u);
+    ASSERT_EQ(result._entries[0].estFreq, 3u);
+}
+
+TEST(SpaceSavingTest, CollatorEvictionKeepsErrorBound) {
+    // Each of the first kMinNumCounters counters is hit twice (lower and upper case); an extra
+    // distinct string then forces an eviction.
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    SpaceSavingSketch sketch(kMinNumCounters, &collator);
+    for (size_t i = 0; i < kMinNumCounters; ++i) {
+        const std::string lower(1, static_cast<char>('a' + i));
+        const std::string upper(1, static_cast<char>('A' + i));
+        sketch.increment(stringValue(lower.c_str()));
+        sketch.increment(stringValue(upper.c_str()));
+    }
+    sketch.increment(stringValue("zz"));
+    ASSERT_EQ(sketch.numCounters(), kMinNumCounters);
+    const auto top = sketch.getTopK();
+    ASSERT_EQ(top.size(), kMinNumCounters);
+    for (const auto& entry : top) {
+        const auto [tag, val] = entry.value.get();
+        const auto str = sbe::value::getStringView(tag, val);
+        if (str == "zz") {
+            // The newcomer inherits the evicted counter's count of 2, plus its own occurrence.
+            ASSERT_EQ(entry.estFreq, 3u);
+            ASSERT_EQ(entry.err, 2u);
+        } else {
+            ASSERT_EQ(entry.estFreq, 2u);
+            ASSERT_EQ(entry.err, 0u);
+        }
+    }
+}
+
 }  // namespace
 }  // namespace mongo::stats

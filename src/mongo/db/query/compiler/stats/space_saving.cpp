@@ -19,8 +19,10 @@ std::string MCVEntry::toString() const {
     return os.str();
 }
 
-SpaceSavingSketch::SpaceSavingSketch(size_t k)
-    : _k(std::max(k, kMinNumCounters)), _table(0, sbe::value::ValueHash(), sbe::value::ValueEq()) {
+SpaceSavingSketch::SpaceSavingSketch(size_t k, const CollatorInterface* collator)
+    : _k(std::max(k, kMinNumCounters)),
+      _collator(collator),
+      _table(0, sbe::value::ValueHash(collator), sbe::value::ValueEq(collator)) {
     _counters.reserve(_k);
     _table.reserve(_k);
     // At most k non-empty buckets can exist at once, one per counter.
@@ -83,7 +85,9 @@ void SpaceSavingSketch::increment(const SBEValue& value) {
     Element* reusedElement = &minBucket._elements.back();
     const size_t evictedCount = minBucket._count;
     const auto next = std::next(_buckets.begin());
-    // Copy first: it can throw, and nothing must be unlinked yet if it does.
+    // Copy first: the copy can throw, and nothing may be unlinked or overwritten before it
+    // succeeds. The final '_table.insert' below can't throw because '_table.reserve(_k)' in the
+    // constructor guarantees it never needs to allocate.
     SBEValue newValue{value};
     _table.erase(_table.find(reusedElement->_value.get()));
     _removeFromBucket(reusedElement);
@@ -99,18 +103,22 @@ std::vector<MCVEntry> SpaceSavingSketch::getTopK() const {
     for (const auto& counter : _counters) {
         entries.emplace_back(SBEValue{counter._value}, counter._bucket->_count, counter._err);
     }
-    std::sort(entries.begin(), entries.end(), [](const MCVEntry& a, const MCVEntry& b) {
+    const sbe::value::ValueCompare<true> compare(_table.key_eq().getCollator());
+    std::sort(entries.begin(), entries.end(), [compare](const MCVEntry& a, const MCVEntry& b) {
         if (a.estFreq != b.estFreq) {
             return a.estFreq > b.estFreq;
         }
-        return compareValues(
-                   a.value.getTag(), a.value.getValue(), b.value.getTag(), b.value.getValue()) < 0;
+        // Break ties under the sketch's collation so that the order is consistent with the
+        // equivalence the hash table uses.
+        return compare(a.value.get(), b.value.get());
     });
     return entries;
 }
 
-MostCommonValues MostCommonValues::make(const std::vector<SBEValue>& values, size_t k) {
-    SpaceSavingSketch sketch(k);
+MostCommonValues MostCommonValues::make(const std::vector<SBEValue>& values,
+                                        size_t k,
+                                        const CollatorInterface* collator) {
+    SpaceSavingSketch sketch(k, collator);
     for (const auto& value : values) {
         sketch.increment(value);
     }
