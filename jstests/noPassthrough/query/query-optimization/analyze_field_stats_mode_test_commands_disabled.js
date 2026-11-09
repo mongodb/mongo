@@ -1,5 +1,5 @@
 /**
- * Tests that the 'analyze' command's ndv mode works when test commands are disabled, unlike
+ * Tests that the 'analyze' command's fieldStats mode works when test commands are disabled, unlike
  * histograms mode.
  *
  * This needs a mongod started without test commands and so cannot run in suites that inject
@@ -13,7 +13,7 @@
  *   disables_test_commands,
  * ]
  */
-const kFieldStatsCollName = "system.stats.field_stats";
+const kFieldStatsCollName = "system.stats.fieldStats";
 
 // 'TestData.enableTestCommands' stays false until the server has been stopped: stopMongod() runs
 // the collection validation hook before shutting the server down, and that hook decides whether to
@@ -35,7 +35,7 @@ try {
     const coll = db.test_coll;
     assert.commandWorked(coll.insertMany([{a: 1}, {a: 2}]));
 
-    assert.commandWorked(db.runCommand({analyze: coll.getName(), mode: "ndv", key: "a"}));
+    assert.commandWorked(db.runCommand({analyze: coll.getName(), mode: "fieldStats", key: "a"}));
     const docs = db[kFieldStatsCollName].find().toArray();
     assert.eq(docs.length, 1, "expected a stats doc", {docs});
     assert.eq(docs[0].ndv.sketches[0].ndv, NumberLong(2), "unexpected ndv", {docs});

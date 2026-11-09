@@ -10,7 +10,7 @@ imports:
 structs:
     NdvSketch:
         description: >-
-            A single HyperLogLog sketch document persisted in system.stats.field_stats.
+            A single HyperLogLog sketch document persisted in system.stats.fieldStats.
         strict: true
         fields:
             ndv:

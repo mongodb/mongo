@@ -6,7 +6,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/query/compiler/ce/ndv/ndv_hashing.h"
+#include "mongo/db/query/compiler/ce/field_stats/ndv_hashing.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/shared_buffer.h"
 

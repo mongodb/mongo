@@ -380,8 +380,12 @@ runTest(pipeline, true /* expectRejected */);
 
     {
         // Now validate the HLL case.
-        assert.commandWorked(db.runCommand({analyze: coll1.getName(), mode: "ndv", key: "b"}));
-        assert.commandWorked(db.runCommand({analyze: coll1.getName(), mode: "ndv", key: "c"}));
+        assert.commandWorked(
+            db.runCommand({analyze: coll1.getName(), mode: "fieldStats", key: "b"}),
+        );
+        assert.commandWorked(
+            db.runCommand({analyze: coll1.getName(), mode: "fieldStats", key: "c"}),
+        );
         const explain = coll1.explain().aggregate(inljPipeline);
         validateJoinCostComponents(
             explain,

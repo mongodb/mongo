@@ -239,7 +239,7 @@ public:
     using SamplingEstimator::estimateNDV;
 
     /**
-     * Serves the NDV from persisted field statistics (built by analyze mode "ndv") when
+     * Serves the NDV from persisted field statistics (built by analyze mode "fieldStats") when
      * eligible: 'persistentNDVStatsEnabled()' and at most 'kNdvMaxFields' fields. The request's
      * equality semantics select the persisted folding variant; composite requests folding
      * several but not all fields have none and are ineligible. Documents are cached per sorted path

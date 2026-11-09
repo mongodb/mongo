@@ -1,10 +1,10 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/query/compiler/ce/ndv/ndv_sketch_builder.h"
+#include "mongo/db/query/compiler/ce/field_stats/ndv_sketch_builder.h"
 
-#include "mongo/db/query/compiler/ce/ndv/field_stats.h"
-#include "mongo/db/query/compiler/ce/ndv/ndv_hashing.h"
+#include "mongo/db/query/compiler/ce/field_stats/field_stats.h"
+#include "mongo/db/query/compiler/ce/field_stats/ndv_hashing.h"
 #include "mongo/util/assert_util.h"
 
 #include <cmath>

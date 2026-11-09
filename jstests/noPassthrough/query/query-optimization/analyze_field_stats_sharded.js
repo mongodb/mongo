@@ -1,5 +1,5 @@
 /**
- * Tests that the analyze command with mode: "ndv" is rejected on sharded collections.
+ * Tests that the analyze command with mode: "fieldStats" is rejected on sharded collections.
  *
  * @tags: [
  *   featureFlagPersistentStats,
@@ -8,7 +8,7 @@
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-describe("analyze mode: ndv on a sharded cluster", function () {
+describe("analyze mode: fieldStats on a sharded cluster", function () {
     before(function () {
         this.st = new ShardingTest({
             shards: 1,
@@ -35,7 +35,7 @@ describe("analyze mode: ndv on a sharded cluster", function () {
         assert.commandWorked(coll.insert({a: 1}));
 
         assert.commandFailedWithCode(
-            this.db.runCommand({analyze: coll.getName(), mode: "ndv", key: "a"}),
+            this.db.runCommand({analyze: coll.getName(), mode: "fieldStats", key: "a"}),
             13175803,
         );
     });

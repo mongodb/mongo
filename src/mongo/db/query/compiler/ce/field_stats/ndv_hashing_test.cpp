@@ -1,7 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/query/compiler/ce/ndv/ndv_hashing.h"
+#include "mongo/db/query/compiler/ce/field_stats/ndv_hashing.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/values/bson.h"

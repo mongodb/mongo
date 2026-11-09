@@ -1,7 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/query/compiler/ce/ndv/hyperloglog.h"
+#include "mongo/db/query/compiler/ce/field_stats/hyperloglog.h"
 
 #include "mongo/unittest/unittest.h"
 

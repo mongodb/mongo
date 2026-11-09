@@ -4,8 +4,8 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/compiler/ce/ndv/hyperloglog.h"
-#include "mongo/db/query/compiler/ce/ndv/ndv_sketch_gen.h"
+#include "mongo/db/query/compiler/ce/field_stats/hyperloglog.h"
+#include "mongo/db/query/compiler/ce/field_stats/ndv_sketch_gen.h"
 
 #include <cstddef>
 #include <span>

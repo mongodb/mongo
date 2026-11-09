@@ -1,5 +1,5 @@
 /**
- * Tests NDV command behavior specific to the direct collection scan.
+ * Tests the analyze command with mode: "fieldStats" specific to the direct collection scan.
  *
  * @tags: [featureFlagPersistentStats]
  */
@@ -12,7 +12,7 @@ import {
 } from "jstests/libs/parallel_shell_helpers.js";
 import {dropStatsColl} from "jstests/libs/query/persistent_samples_utils.js";
 
-const kFieldStatsCollName = "system.stats.field_stats";
+const kFieldStatsCollName = "system.stats.fieldStats";
 
 function assertAnalyzeAborted(source, {failPoint, whilePaused, expectedCode}) {
     const db = source.getDB();
@@ -24,7 +24,7 @@ function assertAnalyzeAborted(source, {failPoint, whilePaused, expectedCode}) {
             awaitAnalyze = assertCommandFailedWithCodeInParallelShell(
                 conn,
                 db,
-                {analyze: source.getName(), mode: "ndv", key: "a"},
+                {analyze: source.getName(), mode: "fieldStats", key: "a"},
                 expectedCode,
             );
             fp.wait({maxTimeMS: 60 * 1000});
@@ -38,7 +38,7 @@ function assertAnalyzeAborted(source, {failPoint, whilePaused, expectedCode}) {
     assert.eq(db[kFieldStatsCollName].countDocuments({}), 0);
 }
 
-describe("analyze NDV direct scan", function () {
+describe("analyze fieldStats direct scan", function () {
     before(function () {
         this.conn = MongoRunner.runMongod({
             setParameter: {
@@ -65,7 +65,7 @@ describe("analyze NDV direct scan", function () {
     it("includes _id in the values fed to the sketch", function () {
         assert.commandWorked(this.coll.insertMany([{_id: 1}, {_id: 2}]));
         assert.commandWorked(
-            this.db.runCommand({analyze: this.coll.getName(), mode: "ndv", key: "_id"}),
+            this.db.runCommand({analyze: this.coll.getName(), mode: "fieldStats", key: "_id"}),
         );
         assert.eq(this.fieldStats.findOne().ndv.sketches[0].ndv, NumberLong(2));
     });
@@ -74,7 +74,7 @@ describe("analyze NDV direct scan", function () {
         assert.commandFailedWithCode(
             this.db.runCommand({
                 analyze: this.coll.getName(),
-                mode: "ndv",
+                mode: "fieldStats",
                 key: Array(201).fill("a").join("."),
             }),
             ErrorCodes.Overflow,
@@ -85,7 +85,7 @@ describe("analyze NDV direct scan", function () {
     it("restores caller permissions after persisting stats", function () {
         assert.commandWorked(this.coll.insertOne({a: 1}));
         assert.commandWorked(
-            this.db.runCommand({analyze: this.coll.getName(), mode: "ndv", key: "a"}),
+            this.db.runCommand({analyze: this.coll.getName(), mode: "fieldStats", key: "a"}),
         );
         assert.commandFailedWithCode(
             this.db.runCommand({
@@ -112,7 +112,7 @@ describe("analyze NDV direct scan", function () {
 
     it("aborts when the source is recreated after the scan", function () {
         assertAnalyzeAborted(this.coll, {
-            failPoint: "hangBeforePersistingNdvStats",
+            failPoint: "hangBeforePersistingFieldStats",
             whilePaused: () => {
                 assert.commandWorked(this.db.runCommand({drop: this.coll.getName()}));
                 assert.commandWorked(this.db.createCollection(this.coll.getName()));
@@ -127,14 +127,14 @@ describe("analyze NDV direct scan", function () {
             this.coll.insertMany(Array.from({length: numDocs}, (_, i) => ({_id: i + 1, a: 0}))),
         );
 
-        const comment = "analyze NDV yield";
+        const comment = "analyze fieldStats yield";
         const preYield = configureFailPoint(this.conn, "setPreYieldWait", {comment});
 
         // Read some records before pausing, so a released snapshot would mix old and new values.
         const pauseScan = configureFailPoint(this.conn, "setPreYieldWaitDeferred", {}, {skip: 2});
         const awaitAnalyze = assertCommandWorkedInParallelShell(this.conn, this.db, {
             analyze: this.coll.getName(),
-            mode: "ndv",
+            mode: "fieldStats",
             key: "a",
             comment,
         });

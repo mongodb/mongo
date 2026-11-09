@@ -24,8 +24,8 @@ using CardinalityEstimate = mongo::cost_based_ranker::CardinalityEstimate;
 using SamplingMetadata = mongo::cost_based_ranker::SamplingMetadata;
 
 /**
- * One persisted NDV statistic (analyze mode "ndv") that served an estimate: the (sorted) field
- * paths it describes and the statistics document's creation time. Deliberately not part of
+ * One persisted NDV statistic (analyze mode "fieldStats") that served an estimate: the (sorted)
+ * field paths it describes and the statistics document's creation time. Deliberately not part of
  * SamplingMetadata: NDV statistics are field statistics, unrelated to the sample, even though
  * the sampling estimator serves both.
  */
@@ -102,8 +102,8 @@ public:
 
     /**
      * Like estimateNDV(), but only serves the estimate from persisted NDV statistics (analyze mode
-     * "ndv") and never falls back to the sample. Returns boost::none if no persisted statistics
-     * cover the given fields.
+     * "fieldStats") and never falls back to the sample. Returns boost::none if no persisted
+     * statistics cover the given fields.
      */
     virtual boost::optional<CardinalityEstimate> tryEstimateNDVFromPersistentStats(
         const std::vector<FieldPathAndEqSemantics>& fields) const {
@@ -138,16 +138,16 @@ public:
     virtual SamplingMetadata getSamplingMetadata() const = 0;
 
     /**
-     * Returns one entry per persisted NDV statistic (analyze mode "ndv") that served an
+     * Returns one entry per persisted NDV statistic (analyze mode "fieldStats") that served an
      * estimate, sorted by field paths. Kept apart from getSamplingMetadata(): these are field
      * statistics, not derived from the sample, even though this estimator serves both.
      */
     virtual std::vector<PersistedNDVEntry> getPersistedNDVMetadata() const = 0;
 
     /**
-     * Returns the number of distinct persisted NDV statistics (analyze mode "ndv") this estimator
-     * has served so far. Repeated NDV requests for the same field path are memoized and counted
-     * once. Cheaper than getPersistedNDVMetadata() when only the count is needed.
+     * Returns the number of distinct persisted NDV statistics (analyze mode "fieldStats") this
+     * estimator has served so far. Repeated NDV requests for the same field path are memoized and
+     * counted once. Cheaper than getPersistedNDVMetadata() when only the count is needed.
      */
     virtual size_t getNumPersistedNDVStatsUsed() const {
         return 0;

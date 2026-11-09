@@ -680,13 +680,16 @@ TEST_F(NamespaceStringTest, IsRenameCollectionTmpCollection) {
 
 TEST_F(NamespaceStringTest, FieldStatsCollection) {
     const auto fieldStatsNss = NamespaceString::createNamespaceString_forTest(
-        boost::none, "test", "system.stats.field_stats");
+        boost::none, "test", "system.stats.fieldStats");
     ASSERT_TRUE(fieldStatsNss.isFieldStatsCollection());
     ASSERT_TRUE(fieldStatsNss.isSystemStatsCollection());
     ASSERT_TRUE(fieldStatsNss.isLegalClientSystemNS());
 
     // Only the exact name qualifies.
-    for (auto&& coll : {"system.stats.field_stats2", "system.stats.field_stat", "field_stats"}) {
+    for (auto&& coll : {"system.stats.fieldStats2",
+                        "system.stats.fieldStat",
+                        "fieldStats",
+                        "system.stats.field_stats"}) {
         const auto nss = NamespaceString::createNamespaceString_forTest(boost::none, "test", coll);
         ASSERT_FALSE(nss.isFieldStatsCollection()) << coll;
         ASSERT_FALSE(nss.isLegalClientSystemNS()) << coll;

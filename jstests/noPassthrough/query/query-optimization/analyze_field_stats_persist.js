@@ -1,6 +1,6 @@
 /**
- * Tests the analyze command with mode: "ndv": parameter validation and the shape of the
- * field-stats documents it persists into system.stats.field_stats.
+ * Tests the analyze command with mode: "fieldStats": parameter validation and the shape of the
+ * field-stats documents it persists into system.stats.fieldStats.
  *
  * @tags: [
  *   featureFlagPersistentStats,
@@ -11,11 +11,11 @@ import {dropStatsColl} from "jstests/libs/query/persistent_samples_utils.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
-const kFieldStatsCollName = "system.stats.field_stats";
+const kFieldStatsCollName = "system.stats.fieldStats";
 const kExpectedSchemaVersion = 1;
 const kExpectedPrecision = 14;
 
-describe("analyze mode: ndv", function () {
+describe("analyze mode: fieldStats", function () {
     before(function () {
         this.conn = MongoRunner.runMongod({
             setParameter: {
@@ -47,7 +47,7 @@ describe("analyze mode: ndv", function () {
     });
 
     it("requires a key", function () {
-        assert.commandFailedWithCode(this.analyze({mode: "ndv"}), 13175800);
+        assert.commandFailedWithCode(this.analyze({mode: "fieldStats"}), 13175800);
     });
 
     it("rejects sampling and histogram parameters", function () {
@@ -59,7 +59,7 @@ describe("analyze mode: ndv", function () {
             {numChunks: 5},
         ]) {
             assert.commandFailedWithCode(
-                this.analyze(Object.assign({mode: "ndv", key: "a"}, params)),
+                this.analyze(Object.assign({mode: "fieldStats", key: "a"}, params)),
                 13175801,
                 `expected rejection of ${tojson(params)}`,
             );
@@ -67,16 +67,16 @@ describe("analyze mode: ndv", function () {
     });
 
     it("rejects invalid key paths", function () {
-        assert.commandFailedWithCode(this.analyze({mode: "ndv", key: ""}), 6799703);
-        assert.commandFailedWithCode(this.analyze({mode: "ndv", key: "a.0.b"}), 6799704);
-        assert.commandFailed(this.analyze({mode: "ndv", key: "$a"}));
+        assert.commandFailedWithCode(this.analyze({mode: "fieldStats", key: ""}), 6799703);
+        assert.commandFailedWithCode(this.analyze({mode: "fieldStats", key: "a.0.b"}), 6799704);
+        assert.commandFailed(this.analyze({mode: "fieldStats", key: "$a"}));
     });
 
     it("rejects timeseries collections and views", function () {
         const tsColl = jsTestName() + "_ts";
         assert.commandWorked(this.db.createCollection(tsColl, {timeseries: {timeField: "t"}}));
         assert.commandFailedWithCode(
-            this.db.runCommand({analyze: tsColl, mode: "ndv", key: "a"}),
+            this.db.runCommand({analyze: tsColl, mode: "fieldStats", key: "a"}),
             areViewlessTimeseriesEnabled(this.db)
                 ? ErrorCodes.CommandNotSupported
                 : ErrorCodes.CommandNotSupportedOnView,
@@ -86,7 +86,7 @@ describe("analyze mode: ndv", function () {
         const view = jsTestName() + "_view";
         assert.commandWorked(this.db.createView(view, this.coll.getName(), []));
         assert.commandFailedWithCode(
-            this.db.runCommand({analyze: view, mode: "ndv", key: "a"}),
+            this.db.runCommand({analyze: view, mode: "fieldStats", key: "a"}),
             ErrorCodes.CommandNotSupportedOnView,
         );
         this.db[view].drop();
@@ -98,7 +98,9 @@ describe("analyze mode: ndv", function () {
             this.db.createCollection(cappedName, {capped: true, size: 1024 * 1024}),
         );
         assert.commandWorked(this.db[cappedName].insert([{a: 1}, {a: 2}]));
-        assert.commandWorked(this.db.runCommand({analyze: cappedName, mode: "ndv", key: "a"}));
+        assert.commandWorked(
+            this.db.runCommand({analyze: cappedName, mode: "fieldStats", key: "a"}),
+        );
 
         const docs = this.statsDocs();
         assert.eq(docs.length, 1, "expected a stats doc for the capped collection", {docs});
@@ -107,22 +109,22 @@ describe("analyze mode: ndv", function () {
     });
 
     it("rejects system collections", function () {
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a"}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
         assert.commandFailedWithCode(
-            this.db.runCommand({analyze: kFieldStatsCollName, mode: "ndv", key: "a"}),
+            this.db.runCommand({analyze: kFieldStatsCollName, mode: "fieldStats", key: "a"}),
             13175804,
         );
     });
 
     it("fails on a nonexistent collection", function () {
         assert.commandFailedWithCode(
-            this.db.runCommand({analyze: "does_not_exist", mode: "ndv", key: "a"}),
+            this.db.runCommand({analyze: "does_not_exist", mode: "fieldStats", key: "a"}),
             13175802,
         );
     });
 
     it("persists a field-stats document with the expected schema", function () {
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a"}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
 
         const docs = this.statsDocs();
         assert.eq(docs.length, 1, "expected exactly one field-stats doc", {docs});
@@ -150,20 +152,20 @@ describe("analyze mode: ndv", function () {
     });
 
     it("replaces the document when rerun and keys dotted paths separately", function () {
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a"}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
         const firstRun = this.statsDocs();
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a"}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
         assert.eq(this.statsDocs().length, 1, "rerun must replace, not duplicate");
 
         // A new distinct value must be reflected after a rerun, along with a fresh createdAt.
         assert.commandWorked(this.coll.insert({a: 9}));
         sleep(10);
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a"}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
         assert.eq(this.statsDocs()[0].ndv.sketches[0].ndv, NumberLong(5));
         assert.gt(this.statsDocs()[0].createdAt, firstRun[0].createdAt);
 
         // A different key gets its own document. Distinct values of "a.b": 1 and missing.
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a.b"}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a.b"}));
         const docs = this.statsDocs();
         assert.eq(docs.length, 2, "expected one doc per field", {docs});
         const dottedDoc = docs.find((doc) => doc.sortedFieldPaths[0] === "a.b");
@@ -180,7 +182,7 @@ describe("analyze mode: ndv", function () {
         );
 
         // Deliberately unsorted: the command canonicalizes the order.
-        assert.commandWorked(this.analyze({mode: "ndv", key: ["other", "a"]}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: ["other", "a"]}));
 
         const docs = this.statsDocs();
         assert.eq(docs.length, 1, "expected exactly one field-stats doc", {docs});
@@ -211,26 +213,29 @@ describe("analyze mode: ndv", function () {
     });
 
     it("stores one document per tuple regardless of key order", function () {
-        assert.commandWorked(this.analyze({mode: "ndv", key: ["a", "other"]}));
-        assert.commandWorked(this.analyze({mode: "ndv", key: ["other", "a"]}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: ["a", "other"]}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: ["other", "a"]}));
         // The reversed order replaces the same document rather than creating a second one.
         assert.eq(this.statsDocs().length, 1, "expected a single doc per tuple");
     });
 
     it("rejects invalid composite keys", function () {
-        assert.commandFailedWithCode(this.analyze({mode: "ndv", key: []}), 13176201);
+        assert.commandFailedWithCode(this.analyze({mode: "fieldStats", key: []}), 13176201);
         assert.commandFailedWithCode(
-            this.analyze({mode: "ndv", key: ["a", "b", "c", "d"]}),
+            this.analyze({mode: "fieldStats", key: ["a", "b", "c", "d"]}),
             13176201,
         );
-        assert.commandFailedWithCode(this.analyze({mode: "ndv", key: ["a", "a"]}), 13176202);
+        assert.commandFailedWithCode(this.analyze({mode: "fieldStats", key: ["a", "a"]}), 13176202);
         // Overlapping paths describe redundant NDV components.
-        assert.commandFailedWithCode(this.analyze({mode: "ndv", key: ["a", "a.b"]}), 13176203);
+        assert.commandFailedWithCode(
+            this.analyze({mode: "fieldStats", key: ["a", "a.b"]}),
+            13176203,
+        );
         // Per-path validation applies to every tuple element.
-        assert.commandFailedWithCode(this.analyze({mode: "ndv", key: ["a", ""]}), 6799703);
+        assert.commandFailedWithCode(this.analyze({mode: "fieldStats", key: ["a", ""]}), 6799703);
     });
 
-    it("rejects the array key form outside ndv mode", function () {
+    it("rejects the array key form outside fieldStats mode", function () {
         assert.commandFailedWithCode(
             this.analyze({mode: "histograms", key: ["a", "other"]}),
             13176200,
@@ -239,12 +244,12 @@ describe("analyze mode: ndv", function () {
     });
 
     it("keys stats by collection UUID across drop and recreate", function () {
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a"}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
         const oldUuid = this.coll.getUUID();
 
         this.coll.drop();
         assert.commandWorked(this.coll.insert({a: 1}));
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a"}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
 
         // The recreated collection gets its own document; the old-UUID document stays behind
         // as an orphan (cleanup after collection drop is an accepted non-goal for now).
@@ -255,7 +260,7 @@ describe("analyze mode: ndv", function () {
     });
 
     it("keeps the previous stats doc when the collection has been emptied", function () {
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a"}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
         const before = this.statsDocs();
         assert.eq(before.length, 1);
 
@@ -263,13 +268,13 @@ describe("analyze mode: ndv", function () {
         // document stays. Stats invalidation is out of scope for now; the read path clamps
         // served estimates to the current collection cardinality, which covers this case.
         assert.commandWorked(this.coll.deleteMany({}));
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a"}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
         assert.eq(this.statsDocs(), before, "previous stats doc must remain");
     });
 
     it("excludes multikey documents from persisted NDV", function () {
         assert.commandWorked(this.coll.insert({a: [{b: 2}, {b: 3}]}));
-        assert.commandWorked(this.analyze({mode: "ndv", key: "a.b"}));
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a.b"}));
         assert.eq(this.fieldStats.findOne().ndv.sketches[0].ndv, NumberLong(2));
     });
 
@@ -285,7 +290,7 @@ describe("analyze mode: ndv", function () {
     });
 });
 
-describe("analyze mode: ndv gating", function () {
+describe("analyze mode: fieldStats gating", function () {
     it("fails without featureFlagPersistentStats", function () {
         // Explicitly disable to override all-feature-flags test variants.
         const conn = MongoRunner.runMongod({
@@ -298,7 +303,7 @@ describe("analyze mode: ndv gating", function () {
             const db = conn.getDB("test");
             assert.commandWorked(db[jsTestName()].insert({a: 1}));
             assert.commandFailedWithCode(
-                db.runCommand({analyze: jsTestName(), mode: "ndv", key: "a"}),
+                db.runCommand({analyze: jsTestName(), mode: "fieldStats", key: "a"}),
                 ErrorCodes.CommandNotSupported,
             );
         } finally {
@@ -317,7 +322,7 @@ describe("analyze mode: ndv gating", function () {
             const db = conn.getDB("test");
             assert.commandWorked(db[jsTestName()].insert({a: 1}));
             assert.commandFailedWithCode(
-                db.runCommand({analyze: jsTestName(), mode: "ndv", key: "a"}),
+                db.runCommand({analyze: jsTestName(), mode: "fieldStats", key: "a"}),
                 ErrorCodes.CommandNotSupported,
             );
         } finally {
@@ -325,7 +330,7 @@ describe("analyze mode: ndv gating", function () {
         }
     });
 
-    // The ndv-mode-without-test-commands case lives in
-    // analyze_ndv_mode_test_commands_disabled.js: it needs a mongod started without test
+    // The fieldStats-mode-without-test-commands case lives in
+    // analyze_field_stats_mode_test_commands_disabled.js: it needs a mongod started without test
     // commands, which is incompatible with suites that inject failpoint setParameters.
 });

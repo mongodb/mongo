@@ -6,7 +6,7 @@
  * generated from src/mongo/db/query/analyze_command.idl — no opCtx, no catalog, no fixture.
  * Runtime checks that require a real collection acquisition live in
  * jstests/noPassthrough/query/query-optimization/analyze_sample_persist.js and
- * analyze_ndv_persist.js instead.
+ * analyze_field_stats_persist.js instead.
  */
 
 #include "mongo/bson/bsonmisc.h"
@@ -95,23 +95,23 @@ TEST(AnalyzeCommandParseTest, ModeIsRequired) {
                        ErrorCodes::IDLFailedToParse);
 }
 
-TEST(AnalyzeCommandParseTest, NdvModeParses) {
+TEST(AnalyzeCommandParseTest, FieldStatsModeParses) {
     auto cmd = BSON("analyze" << "myColl"
                               << "$db" << "test"
-                              << "mode" << "ndv"
+                              << "mode" << "fieldStats"
                               << "key" << "a.b");
     auto request = AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze"));
-    ASSERT(request.getMode() == AnalyzeModeEnum::kNdv);
+    ASSERT(request.getMode() == AnalyzeModeEnum::kFieldStats);
     ASSERT_EQ(std::get<std::string>(*request.getKey()), "a.b");
 }
 
-TEST(AnalyzeCommandParseTest, NdvModeParsesTupleKey) {
+TEST(AnalyzeCommandParseTest, FieldStatsModeParsesTupleKey) {
     auto cmd = BSON("analyze" << "myColl"
                               << "$db" << "test"
-                              << "mode" << "ndv"
+                              << "mode" << "fieldStats"
                               << "key" << BSON_ARRAY("a.b" << "c"));
     auto request = AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze"));
-    ASSERT(request.getMode() == AnalyzeModeEnum::kNdv);
+    ASSERT(request.getMode() == AnalyzeModeEnum::kFieldStats);
     const auto& paths = std::get<std::vector<std::string>>(*request.getKey());
     ASSERT_EQ(paths, (std::vector<std::string>{"a.b", "c"}));
 }

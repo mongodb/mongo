@@ -24,7 +24,7 @@ function makeColl(db, name, source, {numDocs, ndv = numDocs}) {
     if (source === "unique") {
         assert.commandWorked(coll.createIndex({k: 1}, {unique: true}));
     } else if (source === "hll") {
-        assert.commandWorked(db.runCommand({analyze: name, mode: "ndv", key: "k"}));
+        assert.commandWorked(db.runCommand({analyze: name, mode: "fieldStats", key: "k"}));
     }
     return coll;
 }

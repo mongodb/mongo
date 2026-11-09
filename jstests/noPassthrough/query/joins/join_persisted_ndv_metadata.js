@@ -1,5 +1,5 @@
 /**
- * Verifies that NDV estimates served from persisted statistics (analyze mode "ndv") are surfaced
+ * Verifies that NDV estimates served from persisted statistics (analyze mode "fieldStats") are surfaced
  * in explain output as queryPlanner.fieldStatsMetadata.<ns>.ndv for queries that go through
  * the join optimizer.
  *
@@ -58,10 +58,14 @@ describe("persistedNdv in join explain", function () {
 
     it("surfaces persistedNdv for the namespaces served from persisted statistics", function () {
         assert.commandWorked(
-            this.db.runCommand({analyze: this.orders.getName(), mode: "ndv", key: "productId"}),
+            this.db.runCommand({
+                analyze: this.orders.getName(),
+                mode: "fieldStats",
+                key: "productId",
+            }),
         );
         assert.commandWorked(
-            this.db.runCommand({analyze: this.products.getName(), mode: "ndv", key: "sku"}),
+            this.db.runCommand({analyze: this.products.getName(), mode: "fieldStats", key: "sku"}),
         );
 
         joinTestWrapper(this.db, () => {
@@ -123,7 +127,11 @@ describe("persistedNdv in join explain", function () {
 
         // Deliberately unsorted key order; the persisted statistic is canonically sorted.
         assert.commandWorked(
-            this.db.runCommand({analyze: products.getName(), mode: "ndv", key: ["sku", "region"]}),
+            this.db.runCommand({
+                analyze: products.getName(),
+                mode: "fieldStats",
+                key: ["sku", "region"],
+            }),
         );
 
         // Two equality predicates on one join edge: both are $expr equalities, selecting the
@@ -185,7 +193,11 @@ describe("persistedNdv in join explain", function () {
         assert.commandWorked(orders.createIndex({productId: 1}));
         assert.commandWorked(products.createIndex({sku: 1, region: 1}));
         assert.commandWorked(
-            this.db.runCommand({analyze: products.getName(), mode: "ndv", key: ["sku", "region"]}),
+            this.db.runCommand({
+                analyze: products.getName(),
+                mode: "fieldStats",
+                key: ["sku", "region"],
+            }),
         );
 
         // SERVER-134537: estimating the cost of scanning {sku: 1, region: 1} needs the
@@ -247,7 +259,11 @@ describe("persistedNdv in join explain", function () {
         assert.commandWorked(products.createIndex({dummy: 1, sku: 1, region: 1}));
 
         assert.commandWorked(
-            this.db.runCommand({analyze: products.getName(), mode: "ndv", key: ["sku", "region"]}),
+            this.db.runCommand({
+                analyze: products.getName(),
+                mode: "fieldStats",
+                key: ["sku", "region"],
+            }),
         );
 
         // localField/foreignField contributes a regular-equality predicate on "sku" and the

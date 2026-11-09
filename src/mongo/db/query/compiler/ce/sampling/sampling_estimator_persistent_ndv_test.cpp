@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 /**
- * Tests for serving NDV estimates from persisted field statistics (analyze mode "ndv") in
+ * Tests for serving NDV estimates from persisted field statistics (analyze mode "fieldStats") in
  * SamplingEstimatorImpl::estimateNDV(), including all fallbacks to the sample-based estimate.
  */
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/compiler/ce/ndv/field_stats.h"
-#include "mongo/db/query/compiler/ce/ndv/field_stats_gen.h"
+#include "mongo/db/query/compiler/ce/field_stats/field_stats.h"
+#include "mongo/db/query/compiler/ce/field_stats/field_stats_gen.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"

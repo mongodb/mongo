@@ -56,7 +56,7 @@ mongo_cc_unit_test(
     srcs = [
         "field_stats_test.cpp",
     ],
-    tags = ["mongo_unittest_eighth_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":field_stats",
     ],
@@ -93,7 +93,7 @@ mongo_cc_unit_test(
     srcs = [
         "hyperloglog_test.cpp",
     ],
-    tags = ["mongo_unittest_fifth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":hyperloglog",
     ],
@@ -119,7 +119,7 @@ mongo_cc_unit_test(
     srcs = [
         "ndv_hashing_test.cpp",
     ],
-    tags = ["mongo_unittest_sixth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":ndv_hashing",
     ],
@@ -140,7 +140,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "ndv_sketch_builder_test",
     srcs = ["ndv_sketch_builder_test.cpp"],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [":ndv_sketch_builder"],
 )
 

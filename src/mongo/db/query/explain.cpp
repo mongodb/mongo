@@ -182,7 +182,7 @@ void appendQueryPlannerCommonInfo(PlanExecutor* exec,
         }
     }
 
-    // Field statistics (analyze mode "ndv") that served estimates during planning.
+    // Field statistics (analyze mode "fieldStats") that served estimates during planning.
     if (const auto fieldStatsMeta = explainer.getFieldStatsMetadata(); fieldStatsMeta.has_value()) {
         BSONObjBuilder fieldStatsBob(plannerBob.subobjStart("fieldStatsMetadata"));
         for (const auto& [ns, entries] : fieldStatsMeta.value()) {

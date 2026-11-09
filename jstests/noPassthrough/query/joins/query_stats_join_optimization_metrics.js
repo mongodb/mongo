@@ -356,8 +356,8 @@ assert.eq(orders.aggregate(pipeline).itcount(), 1000);
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryEnablePersistentNDVStats: true}),
     );
-    assert.commandWorked(db.runCommand({analyze: orders.getName(), mode: "ndv", key: "b"}));
-    assert.commandWorked(db.runCommand({analyze: items.getName(), mode: "ndv", key: "b"}));
+    assert.commandWorked(db.runCommand({analyze: orders.getName(), mode: "fieldStats", key: "b"}));
+    assert.commandWorked(db.runCommand({analyze: items.getName(), mode: "fieldStats", key: "b"}));
 
     // Clearing the store also drops the analyze commands' own recorded shapes: their internal
     // pipeline contains an internal-only accumulator whose shape fails re-parsing on $queryStats

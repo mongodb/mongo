@@ -1,12 +1,12 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/query/compiler/ce/ndv/field_stats_loader.h"
+#include "mongo/db/query/compiler/ce/field_stats/field_stats_loader.h"
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
-#include "mongo/db/query/compiler/ce/ndv/field_stats.h"
+#include "mongo/db/query/compiler/ce/field_stats/field_stats.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/str.h"
 

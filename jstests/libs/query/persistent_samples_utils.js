@@ -108,7 +108,7 @@ export function getSamplesColl(db) {
     return db[samplesCollName];
 }
 
-// Drops a stats system collection, e.g. system.stats.samples or system.stats.field_stats.
+// Drops a stats system collection, e.g. system.stats.samples or system.stats.fieldStats.
 // This is needed because system collections are special and need to be whitelisted for dropping
 // individually. Not whitelisting them since we don't expect customers to ever drop stats
 // collections themselves.

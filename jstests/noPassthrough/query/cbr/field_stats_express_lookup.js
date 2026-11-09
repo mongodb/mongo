@@ -26,11 +26,13 @@ describe("field_stats point lookup", function () {
     it("uses the express path", function () {
         const coll = this.db[jsTestName()];
         assert.commandWorked(coll.insert([{a: 1}, {a: 2}]));
-        assert.commandWorked(this.db.runCommand({analyze: coll.getName(), mode: "ndv", key: "a"}));
+        assert.commandWorked(
+            this.db.runCommand({analyze: coll.getName(), mode: "fieldStats", key: "a"}),
+        );
 
         // Look the document up by the _id 'analyze' actually wrote, so that a change to the _id
         // scheme is reflected here rather than pinning a stale shape.
-        const statsColl = this.db["system.stats.field_stats"];
+        const statsColl = this.db["system.stats.fieldStats"];
         const docs = statsColl.find().toArray();
         assert.eq(docs.length, 1, "expected one field-stats doc", {docs});
 

@@ -500,7 +500,7 @@ public:
             // Number of join edges whose NDV came from index uniqueness metadata instead of
             // sampling.
             int numUniqueIndexesUsedForNDV = 0;
-            // Number of distinct persisted NDV statistics (analyze mode "ndv") served during
+            // Number of distinct persisted NDV statistics (analyze mode "fieldStats") served during
             // plan enumeration, for edge selectivity estimation or costing. Repeated requests
             // for the same statistics are memoized and counted once.
             int numPersistentNDVStatsUsed = 0;

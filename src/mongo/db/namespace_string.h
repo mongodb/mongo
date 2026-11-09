@@ -59,7 +59,7 @@ public:
     static constexpr std::string_view kStatsSamplesCollectionName{"system.stats.samples"};
 
     // Name for the collection storing persistent per-field statistics, e.g. NDV sketches.
-    static constexpr std::string_view kStatsFieldStatsCollectionName{"system.stats.field_stats"};
+    static constexpr std::string_view kStatsFieldStatsCollectionName{"system.stats.fieldStats"};
 
     // Name for the profile collection
     static constexpr std::string_view kSystemDotProfileCollectionName{"system.profile"};
@@ -546,7 +546,7 @@ public:
 
     /**
      * Returns true for the collections storing optimizer statistics: histograms
-     * (system.statistics.*) and per-field statistics (system.stats.field_stats).
+     * (system.statistics.*) and per-field statistics (system.stats.fieldStats).
      * TODO SERVER-127371: collapse once the statistics namespaces are consolidated.
      */
     bool isSystemStatsCollection() const;

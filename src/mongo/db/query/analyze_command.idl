@@ -18,7 +18,7 @@ enums:
         values:
             kSample: "sample"
             kHistograms: "histograms"
-            kNdv: "ndv"
+            kFieldStats: "fieldStats"
 
 commands:
     analyze:
@@ -39,7 +39,7 @@ commands:
             key:
                 description: >-
                     The possibly dotted field path for which to create or update stats. Mode
-                    "ndv" also accepts an array of paths, building one composite NDV statistic
+                    "fieldStats" also accepts an array of paths, building one composite NDV statistic
                     over the tuple of fields.
                 type:
                     variant: [string, array<string>]

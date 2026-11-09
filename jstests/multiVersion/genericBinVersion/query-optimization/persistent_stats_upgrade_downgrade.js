@@ -28,7 +28,7 @@ const dbNames = [jsTestName() + "_a", jsTestName() + "_b"];
 
 // Collections the downgrade must leave alone: the analyzed collection, a plain one, one whose name
 // contains the samples name, and the sibling persistent-stats collection.
-const keptCollNames = [collName, "keep", "samples", "system.stats.field_stats"];
+const keptCollNames = [collName, "keep", "samples", "system.stats.fieldStats"];
 
 function setFCV(db, version) {
     jsTest.log.info("Setting feature compatibility version", {version});

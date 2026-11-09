@@ -752,7 +752,7 @@ describe("join optimization serverStatus metrics", function () {
     it("counts a persistentNdv hit and numPersistentNDVStatsUsed when statistics serve", function () {
         const products = this.createProducts("hit");
         assert.commandWorked(
-            this.db.runCommand({analyze: products.getName(), mode: "ndv", key: "sku"}),
+            this.db.runCommand({analyze: products.getName(), mode: "fieldStats", key: "sku"}),
         );
 
         const before = this.persistentNdvMetrics();
@@ -779,7 +779,7 @@ describe("join optimization serverStatus metrics", function () {
     it("counts neither hit nor miss when persisted NDV consumption is disabled", function () {
         const products = this.createProducts("disabled");
         assert.commandWorked(
-            this.db.runCommand({analyze: products.getName(), mode: "ndv", key: "sku"}),
+            this.db.runCommand({analyze: products.getName(), mode: "fieldStats", key: "sku"}),
         );
 
         assert.commandWorked(

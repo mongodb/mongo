@@ -6,7 +6,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/query/compiler/ce/ndv/ndv_sketch.idl"
+    - "mongo/db/query/compiler/ce/field_stats/ndv_sketch.idl"
 
 structs:
     NdvStats:
@@ -23,7 +23,7 @@ structs:
 
     FieldStatsDoc:
         description: >-
-            On-disk document stored in <db>.system.stats.field_stats holding per-field
+            On-disk document stored in <db>.system.stats.fieldStats holding per-field
             statistics. Written by the analyze command and consumed by the optimizer's read
             path. Each statistic kind lives in its own top-level section so more can be added
             over time.

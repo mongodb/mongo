@@ -6,7 +6,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/compiler/ce/ndv/field_stats_gen.h"
+#include "mongo/db/query/compiler/ce/field_stats/field_stats_gen.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -17,7 +17,7 @@ namespace mongo::ce {
 
 /**
  * Loads the persisted statistics for one combination of field paths from
- * <dbName>.system.stats.field_stats.
+ * <dbName>.system.stats.fieldStats.
  *
  * The lookup is a point _id query (see makeFieldStatsId()) with no projection, which keeps it
  * express-eligible. Returns NoSuchKey when no statistics are persisted for the key. A document
