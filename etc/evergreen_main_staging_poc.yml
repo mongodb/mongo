@@ -1,0 +1,2595 @@
+#####################################################
+#   Evergreen config for mongodb-main-staging-poc   #
+#####################################################
+# A trimmed-down alternative to etc/evergreen.yml for the main-staging-poc project.
+#
+# What is in here:
+#   - Only build variants tagged "commit-queue", "required" or "suggested".
+#   - None of the tasks that push / publish / promote / sync to external systems. The staging POC
+#     doesn't have these permissions. The only reason we might want them is to frontload more
+#     testing of downstream projects like streams and disagg.
+#
+# NOTE: Evergreen can't include a subset of the variants in a file, so the variant definitions below
+# are COPIED from etc/evergreen_yml_components/variants/** (with YAML anchors resolved). Task and
+# function definitions are still shared via include. The copies will drift from the originals; see
+# the TODOs below, which should replace the copy with something less fragile.
+#
+# TODO(SERVER-138696): Generate the variants section from etc/evergreen_yml_components/variants
+#   (script + a lint that it is up to date) instead of keeping a hand-maintained copy.
+#
+# TODO(SERVER-138697): Add broader patch coverage back once the project is stable. Candidates:
+#     - The remaining non-"suggested" test_dev variants (ubuntu, mongot, wiredtiger, codecoverage,
+#       sanitizer variants not tagged required/suggested).
+#     - The query-team patch-only variants and their patch_aliases (query, query-quick, query-joo).
+#
+# TODO(SERVER-138698): Add nightly / daily cron and release coverage back once the project is
+#   stable:
+#     - Nightly / daily cron coverage (stm-daily-cron, compile_tasks_nightly.yml, coverity,
+#       cron-activated sanitizer and perf variants).
+#     - The release variants (etc/evergreen_yml_components/variants/*/test_release.yml).
+#
+# TODO(SERVER-138699): Re-enable the push/publish tasks once the project's AWS IAM role exists
+#   (or they have been audited to be safe to run here). As an example:
+#     - streams_build_and_push and everything depending on it (the streams_* tasks, streams compile
+#       variants)
+#     - disagg_format_snapshot* and java-driver tests
+#
+# See etc/evergreen.yml for the conventions on expansions and for how to set up the environment in
+# a new task.
+
+include:
+  - filename: etc/evergreen_yml_components/configuration.yml
+  - filename: etc/evergreen_yml_components/definitions.yml
+
+  - filename: etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  - filename: etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  - filename: etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  - filename: etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
+  - filename: etc/evergreen_yml_components/tasks/compile_tasks.yml
+  - filename: etc/evergreen_yml_components/tasks/compile_tasks_shared.yml
+  - filename: etc/evergreen_yml_components/tasks/misc_tasks.yml
+  # Needed only for the disagg_smoke task, which the required sanitizer variants use. This also brings
+  # in the (weekly cron) commit-queue-atlas variant, which runs nothing but disagg_smoke.
+  - filename: src/mongo/db/modules/atlas/atlas_commit_queue.yml
+  # TODO(SERVER-138699): security_tasks.yml (SBOM / SAST publishing) is excluded for now.
+
+parameters:
+  - key: evergreen_config_file_path
+    value: "etc/evergreen_main_staging_poc.yml"
+    description: "path to this file"
+  - key: test_selection_strategies_array
+    description: "Array of test selection strategies"
+  - key: use_tss_staging
+    description: "Set to true to ask the staging test selection deployment instead of production"
+  - key: runtime_params_json
+    description: 'JSON of runtime params (e.g. {"enable_linux_perf":true}) to enable on-CPU profiling on benchmark tasks.'
+  - key: antithesis_suites
+    description: "Comma-separated ds-antithesis suite tasks (e.g. mongod-sls-multi-cell-encryption) to run against this patch's mongod image. No antithesis run is triggered if this parameter is empty or not set."
+
+# TODO(SERVER-138697): Add commit-queue-monorepo / commit-queue-atlas / monguard ("Lint") aliases
+#   back along with their variants.
+commit_queue_aliases:
+  - variant: "^(commit-queue)$"
+    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|resmoke_tests|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
+    variant_tags: []
+    task_tags: []
+  - variant: "^(amazon-linux2023-arm64-static-compile)$"
+    variant_tags: []
+    task_tags: ["clang_tidy"]
+
+github_pr_aliases:
+  - variant: "^(commit-queue)$"
+    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|resmoke_tests|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
+    variant_tags: []
+    task_tags: []
+  - variant: "^(amazon-linux2023-arm64-static-compile)$"
+    variant_tags: []
+    task_tags: ["clang_tidy"]
+  - variant: "^(al2023-arm64-sep-benchmark)$"
+    variant_tags: []
+    task_tags: ["benchmarks_sep"]
+
+# TODO(SERVER-138697): Restore the query, query-quick, query-joo, security, mongot-extension,
+#   codecoverage, unittestcoverage and streams aliases when their variants come back.
+patch_aliases:
+  - alias: required
+    variant_tags: ["required"]
+    task: ".*"
+  - alias: suggested
+    description: "Runs every variant tagged suggested, in addition to the required ones"
+    variant_tags: ["required", "suggested"]
+    task: ".*"
+  - alias: bazel
+    description: "Runs bazel build system tests"
+    variant_tags: ["bazel_check"]
+    task_tags: ["bazel_check"]
+  - alias: bazel_variants
+    description: "Runs bazel build system tests"
+    variant_tags: ["bazel_check"]
+    task: ".*"
+  - alias: search
+    description: "Runs all $search, $vectorSearch tests"
+    variant: ".*"
+    task: "^.*search*"
+  - alias: cluster_scalability
+    variant_tags: ["cluster_scalability_only"]
+    task_tags: ["cluster_scalability_only"]
+  - alias: disagg
+    description: >
+      An alternative to `required` for changes that only touch disagg (DSC) code. Runs every
+      required variant except those tagged `no_atlas_build`, which cannot load DSC code. A required
+      variant without the tag is included, so a missing tag runs an unneeded variant rather than
+      skipping DSC coverage.
+    variant_tags: ["required !no_atlas_build"]
+    task: ".*"
+
+buildvariants:
+  # ---- from variants/amazon/message_filter_plugin_master_branch_only.yml ----
+  - name: message-filter-plugin-amazon2023-arm64
+    display_name: "* Message Filter Plugin ARM"
+    tags:
+      - suggested
+      - non_release_variant
+    activate: true
+    stepback: false
+    run_on:
+      - amazon2023-arm64-latest-large
+    expansions:
+      compile_variant: message-filter-plugin-amazon2023-arm64
+      urp_artifact_name: message-filter-plugin-amazon2023-arm64-dev
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023
+    tasks:
+      - name: archive_message_filter_plugin_TG
+
+  # ---- from variants/amazon/test_dev.yml ----
+  - run_on:
+      - amazon2023-arm64-latest-m8g-4xlarge
+    activate: true
+    stepback: false
+    name: amazon-linux2023-arm64-crypt-compile
+    display_name: "! Amazon Linux 2023 arm64 Crypt Compile"
+    tags:
+      - required
+      - no_atlas_build
+      - bazel_check
+      - non_release_variant
+    expansions:
+      has_packages: false
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023
+      unittest_library_compile_flags: --linkstatic=False
+      unittest_compile_flags: --linkstatic=False
+      compile_variant: amazon-linux2023-arm64-crypt-compile
+      evergreen_remote_exec: true
+    tasks:
+      - name: .crypt
+      - name: crypt_build_debug_and_test
+
+  - run_on:
+      - amazon2023-arm64-latest-m8g-4xlarge
+    activate: true
+    stepback: false
+    name: amazon-linux2023-arm64-static-compile
+    display_name: "! Amazon Linux 2023 arm64 Atlas Compile"
+    tags:
+      - required
+      - bazel_check
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    expansions:
+      has_packages: false
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --jobs=1600 --build_atlas=True --streams_release_build=True --optimize_test_binaries=True
+      unittest_library_compile_flags: --linkstatic=False
+      unittest_compile_flags: --linkstatic=False
+      clang_tidy_toolchain: v5
+      build_mongot: true
+      download_mongot_release: true
+      compile_variant: amazon-linux2023-arm64-static-compile
+      core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
+      evergreen_remote_exec: true
+      skip_debug_link: true
+      remote_link: true
+      resmoke_tests_tag_filter: ci-development-critical-single-variant
+      bazelrc_flags: --remote_execution_priority=3
+    tasks:
+      - name: run_unit_tests_TG
+      - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
+        distros:
+          - amazon2023-arm64-latest-xlarge
+      - name: compile_all_but_not_unittests_TG
+        distros:
+          - amazon2023-arm64-latest-m8gd-4xlarge
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_integration_and_test_parallel_stream_TG
+        distros:
+          - amazon2023-arm64-latest-m8gd-4xlarge
+      - name: resmoke_tests_TG
+        distros:
+          - amazon2023-arm64-latest-m8gd-4xlarge
+      - name: .development_critical_single_variant !.requires_large_host
+      - name: .development_critical_single_variant .requires_large_host
+        distros:
+          - amazon2023-arm64-latest-xlarge
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - amazon2023-arm64-latest-xlarge
+      - name: .all_variants .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .all_variants .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - amazon2023-arm64-latest-xlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
+        distros:
+          - amazon2023-arm64-latest-xlarge
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-amazon-linux2023-arm64
+    display_name: "* Amazon Linux 2023 arm64 Enterprise"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-atlas-latest-m8g-xlarge
+    stepback: true
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-atlas-latest-m8g-4xlarge
+      core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
+      compile_variant: amazon-linux2023-arm64-static-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool,incompatible_with_atlas_environment
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-4xlarge
+      - name: .all_variants !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .all_variants .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-4xlarge
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-4xlarge
+      - name: .fuzzer_deterministic
+      - name: product_limits
+        cron: 0 4 * * 0
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-4xlarge
+
+  - name: commit-queue
+    display_name: ~ Commit Queue
+    tags:
+      - bazel_check
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 1 * * 0
+    run_on:
+      - amazon2023-arm64-latest-m8g-xlarge
+    stepback: false
+    paths:
+      - "*"
+      - "!/monguard/**"
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-atlas-latest-m8g-4xlarge
+      core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
+      has_packages: false
+      skip_symbolization: true
+      evergreen_remote_exec: true
+      build_timeout_seconds: 1440
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --linkstatic=False --build_atlas=True --streams_release_build=True --dtlto=False --pgo_profile_use=False --bolt_profile_use=False
+      clang_tidy_toolchain: v5
+      bazelrc_flags: --remote_execution_priority=4
+      compile_variant: commit-queue
+      resmoke_tests_tag_filter: ci-development-critical-single-variant
+      resmoke_tests_test_timeout_seconds: 1800
+    depends_on: []
+    tasks:
+      - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
+      - name: compile_all_but_not_unittests_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
+      - name: run_unit_tests_no_rbe_incompatible_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
+      - name: compile_test_parallel_dbtest_stream_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
+      - name: resmoke_tests_TG
+        exec_timeout_secs: 3600
+        distros:
+          - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
+      - name: .commit_check
+        create_check_run:
+          path_to_outputs: github_annotations.json
+      - name: .development_critical_single_variant !.requires_large_host !.clang_tidy !.no_commit_queue !.monorepo-commit-queue
+      - name: .development_critical_single_variant .requires_large_host !.clang_tidy !.no_commit_queue !.monorepo-commit-queue
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+      - name: .development_critical !.requires_large_host_commit_queue !.no_commit_queue !.monorepo-commit-queue
+      - name: .development_critical .requires_large_host_commit_queue !.no_commit_queue !.monorepo-commit-queue
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+
+  - name: al2023-arm64-sep-benchmark
+    display_name: "! AL2023.3 arm64 Enterprise (SEP Benchmark)"
+    tags:
+      - required
+      - no_atlas_build
+      - non_release_variant
+    activate: true
+    run_on:
+      - amazon2023.3-arm64-m6g-4xlarge
+    expansions:
+      build_timeout_seconds: 900
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --release=True --dbg_level=1 --separate_debug=False
+      evergreen_remote_exec: true
+      compile_variant: al2023-arm64-sep-benchmark
+    tasks:
+      - name: .benchmarks_sep
+
+  - name: amazon2023-x86-compile
+    display_name: "* Compile Amazon Linux 2023 x86 for sys-perf"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    expansions:
+      platform: linux
+      project_dir: dsi
+      has_packages: false
+      build_arch: x86_64
+      compile_variant: amazon2023-x86-compile
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --release=True
+      bazelrc_flags: --remote_execution_priority=1
+      evergreen_remote_exec: true
+      skip_debug_link: true
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
+    run_on:
+      - amazon2023.3-xlarge
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
+      - name: upload_pgo_bolt_data_TG
+
+  - name: amazon2023-x86-mongocrypt-shlib-compile
+    display_name: "* Compile mongo_crypt_v1.so Amazon Linux 2023 x86 for sys-perf"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    expansions:
+      platform: linux
+      project_dir: dsi
+      has_packages: false
+      build_arch: x86_64
+      compile_variant: amazon2023-x86-compile
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --release=True
+      evergreen_remote_exec: true
+    run_on:
+      - amazon2023.3-xlarge
+    tasks:
+      - name: .crypt
+
+  - name: amazon2023-arm64-atlas-compile
+    display_name: "* Compile Atlas Amazon Linux 2023 arm64 for sys-perf"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    expansions:
+      platform: linux
+      project_dir: dsi
+      has_packages: false
+      compile_variant: amazon2023-arm64-atlas-compile
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --release=True --build_atlas=True
+      bazelrc_flags: --remote_execution_priority=1
+      evergreen_remote_exec: true
+      skip_debug_link: true
+    run_on:
+      - amazon2023.3-arm64-xlarge
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
+
+  - name: amazon2023-arm64-compile
+    display_name: "* Compile Amazon Linux 2023 arm64 for sys-perf"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    expansions:
+      platform: linux
+      project_dir: dsi
+      has_packages: false
+      build_arch: aarch64
+      compile_variant: amazon2023-arm64-compile
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --release=True
+      bazelrc_flags: --remote_execution_priority=1
+      evergreen_remote_exec: true
+      skip_debug_link: true
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
+    run_on:
+      - amazon2023.3-arm64-xlarge
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
+      - name: upload_pgo_bolt_data_TG
+
+  - name: amazon2023-arm64-mongocrypt-shlib-compile
+    display_name: "* Compile mongo_crypt_v1.so Amazon Linux 2023 arm64 for sys-perf"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    expansions:
+      platform: linux
+      project_dir: dsi
+      has_packages: false
+      compile_variant: amazon2023-arm64-compile
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --release=True
+      evergreen_remote_exec: true
+    run_on:
+      - amazon2023.3-arm64-xlarge
+    tasks:
+      - name: .crypt
+
+  # ---- from variants/amazon/test_dev_master_branch_only.yml ----
+  - run_on:
+      - amazon2023-arm64-latest-m8g-4xlarge
+    activate: true
+    stepback: false
+    name: amazon-linux2023-arm64-stitch-compile
+    display_name: "* Amazon Linux 2023 arm64 Enterprise Stitch Compile"
+    tags:
+      - suggested
+      - bazel_check
+      - non_release_variant
+    expansions:
+      has_packages: false
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --dtlto=False --pgo_profile_use=False --bolt_profile_use=False
+      compile_variant: amazon-linux2023-arm64-stitch-compile
+    tasks:
+      - name: .stitch
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags
+    modules:
+      - asp-js-engine
+    display_name: "* Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags)"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-atlas-latest-m8g-xlarge
+    stepback: true
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
+      core_analyzer_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
+      compile_variant: amazon-linux2023-arm64-static-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      streams_variant_tag: -atlas
+      test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible
+    tasks:
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-2xlarge
+      - name: .all_variants !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .all_variants !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-2xlarge
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-2xlarge
+      - name: .fuzzer_deterministic
+      - name: product_limits
+        cron: 0 4 * * 0
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-2xlarge
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+      - name: archive_message_filter_plugin
+        variant: message-filter-plugin-amazon2023-arm64
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-mfp
+    modules:
+      - asp-js-engine
+    display_name: "* Message Filter Plugin ARM master resmoke"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 4 * * 0
+    run_on:
+      - amazon2023-arm64-atlas-latest-m8g-xlarge
+    stepback: true
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
+      core_analyzer_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
+      compile_variant: amazon-linux2023-arm64-static-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      streams_variant_tag: -atlas
+      test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible
+      tss_enabled: false
+      mfp_compile_variant: message-filter-plugin-amazon2023-arm64
+      extra_test_flags: --messageFilterPlugin
+    tasks:
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-2xlarge
+      - name: .all_variants !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .all_variants !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-2xlarge
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-2xlarge
+      - name: .fuzzer_deterministic !.multiversion
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-extra-system-deps
+    modules:
+      - asp-js-engine
+    display_name: "! Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags, extra system deps, Replica Sets)"
+    tags:
+      - required
+      - forbid_tasks_tagged_with_experimental
+      - disagg
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-latest-m8g-xlarge
+    stepback: true
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-latest-m8g-4xlarge
+      core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
+      compile_variant: amazon-linux2023-arm64-static-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      streams_variant_tag: -atlas-extra-deps
+      test_flags: --runAllFeatureFlagTests --additionalFeatureFlags=featureFlagStreams --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source
+      multiversion_release_feed_source: atlas
+      last_versions: last_patch
+    tasks:
+      - name: .requires_extra_system_deps .development_critical !.sharding !.sharded !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .development_critical !.sharding !.sharded .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+      - name: .requires_extra_system_deps .all_variants !.sharding !.sharded !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .all_variants !.sharding !.sharded .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+      - name: .requires_extra_system_deps .default !.sharding !.sharded !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .default !.sharding !.sharded .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: query_golden_disagg_gen
+      - name: no_passthrough_disagg_override_replsets_gen
+    display_tasks: []
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-extra-system-deps-fuzzers
+    modules:
+      - asp-js-engine
+    display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags, extra system deps) Fuzzers"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-latest-m8g-xlarge
+    stepback: true
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-latest-m8g-4xlarge
+      core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
+      compile_variant: amazon-linux2023-arm64-static-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      streams_variant_tag: -atlas
+      test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source
+      tss_enabled: false
+    tasks:
+      - name: .jstestfuzz .requires_extra_system_deps
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-amazon-linux2023-arm64-disagg-no-feature-flags-extra-system-deps
+    modules:
+      - asp-js-engine
+    display_name: "! Amazon Linux 2023 arm64 Atlas Enterprise (no feature flags, extra system deps, Replica Sets)"
+    tags:
+      - required
+      - forbid_tasks_tagged_with_experimental
+      - disagg
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-latest-m8g-xlarge
+    stepback: true
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-latest-m8g-4xlarge
+      core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
+      compile_variant: amazon-linux2023-arm64-static-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      streams_variant_tag: -atlas
+      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,uses_prepare_transaction
+      tss_enabled: false
+      multiversion_release_feed_source: atlas
+      last_versions: last_patch
+    tasks:
+      - name: .requires_extra_system_deps .development_critical !.sharding !.sharded !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.incompatible_disaggregated_storage_no_feature_flag !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .development_critical !.sharding !.sharded .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.incompatible_disaggregated_storage_no_feature_flag !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+      - name: .requires_extra_system_deps .all_variants !.sharding !.sharded !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.incompatible_disaggregated_storage_no_feature_flag !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .all_variants !.sharding !.sharded .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.incompatible_disaggregated_storage_no_feature_flag !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+      - name: .requires_extra_system_deps .default !.sharding !.sharded !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.incompatible_disaggregated_storage_no_feature_flag !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .default !.sharding !.sharded .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.incompatible_disaggregated_storage_no_feature_flag !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: query_golden_disagg_gen
+      - name: disagg_pali_chaos_key
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+      - name: disagg_poa_jscore_passthrough
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+      - name: disagg_poa_jscore_passthrough_secondary_reads
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+      - name: disagg_poa_concurrency
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+    patchable: true
+
+  - depends_on:
+      - name: bazel_result_tasks_gen
+        variant: generate-tasks-for-version
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-rbe
+    modules:
+      - asp-js-engine
+    display_name: "! Amazon Linux 2023 arm64 Enterprise (all feature flags)"
+    tags:
+      - required
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-latest-m8g-xlarge
+    stepback: true
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-latest-m8g-2xlarge
+      core_analyzer_distro_name: amazon2023-arm64-latest-m8g-2xlarge
+      compile_variant: amazon-linux2023-arm64-static-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      streams_variant_tag: -atlas
+      test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --jobs=3200 --build_atlas=True --streams_release_build=True
+      build_mongot: true
+      download_mongot_release: true
+      evergreen_remote_exec: true
+      xlarge_distro_name: amazon2023-arm64-latest-m8g-4xlarge
+      skip_debug_link: true
+      remote_link: true
+      resmoke_tests_tag_filter: ci-development-critical,ci-all-variants,ci-default,ci-fuzzer-deterministic,-suggested_excluding_required__for_devprod_mitigation_only,-incompatible_all_feature_flags,-incompatible_development_variant,-requires_compile_variant,-requires_extra_system_deps
+      resmoke_bazel_per_test_timeout_seconds: 2000
+      resmoke_bazel_test_timeout_seconds: 3000
+    tasks:
+      - name: resmoke_tests_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+        depends_on:
+          - name: version_expansions_gen
+            variant: generate-tasks-for-version
+          - name: bazel_result_tasks_gen
+            variant: generate-tasks-for-version
+      - name: idl_tests
+        depends_on:
+          - name: archive_dist_test
+            variant: amazon-linux2023-arm64-static-compile
+      - name: extensions_verify_visibility
+        depends_on:
+          - name: archive_dist_test
+            variant: amazon-linux2023-arm64-static-compile
+      - name: powercycle_smoke
+        depends_on:
+          - name: archive_dist_test
+            variant: amazon-linux2023-arm64-static-compile
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-fuzzers
+    modules:
+      - asp-js-engine
+    display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Fuzzers"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-atlas-latest-m8g-xlarge
+    stepback: true
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
+      core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
+      compile_variant: amazon-linux2023-arm64-static-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      streams_variant_tag: -atlas
+      test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible
+    tasks:
+      - name: .aggfuzzer
+      - name: .change_stream_fuzzer
+      - name: .config_fuzzer .suggested_excluding_required__for_devprod_mitigation_only
+      - name: .query_fuzzer
+      - name: .updatefuzzer
+      - name: .jstestfuzz !.requires_extra_system_deps
+      - name: .query_shape_hash_stability_fuzzer !.exclude_from_sbe_variants
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-cluster-scalability-only
+    modules:
+      - asp-js-engine
+    display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Cluster Scalability Patch Only"
+    tags:
+      - cluster_scalability_only
+      - suggested
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-atlas-latest-m8g-xlarge
+    stepback: true
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
+      core_analyzer_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
+      compile_variant: amazon-linux2023-arm64-static-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      streams_variant_tag: -atlas
+      test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible
+    tasks:
+      - name: .cluster_scalability_only
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-execution-control-with-prioritization
+    modules:
+      - asp-js-engine
+    display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Execution Control with Prioritization Tasks"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-atlas-latest-m8g-xlarge
+    stepback: true
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
+      core_analyzer_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
+      compile_variant: amazon-linux2023-arm64-static-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      streams_variant_tag: -atlas
+      test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible
+    tasks:
+      - name: .execution_control_with_prioritization
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-magic-restore
+    modules:
+      - asp-js-engine
+    display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Magic Restore Tasks"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-atlas-latest-m8g-xlarge
+    stepback: true
+    expansions:
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      packager_arch: aarch64
+      packager_distro: amazon2023
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
+      core_analyzer_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
+      compile_variant: amazon-linux2023-arm64-static-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      streams_variant_tag: -atlas
+      test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible
+    tasks:
+      - name: .magic_restore
+
+  - name: al2023-arm64-benchmarks
+    display_name: "* AL2023 arm64 (Benchmarks)"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1 * * *
+    run_on:
+      - amazon2023.3-arm64-m6g-4xlarge
+    expansions:
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --dbg_level=1 --separate_debug=False
+      evergreen_remote_exec: true
+      compile_variant: al2023-arm64-benchmarks
+    tasks:
+      - name: compile_upload_benchmarks_TG
+        distros:
+          - amazon2023.3-arm64-m6g-4xlarge
+      - name: .benchmarks
+
+  # ---- from variants/macos/test_dev_master_branch_only.yml ----
+  - name: enterprise-macos-arm64-cross-compile
+    display_name: "! Enterprise MacOS ARM64 Cross Compile"
+    tags:
+      - required
+      - no_atlas_build
+      - bazel_check
+      - non_release_variant
+    cron: 0 1 * * *
+    run_on:
+      - ubuntu2204-arm64-m8g-4xlarge
+    expansions:
+      compile_variant: enterprise-macos-arm64-cross-compile
+      evergreen_remote_exec: true
+      bazel_compile_flags: --config=macos-cross-arm64
+    tasks:
+      - name: compile_devcore_TG
+
+  # ---- from variants/misc/legacy_js_engine.yml ----
+  - name: amazon-linux2023-arm64-legacy-js-engine
+    display_name: "* Amazon Linux 2023 arm64 Legacy JS Engine (MozJS)"
+    tags:
+      - suggested
+      - assigned_to_jira_team_server_query_integration
+      - non_release_variant
+    activate: true
+    stepback: false
+    run_on:
+      - amazon2023-arm64-latest-m8g-4xlarge
+    expansions:
+      compile_variant: amazon-linux2023-arm64-legacy-js-engine
+      evergreen_remote_exec: true
+      bazel_compile_flags: --define=MONGO_DISTMOD=amazon2023 --//bazel/config:js_engine=mozjs
+    tasks:
+      - name: run_legacy_mozjs_unit_tests_TG
+
+  # ---- from variants/misc/misc.yml ----
+  - name: run-all-affected-jstests
+    display_name: "! Run All Affected JStests"
+    tags:
+      - required
+      - non_release_variant
+    patch_only: true
+    run_on:
+      - rhel8.8-medium
+    expansions:
+      large_distro_name: rhel8.8-large
+      core_analyzer_distro_name: rhel8.8-xlarge
+      burn_in_tag_include_all_required_and_suggested: true
+      burn_in_tag_exclude_build_variants: macos-debug-suggested ubuntu2204-arm64-bazel-compile enterprise-amazon-linux2023-arm64-all-feature-flags-mfp
+      burn_in_tag_include_build_variants: enterprise-rhel-8-64-bit-inmem enterprise-rhel-8-64-bit-multiversion amazon-linux2023-arm64-try-sbe-engine amazon_linux2023_arm64_static-classic-engine-query-patch-only
+      burn_in_tag_compile_task_dependency: archive_dist_test
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+      - name: version_burn_in_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    tasks:
+      - name: burn_in_tags_gen
+
+  # ---- from variants/misc/task_generation.yml ----
+  - name: generate-tasks-for-version
+    display_name: "! Generate tasks for evergreen version"
+    tags:
+      - required
+      - non_release_variant
+    activate: true
+    run_on:
+      - rhel8.8-medium
+    expansions:
+      evergreen_remote_exec: true
+    tasks:
+      - name: version_gen
+      - name: version_burn_in_gen
+      - name: version_expansions_gen
+      - name: bazel_result_tasks_gen
+
+  # ---- from variants/rhel/test_dev.yml ----
+  - run_on:
+      - rhel8.8-xlarge
+    activate: true
+    stepback: false
+    name: linux-x86-dynamic-compile
+    display_name: "* Linux x86 Enterprise"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    expansions:
+      has_packages: false
+      bazel_compile_flags: --define=MONGO_DISTMOD=rhel88 --dtlto=False --pgo_profile_use=False --bolt_profile_use=False
+      compile_variant: linux-x86-dynamic-compile
+      build_mongot: true
+      download_mongot_release: true
+    tasks:
+      - name: run_unit_tests_TG
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_integration_and_test_parallel_stream_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel8.8-xlarge
+      - name: .all_variants .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .all_variants .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel8.8-xlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
+        distros:
+          - rhel8.8-xlarge
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: linux-x86-dynamic-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-rhel-8-64-bit-dynamic
+    display_name: "* Enterprise RHEL 8"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - rhel8.8-small
+    expansions:
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      repo_edition: enterprise
+      large_distro_name: rhel8.8-medium
+      core_analyzer_distro_name: rhel8.8-xlarge
+      compile_variant: linux-x86-dynamic-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - rhel8.8-medium
+      - name: .all_variants !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .all_variants .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - rhel8.8-medium
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
+        distros:
+          - rhel8.8-medium
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: linux-x86-dynamic-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-rhel-8-64-bit-dynamic-config-shard
+    display_name: "* Enterprise RHEL 8 (Config Shard)"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 4 * * *
+    run_on:
+      - rhel8.8-small
+    stepback: false
+    expansions:
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      repo_edition: enterprise
+      large_distro_name: rhel8.8-medium
+      core_analyzer_distro_name: rhel8.8-xlarge
+      compile_variant: linux-x86-dynamic-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: --configShard=any --excludeWithAnyTags=config_shard_incompatible
+    tasks:
+      - name: aggregation_mongos_passthrough
+        distros:
+          - rhel8.8-large
+      - name: aggregation_one_shard_sharded_collections
+      - name: aggregation_sharded_collections_causally_consistent_passthrough
+        distros:
+          - rhel8.8-large
+      - name: aggregation_sharded_collections_passthrough
+        distros:
+          - rhel8.8-large
+      - name: auth_gen
+      - name: causally_consistent_jscore_passthrough_auth_gen
+      - name: causally_consistent_jscore_passthrough_gen
+      - name: change_streams
+      - name: change_streams_mongos_sessions_passthrough
+      - name: change_streams_multi_stmt_txn_mongos_passthrough
+      - name: change_streams_multi_stmt_txn_sharded_collections_passthrough
+      - name: change_streams_per_shard_cursor_passthrough
+      - name: change_streams_sharded_collections_query_shape_hash_stability_multiversion_gen
+      - name: fle2_sharding_high_cardinality
+      - name: fle2_sharding
+      - name: jstestfuzz_sharded_causal_consistency_gen
+      - name: jstestfuzz_sharded_gen
+      - name: jstestfuzz_sharded_kill_terminate_stepdown_gen
+      - name: jstestfuzz_sharded_notablescan_gen
+      - name: sharded_causally_consistent_jscore_passthrough_gen
+      - name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
+      - name: sharding_auth_gen
+      - name: sharding_multiversion_gen
+      - name: sharding_jscore_multiversion_gen
+      - name: sharding_jscore_kill_primary_multiversion_gen
+      - name: .sharding .txns !.requires_extra_system_deps !.requires_large_host
+      - name: .sharding .txns .requires_large_host !.requires_extra_system_deps
+        distros:
+          - rhel8.8-large
+      - name: .sharding .common !.requires_extra_system_deps !.csrs !.feature_flag_guarded
+      - name: .sharding .jscore !.requires_extra_system_deps !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
+      - name: .sharding .jscore !.requires_extra_system_deps !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
+        distros:
+          - rhel8.8-large
+      - name: .concurrency .sharded !.requires_extra_system_deps !.large
+      - name: .concurrency .sharded !.requires_extra_system_deps .large
+      - name: .unsplittable_collections !.requires_extra_system_deps
+        distros:
+          - rhel8.8-medium
+      - name: .multi_shard !.requires_extra_system_deps
+
+  # ---- from variants/rhel/test_dev_master_branch_only.yml ----
+  - run_on:
+      - rhel8.8-xlarge
+    activate: true
+    stepback: false
+    name: linux-stitch-compile-suggested
+    display_name: "* Linux x86 Stitch Enterprise Compile"
+    tags:
+      - suggested
+      - non_release_variant
+    expansions:
+      compile_variant: linux-stitch-compile-suggested
+    tasks:
+      - name: .stitch
+
+  - run_on:
+      - rhel8.8-xlarge
+    activate: true
+    stepback: false
+    name: linux-crypt-compile
+    display_name: "* Linux x86 Crypt Enterprise Compile"
+    tags:
+      - suggested
+      - non_release_variant
+    expansions:
+      compile_variant: linux-crypt-compile
+    tasks:
+      - name: .crypt
+      - name: crypt_build_debug_and_test
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: linux-x86-dynamic-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags
+    display_name: "* Enterprise RHEL 8 (all feature flags)"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 */4 * * *
+    run_on:
+      - rhel8.8-small
+    stepback: false
+    expansions:
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      repo_edition: enterprise
+      large_distro_name: rhel8.8-medium
+      core_analyzer_distro_name: rhel8.8-xlarge
+      compile_variant: linux-x86-dynamic-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: '--runAllFeatureFlagTests --mongodSetParameters="{validateParallelTargetRecordsPerSlice: 10}"'
+      build_mongot: true
+      download_mongot_release: true
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-medium
+      - name: .all_variants !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .all_variants .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-medium
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-medium
+
+  - name: enterprise-rhel-8-benchmarks
+    display_name: "* Enterprise RHEL 8 (Benchmarks)"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1 * * *
+    run_on:
+      - rhel8.8-large
+    expansions:
+      bazel_compile_flags: --define=MONGO_DISTMOD=rhel88 --dbg_level=1 --separate_debug=False
+      compile_variant: enterprise-rhel-8-benchmarks
+    tasks:
+      - name: compile_upload_benchmarks_TG
+        distros:
+          - rhel8.8-xlarge
+      - name: .benchmarks
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: linux-x86-dynamic-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-rhel-8-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers
+    display_name: "*| Enterprise RHEL 8 (Classic Engine all feature flags) Fuzzers"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 4 * * 0
+    run_on:
+      - rhel8.8-small
+    stepback: false
+    expansions:
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      repo_edition: enterprise
+      large_distro_name: rhel8.8-medium
+      core_analyzer_distro_name: rhel8.8-xlarge
+      compile_variant: linux-x86-dynamic-compile
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: '--mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}" --runAllFeatureFlagTests --excludeWithAnyTags=resource_intensive,featureFlagSbeFull,requires_sbe'
+      build_mongot: true
+      download_mongot_release: true
+    tasks:
+      - name: .aggfuzzer !.requires_extra_system_deps
+      - name: .change_stream_fuzzer !.requires_extra_system_deps
+      - name: .query_fuzzer !.requires_extra_system_deps
+      - name: .updatefuzzer !.requires_extra_system_deps
+      - name: .jstestfuzz !.requires_extra_system_deps
+
+  # ---- from variants/sanitizer/test_dev.yml ----
+  - run_on:
+      - amazon2023-arm64-latest-m8g-8xlarge
+    activate: true
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: run_unit_tests_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+      - name: .all_variants .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .all_variants .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+    name: linux-arm64-debug-compile-required
+    display_name: "! Amazon Linux 2023 arm64 GCC DEBUG Compile"
+    tags:
+      - required
+      - no_atlas_build
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    stepback: false
+    expansions:
+      has_packages: false
+      bazelrc_flags: --remote_execution_priority=3
+      bazel_compile_flags: --dbg=True --compiler_type=gcc --dtlto=False --pgo_profile_use=False --bolt_profile_use=False --opt=on --jobs=1600
+      unittest_library_compile_flags: --linkstatic=False
+      unittest_compile_flags: --linkstatic=False
+      compile_variant: linux-arm64-debug-compile-required
+      build_mongot: true
+      download_mongot_release: true
+      evergreen_remote_exec: true
+      skip_debug_link: true
+      test_flags: '--mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"'
+
+  - run_on:
+      - amazon2023-arm64-latest-m8g-8xlarge
+    activate: true
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: run_unit_tests_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_integration_and_test_parallel_stream_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+      - name: .all_variants .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .all_variants .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+    name: linux-debug-aubsan-compile-required
+    display_name: "! Amazon Linux 2023 arm64 {A,UB}SAN Atlas Compile"
+    tags:
+      - required
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    expansions:
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      has_packages: false
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      repo_edition: enterprise
+      large_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+      core_analyzer_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+      bazelrc_flags: --remote_execution_priority=3
+      bazel_compile_flags: --config=dbg_aubsan --opt=on --fission=no --jobs=800 --build_atlas --optimize_test_binaries=True
+      build_mongot: true
+      download_mongot_release: true
+      evergreen_remote_exec: true
+      compile_variant: linux-debug-aubsan-compile-required
+      test_flags: '--excludeWithAnyTags=incompatible_aubsan --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"'
+
+  - run_on:
+      - rhel8.8-xlarge
+    activate: true
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: run_unit_tests_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_integration_and_test_parallel_stream_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - rhel8.8-xlarge
+      - name: .all_variants .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .all_variants .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - rhel8.8-xlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - rhel8.8-xlarge
+    name: rhel8-debug-aubsan-compile-x86
+    display_name: RHEL 8 x86_64 {A,UB}SAN Enterprise Compile
+    tags:
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    expansions:
+      has_packages: false
+      activate: false
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      bazel_compile_flags: --config=dbg_aubsan --opt=on --fission=no --jobs=800 --streams_release_build=True --optimize_test_binaries=True
+      build_mongot: true
+      download_mongot_release: true
+      evergreen_remote_exec: true
+      compile_variant: rhel8-debug-aubsan-compile-x86
+      test_flags: '--excludeWithAnyTags=incompatible_aubsan --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"'
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: linux-arm64-debug-compile-required
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: linux-arm64-debug-required
+    display_name: "! Amazon Linux 2023 arm64 GCC DEBUG"
+    tags:
+      - required
+      - no_atlas_build
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-latest-medium-m8g
+    expansions:
+      has_packages: false
+      bazelrc_flags: --remote_execution_priority=3
+      bazel_compile_flags: --dbg=True --compiler_type=gcc --dtlto=False --pgo_profile_use=False --bolt_profile_use=False --opt=on --jobs=1600
+      unittest_library_compile_flags: --linkstatic=False
+      unittest_compile_flags: --linkstatic=False
+      build_mongot: true
+      download_mongot_release: true
+      resmoke_jobs_factor: 0.5
+      test_flags: '--excludeWithAnyTags=requires_http_client --modules=none --additionalFeatureFlags featureFlagMaxKeyDetection --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"'
+      large_distro_name: amazon2023-arm64-latest-m8g-4xlarge
+      xlarge_distro_name: amazon2023-arm64-latest-m8g-4xlarge
+      core_analyzer_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+      compile_variant: linux-arm64-debug-compile-required
+      resmoke_tests_tag_filter: ci-development-critical,ci-all-variants,-suggested_excluding_required__for_devprod_mitigation_only,-requires_all_feature_flags,-requires_compile_variant,-incompatible_development_variant
+      evergreen_remote_exec: true
+    tasks:
+      - name: resmoke_tests_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+        depends_on:
+          - name: version_expansions_gen
+            variant: generate-tasks-for-version
+          - name: bazel_result_tasks_gen
+            variant: generate-tasks-for-version
+
+  - name: linux-arm64-debug-disagg-required
+    display_name: "* AL2023 arm64 GCC DEBUG disagg-storage-services"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 1 * * *
+    run_on:
+      - amazon2023-arm64-latest-m8g-xlarge
+    stepback: false
+    expansions:
+      has_packages: false
+      bazelrc_flags: --remote_execution_priority=3
+      bazel_compile_flags: --dbg=True --compiler_type=gcc --dtlto=False --pgo_profile_use=False --bolt_profile_use=False --opt=on --jobs=1600 --build_atlas --optimize_test_binaries=True
+      unittest_library_compile_flags: --linkstatic=False
+      unittest_compile_flags: --linkstatic=False
+      build_mongot: true
+      download_mongot_release: true
+      skip_debug_link: true
+      resmoke_jobs_factor: 0.5
+      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,uses_prepare_transaction,incompatible_disaggregated_storage_no_feature_flag
+      large_distro_name: amazon2023-arm64-latest-m8g-4xlarge
+      core_analyzer_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+      compile_variant: linux-arm64-debug-disagg-required
+      evergreen_remote_exec: true
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+      - name: run_unit_tests_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+      - name: compile_test_parallel_dbtest_stream_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
+      - name: disagg_storage_gen
+      - name: disagg_repl_jscore_passthrough_gen
+
+  - name: enterprise-amazon2023-linux-x86-debug-tsan-all-feature-flags
+    display_name: "* TSAN Enterprise Amazon 2023 Linux x86 disagg-storage-services DEBUG (all feature flags, Replica Sets)"
+    tags:
+      - forbid_tasks_tagged_with_experimental
+      - suggested
+      - non_release_variant
+    cron: 0 1 * * *
+    run_on:
+      - amazon2023.3-large
+    patchable: true
+    expansions:
+      exec_timeout_secs: 10800
+      timeout_secs: 7200
+      docker_arch: linux-x86-64
+      large_distro_name: amazon2023.3-xlarge
+      compile_variant: enterprise-amazon2023-linux-x86-debug-tsan-all-feature-flags
+      build_mongot: true
+      download_mongot_release: true
+      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      bazel_compile_flags: --config=dbg_tsan --opt=on --fission=no --jobs=800 --define=MONGO_DISTMOD=amazon2023 --build_atlas
+      test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=tsan_incompatible,incompatible_with_amazon_linux,incompatible_disaggregated_storage_tsan,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+      has_packages: false
+      repo_edition: enterprise
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - amazon2023.3-xlarge
+      - name: run_unit_tests_TG
+        distros:
+          - amazon2023.3-xlarge
+      - name: package_supplementary_data
+      - name: generate_buildid_to_debug_symbols_mapping
+      - name: .requires_extra_system_deps .mongot_e2e_tests !.sharding !.sharded !.requires_large_host
+      - name: .requires_extra_system_deps .mongot_e2e_tests !.sharding !.sharded .requires_large_host
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .development_critical !.sharding !.sharded !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+      - name: .requires_extra_system_deps .development_critical !.sharding !.sharded .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .development_critical !.sharding !.sharded .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .all_variants !.sharding !.sharded !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+      - name: .requires_extra_system_deps .all_variants !.sharding !.sharded .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .all_variants !.sharding !.sharded .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .default !.sharding !.sharded !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+      - name: .requires_extra_system_deps .default !.sharding !.sharded .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .default !.sharding !.sharded .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .non_required !.sharding !.sharded !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+      - name: .requires_extra_system_deps .non_required !.sharding !.sharded .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+        distros:
+          - amazon2023.3-xlarge
+      - name: .requires_extra_system_deps .non_required !.sharding !.sharded .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_disaggregated_storage_tsan !.incompatible_system_allocator
+        distros:
+          - amazon2023.3-xlarge
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: linux-debug-aubsan-compile-required
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: linux-debug-aubsan-lite-all-feature-flags-required
+    display_name: "! Amazon Linux 2023 arm64 {A,UB}SAN Atlas DEBUG (all feature flags)"
+    tags:
+      - required
+      - disagg
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-latest-medium-m8g
+    expansions:
+      compile_variant: linux-debug-aubsan-compile-required
+      lang_environment: LANG=C
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      resmoke_jobs_factor: 0.3
+      hang_analyzer_dump_core: false
+      large_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+      xlarge_distro_name: amazon2023-arm64-latest-m8g-16xlarge
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      test_flags: '--runAllFeatureFlagTests --excludeWithAnyTags=incompatible_aubsan --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000, maxRoundsWithoutProgressParameter: 20}"'
+    tasks:
+      - name: jsCore_in_parts_gen
+      - name: jsCore_txns
+      - name: jsCore_wildcard_indexes_gen
+      - name: disagg_smoke
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: rhel8-debug-aubsan-compile-x86
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: rhel8-debug-aubsan-x86
+    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 x86 DEBUG"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - emergency_release
+      - non_release_variant
+    cron: 0 1 1-31/2 * *
+    run_on:
+      - rhel8.8-large
+    expansions:
+      compile_variant: rhel8-debug-aubsan-compile-x86
+      lang_environment: LANG=C
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      resmoke_jobs_factor: 0.3
+      hang_analyzer_dump_core: false
+      large_distro_name: rhel8.8-xlarge
+      xlarge_distro_name: rhel8.8-xxlarge
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      test_flags: '--excludeWithAnyTags=requires_increased_memlock_limits,incompatible_aubsan --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000, maxRoundsWithoutProgressParameter: 20}"'
+    tasks:
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .all_variants !.requires_extra_system_deps !.requires_large_host !.requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .all_variants !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .all_variants !.requires_extra_system_deps .requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .default !.requires_extra_system_deps !.requires_large_host !.requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .default !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .default !.requires_extra_system_deps .requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .non_required !.requires_extra_system_deps !.requires_large_host !.requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .non_required !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .non_required !.requires_extra_system_deps .requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: rhel8-debug-aubsan-compile-x86
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: rhel8-debug-aubsan-experimental
+    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG Experimental"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1 * * *
+    run_on:
+      - rhel8.8-large
+    expansions:
+      compile_variant: rhel8-debug-aubsan-compile-x86
+      lang_environment: LANG=C
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      resmoke_jobs_factor: 0.3
+      hang_analyzer_dump_core: false
+      large_distro_name: rhel8.8-xlarge
+      xlarge_distro_name: rhel8.8-xxlarge
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      test_flags: '--excludeWithAnyTags=requires_increased_memlock_limits --excludeWithAnyTags=incompatible_aubsan --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"'
+    tasks:
+      - name: .multiversion_fuzzer
+      - name: .multiversion_passthrough !.requires_extra_system_deps
+      - name: .random_multiversion_ds
+      - name: .watchdog
+
+  - name: enterprise-rhel8-debug-tsan-compile
+    display_name: "* TSAN Enterprise RHEL 8 DEBUG Compile"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - emergency_release
+      - non_release_variant
+    cron: 0 2 * * *
+    run_on:
+      - rhel8.8-large
+    stepback: false
+    expansions:
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
+      lang_environment: LANG=C
+      toolchain_version: stable
+      compile_variant: enterprise-rhel8-debug-tsan-compile
+      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      build_mongot: true
+      download_mongot_release: true
+      bazel_compile_flags: --config=dbg_tsan --opt=on --fission=no --jobs=800 --streams_release_build=True --optimize_test_binaries=True
+      resmoke_jobs_factor: 0.3
+      large_distro_name: rhel8.8-xlarge
+      xlarge_distro_name: rhel8.8-xxlarge
+      core_analyzer_distro_name: rhel8.8-xxlarge
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: run_unit_tests_TG
+        distros:
+          - rhel8.8-xlarge
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_integration_and_test_parallel_stream_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+      - name: .development_critical .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+        distros:
+          - rhel8.8-xlarge
+      - name: .all_variants .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+      - name: .all_variants .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+        distros:
+          - rhel8.8-xlarge
+      - name: .default .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+      - name: .default .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+        distros:
+          - rhel8.8-xlarge
+
+  - name: enterprise-rhel8-arm64-debug-tsan-compile
+    display_name: "* TSAN Enterprise RHEL 8 arm64 DEBUG Compile"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - emergency_release
+      - non_release_variant
+    cron: 0 2 * * *
+    run_on:
+      - rhel8.8-arm64-m8g-8xlarge
+    stepback: false
+    expansions:
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
+      lang_environment: LANG=C
+      toolchain_version: stable
+      compile_variant: enterprise-rhel8-arm64-debug-tsan-compile
+      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      build_mongot: true
+      download_mongot_release: true
+      bazel_compile_flags: --config=dbg_tsan --opt=on --fission=no --jobs=800 --streams_release_build=True --optimize_test_binaries=True
+      resmoke_jobs_factor: 0.1
+      large_distro_name: rhel8.8-arm64-m8g-8xlarge
+      xlarge_distro_name: rhel8.8-arm64-m8g-8xlarge
+      core_analyzer_distro_name: rhel8.8-arm64-m8g-8xlarge
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      evergreen_remote_exec: true
+      exec_timeout_factor: 1.5
+      idle_timeout_factor: 1.5
+    tasks:
+      - name: compile_test_parallel_core_stream_TG !.multiversion
+      - name: run_unit_tests_TG !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: compile_test_parallel_dbtest_stream_TG !.multiversion
+      - name: compile_integration_and_test_parallel_stream_TG !.multiversion
+      - name: .development_critical .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+      - name: .development_critical .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .all_variants .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+      - name: .all_variants .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .default .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+      - name: .default .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+
+  - name: linux-arm64-tsan-essential-required
+    display_name: "! Amazon Linux 2023 arm64 TSAN Atlas Essential"
+    tags:
+      - required
+      - forbid_tasks_tagged_with_experimental
+      - disagg
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - amazon2023-arm64-latest-m8g-2xlarge
+    stepback: false
+    expansions:
+      evergreen_remote_exec: true
+      test_flags: --excludeWithAnyTags=tsan_incompatible --additionalFeatureFlags featureFlagMaxKeyDetection
+      bazelrc_flags: --remote_execution_priority=3
+      bazel_compile_flags: --config=dbg_tsan --opt=on --fission=no --jobs=1600 --build_atlas --optimize_test_binaries=True
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
+      lang_environment: LANG=C
+      toolchain_version: stable
+      compile_variant: linux-arm64-tsan-essential-required
+      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      build_mongot: true
+      download_mongot_release: true
+      resmoke_jobs_factor: 0.3
+      large_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+      xlarge_distro_name: amazon2023-arm64-latest-m8g-16xlarge
+      core_analyzer_distro_name: amazon2023-arm64-latest-m8g-16xlarge
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+      - name: run_unit_tests_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: disagg_smoke
+        depends_on:
+          - name: archive_dist_test
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: enterprise-rhel8-debug-tsan-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-rhel8-debug-tsan
+    display_name: "* TSAN Enterprise RHEL 8 DEBUG"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - emergency_release
+      - non_release_variant
+    cron: 0 2 1-31/2 * *
+    run_on:
+      - rhel8.8-large
+    stepback: false
+    expansions:
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
+      lang_environment: LANG=C
+      toolchain_version: stable
+      compile_variant: enterprise-rhel8-debug-tsan-compile
+      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      build_mongot: true
+      download_mongot_release: true
+      bazel_compile_flags: --config=dbg_tsan --opt=on --fission=no --jobs=800 --streams_release_build=True --optimize_test_binaries=True
+      resmoke_jobs_factor: 0.3
+      large_distro_name: rhel8.8-xlarge
+      xlarge_distro_name: rhel8.8-xxlarge
+      core_analyzer_distro_name: rhel8.8-xxlarge
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      test_flags: '--mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}" --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}" --excludeWithAnyTags=tsan_incompatible'
+    tasks:
+      - name: .mongot_e2e_tests !.requires_large_host !.experimental !.extensions_secure_mode
+      - name: .mongot_e2e_tests .requires_large_host !.experimental !.extensions_secure_mode
+        distros:
+          - rhel8.8-xlarge
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .all_variants !.requires_extra_system_deps !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .all_variants !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .all_variants !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .default !.requires_extra_system_deps !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .default !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .default !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .non_required !.requires_extra_system_deps !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .non_required !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .non_required !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: rhel8-debug-aubsan-compile-x86
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: rhel8-debug-aubsan-classic-engine
+    display_name: "* {A,UB}SAN Enterprise RHEL 8 DEBUG (Classic Engine)"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1 * * *
+    run_on:
+      - rhel8.8-large
+    expansions:
+      compile_variant: rhel8-debug-aubsan-compile-x86
+      lang_environment: LANG=C
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      resmoke_jobs_factor: 0.3
+      hang_analyzer_dump_core: false
+      large_distro_name: rhel8.8-xlarge
+      xlarge_distro_name: rhel8.8-xxlarge
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      test_flags: '--mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine, internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}" --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}" --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}" --excludeWithAnyTags=requires_increased_memlock_limits,featureFlagSbeFull,incompatible_aubsan,requires_sbe'
+    tasks:
+      - name: .aggregation !.requires_extra_system_deps !.sbe_only
+      - name: .auth !.requires_extra_system_deps
+      - name: audit
+      - name: .causally_consistent !.requires_extra_system_deps !.wo_snapshot
+      - name: .change_streams !.requires_extra_system_deps
+      - name: .misc_js !.requires_extra_system_deps
+      - name: .concurrency !.incompatible_aubsan !.requires_extra_system_deps !.no_txns !.kill_terminate !.compute_mode !.feature_flag_guarded
+      - name: .encrypt !.requires_extra_system_deps
+      - name: external_auth
+      - name: external_auth_aws
+      - name: external_auth_oidc
+      - name: initial_sync_fuzzer_gen
+      - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
+      - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
+      - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
+      - name: .jscore .common !.sbe_only !.feature_flag_guarded
+      - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gcm
+      - name: jsCore_txns_large_txns_format
+      - name: json_schema
+      - name: .multi_shard .common !.requires_extra_system_deps
+      - name: .query_fuzzer !.requires_extra_system_deps
+      - name: .read_write_concern !.requires_extra_system_deps
+      - name: replica_sets_large_txns_format_jscore_passthrough
+      - name: .replica_sets !.requires_extra_system_deps !.multi_oplog !.uninitialized_fcv !.feature_flag_guarded
+      - name: .replica_sets .encrypt !.requires_extra_system_deps
+      - name: .resharding_fuzzer !.requires_extra_system_deps
+      - name: .retry !.requires_extra_system_deps
+      - name: .rollbackfuzzer !.requires_extra_system_deps
+      - name: .read_only !.requires_extra_system_deps
+      - name: sasl
+      - name: secondary_reads_passthrough_gen
+      - name: session_jscore_passthrough
+      - name: .sharding .jscore !.requires_extra_system_deps !.wo_snapshot !.feature_flag_guarded !.uninitialized_fcv
+      - name: .sharding .common !.requires_extra_system_deps !.csrs !.jstestfuzz !.feature_flag_guarded
+      - name: .updatefuzzer !.requires_extra_system_deps
+      - name: unittest_shell_hang_analyzer_gen
+      - name: .watchdog !.requires_extra_system_deps
+
+  # ---- from variants/sanitizer/test_dev_master_branch_only.yml ----
+  - name: windows-debug-suggested
+    display_name: "* Windows Server 2022 DEBUG"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - windows-2022-small
+    expansions:
+      exe: .exe
+      content_type: application/zip
+      bazel_compile_flags: --dbg=True --opt=on --define=MONGO_DISTMOD=windows --build_enterprise=False
+      python: /cygdrive/c/python/python313/python.exe
+      ext: zip
+      multiversion_platform: windows
+      multiversion_edition: enterprise
+      large_distro_name: windows-2022-large
+      test_flags: '--excludeWithAnyTags=incompatible_with_windows_tls,requires_otel_build --modules=none --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}" --mongosSetParameters="{findShardsOnConfigTimeoutMS: 40000}"'
+      compile_variant: windows-debug-suggested
+    tasks:
+      - name: compile_test_serial_TG
+        distros:
+          - windows-2022-xxlarge
+      - name: run_unit_tests_no_sandbox_TG
+        distros:
+          - windows-2022-xxlarge
+      - name: compile_integration_and_test_no_audit_parallel_stream_TG
+        distros:
+          - windows-2022-xxlarge
+      - name: .development_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
+        distros:
+          - windows-2022-large
+      - name: .all_variants !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
+      - name: .all_variants .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_windows !.requires_all_feature_flags
+        distros:
+          - windows-2022-large
+
+  - name: macos-debug-suggested
+    display_name: "* macOS arm64 DEBUG"
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 2 * * *
+    run_on:
+      - macos-15-arm64
+    expansions:
+      compile_variant: macos-debug-suggested
+      test_flags: '--excludeWithAnyTags=incompatible_with_macos,requires_otel_build --modules=none --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"'
+      resmoke_jobs_max: 6
+      bazel_compile_flags: --dbg=True --opt=on --build_enterprise=False
+    tasks:
+      - name: compile_test_serial_TG
+      - name: run_unit_tests_8_way_split_TG
+      - name: .development_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
+      - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
+        distros:
+          - macos-15-arm64
+      - name: .all_variants !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
+      - name: .all_variants .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
+        distros:
+          - macos-15-arm64
+
+  - name: rhel8-debug-ubsan-all-feature-flags
+    display_name: "* Shared Library UBSAN Enterprise RHEL 8 DEBUG (all feature flags)"
+    tags:
+      - suggested
+      - emergency_release
+      - non_release_variant
+    cron: 0 2 * * *
+    run_on:
+      - rhel8.8-large
+    stepback: false
+    expansions:
+      core_analyzer_gdb_index_cache: false
+      toolchain_version: stable
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
+      lang_environment: LANG=C
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      bazel_compile_flags: --dbg=True --opt=on --ubsan=True --compiler_type=clang --dtlto=False --pgo_profile_use=False --bolt_profile_use=False --allocator=tcmalloc-gperf --separate_debug=False
+      compile_variant: rhel8-debug-ubsan-all-feature-flags
+      test_flags: '--excludeWithAnyTags=requires_increased_memlock_limits,all_feature_flags_incompatible --runAllFeatureFlagTests --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"'
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      resmoke_jobs_factor: 0.3
+      large_distro_name: rhel8.8-large
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+      - name: .concurrency .multiversion !.requires_extra_system_deps !.no_txns !.kill_terminate
+      - name: disk_wiredtiger
+      - name: generate_buildid_to_debug_symbols_mapping
+
+  - name: rhel8-arm64-debug-ubsan-all-feature-flags
+    display_name: "* Shared Library UBSAN Enterprise RHEL 8 arm64 DEBUG (all feature flags)"
+    tags:
+      - suggested
+      - emergency_release
+      - non_release_variant
+    cron: 0 2 * * *
+    run_on:
+      - rhel8.8-arm64-m8g-8xlarge
+    stepback: false
+    expansions:
+      evergreen_remote_exec: true
+      core_analyzer_gdb_index_cache: false
+      toolchain_version: stable
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
+      lang_environment: LANG=C
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      bazel_compile_flags: --dbg=True --opt=on --ubsan=True --compiler_type=clang --dtlto=False --pgo_profile_use=False --bolt_profile_use=False --allocator=tcmalloc-gperf --separate_debug=False
+      compile_variant: rhel8-arm64-debug-ubsan-all-feature-flags
+      test_flags: '--excludeWithAnyTags=requires_increased_memlock_limits,all_feature_flags_incompatible --runAllFeatureFlagTests --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"'
+      resmoke_jobs_factor: 0.3
+      large_distro_name: rhel8.8-arm64-m8g-8xlarge
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+      - name: .concurrency !.incompatible_aubsan !.multiversion !.requires_extra_system_deps !.no_txns !.kill_terminate
+      - name: disk_wiredtiger
+      - name: generate_buildid_to_debug_symbols_mapping
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: rhel8-debug-aubsan-compile-x86
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: rhel8-debug-aubsan-all-feature-flags
+    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
+    modules:
+      - asp-js-engine
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - emergency_release
+      - non_release_variant
+    cron: 0 2 1-31/2 * *
+    run_on:
+      - rhel8.8-large
+    display_tasks: []
+    expansions:
+      compile_variant: rhel8-debug-aubsan-compile-x86
+      lang_environment: LANG=C
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      resmoke_jobs_factor: 0.3
+      hang_analyzer_dump_core: false
+      large_distro_name: rhel8.8-xlarge
+      xlarge_distro_name: rhel8.8-xxlarge
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      test_flags: '--runAllFeatureFlagTests --additionalFeatureFlags=featureFlagStreams --excludeWithAnyTags=incompatible_aubsan --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}" --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}" --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"'
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .development_critical .requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .all_variants !.requires_large_host !.requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .all_variants .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .all_variants .requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .default !.requires_large_host !.requires_large_host_aubsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .default .requires_large_host_aubsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .non_required !.requires_large_host !.requires_large_host_aubsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .non_required .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .non_required .requires_large_host_aubsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .streams_sanitizer_all
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: rhel8-debug-aubsan-compile-x86
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: rhel8-debug-aubsan-experimental-all-feature-flags
+    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG Experimental (all feature flags)"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 2 * * *
+    run_on:
+      - rhel8.8-large
+    expansions:
+      compile_variant: rhel8-debug-aubsan-compile-x86
+      lang_environment: LANG=C
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      resmoke_jobs_factor: 0.3
+      hang_analyzer_dump_core: false
+      large_distro_name: rhel8.8-xlarge
+      xlarge_distro_name: rhel8.8-xxlarge
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      test_flags: '--runAllFeatureFlagTests --excludeWithAnyTags=incompatible_aubsan --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}" --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"'
+    tasks:
+      - name: .multiversion_fuzzer
+      - name: .multiversion_passthrough !.requires_extra_system_deps
+      - name: .random_multiversion_ds
+      - name: .watchdog
+
+  - name: rhel8-arm64-debug-aubsan-benchmarks
+    display_name: "* {A,UB}SAN Enterprise RHEL 8 ARM64 DEBUG (Benchmarks)"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 2 * * *
+    run_on:
+      - rhel8.8-arm64-m8g-8xlarge
+    expansions:
+      has_packages: false
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      bazel_compile_flags: --config=dbg_aubsan --opt=on --fission=no
+      test_flags: '--benchmarkRepetitions=1 --excludeWithAnyTags=incompatible_aubsan --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}" --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"'
+      compile_variant: rhel8-arm64-debug-aubsan-benchmarks
+    tasks:
+      - name: compile_upload_benchmarks_TG
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .benchmarks !.multiversion
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: enterprise-rhel8-debug-tsan-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-rhel8-debug-tsan-all-feature-flags
+    display_name: "* TSAN Enterprise RHEL 8 DEBUG (all feature flags)"
+    modules:
+      - asp-js-engine
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - emergency_release
+      - non_release_variant
+    cron: 0 2 * * 0
+    run_on:
+      - rhel8.8-large
+    stepback: false
+    display_tasks: []
+    expansions:
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
+      lang_environment: LANG=C
+      toolchain_version: stable
+      compile_variant: enterprise-rhel8-debug-tsan-compile
+      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      build_mongot: true
+      download_mongot_release: true
+      bazel_compile_flags: --config=dbg_tsan --opt=on --fission=no --jobs=800 --streams_release_build=True --optimize_test_binaries=True
+      resmoke_jobs_factor: 0.3
+      large_distro_name: rhel8.8-xlarge
+      xlarge_distro_name: rhel8.8-xxlarge
+      core_analyzer_distro_name: rhel8.8-xxlarge
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      test_flags: '--mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}" --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}" --excludeWithAnyTags=tsan_incompatible --runAllFeatureFlagTests --additionalFeatureFlags=featureFlagStreams'
+    tasks:
+      - name: .development_critical .multiversion !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .development_critical .multiversion .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .development_critical .multiversion .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .all_variants .multiversion !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .all_variants .multiversion .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .all_variants .multiversion .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .default .multiversion !.requires_large_host !.requires_large_host_tsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default .multiversion .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .default .multiversion .requires_large_host_tsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .non_required .multiversion !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .non_required .multiversion .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .non_required .multiversion .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .jstestfuzz !.multiversion !.initsync !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .streams_sanitizer_all
+      - name: streams_https_sanitizer
+      - name: streams_lambda_sanitizer
+      - name: streams_kinesis_sanitizer
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: enterprise-rhel8-arm64-debug-tsan-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-rhel8-arm64-debug-tsan-all-feature-flags
+    display_name: "* TSAN Enterprise RHEL 8 arm64 DEBUG (all feature flags)"
+    modules:
+      - asp-js-engine
+    tags:
+      - suggested
+      - forbid_tasks_tagged_with_experimental
+      - emergency_release
+      - non_release_variant
+    cron: 0 2 1-31/2 * *
+    run_on:
+      - rhel8.8-arm64-m8g-4xlarge
+    stepback: false
+    expansions:
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
+      lang_environment: LANG=C
+      toolchain_version: stable
+      compile_variant: enterprise-rhel8-arm64-debug-tsan-compile
+      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      build_mongot: true
+      download_mongot_release: true
+      bazel_compile_flags: --config=dbg_tsan --opt=on --fission=no --jobs=800 --streams_release_build=True --optimize_test_binaries=True
+      resmoke_jobs_factor: 0.1
+      large_distro_name: rhel8.8-arm64-m8g-4xlarge
+      xlarge_distro_name: rhel8.8-arm64-m8g-4xlarge
+      core_analyzer_distro_name: rhel8.8-arm64-m8g-4xlarge
+      idle_timeout_factor: 2.0
+      exec_timeout_factor: 2.0
+      exec_timeout_secs: 36000
+      resmoke_jobs_max: 1
+      test_flags: '--mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}" --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}" --excludeWithAnyTags=tsan_incompatible --runAllFeatureFlagTests --additionalFeatureFlags=featureFlagStreams'
+    tasks:
+      - name: .arm64_tsan_needs_8xlarge
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .development_critical !.multiversion !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+      - name: .development_critical !.multiversion .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+        distros:
+          - rhel8.8-arm64-m8g-4xlarge
+      - name: .development_critical !.multiversion .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+        distros:
+          - rhel8.8-arm64-m8g-4xlarge
+      - name: .all_variants !.multiversion !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+      - name: .all_variants !.multiversion .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+        distros:
+          - rhel8.8-arm64-m8g-4xlarge
+      - name: .all_variants !.multiversion .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+        distros:
+          - rhel8.8-arm64-m8g-4xlarge
+      - name: .default !.multiversion !.requires_large_host !.requires_large_host_tsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+      - name: .default !.multiversion .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+        distros:
+          - rhel8.8-arm64-m8g-4xlarge
+      - name: .default !.multiversion .requires_large_host_tsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+        distros:
+          - rhel8.8-arm64-m8g-4xlarge
+      - name: .non_required !.multiversion !.requires_large_host !.requires_large_host_tsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+      - name: .non_required !.multiversion .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+        distros:
+          - rhel8.8-arm64-m8g-4xlarge
+      - name: .non_required !.multiversion .requires_large_host_tsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.arm64_tsan_needs_8xlarge
+        distros:
+          - rhel8.8-arm64-m8g-4xlarge
+      - name: .streams_sanitizer_all
+      - name: streams_https_sanitizer
+      - name: streams_lambda_sanitizer
+      - name: streams_kinesis_sanitizer
+
+  - name: amazon-linux2023-aubsan-all-feature-flags-extra-system-deps-replica-sets
+    display_name: "* Amazon Linux 2023 {A,UB}SAN Enterprise (all feature flags, extra system deps, Replica Sets)"
+    tags:
+      - forbid_tasks_tagged_with_experimental
+      - suggested
+      - non_release_variant
+    cron: 0 1 * * *
+    patchable: true
+    run_on:
+      - amazon2023-arm64-latest-m8g-4xlarge
+    expansions:
+      san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      docker_arch: linux-arm64
+      bazel_compile_flags: --config=dbg_aubsan --define=MONGO_DISTMOD=amazon2023 --build_atlas --linkstatic=True --opt=on --fission=no
+      test_flags: '--runAllFeatureFlagTests --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer,incompatible_aubsan --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}" --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}" --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"'
+      has_packages: false
+      repo_edition: enterprise
+      compile_variant: amazon-linux2023-aubsan-all-feature-flags-extra-system-deps-replica-sets
+      large_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+      resmoke_jobs_factor: 0.2
+      hang_analyzer_dump_core: false
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      multiversion_release_feed_source: atlas
+      last_versions: last_patch
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+      - name: package_supplementary_data
+      - name: .requires_extra_system_deps .development_critical !.sharding !.sharded !.requires_large_host !.incompatible_development_variant !.incompatible_all_feature_flags !.incompatible_aubsan !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .development_critical !.sharding !.sharded .requires_large_host !.incompatible_development_variant !.incompatible_all_feature_flags !.incompatible_aubsan !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+      - name: .requires_extra_system_deps .all_variants !.sharding !.sharded !.requires_large_host !.incompatible_development_variant !.incompatible_all_feature_flags !.incompatible_aubsan !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .all_variants !.sharding !.sharded .requires_large_host !.incompatible_development_variant !.incompatible_all_feature_flags !.incompatible_aubsan !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+      - name: .requires_extra_system_deps .default !.sharding !.sharded !.requires_large_host !.incompatible_development_variant !.incompatible_all_feature_flags !.incompatible_aubsan !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .requires_extra_system_deps .default !.sharding !.sharded .requires_large_host !.incompatible_development_variant !.incompatible_all_feature_flags !.incompatible_aubsan !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - amazon2023-arm64-latest-m8g-8xlarge
+
+  # ---- from variants/windows/test_dev.yml ----
+  - name: windows-compile-required
+    display_name: "! Windows Server 2022 Enterprise Compile Essential"
+    tags:
+      - required
+      - no_atlas_build
+      - bazel_check
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    run_on:
+      - windows-2022-xxlarge
+    activate: true
+    expansions:
+      exe: .exe
+      ext: zip
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug //src/mongo/installer/msi:mongodb-win32-x86_64-windows
+      content_type: application/zip
+      bazel_compile_flags: --define=MONGO_DISTMOD=windows --define=GIT_COMMIT_HASH="nogitversion" --define=MONGO_VERSION=9.1.0-alpha-patch-nogitversion --modify_execution_info=.*=-no-remote-cache
+      python: /cygdrive/c/python/python313/python.exe
+      compile_variant: windows-compile-required
+      xlarge_distro_name: windows-2022-expandedports-xlarge
+    tasks:
+      - name: compile_test_serial_no_unittests_TG
+        distros:
+          - windows-2022-xxxlarge-compile
+      - name: windows_test_launcher_tests_TG
+      - name: run_bazel_compiledb
+      - name: run_unit_tests_no_sandbox_TG
+        distros:
+          - windows-2022-xxxlarge-compile
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-expandedports-xxlarge
+      - name: .all_variants .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
+      - name: .all_variants .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-expandedports-xxlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows .requires_execution_on_windows_patch_build
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows .requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-expandedports-xxlarge
+
+  - name: windows-compile-suggested
+    display_name: "* Windows Server 2022 Enterprise Compile Non-essential"
+    tags:
+      - suggested
+      - bazel_check
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    run_on:
+      - windows-2022-xxlarge
+    activate: true
+    expansions:
+      exe: .exe
+      ext: zip
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug //src/mongo/installer/msi:mongodb-win32-x86_64-windows
+      content_type: application/zip
+      bazel_compile_flags: --define=MONGO_DISTMOD=windows --define=GIT_COMMIT_HASH="nogitversion" --define=MONGO_VERSION=9.1.0-alpha-patch-nogitversion --modify_execution_info=.*=-no-remote-cache
+      python: /cygdrive/c/python/python313/python.exe
+      compile_variant: windows-compile-required
+      xlarge_distro_name: windows-2022-expandedports-xlarge
+    tasks:
+      - name: bazel_run_format
+      - name: bazel_run_lint
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch !.requires_execution_on_windows_patch_build
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch !.requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-expandedports-xxlarge
+      - name: .all_variants .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch !.requires_execution_on_windows_patch_build
+      - name: .all_variants .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch !.requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-expandedports-xxlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.requires_execution_on_windows_patch_build
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-expandedports-xxlarge
+      - name: compile_unittest_libaries_TG
+      - name: run_bazel_TG
+      - name: hydrate_all_headers_TG
+        distros:
+          - windows-2022-xxxlarge-compile
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: windows-compile-required
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-windows-all-feature-flags-required
+    display_name: "! Enterprise Windows Server 2022 (all feature flags) essential tasks"
+    tags:
+      - required
+      - no_atlas_build
+      - forbid_tasks_tagged_with_experimental
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - windows-2022-small
+    expansions:
+      compile_variant: windows-compile-required
+      burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
+      exe: .exe
+      content_type: application/zip
+      python: /cygdrive/c/python/python313/python.exe
+      ext: zip
+      multiversion_platform: windows
+      multiversion_edition: enterprise
+      jstestfuzz_num_generated_files: 35
+      large_distro_name: windows-2022-expandedports-xlarge
+      push_path: windows
+      push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
+      push_name: windows
+      push_arch: x86_64-enterprise
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
+      test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=incompatible_with_windows_tls,requires_otel_build
+      external_auth_jobs_max: 1
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-expandedports-xlarge
+      - name: .all_variants !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
+      - name: .all_variants .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
+        distros:
+          - windows-2022-expandedports-xlarge
+
+  - depends_on:
+      - name: archive_dist_test
+        variant: windows-compile-required
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    name: enterprise-windows-all-feature-flags-non-essential
+    display_name: "* Enterprise Windows Server 2022 (all feature flags) non-essential tasks"
+    tags:
+      - suggested
+      - non_release_variant
+    cron: 0 1,5,9,13,17,21 * * *
+    run_on:
+      - windows-2022-small
+    expansions:
+      compile_variant: windows-compile-required
+      burn_in_tests_build_variant: enterprise-windows-all-feature-flags-non-essential
+      exe: .exe
+      content_type: application/zip
+      python: /cygdrive/c/python/python313/python.exe
+      ext: zip
+      multiversion_platform: windows
+      multiversion_edition: enterprise
+      jstestfuzz_num_generated_files: 35
+      large_distro_name: windows-2022-expandedports-xlarge
+      push_path: windows
+      push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
+      push_name: windows
+      push_arch: x86_64-enterprise
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
+      test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=incompatible_with_windows_tls,requires_otel_build
+      external_auth_jobs_max: 1
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
+        distros:
+          - windows-2022-expandedports-xlarge
+      - name: .all_variants !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
+      - name: .all_variants .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
+        distros:
+          - windows-2022-expandedports-xlarge
