@@ -424,6 +424,14 @@ feature_flags:
         cpp_varname: gFeatureFlagAllocationTimeMemoryTracking
         default: false
         fcv_gated: false
+    featureFlagLogServiceSegmentCompletion:
+        description: >-
+            Whether ClosedSegmentCompletionTracker uses Log Service GetCurrentLogInfo to determine
+            PHYLOG materialization for segments that CMS reports as unmaterialized. When false, the
+            tracker uses CMS segment state and fully_materialized fields only.
+        cpp_varname: gFeatureFlagLogServiceSegmentCompletion
+        default: true
+        fcv_gated: false
 
 server_parameters:
     allowDirectSystemBucketsAccess:
