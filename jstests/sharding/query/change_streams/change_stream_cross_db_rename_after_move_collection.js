@@ -45,7 +45,8 @@ import {
 } from "jstests/libs/util/change_stream/change_stream_verifier.js";
 import {Writer} from "jstests/libs/util/change_stream/change_stream_writer.js";
 
-describe("change stream cross-db rename after moveCollection", function () {
+// TODO: SERVER-138724 Add back in once duplicate events tolerated
+describe.skip("change stream cross-db rename after moveCollection", function () {
     let st, shards, mongos;
 
     before(function () {

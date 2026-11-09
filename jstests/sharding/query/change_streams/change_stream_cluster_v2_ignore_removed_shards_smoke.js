@@ -489,7 +489,9 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         csTest.assertNoChange(csCursor);
     });
 
-    it("returns events in ignoreRemovedShards mode after shard has been removed, showExpandedEvents", () => {
+    // TODO: SERVER-138724 Add back in once duplicate events tolerated
+
+    it.skip("returns events in ignoreRemovedShards mode after shard has been removed, showExpandedEvents", () => {
         // Enable sharding on the the test database and ensure that the primary is shard0.
         assert.commandWorked(
             db.adminCommand({

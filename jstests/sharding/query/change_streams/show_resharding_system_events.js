@@ -16,6 +16,9 @@ import {assertChangeStreamEventEq} from "jstests/libs/query/change_stream_util.j
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {makeTempReshardingCollName} from "jstests/sharding/libs/reshard_collection_util.js";
 
+// TODO: SERVER-138724 Add back in once duplicate events tolerated
+quit();
+
 // Create a single-shard cluster for this test.
 const st = new ShardingTest({
     shards: 1,

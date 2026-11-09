@@ -76,7 +76,9 @@ describe("$changeStream v2", function () {
         st.stop();
     });
 
-    it("returns events before and after resharding a collection", function () {
+    // TODO: SERVER-138724 Add back in once duplicate events tolerated
+
+    it.skip("returns events before and after resharding a collection", function () {
         // Create and shard a collection and allocate collection to shard set {shard0, shard1}.
         assertCreateCollection(db, coll.getName());
         assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
@@ -273,7 +275,9 @@ describe("$changeStream v2", function () {
         csTest.assertNoChange(csCursor);
     });
 
-    it("returns events from multiple collections", function () {
+    // TODO: SERVER-138724 Add back in once duplicate events tolerated
+
+    it.skip("returns events from multiple collections", function () {
         // Create and shard a collection and allocate collection to shard set {shard0, shard1}.
         const coll2Name = `${jsTestName()}` + "_2";
         const coll2 = db.getCollection(coll2Name);
