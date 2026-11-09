@@ -222,6 +222,31 @@ mongo_cc_unit_test(
     ],
 )
 
+# These tests write 4GB+ per run and have a multi-GB memory peak, so they get their own target
+# with an enormous test size. Sanitizer builds multiply memory use beyond what fits, so the
+# target is excluded there entirely.
+mongo_cc_unit_test(
+    name = "wiredtiger_recovery_unit_large_txn_test",
+    size = "enormous",
+    srcs = [
+        "wiredtiger_recovery_unit_large_txn_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_third_group",
+        "server-storage-engine-integration",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:any_enabled_sanitizer": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":storage_wiredtiger",
+        ":storage_wiredtiger_core",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "storage_wiredtiger_record_store_and_index_test",
     srcs = [

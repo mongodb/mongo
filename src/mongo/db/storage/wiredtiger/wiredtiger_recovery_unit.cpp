@@ -7,6 +7,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
@@ -27,6 +28,7 @@
 #include "mongo/util/testing_proctor.h"
 
 #include <algorithm>
+#include <cerrno>
 #include <string>
 
 #include <wiredtiger.h>
@@ -78,6 +80,11 @@ void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, Timestamp& ts) {
 MONGO_FAIL_POINT_DEFINE(WTStepDownRollbackAtCommit);
 
 Atomic<std::int64_t> snapshotTooOldErrorCount{0};
+
+// Number of transactions rejected with TransactionTooLarge because their WiredTiger log record
+// exceeds the 4GB single-record limit.
+auto& txnLogRecordTooLargeCount =
+    *MetricBuilder<Counter64>("storage.transactionLogRecordTooLargeErrors");
 
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* sc)
     : WiredTigerRecoveryUnit(sc, sc->getKVEngine()->getOplogManager()) {}
@@ -612,6 +619,24 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             throwWriteConflictException(
                 "Storage engine no longer in primary mode when committing storage transaction");
         }
+    }
+
+    // EFBIG means the commit log record exceeded WT's 4GB limit, and WT has already rolled back
+    // and released the transaction. Leave the active state (staying in the unit of work if we
+    // were in one, since doAbandonSnapshot can also reach here) so the later abort does not roll
+    // back the released session, and report a user error instead of crashing.
+    if (commit && wtRet == EFBIG) {
+        txnLogRecordTooLargeCount.increment();
+        _resetPerTransactionState();
+        _setState(_inUnitOfWork() ? State::kInactiveInUnitOfWork : State::kInactive);
+        auto gle = _session->getLastError();
+        uasserted(ErrorCodes::TransactionTooLarge,
+                  str::stream() << "Transaction too large to commit: the transaction's commit log "
+                                   "record exceeds the maximum size supported "
+                                   "by the storage engine"
+                                << (gle.err_msg && gle.err_msg[0] != '\0'
+                                        ? fmt::format(": {}", gle.err_msg)
+                                        : ""));
     }
     invariantWTOK(wtRet, *_session);
 
