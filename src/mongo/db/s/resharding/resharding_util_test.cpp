@@ -26,6 +26,7 @@
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_runtime_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_tunables.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -609,6 +610,292 @@ TEST_F(ReshardingUtilTest, ValidatePerformVerification) {
         ASSERT_THROWS_CODE(
             validatePerformVerification(vCtx, true), DBException, ErrorCodes::InvalidOptions);
     }
+}
+
+class ReshardingUtilTunablesTest : public ReshardingUtilTest {
+protected:
+    struct RequestTunableInputs {
+        boost::optional<ReshardingTunables> options;
+        boost::optional<std::int64_t> legacyOplogBatchTaskCount;
+        boost::optional<bool> legacyPerformVerification;
+        OptionalBool demoMode;
+    };
+
+    ConfigsvrReshardCollection makeRequest(const RequestTunableInputs& inputs = {}) {
+        ConfigsvrReshardCollection request(nss(), BSON(shardKey() << 1));
+        request.setDbName(nss().dbName());
+        request.setProvenance(ReshardingProvenanceEnum::kReshardCollection);
+        request.setOptions(inputs.options);
+        request.setRecipientOplogBatchTaskCount(inputs.legacyOplogBatchTaskCount);
+        request.setPerformVerification(inputs.legacyPerformVerification);
+        request.setDemoMode(inputs.demoMode);
+        return request;
+    }
+
+    ReshardingCoordinatorDocument makeCoordinatorDoc(
+        const boost::optional<ReshardingTunables>& options,
+        boost::optional<std::int64_t> legacyOplogBatchTaskCount = boost::none) {
+        const CollectionType collEntry(nss(),
+                                       OID::gen(),
+                                       Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
+                                       Date_t::now(),
+                                       UUID::gen(),
+                                       keyPattern());
+
+        return createReshardingCoordinatorDoc(
+            operationContext(),
+            makeRequest(
+                {.options = options, .legacyOplogBatchTaskCount = legacyOplogBatchTaskCount}),
+            collEntry,
+            primaryShardId(),
+            nss(),
+            true);
+    }
+};
+
+TEST_F(ReshardingUtilTunablesTest, CoordinatorDocHasEveryTunableResolvedWhenEnabled) {
+    unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", true);
+    unittest::ServerParameterGuard timeout("reshardingCriticalSectionTimeoutMillis", 1234);
+    unittest::ServerParameterGuard batchSize("reshardingCollectionClonerBatchSizeCount", 42);
+
+    // A couple of the values are specified by the user.
+    ReshardingTunables options;
+    options.setCollectionClonerBatchSizeCount(7);
+    options.setCoordinatorQuiescePeriodMillis(9);
+
+    auto doc = makeCoordinatorDoc(options);
+    ASSERT_TRUE(doc.getTunables());
+    const auto& tunables = *doc.getTunables();
+
+    // Specified values win.
+    ASSERT_EQ(tunables.getCollectionClonerBatchSizeCount(), 7);
+    ASSERT_EQ(tunables.getCoordinatorQuiescePeriodMillis(), 9);
+    // Unspecified values come from the server parameters.
+    ASSERT_EQ(tunables.getCriticalSectionTimeoutMillis(), 1234);
+
+    // Nothing is left unset.
+    ReshardingTunables unset;
+    resharding::fillDefaults(unset);
+    ASSERT_EQ(tunables.toBSON().nFields(), unset.toBSON().nFields());
+}
+
+TEST_F(ReshardingUtilTunablesTest, CoordinatorDocResolvesTunablesWhenNoOptionsWereGiven) {
+    unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", true);
+    unittest::ServerParameterGuard timeout("reshardingCriticalSectionTimeoutMillis", 1234);
+
+    auto doc = makeCoordinatorDoc(boost::none);
+    ASSERT_TRUE(doc.getTunables());
+    ASSERT_EQ(doc.getTunables()->getCriticalSectionTimeoutMillis(), 1234);
+}
+
+TEST_F(ReshardingUtilTunablesTest,
+       CoordinatorDocCarriesLegacyOplogBatchTaskCountIntoTunablesWhenOtherOptionsGiven) {
+    unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", true);
+    unittest::ServerParameterGuard taskCount("reshardingOplogBatchTaskCount", 2);
+
+    // The oplog batch task count is only given via the legacy top-level field; 'options' carries
+    // an unrelated tunable.
+    ReshardingTunables options;
+    options.setCoordinatorQuiescePeriodMillis(9);
+
+    auto doc = makeCoordinatorDoc(options, 5);
+    ASSERT_TRUE(doc.getTunables());
+    ASSERT_EQ(doc.getTunables()->getCoordinatorQuiescePeriodMillis(), 9);
+    ASSERT_EQ(doc.getTunables()->getOplogBatchTaskCount(), 5);
+}
+
+TEST_F(ReshardingUtilTunablesTest, CoordinatorDocHasNoTunablesWhenDisabled) {
+    unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", false);
+
+    ASSERT_FALSE(makeCoordinatorDoc(boost::none).getTunables());
+}
+
+TEST_F(ReshardingUtilTunablesTest, ResolveReshardingTunables) {
+    VersionContext::ScopedSetDecoration scopedVersionContext(
+        operationContext(),
+        VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+    const auto fom = ForwardableOperationMetadata{operationContext()};
+
+    ReshardingTunables tunables;
+    tunables.setCollectionClonerBatchSizeCount(10);
+
+    // Not specifying options is always valid.
+    for (bool flagEnabled : {false, true}) {
+        unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", flagEnabled);
+        ASSERT_DOES_NOT_THROW(resolveReshardingTunables(fom, makeRequest()));
+    }
+
+    // Specifying options requires featureFlagConcurrentResharding.
+    {
+        unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", true);
+        ASSERT_DOES_NOT_THROW(resolveReshardingTunables(fom, makeRequest({.options = tunables})));
+    }
+    {
+        unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", false);
+        ASSERT_THROWS_CODE(resolveReshardingTunables(fom, makeRequest({.options = tunables})),
+                           DBException,
+                           ErrorCodes::InvalidOptions);
+    }
+}
+
+TEST_F(ReshardingUtilTunablesTest, ResolveReshardingTunablesRejectsConflictingOplogBatchTaskCount) {
+    unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", true);
+    VersionContext::ScopedSetDecoration scopedVersionContext(
+        operationContext(),
+        VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+    const auto fom = ForwardableOperationMetadata{operationContext()};
+
+    ReshardingTunables tunables;
+    tunables.setOplogBatchTaskCount(4);
+
+    // The legacy top-level field and the new option may both be given if they agree.
+    ASSERT_DOES_NOT_THROW(resolveReshardingTunables(
+        fom, makeRequest({.options = tunables, .legacyOplogBatchTaskCount = 4})));
+    ASSERT_DOES_NOT_THROW(resolveReshardingTunables(fom, makeRequest({.options = tunables})));
+
+    ASSERT_THROWS_CODE(resolveReshardingTunables(
+                           fom, makeRequest({.options = tunables, .legacyOplogBatchTaskCount = 8})),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    // The legacy field on its own becomes the oplog batch task count.
+    auto resolved = resolveReshardingTunables(fom, makeRequest({.legacyOplogBatchTaskCount = 8}));
+    ASSERT_TRUE(resolved);
+    ASSERT_EQ(resolved->getOplogBatchTaskCount(), 8);
+}
+
+TEST_F(ReshardingUtilTunablesTest,
+       ResolveReshardingTunablesRejectsOutOfRangeLegacyOplogBatchTaskCount) {
+    unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", true);
+    VersionContext::ScopedSetDecoration scopedVersionContext(
+        operationContext(),
+        VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+    const auto fom = ForwardableOperationMetadata{operationContext()};
+
+    const std::int64_t beyondIntRangeThatWrapsToValidInt = (std::int64_t{1} << 32) + 8;
+    for (std::int64_t invalid : {std::int64_t{0},
+                                 std::int64_t{-1},
+                                 std::int64_t{257},
+                                 beyondIntRangeThatWrapsToValidInt}) {
+        ASSERT_THROWS(
+            resolveReshardingTunables(fom, makeRequest({.legacyOplogBatchTaskCount = invalid})),
+            DBException)
+            << invalid;
+    }
+}
+
+TEST_F(ReshardingUtilTunablesTest, ResolveReshardingTunablesRejectsConflictingPerformVerification) {
+    unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", true);
+    VersionContext::ScopedSetDecoration scopedVersionContext(
+        operationContext(),
+        VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+    const auto fom = ForwardableOperationMetadata{operationContext()};
+
+    ReshardingTunables tunables;
+    tunables.setDocumentVerification(true);
+
+    // The legacy top-level field and the new option may both be given if they agree.
+    ASSERT_DOES_NOT_THROW(resolveReshardingTunables(
+        fom, makeRequest({.options = tunables, .legacyPerformVerification = true})));
+
+    ASSERT_THROWS_CODE(
+        resolveReshardingTunables(
+            fom, makeRequest({.options = tunables, .legacyPerformVerification = false})),
+        DBException,
+        ErrorCodes::InvalidOptions);
+}
+
+TEST_F(ReshardingUtilTunablesTest,
+       ResolveReshardingTunablesLegacyPerformVerificationOverridesDefault) {
+    unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", true);
+    VersionContext::ScopedSetDecoration scopedVersionContext(
+        operationContext(),
+        VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+    const auto fom = ForwardableOperationMetadata{operationContext()};
+
+    for (bool serverParameterValue : {false, true}) {
+        unittest::ServerParameterGuard serverParameter("reshardingDocumentVerification",
+                                                       serverParameterValue);
+
+        ASSERT_EQ(resolveReshardingTunables(fom, makeRequest())->getDocumentVerification(),
+                  serverParameterValue);
+
+        for (bool legacyValue : {false, true}) {
+            auto resolved = resolveReshardingTunables(
+                fom, makeRequest({.legacyPerformVerification = legacyValue}));
+            ASSERT_EQ(resolved->getDocumentVerification(), legacyValue)
+                << "serverParameterValue=" << serverParameterValue;
+        }
+    }
+}
+
+TEST_F(ReshardingUtilTunablesTest, ResolveReshardingTunablesDemoModeSetsDurationsToZero) {
+    unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", true);
+    unittest::ServerParameterGuard minDuration("reshardingMinimumOperationDurationMillis", 100);
+    unittest::ServerParameterGuard delay("reshardingDelayBeforeRemainingOperationTimeQueryMillis",
+                                         200);
+    VersionContext::ScopedSetDecoration scopedVersionContext(
+        operationContext(),
+        VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+    const auto fom = ForwardableOperationMetadata{operationContext()};
+
+    auto withoutDemoMode = resolveReshardingTunables(fom, makeRequest());
+    ASSERT_EQ(withoutDemoMode->getMinimumOperationDurationMillis(), 100);
+    ASSERT_EQ(withoutDemoMode->getDelayBeforeRemainingOperationTimeQueryMillis(), 200);
+
+    auto withDemoMode =
+        resolveReshardingTunables(fom, makeRequest({.demoMode = OptionalBool{true}}));
+    ASSERT_EQ(withDemoMode->getMinimumOperationDurationMillis(), 0);
+    ASSERT_EQ(withDemoMode->getDelayBeforeRemainingOperationTimeQueryMillis(), 0);
+
+    auto demoModeFalse =
+        resolveReshardingTunables(fom, makeRequest({.demoMode = OptionalBool{false}}));
+    ASSERT_EQ(demoModeFalse->getMinimumOperationDurationMillis(), 100);
+}
+
+TEST_F(ReshardingUtilTunablesTest, ResolveReshardingTunablesDemoModeAllowsExplicitZero) {
+    unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", true);
+    VersionContext::ScopedSetDecoration scopedVersionContext(
+        operationContext(),
+        VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+    const auto fom = ForwardableOperationMetadata{operationContext()};
+
+    ReshardingTunables options;
+    options.setMinimumOperationDurationMillis(0);
+    options.setDelayBeforeRemainingOperationTimeQueryMillis(0);
+
+    auto resolved = resolveReshardingTunables(
+        fom, makeRequest({.options = options, .demoMode = OptionalBool{true}}));
+    ASSERT_EQ(resolved->getMinimumOperationDurationMillis(), 0);
+    ASSERT_EQ(resolved->getDelayBeforeRemainingOperationTimeQueryMillis(), 0);
+}
+
+TEST_F(ReshardingUtilTunablesTest, ResolveReshardingTunablesDemoModeRejectsNonZeroDurations) {
+    unittest::ServerParameterGuard flag("featureFlagConcurrentResharding", true);
+    VersionContext::ScopedSetDecoration scopedVersionContext(
+        operationContext(),
+        VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+    const auto fom = ForwardableOperationMetadata{operationContext()};
+
+    ReshardingTunables minDurationOptions;
+    minDurationOptions.setMinimumOperationDurationMillis(5);
+    ASSERT_THROWS_CODE(
+        resolveReshardingTunables(
+            fom, makeRequest({.options = minDurationOptions, .demoMode = OptionalBool{true}})),
+        DBException,
+        ErrorCodes::InvalidOptions);
+
+    ReshardingTunables delayOptions;
+    delayOptions.setDelayBeforeRemainingOperationTimeQueryMillis(5);
+    ASSERT_THROWS_CODE(
+        resolveReshardingTunables(
+            fom, makeRequest({.options = delayOptions, .demoMode = OptionalBool{true}})),
+        DBException,
+        ErrorCodes::InvalidOptions);
+
+    // The same values are fine when demoMode is not requested.
+    ASSERT_DOES_NOT_THROW(resolveReshardingTunables(
+        fom, makeRequest({.options = minDurationOptions, .demoMode = OptionalBool{false}})));
 }
 
 class ReshardingUtilPerformVerificationTest : public ReshardingUtilTest {

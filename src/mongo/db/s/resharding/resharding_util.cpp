@@ -38,6 +38,7 @@
 #include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_runtime_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_startup_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_tunables.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -60,6 +61,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string_view>
+#include <utility>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -698,6 +700,80 @@ void validatePerformVerification(const VersionContext& vCtx, OptionalBool perfor
         performVerification);
 }
 
+namespace {
+void uassertUnsetOrZeroForDemoMode(std::string_view name, const boost::optional<int>& value) {
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Cannot set 'options." << name << "' to " << *value
+                          << " when demoMode is true; demoMode sets it to 0",
+            !value || *value == 0);
+}
+
+int parseOplogBatchTaskCountAsTunable(std::int64_t oplogBatchTaskCount) {
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "recipientOplogBatchTaskCount is out of range: "
+                          << oplogBatchTaskCount,
+            std::in_range<int>(oplogBatchTaskCount));
+    auto tunables = ReshardingTunables::parse(BSON(ReshardingTunables::kOplogBatchTaskCountFieldName
+                                                   << static_cast<int>(oplogBatchTaskCount)),
+                                              IDLParserContext("recipientOplogBatchTaskCount"));
+    return *tunables.getOplogBatchTaskCount();
+}
+}  // namespace
+
+boost::optional<ReshardingTunables> resolveReshardingTunables(
+    const boost::optional<ForwardableOperationMetadata>& fom,
+    const ConfigsvrReshardCollection& request) {
+    if (!resharding::isEnabledWithPinnedVersion(fom,
+                                                resharding::gFeatureFlagConcurrentResharding)) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot specify 'options' when featureFlagConcurrentResharding is not enabled",
+                !request.getOptions());
+        return boost::none;
+    }
+
+    auto tunables = request.getOptions().value_or(ReshardingTunables{});
+
+    if (auto legacyRecipientOplogBatchTaskCount = request.getRecipientOplogBatchTaskCount()) {
+        if (auto optionsTaskCount = tunables.getOplogBatchTaskCount()) {
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Conflicting values for the oplog batch task count: the "
+                                     "top-level field is "
+                                  << *legacyRecipientOplogBatchTaskCount
+                                  << " but 'options.oplogBatchTaskCount' is " << *optionsTaskCount,
+                    *legacyRecipientOplogBatchTaskCount == *optionsTaskCount);
+        } else {
+            tunables.setOplogBatchTaskCount(
+                parseOplogBatchTaskCountAsTunable(*legacyRecipientOplogBatchTaskCount));
+        }
+    }
+
+    if (auto legacyPerformVerification = request.getPerformVerification()) {
+        if (auto optionsDocumentVerification = tunables.getDocumentVerification()) {
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Conflicting values for document verification: the top-level "
+                                     "field 'performVerification' is "
+                                  << *legacyPerformVerification
+                                  << " but 'options.documentVerification' is "
+                                  << *optionsDocumentVerification,
+                    *legacyPerformVerification == *optionsDocumentVerification);
+        } else {
+            tunables.setDocumentVerification(*legacyPerformVerification);
+        }
+    }
+
+    if (request.getDemoMode().value_or(false)) {
+        uassertUnsetOrZeroForDemoMode("minimumOperationDurationMillis",
+                                      tunables.getMinimumOperationDurationMillis());
+        uassertUnsetOrZeroForDemoMode("delayBeforeRemainingOperationTimeQueryMillis",
+                                      tunables.getDelayBeforeRemainingOperationTimeQueryMillis());
+        tunables.setMinimumOperationDurationMillis(0);
+        tunables.setDelayBeforeRemainingOperationTimeQueryMillis(0);
+    }
+
+    resharding::fillDefaults(tunables);
+    return tunables;
+}
+
 ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     OperationContext* opCtx,
     const ConfigsvrReshardCollection& request,
@@ -827,6 +903,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     }
     coordinatorDoc.setNumSamplesPerChunk(request.getNumSamplesPerChunk());
     coordinatorDoc.setDemoMode(request.getDemoMode());
+    coordinatorDoc.setTunables(resolveReshardingTunables(forwardableMetadata, request));
     auto telemetryContext =
         otel::TelemetryContextHolder::getDecoration(opCtx).getTelemetryContext();
     // TODO(SERVER-133103): The telemetry context should not be on the sharding document.

@@ -40,6 +40,7 @@
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/s/resharding/resharding_tunables_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -532,6 +533,23 @@ std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::strin
 void validatePerformVerification(const boost::optional<ForwardableOperationMetadata>& fom,
                                  OptionalBool performVerification);
 void validatePerformVerification(const VersionContext& vCtx, OptionalBool performVerification);
+
+/**
+ * Validates and normalizes the per-operation 'options' of a resharding request into the tunables
+ * stored on the coordinator document:
+ *  - 'options' may only be specified when featureFlagConcurrentResharding is enabled. When it is
+ *    not enabled, returns boost::none.
+ *  - The recipient oplog batch task count may be given through both the legacy top-level field and
+ *    'options', but only if the two values agree. If only the legacy field is given, its value
+ *    becomes the oplog batch task count of the returned tunables.
+ *  - demoMode sets minimumOperationDurationMillis and
+ *    delayBeforeRemainingOperationTimeQueryMillis to 0. Explicitly giving them a non-zero value
+ *    along with demoMode is an error.
+ *  - Every tunable still unspecified is filled in from the server parameters of this node.
+ */
+boost::optional<ReshardingTunables> resolveReshardingTunables(
+    const boost::optional<ForwardableOperationMetadata>& fom,
+    const ConfigsvrReshardCollection& request);
 
 /**
  * Verifies that for each index spec in sourceIndexSpecs, there is an identical spec in

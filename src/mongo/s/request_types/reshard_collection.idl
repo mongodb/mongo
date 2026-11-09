@@ -10,6 +10,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/resharding/common_types.idl"
+    - "mongo/s/resharding/resharding_tunables.idl"
 
 commands:
     reshardCollection:
@@ -164,6 +165,12 @@ commands:
                     "When set to true, overrides reshardingMinimumOperationDurationMillis
                     and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0
                     for quick demo of reshardCollection operation"
+            options:
+                type: ReshardingTunables
+                description: >-
+                    Per-operation resharding settings. Settings that are not specified use the
+                    defaults from the corresponding server parameters.
+                optional: true
 
     rewriteCollection:
         description: "The public command on mongos that rewrites a sharded collection."
