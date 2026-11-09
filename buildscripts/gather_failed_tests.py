@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -34,14 +35,16 @@ def process_bep(bep_path):
 
 
 def _symbol_download_flags(build_flags: list[str]) -> list[str]:
-    """Materialize debug files while retaining the saved build configuration and download regex."""
+    """Materialize runtime libraries and symbols without changing the build configuration."""
     regex = None
     for index, flag in enumerate(build_flags):
         if flag.startswith("--remote_download_regex="):
             regex = flag.split("=", 1)[1]
         elif flag == "--remote_download_regex" and index + 1 < len(build_flags):
             regex = build_flags[index + 1]
-    symbols = r".*\.(pdb|debug|dwp)$"
+    # Native external cc_library dependencies are not necessarily top-level outputs of
+    # our test wrappers. Download them as well as symbols before scanning the output tree.
+    symbols = r".*\.(pdb|debug|dwp|so(?:\.[0-9]+)*|dylib|dll|dSYM(?:/.*)?)$"
     combined = f"(?:{regex})|(?:{symbols})" if regex else symbols
     return [
         *build_flags,
@@ -216,6 +219,12 @@ def _find_bazel_bin_dirs() -> list[Path]:
     return sorted({path.resolve() for path in candidates if path.is_dir()})
 
 
+def _find_bazel_output_dirs() -> list[Path]:
+    """Find configuration output roots, including ones containing only external libraries."""
+    candidates = [Path("bazel-bin"), *Path("bazel-out").glob("*/bin")]
+    return sorted({path.resolve() for path in candidates if path.is_dir()})
+
+
 def _archive_crash_handler_dumps() -> None:
     """Preserves minidumps written beside binaries before Bazel changes their output trees."""
     dumps = sorted(
@@ -264,24 +273,61 @@ def _rerun_failed_tests(failed_test_labels: list[str], bazel_build_flags: list[s
         print(f"Rerun of failed tests exited with code {result.returncode}; continuing.")
 
 
-def _copy_bins_to_upload(upload_bin_dir: str, upload_lib_dir: str):
-    libs = []
-    bins = []
-    dsyms = []
-    for bazel_bin_dir in _find_bazel_bin_dirs():
-        for dirpath, _, filenames in os.walk(bazel_bin_dir):
-            if dirpath.endswith(".dSYM"):
-                dsyms.append(Path(dirpath))
+def _is_shared_library(name: str) -> bool:
+    return re.fullmatch(r".+\.(?:so(?:\.[0-9]+)*|dylib|dll)", name) is not None
+
+
+def _copy_bins_to_upload(upload_bin_dir: Path, upload_lib_dir: Path) -> None:
+    libs: dict[str, Path] = {}
+    bins: list[Path] = []
+    dsyms: dict[Path, Path] = {}
+    output_dirs = _find_bazel_output_dirs()
+    solib_dirs = [solib for output in output_dirs for solib in sorted(output.glob("_solib_*"))]
+    runtime_names: dict[Path, set[str]] = {}
+    for solib_dir in solib_dirs:
+        for library in solib_dir.rglob("*"):
+            if not _is_shared_library(library.name) or not library.is_file():
+                continue
+            if library.stem.endswith(("_with_debug", "_Uwith_Udebug")):
+                continue
+            source = library.resolve()
+            # DT_NEEDED and core mappings refer to the solib alias. Resolving the
+            # source lets us avoid flattening unrelated libraries to the same basename.
+            runtime_names.setdefault(source, set()).add(library.name)
+
+    source_dirs = [output / folder for output in output_dirs for folder in ["src", "external"]]
+    for source_dir in [*source_dirs, *solib_dirs]:
+        for dirpath, dirnames, filenames in os.walk(source_dir):
+            for dirname in dirnames[:]:
+                if not dirname.endswith(".dSYM"):
+                    continue
+                dsym = Path(dirpath, dirname)
+                library_name = dirname.removesuffix(".dSYM")
+                if _is_shared_library(library_name):
+                    library_source = dsym.with_name(library_name).resolve()
+                    for name in sorted(runtime_names.get(library_source, {library_name})):
+                        dsyms.setdefault(upload_lib_dir / (name + ".dSYM"), dsym)
+                else:
+                    dsyms.setdefault(upload_bin_dir / dirname, dsym)
+                # Copy the bundle as a unit; its DWARF file is not another binary.
+                dirnames.remove(dirname)
             for f in filenames:
                 file = Path(f)
-                if file.stem.endswith("_with_debug"):
+                if file.stem.endswith(("_with_debug", "_Uwith_Udebug")):
                     continue
-                if file.suffix in [".so", ".so.debug", ".dylib"]:
-                    libs.append(Path(os.path.join(dirpath, file)))
+                source = Path(dirpath, file)
+                symbol_suffix = file.suffix if file.suffix in [".debug", ".dwp"] else ""
+                library_name = file.name.removesuffix(symbol_suffix) if symbol_suffix else file.name
+                if _is_shared_library(library_name):
+                    if not source.is_file():
+                        continue  # The library may not have been downloaded.
+                    library_source = source.with_name(library_name).resolve()
+                    for name in sorted(runtime_names.get(library_source, {library_name})):
+                        libs.setdefault(name + symbol_suffix, source)
                 # .mdmp minidumps (Windows) are written next to the test binary inside its
                 # runfiles tree on crash; they pair with the .pdb for post-mortem debugging.
                 elif file.suffix in [".debug", ".dwp", ".pdb", ".exe", ".mdmp", ""]:
-                    bins.append(Path(os.path.join(dirpath, file)))
+                    bins.append(source)
 
     for binary_file in bins:
         new_binary_file = upload_bin_dir / binary_file.name
@@ -291,18 +337,19 @@ def _copy_bins_to_upload(upload_bin_dir: str, upload_lib_dir: str):
             except FileNotFoundError:
                 continue  # It is likely a broken symlink.
 
-    for lib_file in libs:
-        new_lib_file = upload_lib_dir / lib_file.name
+    for name, lib_file in libs.items():
+        destination = upload_bin_dir if name.endswith(".dll") else upload_lib_dir
+        new_lib_file = destination / name
         if not os.path.exists(new_lib_file):
             try:
                 shutil.copy(lib_file, new_lib_file)
             except FileNotFoundError:
                 continue  # It is likely a broken symlink.
 
-    for dsym_dir in dsyms:
-        print(f"Copying dsym {dsym_dir} to {upload_bin_dir}")
+    for destination, dsym_dir in dsyms.items():
+        print(f"Copying dsym {dsym_dir} to {destination}")
         try:
-            shutil.copytree(dsym_dir, upload_bin_dir / dsym_dir.name, dirs_exist_ok=True)
+            shutil.copytree(dsym_dir, destination, dirs_exist_ok=True)
         except FileNotFoundError:
             continue  # It is likely a broken symlink.
 

@@ -65,7 +65,7 @@ class TestRelinkBinariesWithSymbols(unittest.TestCase):
                 expected_flags = [
                     *saved_flags,
                     "--remote_download_outputs=toplevel",
-                    r"--remote_download_regex=.*\.(pdb|debug|dwp)$",
+                    r"--remote_download_regex=.*\.(pdb|debug|dwp|so(?:\.[0-9]+)*|dylib|dll|dSYM(?:/.*)?)$",
                 ]
                 self.assertEqual(
                     command,
@@ -114,6 +114,12 @@ class TestRelinkBinariesWithSymbols(unittest.TestCase):
                     "bazel-out/test.pdb",
                     "bazel-out/test.debug",
                     "bazel-out/test.dwp",
+                    "bazel-out/external/abseil-cpp+/absl/base/libbase.so",
+                    "bazel-out/_solib_aarch64/libexternal_Sabseil-cpp+_Sabsl_Sbase_Slibbase.so",
+                    "bazel-out/libfoo.so.1.2",
+                    "bazel-out/libfoo.dylib",
+                    "bazel-out/foo.dll",
+                    "bazel-out/libfoo.dylib.dSYM/Contents/Resources/DWARF/libfoo.dylib",
                 ]:
                     self.assertIsNotNone(regex.fullmatch(path))
                 self.assertIsNone(regex.fullmatch("bazel-out/old.json"))
@@ -147,6 +153,170 @@ class TestCopyBinsToUpload(unittest.TestCase):
 
             self.assertTrue((upload_bin_dir / "mongod.debug").exists())
             self.assertTrue((upload_lib_dir / "libfoo.so").exists())
+
+    def test_collects_external_libraries_without_main_repository_outputs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            external = Path(
+                tmpdir, "bazel-out/aarch64-opt-ST-abc123/bin/external/abseil-cpp+/absl/base"
+            )
+            external.mkdir(parents=True)
+            (external / "libspinlock_wait.so").write_bytes(b"abseil spinlock")
+            (external / "libspinlock_wait.so.debug").write_bytes(b"abseil symbols")
+
+            upload_bin_dir, upload_lib_dir = self._run_in(tmpdir)
+
+            self.assertEqual(
+                (upload_lib_dir / "libspinlock_wait.so").read_bytes(), b"abseil spinlock"
+            )
+            self.assertEqual(
+                (upload_lib_dir / "libspinlock_wait.so.debug").read_bytes(), b"abseil symbols"
+            )
+            self.assertFalse((upload_bin_dir / "libspinlock_wait.so.debug").exists())
+
+    def test_preserves_runtime_names_for_libraries_with_the_same_basename(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir, "bazel-out/aarch64-opt/bin")
+            mongo = output / "src/mongo"
+            abseil = output / "external/abseil-cpp+/absl/base"
+            solib = output / "_solib_aarch64"
+            for directory in [mongo, abseil, solib]:
+                directory.mkdir(parents=True)
+            (mongo / "libbase.so").write_bytes(b"mongo base")
+            mongo_name = "libsrc_Smongo_Slibbase.so"
+            (mongo / (mongo_name + ".debug")).write_bytes(b"mongo symbols")
+            (abseil / "libbase.so").write_bytes(b"abseil base")
+            (abseil / "libbase.so.debug").write_bytes(b"abseil symbols")
+            abseil_name = "libexternal_Sabseil-cpp+_Sabsl_Sbase_Slibbase.so"
+            (solib / mongo_name).symlink_to(mongo / "libbase.so")
+            (solib / abseil_name).symlink_to(abseil / "libbase.so")
+            (solib / "libmissing.so").symlink_to(output / "missing.so")
+
+            upload_bin_dir, upload_lib_dir = self._run_in(tmpdir)
+
+            self.assertEqual((upload_lib_dir / mongo_name).read_bytes(), b"mongo base")
+            self.assertEqual((upload_lib_dir / abseil_name).read_bytes(), b"abseil base")
+            self.assertEqual(
+                (upload_lib_dir / (mongo_name + ".debug")).read_bytes(), b"mongo symbols"
+            )
+            self.assertEqual(
+                (upload_lib_dir / (abseil_name + ".debug")).read_bytes(), b"abseil symbols"
+            )
+            self.assertFalse((upload_lib_dir / "libbase.so").exists())
+            self.assertFalse((upload_lib_dir / "libmissing.so").exists())
+            self.assertEqual(list(upload_bin_dir.iterdir()), [])
+
+    def test_collects_library_symbols_and_versioned_shared_libraries(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src = Path(tmpdir, "bazel-out/k8-opt/bin/src/mongo")
+            src.mkdir(parents=True)
+            names = [
+                "libfoo.so",
+                "libfoo.so.debug",
+                "libfoo.so.dwp",
+                "libfoo.so.1.2",
+                "libfoo.dylib.debug",
+            ]
+            for name in names:
+                (src / name).write_bytes(name.encode())
+            (src / "foo_test.debug").write_bytes(b"test symbols")
+
+            upload_bin_dir, upload_lib_dir = self._run_in(tmpdir)
+
+            for name in names:
+                self.assertEqual((upload_lib_dir / name).read_bytes(), name.encode())
+            self.assertEqual((upload_bin_dir / "foo_test.debug").read_bytes(), b"test symbols")
+
+    def test_collects_solib_libraries_without_a_runfiles_tree(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            solib = Path(tmpdir, "bazel-out/k8-opt/bin/_solib_k8")
+            solib.mkdir(parents=True)
+            (solib / "libexternal_Srepo_Slibfoo.so").write_bytes(b"downloaded library")
+
+            _, upload_lib_dir = self._run_in(tmpdir)
+
+            self.assertEqual(
+                (upload_lib_dir / "libexternal_Srepo_Slibfoo.so").read_bytes(),
+                b"downloaded library",
+            )
+
+    def test_does_not_collect_intermediate_with_debug_solib_aliases(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir, "bazel-out/k8-opt/bin")
+            src = output / "src/mongo"
+            solib = output / "_solib_k8"
+            src.mkdir(parents=True)
+            solib.mkdir()
+            (src / "libfoo_with_debug.so").write_bytes(b"intermediate library")
+            (solib / "libsrc_Smongo_Slibfoo_Uwith_Udebug.so").symlink_to(
+                src / "libfoo_with_debug.so"
+            )
+
+            _, upload_lib_dir = self._run_in(tmpdir)
+
+            self.assertEqual(list(upload_lib_dir.iterdir()), [])
+
+    def test_collects_runtime_aliases_through_with_debug_inputs(self):
+        for extension in ("so", "dylib"):
+            with self.subTest(extension=extension), tempfile.TemporaryDirectory() as tmpdir:
+                output = Path(tmpdir, "bazel-out/k8-opt/bin")
+                src = output / "src/mongo"
+                solib = output / "_solib_k8"
+                src.mkdir(parents=True)
+                solib.mkdir()
+                intermediate = src / f"libfoo_with_debug.{extension}"
+                intermediate.write_bytes(b"runtime library with embedded symbols")
+                final = src / f"libfoo.{extension}"
+                final.symlink_to(intermediate)
+                runtime_name = f"libsrc_Smongo_Slibfoo.{extension}"
+                (solib / runtime_name).symlink_to(final)
+                (solib / f"libsrc_Smongo_Slibfoo_Uwith_Udebug.{extension}").symlink_to(intermediate)
+
+                _, upload_lib_dir = self._run_in(tmpdir)
+
+                self.assertEqual(
+                    (upload_lib_dir / runtime_name).read_bytes(),
+                    b"runtime library with embedded symbols",
+                )
+                self.assertEqual({p.name for p in upload_lib_dir.iterdir()}, {runtime_name})
+
+    def test_collects_windows_dlls_beside_executables_and_pdbs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src = Path(tmpdir, "bazel-out/x64_windows-opt/bin/src/mongo")
+            src.mkdir(parents=True)
+            names = ["foo_test.exe", "foo_test.pdb", "foo.dll", "foo.dll.pdb"]
+            for name in names:
+                (src / name).write_bytes(name.encode())
+
+            upload_bin_dir, upload_lib_dir = self._run_in(tmpdir)
+
+            for name in names:
+                self.assertEqual((upload_bin_dir / name).read_bytes(), name.encode())
+            self.assertEqual(list(upload_lib_dir.iterdir()), [])
+
+    def test_preserves_library_dsym_runtime_names_and_test_dsym_bundles(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir, "bazel-out/darwin_arm64-opt/bin")
+            src = output / "src/mongo"
+            solib = output / "_solib_darwin_arm64"
+            src.mkdir(parents=True)
+            solib.mkdir()
+            (src / "libfoo.dylib").write_bytes(b"library")
+            runtime_name = "libsrc_Smongo_Slibfoo.dylib"
+            (solib / runtime_name).symlink_to(src / "libfoo.dylib")
+            for name in ["libfoo.dylib", "foo_test"]:
+                dwarf = src / (name + ".dSYM") / "Contents/Resources/DWARF" / name
+                dwarf.parent.mkdir(parents=True)
+                dwarf.write_bytes(b"dwarf")
+
+            upload_bin_dir, upload_lib_dir = self._run_in(tmpdir)
+
+            library_dwarf = (
+                upload_lib_dir / (runtime_name + ".dSYM") / "Contents/Resources/DWARF/libfoo.dylib"
+            )
+            test_dwarf = upload_bin_dir / "foo_test.dSYM/Contents/Resources/DWARF/foo_test"
+            self.assertEqual(library_dwarf.read_bytes(), b"dwarf")
+            self.assertEqual(test_dwarf.read_bytes(), b"dwarf")
+            self.assertEqual({path.name for path in upload_bin_dir.iterdir()}, {"foo_test.dSYM"})
 
     def test_collects_windows_minidumps_from_runfiles_trees(self):
         # The mongo exception filter writes .mdmp minidumps next to the test binary inside its
