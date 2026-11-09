@@ -1009,7 +1009,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildTree() {
 
     // We always produce a 'resultSlot'.
     PlanStageReqs reqs;
-    if (_root->getType() == STAGE_GROUP &&
+    if ((_root->getType() == STAGE_GROUP || _root->getType() == STAGE_EQ_LOOKUP_UNWIND) &&
         feature_flags::gFeatureFlagSbeEfficientBoundaryMaterialization.isEnabled()) {
         // The executor builds each result from the result base object (the empty object) and the
         // changed fields, instead of the plan materializing it.

@@ -4,8 +4,7 @@
 { $match: { idx: { $gt: 0 } } }
 
 ## HashJoin
-$$RESULT=s11 env: {  }
-[4] project [s11 = makeBsonObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s10)] 
+$$RESULT=s1 $$RESULT_CHANGES=open{joined=set(s10)} env: {  }
 [4] hash_lookup_unwind left s10 
     outer s8 
         [4] project [s8 = arrayToSet(

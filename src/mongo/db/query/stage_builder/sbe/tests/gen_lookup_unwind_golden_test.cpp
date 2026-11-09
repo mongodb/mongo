@@ -263,6 +263,8 @@ private:
                                                     true};
     unittest::ServerParameterGuard _dynamicIndexedLoopJoin{
         "featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin", true};
+    unittest::ServerParameterGuard _efficientMaterialization{
+        "featureFlagSbeEfficientBoundaryMaterialization", true};
 };
 
 #define LOOKUP_UNWIND_TEST(As, Preserve, Index, Follow)                   \

@@ -3,8 +3,7 @@
 { $unwind: { path: "$joined", preserveNullAndEmptyArrays: true } }
 
 ## HashJoin
-$$RESULT=s10 env: {  }
-[3] project [s10 = makeBsonObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s9)] 
+$$RESULT=s1 $$RESULT_CHANGES=open{joined=set(s9)} env: {  }
 [3] hash_lookup_unwind left s9 
     outer s7 
         [3] project [s7 = arrayToSet(
