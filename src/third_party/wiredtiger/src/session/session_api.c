@@ -381,6 +381,7 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
     WT_TRET(__session_close_cached_cursors(session));
 
     WT_ASSERT(session, session->ncursors == 0);
+    WT_ASSERT(session, __wt_atomic_load_uint32_relaxed(&session->open_cursor_count) == 0);
 
     /* Discard cached handles. */
     __wt_session_close_cache(session);

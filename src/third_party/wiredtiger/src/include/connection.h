@@ -1061,7 +1061,6 @@ struct __wt_connection_impl {
     wt_shared u_int open_btree_count;        /* Locked: open writable btree count */
     uint32_t next_file_id;                   /* Locked: file ID counter */
     wt_shared uint32_t open_file_count;      /* Atomic: open file handle count */
-    wt_shared uint32_t open_cursor_count;    /* Atomic: open cursor handle count */
     wt_shared uint32_t version_cursor_count; /* Atomic: open version cursor count */
 
     /*

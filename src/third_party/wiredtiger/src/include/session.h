@@ -372,6 +372,13 @@ struct __wt_session_impl {
     wt_shared WT_RAND_STATE rnd_skiplist;
 
     /*
+     * Count of cursors in this session's open list, written only by the owning thread and summed
+     * across sessions for statistics. It lives outside the cleared region so the summing load
+     * cannot race a closing session's non-atomic clear; cursor teardown returns it to zero first.
+     */
+    wt_shared uint32_t open_cursor_count;
+
+    /*
      * Hash tables are allocated lazily as sessions are used to keep the size of this structure from
      * growing too large.
      */

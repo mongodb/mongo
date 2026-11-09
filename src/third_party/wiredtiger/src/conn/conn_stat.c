@@ -61,6 +61,21 @@ __stat_config_discard(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __stat_open_cursor_count_callback --
+ *     Add a session's open cursor count to the total.
+ */
+static int
+__stat_open_cursor_count_callback(
+  WT_SESSION_IMPL *session, WT_SESSION_IMPL *array_session, bool *exit_walkp, void *cookiep)
+{
+    WT_UNUSED(session);
+    WT_UNUSED(exit_walkp);
+
+    *(uint64_t *)cookiep += __wt_atomic_load_uint32_relaxed(&array_session->open_cursor_count);
+    return (0);
+}
+
+/*
  * __wt_conn_stat_init --
  *     Initialize the per-connection statistics.
  */
@@ -69,6 +84,7 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_CONNECTION_STATS **stats;
+    uint64_t open_cursor_count;
 
     conn = S2C(session);
     stats = conn->stats;
@@ -85,8 +101,11 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
       session, stats, file_open, __wt_atomic_load_uint32_relaxed(&conn->open_file_count));
     WT_STATP_CONN_SET(
       session, stats, btree_open, __wt_atomic_load_uint32_relaxed(&conn->open_btree_count));
-    WT_STATP_CONN_SET(
-      session, stats, cursor_open_count, __wt_atomic_load_uint32_relaxed(&conn->open_cursor_count));
+    /* Internal sessions hold open cursors too. */
+    open_cursor_count = 0;
+    WT_IGNORE_RET(__wt_session_array_walk(
+      session, __stat_open_cursor_count_callback, false, &open_cursor_count));
+    WT_STATP_CONN_SET(session, stats, cursor_open_count, open_cursor_count);
     WT_STATP_CONN_SET(
       session, stats, dh_conn_handle_count, __wt_atomic_load_uint64_relaxed(&conn->dhandle_count));
     WT_STATP_CONN_SET(session, stats, dh_conn_handle_btree_count,

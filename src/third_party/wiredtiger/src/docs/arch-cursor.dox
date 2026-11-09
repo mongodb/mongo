@@ -256,7 +256,7 @@ e.g. \c __curfile_cache) is relatively quick:
 - Release the *strong* reference to the data handle (decrement \c dhandle->session_inuse).
 - Determine the hash bucket needed (using the hash value in the cursor).
 - Move the cursor from the session's open list to the list in the hash bucket.
-- Increment statistics and decrement the connection's open cursor count.
+- Increment statistics and decrement the session's open cursor count.
 - Set the cache cursor flag.
 - Unlock the dhandle.
 
@@ -284,7 +284,7 @@ call \c reopen on the cursor.  This is what happens within the call to the type-
 - If the dhandle is no longer open, release it and mark the reopen to fail (but continue).
 - Get a "strong" reference to the data handle (increment \c dhandle->session_inuse).
 - Release the "weak" reference to the data handle (decrement \c dhandle->references).
-- Increment statistics and the connection's open cursor count.
+- Increment statistics and the session's open cursor count.
 - Move the handle from the hash bucket to the session's open list (the hash value was previously saved in the cursor)
 - Clear the cache cursor flag.
 - Update convenient pointers within the cursor to parts of the WT_BTREE that may have changed

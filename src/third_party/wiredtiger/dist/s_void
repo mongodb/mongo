@@ -62,6 +62,7 @@ func_ok()
         -e '/int __rec_destroy_session$/d' \
         -e '/int __rts_check_callback$/d' \
         -e '/int __rts_thread_stop$/d' \
+        -e '/int __stat_open_cursor_count_callback$/d' \
         -e '/int __time_aggregate_validate_parent$/d' \
         -e '/int __time_aggregate_validate_parent_stable$/d' \
         -e '/int __time_value_validate_parent$/d' \
