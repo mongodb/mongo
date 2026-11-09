@@ -168,12 +168,15 @@ mongo_cc_benchmark(
     srcs = [
         "transaction_operations_bm.cpp",
     ],
+    tags = ["repl_bm"],
     deps = [
         ":transaction_operations",
+        "//src/mongo/db:end_of_transaction_parameter",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/op_observer:batched_write_context",
         "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/db/session:logical_session_id_helpers",
         "//src/mongo/db/shard_role/lock_manager",
     ],
 )
