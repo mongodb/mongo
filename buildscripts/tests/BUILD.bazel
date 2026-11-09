@@ -380,6 +380,18 @@ py_test(
 )
 
 py_test(
+    name = "test_external_auth_gcp_requirements",
+    srcs = ["test_external_auth_gcp_requirements.py"],
+    data = [
+        "//evergreen:external_auth_gcp_requirements.txt",
+        "//evergreen:external_auth_gcp_setup.sh",
+        "//evergreen:external_auth_gcp_teardown.sh",
+        "//evergreen:external_auth_gcp_venv.sh",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
     name = "test_evergreen_task_timeout",
     srcs = ["test_evergreen_task_timeout.py"],
     visibility = ["//visibility:public"],

@@ -5,5 +5,10 @@ function setup_gcp_venv {
     local gcp_venv="${workdir}/venv/gcp-oidc"
     "$python" -I -m venv "$gcp_venv"
     gcp_python="${gcp_venv}/bin/python"
-    "$gcp_python" -I -m pip install -r evergreen/external_auth_gcp_requirements.txt
+    # --require-hashes enforces the sha256 hashes in the requirements file, so
+    # nothing outside the repository's pinned artifacts can be installed.
+    # --only-binary=:all: additionally refuses source distributions, since
+    # --require-hashes does not cover the build dependencies pip downloads for
+    # PEP 517 build isolation when building an sdist.
+    "$gcp_python" -I -m pip install --require-hashes --only-binary=:all: -r evergreen/external_auth_gcp_requirements.txt
 }

@@ -39,11 +39,25 @@ set -euo pipefail
 [[ "$1" == "-I" ]] || exit 92
 shift
 if [[ "$1" == "-m" && "$2" == "pip" && "$3" == "install" ]]; then
-    [[ "$4" == "-r" && -f "$5" ]] || exit 94
+    # Installation must be hash-enforced via --require-hashes, restricted to
+    # wheels, and use the pinned requirements file.
+    [[ "$4" == "--require-hashes" && "$5" == "--only-binary=:all:" && "$6" == "-r" && -f "$7" ]] || exit 94
     printf 'pip\n' >>"$GCP_TEST_LOG"
     exit "${GCP_TEST_PIP_STATUS:-0}"
 fi
 [[ "$1" == *"/gce_vm_manager.py" ]] || exit 93
+if [[ "$2" == "delete" ]]; then
+    # The service-account key must still exist when the VM delete runs.
+    key_pending=""
+    for arg in "${@:3}"; do
+        if [[ -n "$key_pending" ]]; then
+            [[ -f "$arg" ]] || exit 95
+            key_pending=""
+        elif [[ "$arg" == "--service_account_key_file" ]]; then
+            key_pending=1
+        fi
+    done
+fi
 printf '%s\n' "$2" >>"$GCP_TEST_LOG"
 if [[ "$2" == "create" ]]; then
     touch "$GCP_TEST_HOME/gce_vm_info.json"
@@ -111,6 +125,32 @@ assert_calls $'venv\npip\ncreate'
 : >"${GCP_TEST_LOG}"
 run_script external_auth_gcp_teardown.sh 43
 assert_calls $'venv\npip\ndelete'
+unset GCP_TEST_HELPER_STATUS
+# Teardown must remove both credentials even when the VM delete failed.
+[[ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" && ! -f "${GCP_TEST_HOME}/gcp_ssh_key" ]]
+
+create_credential_files() {
+    touch "${GCP_TEST_HOME}/gce_vm_config.json" "${GCP_TEST_HOME}/gce_vm_info.json"
+    echo ssh-key >"${GCP_TEST_HOME}/gcp_ssh_key"
+    echo sa-key >"${GOOGLE_APPLICATION_CREDENTIALS}"
+}
+
+# A pip failure during teardown must still remove both credentials.
+: >"${GCP_TEST_LOG}"
+create_credential_files
+export GCP_TEST_PIP_STATUS=44
+run_script external_auth_gcp_teardown.sh 44
+assert_calls $'venv\npip'
+[[ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" && ! -f "${GCP_TEST_HOME}/gcp_ssh_key" ]]
+unset GCP_TEST_PIP_STATUS
+
+# A VM delete failure during teardown must still remove both credentials.
+: >"${GCP_TEST_LOG}"
+create_credential_files
+export GCP_TEST_HELPER_STATUS=45
+run_script external_auth_gcp_teardown.sh 45
+assert_calls $'venv\npip\ndelete'
+[[ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" && ! -f "${GCP_TEST_HOME}/gcp_ssh_key" ]]
 unset GCP_TEST_HELPER_STATUS
 
 # Other tasks must not install dependencies or attempt GCP teardown.
