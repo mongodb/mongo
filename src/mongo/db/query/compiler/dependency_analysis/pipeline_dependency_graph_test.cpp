@@ -538,6 +538,36 @@ TEST_F(PipelineDependencyGraphTest, CanPathBeArrayUnwindArrayIndexIsNotSubpipeli
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayUnwindIndexOverwritesAsIsNotSubpipeline) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$set: {b_ssn: 2}}]
+        }},
+        {$unwind: {path: "$docs", includeArrayIndex: "docs"}}
+    ])");
+
+    runTest([&] {
+        // The sub-pipeline constant is not an array, so a subpipeline lookup would give false.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "docs.b_ssn"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayUnwindIndexNestedUnderAsIsNotSubpipeline) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$set: {b_ssn: 2}}]
+        }},
+        {$unwind: {path: "$docs", includeArrayIndex: "docs.idx"}}
+    ])");
+
+    // includeArrayIndex overlapping with the unwind path is not handled.
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "docs.b_ssn")); });
+}
+
 TEST_F(PipelineDependencyGraphTest, SubPipelineCanPathBeArrayUnknownSubField) {
     setOptimizedPipeline(R"([
         {$lookup: {
@@ -3257,6 +3287,90 @@ TEST_F(PipelineDependencyGraphTest, GetConstantNoneForBaseDocument) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, GetConstantFromSubPipeline) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$set: {b_ssn: 42}}]
+        }},
+        {$unwind: "$docs"}
+    ])");
+
+    runTest([&] {
+        auto constant = graph->getConstant(nullptr, "docs.b_ssn");
+        ASSERT_TRUE(constant.has_value());
+        ASSERT_VALUE_EQ(*constant, Value(42));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantFromSubPipelineWithDottedAsPath) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs.x",
+            pipeline: [{$set: {b_ssn: 42}}]
+        }},
+        {$unwind: "$docs.x"}
+    ])");
+
+    runTest([&] {
+        auto constant = graph->getConstant(nullptr, "docs.x.b_ssn");
+        ASSERT_TRUE(constant.has_value());
+        ASSERT_VALUE_EQ(*constant, Value(42));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantFromSubPipelineWithoutUnwind) {
+    // Without an $unwind we have an array at 'docs'.
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$set: {b_ssn: 42}}]
+        }}
+    ])");
+
+    runTest([&] { ASSERT_FALSE(graph->getConstant(nullptr, "docs.b_ssn").has_value()); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantFromSubPipelineWithPreservedEmptyResult) {
+    // With preserveNullAndEmptyArrays, we can have a missing field here (normally we just don't
+    // produce anything past the $unwind).'docs.b_ssn' may not be 42 after the $unwind.
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$set: {b_ssn: 42}}]
+        }},
+        {$unwind: {path: "$docs", preserveNullAndEmptyArrays: true}}
+    ])");
+
+    runTest([&] {
+        const auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_TRUE(subGraph);
+        const auto childConstant = subGraph->getConstant(nullptr, "b_ssn");
+        ASSERT_TRUE(childConstant.has_value());
+        ASSERT_VALUE_EQ(*childConstant, Value(42));
+
+        ASSERT_FALSE(graph->getConstant(nullptr, "docs.b_ssn").has_value());
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs.b_ssn"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantFromSubPipelineUnknownSubField) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$set: {b_ssn: 42}}]
+        }},
+        {$unwind: "$docs"}
+    ])");
+
+    runTest([&] { ASSERT_FALSE(graph->getConstant(nullptr, "docs.unknown").has_value()); });
+}
+
 TEST_F(PipelineDependencyGraphTest, IncludeFieldShadowedByObjectConstant) {
     pathArrayness->addPath("a", {}, false);
     pathArrayness->addPath("a.b", {}, false);
@@ -3788,6 +3902,32 @@ TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginUnwindArrayIndexIsNotSubpi
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginUnwindIndexOverwritesAsIsOther) {
+    setOptimizedPipeline(
+        "[{$lookup: {from: 'coll_b', localField: 'x', foreignField: 'y', as: 'e'}}, "
+        " {$unwind: {path: '$e', includeArrayIndex: 'e'}}]");
+    runTest([&] {
+        // includeArrayIndex overlapping with the unwind path is not handled.
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e.y"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginUnwindIndexNestedUnderAsIsOther) {
+    setOptimizedPipeline(
+        "[{$lookup: {from: 'coll_b', localField: 'x', foreignField: 'y', as: 'e'}}, "
+        " {$unwind: {path: '$e', includeArrayIndex: 'e.idx'}}]");
+    runTest([&] {
+        // includeArrayIndex overlapping with the unwind path is not handled.
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e.y"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginAliasThenSubpipeline) {
     setOptimizedPipeline(
         "[{$lookup: {from: 'coll_b', localField: 'x', foreignField: 'y', as: 'e'}}, "
@@ -4078,6 +4218,199 @@ TEST_F(PipelineDependencyGraphTest, GetTypeAfterLookupOnUnrelatedField) {
         auto* subGraph = graph->getSubpipelineGraph(stages[1].get());
         ASSERT_TRUE(subGraph);
         ASSERT_EQ(subGraph->getType_forTest(nullptr, "x").toDebugString(), "~array");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeFromSubPipeline) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$match: {$and: [
+                {b_ssn: {$type: "number"}},
+                {b_ssn: {$not: {$type: "array"}}}
+            ]}}]
+        }},
+        {$unwind: "$docs"}
+    ])");
+
+    runTest([&] {
+        const auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_TRUE(subGraph);
+        const auto expectedType = subGraph->getType_forTest(nullptr, "b_ssn");
+        ASSERT_EQ(expectedType.toDebugString(), "number");
+
+        const auto type = graph->getType_forTest(nullptr, "docs.b_ssn");
+        ASSERT_EQ(type.toDebugString(), expectedType.toDebugString());
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeFromSubPipelineWithDottedAsPath) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs.x",
+            pipeline: [{$match: {$and: [
+                {b_ssn: {$type: "number"}},
+                {b_ssn: {$not: {$type: "array"}}}
+            ]}}]
+        }},
+        {$unwind: "$docs.x"}
+    ])");
+
+    runTest([&] {
+        const auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_TRUE(subGraph);
+        const auto subGraphType = subGraph->getType_forTest(nullptr, "b_ssn");
+        ASSERT_EQ(subGraphType.toDebugString(), "number");
+
+        // TODO(SERVER-137963): Same as a few other TODOs about knowing whether the prefix field
+        // exists. We should remove the missing.
+        const auto type = graph->getType_forTest(nullptr, "docs.x.b_ssn");
+        ASSERT_EQ(type.toDebugString(), "missing|number");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeFromSubPipelineWithoutUnwind) {
+    // Without $unwind, we just get an array and arrays are opaque.
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$match: {$and: [
+                {b_ssn: {$type: "number"}},
+                {b_ssn: {$not: {$type: "array"}}}
+            ]}}]
+        }}
+    ])");
+
+    runTest([&] {
+        const auto type = graph->getType_forTest(nullptr, "docs.b_ssn");
+        ASSERT_EQ(type.toDebugString(), "any");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeFromSubPipelineWithOuterMatch) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$match: {$and: [
+                {b_ssn: {$type: ["number", "string"]}},
+                {b_ssn: {$not: {$type: "array"}}}
+            ]}}]
+        }},
+        {$unwind: {path: "$docs", includeArrayIndex: "docsIndex"}},
+        {$match: {"docs.b_ssn": {$type: "number"}}}
+    ])");
+
+    ASSERT_EQ(stages.size(), 2U);
+    runTest([&] {
+        const auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_TRUE(subGraph);
+        ASSERT_EQ(subGraph->getType_forTest(nullptr, "b_ssn").toDebugString(), "number|string");
+
+        const auto type = graph->getType_forTest(nullptr, "docs.b_ssn");
+        ASSERT_EQ(type.toDebugString(), "number");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeFromSubPipelineWithPreservedEmptyResult) {
+    // With preserveNullAndEmptyArrays, we can have a missing field here (normally we just don't
+    // produce anything past the $unwind). 'docs.b_ssn' may not be 'number'.
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$match: {$and: [
+                {b_ssn: {$type: "number"}},
+                {b_ssn: {$not: {$type: "array"}}}
+            ]}}]
+        }},
+        {$unwind: {path: "$docs", preserveNullAndEmptyArrays: true}}
+    ])");
+
+    runTest([&] {
+        const auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_TRUE(subGraph);
+        ASSERT_EQ(subGraph->getType_forTest(nullptr, "b_ssn").toDebugString(), "number");
+
+        const auto type = graph->getType_forTest(nullptr, "docs.b_ssn");
+        ASSERT_EQ(type.toDebugString(), "any");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeFromSubPipelineWithIndexOverwrite) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$match: {$and: [
+                {b_ssn: {$type: "number"}},
+                {b_ssn: {$not: {$type: "array"}}}
+            ]}}]
+        }},
+        {$unwind: {path: "$docs", includeArrayIndex: "docs"}}
+    ])");
+
+    runTest([&] {
+        const auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_TRUE(subGraph);
+        ASSERT_EQ(subGraph->getType_forTest(nullptr, "b_ssn").toDebugString(), "number");
+
+        const auto type = graph->getType_forTest(nullptr, "docs.b_ssn");
+        ASSERT_EQ(type.toDebugString(), "any");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeFromSubPipelineIndexUnderUnwindPath) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$match: {$and: [
+                {b_ssn: {$type: "number"}},
+                {b_ssn: {$not: {$type: "array"}}}
+            ]}}]
+        }},
+        {$unwind: {path: "$docs", includeArrayIndex: "docs.idx"}}
+    ])");
+
+    runTest([&] {
+        const auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_TRUE(subGraph);
+        ASSERT_EQ(subGraph->getType_forTest(nullptr, "b_ssn").toDebugString(), "number");
+
+        const auto type = graph->getType_forTest(nullptr, "docs.b_ssn");
+        // includeArrayIndex overlapping with the unwind path is not handled.
+        ASSERT_EQ(type.toDebugString(), "any");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeFromSubPipelineUnknownSubField) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$match: {$and: [
+                {b_ssn: {$type: "number"}},
+                {b_ssn: {$not: {$type: "array"}}}
+            ]}}]
+        }},
+        {$unwind: "$docs"}
+    ])");
+
+    runTest([&] {
+        const auto type = graph->getType_forTest(nullptr, "docs.unknown");
+        ASSERT_EQ(type.toDebugString(), "any");
     });
 }
 
@@ -4532,8 +4865,7 @@ TEST_F(PipelineDependencyGraphTest, GetTypeIntersectsBaseFieldWithArrayness) {
     setPipeline("[{$match: {x: {$type: 'number'}}}]");
     runTest([&] {
         auto type = graph->getType_forTest(nullptr, "x");
-        ASSERT_TRUE(type.hasType(BSONType::numberInt));
-        ASSERT_FALSE(type.hasType(BSONType::array));
+        ASSERT_EQ(type.toDebugString(), "number");
     });
 }
 

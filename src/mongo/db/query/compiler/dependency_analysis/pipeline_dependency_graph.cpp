@@ -185,6 +185,10 @@ struct SubpipelineInfo {
     SubpipelineKind kind{SubpipelineKind::kOther};
     /// The path at which the subpipeline output is stored (the $lookup "as"), empty otherwise.
     ParsedPath embeddingPath;
+    /// True when we have $unwind({preserveNullAndEmptyArrays: true}) which can make the output
+    /// missing, and thus does not preserve the value from the subpipeline (e.g. constant cannot
+    /// propagate).
+    bool embeddedOutputCanBeMissing{false};
 };
 
 /// Represents the set of field definition nodes that a stage or a field definition node depends on.
@@ -771,6 +775,9 @@ public:
                 if (auto c = getConstantForField(fieldId)) {
                     return walkConstant(*std::move(c), match.parsedSuffix());
                 }
+                if (auto* subGraph = getSubpipelineForValuePreservingPath(match)) {
+                    return subGraph->getConstant(nullptr, match.suffix());
+                }
                 return boost::none;
             case FieldMatchType::kMissing:
                 if (_fields[fieldId].metadata.knownToBeMissing) {
@@ -872,6 +879,32 @@ public:
             return nullptr;
         }
         return sub->graph.get();
+    }
+
+    /**
+     * Returns the subpipeline graph when resolving the suffix preserves the value of the full path.
+     *
+     * Unlike getSubpipelineForPath(), returns nullptr when a prefix can traverse an array or an
+     * embedding can be missing from the enclosing document.
+     */
+    const DependencyGraph* getSubpipelineForValuePreservingPath(const PathMatch& match) const {
+        if (match.field.type != FieldMatchType::kShadowed) {
+            return nullptr;
+        }
+
+        const auto fieldId = match.field.fieldId;
+        if (canPrefixContainArrays(match.prefix) || _fields[fieldId].metadata.canFieldBeArray) {
+            return nullptr;
+        }
+
+        const ScopeId declaringScopeId = _fields[fieldId].declaringScope;
+        const StageId declaringStageId = _scopes[declaringScopeId].stage;
+        const auto* subpipeline = _stages[declaringStageId].subpipeline;
+        if (!subpipeline || subpipeline->embeddedOutputCanBeMissing) {
+            return nullptr;
+        }
+
+        return getSubpipelineForPath(declaringStageId, match.parsedPath);
     }
 
     FieldOrigin resolveFieldOrigin(const DocumentSource* ds, PathRef path) const {
@@ -1235,6 +1268,11 @@ private:
                 // of the rename source.
                 if (auto cached = getCachedType(pathMatch.field.fieldId); cached) {
                     fieldType = std::move(*cached);
+                    break;
+                }
+                if (auto* subGraph = getSubpipelineForValuePreservingPath(pathMatch)) {
+                    fieldType = subGraph->_impl->getDocumentType(
+                        subGraph->_impl->lookupPath(nullptr, pathMatch.suffix()));
                     break;
                 }
                 break;
@@ -2210,14 +2248,34 @@ private:
         createSubpipelineGraph(ds, stageId);
     }
 
+    bool isUnwindIndexClashingWithAsField(const DocumentSourceLookUp& lookup,
+                                          const DocumentSourceUnwind& unwind) const {
+        auto indexPath = unwind.indexPath();
+        return indexPath.has_value() &&
+            (lookup.getAsField().isPrefixOf(*indexPath) ||
+             indexPath->isPrefixOf(lookup.getAsField()));
+    }
+
     /**
      * Fills in metadata which describes how the DocumentSource exposes the subpipeline results.
      */
     void setSubpipelineMetadata(const DocumentSource* ds, SubpipelineInfo& info) {
         if (typeid(*ds) == typeid(DocumentSourceLookUp)) {
+            const auto* lookup = checked_cast<const DocumentSourceLookUp*>(ds);
+            if (const auto& unwind = lookup->getUnwindSource()) {
+                if (isUnwindIndexClashingWithAsField(*lookup, *unwind)) {
+                    // Users can set includeArrayIndex to overwrite the unwind path (why?) or be
+                    // nested inside. Both cases we do not handle for now. The latter seems most
+                    // tricky, since it modifies the unwound path.
+                    // {$unwind: {path: "$docs", includeArrayIndex: "docs"}}
+                    // {$unwind: {path: "$docs", includeArrayIndex: "docs.a"}}
+                    info.kind = SubpipelineKind::kOther;
+                    return;
+                }
+                info.embeddedOutputCanBeMissing = unwind->preserveNullAndEmptyArrays();
+            }
             info.kind = SubpipelineKind::kEmbedded;
-            info.embeddingPath =
-                internPath(checked_cast<const DocumentSourceLookUp*>(ds)->getAsField().fullPath());
+            info.embeddingPath = internPath(lookup->getAsField().fullPath());
         } else if (typeid(*ds) == typeid(DocumentSourceUnionWith)) {
             info.kind = SubpipelineKind::kUnion;
         }
