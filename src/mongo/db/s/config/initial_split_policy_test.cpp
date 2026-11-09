@@ -2163,6 +2163,103 @@ TEST_F(SamplingBasedInitSplitTest, NoAvailableShardInZone) {
     }
 }
 
+TEST_F(SamplingBasedInitSplitTest, ZoneContainsUnavailableShard) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    // Both shards are tagged with zoneA, but only shard0 is available to own chunks.
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneA")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY)));
+
+    std::vector<ShardId> availableShardIds = {shardId("0")};
+
+    std::list<BSONObj> mockSamples;
+
+    auto numInitialChunks = 1;
+    SplitPolicyParams params{UUID::gen(), shardId("0")};
+
+    auto initSplitPolicy =
+        makeInitialSplitPolicy(numInitialChunks, zones, mockSamples, availableShardIds);
+    const auto shardCollectionConfig =
+        initSplitPolicy->createFirstChunks(operationContext(), shardKey, params);
+
+    ASSERT_EQ(1U, shardCollectionConfig.chunks.size());
+    ASSERT_EQ(shardId("0"), shardCollectionConfig.chunks[0].getShard());
+}
+
+TEST_F(SamplingBasedInitSplitTest, ZoneContainsDrainingShard) {
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    // Both shards are tagged with zoneA, but shard1 is draining and so cannot own chunks.
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    auto drainingShard =
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneA")});
+    drainingShard.setDraining(true);
+    shardList.emplace_back(drainingShard);
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY)));
+
+    std::list<BSONObj> mockSamples;
+
+    auto numInitialChunks = 1;
+    SplitPolicyParams params{UUID::gen(), shardId("0")};
+
+    auto initSplitPolicy = makeInitialSplitPolicy(
+        numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */);
+    const auto shardCollectionConfig =
+        initSplitPolicy->createFirstChunks(operationContext(), shardKey, params);
+
+    ASSERT_EQ(1U, shardCollectionConfig.chunks.size());
+    ASSERT_EQ(shardId("0"), shardCollectionConfig.chunks[0].getShard());
+}
+
+TEST_F(SamplingBasedInitSplitTest, OnlyShardInZoneIsDraining) {
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    // shard1 is the only shard tagged with zoneA and it is draining, so the zone has no shard that
+    // can own chunks. shard0 is not in zoneA and must not be used as a fallback.
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(ShardType(shardId("0").toString(), "rs0/fakeShard0:123"));
+    auto drainingShard =
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneA")});
+    drainingShard.setDraining(true);
+    shardList.emplace_back(drainingShard);
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY)));
+
+    std::list<BSONObj> mockSamples;
+
+    auto numInitialChunks = 1;
+    SplitPolicyParams params{UUID::gen(), shardId("0")};
+
+    auto initSplitPolicy = makeInitialSplitPolicy(
+        numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */);
+
+    ASSERT_THROWS_CODE(initSplitPolicy->createFirstChunks(operationContext(), shardKey, params),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
 
 class ShardDistributionInitSplitTest : public SingleChunkPerTagSplitPolicyTest {
 public:

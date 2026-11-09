@@ -145,7 +145,12 @@ ShardId selectBestShard(const ChunkDistributionMap& chunkMap,
 
     for (const auto& shard : shards) {
         auto candidateIter = chunkMap.find(shard);
-        // If limitedShardIds is provided, only pick shard in that set.
+        // If the shard is not present in the chunk distribution (due to it being a draining shard),
+        // it is not eligible to own any of the initial chunks, so it must not be offered as a
+        // candidate for any zone.
+        if (candidateIter == chunkMap.end()) {
+            continue;
+        }
         if (bestShardIter == chunkMap.end() || candidateIter->second < bestShardIter->second) {
             bestShardIter = candidateIter;
         }
