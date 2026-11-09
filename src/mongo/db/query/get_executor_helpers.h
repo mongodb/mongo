@@ -8,7 +8,6 @@
 #include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
-#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
 #include "mongo/db/operation_context.h"
@@ -44,23 +43,6 @@ namespace mongo {
 struct PlanCacheInfo {
     boost::optional<uint32_t> planCacheKey;
     boost::optional<uint32_t> planCacheShapeHash;
-};
-
-class ClassicRuntimePlannerResult {
-public:
-    PlanCacheInfo& planCacheInfo() {
-        return _cacheInfo;
-    }
-
-    void setCachedPlanHash(boost::optional<size_t> cachedPlanHash) {
-        // SbeWithClassicRuntimePlanningPrepareExecutionHelper passes cached plan hash to the
-        // runtime planner.
-    }
-
-    std::unique_ptr<classic_runtime_planner::ClassicPlannerInterface> runtimePlanner;
-
-private:
-    PlanCacheInfo _cacheInfo;
 };
 
 /**

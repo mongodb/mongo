@@ -7,9 +7,7 @@
 #include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
-#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
-#include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/replanning_required_info.h"
 #include "mongo/db/query/sbe_trial_runtime_executor.h"
@@ -29,29 +27,6 @@ public:
     ValidCandidatePlanner(PlannerDataForSBE plannerData, sbe::plan_ranker::CandidatePlan candidate)
         : PlannerBase(std::move(plannerData), PlanSelectionStrategy::kCachedPlan),
           _candidate(std::move(candidate)) {}
-
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) override {
-        auto nss = cq()->nss();
-        auto remoteCursors = cq()->getExpCtx()->getExplain()
-            ? nullptr
-            : search_helpers::getSearchRemoteCursors(cq()->cqPipeline());
-        auto remoteExplains = cq()->getExpCtx()->getExplain()
-            ? search_helpers::getSearchRemoteExplains(cq()->getExpCtxRaw(), cq()->cqPipeline())
-            : nullptr;
-        return plan_executor_factory::make(opCtx(),
-                                           std::move(canonicalQuery),
-                                           std::move(_candidate),
-                                           collections(),
-                                           plannerOptions(),
-                                           std::move(nss),
-                                           extractSbeYieldPolicy(),
-                                           std::move(remoteCursors),
-                                           std::move(remoteExplains),
-                                           /*cachedPlanHash=*/boost::none,
-                                           planSelectionStrategy());
-    }
-
 
     PlanRankingResult extractPlanRankingResult() override {
         std::vector<std::unique_ptr<QuerySolution>> v;

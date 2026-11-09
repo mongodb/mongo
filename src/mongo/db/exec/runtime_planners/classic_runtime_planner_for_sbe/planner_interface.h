@@ -3,15 +3,11 @@
 
 #pragma once
 
-#include "mongo/db/exec/classic/multi_plan.h"
-#include "mongo/db/exec/classic/subplan.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/plan_cache/sbe_plan_cache.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
@@ -66,73 +62,12 @@ public:
     PlannerBase(PlannerDataForSBE plannerData, PlanSelectionStrategy planSelectionStrategy);
 
 protected:
-    /**
-     * Function that prepares 'sbePlanAndData' for execution and passes the correct arguments to a
-     * new instance of PlanExecutorSBE and returns it. Note that the classicRuntimePlannerStage is
-     * only passed to PlanExecutorSBE so that it can be plumbed through to a PlanExplainer to
-     * generate the correct explain output when using the classic multiplanner with SBE.
-     */
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> prepareSbePlanExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery,
-        std::unique_ptr<QuerySolution> solution,
-        std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> sbePlanAndData,
-        bool isFromPlanCache,
-        boost::optional<size_t> cachedPlanHash,
-        std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage);
-
-    std::unique_ptr<QuerySolution> extendSolutionWithPipeline(
-        std::unique_ptr<QuerySolution> solution);
-
-    OperationContext* opCtx() {
-        return _plannerData.opCtx;
-    }
-
-    CanonicalQuery* cq() {
-        return _plannerData.cq;
-    }
-
-    const CanonicalQuery* cq() const {
-        return _plannerData.cq;
-    }
-
-    const MultipleCollectionAccessor& collections() const {
-        return _plannerData.collections;
-    }
-
-    PlanYieldPolicy::YieldPolicy yieldPolicy() const {
-        return _plannerData.yieldPolicy;
-    }
-
-    PlanYieldPolicySBE* sbeYieldPolicy() {
-        return _plannerData.sbeYieldPolicy.get();
-    }
-
     std::unique_ptr<PlanYieldPolicySBE> extractSbeYieldPolicy() {
         return std::move(_plannerData.sbeYieldPolicy);
     }
 
-    size_t plannerOptions() const {
-        return _plannerData.plannerParams->mainCollectionInfo.options;
-    }
-
     boost::optional<size_t> cachedPlanHash() const {
         return _plannerData.cachedPlanHash;
-    }
-
-    boost::optional<size_t> cachedPlanSolutionHash() const {
-        return _plannerData.cachedPlanSolutionHash;
-    }
-
-    WorkingSet* ws() {
-        return _plannerData.workingSet.get();
-    }
-
-    std::unique_ptr<WorkingSet> extractWs() {
-        return std::move(_plannerData.workingSet);
-    }
-
-    const QueryPlannerParams& plannerParams() const {
-        return *_plannerData.plannerParams;
     }
 
     std::shared_ptr<QueryPlannerParams> extractPlannerParams() {
@@ -142,15 +77,6 @@ protected:
     PlanSelectionStrategy planSelectionStrategy() const {
         return _planSelectionStrategy;
     }
-
-    /**
-     * For planners that only learn the strategy while planning (the sub-planner). Must be called
-     * before 'makeExecutor()'.
-     */
-    void setPlanSelectionStrategy(PlanSelectionStrategy planSelectionStrategy) {
-        _planSelectionStrategy = planSelectionStrategy;
-    }
-
 
 private:
     PlannerDataForSBE _plannerData;

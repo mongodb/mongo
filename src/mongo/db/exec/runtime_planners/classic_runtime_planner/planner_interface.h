@@ -5,7 +5,6 @@
 
 #include "mongo/db/exec/classic/cached_plan.h"
 #include "mongo/db/exec/classic/multi_plan.h"
-#include "mongo/db/exec/classic/subplan.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
@@ -34,22 +33,10 @@ public:
                             PlanSelectionStrategy planSelectionStrategy);
 
     /**
-     * Function which adds the necessary stages for the generated PlanExecutor to perform counts.
-     */
-    void addCountStage(long long limit, long long skip);
-
-    /**
      * Function that picks the best plan if needed. Returns the status if the planning process
-     * failed. Must always be called before 'makeExecutor()'.
+     * failed.
      */
     Status plan();
-
-    /**
-     * Function that creates a PlanExecutor for the selected plan. Can be called only once, as it
-     * may transfer ownership of some data to returned PlanExecutor.
-     */
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) final;
 
     /**
      * Extracts the WorkingSet and the root of the executable plan used by this planner.
@@ -71,16 +58,6 @@ protected:
         return _planSelectionStrategy;
     }
 
-    /**
-     * For planners that only learn the strategy while planning (the sub-planner). Must be called
-     * before 'makeExecutor()'. The ordering is enforced by the existing planner state machine:
-     * callers must invoke it from 'doPlan()', which runs before 'plan()' advances '_state' to
-     * kInitialized, and 'makeExecutor()' asserts on that state.
-     */
-    void setPlanSelectionStrategy(PlanSelectionStrategy planSelectionStrategy) {
-        _planSelectionStrategy = planSelectionStrategy;
-    }
-
     std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& qs);
 
     void setRoot(std::unique_ptr<PlanStage> root);
@@ -97,7 +74,6 @@ protected:
     }
     size_t plannerOptions() const;
     boost::optional<size_t> cachedPlanHash() const;
-    boost::optional<std::string> replanReason() const;
     WorkingSet* ws() const;
     std::unique_ptr<WorkingSet> extractWs() {
         return std::move(_plannerData.workingSet);
@@ -145,35 +121,6 @@ private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
 
     std::unique_ptr<QuerySolution> extractQuerySolution() override;
-};
-
-/**
- * Trivial planner that just creates a classic plan executor when there is only one QuerySolution
- * present.
- * The planSelectionStrategy param is needed since a single-solution planner can be used for the
- * winning plan of the cost-based ranker.
- */
-class SingleSolutionPassthroughPlanner final : public ClassicPlannerInterface {
-public:
-    SingleSolutionPassthroughPlanner(PlannerData plannerData,
-                                     std::unique_ptr<QuerySolution> querySolution,
-                                     PlanExplainerData explainData,
-                                     PlanSelectionStrategy planSelectionStrategy);
-
-    SingleSolutionPassthroughPlanner(PlannerData plannerData,
-                                     std::unique_ptr<QuerySolution> querySolution,
-                                     PlanExplainerData explainData,
-                                     ClassicExecState&& state,
-                                     PlanSelectionStrategy planSelectionStrategy);
-
-    const QuerySolution* querySolution() const override;
-
-private:
-    Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
-
-    std::unique_ptr<QuerySolution> extractQuerySolution() override;
-
-    std::unique_ptr<QuerySolution> _querySolution;
 };
 
 /**
@@ -267,22 +214,5 @@ private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
 
     MultiPlanStage* _multiplanStage;
-};
-
-/**
- * Planner for rooted $or queries. Uses multi-planning for each individual $or clause.
- */
-class SubPlanner final : public ClassicPlannerInterface {
-public:
-    SubPlanner(PlannerData plannerData);
-
-    const QuerySolution* querySolution() const override;
-
-private:
-    Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
-
-    std::unique_ptr<QuerySolution> extractQuerySolution() override;
-
-    SubplanStage* _subplanStage;
 };
 }  // namespace mongo::classic_runtime_planner
