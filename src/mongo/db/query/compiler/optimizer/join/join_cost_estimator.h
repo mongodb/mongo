@@ -39,8 +39,7 @@ public:
      * The given cost is the CPU cost of the single-table plan from CBR; IO cost is modeled by the
      * fragment method itself.
      *
-     * TODO SERVER-117506: Once we support projections and start producing covered plans, we will
-     * need to modify this function.
+     * TODO SERVER-130026: remove once we can consider IO costs in CBR
      */
     virtual JoinCostEstimate costIndexScanFragment(NodeId id, CostEstimate singleTableCpuCost) = 0;
 
