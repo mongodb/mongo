@@ -1280,8 +1280,13 @@ private:
             case FieldMatchType::kMissing:
                 // TODO(SERVER-137963): Use missing information.
                 break;
-            case FieldMatchType::kBaseDocument:
-                return getDocumentTypeFromCollection(pathMatch);
+            case FieldMatchType::kBaseDocument: {
+                auto rootType = getDocumentTypeFromCollection(pathMatch);
+                fieldType = resolvePathType(
+                    std::move(rootType),
+                    takePathComponents(pathMatch.path, pathMatch.prefix.size() + 1));
+                break;
+            }
         }
         return createDocumentFromLeafMatch(fieldType, pathMatch);
     }

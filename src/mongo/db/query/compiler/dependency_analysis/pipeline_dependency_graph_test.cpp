@@ -4914,8 +4914,20 @@ TEST_F(PipelineDependencyGraphTest, GetTypeAfterProjectedBase) {
             'x.y.z': {$type: 'number'}
         })");
     setPipeline("[{$project: {'x.y': 1}}]");
-    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "{z: number|array(S), ...}");
-    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y.z").toDebugString(), "number|array(S)");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(),
+              "missing|{z: number|array(S), ...}");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSubpathAfterProjectedBase) {
+    setSchemaTypeFromMatch(
+        R"({
+            x: {$not: {$type: 'array'}},
+            'x.y': {$not: {$type: 'array'}},
+            'x.y.z': {$type: 'number'}
+        })");
+    setPipeline("[{$project: {'x.y': 1}}]");
+
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y.z").toDebugString(), "missing|number|array(S)");
 }
 
 TEST_F(PipelineDependencyGraphTest, GetTypeOfSiblingOfSetPathUsesSchema) {
@@ -4925,7 +4937,7 @@ TEST_F(PipelineDependencyGraphTest, GetTypeOfSiblingOfSetPathUsesSchema) {
             'x.foo': {$type: 'number'}
         })");
     setPipeline("[{$set: {'x.y': 'str'}}]");
-    ASSERT_EQ(graph->getType_forTest(nullptr, "x.foo").toDebugString(), "number|array(S)");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.foo").toDebugString(), "missing|number|array(S)");
 }
 
 TEST_F(PipelineDependencyGraphTest, GetTypeOfSiblingOfSetPathUsesPathArrayness) {
@@ -4985,17 +4997,29 @@ TEST_F(PipelineDependencyGraphTest, GetTypeUsesArraynessOfIntermediateComponents
 TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaFieldUnderMatchedNonArrayPrefix) {
     unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
     setSchemaTypeFromMatch("{'x.y': {$_internalSchemaType: 'number'}}");
+    ASSERT_EQ(schemaTypeInfo->getRootType().toDebugString(), "{x: {y: number, ...}|array(S), ...}");
     setPipeline("[{$set: {'x.z': 1}}, {$match: {x: {$not: {$type: 'array'}}}}]");
 
-    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "number");
+    ASSERT_EQ(graph->getType_forTest(stages.back().get(), "x").toDebugString(), "any");
+    ASSERT_EQ(graph->getType_forTest(stages.back().get(), "x.y").toDebugString(),
+              "missing|number|array(S)");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "~array");
+    // TODO(SERVER-137963): We blindly add array(S) on the prefix.
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "missing|number|array(S)");
 }
 
 TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaFieldUnderObjectPrefix) {
     unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
     setSchemaTypeFromMatch("{'x.y': {$_internalSchemaType: 'number'}}");
+    ASSERT_EQ(schemaTypeInfo->getRootType().toDebugString(), "{x: {y: number, ...}|array(S), ...}");
     setPipeline("[{$set: {'x.z': 1}}, {$match: {x: {$_internalSchemaType: 'object'}}}]");
 
-    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "number");
+    ASSERT_EQ(graph->getType_forTest(stages.back().get(), "x").toDebugString(), "any");
+    ASSERT_EQ(graph->getType_forTest(stages.back().get(), "x.y").toDebugString(),
+              "missing|number|array(S)");
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "object");
+    // TODO(SERVER-137963): We blindly add array(S) on the prefix.
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "number|array(S)");
 }
 
 TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaFieldUnderMixedPrefix) {
@@ -5006,6 +5030,34 @@ TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaFieldUnderMixedPrefix) {
     setPipeline("[{$project: {'x.y': 1}}]");
 
     ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "missing|number");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaFieldUnderMixedNumberPrefix) {
+    setSchemaTypeFromMatch(R"({
+        x: {$not: {$_internalSchemaType: 'array'}},
+        $or: [{x: {$_internalSchemaType: 'number'}}, {'x.y': {$_internalSchemaType: 'number'}}]
+    })");
+    setPipeline("[{$project: {'x.y': 1}}]");
+
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "missing|number");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaFieldUnderMixedThenMissingPrefix) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setSchemaTypeFromMatch(R"({
+        x: {$not: {$_internalSchemaType: 'array'}},
+        $or: [{x: {$_internalSchemaType: 'number'}}, {'x.y': {$_internalSchemaType: 'number'}}]
+    })");
+    setPipeline("[{$project: {'x.y': 1}}, {$match: {x: {$exists: false}}}]");
+
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "missing");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaFieldUnderProjectedScalarPrefix) {
+    setSchemaTypeFromMatch("{x: {$_internalSchemaType: 'number'}}");
+    setPipeline("[{$project: {'x.y': 1}}]");
+
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "missing");
 }
 
 }  // namespace
