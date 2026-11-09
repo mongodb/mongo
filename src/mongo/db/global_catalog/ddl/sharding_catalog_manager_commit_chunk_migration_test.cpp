@@ -38,6 +38,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
@@ -101,6 +102,12 @@ protected:
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ConfigServerTestFixture::tearDown();
     }
+
+    // Commits a migration at 'commitTime' with the given history window and returns the history.
+    std::vector<ChunkHistory> commitMigrationWithHistoryAt(const Timestamp& commitTime,
+                                                           std::uint32_t historyWindowSecs,
+                                                           const Timestamp& newerOldEntryValidAfter,
+                                                           const Timestamp& oldestEntryValidAfter);
 
     // Allows the usage of transactions.
     ReadWriteConcernDefaultsLookupMock _lookupMock;
@@ -461,6 +468,126 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
     ASSERT_EQ(updatedClusterTime.asTimestamp(), chunkDoc0.getHistory().front().getValidAfter());
     ASSERT_EQ(updatedClusterTime.asTimestamp(), *chunkDoc0.getOnCurrentShardSince());
+}
+
+// SERVER-137616: an entry is only trimmable once the next newer entry is outside the window.
+TEST_F(CommitChunkMigrate, TrimHistoryKeepsEntryPartiallyOverlappingWindow) {
+    constexpr std::uint32_t kHistoryWindowSecs = 3600;
+    const auto currentTime = VectorClock::get(getServiceContext())->getTime();
+    const auto currentClusterTime = currentTime.clusterTime().asTimestamp();
+    // Avoid underflow below.
+    ASSERT_GT(currentClusterTime.getSecs(), static_cast<std::uint32_t>(7200));
+    const Timestamp commitTime(currentClusterTime.getSecs() + 10, 0);
+
+    // Oldest entry is outside the window, next newer entry is inside it.
+    const Timestamp newerOldEntryValidAfter(commitTime.getSecs() - 1800, 0);
+    const Timestamp oldestEntryValidAfter(commitTime.getSecs() - 7200, 0);
+
+    const auto history = commitMigrationWithHistoryAt(
+        commitTime, kHistoryWindowSecs, newerOldEntryValidAfter, oldestEntryValidAfter);
+
+    // Both old entries are kept.
+    ASSERT_EQ(3UL, history.size());
+    ASSERT_EQ(commitTime, history.front().getValidAfter());
+    ASSERT_EQ(newerOldEntryValidAfter, history.at(1).getValidAfter());
+    ASSERT_EQ(oldestEntryValidAfter, history.back().getValidAfter());
+}
+
+TEST_F(CommitChunkMigrate, TrimHistoryDropsEntriesFullyOutsideWindow) {
+    constexpr std::uint32_t kHistoryWindowSecs = 3600;
+    const auto currentTime = VectorClock::get(getServiceContext())->getTime();
+    const auto currentClusterTime = currentTime.clusterTime().asTimestamp();
+    // Avoid underflow below.
+    ASSERT_GT(currentClusterTime.getSecs(), static_cast<std::uint32_t>(7200));
+    const Timestamp commitTime(currentClusterTime.getSecs() + 10, 0);
+
+    // Both entries are outside the window.
+    const Timestamp newerOldEntryValidAfter(commitTime.getSecs() - 5000, 0);
+    const Timestamp oldestEntryValidAfter(commitTime.getSecs() - 7200, 0);
+
+    const auto history = commitMigrationWithHistoryAt(
+        commitTime, kHistoryWindowSecs, newerOldEntryValidAfter, oldestEntryValidAfter);
+
+    // Only the oldest entry is dropped; at least one old entry is always kept.
+    ASSERT_EQ(2UL, history.size());
+    ASSERT_EQ(commitTime, history.front().getValidAfter());
+    ASSERT_EQ(newerOldEntryValidAfter, history.back().getValidAfter());
+}
+
+TEST_F(CommitChunkMigrate, TrimHistoryKeepsEntryCoveringStartOfBoundarySecond) {
+    constexpr std::uint32_t kHistoryWindowSecs = 3600;
+    const auto currentTime = VectorClock::get(getServiceContext())->getTime();
+    const auto currentClusterTime = currentTime.clusterTime().asTimestamp();
+    ASSERT_GT(currentClusterTime.getSecs(), kHistoryWindowSecs + 100);
+    const Timestamp commitTime(currentClusterTime.getSecs() + 10, 0);
+    const auto boundarySecs = commitTime.getSecs() - kHistoryWindowSecs;
+
+    // Queries in [(boundarySecs, 0), (boundarySecs, 5)) still resolve to the oldest entry.
+    const Timestamp newerOldEntryValidAfter(boundarySecs, 5);
+    const Timestamp oldestEntryValidAfter(boundarySecs - 100, 0);
+
+    const auto history = commitMigrationWithHistoryAt(
+        commitTime, kHistoryWindowSecs, newerOldEntryValidAfter, oldestEntryValidAfter);
+
+    ASSERT_EQ(3UL, history.size());
+    ASSERT_EQ(commitTime, history.front().getValidAfter());
+    ASSERT_EQ(newerOldEntryValidAfter, history.at(1).getValidAfter());
+    ASSERT_EQ(oldestEntryValidAfter, history.back().getValidAfter());
+}
+
+std::vector<ChunkHistory> CommitChunkMigrate::commitMigrationWithHistoryAt(
+    const Timestamp& commitTime,
+    std::uint32_t historyWindowSecs,
+    const Timestamp& newerOldEntryValidAfter,
+    const Timestamp& oldestEntryValidAfter) {
+    const auto collUUID = UUID::gen();
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(42);
+
+    ShardType shard0;
+    shard0.setName("shard0");
+    shard0.setHost("shard0:12");
+
+    ShardType shard1;
+    shard1.setName("shard1");
+    shard1.setHost("shard1:12");
+
+    setupShards({shard0, shard1});
+
+    auto const origVersion = ChunkVersion({collEpoch, collTimestamp}, {15, 4});
+
+    ChunkType chunk0;
+    chunk0.setName(OID::gen());
+    chunk0.setCollectionUUID(collUUID);
+    chunk0.setVersion(origVersion);
+    chunk0.setShard(shard0.getName());
+    chunk0.setOnCurrentShardSince(newerOldEntryValidAfter);
+    chunk0.setHistory({ChunkHistory(newerOldEntryValidAfter, shard0.getName()),
+                       ChunkHistory(oldestEntryValidAfter, shard0.getName())});
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkMax = BSON("a" << 10);
+    chunk0.setRange({chunkMin, chunkMax});
+
+    setupCollection(kNamespace, kKeyPattern, {chunk0});
+
+    VectorClock::get(getServiceContext())->advanceClusterTime_forTest(LogicalTime(commitTime));
+
+    FailPointEnableBlock historyWindowOverride(
+        "overrideHistoryWindowInSecs", BSON("seconds" << static_cast<int>(historyWindowSecs)));
+
+    auto opCtx = operationContext();
+    ASSERT_OK(ShardingCatalogManager::get(opCtx)
+                  ->commitChunkMigration(opCtx,
+                                         kNamespace,
+                                         chunk0,
+                                         origVersion.epoch(),
+                                         collTimestamp,
+                                         ShardId(shard0.getName()),
+                                         ShardId(shard1.getName()))
+                  .getStatus());
+
+    return uassertStatusOK(getChunkDoc(opCtx, chunkMin, collEpoch, collTimestamp)).getHistory();
 }
 
 TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {

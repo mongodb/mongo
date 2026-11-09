@@ -1932,10 +1932,12 @@ ShardingCatalogManager::_commitChunkMigrationImpl(
 
     // Drop old history. Keep at least 1 entry so ChunkInfo::getShardIdAt finds valid history for
     // any query younger than the history window.
+    // Strict '<': the next entry may become valid mid-way through the boundary second, so the
+    // oldest entry may still serve the start of that second.
     if (!MONGO_unlikely(skipExpiringOldChunkHistory.shouldFail())) {
         int entriesDeleted = 0;
         while (newHistory.size() > 1 &&
-               newHistory.back().getValidAfter().getSecs() +
+               newHistory[newHistory.size() - 2].getValidAfter().getSecs() +
                        ShardingCatalogManager::getHistoryWindowInSeconds() <
                    validAfter.getSecs()) {
             newHistory.pop_back();
