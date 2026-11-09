@@ -8139,6 +8139,19 @@ class TestRealCopybaraSkyConfiguration(CopybaraTestCase):
                     f"{field_name} in copybara_path_rules.json must remain sorted.",
                 )
 
+    def test_real_path_rules_exclude_historical_private_artifacts(self):
+        rules = sync_repo_with_copybara.load_copybara_path_rules(self.REAL_PATH_RULES_PATH)
+
+        for path in ("build_events_full.json", "employees", "employees/data.json"):
+            with self.subTest(path=path):
+                self.assertTrue(
+                    any(
+                        sync_repo_with_copybara.matches_excluded_pattern(path, pattern)
+                        for pattern in rules.common_files_to_exclude
+                    ),
+                    f"Historical private path {path} must be excluded from public syncs.",
+                )
+
     @unittest.skipUnless(
         REAL_SKY_PATH.is_file() and REAL_PATH_RULES_PATH.is_file(),
         "checked-in Copybara config files not found at expected paths",
@@ -8154,6 +8167,8 @@ class TestRealCopybaraSkyConfiguration(CopybaraTestCase):
         top_level_paths = {Path(path.decode()).parts[0] for path in output.split(b"\0") if path}
         top_level_paths.add(".copybara_release_fragments")
         top_level_paths.update({"copybara.sky", "copybara.staging.sky"})
+        # These tracked paths were removed from master but still occur in older source commits.
+        top_level_paths.update({"build_events_full.json", "employees"})
 
         with repo_temp_directory() as tmpdir:
             config_path = Path(tmpdir) / "copy.bara.sky"
