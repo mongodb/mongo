@@ -744,6 +744,8 @@ public:
     static const BSONObj kObjectValue;
     static constexpr std::string_view kDateField = "date";
     static const Date_t kDateValue;
+    static constexpr std::string_view kRegexField = "regex";
+    static const BSONRegEx kRegexValue;
 
     LiteralQueryShapeParseNode() : sdk::AggStageParseNode(kStageName) {}
 
@@ -764,6 +766,7 @@ public:
         specBuilder.append(kNumberField, kNumberValue);
         specBuilder.append(kObjectField, kObjectValue);
         specBuilder.append(kDateField, kDateValue);
+        specBuilder.append(kRegexField, kRegexValue);
         auto spec = specBuilder.obj();
 
         // Build the query shape.
@@ -772,6 +775,7 @@ public:
         ctxHandle->appendLiteral(builder, kNumberField, spec[kNumberField]);
         ctxHandle->appendLiteral(builder, kObjectField, spec[kObjectField]);
         ctxHandle->appendLiteral(builder, kDateField, spec[kDateField]);
+        ctxHandle->appendLiteral(builder, kRegexField, spec[kRegexField]);
         return BSON(kStageName << builder.obj());
     }
 
@@ -790,6 +794,7 @@ public:
 
 inline const BSONObj LiteralQueryShapeParseNode::kObjectValue = BSON("hi" << "mongodb");
 inline const Date_t LiteralQueryShapeParseNode::kDateValue = Date_t::fromMillisSinceEpoch(1000);
+inline const BSONRegEx LiteralQueryShapeParseNode::kRegexValue = BSONRegEx("^mongo", "i");
 
 TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithNoTransformation) {
     auto parseNode = new ExtensionAggStageParseNodeAdapter(LiteralQueryShapeParseNode::make());
@@ -808,6 +813,8 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithNoTransformation) {
                        LiteralQueryShapeParseNode::kObjectValue);
     specBuilder.append(LiteralQueryShapeParseNode::kDateField,
                        LiteralQueryShapeParseNode::kDateValue);
+    specBuilder.append(LiteralQueryShapeParseNode::kRegexField,
+                       LiteralQueryShapeParseNode::kRegexValue);
     auto spec = specBuilder.obj();
 
     ASSERT_BSONOBJ_EQ(BSON(LiteralQueryShapeParseNode::kStageName << spec), queryShape);
@@ -827,6 +834,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithDebugShape) {
     specBuilder.append(LiteralQueryShapeParseNode::kNumberField, "?number");
     specBuilder.append(LiteralQueryShapeParseNode::kObjectField, "?object");
     specBuilder.append(LiteralQueryShapeParseNode::kDateField, "?date");
+    specBuilder.append(LiteralQueryShapeParseNode::kRegexField, "?regex");
     auto spec = specBuilder.obj();
 
     ASSERT_BSONOBJ_EQ(BSON(LiteralQueryShapeParseNode::kStageName << spec), queryShape);
@@ -846,6 +854,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValue
     specBuilder.append(LiteralQueryShapeParseNode::kNumberField, 1);
     specBuilder.append(LiteralQueryShapeParseNode::kObjectField, BSON("?" << "?"));
     specBuilder.append(LiteralQueryShapeParseNode::kDateField, Date_t::fromMillisSinceEpoch(0));
+    specBuilder.append(LiteralQueryShapeParseNode::kRegexField, BSONRegEx("/?/"));
     auto spec = specBuilder.obj();
 
     ASSERT_BSONOBJ_EQ(BSON(LiteralQueryShapeParseNode::kStageName << spec), queryShape);

@@ -653,7 +653,10 @@ int BSONElement::computeRegexSize(const char* elem,
     const auto optionsOffset = checkOffsetInBound(patternOffset + len1 + 1);
     p = elem + optionsOffset;
     size_t len2 = bufferSize ? strnlen(p, *bufferSize - optionsOffset) : strlen(p);
-    return checkOffsetInBound(optionsOffset + len2 + 1);
+    // checkOffsetInBound tests offset < *bufferSize, which is right for the offsets above,
+    // because each one is the offset of a byte that must exist. The element size can equal
+    // *bufferSize, so check the offset of the last byte, the options terminator, and add 1 after.
+    return checkOffsetInBound(optionsOffset + len2) + 1;
 }
 
 std::string BSONElement::toString(bool includeFieldName, bool full) const {

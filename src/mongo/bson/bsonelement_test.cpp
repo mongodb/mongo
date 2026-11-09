@@ -779,6 +779,28 @@ TEST(BSONElement, UntrustedConstructorBoundsChecks) {
     ASSERT_EQ(elem.numberInt(), 1);
 }
 
+TEST(BSONElement, UntrustedConstructorRegexEndingAtBufferEnd) {
+    // A regex element whose options terminator is the last byte of the buffer is in bounds.
+    const std::array<char, 6> regexAtEnd{
+        static_cast<char>(BSONType::regEx), 'a', '\0', 'x', '\0', '\0'};
+    BSONElement elem{std::span<const char>(regexAtEnd)};
+    ASSERT_EQ(elem.size(), 6);
+    ASSERT_EQ(std::string_view{elem.regex()}, "x"sv);
+    ASSERT_EQ(std::string_view{elem.regexFlags()}, ""sv);
+
+    // The options string is missing its terminator.
+    const std::array<char, 6> unterminatedOptions{
+        static_cast<char>(BSONType::regEx), 'a', '\0', 'x', '\0', 'i'};
+    ASSERT_TASSERT_CODE(BSONElement(std::span<const char>(unterminatedOptions)),
+                        ErrorCodes::BSONInternalError);
+
+    // The options string is missing entirely.
+    const std::array<char, 5> missingOptions{
+        static_cast<char>(BSONType::regEx), 'a', '\0', 'x', '\0'};
+    ASSERT_TASSERT_CODE(BSONElement(std::span<const char>(missingOptions)),
+                        ErrorCodes::BSONInternalError);
+}
+
 TEST(BSONElementTrustedInitTag, NonEmptyFieldName) {
     const std::array buffer{static_cast<char>(BSONType::string),
                             'f',
