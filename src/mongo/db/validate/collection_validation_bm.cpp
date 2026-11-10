@@ -132,7 +132,10 @@ size_t insertRecords(OperationContext* opCtx, const DataSpec& spec) {
 
 // Builds a fresh storage environment, populates a collection per 'state's range args, and times
 // repeated collection_validation::validate() calls in the requested mode.
-void BM_Validate(benchmark::State& state, collection_validation::ValidateMode mode) {
+void BM_Validate(benchmark::State& state,
+                 collection_validation::ValidateMode mode,
+                 collection_validation::CollectionHashOptions collHash =
+                     collection_validation::CollectionHashOptions::none()) {
     const DataSpec spec{
         .numRecords = static_cast<int>(state.range(0)),
         .numFields = static_cast<int>(state.range(1)),
@@ -158,7 +161,8 @@ void BM_Validate(benchmark::State& state, collection_validation::ValidateMode mo
             collection_validation::ValidationOptions{.validateMode = mode,
                                                      .repairMode =
                                                          collection_validation::RepairMode::kNone,
-                                                     .logDiagnostics = false},
+                                                     .logDiagnostics = false,
+                                                     .collHash = collHash},
             results));
         invariant(results.isValid());
         benchmark::DoNotOptimize(results);
@@ -205,7 +209,39 @@ void DeprecatedTypeArgs(benchmark::internal::Benchmark* b) {
     }
 }
 
-// Record-count scaling, across hash-off (kForeground), full, and hash-on (kCollectionHash) modes.
+// The four XXH3 / SHA256 combinations.
+static constexpr collection_validation::CollectionHashOptions kXxh3OnSha256On{
+    .sha256 = true, .xxh3 = collection_validation::Xxh3HashMode::kAlways};
+static constexpr collection_validation::CollectionHashOptions kXxh3OffSha256On{
+    .sha256 = true, .xxh3 = collection_validation::Xxh3HashMode::kNone};
+static constexpr collection_validation::CollectionHashOptions kXxh3OnSha256Off{
+    .sha256 = false, .xxh3 = collection_validation::Xxh3HashMode::kAlways};
+static constexpr collection_validation::CollectionHashOptions kXxh3OffSha256Off{
+    .sha256 = false, .xxh3 = collection_validation::Xxh3HashMode::kNone};
+
+#define BM_VALIDATE_HASH_COMBOS(axis, argsFn)                           \
+    BENCHMARK_CAPTURE(BM_Validate,                                      \
+                      Xxh3On_Sha256On_##axis,                           \
+                      collection_validation::ValidateMode::kForeground, \
+                      kXxh3OnSha256On)                                  \
+        ->Apply(argsFn);                                                \
+    BENCHMARK_CAPTURE(BM_Validate,                                      \
+                      Xxh3Off_Sha256On_##axis,                          \
+                      collection_validation::ValidateMode::kForeground, \
+                      kXxh3OffSha256On)                                 \
+        ->Apply(argsFn);                                                \
+    BENCHMARK_CAPTURE(BM_Validate,                                      \
+                      Xxh3On_Sha256Off_##axis,                          \
+                      collection_validation::ValidateMode::kForeground, \
+                      kXxh3OnSha256Off)                                 \
+        ->Apply(argsFn);                                                \
+    BENCHMARK_CAPTURE(BM_Validate,                                      \
+                      Xxh3Off_Sha256Off_##axis,                         \
+                      collection_validation::ValidateMode::kForeground, \
+                      kXxh3OffSha256Off)                                \
+        ->Apply(argsFn)
+
+// Record-count scaling, across hash-off (kForeground), full, and each XXH3 / SHA256 combination.
 BENCHMARK_CAPTURE(BM_Validate,
                   Foreground_RecordCount,
                   collection_validation::ValidateMode::kForeground)
@@ -214,18 +250,13 @@ BENCHMARK_CAPTURE(BM_Validate,
                   ForegroundFull_RecordCount,
                   collection_validation::ValidateMode::kForegroundFull)
     ->Apply(RecordCountArgs);
-BENCHMARK_CAPTURE(BM_Validate,
-                  CollectionHash_RecordCount,
-                  collection_validation::ValidateMode::kCollectionHash)
-    ->Apply(RecordCountArgs);
+BM_VALIDATE_HASH_COMBOS(RecordCount, RecordCountArgs);
 
-// Document-size axis, hash off vs on (where the per-record SHA256 cost scales with bytes).
+// Document-size axis, hash off vs each combination (where the per-record hash cost scales with
+// bytes).
 BENCHMARK_CAPTURE(BM_Validate, Foreground_DocSize, collection_validation::ValidateMode::kForeground)
     ->Apply(DocSizeArgs);
-BENCHMARK_CAPTURE(BM_Validate,
-                  CollectionHash_DocSize,
-                  collection_validation::ValidateMode::kCollectionHash)
-    ->Apply(DocSizeArgs);
+BM_VALIDATE_HASH_COMBOS(DocSize, DocSizeArgs);
 
 // Field-count axis (BSON-validation traversal cost per byte).
 BENCHMARK_CAPTURE(BM_Validate,

@@ -750,15 +750,20 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
     results.validateResults.setNumInvalidDocuments(0);
     results.validateResults.setNumNonCompliantDocuments(0);
 
-    const bool computeXxh3Hash = validateOptions.isCollHashValidation() &&
-        rss::ReplicatedStorageService::get(opCtx)
-            .getPersistenceProvider()
-            .shouldUseContinuousInternodeValidation();
+    const auto& collHashOptions = validateOptions.collHash;
+    const bool computeSha256Hash = collHashOptions.sha256;
+    const bool computeXxh3Hash =
+        collHashOptions.xxh3 == collection_validation::Xxh3HashMode::kAlways ||
+        (collHashOptions.xxh3 ==
+             collection_validation::Xxh3HashMode::kIfContinuousHashValidationEnabled &&
+         rss::ReplicatedStorageService::get(opCtx)
+             .getPersistenceProvider()
+             .shouldUseContinuousInternodeValidation());
 
     if (opts.beginRecordId.isNull()) {
         // The record store is empty if the first RecordId isn't initialized. Stand in an empty
         // hash, which is the correct collection hash for an empty collection.
-        if (validateOptions.isCollHashValidation()) {
+        if (computeSha256Hash) {
             results.validateResults.setCollectionHash(SHA256Block::computeHash({}));
         }
         if (computeXxh3Hash) {
@@ -843,10 +848,13 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
             results.validateResults.incrementNumNonCompliantDocuments(compliantDocument ? 0 : 1);
             results.validateResults.incrementNumInvalidDocuments(validDocument ? 0 : 1);
 
-            if (validateOptions.isCollHashValidation()) {
+            if (computeSha256Hash || computeXxh3Hash) {
                 const ConstDataRange recordRange(record->data.data(), record->data.size());
-                const SHA256Block block = SHA256Block::computeHashWithCtx(&hashCtx, {recordRange});
-                accumulatedBlock.xorInline(block);
+                if (computeSha256Hash) {
+                    const SHA256Block block =
+                        SHA256Block::computeHashWithCtx(&hashCtx, {recordRange});
+                    accumulatedBlock.xorInline(block);
+                }
                 if (computeXxh3Hash) {
                     accumulatedXxh3 ^=
                         static_cast<uint64_t>(repl::computeDocValidationHash(recordRange));
@@ -1118,8 +1126,10 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
             }
         }
 
-        if (validateOptions.isCollHashValidation()) {
-            results.validateResults.setCollectionHash(accumulatedBlock);
+        if (computeSha256Hash || computeXxh3Hash) {
+            if (computeSha256Hash) {
+                results.validateResults.setCollectionHash(accumulatedBlock);
+            }
             if (computeXxh3Hash) {
                 results.validateResults.setXxh3CollectionHash(accumulatedXxh3);
             }

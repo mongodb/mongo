@@ -124,10 +124,10 @@ TEST_F(ValidateStateWithoutSizeStorerTest, GetDetectedFastCountTypeReturnsNeithe
 }
 
 TEST(ValidationOptionsToBSONTest, ReportsModeAndRepairMode) {
-    const ValidationOptions options{.validateMode = ValidateMode::kCollectionHash,
+    const ValidationOptions options{.validateMode = ValidateMode::kForegroundFull,
                                     .repairMode = RepairMode::kNone};
     const BSONObj obj = options.toBSON();
-    EXPECT_EQ(obj["mode"].String(), "collectionHash");
+    EXPECT_EQ(obj["mode"].String(), "foregroundFull");
     EXPECT_EQ(obj["repairMode"].String(), "none");
     EXPECT_FALSE(obj["repair"].Bool());
     EXPECT_FALSE(obj["fixMultikey"].Bool());
@@ -135,11 +135,14 @@ TEST(ValidationOptionsToBSONTest, ReportsModeAndRepairMode) {
 }
 
 TEST(ValidationOptionsToBSONTest, ReportsSliceTargetAndSizeStats) {
-    const ValidationOptions options{.validateMode = ValidateMode::kForegroundFull,
-                                    .repairMode = RepairMode::kFixErrors,
-                                    .logDiagnostics = true,
-                                    .targetRecordsPerRecordStoreSlice = 5000,
-                                    .sizeStats = true};
+    const ValidationOptions options{
+        .validateMode = ValidateMode::kForegroundFull,
+        .repairMode = RepairMode::kFixErrors,
+        .logDiagnostics = true,
+        .targetRecordsPerRecordStoreSlice = 5000,
+        .collHash = CollectionHashOptions{.sha256 = true,
+                                          .xxh3 = Xxh3HashMode::kIfContinuousHashValidationEnabled,
+                                          .sizeStats = true}};
     const BSONObj obj = options.toBSON();
     EXPECT_EQ(obj["mode"].String(), "foregroundFull");
     EXPECT_EQ(obj["repairMode"].String(), "fixErrors");
@@ -147,7 +150,10 @@ TEST(ValidationOptionsToBSONTest, ReportsSliceTargetAndSizeStats) {
     // kFixErrors implies kAdjustMultikey.
     EXPECT_TRUE(obj["fixMultikey"].Bool());
     EXPECT_TRUE(obj["logDiagnostics"].Bool());
-    EXPECT_TRUE(obj["sizeStats"].Bool());
+    const BSONObj collHash = obj["collHash"].Obj();
+    EXPECT_TRUE(collHash["sha256"].Bool());
+    EXPECT_EQ(collHash["xxh3"].String(), "ifContinuousHashValidationEnabled");
+    EXPECT_TRUE(collHash["sizeStats"].Bool());
     EXPECT_EQ(obj["targetRecordsPerRecordStoreSlice"].numberLong(), 5000);
 }
 

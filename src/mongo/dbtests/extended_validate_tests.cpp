@@ -135,18 +135,32 @@ public:
         ASSERT_OK(collection_validation::validate(
             &_opCtx,
             _nss1,
-            ValidationOptions{collection_validation::ValidateMode::kCollectionHash,
+            ValidationOptions{collection_validation::ValidateMode::kForeground,
                               collection_validation::RepairMode::kNone,
-                              /*logDiagnostics=*/true},
+                              /*logDiagnostics=*/true,
+                              currentValidationVersion,
+                              /*verifyConfigurationOverride=*/boost::none,
+                              /*readTimestamp=*/boost::none,
+                              /*hashPrefixes=*/boost::none,
+                              /*revealHashedIds=*/boost::none,
+                              /*targetRecordsPerRecordStoreSlice=*/boost::none,
+                              collection_validation::CollectionHashOptions::legacy()},
             results1));
         ASSERT_TRUE(results1.isValid()) << "Validation failed when it should've worked.";
 
         ASSERT_OK(collection_validation::validate(
             &_opCtx,
             _nss2,
-            ValidationOptions{collection_validation::ValidateMode::kCollectionHash,
+            ValidationOptions{collection_validation::ValidateMode::kForeground,
                               collection_validation::RepairMode::kNone,
-                              /*logDiagnostics=*/true},
+                              /*logDiagnostics=*/true,
+                              currentValidationVersion,
+                              /*verifyConfigurationOverride=*/boost::none,
+                              /*readTimestamp=*/boost::none,
+                              /*hashPrefixes=*/boost::none,
+                              /*revealHashedIds=*/boost::none,
+                              /*targetRecordsPerRecordStoreSlice=*/boost::none,
+                              collection_validation::CollectionHashOptions::legacy()},
             results2));
         ASSERT_TRUE(results2.isValid()) << "Validation failed when it should've worked.";
 

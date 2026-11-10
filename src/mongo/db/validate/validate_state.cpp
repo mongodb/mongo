@@ -358,8 +358,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     // and each index cursor). Opening a size-stats cursor resets its counters, so the flag is
     // left off for the seek cursor and every other cursor. Opt-in only; results are logged after
     // the scans complete.
-    const bool collectSizeStats =
-        _options.isCollHashValidation() && _options.sizeStats && !isRecordStoreSlicingEnabled();
+    const bool collectSizeStats = _options.sizeStats() && !isRecordStoreSlicingEnabled();
 
     {
         if (collectSizeStats) {

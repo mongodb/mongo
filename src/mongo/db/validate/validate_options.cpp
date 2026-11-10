@@ -32,10 +32,20 @@ std::string_view toString(ValidateMode validateMode) {
             return "foregroundFullEnforceFastSize";
         case ValidateMode::kForegroundFullEnforceFastCountAndSize:
             return "foregroundFullEnforceFastCountAndSize";
-        case ValidateMode::kCollectionHash:
-            return "collectionHash";
         case ValidateMode::kHashDrillDown:
             return "hashDrillDown";
+    }
+    MONGO_UNREACHABLE;
+}
+
+std::string_view toString(Xxh3HashMode xxh3HashMode) {
+    switch (xxh3HashMode) {
+        case Xxh3HashMode::kNone:
+            return "none";
+        case Xxh3HashMode::kIfContinuousHashValidationEnabled:
+            return "ifContinuousHashValidationEnabled";
+        case Xxh3HashMode::kAlways:
+            return "always";
     }
     MONGO_UNREACHABLE;
 }
@@ -52,6 +62,10 @@ std::string_view toString(RepairMode repairMode) {
     MONGO_UNREACHABLE;
 }
 
+BSONObj CollectionHashOptions::toBSON() const {
+    return BSON("sha256" << sha256 << "xxh3" << toString(xxh3) << "sizeStats" << sizeStats);
+}
+
 BSONObj ValidationOptions::toBSON() const {
     BSONObjBuilder builder;
     builder.append("mode", toString(validateMode));
@@ -60,7 +74,7 @@ BSONObj ValidationOptions::toBSON() const {
     builder.append("fixMultikey", adjustMultikey());
     builder.append("logDiagnostics", logDiagnostics);
     builder.append("validationVersion", static_cast<int>(validationVersion));
-    builder.append("sizeStats", sizeStats);
+    builder.append("collHash", collHash.toBSON());
     if (verifyConfigurationOverride) {
         builder.append("verifyConfigurationOverride", *verifyConfigurationOverride);
     }

@@ -619,6 +619,81 @@ boost::optional<int64_t> getTargetRecordsPerRecordStoreSlice() {
     return gValidateParallelTargetRecordsPerSlice.load();
 }
 
+bool isRecordStoreSlicingEnabled(const boost::optional<int64_t>& targetRecordsPerSlice) {
+    return targetRecordsPerSlice && *targetRecordsPerSlice > 0 &&
+        gValidateParallelMaxRecordStoreSlices.load() > 1;
+}
+
+namespace {
+
+// Absent selects the defaults. 'true' selects the legacy behavior, and 'false' no hashes. A string
+// or an array of strings selects exactly the hashes to compute: "sha256" and/or "xxh3". The string
+// "default" selects whatever absence does, and is only accepted as a string.
+CollectionHashOptions parseCollHashOptions(const BSONElement& elem, bool enableSizeStats) {
+    if (elem.eoo()) {
+        return {};
+    }
+
+    CollectionHashOptions options = CollectionHashOptions::none();
+    auto select = [&](std::string_view algorithm) {
+        if (algorithm == "sha256") {
+            options.sha256 = true;
+        } else if (algorithm == "xxh3") {
+            options.xxh3 = Xxh3HashMode::kAlways;
+        } else {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "Unknown collHash algorithm '" << algorithm
+                                    << "', expected 'sha256' or 'xxh3'");
+        }
+    };
+
+    switch (elem.type()) {
+        case BSONType::null:
+        case BSONType::undefined:
+            break;
+        case BSONType::boolean:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDouble:
+        case BSONType::numberDecimal:
+            if (elem.trueValue()) {
+                options = CollectionHashOptions::legacy();
+            }
+            break;
+        case BSONType::string:
+            if (elem.valueStringData() == "default") {
+                return {};
+            }
+            select(elem.valueStringData());
+            break;
+        case BSONType::array: {
+            if (elem.Obj().isEmpty()) {
+                uasserted(ErrorCodes::InvalidOptions,
+                          "collHash must name at least one algorithm when it is an array");
+            }
+            for (const auto& algorithm : elem.Obj()) {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "collHash array elements must be strings, got "
+                                      << typeName(algorithm.type()),
+                        algorithm.type() == BSONType::string);
+                select(algorithm.valueStringData());
+            }
+            break;
+        }
+        default:
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "collHash must be a boolean, a string or an array of "
+                                       "strings, got "
+                                    << typeName(elem.type()));
+    }
+
+    // Size stats are only collected for SHA256 hashes
+    options.sizeStats = enableSizeStats && options.sha256;
+    return options;
+}
+
+}  // namespace
+
 ValidationOptions parseValidateOptions(OperationContext* opCtx,
                                        NamespaceString nss,
                                        const BSONObj& cmdObj,
@@ -724,14 +799,11 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
                                 << "is not supported on unreplicated collections");
     }
 
-    // collHash parameter.
-    const bool collHash = cmdObj["collHash"].trueValue();
-
     // Size stats accumulate and log a size summary during a collHash validation. This is
     // enabled only by the offline startup '--validate' path (fleet validation), never by the
     // 'validate' command, so customers never see the extra log lines. It is meaningful only for
     // collHash validation, whose full scan drives the size-summary accumulation.
-    const bool sizeStats = enableSizeStats && collHash;
+    const auto collHashOptions = parseCollHashOptions(cmdObj["collHash"], enableSizeStats);
 
     // hashPrefixes parameter.
     const auto rawHashPrefixes = cmdObj["hashPrefixes"];
@@ -752,25 +824,24 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
             str::stream() << "Running the validate command with { hashPrefixes: [] } can only be"
                           << " performed in standalone mode.");
     }
-    if (rawHashPrefixes && !collHash) {
+    if (rawHashPrefixes && !collHashOptions.sha256) {
         uasserted(ErrorCodes::InvalidOptions,
-                  str::stream() << "Running the validate command with { hashPrefixes: [] }"
-                                << " requires {collHash: true}.");
+                  "Running the validate command with { hashPrefixes: [] } requires a collHash that "
+                  "includes 'sha256'.");
     }
 
     // revealHashedIds parameter.
     const auto rawRevealHashedIds = cmdObj["revealHashedIds"];
     boost::optional<std::vector<std::string>> revealHashedIds = boost::none;
     if (rawRevealHashedIds && replCoord->getSettings().isReplSet()) {
-        uasserted(
-            ErrorCodes::InvalidOptions,
-            str::stream() << "Running the validate command with { revealHashedIds: [] } can only be"
-                          << " performed in standalone mode.");
-    }
-    if (rawRevealHashedIds && !collHash) {
         uasserted(ErrorCodes::InvalidOptions,
-                  str::stream() << "Running the validate command with { revealHashedIds: [] }"
-                                << " requires {collHash: true}.");
+                  "Running the validate command with { revealHashedIds: [] } can only be performed "
+                  "in standalone mode.");
+    }
+    if (rawRevealHashedIds && !collHashOptions.sha256) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  "Running the validate command with { revealHashedIds: [] } collHash options that "
+                  "include 'sha256'.");
     }
     if (rawRevealHashedIds && rawHashPrefixes) {
         uasserted(ErrorCodes::InvalidOptions,
@@ -834,9 +905,6 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
         if (hashPrefixes) {
             return collection_validation::ValidateMode::kHashDrillDown;
         }
-        if (collHash) {
-            return collection_validation::ValidateMode::kCollectionHash;
-        }
         if (background) {
             return checkBSONConformance ? collection_validation::ValidateMode::kBackgroundCheckBSON
                                         : collection_validation::ValidateMode::kBackground;
@@ -868,7 +936,6 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
         }
         switch (validateMode) {
             case collection_validation::ValidateMode::kForeground:
-            case collection_validation::ValidateMode::kCollectionHash:
             case collection_validation::ValidateMode::kHashDrillDown:
             case collection_validation::ValidateMode::kForegroundCheckBSON:
             case collection_validation::ValidateMode::kForegroundFull:
@@ -906,7 +973,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
             .hashPrefixes = hashPrefixes,
             .revealHashedIds = revealHashedIds,
             .targetRecordsPerRecordStoreSlice = getTargetRecordsPerRecordStoreSlice(),
-            .sizeStats = sizeStats};
+            .collHash = collHashOptions};
 }
 
 BSONObj ValidationMetrics::toBSON(const ValidateResults& results) const {
@@ -1209,13 +1276,13 @@ Status validate(OperationContext* opCtx,
             }
         }
 
-        if (validateState.getOptions().isCollHashValidation()) {
+        if (validateState.getOptions().collHash.sha256) {
             indexValidator.computeMetadataHash(opCtx, validateState.getCollection(), results);
         }
 
         // Compare the accumulated hash against the replicated metadata system's view of the
         // collection.
-        if (validateState.getOptions().isCollHashValidation() &&
+        if (results.getXxh3CollectionHash().has_value() &&
             rss::ReplicatedStorageService::get(opCtx)
                 .getPersistenceProvider()
                 .shouldUseContinuousInternodeValidation()) {

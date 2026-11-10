@@ -1132,6 +1132,110 @@ TEST_P(CollectionValidationAdaptorTest, ValidateOldUniqueIndexKeyWarning) {
     }
 }
 
+using collection_validation::CollectionHashOptions;
+using collection_validation::Xxh3HashMode;
+
+TEST_F(CollectionValidationTest, CollHashIsIndependentOfValidateMode) {
+    auto parse = [&](BSONObj cmd) {
+        return collection_validation::parseValidateOptions(operationContext(), kNss, cmd);
+    };
+
+    const auto collHashOnly = parse(BSON("validate" << "t" << "collHash" << true));
+    EXPECT_TRUE(collHashOnly.collHash.sha256);
+    EXPECT_EQ(collHashOnly.validateMode, collection_validation::ValidateMode::kForeground);
+
+    const auto full = parse(BSON("validate" << "t" << "full" << true << "collHash" << true));
+    EXPECT_TRUE(full.collHash.sha256);
+    EXPECT_TRUE(full.isFullValidation());
+    EXPECT_EQ(full.validateMode, collection_validation::ValidateMode::kForegroundFull);
+
+    const auto noHash = parse(BSON("validate" << "t" << "full" << true));
+    EXPECT_FALSE(noHash.collHash.sha256);
+    EXPECT_EQ(noHash.collHash.xxh3, Xxh3HashMode::kIfContinuousHashValidationEnabled);
+}
+
+TEST_F(CollectionValidationTest, CollHashAcceptsAlgorithmSelection) {
+    auto parse = [&](BSONObj cmd) {
+        return collection_validation::parseValidateOptions(operationContext(), kNss, cmd).collHash;
+    };
+    const auto legacy = CollectionHashOptions{
+        .sha256 = true, .xxh3 = Xxh3HashMode::kIfContinuousHashValidationEnabled};
+
+    EXPECT_EQ(parse(BSON("collHash" << true)), legacy);
+    EXPECT_EQ(parse(BSON("collHash" << 1)), legacy);
+    EXPECT_EQ(parse(BSON("collHash" << false)), CollectionHashOptions::none());
+    EXPECT_EQ(parse(BSON("collHash" << BSONNULL)), CollectionHashOptions::none());
+
+    // Without collHash, XXH3 is still accumulated when there is a persisted hash to check.
+    EXPECT_EQ(parse(BSONObj()), CollectionHashOptions{});
+    EXPECT_FALSE(parse(BSONObj()).sha256);
+    EXPECT_EQ(parse(BSONObj()).xxh3, Xxh3HashMode::kIfContinuousHashValidationEnabled);
+
+    EXPECT_EQ(parse(BSON("collHash" << "sha256")),
+              (CollectionHashOptions{.sha256 = true, .xxh3 = Xxh3HashMode::kNone}));
+    EXPECT_EQ(parse(BSON("collHash" << "xxh3")),
+              (CollectionHashOptions{.sha256 = false, .xxh3 = Xxh3HashMode::kAlways}));
+    EXPECT_EQ(parse(BSON("collHash" << BSON_ARRAY("sha256" << "xxh3"))),
+              (CollectionHashOptions{.sha256 = true, .xxh3 = Xxh3HashMode::kAlways}));
+    EXPECT_EQ(parse(BSON("collHash" << BSON_ARRAY("xxh3" << "xxh3"))),
+              (CollectionHashOptions{.sha256 = false, .xxh3 = Xxh3HashMode::kAlways}));
+
+    // "default" is the same as leaving collHash out.
+    EXPECT_EQ(parse(BSON("collHash" << "default")), parse(BSONObj()));
+}
+
+TEST_F(CollectionValidationTest, CollHashRejectsInvalidSelection) {
+    auto parse = [&](BSONObj cmd) {
+        return collection_validation::parseValidateOptions(operationContext(), kNss, cmd);
+    };
+    ASSERT_THROWS_CODE(parse(BSON("collHash" << "md5")), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        parse(BSON("collHash" << BSONArray())), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        parse(BSON("collHash" << BSON_ARRAY("default"))), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(parse(BSON("collHash" << BSON_ARRAY("sha256" << "default"))),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(parse(BSON("collHash" << BSON_ARRAY("sha256" << "md5"))),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(parse(BSON("collHash" << BSON_ARRAY("xxh3" << ""))),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(parse(BSON("collHash" << BSON_ARRAY("sha256" << 1))),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        parse(BSON("collHash" << BSON("sha256" << true))), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(CollectionValidationTest, HashDrillDownRequiresSha256) {
+    auto parse = [&](BSONObj cmd) {
+        return collection_validation::parseValidateOptions(operationContext(), kNss, cmd);
+    };
+    ASSERT_THROWS_CODE(parse(BSON("collHash" << "xxh3" << "hashPrefixes" << BSONArray())),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(parse(BSON("collHash" << "xxh3" << "revealHashedIds" << BSON_ARRAY("AB"))),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(CollectionValidationTest, SizeStatsRequiresCollHash) {
+    auto parse = [&](BSONObj cmd, bool enableSizeStats) {
+        return collection_validation::parseValidateOptions(
+                   operationContext(), kNss, cmd, /*skipAtClusterTime=*/false, enableSizeStats)
+            .collHash;
+    };
+    EXPECT_TRUE(parse(BSON("collHash" << true), /*enableSizeStats=*/true).sizeStats);
+    EXPECT_TRUE(parse(BSON("collHash" << "sha256"), /*enableSizeStats=*/true).sizeStats);
+    EXPECT_FALSE(parse(BSON("collHash" << "xxh3"), /*enableSizeStats=*/true).sizeStats);
+    EXPECT_FALSE(parse(BSON("collHash" << "default"), /*enableSizeStats=*/true).sizeStats);
+    EXPECT_FALSE(parse(BSON("collHash" << false), /*enableSizeStats=*/true).sizeStats);
+    EXPECT_FALSE(parse(BSON("collHash" << true), /*enableSizeStats=*/false).sizeStats);
+    EXPECT_FALSE(parse(BSONObj(), /*enableSizeStats=*/true).sizeStats);
+}
+
 TEST_F(CollectionValidationTest, HashPrefixesEmptyString) {
     ASSERT_THROWS_CODE(collection_validation::validateHashes({""}, /*equalLength=*/true),
                        DBException,
@@ -2472,8 +2576,9 @@ protected:
                       operationContext(),
                       nss,
                       collection_validation::ValidationOptions{
-                          .validateMode = collection_validation::ValidateMode::kCollectionHash,
-                          .repairMode = collection_validation::RepairMode::kNone},
+                          .validateMode = collection_validation::ValidateMode::kForeground,
+                          .repairMode = collection_validation::RepairMode::kNone,
+                          .collHash = collection_validation::CollectionHashOptions::legacy()},
                       results));
         return results;
     }
@@ -2683,12 +2788,13 @@ TEST_F(CollectionHashComparisonTest, SkipsWhenTheCallerPinsAReadTimestamp) {
                   operationContext(),
                   kNss,
                   collection_validation::ValidationOptions{
-                      .validateMode = collection_validation::ValidateMode::kCollectionHash,
+                      .validateMode = collection_validation::ValidateMode::kForeground,
                       .repairMode = collection_validation::RepairMode::kNone,
                       .readTimestamp = operationContext()
                                            ->getServiceContext()
                                            ->getStorageEngine()
-                                           ->getAllDurableTimestamp()},
+                                           ->getAllDurableTimestamp(),
+                      .collHash = collection_validation::CollectionHashOptions::legacy()},
                   results));
 
     ASSERT_TRUE(results.getHashComparison().has_value());
@@ -2933,8 +3039,9 @@ protected:
                       operationContext(),
                       nss,
                       collection_validation::ValidationOptions{
-                          .validateMode = collection_validation::ValidateMode::kCollectionHash,
-                          .repairMode = collection_validation::RepairMode::kNone},
+                          .validateMode = collection_validation::ValidateMode::kForeground,
+                          .repairMode = collection_validation::RepairMode::kNone,
+                          .collHash = collection_validation::CollectionHashOptions::legacy()},
                       results));
         return results;
     }
@@ -3059,8 +3166,9 @@ TEST_F(CollectionValidationTest, NoXxh3HashWithoutContinuousInternodeValidation)
                   operationContext(),
                   kNss,
                   collection_validation::ValidationOptions{
-                      .validateMode = collection_validation::ValidateMode::kCollectionHash,
-                      .repairMode = collection_validation::RepairMode::kNone},
+                      .validateMode = collection_validation::ValidateMode::kForeground,
+                      .repairMode = collection_validation::RepairMode::kNone,
+                      .collHash = collection_validation::CollectionHashOptions::legacy()},
                   results));
 
     // The default attached storage provider does not record the per-document validation hashes,

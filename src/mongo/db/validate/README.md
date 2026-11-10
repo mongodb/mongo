@@ -172,9 +172,16 @@ a replica set to check for inter-node consistency. The collection hashing featur
 on a standalone node and is not supported against a replica set. The following parameters are used
 for the collection hashing.
 
-- `collHash`: <bool>
-  - Enables hash computation for the collection. When present, validate computes a combined hash
-    over the collection’s documents.
+- `collHash`: <bool | string | array<string>>
+  - Enables hash computation for the collection. When absent, validate computes only the XXH3 hash,
+    and only when the persistence provider records per-collection hashes to check it against;
+    `false` computes no hash. `true` computes the SHA-256 hash, plus the XXH3 hash when the
+    persistence provider records per-collection hashes to compare it against. A string or array
+    selects the hashes explicitly from `"sha256"` and `"xxh3"`. The string `"default"` (not accepted
+    in an array) is what leaving `collHash` out selects. `"xxh3"` alone computes the XXH3 hash
+    (reported as `xxh3All`) regardless of the persistence provider, and does not compute any SHA-256
+    hash. `hashPrefixes` and `revealHashedIds` require `"sha256"`. It can be combined with any
+    validation mode, such as `full: true`.
 - `hashPrefixes`: <array<string>>
   - Requests a bucketed view of the collection keyed by prefixes of the per-document \_id hash.
     Buckets are returned in the `partial` field and are used to iteratively narrow down inconsistent

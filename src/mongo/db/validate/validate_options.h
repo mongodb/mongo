@@ -55,10 +55,6 @@ enum class ValidateMode {
     // to correcting the fast count/size if they are incorrect).
     kForegroundFullEnforceFastCountAndSize,
 
-    // Performs an extended validate where a total collection hash is computed and returned,
-    // alongside the behavior performed in kForegroundFull.
-    kCollectionHash,
-
     // Part of extended validate, perform drill down operations to isolate documents where
     // inconsistencies are found. Performs no other validation checks.
     kHashDrillDown,
@@ -82,8 +78,48 @@ enum class RepairMode {
     kAdjustMultikey,
 };
 
+enum class Xxh3HashMode {
+    // Do not compute the XXH3 collection hash.
+    kNone,
+    // Compute it only when the persistence provider records per-collection hashes to compare it
+    // against.
+    kIfContinuousHashValidationEnabled,
+    // Compute it regardless of the persistence provider.
+    kAlways,
+};
+
+/**
+ * Which collection hashes validate computes while it traverses the record store. Independent of
+ * the ValidateMode.
+ */
+struct CollectionHashOptions {
+    // The order-independent SHA-256 hash returned as 'all', along with the metadata hash and the
+    // _id hashes that hash drill-down is built on.
+    bool sha256 = false;
+    // By default the XXH3 hash is accumulated whenever there is a persisted hash to check it
+    // against.
+    Xxh3HashMode xxh3 = Xxh3HashMode::kIfContinuousHashValidationEnabled;
+    // Accumulate and log a storage size summary while the hashes are computed.
+    bool sizeStats = false;
+
+    // What '{collHash: true}' selects.
+    static CollectionHashOptions legacy() {
+        return {.sha256 = true, .xxh3 = Xxh3HashMode::kIfContinuousHashValidationEnabled};
+    }
+
+    // What '{collHash: false}' selects: no collection hash at all.
+    static CollectionHashOptions none() {
+        return {.sha256 = false, .xxh3 = Xxh3HashMode::kNone};
+    }
+
+    bool operator==(const CollectionHashOptions&) const = default;
+
+    BSONObj toBSON() const;
+};
+
 std::string_view toString(ValidateMode validateMode);
 std::string_view toString(RepairMode repairMode);
+std::string_view toString(Xxh3HashMode xxh3HashMode);
 
 /**
  * Additional validation options that can run in any mode.
@@ -117,13 +153,13 @@ struct ValidationOptions {
             validateMode == ValidateMode::kForegroundCheckBSON;
     }
 
-    bool isExtendedValidation() const {
-        return validateMode == ValidateMode::kCollectionHash ||
-            validateMode == ValidateMode::kHashDrillDown;
-    }
-
-    bool isCollHashValidation() const {
-        return validateMode == ValidateMode::kCollectionHash;
+    /**
+     * Returns true iff the caller opted in to accumulating and logging a storage size summary. When
+     * set, the record store and index scans are opened as size-stats cursors which log the size
+     * summary when the scan complete. Only active if sizeStats is enabled alongside sha256 hashing.
+     */
+    bool sizeStats() const {
+        return collHash.sizeStats && collHash.sha256;
     }
 
     bool isHashDrillDown() const {
@@ -184,9 +220,9 @@ struct ValidationOptions {
 
     boost::optional<int64_t> targetRecordsPerRecordStoreSlice;
 
-    // Opt-in: when true (and running collHash validation), the record store and index scans
+    // Independent of the validate mode. With 'sizeStats', the record store and index scans
     // accumulate a storage size summary that is read back and logged.
-    bool sizeStats = false;
+    CollectionHashOptions collHash;
 };
 
 }  // namespace mongo::collection_validation
