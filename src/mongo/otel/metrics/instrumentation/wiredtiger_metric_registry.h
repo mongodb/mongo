@@ -39,6 +39,8 @@ class DBException;
  */
 class [[MONGO_MOD_PUBLIC]] WiredTigerMetricRegistry {
 public:
+    WiredTigerMetricRegistry();
+
     /**
      * Records an increase in an OTel counter metric. WiredTiger reports counters as the increment
      * since the last reading, which is what the OTel counter API expects, so the value is passed
@@ -52,6 +54,17 @@ public:
      */
     void updateGauge(std::string_view statName, int64_t currentValue);
 
+    /**
+     * Records that WiredTiger statistics could not be read from the connection.
+     */
+    void recordCollectError();
+
+    /**
+     * Records that WiredTiger was not ready to have its statistics read (e.g. during startup or
+     * shutdown).
+     */
+    void recordEngineNotReadyError();
+
 private:
     static otel::metrics::DynamicMetricNameMaker::Passkey dyn_metric_passkey() {
         return {};
@@ -61,6 +74,10 @@ private:
     otel::metrics::Gauge<int64_t>* _createGauge(std::string_view statName);
 
     void _logUpdateError(std::string_view statName, const DBException& ex);
+
+    // Error-handling metrics, recorded by the server rather than read from WiredTiger.
+    otel::metrics::Counter<int64_t>& _collectErrors;
+    otel::metrics::Counter<int64_t>& _engineNotReadyErrors;
 
     // Guards the members below.
     std::mutex _mutex;

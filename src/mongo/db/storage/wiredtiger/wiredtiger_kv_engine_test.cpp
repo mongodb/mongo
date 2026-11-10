@@ -31,6 +31,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -41,6 +42,8 @@
 #include "mongo/db/validate/validate_options.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/log_test.h"
@@ -1312,6 +1315,62 @@ TEST_F(WiredTigerKVEngineTest, CollectStorageStatsReturnsNoneWhenConnectionNotRe
     engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
     ASSERT(!engine->collectStorageStats());
+}
+
+TEST_F(WiredTigerKVEngineTest, CollectStorageStatsRecordsEngineNotReadyError) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test: OTel metrics unavailable on this platform";
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    auto readEngineNotReadyErrors = [&] {
+        return capturer.readInt64Counter(
+            otel::metrics::MetricNames::kWiredTigerEngineNotReadyErrors);
+    };
+
+    auto* engine = _helper->getWiredTigerKVEngine();
+    const auto initialErrors = readEngineNotReadyErrors();
+    ASSERT(engine->collectStorageStats());
+    ASSERT_EQ(readEngineNotReadyErrors(), initialErrors);
+
+    engine->cleanShutdown(kMemLeakAllowed);
+    ASSERT(!engine->collectStorageStats());
+    ASSERT_EQ(readEngineNotReadyErrors(), initialErrors + 1);
+}
+
+TEST_F(WiredTigerKVEngineTest, CollectStorageStatsRecordsCollectError) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test: OTel metrics unavailable on this platform";
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    auto readCollectErrors = [&] {
+        return capturer.readInt64Counter(otel::metrics::MetricNames::kWiredTigerCollectErrors);
+    };
+    auto readEngineNotReadyErrors = [&] {
+        return capturer.readInt64Counter(
+            otel::metrics::MetricNames::kWiredTigerEngineNotReadyErrors);
+    };
+
+    auto* engine = _helper->getWiredTigerKVEngine();
+    const auto initialCollectErrors = readCollectErrors();
+    const auto initialEngineNotReadyErrors = readEngineNotReadyErrors();
+
+    auto stats = engine->collectStorageStats();
+    ASSERT(stats);
+    ASSERT(!stats->hasField("error"));
+    ASSERT_EQ(readCollectErrors(), initialCollectErrors);
+    ASSERT_EQ(readEngineNotReadyErrors(), initialEngineNotReadyErrors);
+
+    // Statistics cursors are configured from the global setting rather than the one the connection
+    // was opened with, so an invalid value makes opening them fail on an otherwise healthy engine.
+    const auto originalSetting = wiredTigerGlobalOptions.statisticsSetting;
+    ON_BLOCK_EXIT([&] { wiredTigerGlobalOptions.statisticsSetting = originalSetting; });
+    wiredTigerGlobalOptions.statisticsSetting = "invalid";
+
+    stats = engine->collectStorageStats();
+    ASSERT(stats);
+    ASSERT_EQ(stats->getIntField("code"), ErrorCodes::CursorNotFound);
+    ASSERT_EQ(readCollectErrors(), initialCollectErrors + 1);
+    ASSERT_EQ(readEngineNotReadyErrors(), initialEngineNotReadyErrors);
 }
 
 using WiredTigerKVEngineTestDeathTest = WiredTigerKVEngineTest;

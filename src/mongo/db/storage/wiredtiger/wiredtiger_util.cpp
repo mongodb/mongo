@@ -1158,8 +1158,12 @@ std::unique_ptr<WiredTigerSession> WiredTigerUtil::getStatisticsSession(
 bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngineBase& engine,
                                                  BSONObjBuilder& bob,
                                                  const std::vector<std::string>& fieldsToInclude) {
+    auto* registry = engine.getOTelMetricRegistry();
     boost::optional<StatsCollectionPermit> permit = engine.tryGetStatsCollectionPermit();
     if (!permit) {
+        if (registry) {
+            registry->recordEngineNotReadyError();
+        }
         return false;
     }
 
@@ -1176,11 +1180,14 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngineBase& engine,
         "statistics:",
         ss.str(),
         bob,
-        engine.getOTelMetricRegistry(),
+        registry,
         fieldsToInclude.empty() ? categoriesToIgnore : fieldsToInclude,
         fieldsToInclude.empty() ? FilterBehavior::kExcludeCategories
                                 : FilterBehavior::kIncludeStats);
     if (!status.isOK()) {
+        if (registry) {
+            registry->recordCollectError();
+        }
         bob.append("error", "unable to retrieve statistics");
         bob.append("code", static_cast<int>(status.code()));
         bob.append("reason", status.reason());

@@ -21,6 +21,7 @@ namespace {
 using otel::metrics::Counter;
 using otel::metrics::DynamicMetricNameMaker;
 using otel::metrics::Gauge;
+using otel::metrics::MetricNames;
 using otel::metrics::MetricsService;
 using otel::metrics::MetricUnit;
 
@@ -130,6 +131,16 @@ boost::optional<std::string> resolveOtelName(std::string_view statName) {
 
 }  // namespace
 
+WiredTigerMetricRegistry::WiredTigerMetricRegistry()
+    : _collectErrors(MetricsService::instance().createInt64Counter(
+          MetricNames::kWiredTigerCollectErrors,
+          "Number of times WiredTiger stats reading failed during collection",
+          MetricUnit::kCount)),
+      _engineNotReadyErrors(MetricsService::instance().createInt64Counter(
+          MetricNames::kWiredTigerEngineNotReadyErrors,
+          "Number of times the WiredTiger storage engine was not ready in time for collection",
+          MetricUnit::kCount)) {}
+
 Counter<int64_t>* WiredTigerMetricRegistry::_createCounter(std::string_view statName) {
     const auto name = resolveOtelName(statName);
     if (!name) {
@@ -213,6 +224,14 @@ void WiredTigerMetricRegistry::updateGauge(std::string_view statName, int64_t cu
         }
         _logUpdateError(statName, ex);
     }
+}
+
+void WiredTigerMetricRegistry::recordCollectError() {
+    _collectErrors.add(1);
+}
+
+void WiredTigerMetricRegistry::recordEngineNotReadyError() {
+    _engineNotReadyErrors.add(1);
 }
 
 }  // namespace mongo

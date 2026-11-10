@@ -74,12 +74,6 @@ public:
     void updateTicketingSystem(const TicketingSystemStatsSnapshot& snap);
 
     /**
-     * Update metrics tracking WiredTiger errors
-     */
-    void recordWTCollectError();
-    void recordWTEngineNotReadyError();
-
-    /**
      * Update metrics tracking TicketingSystem errors
      */
     void recordTSCollectError();

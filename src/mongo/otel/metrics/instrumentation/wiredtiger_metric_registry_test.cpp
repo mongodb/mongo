@@ -18,6 +18,7 @@ namespace {
 
 using otel::metrics::DynamicMetricNameMaker;
 using otel::metrics::DynamicMetricNameTestPasskeyMaker;
+using otel::metrics::MetricNames;
 using otel::metrics::OtelMetricsCapturer;
 
 class WiredTigerMetricRegistryTest : public unittest::Test {

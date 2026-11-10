@@ -121,14 +121,6 @@ public:
               MetricNames::kConcurrentTransactionsWriteAvailable,
               "Amount of concurrent write transactions available",
               MetricUnit::kCount)),
-          _collectErrors(MetricsService::instance().createInt64Counter(
-              MetricNames::kWiredTigerCollectErrors,
-              "Number of times WiredTiger stats reading failed during collection",
-              MetricUnit::kCount)),
-          _engineNotReadyErrors(MetricsService::instance().createInt64Counter(
-              MetricNames::kWiredTigerEngineNotReadyErrors,
-              "Number of times the WiredTiger storage engine was not ready in time for collection",
-              MetricUnit::kCount)),
           _ticketingSystemCollectErrors(MetricsService::instance().createInt64Counter(
               MetricNames::kTicketingSystemCollectErrors,
               "Number of times reading the ticketing system's stats failed during collection",
@@ -181,14 +173,6 @@ public:
         _concurrentTransactionsWriteAvailable.set(snap.writeAvailable);
     }
 
-    void recordWTCollectError() {
-        _collectErrors.add(1);
-    }
-
-    void recordWTEngineNotReadyError() {
-        _engineNotReadyErrors.add(1);
-    }
-
     void recordTSCollectError() {
         _ticketingSystemCollectErrors.add(1);
     }
@@ -216,8 +200,6 @@ private:
     Gauge<int64_t>& _concurrentTransactionsWriteAvailable;
 
     // Error-handling metrics
-    Counter<int64_t>& _collectErrors;
-    Counter<int64_t>& _engineNotReadyErrors;
     Counter<int64_t>& _ticketingSystemCollectErrors;
 
     // Previous snapshot, used to compute deltas for the monotonic counters.
@@ -233,14 +215,6 @@ void WiredTigerMetrics::updateWiredTiger(const WiredTigerStatsSnapshot& snap) {
 
 void WiredTigerMetrics::updateTicketingSystem(const TicketingSystemStatsSnapshot& snap) {
     _impl->updateTicketingSystem(snap);
-}
-
-void WiredTigerMetrics::recordWTCollectError() {
-    _impl->recordWTCollectError();
-}
-
-void WiredTigerMetrics::recordWTEngineNotReadyError() {
-    _impl->recordWTEngineNotReadyError();
 }
 
 void WiredTigerMetrics::recordTSCollectError() {
@@ -289,19 +263,17 @@ void runWiredTigerCollectionCycle(WiredTigerMetrics& metrics, ServiceContext* sv
     auto rlk = svc->getStorageChangeMutex().readLock();
     auto* se = svc->getStorageEngine();
     if (!se) {
-        metrics.recordWTEngineNotReadyError();
         return;
     }
 
     auto* engine = se->getEngine();
     if (!engine) {
-        metrics.recordWTEngineNotReadyError();
         return;
     }
 
+    // Collection failures are recorded by the engine's WiredTigerMetricRegistry.
     auto stats = engine->collectStorageStats();
     if (!stats) {
-        metrics.recordWTCollectError();
         return;
     }
 
