@@ -46,6 +46,16 @@ ChangeStreamTransformStage::ChangeStreamTransformStage(
 }
 
 GetNextResult ChangeStreamTransformStage::doGetNext() {
+    // We are about to produce a NEW event. Any identity recorded for the previous event (which has
+    // already been delivered to, or dropped by, the stages above) must not be allowed to survive
+    // into the production of this one: if producing it fails, the stale identity from the prior
+    // event would be used by the top-level conversion stage to mislabel the failure. Clear it
+    // before pulling the next input so it is only ever set for the event currently being produced.
+    if (_showErrorsAsEvents) {
+        pExpCtx->clearActiveChangeStreamEvent();
+        pExpCtx->clearActiveChangeStreamErrorSource();
+    }
+
     auto input = pSource->getNext();
     if (!input.isAdvanced()) {
         return input;

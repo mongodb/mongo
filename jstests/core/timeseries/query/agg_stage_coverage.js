@@ -453,6 +453,7 @@ const skippedStages = [
     "$_internalChangeStreamCheckInvalidate",
     "$_internalChangeStreamCheckResumability",
     "$_internalChangeStreamCheckTopologyChange",
+    "$_internalChangeStreamConvertErrors",
     "$_internalChangeStreamHandleTopologyChange",
     "$_internalChangeStreamInjectControlEvents",
     "$_internalChangeStreamOplogMatch",

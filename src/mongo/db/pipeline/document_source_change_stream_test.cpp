@@ -1897,6 +1897,62 @@ TEST_F(ChangeStreamTransformRecordsEventTest, RecordedEventIsUnaffectedByUpstrea
                     recordedSnapshot.getField(DSChangeStream::kClusterTimeField));
 }
 
+// A source that yields one insert change event's oplog entry, then fails on each subsequent call,
+// modelling a change stream whose NEXT event (B) fails while it is being produced, after a previous
+// event (A) was already delivered to -- or dropped by -- the stages above the transform.
+class InsertThenFailSource final : public exec::agg::Stage {
+public:
+    InsertThenFailSource(const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONObj insertOplog)
+        : Stage("$insertThenFail", expCtx), _insertOplog(std::move(insertOplog)) {}
+
+    exec::agg::GetNextResult doGetNext() final {
+        if (!_delivered) {
+            _delivered = true;
+            return exec::agg::GetNextResult(Document(_insertOplog));
+        }
+        uasserted(ErrorCodes::TypeMismatch, "next change event failed to transform");
+        MONGO_UNREACHABLE;
+    }
+
+private:
+    BSONObj _insertOplog;
+    bool _delivered = false;
+};
+
+// Regression test for a stale-identity bug (ProdSec finding on 04b): the transform records the
+// identity of the event it produces AFTER applyTransformation succeeds, and never clears it when it
+// is asked to produce the NEXT event. So if event A is delivered/dropped above the transform (e.g.
+// a user $match filters it out) and the following event B fails during transformation, the stale A
+// identity remains in the slot. The top-level conversion stage would then build an operationType:
+// "error" event attributed to A instead of B, mislabelling the failure and skipping B.
+TEST_F(ChangeStreamTransformRecordsEventTest, DoesNotLeaveStaleIdentityWhenNextEventFails) {
+    unittest::ServerParameterGuard flagEnabler("featureFlagChangeStreamEmitErrorEvents", true);
+
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
+                                 nss,                           // namespace
+                                 BSON("_id" << 1 << "x" << 2),  // o
+                                 testUuid(),                    // uuid
+                                 boost::none,                   // fromMigrate
+                                 BSON("_id" << 1));             // o2
+    auto source = make_intrusive<InsertThenFailSource>(getExpCtx(), insert.getEntry().toBSON());
+
+    auto transformDS = DocumentSourceChangeStreamTransform::createFromBson(
+        BSON(DocumentSourceChangeStreamTransform::kStageName
+             << BSON("showErrorsAsEvents" << true << "startAtOperationTime" << kDefaultTs))
+            .firstElement(),
+        getExpCtx());
+    auto transformStage = exec::agg::buildStageAndStitch(transformDS, source);
+
+    // The first event transforms successfully and its identity is recorded.
+    ASSERT_TRUE(transformStage->getNext().isAdvanced());
+    ASSERT_TRUE(getExpCtx()->getActiveChangeStreamEvent());
+
+    // Producing the next event fails. The stale identity from event A must not survive, or the
+    // top-level conversion stage would attribute event B's failure to A.
+    ASSERT_THROWS(transformStage->getNext(), AssertionException);
+    ASSERT_FALSE(getExpCtx()->getActiveChangeStreamEvent());
+}
+
 TEST_F(ChangeStreamStageTest, TransformInsertDocKeyIdAndX) {
     auto insert = makeOplogEntry(OpTypeEnum::kInsert,            // op type
                                  nss,                            // namespace

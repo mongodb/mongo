@@ -9267,6 +9267,25 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "aggregate_$_internalChangeStreamConvertErrors",
+            command: {
+                aggregate: 1,
+                pipeline: [{$_internalChangeStreamConvertErrors: {}}],
+                cursor: {},
+            },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {__system: 1},
+                    privileges: [
+                        {resource: {db: firstDbName, collection: ""}, actions: ["find"]},
+                        {resource: {cluster: true}, actions: ["internal"]},
+                    ],
+                    expectFail: true,
+                },
+            ],
+        },
+        {
             testname: "aggregate_$_internalChangeStreamInjectControlEvents",
             command: {
                 aggregate: 1,
