@@ -12,7 +12,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {forceSyncSource} from "jstests/replsets/libs/sync_source.js";
@@ -20,18 +20,16 @@ import {forceSyncSource} from "jstests/replsets/libs/sync_source.js";
 let st = new ShardingTest({shards: 0});
 
 // Set up replica set that we'll add as shard
-let replTest = new ReplSetTest({nodes: 3, name: jsTest.name() + "-newReplSet"});
-replTest.startSet({shardsvr: ""});
-let nodeList = replTest.nodeList();
-
-replTest.initiate({
-    _id: replTest.name,
-    members: [
-        {_id: 0, host: nodeList[0], priority: 1},
-        {_id: 1, host: nodeList[1], priority: 0, tags: {"tag": "hanging"}},
-        {_id: 2, host: nodeList[2], priority: 0},
+let replTest = new ReplSetTest({
+    nodes: [
+        {rsConfig: {priority: 1}},
+        {rsConfig: {priority: 0, tags: {"tag": "hanging"}}},
+        {rsConfig: {priority: 0}},
     ],
+    name: jsTest.name() + "-newReplSet",
 });
+replTest.startSet({shardsvr: ""});
+replTest.initiate();
 
 let primary = replTest.getPrimary();
 let hangingSecondary = replTest.getSecondaries()[0];
@@ -45,12 +43,17 @@ const fpHangDuringShardInit = configureFailPoint(
 );
 
 /**
- * Force the other secondary node to sync from the primary. If it syncs from the hanging secondary
- * node that has not inserted the sharding identity document, the sharding initialization will not
- * be triggered and the addShard command will fail
+ * For ASC, force the other secondary node to sync from the primary. If it syncs from the hanging
+ * secondary node that has not inserted the sharding identity document, the sharding initialization
+ * will not be triggered and the addShard command will fail. For DSC, secondaries read from SLS
+ * rather than another replica set member, so they cannot chain through the hanging secondary and
+ * do not need the sync-source failpoint.
  */
-jsTest.log("Going to set sync source of secondary node to be primary.");
-const fpForceSyncSource = forceSyncSource(replTest, anotherSecondary, primary);
+let fpForceSyncSource;
+if (!isDisagg(primary)) {
+    jsTest.log("Going to set sync source of secondary node to be primary.");
+    fpForceSyncSource = forceSyncSource(replTest, anotherSecondary, primary);
+}
 
 jsTest.log("Going to add replica set as shard: " + tojson(replTest.getReplSetConfig()));
 const shardName = "newShard";
@@ -139,7 +142,7 @@ assert.commandWorked(
     }),
 );
 
-fpForceSyncSource.off();
+fpForceSyncSource?.off();
 sessionDb.getSession().endSession();
 
 replTest.stopSet();
