@@ -689,6 +689,7 @@ conn_stats = [
     DisaggStat('disagg_step_up_deferred_pickup_retry_time', 'step up deferred checkpoint pickup retry most recent time (msecs)'),
     DisaggStat('disagg_step_up_in_progress', 'step up in progress', 'no_clear,no_scale'),
     DisaggStat('disagg_step_up_ingest_drain_bytes', 'step up ingest table drain bytes moved to stable tables'),
+    DisaggStat('disagg_step_up_ingest_drain_orphan_remove', 'step up ingest table drain keys with orphan removes skipped'),
     DisaggStat('disagg_step_up_ingest_drain_time', 'step up ingest table drain most recent time (msecs)'),
     DisaggStat('disagg_step_up_ingest_tables_drained', 'step up ingest tables drained'),
     DisaggStat('disagg_step_up_missing_stable_create_time', 'step up missing stable table create most recent time (msecs)'),

@@ -125,7 +125,7 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
         skip_test("cannot run disagg hook on a test that is in-memory")
 
     # FIXME-WT-17177: Read-only connections are currently not supported for disagg.
-    if 'readonly=true' in conn_config or conn_config.strip() == 'readonly':
+    if re.search(r'(^|,)\s*readonly(?:\s*=\s*(?:true|1))?\s*(,|$)', conn_config):
         skip_test("cannot run disagg hook on a test that uses read-only connections")
 
     if 'compatibility=' in conn_config:

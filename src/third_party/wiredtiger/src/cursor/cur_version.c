@@ -280,12 +280,10 @@ __curversion_walk_to_next_update(
             first_globally_visible = next_upd;
 
         if (next_upd != upd) {
-            /*
-             * The previously returned update is not globally visible: snapshot isolation plus the
-             * pinned global timestamp guarantee this. Aborted updates are never globally visible.
-             */
+            /* Prepared and aborted updates are never globally visible. */
             WT_ASSERT(session,
-              version_cursor->upd_stop_txnid == WT_TXN_ABORTED ||
+              version_cursor->upd_stop_prepared ||
+                version_cursor->upd_stop_txnid == WT_TXN_ABORTED ||
                 !__wt_txn_visible_all(session, version_cursor->upd_stop_txnid,
                   version_cursor->curversion_durable_stop_ts));
             break;
@@ -750,8 +748,8 @@ __curversion_process_hs(WT_CURSOR *cursor, WT_PAGE *page, WT_ITEM **keyp, WT_ITE
               session, file_cursor->value_format, &cbt->upd_value->buf, (*hs_valuep)->data));
         } else {
             WT_ASSERT(session, hs_upd_type == WT_UPDATE_STANDARD);
-            cbt->upd_value->buf.data = (*hs_valuep)->data;
-            cbt->upd_value->buf.size = (*hs_valuep)->size;
+            WT_RET(
+              __wt_buf_set(session, &cbt->upd_value->buf, (*hs_valuep)->data, (*hs_valuep)->size));
         }
 
         if (!F_ISSET(version_cursor, WT_CURVERSION_TIMESTAMP_ORDER))

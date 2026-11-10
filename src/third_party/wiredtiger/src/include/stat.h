@@ -1071,6 +1071,7 @@ struct __wt_connection_stats {
     int64_t disagg_step_up_in_progress;
     int64_t disagg_step_up_clear_ingest_retry;
     int64_t disagg_step_up_ingest_drain_bytes;
+    int64_t disagg_step_up_ingest_drain_orphan_remove;
     int64_t disagg_step_up_ingest_drain_time;
     int64_t disagg_step_up_ingest_tables_drained;
     int64_t disagg_step_up_missing_stable_create_time;

@@ -1078,7 +1078,7 @@ functions:
         }
 
         for i in $(seq ${times|1}); do
-          ./t -c ${config|../../../test/format/CONFIG.stress} ${trace_args|-T bulk,txn,retain=50} ${test_format_extra_args|} || fail
+          ./t -c ${config|../../../test/format/CONFIG.stress} ${trace_args|-T bulk,txn,retain=50} ${test_format_extra_args|} ${format_variant_args|} || fail
         done
   "format test predictable":
     command: shell.exec
@@ -1095,7 +1095,7 @@ functions:
         set -o verbose
         ${PREPARE_TEST_ENV}
 
-        ../../../test/evergreen/format_test_predictable.sh ${times} ${test_format_extra_args}
+        ../../../test/evergreen/format_test_predictable.sh ${times} "${test_format_extra_args} ${format_variant_args|}"
   "format test script":
     command: shell.exec
     params:
@@ -1114,7 +1114,7 @@ functions:
         memory_max=$(cat /proc/meminfo | grep "MemTotal: " | grep -o "[[:digit:]]*")
         memory_max=$(( ($memory_max * 8) / (${num_jobs} * 1024 * 10) ))
         for i in $(seq ${times|1}); do
-          ./format.sh -j ${num_jobs} ${format_test_script_args|} cache.maximum=$memory_max 2>&1
+          ./format.sh -j ${num_jobs} ${format_test_script_args|} cache.maximum=$memory_max ${format_variant_args|} 2>&1
         done
   "format test disagg":
     command: shell.exec
@@ -1136,8 +1136,8 @@ functions:
         for i in $(seq ${times}); do
           echo Iteration $i/${times}
           rm -rf RUNDIR
-          ./t -c ../../../test/format/CONFIG.disagg ${format_args|} ${extra_arg|} || fail
-          ./t -R $format_args ${extra_args|} || fail
+          ./t -c ../../../test/format/CONFIG.disagg ${format_args|} ${extra_arg|} ${format_variant_args|} || fail
+          ./t -R $format_args ${extra_args|} ${format_variant_args|} || fail
         done
   "many dbs test":
     command: shell.exec
@@ -8211,11 +8211,12 @@ buildvariants:
     - name: ".cppsuite-stress-test"
       batchtime: 720 # twice a day
 
-- name: amazon2023-arm64-asan
+- &amazon2023-arm64-asan
+  name: amazon2023-arm64-asan
   display_name: "! Amazon2023 ARM64 ASAN"
   run_on:
   - amazon2023.3-arm64-small
-  expansions:
+  expansions: &amazon2023-arm64-asan-expansions
     REQUIRE_MDB_TOOLCHAIN: "1"
     CMAKE_PRESET: linux-clang
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
@@ -8253,6 +8254,16 @@ buildvariants:
     - name: ".unit_test"
     - name: ".unit_test_disagg"
     - name: ".unit_test_long"
+
+- <<: *amazon2023-arm64-asan
+  name: amazon2023-arm64-asan-cursor-copy
+  display_name: "! Amazon2023 ARM64 ASAN Cursor Copy"
+  batchtime: 1440 # Once a day.
+  expansions:
+    <<: *amazon2023-arm64-asan-expansions
+    unit_test_variant_args: --asan --hook cursor_copy
+    format_variant_args: debug.cursor_copy=1
+  tags: ["sanitizer"]
 
 # FIXME-WT-16067: ASAN could hide warnings when tests are executed by many processes simultaneously.
 # Investigate whether a similar thing could happen for TSAN.

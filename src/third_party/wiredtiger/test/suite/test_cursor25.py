@@ -131,6 +131,34 @@ class test_cursor25(wttest.WiredTigerTestCase):
         vc.close()
         self.session.rollback_transaction()
 
+    def test_rollback_then_inflight_prepared_insert(self):
+        self.create()
+        self.prepared_insert_rollback(1, 99, PREPARE_TS, ROLLBACK_TS)
+
+        writer = self.conn.open_session()
+        cursor = writer.open_cursor(self.uri)
+        writer.begin_transaction()
+        cursor[1] = 42
+        writer.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
+
+        # Refresh transaction visibility while the newer insert remains prepared.
+        self.session.checkpoint()
+        self.session.begin_transaction('ignore_prepare=true')
+        version_cursor = self.open_version_cursor(show_prepared_rollback=True)
+        version_cursor.set_key(1)
+        self.assertEqual(version_cursor.search(), 0)
+        values = self.get_values(version_cursor)
+        self.assertEqual(values[11], 1)
+        self.assertEqual(values[14], 42)
+        self.assertEqual(version_cursor.next(), 0)
+        self.verify_prepare_rollback_value(version_cursor, 99, ROLLBACK_TS)
+        self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
+        version_cursor.close()
+        self.session.rollback_transaction()
+        writer.rollback_transaction('rollback_timestamp=' + self.timestamp_str(25))
+        cursor.close()
+        writer.close()
+
     def test_rollback_insert_then_committed_insert(self):
         """
         Prepared insert (no prior value) + rollback, then a new committed insert.

@@ -301,11 +301,9 @@ class test_layered_delta12(wttest.WiredTigerTestCase):
         kv_modified = {}
         num_deltas = random.randint(2, 5)
 
-        # Define a set of keys within the base range that will be updated in deltas.
-        update_keys = [str(random.randint(1, self.nrows)) for _ in range(50)]
-
         for i in range(1, num_deltas + 1):
-            # Each delta updates a subset of base keys (not the trailing ones).
+            # Each delta updates a random subset of base keys (not the trailing ones).
+            update_keys = [str(random.randint(1, self.nrows)) for _ in range(50)]
             kv = {key: f"delta_updated_value_{i}_{key}" for key in update_keys}
 
             self.insert(kv, inital_ts + i)
