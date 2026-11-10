@@ -18,10 +18,10 @@
          kInternalEnableJoinOptimizationName,                                             \
          internalEnableJoinOptimization,                                                  \
          isJoinOrderingEnabled)                                                           \
-    KNOB(kExplainJoinCostComponents,                                                      \
-         kInternalQueryExplainJoinCostComponentsName,                                     \
-         internalQueryExplainJoinCostComponents,                                          \
-         getExplainJoinCostComponents)                                                    \
+    KNOB(kEnableDetailedJoinExplain,                                                      \
+         kInternalEnableDetailedJoinExplainName,                                          \
+         internalEnableDetailedJoinExplain,                                               \
+         getEnableDetailedJoinExplain)                                                    \
     KNOB(kJoinReorderMode,                                                                \
          kInternalJoinReorderModeName,                                                    \
          JoinReorderMode,                                                                 \

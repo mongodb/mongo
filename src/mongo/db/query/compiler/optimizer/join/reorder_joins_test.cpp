@@ -7,6 +7,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
+#include "mongo/db/query/compiler/optimizer/join/join_estimates.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
@@ -380,6 +381,60 @@ IndexedJoinPredicate makeIndexedPredicate(std::string path) {
         .op = QSNJoinPredicate::ComparisonOp::Eq,
         .field = path,
     };
+}
+
+class DetailedJoinExplainTest : public ReorderGraphTest {
+protected:
+    // Plans the join A -- B bottom-up. The returned solution owns the nodes keyed in 'estimates'.
+    ReorderedJoinSolution plan(JoinExplainMode explainMode) {
+        auto idA = addNssWithEmbedding({.collName = "a"});
+        auto idB = addNssWithEmbedding({.collName = "b", .embedPath = FieldPath{"b"}});
+        resolvedPaths = {{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+                         {.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}}};
+        graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b.b*/);
+        for (const auto& nss : namespaces) {
+            catStats.collStats.emplace(nss, CollectionStats{1000.0, 1000.0});
+        }
+
+        auto jCtx = makeContext();
+        jCtx.explainMode = explainMode;
+        FakeJoinCardinalityEstimator cardEstimator(jCtx);
+        JoinCostEstimatorImpl costEstimator(jCtx, cardEstimator);
+        OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics metrics;
+        return uassertStatusOK(constructSolutionBottomUp(jCtx,
+                                                         cardEstimator,
+                                                         costEstimator,
+                                                         {.planShape = PlanTreeShape::ZIG_ZAG,
+                                                          .mode = PlanEnumerationMode::CHEAPEST,
+                                                          .enableHJOrderPruning = true},
+                                                         /*populateCachedPlan=*/false,
+                                                         metrics));
+    }
+};
+
+TEST_F(DetailedJoinExplainTest, NoExplainInformationWithoutExplain) {
+    auto result = plan(JoinExplainMode::kNone);
+    ASSERT_TRUE(result.estimates.empty());
+    ASSERT_TRUE(result.rejectedSolns.empty());
+}
+
+TEST_F(DetailedJoinExplainTest, DefaultExplainOmitsDetailedEstimates) {
+    auto result = plan(JoinExplainMode::kDefault);
+    ASSERT_FALSE(result.estimates.empty());
+    ASSERT_FALSE(result.rejectedSolns.empty());
+    for (const auto& [node, est] : result.estimates) {
+        ASSERT_EQ(dynamic_cast<const JoinExtraEstimateInfo*>(est.get()), nullptr)
+            << node->toString();
+    }
+}
+
+TEST_F(DetailedJoinExplainTest, DetailedExplainIncludesDetailedEstimates) {
+    auto result = plan(JoinExplainMode::kDetailed);
+    ASSERT_FALSE(result.estimates.empty());
+    for (const auto& [node, est] : result.estimates) {
+        ASSERT_NE(dynamic_cast<const JoinExtraEstimateInfo*>(est.get()), nullptr)
+            << node->toString();
+    }
 }
 
 TEST(IndexSatisfiesJoinPredicates, SingleFieldIndex) {

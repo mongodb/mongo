@@ -10,7 +10,6 @@
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/query_join_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/random_utils.h"
@@ -175,7 +174,7 @@ void addEstimatesForExplain(const JoinReorderingContext& ctx,
     auto* ceEstimator = peCtx.getJoinCardinalityEstimator();
     auto ce = ceEstimator->getOrEstimateSubsetCardinality(set);
     auto est = std::make_unique<cost_based_ranker::QSNEstimate>(ce, cost.getTotalCost());
-    if (internalQueryExplainJoinCostComponents.load()) {
+    if (ctx.isDetailedExplain()) {
         auto joinEst = std::make_unique<JoinExtraEstimateInfo>(ce, cost.getTotalCost());
         joinEst->docsProcessed = cost.getNumDocsProcessed().toDouble();
         joinEst->docsOutput = cost.getNumDocsOutput().toDouble();
@@ -227,7 +226,7 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(
                        }
                        qsn = buildQSNFromJoiningNode(ctx, peCtx, join, estimates, metrics);
 
-                       if (ctx.explain) {
+                       if (ctx.isExplain()) {
                            const auto joinEdges =
                                ctx.joinGraph.getJoinEdges(peCtx.registry().getBitset(join.left),
                                                           peCtx.registry().getBitset(join.right));
@@ -238,7 +237,7 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(
                    [&](const BaseNode& base) {
                        // TODO SERVER-111913: Avoid this clone
                        qsn = base.soln->root()->clone();
-                       if (ctx.explain) {
+                       if (ctx.isExplain()) {
                            addEstimatesForExplain(ctx,
                                                   peCtx,
                                                   qsn.get(),
@@ -393,7 +392,7 @@ ReorderedJoinSolution makeReorderedJoinSoln(
         .soln = std::move(ret), .baseNode = baseNodeId, .estimates = std::move(estimates)};
 
     // Also generate rejected plans if we're in explain mode.
-    if (ctx.explain) {
+    if (ctx.isExplain()) {
         auto rejectedPlans = peCtx.getRejectedFinalPlans();
         out.rejectedSolns.reserve(rejectedPlans.size());
 

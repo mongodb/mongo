@@ -55,25 +55,21 @@ server_parameters:
             query_knob:
                 wire_name: enableJoinOptimization
 
-    internalQueryExplainJoinCostComponents:
-        mod_visibility: needs_replacement
+    internalEnableDetailedJoinExplain:
         description: >-
-            When true, explain output for join embedding nodes includes a 'joinCostComponents'
-            sub-object with the detailed cost breakdown (docsProcessed, docsOutput,
-            numDocsTransmitted, sequentialIOPages, randomIOPages, localOpCost, totalCost). For
-            indexed nested loop join nodes it also includes a 'cardinalityRHSBeforeJoinPred' field
-            reporting the RHS cardinality before the join predicate is applied (i.e. after the
-            RHS's own single-table predicates). Join embedding nodes additionally include an
-            'ndvEstimates' array with the NDV estimate and its provenance ('ndv' and 'ndvSource')
-            for each join edge the node applies.
+            When true, explain output for join-optimized queries includes detailed join estimation
+            information (e.g. cost components and NDV estimates). Only affects explain output.
         set_at: [startup, runtime]
-        cpp_varname: "internalQueryExplainJoinCostComponents"
+        cpp_varname: "internalEnableDetailedJoinExplain"
         cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
             query_knob:
-                wire_name: explainJoinCostComponents
+                wire_name: enableDetailedJoinExplain
+                pqs_settable: true
+                fcv:
+                    min: "9.1"
 
     internalJoinReorderMode:
         mod_visibility: public

@@ -531,7 +531,7 @@ async def main():
             "--setParameter",
             "internalEnableJoinOptimization=true",
             "--setParameter",
-            "internalQueryExplainJoinCostComponents=true",
+            "internalEnableDetailedJoinExplain=true",
             "--setParameter",
             "featureFlagPathArrayness=true",
             "--setParameter",

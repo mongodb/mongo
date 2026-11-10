@@ -36,17 +36,21 @@ function assertNdvEstimate(small, large, expectedPkSide, expectedSource) {
         [small, large],
         [large, small],
     ]) {
-        const explain = local.explain().aggregate([
-            {
-                $lookup: {
-                    from: foreign.getName(),
-                    localField: "k",
-                    foreignField: "k",
-                    as: "f",
+        const explain = local.explain().aggregate(
+            [
+                {
+                    $lookup: {
+                        from: foreign.getName(),
+                        localField: "k",
+                        foreignField: "k",
+                        as: "f",
+                    },
                 },
-            },
-            {$unwind: "$f"},
-        ]);
+                {$unwind: "$f"},
+            ],
+            // Reports 'ndvEstimates' on join stages.
+            {querySettings: {queryKnobs: {enableDetailedJoinExplain: true}}},
+        );
         assert(joinOptUsed(explain), "expected join optimization", {explain});
         const joins = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(
             (s) => s.ndvEstimates,
@@ -68,8 +72,6 @@ describe("two-sided join NDV estimation", function () {
                 featureFlagPersistentStats: true,
                 internalQueryEnablePersistentNDVStats: true,
                 internalEnableJoinOptimization: true,
-                // Reports 'ndvEstimates' on join stages.
-                internalQueryExplainJoinCostComponents: true,
             },
         });
         db = conn.getDB("test");

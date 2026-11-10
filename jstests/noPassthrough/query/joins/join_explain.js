@@ -279,12 +279,9 @@ assert.commandWorked(coll2.createIndex({b: 1}));
 assert.commandWorked(coll3.createIndex({c: 1}));
 runTest(pipeline, true /* expectRejected */);
 
-// Test joinCostComponents explain output (internalQueryExplainJoinCostComponents knob).
+// Test joinCostComponents explain output (enableDetailedJoinExplain query knob).
 {
     // Verify that when the knob is OFF, joinCostComponents is absent (default behaviour).
-    assert.commandWorked(
-        conn.adminCommand({setParameter: 1, internalQueryExplainJoinCostComponents: false}),
-    );
     {
         const explain = coll1.explain().aggregate(pipeline);
         const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(
@@ -320,17 +317,17 @@ runTest(pipeline, true /* expectRejected */);
 
     // Verify that when the knob is ON, joinCostComponents and ndvEstimates are present on every
     // join opt stage. Enable the use of unique indexes for NDV estimation.
+    const detailedExplain = {querySettings: {queryKnobs: {enableDetailedJoinExplain: true}}};
     assert.commandWorked(
         conn.adminCommand({
             setParameter: 1,
-            internalQueryExplainJoinCostComponents: true,
             internalEnableJoinOptimizationUseIndexUniqueness: true,
             internalQueryEnablePersistentNDVStats: true,
         }),
     );
     {
         // Basic case. Every RHS filter in 'pipeline' matches all 100 documents, so each INLJ stage must report exactly the RHS collection size for 'cardinalityRHSBeforeJoinPred'.
-        const explain = coll1.explain().aggregate(pipeline);
+        const explain = coll1.explain().aggregate(pipeline, detailedExplain);
         validateJoinCostComponents(
             explain,
             100 /* expectedCardinalityRHSBeforeJoinPred */,
@@ -345,7 +342,7 @@ runTest(pipeline, true /* expectRejected */);
     const inljPipeline = [{$_internalJoinHint: inljHint}].concat(pipeline);
     {
         // Repeat with all INLJ nodes.
-        const explain = coll1.explain().aggregate(inljPipeline);
+        const explain = coll1.explain().aggregate(inljPipeline, detailedExplain);
         validateJoinCostComponents(
             explain,
             100 /* expectedCardinalityRHSBeforeJoinPred */,
@@ -368,7 +365,7 @@ runTest(pipeline, true /* expectRejected */);
                 },
                 {$unwind: "$coll2"},
             ]);
-            const explain = coll1.explain().aggregate(selectivePipeline);
+            const explain = coll1.explain().aggregate(selectivePipeline, detailedExplain);
             // Now we have a filter, so 'cardinalityRHSBeforeJoinPred' reports how many docs match the filter (50).
             validateJoinCostComponents(
                 explain,
@@ -386,7 +383,7 @@ runTest(pipeline, true /* expectRejected */);
         assert.commandWorked(
             db.runCommand({analyze: coll1.getName(), mode: "fieldStats", key: "c"}),
         );
-        const explain = coll1.explain().aggregate(inljPipeline);
+        const explain = coll1.explain().aggregate(inljPipeline, detailedExplain);
         validateJoinCostComponents(
             explain,
             100 /* expectedCardinalityRHSBeforeJoinPred */,
@@ -398,18 +395,13 @@ runTest(pipeline, true /* expectRejected */);
         // Now validate the unique index source case. If available, it is prioritized over HLL.
         assert.commandWorked(coll1.createIndex({b: 1}, {unique: true}));
         assert.commandWorked(coll1.createIndex({c: 1}, {unique: true}));
-        const explain = coll1.explain().aggregate(inljPipeline);
+        const explain = coll1.explain().aggregate(inljPipeline, detailedExplain);
         validateJoinCostComponents(
             explain,
             100 /* expectedCardinalityRHSBeforeJoinPred */,
             "Metadata" /* expectedNdvSource */,
         );
     }
-
-    // Reset the knob to its default.
-    assert.commandWorked(
-        conn.adminCommand({setParameter: 1, internalQueryExplainJoinCostComponents: false}),
-    );
 }
 
 MongoRunner.stopMongod(conn);

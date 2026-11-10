@@ -117,6 +117,14 @@ EnumerationStrategy getEnumerationStrategy(const QueryKnobConfiguration& qkc) {
             .enableHJOrderPruning = qkc.getEnableJoinEnumerationHJOrderPruning()};
 }
 
+JoinExplainMode getExplainMode(const ExpressionContext& expCtx, const QueryKnobConfiguration& qkc) {
+    if (!expCtx.getExplain()) {
+        return JoinExplainMode::kNone;
+    }
+    return qkc.getEnableDetailedJoinExplain() ? JoinExplainMode::kDetailed
+                                              : JoinExplainMode::kDefault;
+}
+
 /**
  * These return the reason the collection is ineligible for join optimization, or boost::none if it
  * is eligible.
@@ -678,7 +686,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                               .catStats = createCatalogStats(opCtx, graphOnlyMca),
                               .uniqueFieldInfo = std::move(uniqueFieldInfo),
                               .samplingEstimators = &samplingEstimators,
-                              .explain = expCtx->getExplain().has_value()};
+                              .explainMode = getExplainMode(*expCtx, qkc)};
 
     // Count the distinct join-graph namespaces whose storage-engine approximate leaf page count is
     // unavailable, forcing cost estimation onto the size-based fallback. 'collStats' covers every
@@ -781,7 +789,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     // Prepare rejected plans if any.
     std::vector<JoinOptPlan> rejectedPlans;
-    if (ctx.explain) {
+    if (ctx.isExplain()) {
         rejectedPlans.reserve(reordered.rejectedSolns.size());
         for (auto&& rs : reordered.rejectedSolns) {
             auto soln = std::move(rs.first);
@@ -805,7 +813,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     // Collect per-namespace sampling metadata for explain output.
     boost::optional<PlanExplainerData> maybeExplainData;
-    if (ctx.explain) {
+    if (ctx.isExplain()) {
         PlanExplainerData explainData;
         for (const auto& [nss, estimator] : samplingEstimators) {
             const std::string serializedNss =

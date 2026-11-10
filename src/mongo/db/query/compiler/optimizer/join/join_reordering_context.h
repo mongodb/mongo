@@ -11,6 +11,8 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
+
 #include <absl/container/flat_hash_map.h>
 
 namespace mongo::join_ordering {
@@ -24,6 +26,9 @@ using AvailableIndexes =
     absl::flat_hash_map<NamespaceString, std::vector<std::shared_ptr<const IndexCatalogEntry>>>;
 
 using PerCollUniqueFieldInfo = absl::flat_hash_map<NamespaceString, UniqueFieldInformation>;
+
+// Whether the query is being explained, and how much join information to include.
+enum class JoinExplainMode : std::uint8_t { kNone, kDefault, kDetailed };
 
 // Maps namespaces to their corresponding sampling-based cardinality estimators.
 using SamplingEstimatorMap =
@@ -68,9 +73,15 @@ struct JoinReorderingContext {
     // May be null (e.g. in tests) in which case NDV-based costing falls back to using docsOutput.
     const SamplingEstimatorMap* samplingEstimators = nullptr;
 
-    // Whether or not we are explaining the query. Based on this flag we may, for example, keep
-    // around costing/CE information to display in the explain output.
-    bool explain = false;
+    JoinExplainMode explainMode = JoinExplainMode::kNone;
+
+    bool isExplain() const {
+        return explainMode != JoinExplainMode::kNone;
+    }
+
+    bool isDetailedExplain() const {
+        return explainMode == JoinExplainMode::kDetailed;
+    }
 };
 
 }  // namespace mongo::join_ordering
