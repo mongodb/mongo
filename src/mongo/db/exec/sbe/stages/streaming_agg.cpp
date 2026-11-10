@@ -15,6 +15,7 @@ using namespace std::literals::string_view_literals;
 
 StreamingAggStage::StreamingAggStage(std::unique_ptr<PlanStage> input,
                                      value::SlotVector keySlots,
+                                     value::SlotVector keyOutSlots,
                                      value::SlotVector clusterKeySlots,
                                      boost::optional<value::SlotId> collatorSlot,
                                      std::vector<std::unique_ptr<HashAggAccumulator>> accumulators,
@@ -25,12 +26,16 @@ StreamingAggStage::StreamingAggStage(std::unique_ptr<PlanStage> input,
                 planNodeId,
                 participateInTrialRunTracking),
       _keySlots(std::move(keySlots)),
+      _keyOutSlots(std::move(keyOutSlots)),
       _clusterKeySlots(std::move(clusterKeySlots)),
       _collatorSlot(collatorSlot),
       _accumulatorList(std::move(accumulators)) {
     tassert(13625700,
             "clusterKeySlots must hold one slot per key slot",
             _clusterKeySlots.size() == _keySlots.size());
+    tassert(13907900,
+            "keyOutSlots must hold one slot per key slot",
+            _keyOutSlots.size() == _keySlots.size());
     size_t clusteredGroupKeys = 0;
     for (size_t i = 0; i < _keySlots.size(); ++i) {
         if (_keySlots[i] != _clusterKeySlots[i]) {
@@ -53,6 +58,7 @@ std::unique_ptr<PlanStage> StreamingAggStage::clone() const {
 
     return std::make_unique<StreamingAggStage>(_children[0]->clone(),
                                                _keySlots,
+                                               _keyOutSlots,
                                                _clusterKeySlots,
                                                _collatorSlot,
                                                std::move(accumulators),
@@ -71,8 +77,8 @@ void StreamingAggStage::prepare(CompileCtx& ctx) {
                 _collatorAccessor != nullptr);
     }
 
-    // Group-by slots and accumulator out slots must be unique, but cluster key slots may repeat a
-    // group-by slot id, so they only need to be unique among themselves.
+    // Cluster key slots may repeat a group-by slot id, so they only need to be unique among
+    // themselves.
     value::SlotSet dupCheck;
     auto throwIfDupSlot = [&dupCheck](value::SlotId slot) {
         auto [_, inserted] = dupCheck.emplace(slot);
@@ -88,11 +94,12 @@ void StreamingAggStage::prepare(CompileCtx& ctx) {
     for (size_t i = 0; i < _keySlots.size(); ++i) {
         auto keySlot = _keySlots[i];
         throwIfDupSlot(keySlot);
+        throwIfDupSlot(_keyOutSlots[i]);
         throwIfDupClusteredSlot(_clusterKeySlots[i]);
         _inKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, keySlot));
         _clusteredInKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, _clusterKeySlots[i]));
         _outKeyAccessors.emplace_back(_outKey, i);
-        _outAccessors[keySlot] = &_outKeyAccessors.back();
+        _outAccessors[_keyOutSlots[i]] = &_outKeyAccessors.back();
     }
 
     _curAggAccessors.reserve(_accumulatorList.size());
@@ -376,6 +383,7 @@ std::unique_ptr<PlanStageStats> StreamingAggStage::getStats(bool includeDebugInf
     if (includeDebugInfo) {
         BSONObjBuilder bob;
         bob.append("keySlots", _keySlots.begin(), _keySlots.end());
+        bob.append("keyOutSlots", _keyOutSlots.begin(), _keyOutSlots.end());
         bob.append("clusterKeySlots", _clusterKeySlots.begin(), _clusterKeySlots.end());
         if (_collatorSlot) {
             bob.appendNumber("collatorSlot", static_cast<long long>(*_collatorSlot));
@@ -398,6 +406,17 @@ void StreamingAggStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
         if (idx) {
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
+        DebugPrinter::addIdentifier(ret, _keySlots[idx]);
+    }
+    ret.emplace_back(DebugPrinter::Block("`]"));
+
+    ret.emplace_back(DebugPrinter::Block("[`"));
+    for (size_t idx = 0; idx < _keySlots.size(); idx++) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
+        DebugPrinter::addIdentifier(ret, _keyOutSlots[idx]);
+        ret.emplace_back("=");
         DebugPrinter::addIdentifier(ret, _keySlots[idx]);
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
@@ -443,6 +462,7 @@ size_t StreamingAggStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
     size += size_estimator::estimate(_children);
     size += size_estimator::estimate(_keySlots);
+    size += size_estimator::estimate(_keyOutSlots);
     size += size_estimator::estimate(_clusterKeySlots);
     size += size_estimator::estimate(_accumulatorList);
     return size;

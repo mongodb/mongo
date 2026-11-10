@@ -27,17 +27,21 @@ namespace mongo::sbe {
  */
 class StreamingAggStageTest : public PlanStageTestFixture {
 protected:
-    static std::unique_ptr<PlanStage> makeStreamingAgg(
+    // Returns the key output slots and the stage.
+    std::pair<value::SlotVector, std::unique_ptr<PlanStage>> makeStreamingAgg(
         std::unique_ptr<PlanStage> scanStage,
         value::SlotVector keySlots,
         boost::optional<value::SlotId> collatorSlot = boost::none) {
+        auto keyOutSlots = generateMultipleSlotIds(keySlots.size());
         // No separate cluster key slots, so the cluster keys equal the group keys.
-        return makeS<StreamingAggStage>(std::move(scanStage),
-                                        keySlots,
-                                        keySlots,
-                                        collatorSlot,
-                                        std::vector<std::unique_ptr<HashAggAccumulator>>{},
-                                        kEmptyPlanNodeId);
+        auto stage = makeS<StreamingAggStage>(std::move(scanStage),
+                                              keySlots,
+                                              keyOutSlots,
+                                              keySlots,
+                                              collatorSlot,
+                                              std::vector<std::unique_ptr<HashAggAccumulator>>{},
+                                              kEmptyPlanNodeId);
+        return {std::move(keyOutSlots), std::move(stage)};
     }
 
     struct GroupPlan {
@@ -47,6 +51,7 @@ protected:
         std::vector<value::SlotAccessor*> accessors;
         value::SlotVector outSlots;
         value::SlotVector keySlots;
+        value::SlotVector keyOutSlots;
         value::SlotVector clusterKeySlots;
         std::unique_ptr<value::OwnedValueAccessor> collatorAccessor;
     };
@@ -120,9 +125,11 @@ protected:
             accOutSlots.push_back(accumulator->getOutSlot());
         }
 
+        auto keyOutSlots = generateMultipleSlotIds(keySlots.size());
         auto agg = makeS<StreamingAggStage>(
             makeS<ProjectStage>(std::move(scanStage), std::move(fields), kEmptyPlanNodeId),
             keySlots,
+            keyOutSlots,
             clusterKeySlots,
             collatorSlot,
             std::move(accumulators),
@@ -131,11 +138,11 @@ protected:
         value::SlotVector outSlots;
         SlotExprPairVector outFields;
         // Render each group key, using the string "missing" for a Nothing value.
-        for (auto keySlot : keySlots) {
+        for (auto keyOutSlot : keyOutSlots) {
             outSlots.push_back(generateSlotId());
             outFields.emplace_back(outSlots.back(),
                                    makeE<EPrimBinary>(EPrimBinary::fillEmpty,
-                                                      makeVariable(keySlot),
+                                                      makeVariable(keyOutSlot),
                                                       makeStringConstant("missing")));
         }
         for (auto accOutSlot : accOutSlots) {
@@ -145,6 +152,7 @@ protected:
         GroupPlan plan;
         plan.agg = agg.get();
         plan.keySlots = keySlots;
+        plan.keyOutSlots = keyOutSlots;
         plan.clusterKeySlots = clusterKeySlots;
         plan.root = makeS<ProjectStage>(std::move(agg), std::move(outFields), kEmptyPlanNodeId);
         plan.ctx = makeCompileCtx();
@@ -218,8 +226,9 @@ protected:
         value::TagValueOwned expectedValue =
             value::TagValueOwned::fromRaw(stage_builder::makeValue(expected));
 
-        auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
-            return std::make_pair(scanSlots, makeStreamingAgg(std::move(scanStage), scanSlots));
+        auto makeStageFn = [this](value::SlotVector scanSlots,
+                                  std::unique_ptr<PlanStage> scanStage) {
+            return makeStreamingAgg(std::move(scanStage), scanSlots);
         };
 
         runTestMulti(numSlots,
@@ -293,7 +302,8 @@ TEST_F(StreamingAggStageTest, RespectsCollation) {
 
     auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputValue));
 
-    auto stage = makeStreamingAgg(std::move(scanStage), sbe::makeSV(scanSlot), collatorSlot);
+    auto [keyOutSlots, stage] =
+        makeStreamingAgg(std::move(scanStage), sbe::makeSV(scanSlot), collatorSlot);
 
     auto ctx = makeCompileCtx();
 
@@ -302,7 +312,7 @@ TEST_F(StreamingAggStageTest, RespectsCollation) {
     collatorAccessor.reset(value::TypeTags::collator,
                            value::bitcastFrom<CollatorInterface*>(collator.release()));
 
-    auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), keyOutSlots[0]);
     assertResults(stage.get(), resultAccessor, expectedValue.tag(), expectedValue.value());
 }
 
@@ -314,9 +324,9 @@ TEST_F(StreamingAggStageTest, ResetsStateAfterReopen) {
 
     auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputValue));
 
-    auto stage = makeStreamingAgg(std::move(scanStage), sbe::makeSV(scanSlot));
+    auto [keyOutSlots, stage] = makeStreamingAgg(std::move(scanStage), sbe::makeSV(scanSlot));
     auto ctx = makeCompileCtx();
-    auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), keyOutSlots[0]);
 
     assertResults(stage.get(), resultAccessor, expectedValue.tag(), expectedValue.value());
 
@@ -347,15 +357,17 @@ TEST_F(StreamingAggStageTest, SumAccumulatorGroupsByKey) {
         makeFunction(EFn::kSum, makeVariable(valueSlot)),
         makeE<EConstant>(value::TypeTags::Nothing, 0)));
 
+    auto keyOutSlot = generateSlotId();
     auto stage = makeS<StreamingAggStage>(std::move(scanStage),
                                           sbe::makeSV(keySlot),
+                                          sbe::makeSV(keyOutSlot),
                                           sbe::makeSV(keySlot),
                                           boost::none,
                                           std::move(accumulators),
                                           kEmptyPlanNodeId);
 
     auto ctx = makeCompileCtx();
-    auto resultAccessors = prepareTree(ctx.get(), stage.get(), sbe::makeSV(keySlot, sumSlot));
+    auto resultAccessors = prepareTree(ctx.get(), stage.get(), sbe::makeSV(keyOutSlot, sumSlot));
 
     value::TagValueOwned results =
         value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), resultAccessors));
@@ -482,6 +494,7 @@ TEST_F(StreamingAggStageTest, RejectsMismatchedClusterKeySlotCount) {
     auto [scanSlots, scanStage] = generateVirtualScanMulti(2, BSONArray{});
     ASSERT_TASSERT_CODE(makeS<StreamingAggStage>(std::move(scanStage),
                                                  scanSlots,
+                                                 generateMultipleSlotIds(2),
                                                  value::SlotVector{scanSlots[0]},
                                                  boost::none,
                                                  std::vector<std::unique_ptr<HashAggAccumulator>>{},
@@ -491,16 +504,16 @@ TEST_F(StreamingAggStageTest, RejectsMismatchedClusterKeySlotCount) {
 
 TEST_F(StreamingAggStageTest, TassertsOnArrayKeyInFirstRow) {
     auto [scanSlot, scanStage] = generateVirtualScan(BSON_ARRAY(BSON_ARRAY(1 << 2) << 3));
-    auto stage = makeStreamingAgg(std::move(scanStage), sbe::makeSV(scanSlot));
+    auto [keyOutSlots, stage] = makeStreamingAgg(std::move(scanStage), sbe::makeSV(scanSlot));
     auto ctx = makeCompileCtx();
-    ASSERT_TASSERT_CODE(prepareTree(ctx.get(), stage.get(), scanSlot), 13857200);
+    ASSERT_TASSERT_CODE(prepareTree(ctx.get(), stage.get(), keyOutSlots[0]), 13857200);
 }
 
 TEST_F(StreamingAggStageTest, TassertsOnArrayKeyInLaterRow) {
     auto [scanSlot, scanStage] = generateVirtualScan(BSON_ARRAY(1 << 1 << BSON_ARRAY(2 << 3)));
-    auto stage = makeStreamingAgg(std::move(scanStage), sbe::makeSV(scanSlot));
+    auto [keyOutSlots, stage] = makeStreamingAgg(std::move(scanStage), sbe::makeSV(scanSlot));
     auto ctx = makeCompileCtx();
-    auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), keyOutSlots[0]);
     ASSERT_TASSERT_CODE(getAllResults(stage.get(), resultAccessor), 13857200);
 }
 
@@ -518,6 +531,11 @@ TEST_F(StreamingAggStageTest, StatsDebugInfoReportsClusterKeySlots) {
     // The first position reuses the group-by slot id; the second has its own cluster key slot id.
     ASSERT_EQ(arr[0].numberLong(), static_cast<long long>(plan.keySlots[0]));
     ASSERT_EQ(arr[1].numberLong(), static_cast<long long>(plan.clusterKeySlots[1]));
+
+    auto keyOut = aggStats->debugInfo["keyOutSlots"].Array();
+    ASSERT_EQ(keyOut.size(), 2);
+    ASSERT_EQ(keyOut[0].numberLong(), static_cast<long long>(plan.keyOutSlots[0]));
+    ASSERT_EQ(keyOut[1].numberLong(), static_cast<long long>(plan.keyOutSlots[1]));
 }
 
 TEST_F(StreamingAggStageTest, DebugPrintReportsClusterKeySlots) {
@@ -584,6 +602,7 @@ TEST_F(StreamingAggStageTest, RejectsMoreThanFourSeparateClusterKeySlots) {
         makeS<StreamingAggStage>(
             std::move(scanStage),
             value::SlotVector{scanSlots.begin(), scanSlots.begin() + 5},
+            generateMultipleSlotIds(5),
             value::SlotVector{scanSlots[5], scanSlots[6], scanSlots[7], scanSlots[8], scanSlots[9]},
             boost::none,
             std::vector<std::unique_ptr<HashAggAccumulator>>{},
@@ -803,4 +822,31 @@ TEST_F(StreamingAggStageTest, ReopenAfterPartiallyDrainingMultiGroupCluster) {
                               << BSON_ARRAY(1 << BSONNULL << 2) << BSON_ARRAY(2 << "missing" << 8)
                               << BSON_ARRAY(2 << BSONNULL << 16)));
 }
+
+TEST_F(StreamingAggStageTest, RejectsMismatchedKeyOutputSlotCount) {
+    auto [scanSlots, scanStage] = generateVirtualScanMulti(2, BSONArray{});
+    ASSERT_TASSERT_CODE(makeS<StreamingAggStage>(std::move(scanStage),
+                                                 scanSlots,
+                                                 generateMultipleSlotIds(1),
+                                                 scanSlots,
+                                                 boost::none,
+                                                 std::vector<std::unique_ptr<HashAggAccumulator>>{},
+                                                 kEmptyPlanNodeId),
+                        13907900);
+}
+
+TEST_F(StreamingAggStageTest, RejectsRepeatedKeyOutputSlot) {
+    auto [scanSlots, scanStage] = generateVirtualScanMulti(2, BSONArray{});
+    auto keyOutSlot = generateSlotId();
+    auto stage = makeS<StreamingAggStage>(std::move(scanStage),
+                                          scanSlots,
+                                          sbe::makeSV(keyOutSlot, keyOutSlot),
+                                          scanSlots,
+                                          boost::none,
+                                          std::vector<std::unique_ptr<HashAggAccumulator>>{},
+                                          kEmptyPlanNodeId);
+    auto ctx = makeCompileCtx();
+    ASSERT_TASSERT_CODE(prepareTree(ctx.get(), stage.get(), keyOutSlot), 11200201);
+}
+
 }  // namespace mongo::sbe

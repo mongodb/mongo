@@ -28,7 +28,9 @@ namespace mongo::sbe {
  * clustering key, multiple group-by keys may appear. Each distinct grouping will produce a single
  * output, consisting of the values of the group-by keys and the results of the aggregate functions.
  *
- * The 'keySlots' parameter defines the group-by slots. The 'clusterKeySlots' parameter defines
+ * The 'keySlots' parameter defines the group-by slots. The group keys are visible above the stage
+ * through 'keyOutSlots', parallel to 'keySlots'. 'keyOutSlots[i]' holds the key of the emitted
+ * group, taken from the group's first row. The 'clusterKeySlots' parameter defines
  * the cluster key slots. If the rows for a specific group-by slot are already contiguous, the
  * clustering key may reuse the group-by slot for the clustering key. However if for a specific key
  * slot values may appear interleaved, the clustering slot should apply some transformation such
@@ -44,12 +46,18 @@ namespace mongo::sbe {
  * Slots from the input stage are not visible in the output. When a group is finalized, the input
  * slots hold values from the following group (or are EOF).
  *
- * Appears as the "streaming_group" stage in debug output.
+ * Appears as the "streaming_group" stage in debug output:
+ *
+ *  streaming_group [<key slots>] [keyOut_1 = key_1, ..., keyOut_k = key_k]
+ *      clustered [<cluster key slots>] [slot_1 = expr_1, ..., slot_n = expr_n]
+ *      (collator collatorSlot)?
+ *  childStage
  */
 class StreamingAggStage final : public PlanStage {
 public:
     StreamingAggStage(std::unique_ptr<PlanStage> input,
                       value::SlotVector keySlots,
+                      value::SlotVector keyOutSlots,
                       value::SlotVector clusterKeySlots,
                       boost::optional<value::SlotId> collatorSlot,
                       std::vector<std::unique_ptr<HashAggAccumulator>> accumulators,
@@ -102,6 +110,8 @@ private:
     bool emitNext();
 
     const value::SlotVector _keySlots;
+    // The slots that expose the group keys above this stage, parallel to '_keySlots'.
+    const value::SlotVector _keyOutSlots;
     const value::SlotVector _clusterKeySlots;
     const boost::optional<value::SlotId> _collatorSlot;
     // True when every group keys map 1-1 to cluster keys, so each cluster contains a single group.

@@ -349,20 +349,17 @@ public:
                 makeFunction(EFn::kLast, makeE<EVariable>(lastSpillSlot))));
 
         // The slots that hold the group keys above the stage.
-        value::SlotVector keyOutSlots;
+        auto keyOutSlots = generateMultipleSlotIds(keySlots.size());
         std::unique_ptr<PlanStage> stage;
         if (streaming) {
-            keyOutSlots = keySlots;
             stage = makeS<StreamingAggStage>(std::move(scanStage),
                                              keySlots,
+                                             keyOutSlots,
                                              clusterKeySlots,
                                              boost::none,
                                              std::move(accumulators),
                                              kEmptyPlanNodeId);
         } else {
-            for (size_t i = 0; i < keySlots.size(); ++i) {
-                keyOutSlots.push_back(generateSlotId());
-            }
             stage = makeS<HashAggStage>(std::move(scanStage),
                                         keySlots,
                                         keyOutSlots,
