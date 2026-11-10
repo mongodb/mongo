@@ -154,5 +154,15 @@ Status onUpdateReplWriterMinThreadCount(const int) {
     return Status::OK();
 }
 
+Status validateOplogWriterThreadCount(const int count, const boost::optional<TenantId>&) {
+    // 0 disables the dedicated pool. A single worker would never be used for a parallel write.
+    if (count == 0 || (count >= 2 && count <= 256)) {
+        return Status::OK();
+    }
+    return Status(ErrorCodes::BadValue,
+                  str::stream() << "Invalid value for parameter oplogWriterThreadCount: " << count
+                                << "; must be 0 (disabled) or between 2 and 256");
+}
+
 }  // namespace repl
 }  // namespace mongo

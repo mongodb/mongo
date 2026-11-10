@@ -11,6 +11,9 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/modules.h"
 
+#include <utility>
+#include <vector>
+
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace repl {
 
@@ -77,11 +80,27 @@ public:
     bool scheduleWriteOplogBatch(OperationContext* opCtx,
                                  const std::vector<OplogEntry>& ops) override;
 
+    enum class ScheduleWriteResult { kSkipped, kWritten, kScheduled };
+
     /**
-     * Wait for all scheduled writes to completed. This should be used in conjunction
-     * with scheduleWriteOplogBatch().
-     *
-     * This function also resets the 'truncateAfterPoint' after writes are completed.
+     * Chooses the range count from total batch bytes, capped by pool size and entry count.
+     * Writes single-range batches inline; only kScheduled requires waitForScheduledWrites().
+     */
+    ScheduleWriteResult scheduleWriteOplogBatch(OperationContext* opCtx,
+                                                const std::vector<BSONObj>& ops);
+
+    /**
+     * Splits 'ops' into exactly 'numRanges' contiguous, non-empty [begin, end) ranges.
+     * A range ends once it reaches either its share of the remaining entries or of the
+     * remaining bytes. 'totalBytes' must be the sum of objsize() over 'ops', and
+     * 1 <= numRanges <= ops.size(). Exposed for testing.
+     */
+    static std::vector<std::pair<size_t, size_t>> splitOplogBatchIntoRanges(
+        const std::vector<BSONObj>& ops, size_t totalBytes, size_t numRanges);
+
+    /**
+     * Waits for the worker pool to become idle, then resets the truncate point set by
+     * scheduleWriteOplogBatch().
      */
     void waitForScheduledWrites(OperationContext* opCtx) override;
 

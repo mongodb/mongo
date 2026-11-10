@@ -10,7 +10,10 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
+#include <algorithm>
 #include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
@@ -19,6 +22,11 @@ namespace mongo {
 namespace repl {
 
 namespace {
+
+// Holds only a dedicated steady-state writer's parallel range before it writes anything.
+// Inline writes and OplogEntry applier tasks do not enter this hook. If "beginOffset" is set,
+// only the parallel range starting at that index is held.
+MONGO_FAIL_POINT_DEFINE(hangOplogWriterBeforeWritingOplogBatchRange);
 
 constexpr size_t kMinOpsPerThread = 16;
 
@@ -186,7 +194,20 @@ void OplogWriterImpl::_run() {
             TimerHolder timer(&oplogWriterMetric.getBatches());
 
             // Write the operations in this batch.
-            invariant(writeOplogBatch(opCtx, ops));
+            if (_workerPool) {
+                // Scheduled ranges reference 'ops'. If scheduling throws part way through, wait
+                // for them before 'ops' is destroyed. Keep the truncate point so that recovery
+                // still truncates the unfinished batch.
+                ScopeGuard waitForScheduledRanges([&] { _workerPool->waitForIdle(); });
+                const auto result = scheduleWriteOplogBatch(opCtx, ops);
+                invariant(result != ScheduleWriteResult::kSkipped);
+                if (result == ScheduleWriteResult::kScheduled) {
+                    waitForScheduledWrites(opCtx);
+                }
+                waitForScheduledRanges.dismiss();
+            } else {
+                invariant(writeOplogBatch(opCtx, ops));
+            }
         }
 
         // Update various things that care about our last written optime.
@@ -210,6 +231,12 @@ bool OplogWriterImpl::writeOplogBatch(OperationContext* opCtx, const std::vector
 
     return true;
 }
+
+namespace {
+// Byte target per range for the steady-state writer. Floor division requires at least
+// twice this many bytes before a batch uses multiple ranges.
+constexpr size_t kTargetBytesPerThread = 2 * 1024 * 1024;
+}  // namespace
 
 bool OplogWriterImpl::scheduleWriteOplogBatch(OperationContext* opCtx,
                                               const std::vector<OplogEntry>& ops) {
@@ -254,6 +281,103 @@ bool OplogWriterImpl::scheduleWriteOplogBatch(OperationContext* opCtx,
     }
 
     return true;
+}
+
+OplogWriterImpl::ScheduleWriteResult OplogWriterImpl::scheduleWriteOplogBatch(
+    OperationContext* opCtx, const std::vector<BSONObj>& ops) {
+    invariant(!ops.empty());
+
+    if (!_checkWriteOptions(VersionContext::getDecoration(opCtx))) {
+        return ScheduleWriteResult::kSkipped;
+    }
+
+    invariant(_workerPool);
+    const auto poolMaxThreads = static_cast<size_t>(_workerPool->getStats().options.maxThreads);
+    if (ops.size() == 1) {
+        invariant(writeOplogBatch(opCtx, ops));
+        return ScheduleWriteResult::kWritten;
+    }
+
+    size_t totalBytes = 0;
+    for (const auto& op : ops) {
+        totalBytes += static_cast<size_t>(op.objsize());
+    }
+
+    const size_t threadsByBytes = std::max<size_t>(1, totalBytes / kTargetBytesPerThread);
+    const size_t numWriteThreads = std::min({threadsByBytes, poolMaxThreads, ops.size()});
+
+    if (numWriteThreads == 1) {
+        invariant(writeOplogBatch(opCtx, ops));
+        return ScheduleWriteResult::kWritten;
+    }
+
+    // Recovery truncates an unfinished parallel batch to the last completed batch.
+    _consistencyMarkers->setOplogTruncateAfterPoint(
+        opCtx, _replCoord->getMyLastWrittenOpTime().getTimestamp());
+
+    auto makeOplogWriteForRange = [this, &ops](size_t begin, size_t end) {
+        return [=, this, &ops](auto status) {
+            invariant(status);
+            auto opCtx = cc().getServiceContext()->makeKillOpsExemptOperationContext(&cc());
+            if (MONGO_unlikely(hangOplogWriterBeforeWritingOplogBatchRange.shouldFail(
+                    [&](const BSONObj& data) {
+                        if (!data.hasField("beginOffset")) {
+                            return true;
+                        }
+                        return static_cast<size_t>(data["beginOffset"].safeNumberLong()) == begin;
+                    }))) {
+                LOGV2(
+                    10727100,
+                    "hangOplogWriterBeforeWritingOplogBatchRange fail point enabled; holding oplog "
+                    "write range",
+                    "begin"_attr = begin,
+                    "end"_attr = end);
+                hangOplogWriterBeforeWritingOplogBatchRange.pauseWhileSet(opCtx.get());
+            }
+            _writeOplogBatchForRange(opCtx.get(), ops, begin, end);
+        };
+    };
+
+    const auto ranges = splitOplogBatchIntoRanges(ops, totalBytes, numWriteThreads);
+    invariant(ranges.size() == numWriteThreads);
+    for (const auto& [begin, end] : ranges) {
+        _workerPool->schedule(makeOplogWriteForRange(begin, end));
+    }
+
+    return ScheduleWriteResult::kScheduled;
+}
+
+std::vector<std::pair<size_t, size_t>> OplogWriterImpl::splitOplogBatchIntoRanges(
+    const std::vector<BSONObj>& ops, size_t totalBytes, size_t numRanges) {
+    invariant(numRanges >= 1 && numRanges <= ops.size());
+
+    std::vector<std::pair<size_t, size_t>> ranges;
+    ranges.reserve(numRanges);
+    size_t begin = 0;
+    size_t remainingBytes = totalBytes;
+    while (ranges.size() + 1 < numRanges) {
+        const size_t rangesLeft = numRanges - ranges.size();
+        const size_t opsLeft = ops.size() - begin;
+        // Targets come from the remaining work, so a range closed early by one limit spreads
+        // the rest evenly instead of leaving it to the last range.
+        const size_t targetOps = (opsLeft + rangesLeft - 1) / rangesLeft;
+        const size_t targetBytes = std::max<size_t>(1, remainingBytes / rangesLeft);
+        // Leave at least one entry for each later range.
+        const size_t maxEnd = ops.size() - (rangesLeft - 1);
+
+        size_t end = begin;
+        size_t rangeBytes = 0;
+        do {
+            rangeBytes += static_cast<size_t>(ops[end].objsize());
+            ++end;
+        } while (end < maxEnd && end - begin < targetOps && rangeBytes < targetBytes);
+
+        ranges.emplace_back(begin, end);
+        remainingBytes -= rangeBytes;
+        begin = end;
+    }
+    ranges.emplace_back(begin, ops.size());
+    return ranges;
 }
 
 void OplogWriterImpl::waitForScheduledWrites(OperationContext* opCtx) {

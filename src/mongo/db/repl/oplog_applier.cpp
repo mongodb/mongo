@@ -136,14 +136,17 @@ void OplogApplier::setMinValid(const OpTime& minValid) {
 
 namespace {
 
-std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount,
+MONGO_FAIL_POINT_DEFINE(overrideOplogWriterPoolStartupThreadCount);
+
+std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t minThreads,
+                                               size_t maxThreads,
                                                std::string_view name,
                                                bool isKillableByStepdown) {
     auto pool = ThreadPool::make({
         .poolName = fmt::format("{}ThreadPool", name),
         .threadNamePrefix = fmt::format("{}-", name),
-        .minThreads = std::min(getMinThreadCountForReplWorkerPool(), threadCount),
-        .maxThreads = threadCount,
+        .minThreads = std::min(minThreads, maxThreads),
+        .maxThreads = maxThreads,
         .onCreateThread =
             [isKillableByStepdown](const std::string&) {
                 Client::initThread(getThreadName(),
@@ -165,7 +168,38 @@ std::unique_ptr<ThreadPool> makeReplWorkerPool() {
 }
 
 std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount) {
-    return makeReplWorkerPool(threadCount, "ReplWriterWorker"sv, false);
+    return makeReplWorkerPool(
+        getMinThreadCountForReplWorkerPool(), threadCount, "ReplWriterWorker"sv, false);
+}
+
+std::unique_ptr<ThreadPool> makeOplogWriterWorkerPool(size_t threadCount) {
+    invariant(threadCount >= 2);
+
+    // Keep every configured worker resident, independently of replWriterMinThreadCount. With
+    // minThreads == maxThreads, idle workers are not reaped and scheduling needs no new threads.
+    size_t minThreads = threadCount;
+    // Simulate incomplete startup without changing ThreadPool or exhausting OS resources.
+    overrideOplogWriterPoolStartupThreadCount.execute([&](const BSONObj& data) {
+        const auto startupThreads = data["startupThreads"].safeNumberInt();
+        uassert(ErrorCodes::BadValue,
+                "startupThreads must be numeric and between 0 and the configured thread count",
+                data["startupThreads"].isNumber() && startupThreads >= 0 &&
+                    static_cast<size_t>(startupThreads) <= threadCount);
+        minThreads = static_cast<size_t>(startupThreads);
+    });
+
+    auto pool = makeReplWorkerPool(minThreads, threadCount, "OplogWriterWorker"sv, false);
+    const auto numThreads = pool->getStats().numThreads;
+    if (numThreads != threadCount) {
+        pool->shutdown();
+        pool->join();
+        uasserted(ErrorCodes::InternalError,
+                  fmt::format("Failed to start all {} dedicated oplog writer workers; only {} "
+                              "were created. Check process thread limits and available memory.",
+                              threadCount,
+                              numThreads));
+    }
+    return pool;
 }
 
 }  // namespace repl

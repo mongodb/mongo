@@ -256,6 +256,10 @@ private:
     // The pool's own internal synchronization handles shutdown()/join().
     const std::unique_ptr<ThreadPool> _workerPool;
 
+    // Used by the steady-state OplogWriter so that its writes do not contend with the applier.
+    // Null unless oplogWriterThreadCount > 0 and ReduceMajorityWriteLatency is enabled.
+    const std::unique_ptr<ThreadPool> _oplogWriterPool;
+
     // Writes a noop every 10 seconds.
     std::unique_ptr<NoopWriter> _noopWriter;
 };
