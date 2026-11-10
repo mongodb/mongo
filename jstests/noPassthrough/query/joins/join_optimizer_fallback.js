@@ -1064,4 +1064,83 @@ assertResultsStableAndJoinOptUsed(
     });
 }
 
+// SBE cannot produce document metadata, such as the sort key that $rank needs, so a join node that
+// depends on it must fall back.
+{
+    const lookupColl12 = {
+        $lookup: {from: coll12.getName(), localField: "a", foreignField: "a", as: "c12"},
+    };
+
+    // Run the join prefix on its own first, so that a join plan cached for it is not reused below.
+    runTestCaseEligiblePipeline({pipeline: [lookupColl12, {$unwind: "$c12"}], expectedCount: 1});
+
+    // Window functions that depend on the sort key.
+    for (const windowFunction of ["$rank", "$denseRank", "$documentNumber"]) {
+        runTestCaseIneligiblePipeline({
+            pipeline: [
+                lookupColl12,
+                {$unwind: "$c12"},
+                {$setWindowFields: {sortBy: {_id: 1}, output: {r: {[windowFunction]: {}}}}},
+            ],
+            expectedCount: 1,
+            expectedFallbackReason: "sbeIncompatibleExpression",
+        });
+    }
+
+    // Other metadata after the join.
+    runTestCaseIneligiblePipeline({
+        pipeline: [lookupColl12, {$unwind: "$c12"}, {$addFields: {r: {$meta: "recordId"}}}],
+        expectedCount: 1,
+        expectedFallbackReason: "sbeIncompatibleExpression",
+    });
+
+    // A window function that does not depend on the sort key keeps the join prefix optimized.
+    runTestCaseIneligibleSuffix({
+        pipeline: [
+            lookupColl12,
+            {$unwind: "$c12"},
+            {$setWindowFields: {sortBy: {_id: 1}, output: {r: {$shift: {output: "$b", by: 1}}}}},
+        ],
+        expectedCount: 1,
+        expectedNumJoinNodes: 1,
+        expectedFallbackReason: "unsupportedStage",
+    });
+
+    // $setWindowFields inside the $lookup sub-pipeline.
+    runTestCaseIneligiblePipeline({
+        pipeline: [
+            {
+                $lookup: {
+                    from: coll12.getName(),
+                    localField: "a",
+                    foreignField: "a",
+                    pipeline: [{$setWindowFields: {sortBy: {_id: 1}, output: {r: {$rank: {}}}}}],
+                    as: "c12",
+                },
+            },
+            {$unwind: "$c12"},
+        ],
+        expectedCount: 1,
+        expectedFallbackReason: "ineligibleSubPipelineStage",
+    });
+
+    // Metadata inside the $lookup sub-pipeline.
+    runTestCaseIneligiblePipeline({
+        pipeline: [
+            {
+                $lookup: {
+                    from: coll12.getName(),
+                    localField: "a",
+                    foreignField: "a",
+                    pipeline: [{$addFields: {r: {$meta: "recordId"}}}],
+                    as: "c12",
+                },
+            },
+            {$unwind: "$c12"},
+        ],
+        expectedCount: 1,
+        expectedFallbackReason: "sbeIncompatibleExpression",
+    });
+}
+
 MongoRunner.stopMongod(conn);

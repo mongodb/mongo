@@ -3048,6 +3048,26 @@ TEST_F(PipelineAnalyzerTest, TrailingSbeIncompatibleMatchBailsOut) {
               toStringData(JoinFallbackReason::kSbeIncompatibleExpression));
 }
 
+TEST_F(PipelineAnalyzerTest, SortKeyMetadataDependencyBailsOut) {
+    // $rank depends on the sort key metadata, which SBE cannot produce for the base node.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$setWindowFields: {sortBy: {_id: 1}, output: {r: {$rank: {}}}}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kSbeIncompatibleExpression));
+}
+
 TEST_F(PipelineAnalyzerTest, SbeIncompatibleNodePredicateIsNotInferred) {
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},

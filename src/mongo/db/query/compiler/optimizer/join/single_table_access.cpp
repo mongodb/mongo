@@ -166,10 +166,14 @@ StatusWith<SingleTablePlanResult> accessPlanForFilterWithDerivedPredicates(
     auto& winningSolution = cbrResult.solutions.front();
     const auto* rootQsn = winningSolution->root();
 
+    // CBR also accepts a plan it cannot estimate, leaving it to the multi-planner. As the sole
+    // candidate, such a plan looks like a winner but has no cost.
     auto rootEstIt = cbrResult.maybeExplainData->estimates.find(rootQsn);
-    tassert(11514601,
-            "Missing estimate for winning single-table plan's root QSN",
-            rootEstIt != cbrResult.maybeExplainData->estimates.end());
+    if (rootEstIt == cbrResult.maybeExplainData->estimates.end()) {
+        return Status(ErrorCodes::NoQueryExecutionPlans,
+                      fmt::format("CBR could not estimate the only plan for nss: {}",
+                                  node.accessPath->nss().toStringForErrorMsg()));
+    }
 
     return SingleTablePlanResult{
         .solution = std::move(winningSolution),

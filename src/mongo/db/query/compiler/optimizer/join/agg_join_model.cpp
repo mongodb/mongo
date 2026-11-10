@@ -88,6 +88,13 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCQForJoinPipeline(
                       "Encountered an expression that SBE does not support");
     }
 
+    // SBE cannot produce document metadata either (e.g. the sort key $rank depends on).
+    if (!swCQ.getValue()->metadataDeps().none()) {
+        reason = JoinFallbackReason::kSbeIncompatibleExpression;
+        return Status(ErrorCodes::QueryFeatureNotAllowed,
+                      "Encountered a metadata dependency that SBE does not support");
+    }
+
     // Mark the CQ as SBE-compatible to work around the check in 'shouldCacheQuery()' that prevents
     // caching of non-sbe collscan plans.
     swCQ.getValue()->setSbeCompatible(true);

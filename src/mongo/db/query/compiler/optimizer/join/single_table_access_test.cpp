@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
@@ -148,6 +149,34 @@ TEST_F(SingleTableAccessTestFixture, ZeroScanEstimateStillYieldsSingleCostedPlan
     ASSERT_EQ(soln->getFirstNodeByType(STAGE_IXSCAN).second, 1);
     ASSERT_EQ(1, res.nodeCBRCosts.size());
     ASSERT_GT(res.nodeCBRCosts[0].toDouble(), 0.0);
+}
+
+TEST_F(SingleTableAccessTestFixture, SoleUnestimablePlanFails) {
+    auto opCtx = operationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < 10; ++i) {
+        docs.push_back(BSON("_id" << i << "a" << i));
+    }
+    ce::createCollAndInsertDocuments(opCtx, nss, docs);
+    auto mca = multipleCollectionAccessor(opCtx, {nss});
+
+    SamplingEstimatorMap estimators;
+    estimators[nss] = samplingEstimator(mca, nss, 1.0);
+
+    auto cq = makeCanonicalQuery(nss);
+    QueryMetadataBitSet sortKey;
+    sortKey.set(DocumentMetadataFields::kSortKey);
+    cq->requestAdditionalMetadata(sortKey);
+
+    MutableJoinGraph mgraph;
+    ASSERT(mgraph.addNode(nss, std::move(cq), boost::none));
+
+    JoinGraph graph(std::move(mgraph));
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics metrics;  // Unused for testing.
+    auto swRes = singleTableAccessPlans(opCtx, mca, graph, estimators, metrics);
+    ASSERT_EQ(ErrorCodes::NoQueryExecutionPlans, swRes.getStatus().code());
 }
 
 }  // namespace mongo::join_ordering
