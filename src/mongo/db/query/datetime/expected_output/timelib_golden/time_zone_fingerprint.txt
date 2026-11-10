@@ -124,7 +124,7 @@ America/Guatemala -> def89790ee431a33
 America/Guayaquil -> 9b831267fb586d89
 America/Guyana -> 9525950f5472169d
 America/Halifax -> e74b79010fd84099
-America/Havana -> e0cb65fe8acc0031
+America/Havana -> f906d4bef558ffc9
 America/Hermosillo -> 1dfb6b4008024fd1
 America/Indiana/Indianapolis -> 95635cf169d30111
 America/Indiana/Knox -> 5406e90383aa23e5
@@ -384,7 +384,7 @@ Canada/Saskatchewan -> aeb78ba7fb82ec81
 Canada/Yukon -> 3fcf8ba41623034f
 Chile/Continental -> 439a1d0238ce0ea9
 Chile/EasterIsland -> c9dc034538e16c4d
-Cuba -> e0cb65fe8acc0031
+Cuba -> f906d4bef558ffc9
 EET -> 6643fc04a17b609d
 EST -> fd3b1b4a154a8de1
 EST5EDT -> 9dd47ae54f43e889

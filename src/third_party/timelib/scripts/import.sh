@@ -46,7 +46,7 @@ fi
 
 mkdir -p $DEST_DIR
 pushd $TEMP_DIR
-git clone --branch $VERSION --depth 1 git@github.com:derickr/timelib.git .
+git clone --branch $VERSION --depth 1 https://github.com/derickr/timelib.git .
 
 # Avoid embedding the git repository itself.
 rm -rf .git*
@@ -56,6 +56,9 @@ rm -rf tests/
 
 # Download the latest Olson timezone database and generate 'timezonedb.h'.
 make -C zones
+
+# Save the version info.
+cp -r zones/version-info.txt $DEST_DIR
 
 # Generate the parsers.
 make parse_date.c parse_iso_intervals.c
