@@ -11,6 +11,7 @@
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 
 // Drop and recreate collections to assure a clean run.
 const collName = "report_post_batch_resume_token";
@@ -25,11 +26,22 @@ const assertEqIfNotMongos = function (val1, val2) {
     }
 };
 
-// Assert that the postBatchResumeToken is at the resume token of the last event returned
-// in the batch.
+// The postBatchResumeToken can advance past the resume token of the last event returned in the
+// batch when unrelated oplog entries are scanned. On a sharded cluster this happens because the
+// events in a batch may come from different shards. On disaggregated storage it happens because
+// replicated fast count is always enabled and writes background oplog entries. In both cases we
+// can only assert that the PBRT is at or beyond the last event's resume token, not equal to it.
+const pbrtMayExceedLastEvent = FixtureHelpers.isMongos(db) || isDisagg(db);
+
+// Assert that the postBatchResumeToken is at the resume token of the last event returned in the
+// batch, or beyond it when unrelated oplog entries may have been scanned.
 function assertPbrtMatchesLastEvent(pbrt, eventResumeToken) {
     const cmp = bsonWoCompare(pbrt, eventResumeToken);
-    assertEqIfNotMongos(cmp, 0);
+    if (pbrtMayExceedLastEvent) {
+        assert.gte(cmp, 0, "expecting the PBRT to be at or beyond the last event's resume token");
+    } else {
+        assert.eq(cmp, 0, "expecting resume tokens to be equal");
+    }
 }
 
 let docId = 0; // Tracks _id of documents inserted to ensure that we do not duplicate.
@@ -80,8 +92,9 @@ assert(csCursor.objsLeftInBatch() == 1);
 // the resume token of the last item in the batch and greater than the initial PBRT.
 let resumeTokenFromDoc = csCursor.next()._id;
 getMorePBRT = csCursor.getResumeToken();
-// When running in a sharded passthrough, we cannot guarantee that the retrieved event was the last
-// item in the oplog, and so we cannot assert that the PBRT is equal to the event's resume token.
+// When running in a sharded passthrough or on disaggregated storage, we cannot guarantee that the
+// retrieved event was the last item in the oplog, and so we cannot assert that the PBRT is equal to
+// the event's resume token.
 assertPbrtMatchesLastEvent(getMorePBRT, resumeTokenFromDoc);
 assert.gt(bsonWoCompare(getMorePBRT, initialAggPBRT), 0);
 
@@ -109,8 +122,9 @@ while (csCursor.objsLeftInBatch()) {
     resumeTokenFromDoc = eventFromCursor._id;
 }
 getMorePBRT = csCursor.getResumeToken();
-// When running in a sharded passthrough, we cannot guarantee that the retrieved event was the last
-// item in the oplog, and so we cannot assert that the PBRT is equal to the event's resume token.
+// When running in a sharded passthrough or on disaggregated storage, we cannot guarantee that the
+// retrieved event was the last item in the oplog, and so we cannot assert that the PBRT is equal to
+// the event's resume token.
 assertPbrtMatchesLastEvent(getMorePBRT, resumeTokenFromDoc);
 assert.gt(bsonWoCompare(getMorePBRT, initialAggPBRT), 0);
 
