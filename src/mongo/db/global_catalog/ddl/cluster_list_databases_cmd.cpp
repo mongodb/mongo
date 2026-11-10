@@ -68,6 +68,7 @@ public:
 
         struct DatabaseAggregatedInfo {
             long long size = 0;
+            bool empty = true;
             std::unique_ptr<BSONObjBuilder> sizePerShard = nullptr;
         };
 
@@ -184,7 +185,7 @@ public:
             //
             // Several reply fields are computed during aggregation on mongos and either do not
             // exist on individual shard replies or hold different values there: 'sizeOnDisk' is
-            // summed across shards, 'empty' is recomputed from the aggregated size, and 'shards' is
+            // summed across shards, 'empty' is true only if all shards are empty, and 'shards' is
             // synthesised on mongos only. Evaluating such a filter on each shard would incorrectly
             // drop databases that should match the aggregated result (or vice versa). The filter is
             // always re-applied authoritatively to the aggregated reply items in 'buildReply'.
@@ -292,6 +293,7 @@ public:
 
                     auto [it, inserted] = databaseAggregatedInfos.try_emplace(name);
                     it->second.size += sizeOnShard;
+                    it->second.empty &= dbObj["empty"].boolean();
 
                     if (!it->second.sizePerShard) {
                         it->second.sizePerShard = std::make_unique<BSONObjBuilder>();
@@ -331,6 +333,7 @@ public:
             for (const auto& databaseAggregatedInfo : databaseAggregatedInfos) {
                 const auto& dbName = databaseAggregatedInfo.first;
                 const auto& size = databaseAggregatedInfo.second.size;
+                const auto& empty = databaseAggregatedInfo.second.empty;
                 const auto& sizePerShard = databaseAggregatedInfo.second.sizePerShard;
                 const auto databaseName =
                     DatabaseNameUtil::deserialize(tenantId, dbName, cmd.getSerializationContext());
@@ -342,7 +345,7 @@ public:
                 ListDatabasesReplyItem item(dbName);
 
                 item.setSizeOnDisk(size);
-                item.setEmpty(size == 0);
+                item.setEmpty(empty);
                 if (sizePerShard) {
                     item.setShards(sizePerShard->obj());
                 }

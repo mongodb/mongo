@@ -7,7 +7,7 @@
  *   - 'sizeOnDisk' is the sum of the per-shard sizes, so it can exceed every individual shard's
  *     value.
  *   - 'shards' only exists in the aggregated mongos reply; individual shard replies do not have it.
- *   - 'empty' is recomputed on mongos from the aggregated size.
+ *   - 'empty' is true only if the database is empty on all shards.
  * Evaluating the filter only on the shards therefore either drops databases that should match or
  * keeps ones that should not. This test exercises those cases against a two-shard cluster and also
  * verifies that name-based and nameOnly filtering still behave correctly.
@@ -175,7 +175,7 @@ describe("listDatabases filter on mongos", function () {
         assert.eq(0, excluded.databases.length, tojson(excluded));
     });
 
-    it("applies an 'empty' filter against the aggregated size", function () {
+    it("applies an 'empty' filter", function () {
         const filtered = listDbs(this.mongos, {filter: {name: namePrefix, empty: false}});
         assert.eq(
             [dbOnBoth, dbOnShard0, dbOnShard1].sort(),
