@@ -1,0 +1,87 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/query/compiler/ce/persistence/persistent_stats_config_serialization.h"
+    mod_visibility: public
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+types:
+    PersistentStatsSampleSize:
+        bson_serialization_type: any
+        description: >-
+            A sample size for the persistent samples of a collection: a positive number to set the
+            size, or null to remove it.
+        cpp_type: "mongo::SampleSizeUpdate"
+        is_view: false
+        serializer: "::mongo::sampleSizeUpdateSerializeToBSON"
+        deserializer: "::mongo::sampleSizeUpdateParseFromBSON"
+
+structs:
+    PersistentStatsSamplesConfig:
+        description: >-
+            The number of documents to sample when generating the persistent samples used by the
+            cost-based ranker and the join optimizer.
+        generate_comparison_operators: true
+        fields:
+            sampleSize:
+                description: >-
+                    The number of documents to sample for cardinality estimation in the
+                    cost-based ranker.
+                type: safeInt
+                optional: true
+                validator:
+                    gt: 0
+                stability: unstable
+            joinSampleSize:
+                description: "The number of documents to sample for the join optimizer."
+                type: safeInt
+                optional: true
+                validator:
+                    gt: 0
+                stability: unstable
+
+    PersistentStatsConfig:
+        description: "Configuration for the persistent statistics collected on a collection."
+        generate_comparison_operators: true
+        fields:
+            samples:
+                description: "The sample sizes for the persistent samples of this collection."
+                type: PersistentStatsSamplesConfig
+                optional: true
+                stability: unstable
+
+    PersistentStatsSamplesConfigUpdate:
+        description: >-
+            A partial update to the sample sizes of a collection's persistent stats. Sample sizes
+            that are omitted are left unchanged; sample sizes set to null are removed.
+        strict: true
+        fields:
+            sampleSize:
+                description: >-
+                    The number of documents to sample for cardinality estimation in the
+                    cost-based ranker, or null to remove it.
+                type: PersistentStatsSampleSize
+                optional: true
+                stability: unstable
+            joinSampleSize:
+                description: "The number of documents to sample for the join optimizer, or null to remove it."
+                type: PersistentStatsSampleSize
+                optional: true
+                stability: unstable
+
+    PersistentStatsConfigUpdate:
+        description: >-
+            A partial update to a collection's persistentStatsConfig. Sample sizes that are
+            omitted are left unchanged; sample sizes set to null are removed.
+        strict: true
+        fields:
+            samples:
+                description: "The sample size updates for the persistent samples of this collection."
+                type: PersistentStatsSamplesConfigUpdate
+                optional: true
+                stability: unstable
