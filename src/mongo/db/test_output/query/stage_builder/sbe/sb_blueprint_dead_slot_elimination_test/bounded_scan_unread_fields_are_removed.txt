@@ -1,0 +1,20 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/BoundedScanUnreadFieldsAreRemoved
+Live slots: s2 s4
+
+Before:
+[1] nlj inner [] [s1] 
+    left 
+        [1] project [s1 = 0ll] 
+        [1] coscan 1 
+    right 
+        [1] scan s1 = minRecordId [s2 = record, s3 = recordId] [s4 = a, s5 = b] @"UUID" forward 
+
+
+After firing 1:
+[1] nlj inner [] [s1] 
+    left 
+        [1] project [s1 = 0ll] 
+        [1] coscan 1 
+    right 
+        [1] scan s1 = minRecordId [s2 = record, s3 = recordId] [s4 = a] @"UUID" forward 
+

@@ -91,6 +91,7 @@ const strategyFlags = {
     featureFlagSbeEqLookupUnwindNestedLoopJoin: false,
     featureFlagSbeEqLookupUnwindIndexedLoopJoin: false,
     featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: false,
+    featureFlagSbeBlueprintRewrites: false,
 };
 const priorFlagValues = {};
 for (const [flag, value] of Object.entries(strategyFlags)) {

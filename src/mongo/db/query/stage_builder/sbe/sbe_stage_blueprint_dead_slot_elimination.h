@@ -10,8 +10,8 @@
 namespace mongo::stage_builder {
 /**
  * Returns a rule that removes project entries whose outputs nothing reads, and replaces a project
- * left with no entries by its child. The rule needs the slot summary in the rewrite context and
- * keeps it up to date.
+ * left with no entries by its child. It also removes the fields of a scan whose slots nothing
+ * reads. The rule needs the slot summary in the rewrite context and keeps it up to date.
  */
 std::unique_ptr<SbBlueprintRewriteRule> makeDeadSlotEliminationRule();
 }  // namespace mongo::stage_builder

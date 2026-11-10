@@ -199,5 +199,54 @@ TEST_F(SbBlueprintDeadSlotEliminationTest, AddFieldsFieldThatFailsButIsProjected
         return Plan{std::move(project), {projectOut[0].getId()}};
     });
 }
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, UnreadScanFieldsAreRemoved) {
+    // Only the record and 'b' are read. 'a' and 'c' go, and 'b' keeps its slot.
+    runGoldenTest([&](SbBuilder& b) {
+        auto [scan, recordSlot, recordIdSlot, fieldSlots] =
+            b.makeScan(_uuid, DatabaseName::kAdmin, true, {"a", "b", "c"});
+        return Plan{std::move(scan), {recordSlot.getId(), fieldSlots[1].getId()}};
+    });
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, ScanWithNoReadFieldsKeepsNone) {
+    runGoldenTest([&](SbBuilder& b) {
+        auto [scan, recordSlot, recordIdSlot, fieldSlots] =
+            b.makeScan(_uuid, DatabaseName::kAdmin, true, {"a", "b"});
+        return Plan{std::move(scan), {recordSlot.getId()}};
+    });
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, BoundedScanUnreadFieldsAreRemoved) {
+    // A scan with record id bounds lowers to a ScanStage rather than a GenericScanStage.
+    runGoldenTest([&](SbBuilder& b) {
+        auto [boundsProject, boundsSlots] = b.makeProject(b.makeCoScan(1), b.makeInt64Constant(0));
+        auto [scan, recordSlot, recordIdSlot, fieldSlots] =
+            b.makeScan(_uuid,
+                       DatabaseName::kAdmin,
+                       true,
+                       {"a", "b"},
+                       SbScanBounds{.minRecordIdSlot = boundsSlots[0]});
+        auto loopJoin = b.makeLoopJoin(std::move(boundsProject),
+                                       std::move(scan),
+                                       /*outerProjects=*/{},
+                                       /*outerCorrelated=*/{boundsSlots[0]});
+        return Plan{std::move(loopJoin), {recordSlot.getId(), fieldSlots[0].getId()}};
+    });
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, RemovingAnEntryQueuesTheScanThatDefinesItsInput) {
+    // Only the project's first entry is live. Removing the second leaves the scan's 'b' unread, so
+    // the rule queues the scan and removes 'b' from it.
+    runGoldenTest([&](SbBuilder& b) {
+        auto [scan, recordSlot, recordIdSlot, fieldSlots] =
+            b.makeScan(_uuid, DatabaseName::kAdmin, true, {"a", "b"});
+        auto [project, outSlots] = b.makeProject(
+            std::move(scan),
+            b.makeBinaryOp(abt::Operations::Add, fieldSlots[0], b.makeInt32Constant(1)),
+            b.makeBinaryOp(abt::Operations::Add, fieldSlots[1], b.makeInt32Constant(1)));
+        return Plan{std::move(project), {recordSlot.getId(), outSlots[0].getId()}};
+    });
+}
 }  // namespace
 }  // namespace mongo::stage_builder

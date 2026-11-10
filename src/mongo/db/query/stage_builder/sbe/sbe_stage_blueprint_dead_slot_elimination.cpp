@@ -3,10 +3,12 @@
 
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint_dead_slot_elimination.h"
 
+#include <variant>
+
 namespace mongo::stage_builder {
 namespace {
 /**
- * Removes dead slots from the plan. Initially limited to only 'project' stages.
+ * Removes dead slots from the plan. Limited to 'project' stages and the fields of 'scan' stages.
  */
 class DeadSlotEliminationRule final : public SbBlueprintRewriteRule {
 public:
@@ -20,13 +22,22 @@ public:
 
     boost::optional<SbDetachedNode> apply(SbDetachedNode& node,
                                           SbBlueprintRewriteContext& ctx) override {
-        auto* project = std::get_if<SbBlueprintProject>(&*node);
-        if (!project) {
-            return boost::none;
-        }
+        return std::visit([&](auto& concrete) { return applyTo(concrete, node, ctx); }, *node);
+    }
 
+private:
+    template <typename T>
+    static boost::optional<SbDetachedNode> applyTo(T&,
+                                                   SbDetachedNode&,
+                                                   SbBlueprintRewriteContext&) {
+        return boost::none;
+    }
+
+    static boost::optional<SbDetachedNode> applyTo(SbBlueprintProject& project,
+                                                   SbDetachedNode& node,
+                                                   SbBlueprintRewriteContext& ctx) {
         auto& usage = ctx.slotUsage();
-        auto& projects = project->projects;
+        auto& projects = project.projects;
         // Not all slots are safe to remove. For instance, a slot may be computed simply to throw an
         // error. It's the caller's responsibility to ensure that these slots are not removed with
         // the SbBlueprint::keepSlot() interface.
@@ -66,6 +77,33 @@ public:
         if (removed == 0) {
             return boost::none;
         }
+        return std::move(node);
+    }
+
+    static boost::optional<SbDetachedNode> applyTo(SbBlueprintScan& scan,
+                                                   SbDetachedNode& node,
+                                                   SbBlueprintRewriteContext& ctx) {
+        // A field slot reads no other slot, so removing one never leaves another slot dead.
+        auto& usage = ctx.slotUsage();
+        auto& names = scan.info->scanFieldNames;
+        auto& slots = scan.info->scanFieldSlots;
+        size_t keep = 0;
+        for (size_t i = 0; i < slots.size(); ++i) {
+            if (usage.numUses(slots[i]) == 0) {
+                usage.removeDef(slots[i]);
+                continue;
+            }
+            if (keep != i) {
+                names[keep] = std::move(names[i]);
+                slots[keep] = slots[i];
+            }
+            ++keep;
+        }
+        if (keep == slots.size()) {
+            return boost::none;
+        }
+        names.resize(keep);
+        slots.resize(keep);
         return std::move(node);
     }
 };
