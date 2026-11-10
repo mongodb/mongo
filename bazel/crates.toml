@@ -553,9 +553,12 @@ dependencies = [
 name = "direct-cargo-bazel-deps"
 version = "0.0.1"
 dependencies = [
+ "tokio",
  "wasmtime",
  "wasmtime-c-api-impl",
  "wasmtime-cli",
+ "wasmtime-wasi",
+ "wasmtime-wizer",
  "zstd-sys",
 ]
 

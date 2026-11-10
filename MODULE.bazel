@@ -738,6 +738,25 @@ crate.spec(
     package = "wasmtime",
     version = "=44.0.1",
 )
+
+# For //bazel/wasm_rules/wizer_driver.
+crate.spec(
+    features = [
+        "component-model",
+        "wasmtime",
+    ],
+    package = "wasmtime-wizer",
+    version = "=44.0.1",
+)
+crate.spec(
+    package = "wasmtime-wasi",
+    version = "=44.0.1",
+)
+crate.spec(
+    features = ["rt"],
+    package = "tokio",
+    version = "=1.51.0",
+)
 crate.spec(
     features = [
         "cranelift",

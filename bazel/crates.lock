@@ -1,5 +1,5 @@
 {
-  "checksum": "9f58d9521be5db6e457e07ee78c32bdc685775f21fc31a92c6bf67ac15bdb54b",
+  "checksum": "005d2f24b942fc500b3c54a9932a3bdc3b791c983594cc6f8b91a0bdae9107b4",
   "crates": {
     "addr2line 0.26.1": {
       "name": "addr2line",
@@ -3596,6 +3596,10 @@
         "deps": {
           "common": [
             {
+              "id": "tokio 1.51.0",
+              "target": "tokio"
+            },
+            {
               "id": "wasmtime 44.0.1",
               "target": "wasmtime"
             },
@@ -3607,6 +3611,14 @@
             {
               "id": "wasmtime-cli 44.0.1",
               "target": "wasmtime_cli"
+            },
+            {
+              "id": "wasmtime-wasi 44.0.1",
+              "target": "wasmtime_wasi"
+            },
+            {
+              "id": "wasmtime-wizer 44.0.1",
+              "target": "wasmtime_wizer"
             },
             {
               "id": "zstd-sys 2.0.9+zstd.1.5.5",
@@ -24677,9 +24689,12 @@
     ]
   },
   "direct_deps": [
+    "tokio 1.51.0",
     "wasmtime 44.0.1",
     "wasmtime-c-api-impl 44.0.1",
     "wasmtime-cli 44.0.1",
+    "wasmtime-wasi 44.0.1",
+    "wasmtime-wizer 44.0.1",
     "zstd-sys 2.0.9+zstd.1.5.5"
   ],
   "direct_dev_deps": [],
