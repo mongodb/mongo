@@ -981,7 +981,9 @@ struct SbBlueprintHashAgg {
 struct SbBlueprintBlockHashAggInfo {
     SbBlueprintNodeIdx child;
     sbe::value::SlotVector groupBySlots;
+    sbe::value::SlotVector groupByOutSlots;
     sbe::value::SlotId selectivityBitmapSlot{0};
+    sbe::value::SlotId selectivityBitmapOutSlot{0};
     sbe::value::SlotVector blockAccArgSlots;
     sbe::value::SlotId bitmapInternalSlot{0};
     sbe::value::SlotVector accumulatorDataSlots;
@@ -990,6 +992,8 @@ struct SbBlueprintBlockHashAggInfo {
     bool forceIncreasedSpilling{false};
 
     void def(SbSlotCollector& out) const {
+        out.add(groupByOutSlots);
+        out.add(selectivityBitmapOutSlot);
         for (const auto& [outSlot, agg] : aggs) {
             out.add(outSlot);
         }

@@ -65,7 +65,9 @@ using TokenizeTableType = stdx::unordered_map<std::span<size_t>, size_t, SpanHas
 
 BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
                                      value::SlotVector groupSlotIds,
+                                     value::SlotVector groupSlotOutIds,
                                      value::SlotId blockBitsetInSlotId,
+                                     value::SlotId blockBitsetOutSlotId,
                                      value::SlotVector blockDataInSlotIds,
                                      value::SlotVector accumulatorDataSlotIds,
                                      value::SlotId accumulatorBitsetSlotId,
@@ -83,8 +85,10 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
                        participateInTrialRunTracking,
                        allowDiskUse,
                        forceIncreasedSpilling),
-      _groupSlots(groupSlotIds),
+      _groupSlots(std::move(groupSlotIds)),
+      _groupOutSlots(std::move(groupSlotOutIds)),
       _blockBitsetInSlotId(blockBitsetInSlotId),
+      _blockBitsetOutSlotId(blockBitsetOutSlotId),
       _blockDataInSlotIds(std::move(blockDataInSlotIds)),
       _accumulatorBitsetSlotId(accumulatorBitsetSlotId),
       _accumulatorDataSlotIds(std::move(accumulatorDataSlotIds)),
@@ -93,6 +97,9 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
     tassert(8780600,
             "Expected 'blockDataInSlotIds' and 'accumulatorDataSlotIds' to have the same size",
             _blockDataInSlotIds.size() == _accumulatorDataSlotIds.size());
+    tassert(13904300,
+            "BlockHashAggStage needs one output slot for each group-by slot",
+            _groupOutSlots.size() == _groupSlots.size());
 
     _children.emplace_back(std::move(input));
 
@@ -143,7 +150,9 @@ std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
 
     return std::make_unique<BlockHashAggStage>(_children[0]->clone(),
                                                _groupSlots,
+                                               _groupOutSlots,
                                                _blockBitsetInSlotId,
+                                               _blockBitsetOutSlotId,
                                                _blockDataInSlotIds,
                                                _accumulatorDataSlotIds,
                                                _accumulatorBitsetSlotId,
@@ -176,21 +185,24 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
         invariant(_blockDataInAccessors[i]);
     }
     throwIfDupSlot(_blockBitsetInSlotId);
+    throwIfDupSlot(_blockBitsetOutSlotId);
 
-    _outAccessorsMap.reserve(_groupSlots.size() + _aggs.size());
+    _outAccessorsMap.reserve(_groupSlots.size() + _aggs.size() + 1 /* blockBitset */);
+    _outAccessorsMap[_blockBitsetOutSlotId] = &_blockBitsetOutAccessor;
     _outIdBlockAccessors.resize(_groupSlots.size());
     _outAggBlockAccessors.resize(_aggs.size());
 
     for (size_t i = 0; i < _groupSlots.size(); ++i) {
         auto& slot = _groupSlots[i];
         throwIfDupSlot(slot);
+        throwIfDupSlot(_groupOutSlots[i]);
 
         _idInAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
 
         // Construct accessor for obtaining the key values from the hash table.
         _idHtAccessors.emplace_back(std::make_unique<HashKeyAccessor>(_htIt, i));
 
-        _outAccessorsMap[slot] = &_outIdBlockAccessors[i];
+        _outAccessorsMap[_groupOutSlots[i]] = &_outIdBlockAccessors[i];
     }
 
     // Change the agg slot accessors to point to the blocks.
@@ -269,15 +281,11 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
 }
 
 value::SlotAccessor* BlockHashAggStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
-    if (slot == _blockBitsetInSlotId) {
-        // Re-map the bitset slot to our output bitset accessor.
-        return &_blockBitsetOutAccessor;
-    }
-
     if (_compiled) {
-        if (_outAccessorsMap.count(slot)) {
-            return _outAccessorsMap[slot];
+        if (auto it = _outAccessorsMap.find(slot); it != _outAccessorsMap.end()) {
+            return it->second;
         }
+        return ctx.getAccessor(slot);
     } else {
         if (_accumulatorBitsetSlotId == slot) {
             return &_accumulatorBitsetAccessor;
@@ -925,6 +933,7 @@ std::unique_ptr<PlanStageStats> BlockHashAggStage::getStats(bool includeDebugInf
         BSONObjBuilder bob;
 
         bob.append("groupBySlots", _groupSlots.begin(), _groupSlots.end());
+        bob.append("groupByOutSlots", _groupOutSlots.begin(), _groupOutSlots.end());
 
         {
             BSONObjBuilder blockExprBob(bob.subobjStart("blockExpressions"));
@@ -1042,8 +1051,11 @@ void BlockHashAggStage::close() {
 
 void BlockHashAggStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
                                      DebugPrintInfo& debugPrintInfo) const {
-    ret.emplace_back(DebugPrinter::Block("bitset ="));
+    ret.emplace_back(DebugPrinter::Block("bitset [`"));
+    DebugPrinter::addIdentifier(ret, _blockBitsetOutSlotId);
+    ret.emplace_back("=");
     DebugPrinter::addIdentifier(ret, _blockBitsetInSlotId);
+    ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _groupSlots.size(); ++idx) {
@@ -1051,6 +1063,18 @@ void BlockHashAggStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
 
+        DebugPrinter::addIdentifier(ret, _groupSlots[idx]);
+    }
+    ret.emplace_back(DebugPrinter::Block("`]"));
+
+    ret.emplace_back(DebugPrinter::Block("[`"));
+    for (size_t idx = 0; idx < _groupSlots.size(); ++idx) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
+
+        DebugPrinter::addIdentifier(ret, _groupOutSlots[idx]);
+        ret.emplace_back("=");
         DebugPrinter::addIdentifier(ret, _groupSlots[idx]);
     }
     ret.emplace_back(DebugPrinter::Block("`]"));

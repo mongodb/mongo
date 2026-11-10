@@ -1070,11 +1070,11 @@ std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots> buil
  * This function builds a BlockHashAggStage for 'groupNode'.
  *
  * Returns a tuple containing the updated SBE plan tree, the list of slots corresponding to the
- * group by inputs, and the list of accumulator output slots corresponding to the accumulators from
- * 'groupNode'.
+ * group by inputs, the list of accumulator output slots corresponding to the accumulators from
+ * 'groupNode', and the output selectivity bitmap slot.
  */
 MONGO_COMPILER_NOINLINE
-std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationBlock(
+std::tuple<SbStage, SbSlotVector, SbSlotVector, SbSlot> buildGroupAggregationBlock(
     StageBuilderState& state,
     const PlanStageSlots& childOutputs,
     SbSlotVector individualSlots,
@@ -1125,7 +1125,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationBlock(
         individualSlots.end(), flattenedBlockAccArgSlots.begin(), flattenedBlockAccArgSlots.end());
 
     // Builds a group stage with accumulator expressions and group-by slot(s).
-    auto [hashAggStage, groupByOutSlots, aggSlots] = [&] {
+    auto [hashAggStage, groupByOutSlots, aggSlots, bitmapOutSlot] = [&] {
         SbBlockAggExprVector flattenedSbBlockAggExprs;
         for (auto& vec : sbBlockAggExprs) {
             std::move(vec.begin(), vec.end(), std::back_inserter(flattenedSbBlockAggExprs));
@@ -1150,7 +1150,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationBlock(
                                   std::move(flattenedMergingExprs));
     }();
     stage = std::move(hashAggStage);
-    return {std::move(stage), std::move(groupByOutSlots), std::move(aggSlots)};
+    return {std::move(stage), std::move(groupByOutSlots), std::move(aggSlots), bitmapOutSlot};
 }  // buildGroupAggregationBlock
 
 /**
@@ -1628,7 +1628,7 @@ SlotBasedStageBuilder::buildGroupImplBlock(SbStage stage,  // moved in
     SbSlotVector individualSlots;
 
     // Build the BlockHashAggStage.
-    auto [outStage, groupByOutSlots, aggOutSlots] =
+    auto [outStage, groupByOutSlots, aggOutSlots, bitmapOutSlot] =
         buildGroupAggregationBlock(_state,
                                    childOutputs,
                                    std::move(individualSlots),
@@ -1652,9 +1652,7 @@ SlotBasedStageBuilder::buildGroupImplBlock(SbStage stage,  // moved in
 
     // Outputs produced by the final $group stage that is added below by buildGroupFinalStage().
     PlanStageSlots outputs;
-    // This stage re-maps the selectivity bitset slot.
-    outputs.set(PlanStageSlots::kBlockSelectivityBitmap,
-                childOutputs.get(PlanStageSlots::kBlockSelectivityBitmap));
+    outputs.set(PlanStageSlots::kBlockSelectivityBitmap, bitmapOutSlot);
 
     // The finalize step does not yet support block mode, so for now we unconditionally end the
     // block processing pipeline here.

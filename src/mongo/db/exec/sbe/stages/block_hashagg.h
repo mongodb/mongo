@@ -20,8 +20,13 @@ namespace sbe {
  * Block equivalent of the HashAgg stage. Only supports algebraic accumulators (median for example
  * is not supported).
  *
+ * The group-by keys are visible above the stage through 'groupSlotOutIds', parallel to
+ * 'groupSlotIds', as blocks of the stored group keys. The stage's output bitset, which selects
+ * every output row, is visible through 'blockBitsetOutSlotId'.
+ *
  * Debug string representation:
- * block_group bitset=bitmapSlotId [<groupby slot>]
+ * block_group bitset [bitmapOutSlotId = bitmapInSlotId] [<groupby slot>]
+ *     [groupbyOut_1 = groupby_1, ..., groupbyOut_k = groupby_k]
  *     [slot_1 = block_expr_1, ..., slot_n = block_expr_n]
  *     [slot_1 = row_expr_1, ..., slot_n = row_expr_n] [_rowAccSlotId]
  *     childStage
@@ -32,7 +37,9 @@ class BlockHashAggStage final : public HashAggBaseStage<BlockHashAggStage> {
 public:
     BlockHashAggStage(std::unique_ptr<PlanStage> input,
                       value::SlotVector groupSlotIds,
+                      value::SlotVector groupSlotOutIds,
                       value::SlotId blockBitsetInSlotId,
+                      value::SlotId blockBitsetOutSlotId,
                       value::SlotVector blockDataInSlotIds,
                       value::SlotVector accumulatorDataSlotIds,
                       value::SlotId accumulatorBitsetSlotId,
@@ -184,15 +191,16 @@ private:
 
     value::ValueBlock* makeMonoBlock(value::TypeTags tag, value::Value val);
 
-    // Groupby key slots.
+    // Groupby key slots, and the slots that expose the keys above this stage.
     const value::SlotVector _groupSlots;
+    const value::SlotVector _groupOutSlots;
     std::vector<value::SlotAccessor*> _idInAccessors;
 
-    // Input/output slot for bitset corresponding to data input.
-    // On input, this indicates which rows are to be included in the group by.
-    // On output, this slot contains a bitset of all 1s, for use by additional block
-    // operations.
+    // Input and output slots for the bitset.
+    // The input bitset indicates which rows are to be included in the group by.
+    // The output bitset is all 1s, for use by additional block operations.
     const value::SlotId _blockBitsetInSlotId;
+    const value::SlotId _blockBitsetOutSlotId;
     value::SlotAccessor* _blockBitsetInAccessor = nullptr;
     value::OwnedValueAccessor _blockBitsetOutAccessor;
 

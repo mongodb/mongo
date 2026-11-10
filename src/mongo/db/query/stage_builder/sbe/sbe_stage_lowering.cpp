@@ -370,7 +370,9 @@ struct Lowerer {
 
         return sbe::makeS<sbe::BlockHashAggStage>(std::move(child),
                                                   std::move(node.info->groupBySlots),
+                                                  std::move(node.info->groupByOutSlots),
                                                   node.info->selectivityBitmapSlot,
+                                                  node.info->selectivityBitmapOutSlot,
                                                   std::move(node.info->blockAccArgSlots),
                                                   std::move(node.info->accumulatorDataSlots),
                                                   node.info->bitmapInternalSlot,

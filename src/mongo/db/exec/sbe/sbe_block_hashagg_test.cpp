@@ -11,6 +11,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/util/tick_source_mock.h"
 
 #include <algorithm>
@@ -185,11 +186,12 @@ public:
 
         auto makeFn = [=, this](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
             value::SlotVector idSlots;
-            value::SlotVector outputSlots;
+            value::SlotVector idOutSlots;
             for (size_t i = 0; i < keySize; ++i) {
                 idSlots.push_back(scanSlots[i]);
-                outputSlots.push_back(idSlots[i]);
+                idOutSlots.push_back(generateSlotId());
             }
+            value::SlotVector outputSlots = idOutSlots;
 
             auto bitsetInSlot = scanSlots[keySize];
 
@@ -236,7 +238,9 @@ public:
 
             auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),
                                                      idSlots,
+                                                     idOutSlots,
                                                      bitsetInSlot,
+                                                     generateSlotId(),
                                                      dataInSlots,
                                                      accDataSlots,
                                                      accumulatorBitset,
@@ -474,7 +478,8 @@ public:
         auto makeStageFn = [this](value::SlotVector scanSlots,
                                   std::unique_ptr<PlanStage> scanStage) {
             value::SlotVector idSlots{scanSlots[0]};
-            value::SlotVector outputSlots{scanSlots[0]};
+            value::SlotVector idOutSlots{generateSlotId()};
+            value::SlotVector outputSlots = idOutSlots;
             auto bitsetInSlot = scanSlots[1];
 
             auto accumulatorBitset = generateSlotId();
@@ -500,7 +505,9 @@ public:
 
             auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),
                                                      idSlots,
+                                                     idOutSlots,
                                                      bitsetInSlot,
+                                                     generateSlotId(),
                                                      dataInSlots,
                                                      accDataSlots,
                                                      accumulatorBitset,
@@ -1317,5 +1324,23 @@ TEST_F(BlockHashAggDelinquencyTest, EndOfInputTeardownIsExcludedFromInterruptDel
     // The first call emits the only group and clears the exhausted hash table.
     assertTeardownExcluded([&] { ASSERT_EQ(stage->getNext(), PlanState::ADVANCED); });
     stage->close();
+}
+
+TEST_F(BlockHashAggStageTest, GroupByOutputSlotsMustMatchGroupBySlots) {
+    auto [scanSlots, scanStage] = generateVirtualScanMulti(2, BSONArray{});
+    ASSERT_TASSERT_CODE(makeS<BlockHashAggStage>(std::move(scanStage),
+                                                 makeSV(scanSlots[0]),
+                                                 makeSV(),
+                                                 scanSlots[1],
+                                                 generateSlotId(),
+                                                 makeSV(),
+                                                 makeSV(),
+                                                 generateSlotId(),
+                                                 BlockAggExprTupleVector{},
+                                                 /*allowDiskUse=*/false,
+                                                 SlotExprPairVector{},
+                                                 /*yieldPolicy=*/nullptr,
+                                                 kEmptyPlanNodeId),
+                        13904300);
 }
 }  // namespace mongo::sbe

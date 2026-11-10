@@ -1,13 +1,13 @@
 # Golden test output of SbeTimeseriesTest/TestGroupAvg
-$$RESULT=s25 env: { s9 = Nothing (nothing), s24 = {} (emptyObj) }
-[4] project [s25 = makeBsonObj(MakeObjSpec([average = Add(0)], Closed, NewObj, 0), s24, s23)] 
-[3] project [s23 = 
-    if (s22 == 0ll) 
+$$RESULT=s27 env: { s9 = Nothing (nothing), s26 = {} (emptyObj) }
+[4] project [s27 = makeBsonObj(MakeObjSpec([average = Add(0)], Closed, NewObj, 0), s26, s25)] 
+[3] project [s25 = 
+    if (s24 == 0ll) 
     then null 
-    else (doubleDoubleSumFinalize(s21) / s22) 
+    else (doubleDoubleSumFinalize(s23) / s24) 
 ] 
-[3] block_to_row blocks[s15, s18, s19] row[s20, s21, s22] s8 
-[3] block_group bitset = s8 [s15] [s18 = valueBlockAggDoubleDoubleSum(s12, s10), s19 = valueBlockAggSum(s12, s11)] [s18 = aggDoubleDoubleSum(s10), s19 = sum(s11)] [s16, s17] [s10, s11] spillSlots[s13, s14] mergingExprs[aggMergeDoubleDoubleSums(s13), sum(s14)] 
+[3] block_to_row blocks[s20, s18, s19] row[s22, s23, s24] s21 
+[3] block_group bitset [s21 = s8] [s15] [s20 = s15] [s18 = valueBlockAggDoubleDoubleSum(s12, s10), s19 = valueBlockAggSum(s12, s11)] [s18 = aggDoubleDoubleSum(s10), s19 = sum(s11)] [s16, s17] [s10, s11] spillSlots[s13, s14] mergingExprs[aggMergeDoubleDoubleSums(s13), sum(s14)] 
 [3] project [s15 = null, s16 = cellFoldValues_P(cellBlockGetFlatValuesBlock(s5), s5), s17 = 
     let [
         l8.0 = valueBlockLogicalOr(valueBlockIsNullish(cellFoldValues_P(cellBlockGetFlatValuesBlock(s5), s5)), valueBlockLogicalNot(valueBlockTypeMatch(cellFoldValues_P(cellBlockGetFlatValuesBlock(s5), s5), 851970))) 

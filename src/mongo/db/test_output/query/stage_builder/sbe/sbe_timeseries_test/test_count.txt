@@ -1,9 +1,9 @@
 # Golden test output of SbeTimeseriesTest/TestCount
-$$RESULT=s17 env: { s9 = Nothing (nothing) }
-[4] project [s17 = newBsonObj("count", s16)] 
-[3] project [s16 = (convert ( s15, int32) ?: s15)] 
-[3] block_to_row blocks[s12, s13] row[s14, s15] s8 
-[3] block_group bitset = s8 [s12] [s13 = valueBlockAggCount(s10)] [s13 = count()] [] [] spillSlots[s11] mergingExprs[sum(s11)] 
+$$RESULT=s19 env: { s9 = Nothing (nothing) }
+[4] project [s19 = newBsonObj("count", s18)] 
+[3] project [s18 = (convert ( s17, int32) ?: s17)] 
+[3] block_to_row blocks[s14, s13] row[s16, s17] s15 
+[3] block_group bitset [s15 = s8] [s12] [s14 = s12] [s13 = valueBlockAggCount(s10)] [s13 = count()] [] [] spillSlots[s11] mergingExprs[sum(s11)] 
 [3] project [s12 = null] 
 [2] filter {!(valueBlockNone(s8, true))} 
 [2] project [s8 = valueBlockLogicalAnd(s3, cellFoldValues_F(valueBlockFillEmpty(valueBlockGtScalar(cellBlockGetFlatValuesBlock(s7), Date(1737650858692)), false), s7))] 

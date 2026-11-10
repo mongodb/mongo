@@ -371,7 +371,9 @@ void checkHashAgg(SlotMembershipChecker& c) {
 
 void checkBlockHashAgg(SlotMembershipChecker& c) {
     auto groupBy = c.slot();
+    auto groupByOut = c.slot();
     auto selectivityBitmap = c.slot();
+    auto selectivityBitmapOut = c.slot();
     auto blockAccArg = c.slot();
     auto bitmapInternal = c.slot();
     auto accumulatorData = c.slot();
@@ -381,14 +383,21 @@ void checkBlockHashAgg(SlotMembershipChecker& c) {
     auto mergingOut = c.sbSlot();
     auto info = std::make_unique<SbBlueprintBlockHashAggInfo>();
     info->groupBySlots = {groupBy};
+    info->groupByOutSlots = {groupByOut};
     info->selectivityBitmapSlot = selectivityBitmap;
+    info->selectivityBitmapOutSlot = selectivityBitmapOut;
     info->blockAccArgSlots = {blockAccArg};
     info->bitmapInternalSlot = bitmapInternal;
     info->accumulatorDataSlots = {accumulatorData};
     info->aggs.emplace_back(aggOut, std::move(blockAgg));
     info->mergingExprs.emplace_back(std::move(merging), mergingOut);
     c.check(SbBlueprintBlockHashAgg{.info = std::move(info)},
-            {aggOut, mergingOut.getId(), bitmapInternal, accumulatorData},
+            {groupByOut,
+             selectivityBitmapOut,
+             aggOut,
+             mergingOut.getId(),
+             bitmapInternal,
+             accumulatorData},
             concat({groupBy, selectivityBitmap, blockAccArg, mergingSlot}, blockAggSlots));
 }
 
