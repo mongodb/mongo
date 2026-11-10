@@ -63,11 +63,13 @@ try {
 }
 
 const redText = (msg) => `\x1b[31m${msg}\x1b[0m`;
-const stdout = (msg) => jsTest.log.info(msg);
+// Golden suites write everything printed to the golden file, which must not include the report.
+const notGolden = (fn) => (globalThis.withoutGoldenCapture ?? ((fn) => fn()))(fn);
+const stdout = (msg) => notGolden(() => jsTest.log.info(msg));
 // 'attr' carries the structured data that shell Errors optionally attach as 'error.extraAttr' (see
 // _getErrorWithCode in src/mongo/shell/utils.js). Forward it to jsTest.log.error so it is preserved
 // as structured log data rather than dropped.
-const stderr = (msg, attr) => jsTest.log.error(redText(msg), attr);
+const stderr = (msg, attr) => notGolden(() => jsTest.log.error(redText(msg), attr));
 
 /**
  * Reporter class for logging test results.
