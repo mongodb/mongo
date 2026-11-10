@@ -81,6 +81,29 @@ TEST_F(ComputeOplogTruncationBoundTest, ReturnsPinnedOplogTimestamp) {
     ASSERT_EQ(oplog_truncation::computeTruncationBound(operationContext()), pinnedOplogTs);
 }
 
+TEST_F(ComputeOplogTruncationBoundTest, ReturnsMinIfPinnedOplogTimestampIsMin) {
+    setPinnedOplogTimestamp(operationContext(), Timestamp::min());
+    ASSERT_EQ(oplog_truncation::computeTruncationBound(operationContext()), Timestamp::min());
+}
+
+TEST_F(ComputeOplogTruncationBoundTest, ReturnsMaxIfPinnedOplogTimestampIsMax) {
+    setPinnedOplogTimestamp(operationContext(), Timestamp::max());
+    ASSERT_EQ(oplog_truncation::computeTruncationBound(operationContext()), Timestamp::max());
+}
+
+TEST_F(ComputeOplogTruncationBoundWithReplicatedFastCountTest,
+       ReturnsMinIfPinnedOplogTimestampIsMinPersistedValidAsOfNotSet) {
+    setPinnedOplogTimestamp(operationContext(), Timestamp::min());
+    ASSERT_EQ(oplog_truncation::computeTruncationBound(operationContext()), Timestamp::min());
+}
+
+TEST_F(ComputeOplogTruncationBoundWithReplicatedFastCountTest,
+       ReturnsMinIfPinnedOplogTimestampIsMinPersistedValidAsOfSet) {
+    setPinnedOplogTimestamp(operationContext(), Timestamp::min());
+    setPersistedTimestamp(Timestamp{3, 0});
+    ASSERT_EQ(oplog_truncation::computeTruncationBound(operationContext()), Timestamp::min());
+}
+
 TEST_F(ComputeOplogTruncationBoundWithReplicatedFastCountTest,
        ReturnsMinTimestampIfPersistedValidAsOfNotSet) {
     const Timestamp pinnedOplogTs{1, 5};

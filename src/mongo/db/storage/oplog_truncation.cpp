@@ -70,9 +70,9 @@ bool checkOplogTruncationBounds(OperationContext* opCtx,
                       "numBytes"_attr = marker.bytes);
     }
 
-    // It is necessary that there exists a record after the truncate marker but before
-    // or including the mayTruncateUpTo point.  Since the mayTruncateUpTo point may fall
-    // between records, the truncate marker check is not sufficient.
+    // mayTruncateUpTo is an exclusive upper bound on truncation, and we must leave at least one
+    // record in the oplog with recordId <= mayTruncateUpTo. Since mayTruncateUpTo may fall between
+    // records, it's not sufficient to check the last record of the truncate marker.
     auto nextRecordAfterTruncateMarker =
         seekableCursor->seek(marker.lastRecord, SeekableRecordCursor::BoundInclusion::kExclude);
     if (!nextRecordAfterTruncateMarker) {
@@ -214,9 +214,16 @@ RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayT
 }
 
 Timestamp computeTruncationBound(OperationContext* opCtx) {
+    // getPinnedOplog() returns the earliest recordId that may not be truncated due to the pin.
     const Timestamp ts = opCtx->getServiceContext()->getStorageEngine()->getPinnedOplog();
+    if (ts == Timestamp::min()) {
+        return ts;
+    }
     if (isReplicatedFastCountEnabled(opCtx)) {
         Lock::GlobalLock readLock(opCtx, MODE_IS);
+        // findPersistedTimestampStoreTs() returns the latest persisted timestamp from the timestamp
+        // store. We must retain at least one record at or below this timestamp.
+        // When no persistent timestamp is found, don't allow truncation.
         auto persistedTs = writeConflictRetry(
             opCtx, "computeTruncationBound", NamespaceString::kRsOplogNamespace, [&] {
                 return replicated_fast_count::ReplicatedFastCountManager::get(

@@ -65,7 +65,8 @@ using TruncateFn [[MONGO_MOD_PUBLIC]] =
  * Attempts to truncate oplog entries before the pinned oplog timestamp. Truncation will occur
  * if the oplog is at capacity and the maximum retention time has elapsed.
  *
- * `mayTruncateUpTo` is the highest allowable record that will be truncated, inclusive.
+ * mayTruncateUpTo is an exclusive upper bound on what records may be truncated. At least one record
+ * must remain in the oplog with recordId <= mayTruncateUpTo.
  *
  * Returns the highest RecordId that was truncated, or a null RecordId if nothing was truncated.
  */
