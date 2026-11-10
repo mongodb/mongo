@@ -152,40 +152,42 @@ value::TagValueMaybeOwned ByteCode::builtinAddToArrayCappedImpl(
             "Array accumulator with invalid length",
             accumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
 
-    // Compute the size of the array after adding the new element.
     auto accArraySizeTagVal =
         accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
     tassert(11004214,
             "Expected integer value for array size",
             accArraySizeTagVal.tag == value::TypeTags::NumberInt64);
-    int64_t currentSize = value::bitcastTo<int64_t>(accArraySizeTagVal.value);
-    int newElemSize = value::getApproximateSize(newElem.tag(), newElem.value());
-    int64_t newSize = currentSize + newElemSize;
+    int64_t size = value::bitcastTo<int64_t>(accArraySizeTagVal.value);
 
-    // Check that array with the new element will not exceed the limit.
     auto accArrayTagVal = accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
     tassert(11004215,
             "Expected Array in accumulator state",
             accArrayTagVal.tag == value::TypeTags::Array);
-    auto accArray = value::getArrayView(accArrayTagVal.value);
 
+    addToArrayCapped(*value::getArrayView(accArrayTagVal.value), size, std::move(newElem), sizeCap);
+
+    accumulatorState->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+                            value::TypeTags::NumberInt64,
+                            value::bitcastFrom<int64_t>(size));
+
+    return accumulatorStateTagVal;
+}
+
+void ByteCode::addToArrayCapped(value::Array& values,
+                                int64_t& valuesSize,
+                                value::TagValueMaybeOwned newElem,
+                                int32_t sizeCap) {
+    int newElemSize = value::getApproximateSize(newElem.tag(), newElem.value());
+    int64_t newSize = valuesSize + newElemSize;
     uassert(ErrorCodes::ExceededMemoryLimit,
             str::stream() << "Used too much memory for a single array. Memory limit: " << sizeCap
-                          << " bytes. The array contains " << accArray->size()
-                          << " elements and is of size " << currentSize
+                          << " bytes. The array contains " << values.size()
+                          << " elements and is of size " << valuesSize
                           << " bytes. The element being added has size " << newElemSize
                           << " bytes.",
             newSize < sizeCap);
-
-    // Update the array's size as stored by the accumulator.
-    accumulatorState->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
-                            value::TypeTags::NumberInt64,
-                            value::bitcastFrom<int64_t>(newSize));
-
-    // Add an owned copy of the element to the array.
-    accArray->push_back_raw(newElem.releaseToOwnedRaw());
-
-    return accumulatorStateTagVal;
+    valuesSize = newSize;
+    values.push_back(newElem.moveToOwned());
 }
 
 // The value being accumulated is an SBE array that contains an integer and the accumulated array,

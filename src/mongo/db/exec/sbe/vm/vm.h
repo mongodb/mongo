@@ -238,6 +238,11 @@ public:
     static value::TagValueMaybeOwned builtinAddToArrayCappedImpl(
         value::TagValueOwned accumulatorState, value::TagValueMaybeOwned newElem, int32_t sizeCap);
 
+    static void addToArrayCapped(value::Array& values,
+                                 int64_t& valuesSize,
+                                 value::TagValueMaybeOwned newElem,
+                                 int32_t sizeCap);
+
     static value::TagValueMaybeOwned addToSetCappedImpl(value::TagValueOwned accumulatorState,
                                                         value::TagValueMaybeOwned newElem,
                                                         int32_t sizeCap,
