@@ -125,8 +125,6 @@ describe("Index build attempt counts across rollback", function () {
 
     // Rolls back a commit or abort on 'rollbackNode'. The build restarts, but the index build's
     // attempt counts have already been deleted, so we reset and count from 0.
-    // TODO SERVER-138116: Keep the attempt count when rollback undoes a commit or abort, and expect
-    // 1 here.
     const rollBackAndAssertCountResets = (rollbackNode, collName, buildUUID) => {
         rollBack();
         rollbackNode.setSecondaryOk();
