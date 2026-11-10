@@ -171,7 +171,6 @@ int ZLIB_INTERNAL zmemcmp(const void FAR *s1, const void FAR *s2, z_size_t n) {
 
 void ZLIB_INTERNAL zmemzero(void FAR *b, z_size_t len) {
     uchf *p = b;
-    if (len == 0) return;
     while (len) {
         *p++ = 0;
         len--;
@@ -228,7 +227,11 @@ voidpf ZLIB_INTERNAL zcalloc(voidpf opaque, unsigned items, unsigned size) {
     } else {
         buf = farmalloc(bsize + 16L);
     }
-    if (buf == NULL || next_ptr >= MAX_PTR) return NULL;
+    if (buf == NULL) return NULL;
+    if (next_ptr >= MAX_PTR) {
+        farfree(buf);
+        return NULL;
+    }
     table[next_ptr].org_ptr = buf;
 
     /* Normalize the pointer to seg:0 */

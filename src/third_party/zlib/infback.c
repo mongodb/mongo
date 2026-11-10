@@ -423,8 +423,6 @@ int ZEXPORT inflateBack(z_streamp strm, in_func in, void FAR *in_desc,
             /* use inflate_fast() if we have enough input and output */
             if (have >= 6 && left >= 258) {
                 RESTORE();
-                if (state->whave < state->wsize)
-                    state->whave = state->wsize - left;
                 inflate_fast(strm, state->wsize);
                 LOAD();
                 break;

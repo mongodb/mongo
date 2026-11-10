@@ -255,7 +255,7 @@ local_path_override(
     path = "src/third_party/re2/dist",
 )
 
-bazel_dep(name = "zlib", version = "1.3.1")
+bazel_dep(name = "zlib", version = "1.4")
 local_path_override(
     module_name = "zlib",
     path = "src/third_party/zlib",
