@@ -155,43 +155,6 @@ protected:
     }
 };
 
-struct CompactPushState {
-    value::Array values;
-    int64_t valuesSize = 0;
-};
-
-class CompactPushHashAggAccumulator final
-    : public TypedCompactHashAggAccumulator<CompactPushState> {
-public:
-    CompactPushHashAggAccumulator(value::SlotId outSlot,
-                                  std::unique_ptr<EExpression> inputExpr,
-                                  int32_t sizeCap)
-        : TypedCompactHashAggAccumulator(outSlot, std::move(inputExpr)), _sizeCap(sizeCap) {}
-
-    std::unique_ptr<CompactHashAggAccumulator> clone() const final {
-        return std::make_unique<CompactPushHashAggAccumulator>(
-            _outSlot, _inputExpr->clone(), _sizeCap);
-    }
-
-    size_t estimateSize() const final {
-        return estimateSizeWithInput(sizeof(*this));
-    }
-
-protected:
-    void accumulateValue(value::TagValueMaybeOwned input, CompactPushState& state) const final;
-
-    value::TagValueMaybeOwned finalizeState(CompactPushState& state) const final;
-
-    size_t stateHeapMemUsage(const CompactPushState& state) const final;
-
-    std::string getDebugName() const final {
-        return "_compactPush";
-    }
-
-private:
-    int32_t _sizeCap;
-};
-
 namespace size_estimator {
 inline size_t estimate(const std::unique_ptr<CompactHashAggAccumulator>& accumulator) {
     return accumulator->estimateSize();
