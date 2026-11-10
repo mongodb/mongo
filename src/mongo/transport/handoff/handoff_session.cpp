@@ -767,9 +767,11 @@ StatusWith<Message> HandoffSession::sourceMessage() {
 
     // Validate message length and read the body.
     MSGHEADER::ConstView headerView(headerBuf);
-    int32_t msgLen = headerView.getMessageLength();
-    if (msgLen < static_cast<int32_t>(kHeaderSize) ||
-        msgLen > static_cast<int32_t>(MaxMessageSizeBytes)) {
+    const int32_t msgLen = headerView.getMessageLength();
+    const int32_t maxMessageSize = isPreauthIngress()
+        ? gPreAuthMaximumMessageSizeBytes.loadRelaxed()
+        : static_cast<int32_t>(MaxMessageSizeBytes);
+    if (msgLen < static_cast<int32_t>(kHeaderSize) || msgLen > maxMessageSize) {
         return Status(ErrorCodes::ProtocolError, fmt::format("Invalid message length: {}", msgLen));
     }
 

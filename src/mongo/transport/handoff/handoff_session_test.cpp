@@ -13,6 +13,7 @@
 #include "mongo/transport/handoff/session_handoff_message_gen.h"
 #include "mongo/transport/session_manager_common_mock.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -596,8 +597,33 @@ TEST_F(HandoffSessionPreHandoffMessageTest, SourceMessageRejectsTooSmallLength) 
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::ProtocolError);
 }
 
-/** sourceMessage() rejects a header whose length exceeds MaxMessageSizeBytes. */
-TEST_F(HandoffSessionPreHandoffMessageTest, SourceMessageRejectsTooLargeLength) {
+/**
+ * A pre-auth handoff session must reject a message whose declared length exceeds the pre-auth
+ * limit (gPreAuthMaximumMessageSizeBytes), even though that length is still below the post-auth
+ * MaxMessageSizeBytes.
+ */
+TEST_F(HandoffSessionPreHandoffMessageTest, PreAuthSourceMessageRejectsMessageAbovePreAuthLimit) {
+    auto session = makeSession();
+    session->setPreauthIngress(true);
+
+    MSGHEADER::Value header;
+    MsgData::View view(reinterpret_cast<char*>(&header));
+    view.setLen(gPreAuthMaximumMessageSizeBytes.loadRelaxed() + 1);
+    view.setId(nextMessageId());
+    view.setResponseToMsgId(0);
+    view.setOperation(dbMsg);
+
+    writeAll(proxyFd(), reinterpret_cast<const char*>(&header), sizeof(header));
+
+    auto result = session->sourceMessage();
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ProtocolError);
+}
+
+/**
+ * A post-auth handoff session must reject a message whose declared length exceeds
+ * MaxMessageSizeBytes.
+ */
+TEST_F(HandoffSessionPreHandoffMessageTest, PostAuthSourceMessageRejectsMessageAbovePostAuthLimit) {
     auto session = makeSession();
 
     MSGHEADER::Value header;
@@ -611,6 +637,25 @@ TEST_F(HandoffSessionPreHandoffMessageTest, SourceMessageRejectsTooLargeLength) 
 
     auto result = session->sourceMessage();
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::ProtocolError);
+}
+
+/**
+ * A post-auth handoff session must accept a message whose declared length exceeds the pre-auth
+ * limit (gPreAuthMaximumMessageSizeBytes) but is still below MaxMessageSizeBytes.
+ */
+TEST_F(HandoffSessionPreHandoffMessageTest, PostAuthSourceMessageAcceptsMessageAbovePreAuthLimit) {
+    auto session = makeSession();
+
+    const int32_t preAuthLimit = gPreAuthMaximumMessageSizeBytes.loadRelaxed();
+    Message msg = makeMessage(dbMsg, BSON("payload" << std::string(preAuthLimit + 1024, 'x')));
+    ASSERT_GT(msg.size(), preAuthLimit);
+    ASSERT_LT(msg.size(), static_cast<int>(MaxMessageSizeBytes));
+    writeAll(proxyFd(), msg.buf(), msg.size());
+
+    auto result = session->sourceMessage();
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue().size(), msg.size());
+    ASSERT_EQ(memcmp(result.getValue().buf(), msg.buf(), msg.size()), 0);
 }
 
 /**
