@@ -11,6 +11,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
@@ -37,6 +38,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/validate/validate_options.h"
+#include "mongo/db/validate/validate_results.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/join_thread.h"
@@ -83,11 +86,15 @@ class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper(ServiceContext* svcCtx,
                               bool forRepair = false,
-                              bool preciseCheckpoints = false)
+                              bool preciseCheckpoints = false,
+                              bool isReplSet = true,
+                              bool shouldRecoverFromOplogAsStandalone = false)
         : _svcCtx(svcCtx),
           _dbpath("wt-kv-harness"),
           _forRepair(forRepair),
-          _preciseCheckpoints(preciseCheckpoints) {
+          _preciseCheckpoints(preciseCheckpoints),
+          _isReplSet(isReplSet),
+          _shouldRecoverFromOplogAsStandalone(shouldRecoverFromOplogAsStandalone) {
         _svcCtx->setStorageEngine(makeEngine());
         getWiredTigerKVEngine()->notifyStorageStartupRecoveryComplete();
     }
@@ -129,8 +136,6 @@ private:
         }
         // Faithfully simulate being in replica set mode for timestamping tests which requires
         // parity for journaling settings.
-        auto isReplSet = true;
-        auto shouldRecoverFromOplogAsStandalone = false;
         auto replSetMemberInStandaloneMode = false;
         auto kv = std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
                                                        _dbpath.path(),
@@ -139,8 +144,8 @@ private:
                                                        WiredTigerExtensions::get(_svcCtx),
                                                        provider,
                                                        _forRepair,
-                                                       isReplSet,
-                                                       shouldRecoverFromOplogAsStandalone,
+                                                       _isReplSet,
+                                                       _shouldRecoverFromOplogAsStandalone,
                                                        replSetMemberInStandaloneMode);
 
         auto client = _svcCtx->getService()->makeClient("opCtx");
@@ -155,17 +160,28 @@ private:
     unittest::TempDir _dbpath;
     bool _forRepair;
     bool _preciseCheckpoints;
+    bool _isReplSet;
+    bool _shouldRecoverFromOplogAsStandalone;
 };
 
 class WiredTigerKVEngineTest : public ServiceContextTest {
 public:
-    WiredTigerKVEngineTest(bool repair = false, bool preciseCheckpoints = false)
-        : _repair(repair), _preciseCheckpoints(preciseCheckpoints) {}
+    WiredTigerKVEngineTest(bool repair = false,
+                           bool preciseCheckpoints = false,
+                           bool isReplSet = true,
+                           bool shouldRecoverFromOplogAsStandalone = false)
+        : _repair(repair),
+          _preciseCheckpoints(preciseCheckpoints),
+          _isReplSet(isReplSet),
+          _shouldRecoverFromOplogAsStandalone(shouldRecoverFromOplogAsStandalone) {}
 
     void setUp() override {
         ServiceContextTest::setUp();
-        _helper = std::make_unique<WiredTigerKVHarnessHelper>(
-            getServiceContext(), _repair, _preciseCheckpoints);
+        _helper = std::make_unique<WiredTigerKVHarnessHelper>(getServiceContext(),
+                                                              _repair,
+                                                              _preciseCheckpoints,
+                                                              _isReplSet,
+                                                              _shouldRecoverFromOplogAsStandalone);
     }
 
     void tearDown() override {
@@ -198,6 +214,8 @@ protected:
 
     bool _repair;
     bool _preciseCheckpoints;
+    bool _isReplSet;
+    bool _shouldRecoverFromOplogAsStandalone;
     std::unique_ptr<WiredTigerKVHarnessHelper> _helper;
 };
 
@@ -205,6 +223,87 @@ class WiredTigerKVEngineRepairTest : public WiredTigerKVEngineTest {
 public:
     WiredTigerKVEngineRepairTest() : WiredTigerKVEngineTest(/*repair=*/true) {}
 };
+
+/**
+ * Runs the engine in the mode file-copy based initial sync uses for its final startup oplog
+ * recovery: standalone with recoverFromOplogAsStandalone=true.
+ */
+class WiredTigerKVEngineRecoverFromOplogAsStandaloneTest : public WiredTigerKVEngineTest {
+public:
+    WiredTigerKVEngineRecoverFromOplogAsStandaloneTest()
+        : WiredTigerKVEngineTest(/*repair=*/false,
+                                 /*preciseCheckpoints=*/false,
+                                 /*isReplSet=*/false,
+                                 /*shouldRecoverFromOplogAsStandalone=*/true) {}
+};
+
+TEST_F(WiredTigerKVEngineTest, RecordIdsGroupIdTableIsNotLoggedOnReplSet) {
+    auto opCtxPtr = _makeOperationContext();
+    const auto nss = NamespaceString::kDefaultRecordIdsGroupIdNamespace;
+    std::string ident = "collection-1234";
+    RecordStore::Options options;
+    auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+    {
+        WriteUnitOfWork wuow(opCtxPtr.get());
+        ASSERT_OK(
+            _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+        wuow.commit();
+    }
+
+    // In steady-state replica set operation the membership marker table must be created with
+    // logging disabled, so that rollback-to-stable reverts it together with the data.
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    // The log setting lives on the file's config, which getSourceMetadata returns (the same
+    // read validateTableLogging performs). getMetadata would return only the table: config.
+    const auto metadata = WiredTigerUtil::getSourceMetadata(
+        *wtRu.getSessionNoTxn(), std::string(WiredTigerUtil::kTableUriPrefix) + ident);
+    ASSERT_OK(metadata);
+    const auto logged = WiredTigerConfigParser(metadata.getValue()).isTableLoggingEnabled();
+    ASSERT_TRUE(logged.has_value());
+    EXPECT_FALSE(*logged);
+}
+
+TEST_F(WiredTigerKVEngineRecoverFromOplogAsStandaloneTest,
+       RecordIdsGroupIdTableIsNotLoggedAndPassesValidation) {
+    auto opCtxPtr = _makeOperationContext();
+    const auto nss = NamespaceString::kDefaultRecordIdsGroupIdNamespace;
+    std::string ident = "collection-1234";
+    RecordStore::Options options;
+    auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+    {
+        WriteUnitOfWork wuow(opCtxPtr.get());
+        ASSERT_OK(
+            _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+        wuow.commit();
+    }
+    auto rs = _helper->getWiredTigerKVEngine()->getRecordStore(
+        opCtxPtr.get(), nss, ident, options, UUID::gen());
+    ASSERT(rs);
+
+    // The membership marker must stay revertible by rollback-to-stable together with the data
+    // files it was copied with, so its table must have been created with logging disabled even in
+    // this recovery mode.
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    // The log setting lives on the file's config, which getSourceMetadata returns (the same
+    // read validateTableLogging performs). getMetadata would return only the table: config.
+    const auto metadata = WiredTigerUtil::getSourceMetadata(
+        *wtRu.getSessionNoTxn(), std::string(WiredTigerUtil::kTableUriPrefix) + ident);
+    ASSERT_OK(metadata);
+    const auto logged = WiredTigerConfigParser(metadata.getValue()).isTableLoggingEnabled();
+    ASSERT_TRUE(logged.has_value());
+    EXPECT_FALSE(*logged);
+
+    // And validation must accept that on-disk log setting.
+    ValidateResults results;
+    rs->validate(ru,
+                 {collection_validation::ValidateMode::kForeground,
+                  collection_validation::RepairMode::kNone,
+                  /*logDiagnostics=*/false},
+                 &results);
+    EXPECT_TRUE(results.isValid());
+}
 
 TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     auto opCtxPtr = _makeOperationContext();

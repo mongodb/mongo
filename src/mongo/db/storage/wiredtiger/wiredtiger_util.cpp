@@ -1043,6 +1043,15 @@ bool WiredTigerUtil::useTableLogging(const rss::PersistenceProvider& provider,
         return false;
     }
 
+    if (nss == NamespaceString::kDefaultRecordIdsGroupIdNamespace) {
+        // The Replicated RecordIds group membership marker is per-node state derived from the
+        // replicated oplog stream. It must be reverted by rollback-to-stable together with the
+        // data, so it is not logged. Note this also holds when recovering from the oplog as
+        // standalone (e.g. at the end of file-copy based initial sync), where
+        // 'journalWritesBecauseStandalone' above is false.
+        return false;
+    }
+
     // The remainder of local gets logged. In particular, the oplog and user created
     // collections.
     return true;

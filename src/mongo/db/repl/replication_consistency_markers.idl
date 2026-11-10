@@ -57,3 +57,16 @@ structs:
                 type: date
                 optional: true
                 description: "The walltime at which the initial sync document was written."
+
+    RecordIdsGroupIdDocument:
+        description: A document in which the server stores its membership in a Replicated RecordIds group. Presence of this document means the node shares the replica set's recordId space and honors recordIds carried in the oplog.
+        fields:
+            _id:
+                type: string
+                description: "Always set to 'recordIdsGroupId' to easily retrieve it."
+            groupId:
+                type: uuid
+                description: "The identifier of the Replicated RecordIds group this node is a member of."
+            foundingOpTime:
+                type: optime
+                description: "The OpTime of the fencing entry that minted the groupId."

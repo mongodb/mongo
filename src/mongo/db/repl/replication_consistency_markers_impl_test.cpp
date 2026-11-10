@@ -18,10 +18,13 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/journal_listener.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/uuid.h"
 
 #include <memory>
 #include <utility>
@@ -38,6 +41,7 @@ NamespaceString kMinValidNss = NamespaceString::kDefaultMinValidNamespace;
 NamespaceString kOplogTruncateAfterPointNss =
     NamespaceString::createNamespaceString_forTest("local", "replset.oplogTruncateAfterPoint");
 NamespaceString kInitialSyncIdNss = NamespaceString::kDefaultInitialSyncIdNamespace;
+NamespaceString kRecordIdsGroupIdNss = NamespaceString::kDefaultRecordIdsGroupIdNamespace;
 
 /**
  * Returns min valid document.
@@ -111,9 +115,16 @@ private:
     std::unique_ptr<StorageInterfaceImpl> _storageInterface;
 };
 
+// Death tests must live in their own suite: DEATH_TEST_F wraps the fixture in a different
+// generated class, and Google Test requires all tests in a suite to share one fixture class.
+class ReplicationConsistencyMarkersDeathTest : public ReplicationConsistencyMarkersTest {};
+
 TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
-    ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss, kInitialSyncIdNss);
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -136,8 +147,11 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, GetMarkersAfterSettingInitialSyncFlagWorks) {
-    ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss, kInitialSyncIdNss);
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -154,8 +168,11 @@ TEST_F(ReplicationConsistencyMarkersTest, GetMarkersAfterSettingInitialSyncFlagW
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, ClearInitialSyncFlagResetsOplogTruncateAfterPoint) {
-    ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss, kInitialSyncIdNss);
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -177,8 +194,11 @@ TEST_F(ReplicationConsistencyMarkersTest, ClearInitialSyncFlagResetsOplogTruncat
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
-    ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss, kInitialSyncIdNss);
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
     auto opCtx = getOperationContext();
     ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
@@ -209,8 +229,11 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, InitialSyncId) {
-    ReplicationConsistencyMarkersImpl consistencyMarkers(
-        getStorageInterface(), kMinValidNss, kOplogTruncateAfterPointNss, kInitialSyncIdNss);
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
     auto opCtx = getOperationContext();
 
     // Initially, initialSyncId should be unset.
@@ -244,6 +267,140 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncId) {
     InitialSyncIdDocument secondInitialSyncIdDoc =
         InitialSyncIdDocument::parse(secondInitialSyncIdBson, IDLParserContext("initialSyncId"));
     ASSERT_NE(firstInitialSyncIdDoc.get_id(), secondInitialSyncIdDoc.get_id());
+}
+
+TEST_F(ReplicationConsistencyMarkersTest, RecordIdsGroupIdLifecycle) {
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
+    auto opCtx = getOperationContext();
+
+    // Initially the node holds no groupId: neither the collection nor the document exist.
+    ASSERT_FALSE(consistencyMarkers.getRecordIdsGroupId(opCtx));
+
+    // Clearing an already-clear groupId is a no-op. The WriteUnitOfWork stands in for the
+    // fencing entry's. Callers without a fencing entry open their own around the call.
+    {
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.clearRecordIdsGroupId(opCtx);
+        wuow.commit();
+    }
+    ASSERT_FALSE(consistencyMarkers.getRecordIdsGroupId(opCtx));
+
+    // Creating the collection alone does not make the node a group member.
+    consistencyMarkers.createRecordIdsGroupIdCollection(opCtx);
+    ASSERT_FALSE(consistencyMarkers.getRecordIdsGroupId(opCtx));
+
+    // Creating the collection again is a no-op.
+    consistencyMarkers.createRecordIdsGroupIdCollection(opCtx);
+    ASSERT_FALSE(consistencyMarkers.getRecordIdsGroupId(opCtx));
+
+    // Mint a groupId. The WriteUnitOfWork stands in for the fencing entry's, and the
+    // foundingOpTime for the fencing entry's OpTime.
+    auto groupId = UUID::gen();
+    OpTime foundingOpTime({Seconds(123), 4}, 1LL);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.setRecordIdsGroupId(opCtx, groupId, foundingOpTime);
+        wuow.commit();
+    }
+    auto doc = consistencyMarkers.getRecordIdsGroupId(opCtx);
+    ASSERT_TRUE(doc);
+    ASSERT_EQ(doc->get_id(), kRecordIdsGroupIdDocId);
+    ASSERT_EQ(doc->getGroupId(), groupId);
+    ASSERT_EQ(doc->getFoundingOpTime(), foundingOpTime);
+
+    // Clearing drops the collection: the node is no longer a group member.
+    {
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.clearRecordIdsGroupId(opCtx);
+        wuow.commit();
+    }
+    ASSERT_FALSE(consistencyMarkers.getRecordIdsGroupId(opCtx));
+
+    // A new groupId can be minted after a clear.
+    consistencyMarkers.createRecordIdsGroupIdCollection(opCtx);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.setRecordIdsGroupId(opCtx, groupId, foundingOpTime);
+        wuow.commit();
+    }
+    doc = consistencyMarkers.getRecordIdsGroupId(opCtx);
+    ASSERT_TRUE(doc);
+    ASSERT_EQ(doc->getGroupId(), groupId);
+    ASSERT_EQ(doc->getFoundingOpTime(), foundingOpTime);
+}
+
+DEATH_TEST_F(ReplicationConsistencyMarkersDeathTest,
+             CreateRecordIdsGroupIdCollectionRejectsActiveWriteUnitOfWork,
+             "createRecordIdsGroupIdCollection manages its own WriteUnitOfWork") {
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
+    auto opCtx = getOperationContext();
+
+    // Creation is an untimestamped catalog operation and must run before the fencing entry's
+    // WriteUnitOfWork opens, never inside it.
+    WriteUnitOfWork wuow(opCtx);
+    consistencyMarkers.createRecordIdsGroupIdCollection(opCtx);
+}
+
+DEATH_TEST_F(ReplicationConsistencyMarkersDeathTest,
+             SetRecordIdsGroupIdRequiresWriteUnitOfWork,
+             "setRecordIdsGroupId must be called within") {
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
+    auto opCtx = getOperationContext();
+    consistencyMarkers.createRecordIdsGroupIdCollection(opCtx);
+
+    // Document writes to the recordIdsGroupId collection must always be timestamped, so a write
+    // outside of the fencing entry's WriteUnitOfWork is a programming error.
+    consistencyMarkers.setRecordIdsGroupId(opCtx, UUID::gen(), OpTime({Seconds(123), 4}, 1LL));
+}
+
+DEATH_TEST_F(ReplicationConsistencyMarkersDeathTest,
+             ClearRecordIdsGroupIdRequiresWriteUnitOfWork,
+             "clearRecordIdsGroupId must be called within") {
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
+    auto opCtx = getOperationContext();
+    consistencyMarkers.createRecordIdsGroupIdCollection(opCtx);
+
+    // The clear must commit atomically with the fencing entry, so calling it outside of a
+    // WriteUnitOfWork is a programming error.
+    consistencyMarkers.clearRecordIdsGroupId(opCtx);
+}
+
+DEATH_TEST_F(ReplicationConsistencyMarkersDeathTest,
+             SetRecordIdsGroupIdFailsWhenAlreadySet,
+             "must not overwrite an existing recordIdsGroupId document") {
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
+    auto opCtx = getOperationContext();
+    consistencyMarkers.createRecordIdsGroupIdCollection(opCtx);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.setRecordIdsGroupId(opCtx, UUID::gen(), OpTime({Seconds(123), 4}, 1LL));
+        wuow.commit();
+    }
+
+    // A groupId is only ever written while groupless. Writing over an existing document would
+    // silently overwrite the membership marker, so it fails instead.
+    WriteUnitOfWork wuow(opCtx);
+    consistencyMarkers.setRecordIdsGroupId(opCtx, UUID::gen(), OpTime({Seconds(567), 8}, 1LL));
 }
 
 }  // namespace

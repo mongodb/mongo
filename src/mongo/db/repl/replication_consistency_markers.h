@@ -7,7 +7,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/uuid.h"
+
+#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -22,6 +26,11 @@ namespace repl {
 
 class OpTime;
 class StorageInterface;
+
+/**
+ * The _id value of the singleton document in 'local.replset.recordIdsGroupId'.
+ */
+inline constexpr std::string_view kRecordIdsGroupIdDocId = "recordIdsGroupId";
 
 /**
  * This interface provides helper functions for maintaining the documents used for
@@ -62,6 +71,20 @@ class StorageInterface;
  * {
  *      _id: <UUID>,
  *      wallTime: <Date_t>
+ * }
+ *
+ * The recordIdsGroupId document, in 'local.replset.recordIdsGroupId', is the per-node membership
+ * marker for set-wide Replicated RecordIds. A node honors recordIds carried in the oplog if and
+ * only if this document is present. Membership is only ever acquired by a primary minting the
+ * groupId (fenced by the new-primary noop or the setFCV upgrade-complete write) or by initial
+ * sync inheriting the sync source's marker, and is only ever lost by dropping the collection,
+ * fenced at or before the first op applied not honoring recordIds.
+ *
+ * Example of all fields:
+ * {
+ *      _id: 'recordIdsGroupId',
+ *      groupId: <UUID>,
+ *      foundingOpTime: <OpTime>      // the OpTime of the fencing entry that minted the groupId
  * }
  */
 class [[MONGO_MOD_OPEN]] ReplicationConsistencyMarkers {
@@ -233,6 +256,82 @@ public:
      * Returns the initial sync id object, or an empty object if none.
      */
     virtual BSONObj getInitialSyncId(OperationContext* opCtx) = 0;
+
+    // -------- Replicated RecordIds Group Id ----------
+
+    /**
+     * Creates the 'local.replset.recordIdsGroupId' collection if it does not already exist.
+     *
+     * This is an untimestamped catalog operation that manages its own WriteUnitOfWork, so it must
+     * be called outside of any active WriteUnitOfWork, before opening the fencing entry's
+     * WriteUnitOfWork that setRecordIdsGroupId is called within.
+     *
+     * This fasserts on failure.
+     */
+    virtual void createRecordIdsGroupIdCollection(OperationContext* opCtx) = 0;
+
+    /**
+     * Inserts the recordIdsGroupId document {_id: 'recordIdsGroupId', groupId, foundingOpTime},
+     * where 'foundingOpTime' is the OpTime of the fencing entry that minted the groupId.
+     *
+     * Document writes to this collection must always be timestamped so that rollback-to-stable
+     * reverts them together with the data. To that end, this must be called within an active
+     * WriteUnitOfWork whose commit timestamp is the fencing entry's (the new-primary noop's
+     * WriteUnitOfWork on a minting primary, or the setFCV upgrade-complete WriteUnitOfWork), and
+     * the collection must already exist (see createRecordIdsGroupIdCollection). This shares the
+     * fencing entry's WriteUnitOfWork so that mints are atomic with their fencing entries.
+     * Secondaries never acquire a groupId during oplog application. The announced fields in the
+     * new-primary noop are read-only for them and only feed the membership comparison, and
+     * initial sync adoption writes at completion, outside the application window.
+     *
+     * A groupId is only ever written while groupless: minted by a groupless primary, or adopted at
+     * initial sync completion onto an empty (or cleared) collection. A node that already holds a
+     * groupId re-announces it without rewriting it, so writing over an existing document is a
+     * logic error and invariants rather than silently overwriting the membership marker.
+     *
+     * An insert failure from the storage layer fasserts.
+     */
+    virtual void setRecordIdsGroupId(OperationContext* opCtx,
+                                     const UUID& groupId,
+                                     const OpTime& foundingOpTime) = 0;
+
+    /**
+     * Returns the recordIdsGroupId document, or boost::none if the node holds no groupId (the
+     * collection or the document is absent). This reads from storage, so it is safe to call at
+     * startup before replication starts.
+     *
+     * This reads from storage on every call and must not be used per-op. Hot paths (oplog rid
+     * emission on the primary, rid honoring in the applier) must instead consult the cached
+     * membership view that is loaded at startup and updated transactionally at each mint and
+     * clear.
+     */
+    virtual boost::optional<RecordIdsGroupIdDocument> getRecordIdsGroupId(
+        OperationContext* opCtx) = 0;
+
+    /**
+     * Clears the recordIdsGroupId by dropping the collection. Clears are always collection drops,
+     * never untimestamped document writes: untimestamped writes to this timestamped document would
+     * rewrite its history and break snapshot isolation.
+     *
+     * Must be called within an active WriteUnitOfWork, and for fenced clears (a mismatched
+     * new-primary noop or a setFCV downgrade) that WriteUnitOfWork must commit at the fencing
+     * entry's timestamp. On the primary that means riding the fencing write's own WriteUnitOfWork
+     * (the setFCV downgrade write). On secondaries the applier wraps the entry in a
+     * WriteUnitOfWork committing at the entry's timestamp, so the drop lands at the fencing
+     * timestamp even though the oplog insert itself commits on a separate writer thread. The
+     * timestamp atomicity is load-bearing: the table is not logged, so rollback-to-stable reverts
+     * it to the last stable checkpoint together with the data. If the drop committed in a later
+     * WriteUnitOfWork than the fencing entry, a checkpoint covering the entry but not the drop
+     * followed by a crash would leave the marker present while oplog replay resumes past the
+     * fencing entry, and the node would carry a stale groupId into the new term. Callers without
+     * a fencing entry (the flag-off startup clear and the standalone first-write clear) open their
+     * own WriteUnitOfWork around the call.
+     *
+     * It is idempotent. Storage errors fassert. A WriteConflictException escapes to the caller so
+     * that the whole fencing WriteUnitOfWork retries; this method must not retry internally
+     * because a write conflict requires aborting the fencing entry's other writes as well.
+     */
+    virtual void clearRecordIdsGroupId(OperationContext* opCtx) = 0;
 };
 
 }  // namespace repl

@@ -277,6 +277,9 @@
     /*  Namespace used for local minimum valid namespace. */                                       \
     X(kDefaultMinValidNamespace, DatabaseName::kLocal, "replset.minvalid")                         \
                                                                                                    \
+    /*  Namespace used for the local Replicated RecordIds group membership marker. */              \
+    X(kDefaultRecordIdsGroupIdNamespace, DatabaseName::kLocal, "replset.recordIdsGroupId")         \
+                                                                                                   \
     /*  Namespace used by the test command to pin the oldest timestamp. */                         \
     X(kDurableHistoryTestNamespace, DatabaseName::kMdbTesting, "pinned_timestamp")                 \
                                                                                                    \

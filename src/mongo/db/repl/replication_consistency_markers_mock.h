@@ -64,6 +64,13 @@ public:
     void clearInitialSyncId(OperationContext* opCtx) override;
     BSONObj getInitialSyncId(OperationContext* opCtx) override;
 
+    void createRecordIdsGroupIdCollection(OperationContext* opCtx) override;
+    void setRecordIdsGroupId(OperationContext* opCtx,
+                             const UUID& groupId,
+                             const OpTime& foundingOpTime) override;
+    boost::optional<RecordIdsGroupIdDocument> getRecordIdsGroupId(OperationContext* opCtx) override;
+    void clearRecordIdsGroupId(OperationContext* opCtx) override;
+
 private:
     mutable std::mutex _initialSyncFlagMutex;
     bool _initialSyncFlag = false;
@@ -73,6 +80,9 @@ private:
     OpTime _minValid;
     Timestamp _oplogTruncateAfterPoint;
     BSONObj _initialSyncId;
+
+    mutable std::mutex _recordIdsGroupIdMutex;
+    boost::optional<RecordIdsGroupIdDocument> _recordIdsGroupId;
 };
 
 }  // namespace repl

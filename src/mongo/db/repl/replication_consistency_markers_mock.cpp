@@ -113,5 +113,34 @@ BSONObj ReplicationConsistencyMarkersMock::getInitialSyncId(OperationContext* op
     return _initialSyncId;
 }
 
+void ReplicationConsistencyMarkersMock::createRecordIdsGroupIdCollection(OperationContext* opCtx) {}
+
+void ReplicationConsistencyMarkersMock::setRecordIdsGroupId(OperationContext* opCtx,
+                                                            const UUID& groupId,
+                                                            const OpTime& foundingOpTime) {
+    RecordIdsGroupIdDocument doc;
+    doc.set_id(kRecordIdsGroupIdDocId);
+    doc.setGroupId(groupId);
+    doc.setFoundingOpTime(foundingOpTime);
+
+    std::lock_guard<std::mutex> lock(_recordIdsGroupIdMutex);
+    // A groupId is only ever written while groupless, and writing over an existing one is always
+    // a bug.
+    invariant(!_recordIdsGroupId.has_value(),
+              "setRecordIdsGroupId called while a recordIdsGroupId document is already present");
+    _recordIdsGroupId = doc;
+}
+
+boost::optional<RecordIdsGroupIdDocument> ReplicationConsistencyMarkersMock::getRecordIdsGroupId(
+    OperationContext* opCtx) {
+    std::lock_guard<std::mutex> lock(_recordIdsGroupIdMutex);
+    return _recordIdsGroupId;
+}
+
+void ReplicationConsistencyMarkersMock::clearRecordIdsGroupId(OperationContext* opCtx) {
+    std::lock_guard<std::mutex> lock(_recordIdsGroupIdMutex);
+    _recordIdsGroupId = boost::none;
+}
+
 }  // namespace repl
 }  // namespace mongo

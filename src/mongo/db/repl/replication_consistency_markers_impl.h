@@ -41,7 +41,8 @@ public:
     ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface,
                                       NamespaceString minValidNss,
                                       NamespaceString oplogTruncateAfterNss,
-                                      NamespaceString initialSyncIdNss);
+                                      NamespaceString initialSyncIdNss,
+                                      NamespaceString recordIdsGroupIdNss);
 
     void initializeMinValidDocument(OperationContext* opCtx) override;
 
@@ -72,6 +73,13 @@ public:
     void setInitialSyncIdIfNotSet(OperationContext* opCtx) override;
     void clearInitialSyncId(OperationContext* opCtx) override;
     BSONObj getInitialSyncId(OperationContext* opCtx) override;
+
+    void createRecordIdsGroupIdCollection(OperationContext* opCtx) override;
+    void setRecordIdsGroupId(OperationContext* opCtx,
+                             const UUID& groupId,
+                             const OpTime& foundingOpTime) override;
+    boost::optional<RecordIdsGroupIdDocument> getRecordIdsGroupId(OperationContext* opCtx) override;
+    void clearRecordIdsGroupId(OperationContext* opCtx) override;
 
 private:
     /**
@@ -115,6 +123,7 @@ private:
     const NamespaceString _minValidNss;
     const NamespaceString _oplogTruncateAfterPointNss;
     const NamespaceString _initialSyncIdNss;
+    const NamespaceString _recordIdsGroupIdNss;
 
     // Protects modifying and reading _isPrimary below.
     mutable std::mutex _truncatePointIsPrimaryMutex;

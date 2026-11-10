@@ -11,14 +11,17 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
+#include "mongo/db/shard_role/shard_role.h"  // for acquireCollection() and CollectionAcquisitionRequest
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -57,17 +60,20 @@ ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
     : ReplicationConsistencyMarkersImpl(storageInterface,
                                         NamespaceString::kDefaultMinValidNamespace,
                                         NamespaceString::kDefaultOplogTruncateAfterPointNamespace,
-                                        NamespaceString::kDefaultInitialSyncIdNamespace) {}
+                                        NamespaceString::kDefaultInitialSyncIdNamespace,
+                                        NamespaceString::kDefaultRecordIdsGroupIdNamespace) {}
 
 ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
     StorageInterface* storageInterface,
     NamespaceString minValidNss,
     NamespaceString oplogTruncateAfterPointNss,
-    NamespaceString initialSyncIdNss)
+    NamespaceString initialSyncIdNss,
+    NamespaceString recordIdsGroupIdNss)
     : _storageInterface(storageInterface),
       _minValidNss(minValidNss),
       _oplogTruncateAfterPointNss(oplogTruncateAfterPointNss),
-      _initialSyncIdNss(initialSyncIdNss) {}
+      _initialSyncIdNss(initialSyncIdNss),
+      _recordIdsGroupIdNss(recordIdsGroupIdNss) {}
 
 boost::optional<MinValidDocument> ReplicationConsistencyMarkersImpl::_getMinValidDocument(
     OperationContext* opCtx) const {
@@ -558,6 +564,111 @@ BSONObj ReplicationConsistencyMarkersImpl::getInitialSyncId(OperationContext* op
         uassertStatusOK(idStatus);
     }
     return BSONObj();
+}
+
+void ReplicationConsistencyMarkersImpl::createRecordIdsGroupIdCollection(OperationContext* opCtx) {
+    // Creation is an untimestamped catalog operation that manages its own WriteUnitOfWork, so it
+    // must run before the fencing entry's WriteUnitOfWork opens, never inside it.
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork(),
+              "createRecordIdsGroupIdCollection manages its own WriteUnitOfWork and must be "
+              "called outside of any active WriteUnitOfWork");
+    auto status =
+        _storageInterface->createCollection(opCtx, _recordIdsGroupIdNss, CollectionOptions());
+    if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
+        LOGV2_FATAL(13810501,
+                    "Failed to create collection",
+                    logAttrs(_recordIdsGroupIdNss),
+                    "error"_attr = status);
+    }
+}
+
+void ReplicationConsistencyMarkersImpl::setRecordIdsGroupId(OperationContext* opCtx,
+                                                            const UUID& groupId,
+                                                            const OpTime& foundingOpTime) {
+    // Document writes to this collection must always be timestamped, so this write must ride on
+    // the fencing entry's WriteUnitOfWork and commit at the fencing entry's timestamp.
+    invariant(
+        shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork(),
+        "setRecordIdsGroupId must be called within the fencing entry's WriteUnitOfWork so that "
+        "the write is timestamped");
+
+    RecordIdsGroupIdDocument doc;
+    doc.set_id(kRecordIdsGroupIdDocId);
+    doc.setGroupId(groupId);
+    doc.setFoundingOpTime(foundingOpTime);
+
+    // In practice, this lock acquisition on the recordIdsGroupId collection cannot block. The only
+    // time a stronger lock acquisition is taken on this namespace is when the collection is
+    // created or dropped.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+        shard_role_details::getLocker(opCtx));
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(_recordIdsGroupIdNss,
+                                     PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    invariant(collection.exists(),
+              "setRecordIdsGroupId requires the recordIdsGroupId collection to have been created "
+              "first, see createRecordIdsGroupIdCollection");
+
+    // A groupId is only ever written while groupless: minted by a groupless primary, or adopted at
+    // initial sync completion onto an empty (or cleared) collection. A node that already holds a
+    // groupId re-announces it without rewriting it, so writing over an existing document is
+    // always a logic error and must fail loudly rather than silently overwrite the membership
+    // marker. Scan the record store directly rather than trusting numRecords(), which is cached
+    // count metadata that can diverge from the data after an unclean shutdown.
+    {
+        auto cursor = collection.getCollectionPtr()->getRecordStore()->getCursor(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        invariant(!cursor->next(),
+                  "setRecordIdsGroupId must not overwrite an existing recordIdsGroupId document");
+    }
+    // An insert failure is an unexpected storage error status, e.g. a DuplicateKey from a
+    // racing writer that got past the emptiness check above.
+    fassert(13810502,
+            collection_internal::insertDocument(opCtx,
+                                                collection.getCollectionPtr(),
+                                                InsertStatement(doc.toBSON()),
+                                                /*opDebug=*/nullptr));
+}
+
+boost::optional<RecordIdsGroupIdDocument> ReplicationConsistencyMarkersImpl::getRecordIdsGroupId(
+    OperationContext* opCtx) {
+    auto result = _storageInterface->findSingleton(opCtx, _recordIdsGroupIdNss);
+    if (!result.isOK()) {
+        if (result.getStatus() == ErrorCodes::NamespaceNotFound ||
+            result.getStatus() == ErrorCodes::CollectionIsEmpty) {
+            return boost::none;
+        }
+        // Fail if there is an error other than the collection being missing or being empty.
+        fassertFailedWithStatus(13810503, result.getStatus());
+    }
+
+    return RecordIdsGroupIdDocument::parse(result.getValue());
+}
+
+void ReplicationConsistencyMarkersImpl::clearRecordIdsGroupId(OperationContext* opCtx) {
+    // Clears are always drops of the whole collection, never untimestamped document writes:
+    // untimestamped writes to this timestamped document would rewrite its history and break
+    // snapshot isolation. Dropping a collection that does not exist is a no-op.
+    //
+    // The drop rides the caller's WriteUnitOfWork: for fenced clears that is the fencing
+    // entry's WriteUnitOfWork, so the drop commits atomically with the fence at its timestamp.
+    // This mirrors StorageInterfaceImpl::dropCollection minus its WriteUnitOfWork.
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork(),
+              "clearRecordIdsGroupId must be called within a WriteUnitOfWork");
+
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+        shard_role_details::getLocker(opCtx));
+    AutoGetDb autoDb(opCtx, _recordIdsGroupIdNss.dbName(), MODE_IX);
+    if (!autoDb.getDb()) {
+        // Database does not exist, so there is nothing to do.
+        return;
+    }
+    Lock::CollectionLock collLock(opCtx, _recordIdsGroupIdNss, MODE_X);
+    fassert(13810504, autoDb.getDb()->dropCollectionEvenIfSystem(opCtx, _recordIdsGroupIdNss));
 }
 
 }  // namespace repl

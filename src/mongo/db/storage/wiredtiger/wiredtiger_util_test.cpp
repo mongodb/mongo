@@ -5,6 +5,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
@@ -1538,6 +1540,44 @@ TEST_F(StatVisitorTest, NullRegistryIsNoOp) {
 TEST_F(StatVisitorTest, NoneIsNoOp) {
     WiredTigerUtil::visitorFor(WiredTigerUtil::OTelStatType::kNone,
                                &_registry)("test-visitor: none", 1);
+}
+
+TEST(WiredTigerUtilTableLoggingTest, RecordIdsGroupIdDoesNotUseTableLogging) {
+    rss::AttachedPersistenceProvider provider;
+    const auto groupIdNss = NamespaceString::kDefaultRecordIdsGroupIdNamespace;
+
+    // The membership marker is per-node state derived from the replicated oplog stream, so it must
+    // be reverted by rollback-to-stable together with the data, both in steady-state replica set
+    // operation and when recovering from the oplog as standalone. The latter is the mode file-copy
+    // based initial sync runs in after copying the files ('journalWritesBecauseStandalone' is
+    // false specifically in that mode), and is what keeps the table revertible together with the
+    // data files it was copied with.
+    EXPECT_FALSE(WiredTigerUtil::useTableLogging(
+        provider, groupIdNss, /*isReplSet=*/true, /*shouldRecoverFromOplogAsStandalone=*/false));
+    EXPECT_FALSE(WiredTigerUtil::useTableLogging(
+        provider, groupIdNss, /*isReplSet=*/false, /*shouldRecoverFromOplogAsStandalone=*/true));
+
+    // In plain standalone startup all of the local database is journaled, same as
+    // 'replset.minvalid'.
+    EXPECT_TRUE(WiredTigerUtil::useTableLogging(
+        provider, groupIdNss, /*isReplSet=*/false, /*shouldRecoverFromOplogAsStandalone=*/false));
+
+    // Sanity check the neighboring behavior: 'replset.minvalid' is the only other exempt local
+    // collection, and non-local collections are never logged on a replica set.
+    EXPECT_FALSE(WiredTigerUtil::useTableLogging(provider,
+                                                 NamespaceString::kDefaultMinValidNamespace,
+                                                 /*isReplSet=*/true,
+                                                 /*shouldRecoverFromOplogAsStandalone=*/false));
+    EXPECT_TRUE(WiredTigerUtil::useTableLogging(
+        provider,
+        NamespaceString::createNamespaceString_forTest("local.someOtherCollection"),
+        /*isReplSet=*/true,
+        /*shouldRecoverFromOplogAsStandalone=*/false));
+    EXPECT_FALSE(
+        WiredTigerUtil::useTableLogging(provider,
+                                        NamespaceString::createNamespaceString_forTest("test.coll"),
+                                        /*isReplSet=*/true,
+                                        /*shouldRecoverFromOplogAsStandalone=*/false));
 }
 
 }  // namespace
