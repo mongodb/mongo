@@ -258,11 +258,7 @@ void runFieldStatsMode(OperationContext* opCtx, const AnalyzeCommandRequest& cmd
         statsNss, BSON("_id" << document->get_id()), document->toBSON(), /*upsert=*/true)));
 }
 
-void runSampleMode(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   boost::optional<int> requestedSampleSizeOpt,
-                   boost::optional<SamplingCEMethodEnum> requestedSamplingMethodOpt,
-                   boost::optional<int> numChunksOpt) {
+void runSampleMode(OperationContext* opCtx, const NamespaceString& nss) {
     auto* tickSource = opCtx->getServiceContext()->getTickSource();
     auto startTicks = tickSource->getTicks();
 
@@ -273,30 +269,20 @@ void runSampleMode(OperationContext* opCtx,
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
-    // 'samplingMethod' is optional on the command. Default to
-    // internalQuerySamplingCEMethodForPersistentSamples.
     QueryKnobConfiguration qkc(query_settings::QuerySettings{});
-    const SamplingCEMethodEnum requestedSamplingMethod = requestedSamplingMethodOpt.value_or(
-        qkc.getInternalQuerySamplingCEMethodForPersistentSamples());
-
-    const size_t requestedSampleSize =
-        requestedSampleSizeOpt ? requestedSampleSizeOpt.value() : ce::calculateSampleSize(qkc);
-
-    if (requestedSamplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt) {
-        numChunksOpt = internalQueryNumChunksForChunkBasedSampling.load();
-    }
-
-    tassert(12433003,
-            "numChunks must be set for chunk-based sampling",
-            !(requestedSamplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt));
 
     // Use kOnTheFlySample to force collection of a new sample rather than attempting to
     // read an existing one.
+    size_t requestedSampleSize = ce::calculateSampleSize(qkc);
+    if (qkc.isJoinOrderingEnabled()) {
+        requestedSampleSize = std::max(requestedSampleSize,
+                                       static_cast<size_t>(qkc.getInternalJoinPlanSamplingSize()));
+    }
     const ce::SampleSpec spec{
         .nss = nss,
         .requestedSampleSize = requestedSampleSize,
-        .sampleGenerationMethod = requestedSamplingMethod,
-        .numChunks = numChunksOpt,
+        .sampleGenerationMethod = qkc.getInternalQuerySamplingCEMethodForPersistentSamples(),
+        .numChunks = qkc.getNumChunksForChunkBasedSampling(),
         .samplingSource = SamplingSourceEnum::kOnTheFlySample,
         .topLevelSampleFieldNames = {},
     };
@@ -484,11 +470,7 @@ public:
 
             switch (mode) {
                 case AnalyzeModeEnum::kSample:
-                    runSampleMode(opCtx,
-                                  nss,
-                                  cmd.getSampleSize(),
-                                  cmd.getSamplingMethod(),
-                                  cmd.getNumChunks());
+                    runSampleMode(opCtx, nss);
                     break;
                 case AnalyzeModeEnum::kFieldStats:
                     runFieldStatsMode(opCtx, cmd);

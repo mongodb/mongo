@@ -1,5 +1,8 @@
 /**
- * Tests that both CBR and JOO can use persistent samples with different or same sizes.
+ * Tests that a single analyze call persists one sample per collection, and that both the CBR
+ * and join optimization read paths can consume it. A consumer whose requested size exceeds the
+ * persisted sample's size falls back to on-the-fly sampling; a consumer requesting less uses a
+ * prefix of the persisted sample.
  *
  * @tags: [
  *   # Requires featureFlagPersistentStats for persisted samples.
@@ -9,6 +12,7 @@
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 import {
     getQueryPlanner,
     getWinningPlanFromExplain,
@@ -44,29 +48,18 @@ const kNumProducts = 150;
 
 // Sizes requested by the two read paths. They must differ so that the size reported by a query
 // identifies which knob it consulted.
-const kCbrSampleSize = 20;
-const kJoinSampleSize = 30;
+const kSmallerSize = 20;
+const kLargerSize = 30;
 assert.neq(
-    kCbrSampleSize,
-    kJoinSampleSize,
+    kSmallerSize,
+    kLargerSize,
     "the two sample sizes must differ for this test to be meaningful",
 );
 
 const kRandomSamplingMethod = "random";
+const kChunkSamplingMethod = "chunk";
 
-/**
- * Runs 'analyze' in sample mode, passing 'sampleSize' along only when one is given. Omitting it is
- * what makes 'analyze' fall back to 'internalSamplingSizeOverride'.
- */
-function analyzeColl(collName, sampleSize = undefined) {
-    const cmd = {analyze: collName, mode: "sample", samplingMethod: kRandomSamplingMethod};
-    if (sampleSize !== undefined) {
-        cmd.sampleSize = sampleSize;
-    }
-    assert.commandWorked(db.runCommand(cmd));
-}
-
-function setSampleSizeKnobs(cbrSampleSize, joinSampleSize) {
+function setSampleSizeKnobs({cbrSampleSize, joinSampleSize}) {
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
@@ -76,17 +69,40 @@ function setSampleSizeKnobs(cbrSampleSize, joinSampleSize) {
     );
 }
 
+// Returns the persisted sample pages for 'collName' ordered by page number. At most one sample
+// exists per collection.
+function getSamplePages(collName) {
+    const filter = PersistentSamplesUtils.getSampleLookupFilter(
+        PersistentSamplesUtils.getCollUUID(db, collName),
+    );
+    return PersistentSamplesUtils.getSamplesColl(db)
+        .find(filter)
+        .sort({[PersistentSamplesUtils.sampleDocFieldNames.pageNoField]: 1})
+        .toArray();
+}
+
 // Asserts that a single ceSamplingMetadata entry key reports a sample of 'expectedSize' obtained from
 // 'expectedSource' ("persisted" or "onTheFly").
-function assertSampleMetadata(meta, {expectedSource, expectedSize}) {
+function assertSampleMetadata(
+    meta,
+    {expectedSource, expectedSize, expectedTechnique = kRandomSamplingMethod},
+) {
     assert.eq(meta.sampleSource, expectedSource, `expected a '${expectedSource}' sample`, {meta});
     assert.eq(meta.sampleRequestedDocCount, expectedSize, "unexpected requested sample size", {
         meta,
     });
-    // Both collections are larger than every size this test requests, so the sample is always
-    // filled to exactly the requested size.
-    assert.eq(meta.sampleDocCount, expectedSize, "unexpected sampled document count", {meta});
-    assert.eq(meta.sampleTechnique, kRandomSamplingMethod, "unexpected sampling technique", {meta});
+    if (expectedTechnique === kChunkSamplingMethod) {
+        assert.between(
+            PersistentSamplesUtils.defaultNumChunks(db),
+            meta.sampleDocCount,
+            expectedSize,
+            "unexpected sampled document count",
+            {meta},
+        );
+    } else {
+        assert.eq(meta.sampleDocCount, expectedSize, "unexpected sampled document count", {meta});
+    }
+    assert.eq(meta.sampleTechnique, expectedTechnique, "unexpected sampling technique", {meta});
     if (expectedSource === "persisted") {
         PersistentSamplesUtils.assertPersistedSampleMetadataPresent(meta);
     } else {
@@ -143,12 +159,17 @@ function getJoinSamplingMetadata() {
     return ceSamplingMetadata;
 }
 
-describe("persisted sample sizes used by CBR and by join optimization", () => {
+function analyzeBoth() {
+    assert.commandWorked(db.runCommand({analyze: ordersName, mode: "sample"}));
+    assert.commandWorked(db.runCommand({analyze: productsName, mode: "sample"}));
+}
+
+describe("the single persisted sample shared by CBR and join optimization", () => {
     before(() => {
         // A collection smaller than the requested sample size is sampled with a full collection
         // scan instead of the pinned technique, which would invalidate the assertions below.
         assert.lt(
-            Math.max(kCbrSampleSize, kJoinSampleSize),
+            Math.max(kSmallerSize, kLargerSize),
             Math.min(kNumOrders, kNumProducts),
             "every collection must be larger than the largest sample size this test requests",
         );
@@ -183,98 +204,163 @@ describe("persisted sample sizes used by CBR and by join optimization", () => {
         PersistentSamplesUtils.dropSamplesColl(db);
     });
 
-    it("does not use a persisted sample smaller than the requested size", () => {
-        setSampleSizeKnobs(kCbrSampleSize, kJoinSampleSize);
+    it("persists a single sample per collection, replacing it on re-analyze", () => {
+        setSampleSizeKnobs({cbrSampleSize: kSmallerSize, joinSampleSize: kLargerSize});
 
-        // By default analyze persists CBR's sample size.
-        analyzeColl(ordersName);
-        analyzeColl(productsName);
+        assert.commandWorked(db.runCommand({analyze: ordersName, mode: "sample"}));
+        PersistentSamplesUtils.validatePersistentSample(db, {
+            sampledCollName: ordersName,
+            samplingMethod: kRandomSamplingMethod,
+            requestedSampleSize: kLargerSize,
+            actualSampleSize: kLargerSize,
+        });
+        const originalSamplePages = getSamplePages(ordersName);
+
+        // A second analyze replaces the sample rather than accumulating another one.
+        assert.commandWorked(db.runCommand({analyze: ordersName, mode: "sample"}));
+        const updatedSamplePages = getSamplePages(ordersName);
+        assert.eq(
+            updatedSamplePages.length,
+            originalSamplePages.length,
+            "re-analyze should replace the sample, not add another",
+        );
+        assert.eq(
+            updatedSamplePages.map((p) => p._id),
+            originalSamplePages.map((p) => p._id),
+            "re-analyze should replace the same sample's pages in place",
+        );
+
+        const createdAtField = PersistentSamplesUtils.sampleDocFieldNames.createdAtField;
+        assert.gt(
+            updatedSamplePages[0][createdAtField],
+            originalSamplePages[0][createdAtField],
+            "re-analyze should persist a fresh sample with a later createdAt",
+        );
+    });
+
+    it("is loaded by both read paths when the join size fits inside it", () => {
+        setSampleSizeKnobs({cbrSampleSize: kLargerSize, joinSampleSize: kSmallerSize});
+        analyzeBoth();
 
         for (const collName of [ordersName, productsName]) {
             PersistentSamplesUtils.validatePersistentSample(db, {
                 sampledCollName: collName,
                 samplingMethod: kRandomSamplingMethod,
-                requestedSampleSize: kCbrSampleSize,
-                actualSampleSize: kCbrSampleSize,
+                requestedSampleSize: kLargerSize,
+                actualSampleSize: kLargerSize,
             });
         }
 
-        // CBR asks for the size it just persisted, so it loads the sample.
         assertSampleMetadata(getCbrSamplingMetadata(), {
             expectedSource: "persisted",
-            expectedSize: kCbrSampleSize,
+            expectedSize: kLargerSize,
         });
 
-        // Join optimization asks for a larger size and falls back to sampling on the fly.
         const ceSamplingMetadata = getJoinSamplingMetadata();
         for (const coll of [orders, products]) {
-            const ns = coll.getFullName();
-            const meta = ceSamplingMetadata[ns];
+            const meta = ceSamplingMetadata[coll.getFullName()];
+            assertSampleMetadata(meta, {
+                expectedSource: "persisted",
+                expectedSize: kSmallerSize,
+            });
+        }
+    });
+
+    it("is loaded by both read paths when both request the same size", () => {
+        setSampleSizeKnobs({cbrSampleSize: kSmallerSize, joinSampleSize: kSmallerSize});
+        analyzeBoth();
+
+        for (const collName of [ordersName, productsName]) {
+            PersistentSamplesUtils.validatePersistentSample(db, {
+                sampledCollName: collName,
+                samplingMethod: kRandomSamplingMethod,
+                requestedSampleSize: kSmallerSize,
+                actualSampleSize: kSmallerSize,
+            });
+        }
+
+        assertSampleMetadata(getCbrSamplingMetadata(), {
+            expectedSource: "persisted",
+            expectedSize: kSmallerSize,
+        });
+
+        const ceSamplingMetadata = getJoinSamplingMetadata();
+        for (const coll of [orders, products]) {
+            const meta = ceSamplingMetadata[coll.getFullName()];
+            assertSampleMetadata(meta, {
+                expectedSource: "persisted",
+                expectedSize: kSmallerSize,
+            });
+        }
+    });
+
+    it("join optimization samples on-the-fly when its requested size exceeds the persisted sample", () => {
+        setSampleSizeKnobs({cbrSampleSize: kSmallerSize, joinSampleSize: kSmallerSize});
+        analyzeBoth();
+
+        for (const collName of [ordersName, productsName]) {
+            PersistentSamplesUtils.validatePersistentSample(db, {
+                sampledCollName: collName,
+                samplingMethod: kRandomSamplingMethod,
+                requestedSampleSize: kSmallerSize,
+                actualSampleSize: kSmallerSize,
+            });
+        }
+
+        assertSampleMetadata(getCbrSamplingMetadata(), {
+            expectedSource: "persisted",
+            expectedSize: kSmallerSize,
+        });
+
+        // The on-the-fly technique is pinned to chunk (rather than left at its "random" default)
+        // so the reported technique proves the join read path consulted its own method knob.
+        const ceSamplingMetadata = runWithKnobs(db, getJoinSamplingMetadata, {
+            internalJoinPlanSamplingSize: kLargerSize,
+            internalJoinOptimizationSamplingCEMethod: kChunkSamplingMethod,
+        });
+        for (const coll of [orders, products]) {
+            const meta = ceSamplingMetadata[coll.getFullName()];
             assertSampleMetadata(meta, {
                 expectedSource: "onTheFly",
-                expectedSize: kJoinSampleSize,
+                expectedSize: kLargerSize,
+                expectedTechnique: kChunkSamplingMethod,
             });
         }
     });
 
-    it("satisfies both join and CBR with one larger sample, using a prefix of the sample for the smaller request", () => {
-        setSampleSizeKnobs(kCbrSampleSize, kJoinSampleSize);
+    // TODO SERVER-138209: stop supporting chunk sampling for persisted samples
+    it("is loaded by join optimization regardless of its own on-the-fly method knob", () => {
+        // Persist a chunk sample while join optimization's on-the-fly method stays "random";
+        // the loaded sample reports the technique it was generated with.
+        setSampleSizeKnobs({cbrSampleSize: kSmallerSize, joinSampleSize: kSmallerSize});
+        runWithKnobs(db, analyzeBoth, {
+            internalQuerySamplingCEMethodForPersistentSamples: kChunkSamplingMethod,
+        });
 
-        analyzeColl(ordersName, kJoinSampleSize);
-        analyzeColl(productsName, kJoinSampleSize);
-
+        const defaultNumChunks = PersistentSamplesUtils.defaultNumChunks(db);
         for (const collName of [ordersName, productsName]) {
             PersistentSamplesUtils.validatePersistentSample(db, {
                 sampledCollName: collName,
-                samplingMethod: kRandomSamplingMethod,
-                requestedSampleSize: kJoinSampleSize,
-                actualSampleSize: kJoinSampleSize,
+                samplingMethod: kChunkSamplingMethod,
+                requestedSampleSize: kSmallerSize,
+                actualSampleSize: kSmallerSize,
+                numChunks: defaultNumChunks,
             });
         }
 
+        assertSampleMetadata(getCbrSamplingMetadata(), {
+            expectedSource: "persisted",
+            expectedSize: kSmallerSize,
+            expectedTechnique: kChunkSamplingMethod,
+        });
+
         const ceSamplingMetadata = getJoinSamplingMetadata();
         for (const coll of [orders, products]) {
-            assertSampleMetadata(ceSamplingMetadata[coll.getFullName()], {
+            const meta = ceSamplingMetadata[coll.getFullName()];
+            assertSampleMetadata(meta, {
                 expectedSource: "persisted",
-                expectedSize: kJoinSampleSize,
-            });
-        }
-
-        // CBR asks for a smaller size and uses only the prefix of the persisted sample it needs.
-        assertSampleMetadata(getCbrSamplingMetadata(), {
-            expectedSource: "persisted",
-            expectedSize: kCbrSampleSize,
-        });
-    });
-
-    it("replaces the persisted sample when analyze runs again with a different size", () => {
-        setSampleSizeKnobs(kCbrSampleSize, kJoinSampleSize);
-
-        for (const collName of [ordersName, productsName]) {
-            analyzeColl(collName, kJoinSampleSize);
-            analyzeColl(collName);
-
-            // Only the most recently persisted sample remains
-            PersistentSamplesUtils.validatePersistentSample(db, {
-                sampledCollName: collName,
-                samplingMethod: kRandomSamplingMethod,
-                requestedSampleSize: kCbrSampleSize,
-                actualSampleSize: kCbrSampleSize,
-            });
-        }
-
-        assertSampleMetadata(getCbrSamplingMetadata(), {
-            expectedSource: "persisted",
-            expectedSize: kCbrSampleSize,
-        });
-
-        // The larger join-sized sample was replaced, so join optimization falls back to sampling
-        // on the fly.
-        const ceSamplingMetadata = getJoinSamplingMetadata();
-        for (const coll of [orders, products]) {
-            assertSampleMetadata(ceSamplingMetadata[coll.getFullName()], {
-                expectedSource: "onTheFly",
-                expectedSize: kJoinSampleSize,
+                expectedSize: kSmallerSize,
+                expectedTechnique: kChunkSamplingMethod,
             });
         }
     });

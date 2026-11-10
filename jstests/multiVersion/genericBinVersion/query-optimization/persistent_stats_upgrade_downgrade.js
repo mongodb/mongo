@@ -37,9 +37,7 @@ function setFCV(db, version) {
 
 function persistSample(db) {
     assert.commandWorked(db[collName].insert([{a: 1}, {a: 2}, {a: 2}, {a: 3}]));
-    assert.commandWorked(
-        db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
-    );
+    assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"}));
 }
 
 function createKeptColls(db) {
@@ -216,7 +214,6 @@ describe(`Sample persisted while downgrading on ${raceDeployment.name}`, functio
                         const res = db.getSiblingDB(dbName).runCommand({
                             analyze: collName,
                             mode: "sample",
-                            samplingMethod: "random",
                         });
                         assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
                     },

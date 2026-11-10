@@ -9,11 +9,10 @@
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
-import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
+import {setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
+import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {
     assertHistogramBoundaries,
     getAnalyzeCommandMetrics,
@@ -78,6 +77,12 @@ describe("persistent sample serverStatus metrics", function () {
         PersistentSamplesUtils.dropSamplesColl(db);
     });
 
+    function runAnalyzeWithSampleSize(targetCollName, sampleSize) {
+        return runWithKnobs(db, () => db.runCommand({analyze: targetCollName, mode: "sample"}), {
+            internalSamplingSizeOverride: sampleSize,
+        });
+    }
+
     after(function () {
         MongoRunner.stopMongod(conn);
     });
@@ -90,8 +95,6 @@ describe("persistent sample serverStatus metrics", function () {
             db.runCommand({
                 analyze: collName,
                 mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kSampleSize,
             }),
         );
 
@@ -143,8 +146,6 @@ describe("persistent sample serverStatus metrics", function () {
             db.runCommand({
                 analyze: collName,
                 mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kSampleSize,
             }),
         );
         const afterSecond = getAnalyzeMetrics(db);
@@ -177,13 +178,15 @@ describe("persistent sample serverStatus metrics", function () {
     it("increments write-path metrics for a chunk-technique run", function () {
         const before = getAnalyzeMetrics(db);
 
-        assert.commandWorked(
-            db.runCommand({
-                analyze: collName,
-                mode: "sample",
-                samplingMethod: "chunk",
-                sampleSize: kSampleSize,
-            }),
+        // Both consumers' method knobs must agree, or analyze persists a chunk sample for CBR and
+        // a random one for join optimization, moving two sets of per-method counters.
+        runWithKnobs(
+            db,
+            () => assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"})),
+            {
+                internalQuerySamplingCEMethodForPersistentSamples: "chunk",
+                internalJoinOptimizationSamplingCEMethod: "chunk",
+            },
         );
 
         const after = getAnalyzeMetrics(db);
@@ -219,14 +222,7 @@ describe("persistent sample serverStatus metrics", function () {
         const before = getAnalyzeMetrics(db);
 
         // A sample size >= the collection size forces a full collection scan.
-        assert.commandWorked(
-            db.runCommand({
-                analyze: collName,
-                mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kSourceSize,
-            }),
-        );
+        assert.commandWorked(runAnalyzeWithSampleSize(collName, kSourceSize));
 
         const after = getAnalyzeMetrics(db);
 
@@ -270,15 +266,8 @@ describe("persistent sample serverStatus metrics", function () {
 
         const before = getAnalyzeMetrics(db);
 
-        // sampleSize == numRecords so all docs will be in the sample.
-        assert.commandWorked(
-            db.runCommand({
-                analyze: discardCollName,
-                mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kNumDocs,
-            }),
-        );
+        // The sample size equals numRecords so all docs will be in the sample.
+        assert.commandWorked(runAnalyzeWithSampleSize(discardCollName, kNumDocs));
 
         const after = getAnalyzeMetrics(db);
 
@@ -308,8 +297,6 @@ describe("persistent sample serverStatus metrics", function () {
             db.runCommand({
                 analyze: collName,
                 mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kSampleSize,
             }),
         );
 
@@ -369,8 +356,6 @@ describe("persistent sample serverStatus metrics", function () {
             db.runCommand({
                 analyze: collName,
                 mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kSampleSize,
             }),
         );
         const afterSuccess = getAnalyzeCommandMetrics(db);
@@ -397,8 +382,6 @@ describe("persistent sample serverStatus metrics", function () {
             db.runCommand({
                 analyze: "nonexistentCollection",
                 mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kSampleSize,
             }),
         );
         const afterFailure = getAnalyzeCommandMetrics(db);
@@ -434,8 +417,6 @@ describe("persistent sample serverStatus metrics", function () {
             db.runCommand({
                 analyze: collName,
                 mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kSampleSize,
             }),
         );
 
@@ -479,8 +460,6 @@ describe("persistent sample serverStatus metrics", function () {
             db.runCommand({
                 analyze: collName,
                 mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kSampleSize,
             }),
         );
 
@@ -511,8 +490,6 @@ describe("persistent sample serverStatus metrics", function () {
             db.runCommand({
                 analyze: collName,
                 mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kSampleSize,
             }),
         );
 
@@ -559,8 +536,6 @@ describe("persistent sample serverStatus metrics", function () {
                 db.runCommand({
                     analyze: largeCollName,
                     mode: "sample",
-                    samplingMethod: "random",
-                    sampleSize: kSampleSize,
                 }),
             );
             const pages = PersistentSamplesUtils.getSamplesColl(db)
@@ -603,7 +578,7 @@ describe("persistent sample serverStatus metrics", function () {
         });
 
         it("records pagesRead for a multi-page read-path load", function () {
-            const pages = persistMultiPageSample();
+            persistMultiPageSample();
             const before = getPersistentSampleMetrics(db);
             const explain = largeColl.find({pad: {$gte: ""}}).explain();
             assert(isCollscan(db, getWinningPlanFromExplain(explain)), "expected a COLLSCAN plan", {

@@ -54,8 +54,6 @@ assert.commandWorked(
     db.runCommand({
         analyze: customers.getName(),
         mode: "sample",
-        samplingMethod: "random",
-        sampleSize: kJoinSampleSize,
     }),
 );
 

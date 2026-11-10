@@ -726,7 +726,7 @@ export const authCommandsLib = {
             // Sample mode of analyze enforces the same authorization as histograms mode: both the
             // 'analyze' and 'find' privileges are required on the target collection.
             testname: "analyze_sample",
-            command: {analyze: "x", mode: "sample", samplingMethod: "random", sampleSize: 10},
+            command: {analyze: "x", mode: "sample"},
             setup: function (db) {
                 assert.commandWorked(db.x.insert({}));
             },

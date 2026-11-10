@@ -54,13 +54,7 @@ describe("analyze mode: fieldStats", function () {
     it("ignores sampling and histogram parameters", function () {
         assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
         const baseline = this.statsDocs()[0];
-        for (const params of [
-            {sampleRate: 0.5},
-            {sampleSize: 100},
-            {numberBuckets: 10},
-            {samplingMethod: "random"},
-            {numChunks: 5},
-        ]) {
+        for (const params of [{sampleRate: 0.5}, {numberBuckets: 10}]) {
             assert.commandWorked(
                 this.analyze(Object.assign({mode: "fieldStats", key: "a"}, params)),
             );

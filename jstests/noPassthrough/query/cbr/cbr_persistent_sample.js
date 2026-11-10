@@ -14,6 +14,7 @@
 
 import {getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
 import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
+import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
 
 const conn = MongoRunner.runMongod({
@@ -92,8 +93,6 @@ try {
         db.runCommand({
             analyze: collName,
             mode: "sample",
-            samplingMethod: "random",
-            sampleSize: kSampleSize,
         });
 
         const meta = getWinningPlanMetadata({a: {$gte: 0}});
@@ -159,15 +158,7 @@ try {
         resetCollections();
 
         // Collect a sample
-        assert.commandWorked(
-            db.runCommand({
-                analyze: collName,
-                mode: "sample",
-                samplingMethod: "chunk",
-                sampleSize: kSampleSize,
-                numChunks: kNumChunks,
-            }),
-        );
+        assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"}));
 
         // Chunk sampling scans full WiredTiger pages so the actual doc count may be less than
         // requestedSampleSize; compare sampleDocCount against what was actually stored, not the
@@ -216,14 +207,10 @@ try {
         resetCollections();
 
         const persistedNumChunks = kNumChunks + 1;
-        assert.commandWorked(
-            db.runCommand({
-                analyze: collName,
-                mode: "sample",
-                samplingMethod: "chunk",
-                sampleSize: kSampleSize,
-                numChunks: persistedNumChunks,
-            }),
+        runWithKnobs(
+            db,
+            () => assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"})),
+            {internalQueryNumChunksForChunkBasedSampling: persistedNumChunks},
         );
 
         // The query requests the default number of chunks, which differs from the persisted one.
@@ -271,21 +258,19 @@ try {
         jsTest.log.info(
             `Testing a persisted ${persistedMethod} sample hit when the on-the-fly method is ${onTheFlyMethod}`,
         );
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: onTheFlyMethod}),
-        );
         resetCollections();
 
-        assert.commandWorked(
-            db.runCommand({
-                analyze: collName,
-                mode: "sample",
-                samplingMethod: persistedMethod,
-                sampleSize: kSampleSize,
-            }),
+        const meta = runWithKnobs(
+            db,
+            () => {
+                assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"}));
+                return getWinningPlanMetadata({a: {$gte: 0}});
+            },
+            {
+                internalQuerySamplingCEMethod: onTheFlyMethod,
+                internalQuerySamplingCEMethodForPersistentSamples: persistedMethod,
+            },
         );
-
-        const meta = getWinningPlanMetadata({a: {$gte: 0}});
         assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
         assert.eq(
             meta.sampleTechnique,
@@ -318,9 +303,7 @@ try {
             ),
         );
 
-        assert.commandWorked(
-            db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
-        );
+        assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"}));
 
         const meta = getWinningPlanMetadata({a: {$gte: 0}});
         assert.eq(
@@ -369,9 +352,7 @@ try {
             ),
         );
 
-        assert.commandWorked(
-            db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
-        );
+        assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"}));
 
         assert.commandWorked(
             coll.insertMany(
@@ -411,9 +392,7 @@ try {
         );
         resetCollections();
 
-        assert.commandWorked(
-            db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
-        );
+        assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"}));
 
         assert.commandWorked(coll.deleteMany({_id: {$gte: kSmallCollSize}}));
         assert.lt(coll.count(), kSampleSize, "collection should now be below the sample size");
@@ -500,8 +479,6 @@ try {
             db.runCommand({
                 analyze: collName,
                 mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kSampleSize,
             }),
         );
 
@@ -577,13 +554,10 @@ try {
         );
         resetCollections();
 
-        assert.commandWorked(
-            db.runCommand({
-                analyze: collName,
-                mode: "sample",
-                samplingMethod: "chunk",
-                sampleSize: kSampleSize,
-            }),
+        runWithKnobs(
+            db,
+            () => assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"})),
+            {internalQuerySamplingCEMethodForPersistentSamples: "chunk"},
         );
 
         const meta = getWinningPlanMetadata({a: {$gte: 0}});
@@ -673,8 +647,6 @@ try {
             db.runCommand({
                 analyze: collName,
                 mode: "sample",
-                samplingMethod: "random",
-                sampleSize: kSampleSize,
             }),
         );
 

@@ -10,6 +10,7 @@
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 import {dropSamplesColl} from "jstests/libs/query/persistent_samples_utils.js";
 import {getPersistentNDVMetrics} from "jstests/libs/query/planning_metrics_utils.js";
 
@@ -458,21 +459,21 @@ describe("join optimization serverStatus metrics", function () {
     it("counts persisted samples reused instead of sampling on the fly", function () {
         // Join optimization samples once per distinct namespace in the join graph. With a persisted
         // sample available for each, every sampling call loads it instead of scanning.
-        const sampleSize = assert.commandWorked(
+        const colls = [this.orders, this.customers, this.items];
+        // analyze persists at the CBR-derived size by default, which is smaller than what join
+        // optimization requests; the read path only reuses a sample at least as large as requested.
+        const joinSampleSize = assert.commandWorked(
             this.db.adminCommand({getParameter: 1, internalJoinPlanSamplingSize: 1}),
         ).internalJoinPlanSamplingSize;
-        const colls = [this.orders, this.customers, this.items];
         try {
             for (const coll of colls) {
-                // The persisted sample is keyed on the sampling method and sample size, so both
-                // must match what join optimization asks for.
-                assert.commandWorked(
-                    this.db.runCommand({
-                        analyze: coll.getName(),
-                        mode: "sample",
-                        samplingMethod: "random",
-                        sampleSize: sampleSize,
-                    }),
+                runWithKnobs(
+                    this.db,
+                    () =>
+                        assert.commandWorked(
+                            this.db.runCommand({analyze: coll.getName(), mode: "sample"}),
+                        ),
+                    {internalSamplingSizeOverride: joinSampleSize},
                 );
             }
 

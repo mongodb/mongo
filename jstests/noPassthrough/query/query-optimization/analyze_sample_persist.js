@@ -1,6 +1,6 @@
 /**
- * Tests that the analyze command with mode: "sample" correctly handles all sampling-related
- * parameters: sampleSize, sampleRate, samplingMethod, numChunks, and mode.
+ * Tests that the analyze command with mode: "sample" persists a sample whose size, sampling
+ * method and chunk count are taken from the corresponding query knobs.
  *
  * @tags: [
  *   # Requires featureFlagPersistentStats for persisted samples.
@@ -9,8 +9,8 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({
     setParameter: {
@@ -51,22 +51,31 @@ function runAnalyze(analyzeCmd) {
     PersistentSamplesUtils.assertSamplesCollClustered(db);
 }
 
+function runAnalyzeWith({sampleSize, samplingMethod, numChunks}) {
+    const knobs = {};
+    if (sampleSize !== undefined) {
+        knobs.internalSamplingSizeOverride = sampleSize;
+    }
+    if (samplingMethod !== undefined) {
+        knobs.internalQuerySamplingCEMethodForPersistentSamples = samplingMethod;
+    }
+    if (numChunks !== undefined) {
+        knobs.internalQueryNumChunksForChunkBasedSampling = numChunks;
+    }
+    runWithKnobs(db, () => runAnalyze({analyze: collName, mode: "sample"}), knobs);
+}
+
 const sourceDocFields = ["a", "b"];
 
 // =============================================================================
-// sampleSize parameter
+// internalSamplingSizeOverride knob
 // =============================================================================
 
-// Custom sampleSize: collection (20) > sampleSize (10), so size == sampleSize exactly.
+// Collection (20) > sample size (10), so size == sample size exactly.
 cleanup();
 insertDocs(20);
 {
-    runAnalyze({
-        analyze: collName,
-        mode: "sample",
-        sampleSize: 10,
-        samplingMethod: "random",
-    });
+    runAnalyzeWith({sampleSize: 10, samplingMethod: "random"});
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
@@ -77,16 +86,11 @@ insertDocs(20);
     });
 }
 
-// sampleSize larger than collection: clamped to numRecords (20), so size == 20 exactly.
+// Sample size larger than collection: clamped to numRecords (20), so size == 20 exactly.
 cleanup();
 insertDocs(20);
 {
-    runAnalyze({
-        analyze: collName,
-        mode: "sample",
-        sampleSize: 100,
-        samplingMethod: "random",
-    });
+    runAnalyzeWith({sampleSize: 100, samplingMethod: "random"});
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
@@ -97,18 +101,12 @@ insertDocs(20);
     });
 }
 
-// Re-run with the same sampleSize upserts (replaces) the existing sample document, and
-// createdAt is updated to a strictly later timestamp.
+// Re-running analyze with the same sample size upserts (replaces) the existing sample document,
+// and createdAt is updated to a strictly later timestamp.
 cleanup();
 insertDocs(20);
 {
-    const analyzeCmd = {
-        analyze: collName,
-        mode: "sample",
-        sampleSize: 10,
-        samplingMethod: "random",
-    };
-    runAnalyze(analyzeCmd);
+    runAnalyzeWith({sampleSize: 10, samplingMethod: "random"});
     const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
     const expectedId = PersistentSamplesUtils.getExpectedId(uuid, expectedSchemaVersion);
     const firstCreatedAt = PersistentSamplesUtils.getSampleDoc(samplesColl, expectedId)[
@@ -116,7 +114,7 @@ insertDocs(20);
     ];
 
     // Re-running analyze against an already-clustered samples collection must be a no-op create.
-    runAnalyze(analyzeCmd);
+    runAnalyzeWith({sampleSize: 10, samplingMethod: "random"});
     const secondPages = PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
@@ -136,12 +134,7 @@ insertDocs(20);
 cleanup();
 assert.commandWorked(db.createCollection(collName));
 {
-    runAnalyze({
-        analyze: collName,
-        mode: "sample",
-        sampleSize: 10,
-        samplingMethod: "random",
-    });
+    runAnalyzeWith({sampleSize: 10, samplingMethod: "random"});
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
@@ -154,20 +147,20 @@ assert.commandWorked(db.createCollection(collName));
 // Non-existent collection: analyze with sample mode fails with a "collection not found" uassert
 cleanup();
 assert.commandFailedWithCode(
-    db.runCommand({analyze: "no_such_coll", mode: "sample", samplingMethod: "random"}),
+    db.runCommand({analyze: "no_such_coll", mode: "sample"}),
     13097202,
     "analyze on a non-existent collection should fail with 13097202",
 );
 
 // =============================================================================
-// Default sample size (neither sampleSize nor sampleRate provided)
+// Default sample size
 // =============================================================================
 
-// Large collection (> default): sampleSize equals the calculated default, not clamped.
+// Large collection (> default): sample size equals the calculated default, not clamped.
 cleanup();
 insertDocs(500);
 {
-    runAnalyze({analyze: collName, mode: "sample", samplingMethod: "random"});
+    runAnalyze({analyze: collName, mode: "sample"});
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
@@ -183,7 +176,7 @@ insertDocs(500);
 cleanup();
 insertDocs(50);
 {
-    runAnalyze({analyze: collName, mode: "sample", samplingMethod: "random"});
+    runAnalyze({analyze: collName, mode: "sample"});
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
@@ -198,8 +191,8 @@ insertDocs(50);
 // internalSamplingSizeOverride knob
 // =============================================================================
 
-// The override knob takes precedence over the default size derived from samplingConfidenceInterval and
-// samplingMarginOfError when the command does not specify a sampleSize.
+// The override knob takes precedence over the default size derived from
+// samplingConfidenceInterval and samplingMarginOfError.
 cleanup();
 insertDocs(500);
 {
@@ -209,165 +202,44 @@ insertDocs(500);
         defaultSampleSize,
         "override size must differ from the derived default for this test to be meaningful",
     );
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalSamplingSizeOverride: overrideSize}),
-    );
-    try {
-        runAnalyze({analyze: collName, mode: "sample", samplingMethod: "random"});
-        PersistentSamplesUtils.validatePersistentSample(db, {
-            sampledCollName: collName,
-            samplingMethod: "random",
-            requestedSampleSize: overrideSize,
-            actualSampleSize: overrideSize,
-            expectedSchemaVersion: expectedSchemaVersion,
-            expectedFields: sourceDocFields,
-        });
-    } finally {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalSamplingSizeOverride: 0}));
-    }
-}
-
-// An explicit sampleSize on the command takes precedence over the override knob.
-cleanup();
-insertDocs(500);
-{
-    const explicitSampleSize = 40;
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalSamplingSizeOverride: 25}));
-    try {
-        runAnalyze({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: explicitSampleSize,
-            samplingMethod: "random",
-        });
-        PersistentSamplesUtils.validatePersistentSample(db, {
-            sampledCollName: collName,
-            samplingMethod: "random",
-            requestedSampleSize: explicitSampleSize,
-            actualSampleSize: explicitSampleSize,
-            expectedSchemaVersion: expectedSchemaVersion,
-            expectedFields: sourceDocFields,
-        });
-    } finally {
-        assert.commandWorked(db.adminCommand({setParameter: 1, internalSamplingSizeOverride: 0}));
-    }
-}
-
-// =============================================================================
-// numChunks parameter
-// =============================================================================
-
-// samplingMethod: "chunk" with explicit numChunks succeeds.
-cleanup();
-insertDocs(20);
-{
-    const sampleSize = 10;
-    runAnalyze({
-        analyze: collName,
-        mode: "sample",
-        sampleSize: sampleSize,
-        samplingMethod: "chunk",
-        numChunks: 5,
-    });
-    PersistentSamplesUtils.validatePersistentSample(db, {
-        sampledCollName: collName,
-        samplingMethod: "chunk",
-        requestedSampleSize: sampleSize,
-        actualSampleSize: sampleSize,
-        numChunks: 5,
-        expectedSchemaVersion: expectedSchemaVersion,
-        expectedFields: sourceDocFields,
-    });
-}
-
-// samplingMethod: "chunk" without explicit numChunks succeeds with default numChunks value.
-cleanup();
-insertDocs(20);
-{
-    const sampleSize = 10;
-    runAnalyze({
-        analyze: collName,
-        mode: "sample",
-        sampleSize: sampleSize,
-        samplingMethod: "chunk",
-    });
-    PersistentSamplesUtils.validatePersistentSample(db, {
-        sampledCollName: collName,
-        samplingMethod: "chunk",
-        requestedSampleSize: sampleSize,
-        actualSampleSize: sampleSize,
-        numChunks: defaultNumChunks,
-        expectedSchemaVersion: expectedSchemaVersion,
-        expectedFields: sourceDocFields,
-    });
-}
-
-// =============================================================================
-// samplingMethod parameter
-// =============================================================================
-
-// `random` and `chunk` success cases are exercised by the sampleSize
-// and numChunks sections above. Here we cover the default and IDL enum boundaries.
-
-// samplingMethod defaults to internalQuerySamplingCEMethodForPersistentSamples when omitted.
-cleanup();
-insertDocs(20);
-{
-    assert.commandWorked(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: 10,
-        }),
-    );
+    runAnalyzeWith({sampleSize: overrideSize, samplingMethod: "random"});
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
-        requestedSampleSize: 10,
-        actualSampleSize: 10,
+        requestedSampleSize: overrideSize,
+        actualSampleSize: overrideSize,
         expectedSchemaVersion: expectedSchemaVersion,
         expectedFields: sourceDocFields,
     });
 }
 
-// Confirms the default tracks the knob, not a hardcoded value.
+// =============================================================================
+// internalQuerySamplingCEMethodForPersistentSamples and
+// internalQueryNumChunksForChunkBasedSampling knobs
+// =============================================================================
+
+// Confirms the persisted method and chunk count track their knobs rather than hardcoded
+// defaults, so both are set to non-default values here.
 cleanup();
 insertDocs(20);
 {
-    const prevMethod = assert.commandWorked(
-        db.adminCommand({getParameter: 1, internalQuerySamplingCEMethodForPersistentSamples: 1}),
-    ).internalQuerySamplingCEMethodForPersistentSamples;
-    assert.commandWorked(
-        db.adminCommand({
-            setParameter: 1,
-            internalQuerySamplingCEMethodForPersistentSamples: "chunk",
-        }),
+    const sampleSize = 10;
+    const numChunks = 5;
+    assert.neq(
+        numChunks,
+        defaultNumChunks,
+        "numChunks must differ from the default for this test to be meaningful",
     );
-    try {
-        assert.commandWorked(
-            db.runCommand({
-                analyze: collName,
-                mode: "sample",
-                sampleSize: 10,
-            }),
-        );
-        PersistentSamplesUtils.validatePersistentSample(db, {
-            sampledCollName: collName,
-            samplingMethod: "chunk",
-            requestedSampleSize: 10,
-            actualSampleSize: 10,
-            numChunks: defaultNumChunks,
-            expectedSchemaVersion: expectedSchemaVersion,
-            expectedFields: sourceDocFields,
-        });
-    } finally {
-        assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQuerySamplingCEMethodForPersistentSamples: prevMethod,
-            }),
-        );
-    }
+    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "chunk", numChunks: numChunks});
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "chunk",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        numChunks: numChunks,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
 }
 
 // Invalid mode values/types fail to parse.
@@ -388,59 +260,6 @@ insertDocs(20);
     );
 }
 
-// Invalid samplingMethod values and types are rejected by IDL parsing.
-cleanup();
-insertDocs(20);
-{
-    // Unknown enum string.
-    assert.commandFailedWithCode(
-        db.runCommand({analyze: collName, mode: "sample", sampleSize: 10, samplingMethod: "bogus"}),
-        ErrorCodes.BadValue,
-        "unknown samplingMethod should fail to parse",
-    );
-    // Wrong BSON type for samplingMethod (expects a string).
-    assert.commandFailedWithCode(
-        db.runCommand({analyze: collName, mode: "sample", sampleSize: 10, samplingMethod: 1}),
-        ErrorCodes.TypeMismatch,
-        "non-string samplingMethod should fail to parse",
-    );
-}
-
-// Invalid sample-mode inputs are rejected.
-cleanup();
-insertDocs(20);
-{
-    // sampleSize must be > 0.
-    assert.commandFailedWithCode(
-        db.runCommand({analyze: collName, mode: "sample", sampleSize: 0, samplingMethod: "random"}),
-        ErrorCodes.BadValue,
-        "sampleSize of 0 should fail the gt:0 validator",
-    );
-    // numChunks must be > 0.
-    assert.commandFailedWithCode(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: 10,
-            samplingMethod: "chunk",
-            numChunks: 0,
-        }),
-        ErrorCodes.BadValue,
-        "numChunks of 0 should fail the gt:0 validator",
-    );
-    // Wrong BSON type for sampleSize (expects an int).
-    assert.commandFailedWithCode(
-        db.runCommand({
-            analyze: collName,
-            mode: "sample",
-            sampleSize: "ten",
-            samplingMethod: "random",
-        }),
-        ErrorCodes.TypeMismatch,
-        "non-numeric sampleSize should fail to parse",
-    );
-}
-
 // =============================================================================
 // timeseries collection
 // =============================================================================
@@ -452,7 +271,7 @@ const tsCollName = jsTestName() + "_ts";
 db[tsCollName].drop();
 assert.commandWorked(db.createCollection(tsCollName, {timeseries: {timeField: "timestamp"}}));
 assert.commandFailedWithCode(
-    db.runCommand({analyze: tsCollName, mode: "sample", sampleSize: 10, samplingMethod: "random"}),
+    db.runCommand({analyze: tsCollName, mode: "sample"}),
     ErrorCodes.IllegalOperation,
     "analyze on a timeseries collection should fail with IllegalOperation",
 );
@@ -472,12 +291,7 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    runAnalyze({
-        analyze: collName,
-        mode: "sample",
-        sampleSize: sampleSize,
-        samplingMethod: "chunk",
-    });
+    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "chunk"});
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "seqScan",
@@ -493,12 +307,7 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    runAnalyze({
-        analyze: collName,
-        mode: "sample",
-        sampleSize: sampleSize,
-        samplingMethod: "random",
-    });
+    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "random"});
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "seqScan",
@@ -517,12 +326,7 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    runAnalyze({
-        analyze: collName,
-        mode: "sample",
-        sampleSize: sampleSize,
-        samplingMethod: "random",
-    });
+    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "random"});
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "seqScan",
@@ -543,12 +347,7 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    runAnalyze({
-        analyze: collName,
-        mode: "sample",
-        sampleSize: sampleSize,
-        samplingMethod: "chunk",
-    });
+    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "chunk"});
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "strides",
@@ -564,12 +363,7 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    runAnalyze({
-        analyze: collName,
-        mode: "sample",
-        sampleSize: sampleSize,
-        samplingMethod: "random",
-    });
+    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "random"});
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "strides",
@@ -601,7 +395,7 @@ const db2 = conn2.getDB(jsTestName());
 if (!FeatureFlagUtil.isEnabled(db2, "PersistentStats")) {
     assert.commandWorked(db2[collName].insert({a: 1}));
     assert.commandFailedWithCode(
-        db2.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
+        db2.runCommand({analyze: collName, mode: "sample"}),
         ErrorCodes.CommandNotSupported,
     );
 }

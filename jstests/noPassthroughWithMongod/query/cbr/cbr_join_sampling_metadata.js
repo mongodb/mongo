@@ -177,24 +177,6 @@ describe("ceSamplingMetadata in join explain", function () {
         const samplingMethod = "random";
         const expectedSamplingMethodUsed = getExpectedSamplingMethod(db, samplingMethod);
 
-        // Create persisted samples for both collections.
-        assert.commandWorked(
-            db.runCommand({
-                analyze: ordersName,
-                mode: "sample",
-                samplingMethod: samplingMethod,
-                sampleSize: joinSampleSize,
-            }),
-        );
-        assert.commandWorked(
-            db.runCommand({
-                analyze: productsName,
-                mode: "sample",
-                samplingMethod: samplingMethod,
-                sampleSize: joinSampleSize,
-            }),
-        );
-
         try {
             joinTestWrapper(db, () => {
                 // Set both parameters inside the wrapper so it snapshots the originals and
@@ -204,8 +186,12 @@ describe("ceSamplingMetadata in join explain", function () {
                         setParameter: 1,
                         internalEnableJoinOptimization: true,
                         internalJoinPlanSamplingSize: joinSampleSize,
+                        internalSamplingSizeOverride: joinSampleSize,
                     }),
                 );
+
+                assert.commandWorked(db.runCommand({analyze: ordersName, mode: "sample"}));
+                assert.commandWorked(db.runCommand({analyze: productsName, mode: "sample"}));
 
                 const pipeline = [
                     {

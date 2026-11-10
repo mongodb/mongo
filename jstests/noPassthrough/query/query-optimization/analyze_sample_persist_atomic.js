@@ -45,8 +45,6 @@ describe("analyze sample persist atomicity under interruption", function () {
         const analyzeCmd = {
             analyze: collName,
             mode: "sample",
-            samplingMethod: "random",
-            sampleSize: kNumDocs,
         };
 
         // First analyze succeeds and persists a sample.

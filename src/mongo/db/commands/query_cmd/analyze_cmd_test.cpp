@@ -26,8 +26,8 @@ namespace {
 TEST(AnalyzeCommandParseTest, SampleSizeRejectsZero) {
     auto cmd = BSON("analyze" << "myColl"
                               << "$db" << "test"
-                              << "mode" << "sample"
-                              << "samplingMethod" << "random"
+                              << "mode" << "histograms"
+                              << "key" << "a"
                               << "sampleSize" << 0);
     ASSERT_THROWS_CODE(AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze")),
                        DBException,
@@ -37,41 +37,9 @@ TEST(AnalyzeCommandParseTest, SampleSizeRejectsZero) {
 TEST(AnalyzeCommandParseTest, SampleSizeRejectsNegative) {
     auto cmd = BSON("analyze" << "myColl"
                               << "$db" << "test"
-                              << "mode" << "sample"
-                              << "samplingMethod" << "random"
+                              << "mode" << "histograms"
+                              << "key" << "a"
                               << "sampleSize" << -1);
-    ASSERT_THROWS_CODE(AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze")),
-                       DBException,
-                       ErrorCodes::BadValue);
-}
-
-TEST(AnalyzeCommandParseTest, NumChunksRejectsZero) {
-    auto cmd = BSON("analyze" << "myColl"
-                              << "$db" << "test"
-                              << "mode" << "sample"
-                              << "samplingMethod" << "chunk"
-                              << "numChunks" << 0);
-    ASSERT_THROWS_CODE(AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze")),
-                       DBException,
-                       ErrorCodes::BadValue);
-}
-
-TEST(AnalyzeCommandParseTest, NumChunksRejectsNegative) {
-    auto cmd = BSON("analyze" << "myColl"
-                              << "$db" << "test"
-                              << "mode" << "sample"
-                              << "samplingMethod" << "chunk"
-                              << "numChunks" << -1);
-    ASSERT_THROWS_CODE(AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze")),
-                       DBException,
-                       ErrorCodes::BadValue);
-}
-
-TEST(AnalyzeCommandParseTest, SamplingMethodRejectsUnknownValue) {
-    auto cmd = BSON("analyze" << "myColl"
-                              << "$db" << "test"
-                              << "mode" << "sample"
-                              << "samplingMethod" << "invalid_method");
     ASSERT_THROWS_CODE(AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze")),
                        DBException,
                        ErrorCodes::BadValue);
