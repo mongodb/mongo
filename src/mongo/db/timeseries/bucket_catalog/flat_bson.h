@@ -219,6 +219,14 @@ public:
         Iterator search(Iterator first, std::string_view fieldName);
 
         /**
+         * Renames the array element entry at 'pos' so it can be used for an object field with
+         * the given name, keeping the fast lookup map (when present) in sync with the rename.
+         * Returns false and leaves the entry untouched if the map already contains an entry with
+         * 'fieldName', as renaming would create a duplicate key.
+         */
+        bool claimArrayFieldName(Iterator pos, std::string fieldName);
+
+        /**
          * Insert a new element before the position 'pos'. Invalidates all previously returned
          * Iterators and Obj. This Obj remain valid.
          *
