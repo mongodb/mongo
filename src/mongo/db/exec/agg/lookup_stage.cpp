@@ -449,8 +449,6 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
         // causing multiple view kickbacks during the lifetime of $lookup. To handle these repeated
         // view kickbacks, we need to increment '_fieldMatchPipelineIdx' to preserve the previously
         // prepended view pipelines.
-        // TODO SERVER-121988 Remove 'isTimeseriesBucketsCollection' if this behavior should apply
-        // to all collections.
         // TODO SERVER-111172: Remove (if there is) any timeseries handling after 9.0 is LTS.
         _fieldMatchPipelineIdx = resolvedNs.isTimeseriesBucketsCollection()
             ? _fieldMatchPipelineIdx.value_or(0) +
