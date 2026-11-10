@@ -128,7 +128,7 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
     auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
     bool isReplSet = replCoord && replCoord->getSettings().isReplSet();
 
-    std::shared_lock lock(_stateMutex);
+    CheckedSharedLock lock(_stateMutex);
 
     // Do not interrupt if the killing opCtx is performing work or we are inside an
     // UninterruptibleLockGuard.
@@ -179,7 +179,10 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
         // BlockingWrite intent without waiting for pending state transitions to complete. Those
         // transitions are already waiting for the outer intent to be released, so making the nested
         // acquisition wait would deadlock.
-        auto canProceed = [&] {
+        // The predicate reads _pendingStateChange, which requires holding _stateMutex. The wait
+        // machinery re-acquires the lock before each predicate invocation, but the analyzer
+        // cannot see that, so the lambda opts out of the analysis.
+        auto canProceed = [&]() MONGO_LOCKING_NO_THREAD_SAFETY_ANALYSIS {
             return _pendingStateChange == 0 || _holdsBlockingWriteIntent(opCtx);
         };
         if (opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
@@ -204,7 +207,7 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
         // Register the opId -> counter mapping so deregisterIntent can correctly
         // skip the decrement if this opCtx is destroyed before the WUOW ends.
         {
-            std::lock_guard opIdLock(_opIdMutex);
+            clang_checked::lock_guard opIdLock(_opIdMutex);
             _opIdToWriteCountPtr.try_emplace(opCtx->getOpID(), &writeIntentCountOnOpCtx(opCtx));
         }
         writeIntentCleanup(opCtx).init(this, opCtx->getOpID());
@@ -218,7 +221,7 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
                     "opCtx"_attr = opCtx->getOpID());
     }
     {
-        std::unique_lock<std::mutex> lockTokenMap(tokenMap.lock);
+        clang_checked::unique_lock lockTokenMap(tokenMap.lock);
         tokenMap.map.insert({token.id(),
                              {opCtx,
                               opCtx->getClient(),
@@ -232,7 +235,7 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
 }
 void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
     auto& tokenMap = _tokenMaps[(size_t)token.intent()];
-    std::lock_guard<std::mutex> lock(tokenMap.lock);
+    clang_checked::lock_guard lock(tokenMap.lock);
 
     if (token.intent() == Intent::Write || token.intent() == Intent::BlockingWrite) {
         auto it = tokenMap.map.find(token.id());
@@ -242,7 +245,7 @@ void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
             // destroyed before this callback fired (e.g., deferred lock release in a multi-document
             // transaction), WriteIntentCleanup will have already removed the entry, and we skip
             // the decrement to avoid corrupting a new opCtx allocated at the same address.
-            std::lock_guard opIdLock(_opIdMutex);
+            clang_checked::lock_guard opIdLock(_opIdMutex);
             auto countIt = _opIdToWriteCountPtr.find(opId);
             if (countIt != _opIdToWriteCountPtr.end()) {
                 auto newCount = countIt->second->subtractAndFetch(1);
@@ -274,14 +277,14 @@ void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
 
 bool IntentRegistry::_holdsBlockingWriteIntent(const OperationContext* opCtx) {
     auto& tokenMap = _tokenMaps[(size_t)Intent::BlockingWrite];
-    std::lock_guard<std::mutex> lock(tokenMap.lock);
+    clang_checked::lock_guard lock(tokenMap.lock);
     return std::any_of(tokenMap.map.begin(), tokenMap.map.end(), [&](const auto& entry) {
         return entry.second.opId == opCtx->getOpID();
     });
 }
 
 void IntentRegistry::_unregisterWriteCountForOpId(uint64_t opId) {
-    std::lock_guard opIdLock(_opIdMutex);
+    clang_checked::lock_guard opIdLock(_opIdMutex);
     _opIdToWriteCountPtr.erase(opId);
 }
 
@@ -292,7 +295,7 @@ void IntentRegistry::deregisterTokensForClient(Client* client) {
 
         std::vector<IntentToken> tokensToDeregister;
         {
-            std::lock_guard<std::mutex> lock(tokenMap.lock);
+            clang_checked::lock_guard lock(tokenMap.lock);
             for (auto& [id, entry] : tokenMap.map) {
                 if (entry.client == client) {
                     tokensToDeregister.push_back(IntentToken(intent, id));
@@ -318,7 +321,7 @@ void IntentRegistry::deregisterTokensForSession(OperationContext* opCtx,
 
         std::vector<IntentToken> tokensToDeregister;
         {
-            std::lock_guard<std::mutex> lock(tokenMap.lock);
+            clang_checked::lock_guard lock(tokenMap.lock);
             for (auto& [id, entry] : tokenMap.map) {
                 bool lsidMatch = entry.lsid &&
                     (*entry.lsid == lsid || (parentLsid && *entry.lsid == *parentLsid));
@@ -344,7 +347,7 @@ bool IntentRegistry::canDeclareIntent(Intent intent, OperationContext* opCtx) {
     auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
     bool isReplSet = replCoord && replCoord->getSettings().isReplSet();
 
-    std::shared_lock lock(_stateMutex);
+    CheckedSharedLock lock(_stateMutex);
 
     if (opCtx != _interruptionCtx) {
         if (!_validIntent(intent)) {
@@ -369,7 +372,7 @@ IntentRegistry::killConflictingOperations(IntentRegistry::InterruptionType inter
                                           bool orderedByGlobalLock) {
     LOGV2(9945003, "Intent Registry killConflictingOperations", "interrupt"_attr = interrupt);
     {
-        std::unique_lock lock(_stateMutex);
+        clang_checked::unique_lock lock(_stateMutex);
         ++_pendingStateChange;
     }
     auto timeOutSec = std::chrono::seconds(
@@ -379,12 +382,16 @@ IntentRegistry::killConflictingOperations(IntentRegistry::InterruptionType inter
                   std::chrono::duration_cast<std::chrono::milliseconds>(timeOutSec),
                   interrupt);
     {
-        std::unique_lock lock(_stateMutex);
+        clang_checked::unique_lock lock(_stateMutex);
         if (_interruptionCtx) {
             LOGV2(9945001, "Existing kill ongoing. Blocking until it is finished.");
         }
 
-        _activeInterruptionCV.wait(lock, [this] { return !_interruptionCtx; });
+        // The predicate reads _interruptionCtx, which requires holding _stateMutex. The wait
+        // machinery re-acquires the lock before each predicate invocation, but the analyzer
+        // cannot see that, so the lambda opts out of the analysis.
+        _activeInterruptionCV.wait(
+            lock, [&]() MONGO_LOCKING_NO_THREAD_SAFETY_ANALYSIS { return !_interruptionCtx; });
         _lastInterruption = interrupt;
         _interruptionCtx = opCtx;
         _interruptionOrderedByGlobalLock = orderedByGlobalLock;
@@ -457,11 +464,14 @@ IntentRegistry::killConflictingOperations(IntentRegistry::InterruptionType inter
                 }
             }
 
-            updateAndLogStateTransitionMetrics(interrupt, _totalOpsKilled);
-            _totalOpsKilled = 0;
+            // Atomically read and reset the counter: increments happen under the token map lock
+            // of whichever intent is being drained, while this thread holds no registry lock, so
+            // the read-and-reset must itself be a single atomic operation.
+            auto numOpsKilled = _totalOpsKilled.swap(0);
+            updateAndLogStateTransitionMetrics(interrupt, numOpsKilled);
 
             return ReplicationStateTransitionGuard([&]() {
-                std::lock_guard lock(_stateMutex);
+                clang_checked::lock_guard lock(_stateMutex);
                 _interruptionCtx = nullptr;
                 _lastInterruption = InterruptionType::None;
                 _interruptionOrderedByGlobalLock = false;
@@ -492,17 +502,17 @@ bool IntentRegistry::hasWriteIntentDeclared(const OperationContext* opCtx) {
 }
 
 bool IntentRegistry::isPrimaryEnforcementActive() {
-    std::shared_lock lock(_stateMutex);
+    CheckedSharedLock lock(_stateMutex);
     return _primaryEnforcementActive;
 }
 
 void IntentRegistry::activatePrimaryEnforcement() {
-    std::lock_guard lock(_stateMutex);
+    clang_checked::lock_guard lock(_stateMutex);
     _primaryEnforcementActive = true;
 }
 
 void IntentRegistry::enable() {
-    std::lock_guard lock(_stateMutex);
+    clang_checked::lock_guard lock(_stateMutex);
     _enabled = true;
     _primaryEnforcementActive = true;
     _lastInterruption = InterruptionType::None;
@@ -511,7 +521,7 @@ void IntentRegistry::enable() {
 }
 
 void IntentRegistry::disable() {
-    std::lock_guard lock(_stateMutex);
+    clang_checked::lock_guard lock(_stateMutex);
     _enabled = false;
     _primaryEnforcementActive = false;
     _lastInterruption = InterruptionType::None;
@@ -537,7 +547,7 @@ bool IntentRegistry::_validIntent(IntentRegistry::Intent intent) const {
 void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent,
                                              InterruptionType interruption) {
     auto& tokenMap = _tokenMaps[(size_t)intent];
-    std::lock_guard<std::mutex> lock(tokenMap.lock);
+    clang_checked::lock_guard lock(tokenMap.lock);
     for (auto& [token, entry] : tokenMap.map) {
         // Atomically look up and lock the client by opId rather than dereferencing the stored
         // Client* directly. This is safe even if the client is undergoing destruction: once
@@ -590,7 +600,7 @@ void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent,
             entry.svcCtx->killOperation(
                 clientLock, currentOpCtx, ErrorCodes::InterruptedDueToReplStateChange);
         }
-        _totalOpsKilled += 1;
+        _totalOpsKilled.addAndFetch(1);
         LOGV2(9795400,
               "Repl state change interrupted a thread.",
               "name"_attr = entry.clientDesc,
@@ -605,9 +615,15 @@ void IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
     static constexpr auto kRetryKillInterval = std::chrono::milliseconds(100);
 
     auto& tokenMap = _tokenMaps[(size_t)intent];
-    std::unique_lock<std::mutex> lock(tokenMap.lock);
 
-    auto logAndFassert = [&]() {
+    // The predicate and logAndFassert read tokenMap.map, which requires holding tokenMap.lock.
+    // The wait machinery re-acquires the lock before each predicate invocation (and
+    // logAndFassert is only called with it held), but the analyzer cannot see either, so both
+    // lambdas opt out of the analysis.
+    auto mapEmpty = [&]() MONGO_LOCKING_NO_THREAD_SAFETY_ANALYSIS {
+        return tokenMap.map.empty();
+    };
+    auto logAndFassert = [&]() MONGO_LOCKING_NO_THREAD_SAFETY_ANALYSIS {
         LOGV2(
             9795403, "There are still registered intents", "Intent"_attr = intentToString(intent));
         for (auto& [token, entry] : tokenMap.map) {
@@ -625,45 +641,57 @@ void IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
         fasserted(9795401);
     };
 
+    // Each iteration takes tokenMap.lock in its own scope, waits, and then runs the kill pass
+    // outside the lock (it takes the lock itself), rather than unlocking and relocking a single
+    // guard: relocking a guard mid-function is not modeled precisely by the analyzer.
     if (timeout.count()) {
         auto deadline = std::chrono::steady_clock::now() + timeout;
-        while (!tokenMap.map.empty()) {
-            auto now = std::chrono::steady_clock::now();
-            if (now >= deadline) {
-                logAndFassert();
-                return;
+        while (true) {
+            {
+                clang_checked::unique_lock lock(tokenMap.lock);
+                if (tokenMap.map.empty()) {
+                    break;
+                }
+                auto now = std::chrono::steady_clock::now();
+                if (now >= deadline) {
+                    logAndFassert();
+                    return;
+                }
+                auto remaining =
+                    std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now);
+                auto waitTime = std::min(remaining, kRetryKillInterval);
+                tokenMap.cv.wait_for(lock, waitTime, mapEmpty);
+                if (tokenMap.map.empty()) {
+                    break;
+                }
             }
-            auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now);
-            auto waitTime = std::min(remaining, kRetryKillInterval);
-            tokenMap.cv.wait_for(lock, waitTime, [&tokenMap] { return tokenMap.map.empty(); });
-
-            if (!tokenMap.map.empty()) {
-                lock.unlock();
-                _killOperationsByIntent(intent, interruption);
-                lock.lock();
-            }
+            _killOperationsByIntent(intent, interruption);
         }
     } else {
-        while (!tokenMap.map.empty()) {
-            tokenMap.cv.wait_for(
-                lock, kRetryKillInterval, [&tokenMap] { return tokenMap.map.empty(); });
-            if (!tokenMap.map.empty()) {
-                lock.unlock();
-                _killOperationsByIntent(intent, interruption);
-                lock.lock();
+        while (true) {
+            {
+                clang_checked::unique_lock lock(tokenMap.lock);
+                if (tokenMap.map.empty()) {
+                    break;
+                }
+                tokenMap.cv.wait_for(lock, kRetryKillInterval, mapEmpty);
+                if (tokenMap.map.empty()) {
+                    break;
+                }
             }
+            _killOperationsByIntent(intent, interruption);
         }
     }
 }
 
 size_t IntentRegistry::getTotalOpsKilled() const {
-    return _totalOpsKilled;
+    return _totalOpsKilled.load();
 }
 
 std::vector<size_t> IntentRegistry::getTotalIntentsDeclared() const {
     auto getTotalIntents = [&](IntentRegistry::Intent intent) {
         auto& tokenMap = _tokenMaps[(size_t)intent];
-        std::unique_lock<std::mutex> lock(tokenMap.lock);
+        clang_checked::unique_lock lock(tokenMap.lock);
         return tokenMap.map.size();
     };
     auto res = std::vector<size_t>();

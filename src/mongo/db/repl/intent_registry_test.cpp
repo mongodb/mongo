@@ -6,11 +6,15 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/fail_point.h"
 
 #include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <vector>
 
 
 namespace mongo {
@@ -908,6 +912,52 @@ TEST_F(IntentRegistryTest, WriteIntentLifetimeExtendedThroughWriteUnitOfWork) {
 
     // Once the WUOW ends, both the lock and the intent are released.
     ASSERT_FALSE(_intentRegistry->hasWriteIntentDeclared(opCtx.get()));
+}
+
+TEST_F(IntentRegistryTest, CheckedRWMutexAllowsConcurrentSharedLockers) {
+    // The registry's read path depends on CheckedRWMutex allowing concurrent shared holders.
+    // Every reader must arrive (while holding the mutex) before any of them leaves, which is
+    // only possible if shared acquisitions do not exclude one another; otherwise the last
+    // reader can never arrive and this test hangs until its timeout.
+    CheckedRWMutex mutex;
+    constexpr int kReaders = 4;
+    std::mutex m;
+    std::condition_variable cv;
+    int arrived = 0;
+
+    std::vector<stdx::thread> readers;
+    for (int i = 0; i < kReaders; ++i) {
+        readers.emplace_back([&] {
+            CheckedSharedLock lock(mutex);
+            std::unique_lock lk(m);
+            if (++arrived == kReaders) {
+                cv.notify_all();
+            } else {
+                cv.wait(lk, [&] { return arrived == kReaders; });
+            }
+        });
+    }
+    for (auto& reader : readers) {
+        reader.join();
+    }
+}
+
+TEST_F(IntentRegistryTest, CheckedSharedLockSupportsUnlockAndRelock) {
+    // The lock()/unlock() pair exists for condition_variable waits, which release and re-acquire
+    // the mutex around the actual sleep. Verify a full cycle: while the guard is unlocked,
+    // another thread can take the mutex exclusively (if unlock() failed to release, this thread
+    // would hang on join), and the subsequent relock succeeds.
+    CheckedRWMutex mutex;
+    CheckedSharedLock lock(mutex);
+    lock.unlock();
+
+    stdx::thread writer([&] {
+        mutex.lock();
+        mutex.unlock();
+    });
+    writer.join();
+
+    lock.lock();
 }
 
 }  // namespace mongo

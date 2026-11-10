@@ -5,6 +5,9 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/clang_checked/checked_mutex.h"
+#include "mongo/db/repl/clang_checked/mutex.h"
+#include "mongo/db/repl/clang_checked/thread_safety_annotations.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic.h"
@@ -17,7 +20,6 @@
 #include <functional>
 #include <future>
 #include <mutex>
-#include <shared_mutex>
 #include <vector>
 
 
@@ -69,6 +71,72 @@ class WriteIntentCleanup;
 // destroyed while a stashed WUOW still holds write-intent tokens, preventing
 // _killOperationsByIntent from dereferencing the freed client pointer.
 class ClientIntentCleanup;
+
+/**
+ * CheckedRWMutex is to RWMutex what clang_checked::CheckedMutex is to exclusive mutex types:
+ * wrapping the mutex gives the state it guards a capability that the MONGO_LOCKING_* annotations
+ * can name, so clang's thread safety analysis can verify that every access is made while holding
+ * the mutex. Unlike clang_checked::CheckedMutex, which models exclusive locking only, this
+ * declares a "shared" capability so reader acquisitions are modeled too.
+ *
+ * It is defined here rather than in clang_checked because the intent registry is its only user so
+ * far; move it there if a second user appears.
+ */
+class MONGO_LOCKING_CAPABILITY("shared") CheckedRWMutex {
+public:
+    void lock() MONGO_LOCKING_ACQUIRE() {
+        _m.lock();
+    }
+
+    void unlock() MONGO_LOCKING_RELEASE() {
+        _m.unlock();
+    }
+
+    void lock_shared() MONGO_LOCKING_ACQUIRE_SHARED() {
+        _m.lock_shared();
+    }
+
+    void unlock_shared() MONGO_LOCKING_RELEASE_SHARED() {
+        _m.unlock_shared();
+    }
+
+private:
+    mutable RWMutex _m;
+};
+
+/**
+ * RAII shared (reader) acquisition of a CheckedRWMutex, analogous to std::shared_lock but visible
+ * to clang's thread safety analysis. lock() and unlock() exist so the guard can be used with
+ * stdx::condition_variable and Interruptible waits (via BasicLockableAdapter), both of which
+ * release and re-acquire the lock around the actual sleep. They are not annotated: the analyzer
+ * models the acquisition made by the constructor and the destructor, and the transient release
+ * during a wait is invisible to it.
+ */
+class MONGO_LOCKING_SCOPED_CAPABILITY CheckedSharedLock {
+public:
+    explicit CheckedSharedLock(CheckedRWMutex& mutex) MONGO_LOCKING_ACQUIRE_SHARED(mutex)
+        : _mutex(mutex) {
+        _mutex.lock_shared();
+    }
+
+    CheckedSharedLock(const CheckedSharedLock&) = delete;
+    CheckedSharedLock& operator=(const CheckedSharedLock&) = delete;
+
+    ~CheckedSharedLock() MONGO_LOCKING_RELEASE() {
+        _mutex.unlock_shared();
+    }
+
+    void lock() MONGO_LOCKING_NO_THREAD_SAFETY_ANALYSIS {
+        _mutex.lock_shared();
+    }
+
+    void unlock() MONGO_LOCKING_NO_THREAD_SAFETY_ANALYSIS {
+        _mutex.unlock_shared();
+    }
+
+private:
+    CheckedRWMutex& _mutex;
+};
 
 class IntentRegistry {
     friend class IntentRegistryTest;
@@ -145,7 +213,7 @@ public:
      * Returns true if there is an active Replication state transition ongoing, false otherwise.
      */
     bool activeStateTransition() {
-        std::shared_lock lock(_stateMutex);
+        CheckedSharedLock lock(_stateMutex);
         return _interruptionCtx != nullptr;
     }
 
@@ -154,7 +222,7 @@ public:
      * boost::none otherwise.
      */
     boost::optional<OperationContext*> replicationStateTransitionInterruptionCtx() {
-        std::shared_lock lock(_stateMutex);
+        CheckedSharedLock lock(_stateMutex);
         if (_interruptionCtx != nullptr) {
             return _interruptionCtx;
         } else {
@@ -180,7 +248,7 @@ public:
      * boost::none if there is no active transition.
      */
     boost::optional<ActiveStateTransition> activeStateTransitionInfo() {
-        std::shared_lock lock(_stateMutex);
+        CheckedSharedLock lock(_stateMutex);
         if (!_interruptionCtx) {
             return boost::none;
         }
@@ -195,7 +263,7 @@ public:
     bool isOpBlockedByActiveTransitionDrain(OperationContext* opCtx) {
         InterruptionType interruption;
         {
-            std::shared_lock lock(_stateMutex);
+            CheckedSharedLock lock(_stateMutex);
             if (!_interruptionCtx) {
                 return false;
             }
@@ -293,13 +361,16 @@ private:
         std::string clientDesc;
     };
 
+    // One map per intent kind. `lock` guards `map` and must be held to inspect or mutate it;
+    // `cv` is notified when the map becomes empty so drains waiting on it can wake up.
     struct tokenMap {
-        mutable std::mutex lock;
+        mutable clang_checked::CheckedMutex<std::mutex> lock;
         stdx::condition_variable cv;
-        absl::flat_hash_map<IntentToken::idType, TokenMapEntry> map;
+        absl::flat_hash_map<IntentToken::idType, TokenMapEntry> map MONGO_LOCKING_GUARDED_BY(lock);
     };
 
-    bool _validIntent(Intent intent) const;
+    // Callers must hold _stateMutex, shared is sufficient.
+    bool _validIntent(Intent intent) const MONGO_LOCKING_REQUIRES_SHARED(_stateMutex);
     void _killOperationsByIntent(Intent intent, InterruptionType interruption);
     void _waitForDrain(Intent intent,
                        std::chrono::milliseconds timeout,
@@ -312,28 +383,36 @@ private:
     // Removes the mapping so deferred deregistration callbacks skip the decrement.
     void _unregisterWriteCountForOpId(uint64_t opId);
 
-    bool _enabled = true;
+    // Intent registration and state transition state, guarded by _stateMutex. Readers take it
+    // shared; state transitions take it exclusive.
+    mutable CheckedRWMutex _stateMutex;
+    bool _enabled MONGO_LOCKING_GUARDED_BY(_stateMutex) = true;
     // Controls if we reject write intents based on if a node is primary or not. Starts false so
     // that unit tests do not need to set up a primary in order to register intents.
-    bool _primaryEnforcementActive = false;
-    RWMutex _stateMutex;
+    bool _primaryEnforcementActive MONGO_LOCKING_GUARDED_BY(_stateMutex) = false;
     stdx::condition_variable _activeInterruptionCV;
-    InterruptionType _lastInterruption = InterruptionType::None;
+    InterruptionType _lastInterruption MONGO_LOCKING_GUARDED_BY(_stateMutex) =
+        InterruptionType::None;
     // TODO(SERVER-122542): Remove once step up no longer takes the global lock in MODE_X.
-    bool _interruptionOrderedByGlobalLock = false;
-    OperationContext* _interruptionCtx = nullptr;
+    bool _interruptionOrderedByGlobalLock MONGO_LOCKING_GUARDED_BY(_stateMutex) = false;
+    OperationContext* _interruptionCtx MONGO_LOCKING_GUARDED_BY(_stateMutex) = nullptr;
+    // Fixed at construction; each element's map is guarded by that element's own lock.
     std::vector<tokenMap> _tokenMaps;
     // Number of state transitions that are pending or in progress. Guarded by _stateMutex.
-    int _pendingStateChange = 0;
+    int _pendingStateChange MONGO_LOCKING_GUARDED_BY(_stateMutex) = 0;
     stdx::condition_variable _pendingStateChangeCV;
 
     // Maps opCtx opId -> write intent counter pointer. Removed when the opCtx is destroyed
     // (via WriteIntentCleanup) so deferred callbacks don't corrupt a new opCtx's counter.
-    mutable std::mutex _opIdMutex;
-    absl::flat_hash_map<uint64_t, Atomic<int32_t>*> _opIdToWriteCountPtr;
+    mutable clang_checked::CheckedMutex<std::mutex> _opIdMutex;
+    absl::flat_hash_map<uint64_t, Atomic<int32_t>*> _opIdToWriteCountPtr
+        MONGO_LOCKING_GUARDED_BY(_opIdMutex);
 
-    // Tracks number of operations killed on state transition.
-    size_t _totalOpsKilled = 0;
+    // Tracks number of operations killed on state transition. Atomic rather than mutex-guarded:
+    // it is incremented by _killOperationsByIntent under whichever token map lock is currently
+    // being drained, and read and reset by the transition thread after the drain completes while
+    // holding no registry lock, so no single mutex protects every access.
+    Atomic<size_t> _totalOpsKilled{0};
 };
 }  // namespace consensus
 }  // namespace rss

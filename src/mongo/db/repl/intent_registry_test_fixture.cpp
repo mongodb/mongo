@@ -18,13 +18,13 @@ void IntentRegistryTest::tearDown() {
 
 bool IntentRegistryTest::containsToken(IntentRegistry::IntentToken token) const {
     auto& tokenMap = _intentRegistry->_tokenMaps[(size_t)token.intent()];
-    std::lock_guard<std::mutex> lock(tokenMap.lock);
+    clang_checked::lock_guard lock(tokenMap.lock);
     return tokenMap.map.contains(token.id());
 }
 
 size_t IntentRegistryTest::getMapSize(IntentRegistry::Intent intent) const {
     auto& tokenMap = _intentRegistry->_tokenMaps[(size_t)intent];
-    std::lock_guard<std::mutex> lock(tokenMap.lock);
+    clang_checked::lock_guard lock(tokenMap.lock);
     return tokenMap.map.size();
 }
 
