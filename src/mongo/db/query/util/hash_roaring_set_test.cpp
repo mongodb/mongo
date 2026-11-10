@@ -135,6 +135,33 @@ TEST(HashRoaringTest, Migration) {
     ASSERT_EQ(hashRoaring.getCurrentState(), HashRoaringSet::kBitmap);
 }
 
+TEST(HashRoaringTest, EraseDuringMigration) {
+    HashRoaringSet hashRoaring(1'000, 7, 1'000'000);
+
+    for (uint64_t i = 0; i < 1'000; ++i) {
+        ASSERT_TRUE(hashRoaring.addChecked(i));
+    }
+    ASSERT_TRUE(hashRoaring.addChecked(1'000));
+    ASSERT_EQ(hashRoaring.getCurrentState(), HashRoaringSet::kHashTableAndBitmap);
+
+    for (uint64_t i = 0; i < 1'000; i += 3) {
+        hashRoaring.erase(i);
+        hashRoaring.addChecked(2'000 + i);
+    }
+
+    for (uint64_t i = 0; i < 5'000; ++i) {
+        hashRoaring.addChecked(5'000 + i);
+    }
+    ASSERT_EQ(hashRoaring.getCurrentState(), HashRoaringSet::kBitmap);
+
+    for (uint64_t i = 0; i <= 1'000; ++i) {
+        ASSERT_EQ(hashRoaring.contains(i), i >= 1'000 || i % 3 != 0) << i;
+    }
+    for (uint64_t i = 0; i < 1'000; i += 3) {
+        ASSERT_TRUE(hashRoaring.contains(2'000 + i)) << i;
+    }
+}
+
 TEST(HashRoaringTest, HashRoaringIterator) {
     bool isSwitched = false;
     size_t threshold = 40;

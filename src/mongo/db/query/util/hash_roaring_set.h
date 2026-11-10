@@ -8,6 +8,7 @@
 #include "mongo/util/roaring_bitmaps.h"
 
 #include <absl/container/flat_hash_set.h>
+#include <boost/optional/optional.hpp>
 
 
 namespace mongo {
@@ -198,6 +199,7 @@ public:
                 return;
             case kHashTableAndBitmap:
                 _hashTable.erase(value);
+                _migrationPos = boost::none;
                 _bitmap.erase(value);
                 return;
             case kBitmap:
@@ -217,6 +219,7 @@ public:
 
     void clear() {
         _hashTable.clear();
+        _migrationPos = boost::none;
         _bitmap.clear();
         _size = 0;
         _minValue = std::numeric_limits<uint64_t>::max();
@@ -252,10 +255,12 @@ private:
      * Move 'chunkSize' elements from hash table to Roaring Bitmaps.
      */
     void migrateNextChunk() {
-        auto pos = _hashTable.begin();
-        for (size_t i = 0; i < _chunkSize && pos != _hashTable.end(); ++i) {
-            _bitmap.add(*pos);
-            _hashTable.erase(pos++);
+        if (!_migrationPos) {
+            _migrationPos = _hashTable.begin();
+        }
+        for (size_t i = 0; i < _chunkSize && *_migrationPos != _hashTable.end(); ++i) {
+            _bitmap.add(**_migrationPos);
+            _hashTable.erase((*_migrationPos)++);
         }
 
         if (_hashTable.empty()) {
@@ -265,6 +270,7 @@ private:
     }
 
     absl::flat_hash_set<uint64_t> _hashTable;
+    boost::optional<absl::flat_hash_set<uint64_t>::iterator> _migrationPos;
     Roaring64BTree _bitmap;
 
     const size_t _threshold;
