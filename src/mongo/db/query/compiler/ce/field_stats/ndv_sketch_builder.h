@@ -4,8 +4,8 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/compiler/ce/field_stats/field_stats_gen.h"
 #include "mongo/db/query/compiler/ce/field_stats/hyperloglog.h"
-#include "mongo/db/query/compiler/ce/field_stats/ndv_sketch_gen.h"
 
 #include <cstddef>
 #include <span>
@@ -22,16 +22,16 @@ public:
     explicit NdvSketchBuilder(size_t numFields);
 
     /**
-     * Consumes borrowed values in canonical field order without retaining or modifying them.
+     * Consumes borrowed values in a consistent field order without retaining or modifying them.
      * Missing values must be represented as Nothing, distinct from null.
      */
-    void accumulateTuple(std::span<const sbe::value::TagValueView> values);
+    void accumulate(std::span<const sbe::value::TagValueView> values);
 
     /**
      * Returns an owned snapshot: one strict sketch for a single field; otherwise the strict
      * tuple, one missing-to-null folding variant per field, and the all-match variant.
      */
-    std::vector<NdvSketch> getSketches() const;
+    NdvStats getStats() const;
 
 private:
     size_t _numFields;

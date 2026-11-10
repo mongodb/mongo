@@ -87,10 +87,10 @@ public:
      * missing) vs. regular equality semantics (null == missing).
      *
      * Note: when the estimate is served from persisted NDV statistics (no bounds, at most
-     * kNdvMaxFields fields), the semantics select the persisted folding variant. A single-field
-     * statistic carries only the strict ($expr) sketch and serves both semantics, off by at most
-     * one; a composite statistic carries one variant per folded field plus all-match, and requests
-     * folding several but not all fields fall back to the sample.
+     * kMaxFieldStatsFields fields), the semantics select the persisted folding variant. A
+     * single-field statistic carries only the strict ($expr) sketch and serves both semantics, off
+     * by at most one; a composite statistic carries one variant per folded field plus all-match,
+     * and requests folding several but not all fields fall back to the sample.
      */
     virtual CardinalityEstimate estimateNDV(
         const std::vector<FieldPathAndEqSemantics>& fields,

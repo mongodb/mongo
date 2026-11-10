@@ -91,6 +91,8 @@ protected:
         sketch.setPrecision(14);
         NdvStats ndvStats;
         ndvStats.setSketches({std::move(sketch)});
+        McvStats mcvStats;
+        mcvStats.setSketches({});
 
         FieldStatsDoc doc;
         doc.set_id(makeFieldStatsId(collUuid, {path}));
@@ -99,6 +101,7 @@ protected:
         doc.setSortedFieldPaths(std::vector<std::string>{path});
         doc.setCreatedAt(kCreatedAt);
         doc.setNdv(std::move(ndvStats));
+        doc.setMcv(std::move(mcvStats));
         return doc.toBSON();
     }
 
@@ -125,6 +128,8 @@ protected:
             sketches.push_back(std::move(sketch));
         }
         ndvStats.setSketches(std::move(sketches));
+        McvStats mcvStats;
+        mcvStats.setSketches({});
 
         FieldStatsDoc doc;
         doc.set_id(makeFieldStatsId(collUuid, {"a"}));
@@ -133,6 +138,7 @@ protected:
         doc.setSortedFieldPaths(std::vector<std::string>{"a"});
         doc.setCreatedAt(Date_t::now());
         doc.setNdv(std::move(ndvStats));
+        doc.setMcv(std::move(mcvStats));
         insertStatsDoc(doc.toBSON());
     }
 
@@ -160,6 +166,8 @@ protected:
             sketches.push_back(std::move(sketch));
         }
         ndvStats.setSketches(std::move(sketches));
+        McvStats mcvStats;
+        mcvStats.setSketches({});
 
         FieldStatsDoc doc;
         doc.set_id(makeFieldStatsId(collUuid, paths));
@@ -168,6 +176,7 @@ protected:
         doc.setSortedFieldPaths(paths);
         doc.setCreatedAt(kCreatedAt);
         doc.setNdv(std::move(ndvStats));
+        doc.setMcv(std::move(mcvStats));
         insertStatsDoc(doc.toBSON());
     }
 
@@ -395,6 +404,11 @@ TEST_F(PersistentNDVTest, MissingNdvSectionFallsBack) {
     // The ndv section is required by the schema, so a stored document lacking it fails to
     // parse on the read path and must not be served.
     insertStatsDoc(makeStatsDoc(kPersistedNDV).removeField("ndv"));
+    ASSERT_NE(estimateForA(), kPersistedNDV);
+}
+
+TEST_F(PersistentNDVTest, MissingMcvSectionFallsBack) {
+    insertStatsDoc(makeStatsDoc(kPersistedNDV).removeField("mcv"));
     ASSERT_NE(estimateForA(), kPersistedNDV);
 }
 

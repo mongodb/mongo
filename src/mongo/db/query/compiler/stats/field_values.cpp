@@ -18,6 +18,7 @@ std::pair<std::vector<FieldValueTuple>, bool> extractFieldValues(const BSONObj& 
 
     std::vector<FieldValueTuple> tuples(1);
     MultikeyComponents arrayComponents;
+    bool hasNonScalar = false;
     for (const auto& path : paths) {
         BSONElementSet elements;
         multikey_dotted_path_support::extractAllElementsAlongPath(
@@ -26,6 +27,9 @@ std::pair<std::vector<FieldValueTuple>, bool> extractFieldValues(const BSONObj& 
             elements,
             /*expandArrayOnTrailingField=*/true,
             &arrayComponents);
+
+        hasNonScalar = hasNonScalar || !arrayComponents.empty() ||
+            std::ranges::any_of(elements, &BSONElement::isABSONObj);
 
         const auto numValues = std::max<size_t>(elements.size(), 1);
         uassert(ErrorCodes::ExceededMemoryLimit,
@@ -48,7 +52,7 @@ std::pair<std::vector<FieldValueTuple>, bool> extractFieldValues(const BSONObj& 
 
         tuples = std::move(expanded);
     }
-    return {std::move(tuples), !arrayComponents.empty()};
+    return {std::move(tuples), hasNonScalar};
 }
 
 }  // namespace mongo::stats

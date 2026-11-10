@@ -3,6 +3,8 @@
 
 #include "mongo/db/query/compiler/ce/field_stats/field_stats.h"
 
+#include "mongo/db/field_ref.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -37,6 +39,21 @@ std::string makeFieldStatsId(const UUID& collectionUuid, std::vector<std::string
         id << "|" << escapeFieldPath(path);
     }
     return id;
+}
+
+void validateFieldStatsPath(std::string_view path) {
+    const FieldRef fieldRef(path);
+    uassert(6799703, "Key path is empty", !fieldRef.empty());
+
+    const auto numericPathComponents = fieldRef.getNumericPathComponents(0);
+    uassert(6799704,
+            str::stream() << "Key path contains numeric component "
+                          << fieldRef.getPart(*(numericPathComponents.begin())),
+            numericPathComponents.empty());
+
+    for (size_t i = 0; i < fieldRef.numParts(); ++i) {
+        uassertStatusOK(FieldPath::validateFieldName(fieldRef.getPart(i)));
+    }
 }
 
 }  // namespace mongo::ce

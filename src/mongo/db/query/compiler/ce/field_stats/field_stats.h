@@ -7,15 +7,16 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mongo::ce {
 
 inline constexpr int kFieldStatsSchemaVersion = 1;
 
-// Maximum number of fields a composite NDV statistic may cover. Enforced on user input by the
-// analyze command and defensively by the sketch builder.
-inline constexpr size_t kNdvMaxFields = 3;
+// Maximum number of fields a composite field statistic may cover. Enforced on user input by the
+// field statistics builder.
+inline constexpr size_t kMaxFieldStatsFields = 3;
 
 /**
  * Builds the '_id' string for a field-stats document, e.g. "1|<collection uuid>|<field path>".
@@ -28,5 +29,7 @@ inline constexpr size_t kNdvMaxFields = 3;
  * escaped so a path cannot fake a separator.
  */
 std::string makeFieldStatsId(const UUID& collectionUuid, std::vector<std::string> fieldPaths);
+
+void validateFieldStatsPath(std::string_view path);
 
 }  // namespace mongo::ce

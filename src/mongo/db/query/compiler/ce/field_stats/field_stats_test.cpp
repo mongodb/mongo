@@ -3,6 +3,8 @@
 
 #include "mongo/db/query/compiler/ce/field_stats/field_stats.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/query/compiler/ce/field_stats/field_stats_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/unittest.h"
@@ -74,6 +76,16 @@ TEST(FieldStatsDocTest, SerializationGolden) {
     doc.setCreatedAt(Date_t::fromMillisSinceEpoch(1000));
     doc.setNdv(std::move(ndvStats));
 
+    McvEntry entry;
+    entry.setValue(IDLAnyTypeOwned(BSON("value" << 1.5).firstElement()));
+    entry.setEstFreq(5);
+    entry.setErr(2);
+    McvSketch mcvSketch;
+    mcvSketch.setEntries({std::move(entry)});
+    McvStats mcvStats;
+    mcvStats.setSketches({std::move(mcvSketch)});
+    doc.setMcv(std::move(mcvStats));
+
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "_id": "1|aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee|a.b",
@@ -91,9 +103,31 @@ TEST(FieldStatsDocTest, SerializationGolden) {
                         "precision": 14
                     }
                 ]
+            },
+            "mcv": {
+                "sketches": [
+                    {
+                        "entries": [
+                            {
+                                "value": 1.5,
+                                "estFreq": 5,
+                                "err": 2
+                            }
+                        ]
+                    }
+                ]
             }
         })",
         doc.toBSON());
+}
+
+TEST(FieldStatsDocTest, McvEntriesRejectInvalidCounts) {
+    for (const auto& entry : {BSON("value" << BSONObj() << "estFreq" << 0LL << "err" << 0LL),
+                              BSON("value" << BSONObj() << "estFreq" << 1LL << "err" << -1LL)}) {
+        ASSERT_THROWS_CODE(McvEntry::parse(entry, IDLParserContext("McvEntry")),
+                           DBException,
+                           ErrorCodes::BadValue);
+    }
 }
 
 TEST(FieldStatsDocTest, RoundTripsThroughIdl) {
@@ -113,6 +147,16 @@ TEST(FieldStatsDocTest, RoundTripsThroughIdl) {
     doc.setSortedFieldPaths(std::vector<std::string>{"a.b"});
     doc.setCreatedAt(Date_t::now());
     doc.setNdv(std::move(ndvStats));
+
+    McvEntry entry;
+    entry.setValue(IDLAnyTypeOwned(BSON("value" << 1.5).firstElement()));
+    entry.setEstFreq(5);
+    entry.setErr(2);
+    McvSketch mcvSketch;
+    mcvSketch.setEntries({std::move(entry)});
+    McvStats mcvStats;
+    mcvStats.setSketches({std::move(mcvSketch)});
+    doc.setMcv(std::move(mcvStats));
 
     const BSONObj serialized = doc.toBSON();
     const auto parsed = FieldStatsDoc::parse(serialized, IDLParserContext("FieldStatsDoc"));

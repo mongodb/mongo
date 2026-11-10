@@ -28,9 +28,28 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "mcv_sketch_gen",
+    src = "mcv_sketch.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "mcv_sketch_gen_lib",
+    srcs = [
+        ":mcv_sketch_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
     name = "field_stats_gen",
     src = "field_stats.idl",
     deps = [
+        ":mcv_sketch_gen",
         ":ndv_sketch_gen",
         "//src/mongo/db:basic_types_gen",
     ],
@@ -46,8 +65,11 @@ mongo_cc_library(
         "field_stats.h",
     ],
     deps = [
+        ":mcv_sketch_gen_lib",
         ":ndv_sketch_gen_lib",
+        "//src/mongo/db:common",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/pipeline:field_path",
     ],
 )
 
@@ -86,6 +108,23 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
     ],
+)
+
+mongo_cc_library(
+    name = "mcv_sketch_builder",
+    srcs = ["mcv_sketch_builder.cpp"],
+    hdrs = ["mcv_sketch_builder.h"],
+    deps = [
+        ":field_stats",
+        "//src/mongo/db/query/compiler/stats:stats_gen",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "mcv_sketch_builder_test",
+    srcs = ["mcv_sketch_builder_test.cpp"],
+    tags = ["mongo_unittest_first_group"],
+    deps = [":mcv_sketch_builder"],
 )
 
 mongo_cc_unit_test(
@@ -142,6 +181,28 @@ mongo_cc_unit_test(
     srcs = ["ndv_sketch_builder_test.cpp"],
     tags = ["mongo_unittest_sixth_group"],
     deps = [":ndv_sketch_builder"],
+)
+
+mongo_cc_library(
+    name = "field_stats_builder",
+    srcs = ["field_stats_builder.cpp"],
+    hdrs = ["field_stats_builder.h"],
+    deps = [
+        ":field_stats",
+        ":mcv_sketch_builder",
+        ":ndv_sketch_builder",
+        "//src/mongo/db/pipeline:field_path",
+        "//src/mongo/db/query/compiler/stats:field_values",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "field_stats_builder_test",
+    srcs = ["field_stats_builder_test.cpp"],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":field_stats_builder",
+    ],
 )
 
 mongo_cc_fuzztest(

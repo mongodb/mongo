@@ -763,7 +763,8 @@ boost::optional<PersistedNDVEntry> SamplingEstimatorImpl::loadPersistedNDVStats(
 
 boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPersistentStats(
     const std::vector<FieldPathAndEqSemantics>& fields) const {
-    if (fields.empty() || fields.size() > ce::kNdvMaxFields || !persistentNDVStatsEnabled()) {
+    if (fields.empty() || fields.size() > ce::kMaxFieldStatsFields ||
+        !persistentNDVStatsEnabled()) {
         return boost::none;
     }
 

@@ -240,8 +240,8 @@ public:
 
     /**
      * Serves the NDV from persisted field statistics (built by analyze mode "fieldStats") when
-     * eligible: 'persistentNDVStatsEnabled()' and at most 'kNdvMaxFields' fields. The request's
-     * equality semantics select the persisted folding variant; composite requests folding
+     * eligible: 'persistentNDVStatsEnabled()' and at most 'kMaxFieldStatsFields' fields. The
+     * request's equality semantics select the persisted folding variant; composite requests folding
      * several but not all fields have none and are ineligible. Documents are cached per sorted path
      * set and results, including misses, are memoized per path set and variant.
      */

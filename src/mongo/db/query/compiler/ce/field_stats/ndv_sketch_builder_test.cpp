@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/ce/field_stats/ndv_sketch_builder.h"
 
 #include "mongo/db/query/compiler/ce/field_stats/ndv_hashing.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -21,7 +22,8 @@ using sbe::value::TagValueView;
 
 void assertNdvs(const NdvSketchBuilder& builder, const std::vector<long long>& expected) {
     std::vector<long long> actual;
-    for (const auto& sketch : builder.getSketches()) {
+    const auto stats = builder.getStats();
+    for (const auto& sketch : stats.getSketches()) {
         actual.push_back(sketch.getNdv());
     }
     ASSERT_EQ(actual, expected);
@@ -36,9 +38,10 @@ HyperLogLog deserializeSketch(const NdvSketch& sketch) {
 
 TEST(NdvSketchBuilderTest, StrictSketchUsesSharedHash) {
     const std::array values{TagValueView::numberInt32(7), TagValueView::null()};
+
     NdvSketchBuilder builder(2);
-    builder.accumulateTuple(values);
-    const auto strictSketch = deserializeSketch(builder.getSketches().front());
+    builder.accumulate(values);
+    const auto strictSketch = deserializeSketch(builder.getStats().getSketches().front());
 
     auto expected = uassertStatusOK(HyperLogLog::create(NdvSketchBuilder::kPrecision));
     expected.addHash(hashValuesForNdv(values));
@@ -52,10 +55,11 @@ TEST(NdvSketchBuilderTest, SerializedSketchesPreserveState) {
     const auto one = TagValueView::numberInt32(1);
 
     NdvSketchBuilder builder(3);
-    builder.accumulateTuple(std::array{missing, missing, one});
-    builder.accumulateTuple(std::array{null, null, one});
+    builder.accumulate(std::array{missing, missing, one});
+    builder.accumulate(std::array{null, null, one});
 
-    for (const auto& sketch : builder.getSketches()) {
+    const auto stats = builder.getStats();
+    for (const auto& sketch : stats.getSketches()) {
         const auto restored = deserializeSketch(sketch);
         ASSERT_EQ(sketch.getNdv(), std::llround(restored.estimate()));
     }
@@ -88,7 +92,7 @@ TEST(NdvSketchBuilderTest, FoldingVariantsFollowFieldOrder) {
 
     NdvSketchBuilder builder(3);
     for (const auto& tuple : tuples) {
-        builder.accumulateTuple(tuple);
+        builder.accumulate(tuple);
     }
 
     // Strict, fold field 0, fold field 1, fold field 2, fold all missing fields.
@@ -107,18 +111,19 @@ TEST(NdvSketchBuilderTest, AllMatchFoldsMultipleMissingFields) {
 
     for (const auto& [missingTuple, nullTuple] : tuplePairs) {
         NdvSketchBuilder builder(3);
-        builder.accumulateTuple(missingTuple);
-        builder.accumulateTuple(nullTuple);
+        builder.accumulate(missingTuple);
+        builder.accumulate(nullTuple);
 
-        ASSERT_EQ(builder.getSketches().back().getNdv(), 1);
+        ASSERT_EQ(builder.getStats().getSketches().back().getNdv(), 1);
     }
 }
 
 TEST(NdvSketchBuilderTest, AllMatchEqualsStrictWithoutMissingFields) {
     NdvSketchBuilder builder(2);
-    builder.accumulateTuple(std::array{TagValueView::numberInt32(1), TagValueView::numberInt32(2)});
+    builder.accumulate(std::array{TagValueView::numberInt32(1), TagValueView::numberInt32(2)});
 
-    const auto sketches = builder.getSketches();
+    const auto stats = builder.getStats();
+    const auto& sketches = stats.getSketches();
     ASSERT_BSONOBJ_EQ(sketches.front().toBSON(), sketches.back().toBSON());
 }
 
@@ -128,8 +133,8 @@ TEST(NdvSketchBuilderTest, UndefinedIsNotFoldedToNull) {
     const auto one = TagValueView::numberInt32(1);
 
     NdvSketchBuilder builder(2);
-    builder.accumulateTuple(std::array{undefined, one});
-    builder.accumulateTuple(std::array{null, one});
+    builder.accumulate(std::array{undefined, one});
+    builder.accumulate(std::array{null, one});
 
     assertNdvs(builder, {2, 2, 2, 2});
 }
@@ -156,18 +161,30 @@ TEST(NdvSketchBuilderTest, PreservesLegacyDbRefHashes) {
 
     for (const auto& [inputTuple, normalizedTuple] : tuplePairs) {
         NdvSketchBuilder actual(inputTuple.size());
-        actual.accumulateTuple(inputTuple);
-        const auto actualSketches = actual.getSketches();
+        actual.accumulate(inputTuple);
+        const auto actualSketches = actual.getStats().getSketches();
 
         NdvSketchBuilder expected(normalizedTuple.size());
-        expected.accumulateTuple(normalizedTuple);
-        const auto expectedSketches = expected.getSketches();
+        expected.accumulate(normalizedTuple);
+        const auto expectedSketches = expected.getStats().getSketches();
 
         ASSERT_EQ(actualSketches.size(), expectedSketches.size());
         for (size_t i = 0; i < actualSketches.size(); ++i) {
             ASSERT_BSONOBJ_EQ(actualSketches[i].toBSON(), expectedSketches[i].toBSON());
         }
     }
+}
+
+TEST(NdvSketchBuilderTest, RejectsZeroFields) {
+    ASSERT_TASSERT_CODE(NdvSketchBuilder(0), 13794500);
+}
+
+TEST(NdvSketchBuilderTest, RejectsWrongFieldValueCountBeforeUpdatingAnySketch) {
+    NdvSketchBuilder builder(2);
+    const auto one = TagValueView::numberInt32(1);
+    ASSERT_TASSERT_CODE(builder.accumulate(std::array{one}), 13794501);
+    ASSERT_TASSERT_CODE(builder.accumulate(std::array{one, one, one}), 13794501);
+    assertNdvs(builder, {0, 0, 0, 0});
 }
 
 }  // namespace

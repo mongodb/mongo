@@ -23,9 +23,9 @@ using sbe::value::TagValueView;
 using sbe::value::TypeTags;
 
 struct NormalizedTuple {
-    absl::InlinedVector<TagValueView, kNdvMaxFields> values;
+    absl::InlinedVector<TagValueView, kMaxFieldStatsFields> values;
     // Keep normalized DBRef storage alive while the views are consumed.
-    absl::InlinedVector<TagValueOwned, kNdvMaxFields> ownedDbRefs;
+    absl::InlinedVector<TagValueOwned, kMaxFieldStatsFields> ownedDbRefs;
 };
 
 NormalizedTuple normalizeTuple(std::span<const TagValueView> values) {
@@ -64,14 +64,12 @@ long long roundNdvEstimate(double estimate) {
 }  // namespace
 
 NdvSketchBuilder::NdvSketchBuilder(size_t numFields) : _numFields(numFields) {
-    tassert(13794500,
-            "NDV sketch construction requires between 1 and 3 fields",
-            numFields > 0 && numFields <= kNdvMaxFields);
-    const auto numSketches = numFields == 1 ? 1 : numFields + 2;
+    tassert(13794500, "NDV sketch construction requires at least one field", _numFields > 0);
+    const auto numSketches = _numFields == 1 ? 1 : _numFields + 2;
     _sketches.assign(numSketches, uassertStatusOK(HyperLogLog::create(kPrecision)));
 }
 
-void NdvSketchBuilder::accumulateTuple(std::span<const TagValueView> values) {
+void NdvSketchBuilder::accumulate(std::span<const TagValueView> values) {
     tassert(
         13794501, "NDV input must match the configured field count", values.size() == _numFields);
 
@@ -117,7 +115,7 @@ void NdvSketchBuilder::accumulateTuple(std::span<const TagValueView> values) {
     _sketches.back().addHash(hashValuesForNdv(tuple));
 }
 
-std::vector<NdvSketch> NdvSketchBuilder::getSketches() const {
+NdvStats NdvSketchBuilder::getStats() const {
     std::vector<NdvSketch> sketches;
     sketches.reserve(_sketches.size());
 
@@ -132,7 +130,7 @@ std::vector<NdvSketch> NdvSketchBuilder::getSketches() const {
         sketches.push_back(std::move(sketch));
     }
 
-    return sketches;
+    return NdvStats(std::move(sketches));
 }
 
 }  // namespace mongo::ce

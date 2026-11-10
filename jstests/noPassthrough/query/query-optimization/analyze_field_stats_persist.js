@@ -40,7 +40,8 @@ describe("analyze mode: fieldStats", function () {
     beforeEach(function () {
         this.coll.drop();
         dropStatsColl(this.db, kFieldStatsCollName);
-        // Four distinct values of "a" (7, 8, {b: 1} and missing), two of "a.b" (1 and missing).
+        // Three scalar/nullish values of "a" (7, 8 and missing); the object is excluded.
+        // Two distinct values of "a.b" (1 and missing).
         assert.commandWorked(
             this.coll.insert([{a: 7}, {a: 7}, {a: 8}, {a: {b: 1}}, {other: true}]),
         );
@@ -50,7 +51,9 @@ describe("analyze mode: fieldStats", function () {
         assert.commandFailedWithCode(this.analyze({mode: "fieldStats"}), 13175800);
     });
 
-    it("rejects sampling and histogram parameters", function () {
+    it("ignores sampling and histogram parameters", function () {
+        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
+        const baseline = this.statsDocs()[0];
         for (const params of [
             {sampleRate: 0.5},
             {sampleSize: 100},
@@ -58,11 +61,12 @@ describe("analyze mode: fieldStats", function () {
             {samplingMethod: "random"},
             {numChunks: 5},
         ]) {
-            assert.commandFailedWithCode(
+            assert.commandWorked(
                 this.analyze(Object.assign({mode: "fieldStats", key: "a"}, params)),
-                13175801,
-                `expected rejection of ${tojson(params)}`,
             );
+            const doc = this.statsDocs()[0];
+            assert.eq(doc.ndv, baseline.ndv);
+            assert.eq(doc.mcv, baseline.mcv);
         }
     });
 
@@ -145,10 +149,16 @@ describe("analyze mode: fieldStats", function () {
 
         const sketches = doc.ndv.sketches;
         assert.eq(sketches.length, 1, "expected one sketch per field", {doc});
-        // Distinct values of "a": 7, 8, {b: 1} and missing.
-        assert.eq(sketches[0].ndv, NumberLong(4), "unexpected ndv", {doc});
+        // Distinct scalar/nullish values of "a": 7, 8 and missing.
+        assert.eq(sketches[0].ndv, NumberLong(3), "unexpected ndv", {doc});
         assert.eq(sketches[0].precision, kExpectedPrecision, "unexpected precision", {doc});
         assert(sketches[0].registers instanceof BinData, "registers must be BinData", {doc});
+
+        assert.eq(doc.mcv.sketches.length, 1, "expected one MCV sketch per field", {doc});
+        assert.sameMembers(doc.mcv.sketches[0].entries, [
+            {value: 7, estFreq: NumberLong(2), err: NumberLong(0)},
+            {value: 8, estFreq: NumberLong(1), err: NumberLong(0)},
+        ]);
     });
 
     it("replaces the document when rerun and keys dotted paths separately", function () {
@@ -161,7 +171,11 @@ describe("analyze mode: fieldStats", function () {
         assert.commandWorked(this.coll.insert({a: 9}));
         sleep(10);
         assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
-        assert.eq(this.statsDocs()[0].ndv.sketches[0].ndv, NumberLong(5));
+        assert.eq(this.statsDocs()[0].ndv.sketches[0].ndv, NumberLong(4));
+        assert.sameMembers(
+            this.statsDocs()[0].mcv.sketches[0].entries.map((entry) => entry.value),
+            [7, 8, 9],
+        );
         assert.gt(this.statsDocs()[0].createdAt, firstRun[0].createdAt);
 
         // A different key gets its own document. Distinct values of "a.b": 1 and missing.
@@ -175,7 +189,7 @@ describe("analyze mode: fieldStats", function () {
     it("persists a composite document with n+2 sketches for a tuple key", function () {
         // Four extra documents make all four sketches produce pairwise different counts, so a
         // duplicated or misordered sketch in the persisted array cannot go unnoticed. Tuples of
-        // (a, other): (7, missing) x2, (8, missing), ({b: 1}, missing), (missing, true),
+        // (a, other): (7, missing) x2, (8, missing), (missing, true),
         // (null, missing), (missing, missing), (7, null) and (null, true).
         assert.commandWorked(
             this.coll.insert([{a: null}, {x: 1}, {a: 7, other: null}, {a: null, other: true}]),
@@ -197,15 +211,17 @@ describe("analyze mode: fieldStats", function () {
         );
         assert.eq(doc.sortedFieldPaths, ["a", "other"], "unexpected doc", {doc});
 
+        assert.eq(doc.mcv.sketches.length, 2, "expected one MCV sketch per field", {doc});
+
         // n+2 sketches for n = 2 fields, positionally keyed off the sorted paths: the strict
         // tuple sketch first, then the variant folding "a" (which merges two tuple pairs), then
         // the variant folding "other" (which merges one), then all-match (which merges three).
         const sketches = doc.ndv.sketches;
         assert.eq(sketches.length, 4, "expected n+2 sketches", {doc});
-        assert.eq(sketches[0].ndv, NumberLong(8), "unexpected strict ndv", {doc});
-        assert.eq(sketches[1].ndv, NumberLong(6), "unexpected ndv folding 'a'", {doc});
-        assert.eq(sketches[2].ndv, NumberLong(7), "unexpected ndv folding 'other'", {doc});
-        assert.eq(sketches[3].ndv, NumberLong(5), "unexpected all-match ndv", {doc});
+        assert.eq(sketches[0].ndv, NumberLong(7), "unexpected strict ndv", {doc});
+        assert.eq(sketches[1].ndv, NumberLong(5), "unexpected ndv folding 'a'", {doc});
+        assert.eq(sketches[2].ndv, NumberLong(6), "unexpected ndv folding 'other'", {doc});
+        assert.eq(sketches[3].ndv, NumberLong(4), "unexpected all-match ndv", {doc});
         for (const sketch of sketches) {
             assert.eq(sketch.precision, kExpectedPrecision, "unexpected precision", {doc});
             assert(sketch.registers instanceof BinData, "registers must be BinData", {doc});

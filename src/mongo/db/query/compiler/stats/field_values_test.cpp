@@ -60,6 +60,21 @@ TEST(FieldValuesTest, RetainsNonScalarFlagFromEarlierPath) {
     ASSERT_TRUE(hasNonScalar);
 }
 
+TEST(FieldValuesTest, MarksTerminalObjectsAsNonScalar) {
+    for (const auto& doc : {fromjson("{a: {}, c: 9}"), fromjson("{a: {b: 1}, c: 9}")}) {
+        const auto [tuples, hasNonScalar] = extractFieldValues(doc, makePaths({"a", "c"}));
+        ASSERT_TRUE(hasNonScalar);
+        ASSERT_EQ(tuples.size(), 1u);
+        ASSERT_EQ(tuples[0][0].tag, TypeTags::bsonObject);
+    }
+}
+
+TEST(FieldValuesTest, AllowsObjectsAlongDottedPaths) {
+    const auto doc = fromjson("{a: {b: 1}, c: 9}");
+    const auto [tuples, hasNonScalar] = extractFieldValues(doc, makePaths({"a.b", "c"}));
+    ASSERT_FALSE(hasNonScalar);
+}
+
 TEST(FieldValuesTest, ProducesCrossProductOfRequestedPaths) {
     const auto doc = fromjson("{a: [{x: 1}, {x: 2}], b: [{y: 3}, {y: 4}], c: 9}");
     ASSERT_EQ(extractInt32Tuples(doc, {"a.x", "c", "b.y"}),

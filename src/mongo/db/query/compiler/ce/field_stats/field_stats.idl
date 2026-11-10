@@ -7,10 +7,13 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/query/compiler/ce/field_stats/ndv_sketch.idl"
+    - "mongo/db/query/compiler/ce/field_stats/mcv_sketch.idl"
 
 structs:
     NdvStats:
-        description: "The NDV section of a field-stats document."
+        description: >-
+            The NDV section of a field-stats document, excluding documents with array traversal
+            or terminal object values at any analyzed path.
         strict: true
         fields:
             sketches:
@@ -20,6 +23,14 @@ structs:
                 # n + 2, the all-strict tuple sketch first, then per field the variant folding
                 # that field's missing values into null, followed by all-match (folding all fields).
                 type: array<NdvSketch>
+
+    McvStats:
+        description: "The MCV section of a field-stats document."
+        strict: true
+        fields:
+            sketches:
+                # One sketch per field, in sortedFieldPaths order, including empty sketches.
+                type: array<McvSketch>
 
     FieldStatsDoc:
         description: >-
@@ -39,12 +50,12 @@ structs:
             collectionUuid:
                 type: uuid
             sortedFieldPaths:
-                # Sorted canonically, matching the order the _id string is built in. The order
-                # carries no meaning; the statistics describe the set of fields.
+                # Sorted canonically, matching the order the _id string is built in.
+                # Positions identify fields in the sketches; the statistics describe the set.
                 type: array<string>
             createdAt:
                 type: date
             ndv:
-                # Required for now since NDV is the only statistic kind; relax to optional with
-                # a schemaVersion bump once another kind can be written first.
                 type: NdvStats
+            mcv:
+                type: McvStats

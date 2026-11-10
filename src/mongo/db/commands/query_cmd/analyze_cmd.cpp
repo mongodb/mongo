@@ -30,12 +30,11 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/compiler/ce/field_stats/field_stats.h"
+#include "mongo/db/query/compiler/ce/field_stats/field_stats_builder.h"
 #include "mongo/db/query/compiler/ce/field_stats/field_stats_gen.h"
-#include "mongo/db/query/compiler/ce/field_stats/ndv_sketch_builder.h"
 #include "mongo/db/query/compiler/ce/sampling/on_the_fly_sample_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_manager.h"
 #include "mongo/db/query/compiler/stats/ce_histogram.h"
-#include "mongo/db/query/compiler/stats/field_values.h"
 #include "mongo/db/query/compiler/stats/max_diff.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
 #include "mongo/db/query/compiler/stats/stats_catalog.h"
@@ -58,7 +57,6 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/clock_source.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/scopeguard.h"
@@ -140,67 +138,7 @@ void recordPersistedSampleMetrics(const ce::PersistedSampleSummary& summary) {
 }
 
 /**
- * Validates a user-provided key path. Shared by the histograms and fieldStats modes.
- */
-void validateKeyPath(std::string_view key) {
-    const FieldRef keyFieldRef(key);
-
-    // Empty path
-    uassert(6799703, "Key path is empty", !keyFieldRef.empty());
-
-    for (size_t i = 0; i < keyFieldRef.numParts(); ++i) {
-        uassertStatusOK(FieldPath::validateFieldName(keyFieldRef.getPart(i)));
-    }
-
-    // Numerics
-    const auto numericPathComponents = keyFieldRef.getNumericPathComponents(0);
-    uassert(6799704,
-            str::stream() << "Key path contains numeric component "
-                          << keyFieldRef.getPart(*(numericPathComponents.begin())),
-            numericPathComponents.empty());
-}
-
-/**
- * Normalizes and validates the fieldStats-mode 'key' argument: the string form becomes a one-path
- * vector, the array form carries up to kNdvMaxFields distinct paths for one composite NDV
- * statistic. Returns the paths canonically sorted, the order the statistic is keyed and
- * persisted in (NDV is insensitive to field order).
- */
-std::vector<std::string> normalizeFieldStatsKeyPaths(
-    const std::variant<std::string, std::vector<std::string>>& key) {
-    std::vector<std::string> paths =
-        visit(OverloadedVisitor{
-                  [](const std::string& single) { return std::vector<std::string>{single}; },
-                  [](const std::vector<std::string>& multiple) {
-                      return multiple;
-                  }},
-              key);
-    uassert(13176201,
-            str::stream() << "fieldStats mode supports between 1 and " << ce::kNdvMaxFields
-                          << " key paths",
-            !paths.empty() && paths.size() <= ce::kNdvMaxFields);
-    for (const auto& path : paths) {
-        validateKeyPath(path);
-    }
-    std::sort(paths.begin(), paths.end());
-    uassert(13176202,
-            "fieldStats mode key paths must be distinct",
-            std::adjacent_find(paths.begin(), paths.end()) == paths.end());
-    // Overlapping paths describe redundant NDV components. After sorting, a path can only
-    // precede its extensions.
-    for (size_t i = 0; i + 1 < paths.size(); ++i) {
-        for (size_t j = i + 1; j < paths.size(); ++j) {
-            uassert(13176203,
-                    str::stream() << "fieldStats mode key paths may not overlap: '" << paths[i]
-                                  << "' is a prefix of '" << paths[j] << "'",
-                    !FieldRef(paths[i]).isPrefixOf(FieldRef(paths[j])));
-        }
-    }
-    return paths;
-}
-
-/**
- * Acquires 'nss' for reading and performs the collection validation shared by the sample and
+ * Acquires 'nss' for reading and performs the collection validation shared by the histograms and
  * fieldStats modes: the collection must exist ('notFoundCode' preserves each mode's error code) and
  * must not be timeseries. Views never reach this point; the acquisition rejects them.
  */
@@ -225,16 +163,51 @@ CollectionAcquisition acquireAndValidateCollection(OperationContext* opCtx,
     return coll;
 }
 
-void runFieldStatsMode(OperationContext* opCtx,
-                       const NamespaceString& nss,
-                       const std::variant<std::string, std::vector<std::string>>& key) {
+/**
+ * Releases the source acquisition and executor before the caller persists statistics.
+ */
+boost::optional<ce::FieldStatsDoc> collectFieldStatsDocument(
+    OperationContext* opCtx, const NamespaceString& nss, const std::vector<std::string>& paths) {
+    auto coll = acquireAndValidateCollection(opCtx, nss, 13175802);
+    const auto& collectionPtr = coll.getCollectionPtr();
+    uassert(13175804,
+            str::stream() << nss.toStringForErrorMsg()
+                          << " is not a normal or clustered collection",
+            (nss.isNormalCollection() || collectionPtr->isClustered()) && !nss.isOplog() &&
+                !collectionPtr->isTimeseriesCollection());
+    // system.stats.fieldStats is shard-local and invisible through mongos.
+    // TODO SERVER-133119: Support NDV statistics for sharded collections.
+    uassert(13175803,
+            "fieldStats mode is not supported on sharded collections",
+            !coll.getShardingDescription().isSharded());
+
+    const auto collUuid = coll.uuid();
+    ce::FieldStatsBuilder statsBuilder(paths, collUuid);
+
+    // TODO SERVER-132681: Consider using a covered IXSCAN instead of the collection scan.
+    // Full scans can exceed five minutes, so periodically release the source snapshot.
+    MultipleCollectionAccessor collections(std::move(coll));
+    auto exec = InternalPlanner::collectionScanSbe(
+        opCtx, collections, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+
+    for (BSONObj doc; exec->getNext(&doc, nullptr) == PlanExecutor::ADVANCED;
+         opCtx->checkForInterrupt()) {
+        statsBuilder.accumulate(doc);
+    }
+    if (statsBuilder.getNumDocumentsObserved() == 0) {
+        // Keep previous statistics after an empty scan.
+        return boost::none;
+    }
+    return statsBuilder.getStats();
+}
+
+void runFieldStatsMode(OperationContext* opCtx, const AnalyzeCommandRequest& cmd) {
     uassert(ErrorCodes::CommandNotSupported,
             "The analyze command with fieldStats mode requires featureFlagPersistentStats to be "
             "enabled",
             feature_flags::gFeatureFlagPersistentStats.isEnabled(
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
     // The knob gates the whole persistent-NDV feature: while it is off, statistics are neither
     // collected nor consumed.
     uassert(
@@ -243,59 +216,20 @@ void runFieldStatsMode(OperationContext* opCtx,
         "to be enabled",
         QueryKnobConfiguration(query_settings::QuerySettings{}).getEnablePersistentNDVStats());
 
-    // Validated only after the feature gates above: without them the command must fail with
-    // CommandNotSupported, not with key validation errors for a disabled feature.
-    const std::vector<std::string> keyPaths = normalizeFieldStatsKeyPaths(key);
-    const std::vector<FieldPath> paths(keyPaths.begin(), keyPaths.end());
+    const auto& nss = cmd.getNamespace();
+    const auto& key = cmd.getKey();
+    uassert(13175800, "fieldStats mode requires a key to be specified", key);
+    const auto paths = std::visit(OverloadedVisitor{[](const std::string& single) {
+                                                        return std::vector<std::string>{single};
+                                                    },
+                                                    [](const std::vector<std::string>& multiple) {
+                                                        return multiple;
+                                                    }},
+                                  *key);
 
-    ce::FieldStatsDoc document;
-    {
-        // Release the source acquisition and executor before writing statistics.
-        auto coll = acquireAndValidateCollection(opCtx, nss, 13175802);
-        const auto& collectionPtr = coll.getCollectionPtr();
-        uassert(13175804,
-                str::stream() << nss.toStringForErrorMsg()
-                              << " is not a normal or clustered collection",
-                (nss.isNormalCollection() || collectionPtr->isClustered()) && !nss.isOplog() &&
-                    !collectionPtr->isTimeseriesCollection());
-        // system.stats.fieldStats is shard-local and invisible through mongos.
-        // TODO SERVER-133119: Support NDV statistics for sharded collections.
-        uassert(13175803,
-                "fieldStats mode is not supported on sharded collections",
-                !coll.getShardingDescription().isSharded());
-
-        const auto collUuid = coll.uuid();
-        const auto createdAt = opCtx->getServiceContext()->getFastClockSource()->now();
-
-        // TODO SERVER-132681: Consider using a covered IXSCAN instead of the collection scan.
-        // Full scans can exceed five minutes, so periodically release the source snapshot.
-        MultipleCollectionAccessor collections(std::move(coll));
-        auto exec = InternalPlanner::collectionScanSbe(
-            opCtx, collections, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
-        BSONObj doc;
-        if (exec->getNext(&doc, nullptr) == PlanExecutor::IS_EOF) {
-            // Keep previous statistics after an empty scan; the read path guards against staleness.
-            return;
-        }
-
-        ce::NdvSketchBuilder builder(paths.size());
-        do {
-            opCtx->checkForInterrupt();
-            const auto [tuples, hasNonScalar] = stats::extractFieldValues(doc, paths);
-            if (!hasNonScalar) {
-                for (const auto& tuple : tuples) {
-                    builder.accumulateTuple(tuple);
-                }
-                // TODO: integrate MCV here
-            }
-        } while (exec->getNext(&doc, nullptr) == PlanExecutor::ADVANCED);
-
-        document.set_id(ce::makeFieldStatsId(collUuid, keyPaths));
-        document.setSchemaVersion(ce::kFieldStatsSchemaVersion);
-        document.setCollectionUuid(collUuid);
-        document.setSortedFieldPaths(keyPaths);
-        document.setCreatedAt(createdAt);
-        document.setNdv(ce::NdvStats(builder.getSketches()));
+    auto document = collectFieldStatsDocument(opCtx, nss, paths);
+    if (!document) {
+        return;
     }
 
     hangBeforePersistingFieldStats.pauseWhileSet(opCtx);
@@ -304,7 +238,7 @@ void runFieldStatsMode(OperationContext* opCtx,
     acquireCollectionMaybeLockFree(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, nss, AcquisitionPrerequisites::kRead, document.getCollectionUuid()));
+            opCtx, nss, AcquisitionPrerequisites::kRead, document->getCollectionUuid()));
 
     const auto statsNss = NamespaceStringUtil::deserialize(
         nss.dbName(), NamespaceString::kStatsFieldStatsCollectionName);
@@ -321,7 +255,7 @@ void runFieldStatsMode(OperationContext* opCtx,
 
     DBDirectClient client(opCtx);
     uassertStatusOK(getStatusFromWriteCommandReply(client.updateAcknowledged(
-        statsNss, BSON("_id" << document.get_id()), document.toBSON(), /*upsert=*/true)));
+        statsNss, BSON("_id" << document->get_id()), document->toBSON(), /*upsert=*/true)));
 }
 
 void runSampleMode(OperationContext* opCtx,
@@ -409,7 +343,7 @@ std::vector<stats::SBEValue> collectHistogramValues(OperationContext* opCtx,
                           << " is not a normal or clustered collection",
             nss.isNormalCollection() || collectionPtr->isClustered());
 
-    validateKeyPath(key);
+    ce::validateFieldStatsPath(key);
     const auto numRecords = static_cast<size_t>(collectionPtr->numRecords(opCtx));
     size_t draws = numRecords;
     if (sampleSize) {
@@ -557,14 +491,7 @@ public:
                                   cmd.getNumChunks());
                     break;
                 case AnalyzeModeEnum::kFieldStats:
-                    uassert(13175800, "fieldStats mode requires a key to be specified", key);
-                    uassert(13175801,
-                            "sampleRate, sampleSize, numberBuckets, samplingMethod and numChunks "
-                            "are not supported with fieldStats mode",
-                            !cmd.getSampleRate() && !cmd.getSampleSize() &&
-                                !cmd.getNumberBuckets() && !cmd.getSamplingMethod() &&
-                                !cmd.getNumChunks());
-                    runFieldStatsMode(opCtx, nss, *key);
+                    runFieldStatsMode(opCtx, cmd);
                     break;
                 case AnalyzeModeEnum::kHistograms:
                     runHistogramsMode(

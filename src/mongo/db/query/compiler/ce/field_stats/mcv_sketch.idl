@@ -1,0 +1,29 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+global:
+    cpp_namespace: "mongo::ce"
+    mod_visibility: private
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    McvEntry:
+        description: "A most common value with its estimated count and overestimation bound."
+        strict: true
+        fields:
+            value:
+                type: IDLAnyTypeOwned
+            estFreq:
+                type: long
+                validator: {gte: 1}
+            err:
+                type: long
+                validator: {gte: 0}
+
+    McvSketch:
+        description: "A field's most common values, sorted by ascending BSON value order."
+        strict: true
+        fields:
+            entries:
+                type: array<McvEntry>

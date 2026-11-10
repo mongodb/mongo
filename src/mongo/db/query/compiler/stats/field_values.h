@@ -23,7 +23,8 @@ using FieldValueTuple = absl::InlinedVector<sbe::value::TagValueView, 3>;
  * is returned, so a document can produce several tuples: the cross product of the values of each
  * path, each tuple in path order. A path that resolves to no value contributes Nothing.
  * The second result is true if any requested path encounters an array, including trailing and
- * empty arrays, even when all extracted values are scalar.
+ * empty arrays, or yields an object value. The extracted tuples are returned even when this flag
+ * is true, so callers decide whether to collect them.
  * Throws ExceededMemoryLimit if a document would produce more than 100,000 tuples.
  */
 std::pair<std::vector<FieldValueTuple>, bool> extractFieldValues(const BSONObj& doc,
