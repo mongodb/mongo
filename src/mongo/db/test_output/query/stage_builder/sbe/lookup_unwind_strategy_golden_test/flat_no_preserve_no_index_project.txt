@@ -51,10 +51,9 @@ $$RESULT=s9 env: {  }
         [2] scan generic [s4 = record, s5 = recordId] [s6 = fkey] @"UUID" 
 
 ## IndexedLoopJoin
-$$RESULT=s19 env: { s10 = {"fkey" : 1} }
-[5] project [s19 = makeBsonObj(MakeObjSpec([lkey, joined], Closed, NewObj, 0), s18)] 
-[4] project [s18 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s11)] 
-[4] nlj inner [s1] [s14] 
+$$RESULT=s18 env: { s10 = {"fkey" : 1} }
+[5] project [s18 = makeBsonObj(MakeObjSpec([joined = Set(0), lkey], Closed, NewObj, 0), s1, s11)] 
+[4] nlj inner [s1, s3] [s14] 
     left 
         [4] project [s14 = arrayToSet(
             if (isArray(s3) ?: false) 

@@ -303,12 +303,26 @@ SbExpr generateForeignKeyStream(SbVar inputSlot,
                               SbLocalVar{getFieldFrameId, 1}));
 }
 
-// Returns the vector of local slots to be used in lookup join.
-SbSlotVector buildLocalSlots(StageBuilderState& state, SbSlot localRecordSlot) {
-    SbSlotVector slots;
-    slots.push_back(localRecordSlot);
+// Returns the local slots that a lookup loop join exposes above it. When the local side produces a
+// ResultInfo instead of a result object, the parent reads the ResultInfo base object and the local
+// field slots, so the join exposes all the local slots.
+SbSlotVector buildLocalSlots(StageBuilderState& state, const PlanStageSlots& slots) {
+    if (slots.hasResultObj()) {
+        return SbSlotVector{slots.getResultObj()};
+    }
 
-    return slots;
+    SbSlotVector localSlots;
+    sbe::value::SlotSet dedupSlotIds;
+    for (const auto& slot : slots.getAllSlotsInOrder()) {
+        // Environment slots are visible above the join without being exposed by it.
+        if (state.env->isSlotRegistered(slot.getId())) {
+            continue;
+        }
+        if (dedupSlotIds.insert(slot.getId()).second) {
+            localSlots.push_back(slot);
+        }
+    }
+    return localSlots;
 }
 
 // We need to lookup the values in 'localKeyValueSet' in the index defined on the foreign
@@ -843,13 +857,12 @@ std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
                                         indexSlot,
                                         joinType);
 
-    SbSlot localRecordSlot = slots.getResultObj();
     // Connect the two branches with a nested loop join. For each outer record with a corresponding
     // value in the 'localKeySlot', the inner branch is executed, and the join exposes its result in
     // 'inner.matchedRecordsSlot'.
     SbStage nlj = b.makeLoopJoin(std::move(outerRootStage),
                                  std::move(inner.stage),
-                                 buildLocalSlots(state, localRecordSlot),
+                                 buildLocalSlots(state, slots),
                                  /*outerCorrelated=*/SbExpr::makeSV(localKeySlot),
                                  /*innerProjects=*/inner.innerProjects,
                                  /*innerProjectOutputs=*/inner.innerProjectOutputs,
@@ -1156,12 +1169,11 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
                                         indexSlot,
                                         joinType);
 
-    SbSlot localRecordSlot = slots.getResultObj();
     // The top level loop join stage that joins each local field with the matched foreign
     // documents.
     auto nljStage = b.makeLoopJoin(std::move(localKeysSetStage),
                                    std::move(inner.stage),
-                                   buildLocalSlots(state, localRecordSlot),
+                                   buildLocalSlots(state, slots),
                                    /*outerCorrelated=*/SbExpr::makeSV(localKeysSetSlot),
                                    /*innerProjects=*/inner.innerProjects,
                                    /*innerProjectOutputs=*/inner.innerProjectOutputs,
@@ -1380,7 +1392,7 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     }
     SbStage nlj = b.makeLoopJoin(std::move(localKeysSetStage),
                                  std::move(inner.stage),
-                                 buildLocalSlots(state, localRecordSlot),
+                                 buildLocalSlots(state, slots),
                                  std::move(outerCorrelated),
                                  /*innerProjects=*/inner.innerProjects,
                                  /*innerProjectOutputs=*/inner.innerProjectOutputs,
@@ -1586,7 +1598,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
     boost::optional<FieldEffects> reqEffectsForChild;
 
     if (reqs.hasResultInfo() &&
-        eqLookupNode->lookupStrategy == EqLookupNode::LookupStrategy::kHashJoin) {
+        (eqLookupNode->lookupStrategy == EqLookupNode::LookupStrategy::kHashJoin ||
+         eqLookupNode->lookupStrategy == EqLookupNode::LookupStrategy::kIndexedLoopJoin)) {
         effects = getQsnInfo(root).effects;
 
         if (effects) {

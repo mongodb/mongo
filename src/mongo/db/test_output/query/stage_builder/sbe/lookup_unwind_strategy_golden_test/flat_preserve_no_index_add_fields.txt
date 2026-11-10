@@ -92,61 +92,59 @@ $$RESULT=s18 env: {  }
         [2] scan generic [s6 = record, s7 = recordId] [s8 = fkey, s9 = joined, s10 = n] @"UUID" 
 
 ## IndexedLoopJoin
-$$RESULT=s28 env: { s12 = {"fkey" : 1} }
-[5] project [s28 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s23, s27)] 
-[5] project [s27 = 
-    if (isNullish(s25) || isNullish(s26)) 
+$$RESULT=s24 env: { s11 = {"fkey" : 1} }
+[5] project [s24 = makeBsonObj(MakeObjSpec([joined = Set(0), computed = Set(1)], Open, NewObj, 0), s1, s21, s23)] 
+[5] project [s23 = 
+    if (isNullish(s4) || isNullish(s22)) 
     then null 
     elif ((
-        if isNumber(s25) 
+        if isNumber(s4) 
         then 0 
-        elif isDate(s25) 
+        elif isDate(s4) 
         then 1 
         else fail(7157723, "only numbers and dates are allowed in an $add expression") 
     + 
-        if isNumber(s26) 
+        if isNumber(s22) 
         then 0 
-        elif isDate(s26) 
+        elif isDate(s22) 
         then 1 
         else fail(7157723, "only numbers and dates are allowed in an $add expression") 
    ) > 1) 
     then fail(7157722, "only one date allowed in an $add expression") 
-    else (s25 + s26) 
+    else (s4 + s22) 
 ] 
-[5] extract_field_paths inputs[s24 = Get(joined)/Id, s25 = Get(n)/Id] outputs[s26 = Get(joined)/Traverse/Get(c)/Id] 
-[4] project [s24 = getField(s23, "joined"), s25 = getField(s23, "n")] 
-[4] project [s23 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s22)] 
-[4] nlj left [s1] [s18] [s22 = s13] 
+[5] extract_field_paths inputs[s4 = Get(n)/Id, s21 = Get(joined)/Id] outputs[s22 = Get(joined)/Traverse/Get(c)/Id] 
+[4] nlj left [s1, s3, s4] [s17] [s21 = s12] 
     left 
-        [4] project [s18 = arrayToSet(
-            if (isArray(s4) ?: false) 
+        [4] project [s17 = arrayToSet(
+            if (isArray(s3) ?: false) 
             then 
-                if isArrayEmpty(s4) 
+                if isArrayEmpty(s3) 
                 then [null] 
-                else s4 
+                else s3 
             
-            else newArray((s4 ?: null)) 
+            else newArray((s3 ?: null)) 
        )] 
-        [1] scan generic [s1 = record, s2 = recordId] [s3 = joined, s4 = lkey, s5 = n] @"UUID" 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = lkey, s4 = n] @"UUID" 
     right 
-        [4] filter {traverseF((s15 ?: null), lambda(l10.0) { isMember(move(l10.0), s18) }, true)} 
-        [4] nlj inner [] [s6, s7] 
+        [4] filter {traverseF((s14 ?: null), lambda(l10.0) { isMember(move(l10.0), s17) }, true)} 
+        [4] nlj inner [] [s5, s6] 
             left 
-                [4] project [s6 = ks(1ll, 0, s20, 1ll), s7 = ks(1ll, 0, s20, 2ll)] 
-                [4] unwind s20 = outField, s21 = outIndex, s19 = inField _preserveNullAndEmptyArrays 
-                [4] project [s19 = 
-                    if traverseF(s18, lambda(l8.0) { isArray(move(l8.0)) }, false) 
-                    then arrayToSet(concatArrays(s18, traverseP(s18, lambda(l9.0) { 
+                [4] project [s5 = ks(1ll, 0, s19, 1ll), s6 = ks(1ll, 0, s19, 2ll)] 
+                [4] unwind s19 = outField, s20 = outIndex, s18 = inField _preserveNullAndEmptyArrays 
+                [4] project [s18 = 
+                    if traverseF(s17, lambda(l8.0) { isArray(move(l8.0)) }, false) 
+                    then arrayToSet(concatArrays(s17, traverseP(s17, lambda(l9.0) { 
                         if isArray(l9.0) 
                         then (getElement(move(l9.0), 0) ?: undefined) 
                         else move(l9.0) 
                     }, 1))) 
-                    else s18 
+                    else s17 
                ] 
                 [4] coscan 1 
             right 
-                [3] fetch s8 = seek, s13 = result, s14 = recordId, s11 = inSnapshotId, s9 = inIndexIdent, s10 = inIndexKey, s12 = inIndexKeyPattern [s15 = fkey, s16 = joined, s17 = n] @"UUID" 
-                [2] ixseek seekKeyLow = s6 seekKeyHigh = s7 [s10 = indexKey, s8 = recordId, s11 = snapshotId, s9 = indexIdent] [] @"UUID" @"fkey_1" forward 
+                [3] fetch s7 = seek, s12 = result, s13 = recordId, s10 = inSnapshotId, s8 = inIndexIdent, s9 = inIndexKey, s11 = inIndexKeyPattern [s14 = fkey, s15 = joined, s16 = n] @"UUID" 
+                [2] ixseek seekKeyLow = s5 seekKeyHigh = s6 [s9 = indexKey, s7 = recordId, s10 = snapshotId, s8 = indexIdent] [] @"UUID" @"fkey_1" forward 
 
 ## DynamicIndexedLoopJoin
 $$RESULT=s35 env: { s12 = {"fkey" : 1} }
