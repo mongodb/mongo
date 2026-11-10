@@ -1,6 +1,6 @@
 /**
  * Verifies that the join plan cache key hash is exposed in explain output as
- * queryPlanner.joinPlanCacheKey, and that the hash changes when the cache key
+ * queryPlanner.joinOptimizer.planCacheKey, and that the hash changes when the cache key
  * encoding should change and stays stable when it should not.
  *
  * See jstests/query_golden/join_opt/join_plan_cache_key_md.js for additional test cases.
@@ -53,11 +53,11 @@ describe("join plan cache key in explain", function () {
             assert(joinOptUsed(explain), "expected join optimization to be used", {explain});
             const planner = getQueryPlanner(explain);
             assert(
-                planner.hasOwnProperty("joinPlanCacheKey"),
-                "expected joinPlanCacheKey in queryPlanner",
+                planner.joinOptimizer?.hasOwnProperty("planCacheKey"),
+                "expected planCacheKey in queryPlanner.joinOptimizer",
                 {planner},
             );
-            return planner.joinPlanCacheKey;
+            return planner.joinOptimizer.planCacheKey;
         };
 
         // A cache-eligible $lookup/$unwind join with a single-table predicate on the base
@@ -80,10 +80,10 @@ describe("join plan cache key in explain", function () {
         MongoRunner.stopMongod(this.conn);
     });
 
-    it("exposes a joinPlanCacheKey hash when join optimization is used", function () {
+    it("exposes a planCacheKey hash when join optimization is used", function () {
         const key = this.getKey(this.makePipeline());
-        assert.eq(typeof key, "string", "joinPlanCacheKey should be a hex string");
-        assert.gt(key.length, 0, "joinPlanCacheKey should be non-empty");
+        assert.eq(typeof key, "string", "planCacheKey should be a hex string");
+        assert.gt(key.length, 0, "planCacheKey should be non-empty");
     });
 
     it("produces the same hash for structurally identical queries", function () {

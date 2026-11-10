@@ -6,7 +6,11 @@
  *   requires_sbe,
  * ]
  */
-import {getAllPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAllPlanStages,
+    getQueryPlanner,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 import {plannerStageIsJoinOptNode} from "jstests/libs/query/join_utils.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -67,6 +71,12 @@ describe("enableDetailedJoinExplain", function () {
     }
 
     function assertDetailedJoinFields(explainOutput, expectDetails) {
+        const joinOptimizer = getQueryPlanner(explainOutput).joinOptimizer;
+        assert(joinOptimizer, "expected joinOptimizer in queryPlanner", {explainOutput});
+        assert.eq(joinOptimizer.hasOwnProperty("metrics"), expectDetails, "unexpected 'metrics'", {
+            joinOptimizer,
+        });
+
         const joinStages = getAllPlanStages(getWinningPlanFromExplain(explainOutput)).filter(
             plannerStageIsJoinOptNode,
         );

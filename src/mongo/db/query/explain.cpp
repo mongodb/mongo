@@ -29,6 +29,7 @@
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
@@ -123,32 +124,40 @@ void appendQueryPlannerCommonInfo(PlanExecutor* exec,
 
     auto&& explainer = exec->getPlanExplainer();
 
+    BSONObjBuilder joinOptimizerBob;
     if (const auto joinPlanCacheKeyHash = explainer.getJoinPlanCacheKeyHash();
         joinPlanCacheKeyHash.has_value()) {
-        plannerBob.append("joinPlanCacheKey", zeroPaddedHex(*joinPlanCacheKeyHash));
+        joinOptimizerBob.append("planCacheKey", zeroPaddedHex(*joinPlanCacheKeyHash));
     }
 
     if (const auto& joinMetrics = CurOp::get(exec->getOpCtx())->debug().joinOptimizationMetrics) {
         if (joinMetrics->fallbackReason) {
-            plannerBob.append("joinFallbackReason",
-                              join_ordering::toReasonName(*joinMetrics->fallbackReason));
+            joinOptimizerBob.append("fallbackReason",
+                                    join_ordering::toReasonName(*joinMetrics->fallbackReason));
         }
 
-        BSONObjBuilder joinOptBob(plannerBob.subobjStart("joinOptimizationMetrics"));
-        joinOptBob.appendNumber("joinModelingTimeMicros",
-                                static_cast<long long>(joinMetrics->joinModelingTimeMicros));
-        joinOptBob.appendNumber("sbeLoweringTimeMicros",
-                                static_cast<long long>(joinMetrics->sbeLoweringTimeMicros));
-        if (const auto& pe = joinMetrics->planEnumerationMetrics) {
-            joinOptBob.appendNumber("samplingTimeMicros",
-                                    static_cast<long long>(pe->samplingTimeMicros));
-            joinOptBob.appendNumber("cbrPlanningTimeMicros",
-                                    static_cast<long long>(pe->cbrPlanningTimeMicros));
-            joinOptBob.appendNumber("planEnumerationTimeMicros",
-                                    static_cast<long long>(pe->planEnumerationTimeMicros));
-            joinOptBob.appendNumber("ceTimeMicros", static_cast<long long>(pe->ceTimeMicros));
-            joinOptBob.append("wtLeafPagesAvailable", pe->numApproxLeafPagesUnavailable == 0);
+        if (QueryKnobConfiguration::get(exec->getOpCtx()).getEnableDetailedJoinExplain()) {
+            BSONObjBuilder metricsBob(joinOptimizerBob.subobjStart("metrics"));
+            metricsBob.appendNumber("joinModelingTimeMicros",
+                                    static_cast<long long>(joinMetrics->joinModelingTimeMicros));
+            metricsBob.appendNumber("sbeLoweringTimeMicros",
+                                    static_cast<long long>(joinMetrics->sbeLoweringTimeMicros));
+            if (const auto& pe = joinMetrics->planEnumerationMetrics) {
+                metricsBob.appendNumber("samplingTimeMicros",
+                                        static_cast<long long>(pe->samplingTimeMicros));
+                metricsBob.appendNumber("cbrPlanningTimeMicros",
+                                        static_cast<long long>(pe->cbrPlanningTimeMicros));
+                metricsBob.appendNumber("planEnumerationTimeMicros",
+                                        static_cast<long long>(pe->planEnumerationTimeMicros));
+                metricsBob.appendNumber("ceTimeMicros", static_cast<long long>(pe->ceTimeMicros));
+                // TODO SERVER-138850: Replace with 'joinOptimizer.collectionsWithoutPageCount'.
+                metricsBob.append("wtLeafPagesAvailable", pe->numApproxLeafPagesUnavailable == 0);
+            }
         }
+    }
+
+    if (const auto joinOptimizer = joinOptimizerBob.obj(); !joinOptimizer.isEmpty()) {
+        plannerBob.append("joinOptimizer", joinOptimizer);
     }
 
     if (const auto ceSamplingMeta = explainer.getCeSamplingMetadata(); ceSamplingMeta.has_value()) {

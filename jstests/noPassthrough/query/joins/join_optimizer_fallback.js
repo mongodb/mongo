@@ -80,7 +80,7 @@ function assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expecte
 }
 
 function getFallbackReason(explain) {
-    return getQueryPlanner(explain).joinFallbackReason;
+    return getQueryPlanner(explain).joinOptimizer?.fallbackReason;
 }
 
 // This helper is for test cases where the entire pipeline is ineligible for join optimization.

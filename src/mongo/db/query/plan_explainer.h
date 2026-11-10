@@ -219,8 +219,8 @@ struct ExplainPlanEntry {
     // TODO SERVER-134561: carry whether join optimization produced this plan. Legacy emits
     // "usedJoinOptimization" whenever the join optimization knob is on; V3 emits nothing. The
     // ticket has to settle where the value belongs - here at plan level, matching legacy's SBE
-    // placement, or once on "queryPlanner" alongside "joinPlanCacheKey", which is the scope it
-    // actually has today since it never varies across the plans of one explain.
+    // placement, or once on "queryPlanner.joinOptimizer" alongside "planCacheKey", which is the
+    // scope it actually has today since it never varies across the plans of one explain.
     // TODO SERVER-131545: attach additional per-plan data (e.g. planningResult,
     // stopCondition, score) via a per-candidate record.
 };

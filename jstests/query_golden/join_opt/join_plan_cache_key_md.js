@@ -14,9 +14,9 @@
 function getJoinPlanCacheKey(command) {
     const explain = assert.commandWorked(db.runCommand({explain: command}));
     if (explain.hasOwnProperty("queryPlanner")) {
-        return explain.queryPlanner.joinPlanCacheKey;
+        return explain.queryPlanner.joinOptimizer?.planCacheKey;
     } else if (explain.hasOwnProperty("stages")) {
-        return explain.stages[0]["$cursor"].queryPlanner.joinPlanCacheKey;
+        return explain.stages[0]["$cursor"].queryPlanner.joinOptimizer?.planCacheKey;
     } else {
         return undefined;
     }

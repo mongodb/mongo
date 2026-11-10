@@ -138,25 +138,19 @@ function validateJoinCostComponents(
     }
 }
 
-// Runs the pipeline, and asserts that the join optimizer was used and that estimate information is
-// present in the explain output.
-function runTest(pipeline, expectRejected) {
-    // Ensure stable on-disk sizes.
-    assert.commandWorked(db.adminCommand({fsync: 1}));
-    const explain = coll1.explain().aggregate(pipeline);
+function explainWithDetailedJoinExplain(coll, pipeline) {
+    return coll
+        .explain()
+        .aggregate(pipeline, {querySettings: {queryKnobs: {enableDetailedJoinExplain: true}}});
+}
 
-    const queryPlanner = getQueryPlanner(explain);
-    const usedJoinOptimization = queryPlanner.winningPlan.hasOwnProperty("usedJoinOptimization")
-        ? queryPlanner.winningPlan.usedJoinOptimization
-        : false;
-    assert(usedJoinOptimization, "Join optimizer was not used as expected", {explain});
-
-    const joinMetrics = queryPlanner.joinOptimizationMetrics;
-    assert(joinMetrics, "joinOptimizationMetrics missing from queryPlanner", {queryPlanner});
+function assertJoinOptimizerMetrics(queryPlanner) {
+    const joinMetrics = queryPlanner.joinOptimizer.metrics;
+    assert(joinMetrics, "metrics missing from queryPlanner.joinOptimizer", {queryPlanner});
 
     // The outer phase timers are always populated when join optimization ran.
     for (const field of ["joinModelingTimeMicros", "sbeLoweringTimeMicros"]) {
-        assert(joinMetrics.hasOwnProperty(field), field + " missing from joinOptimizationMetrics", {
+        assert(joinMetrics.hasOwnProperty(field), field + " missing from joinOptimizer.metrics", {
             field,
             joinMetrics,
         });
@@ -172,12 +166,35 @@ function runTest(pipeline, expectRejected) {
         "ceTimeMicros",
         "wtLeafPagesAvailable",
     ]) {
-        assert(joinMetrics.hasOwnProperty(field), field + " missing from joinOptimizationMetrics", {
+        assert(joinMetrics.hasOwnProperty(field), field + " missing from joinOptimizer.metrics", {
             field,
             joinMetrics,
         });
     }
     assert.eq("boolean", typeof joinMetrics.wtLeafPagesAvailable, joinMetrics);
+}
+
+// Runs the pipeline, and asserts that the join optimizer was used and that estimate information is
+// present in the explain output.
+function runTest(pipeline, expectRejected) {
+    // Ensure stable on-disk sizes.
+    assert.commandWorked(db.adminCommand({fsync: 1}));
+    const explain = coll1.explain().aggregate(pipeline);
+
+    const queryPlanner = getQueryPlanner(explain);
+    const usedJoinOptimization = queryPlanner.winningPlan.hasOwnProperty("usedJoinOptimization")
+        ? queryPlanner.winningPlan.usedJoinOptimization
+        : false;
+    assert(usedJoinOptimization, "Join optimizer was not used as expected", {explain});
+
+    const joinOptimizer = queryPlanner.joinOptimizer;
+    assert(joinOptimizer, "joinOptimizer missing from queryPlanner", {queryPlanner});
+    assert(
+        !joinOptimizer.hasOwnProperty("metrics"),
+        "metrics should be absent when internalEnableDetailedJoinExplain is off",
+        {joinOptimizer},
+    );
+    assertJoinOptimizerMetrics(getQueryPlanner(explainWithDetailedJoinExplain(coll1, pipeline)));
 
     jsTest.log.info("Explain output", {explain});
     const winningPlan = getWinningPlanFromExplain(explain);
