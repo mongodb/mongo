@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
@@ -20,6 +21,7 @@
 #include "mongo/util/string_map.h"
 
 #include <cstdint>
+#include <vector>
 
 namespace mongo {
 
@@ -81,6 +83,9 @@ struct PlanExplainerData {
     bool fromPlanCache = false;
     // Hash of the join plan cache key. Populated on the explain path of a join eligible query.
     boost::optional<uint32_t> joinPlanCacheKeyHash;
+    // Sorted join-graph collections for which the storage engine did not report an approximate
+    // leaf page count. Populated on the explain path of a join-optimized query.
+    boost::optional<std::vector<NamespaceString>> joinCollectionsWithoutPageCount;
     // The reason the deciding plan ranker was chosen, recorded by the ranking strategy at the
     // branch point where it made its final decision. Emitted in V3 explain as the
     // queryPlanner.rankerChoice.reason value. boost::none when no strategy recorded a decision.
@@ -450,6 +455,15 @@ public:
      * for join optimization.
      */
     virtual boost::optional<uint32_t> getJoinPlanCacheKeyHash() const {
+        return boost::none;
+    }
+
+    /**
+     * Returns the join-graph collections for which the storage engine did not report an
+     * approximate leaf page count. Returns boost::none if the plan was not join-optimized.
+     */
+    virtual boost::optional<std::vector<NamespaceString>> getJoinCollectionsWithoutPageCount()
+        const {
         return boost::none;
     }
 

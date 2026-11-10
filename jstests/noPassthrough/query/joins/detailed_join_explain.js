@@ -73,9 +73,11 @@ describe("enableDetailedJoinExplain", function () {
     function assertDetailedJoinFields(explainOutput, expectDetails) {
         const joinOptimizer = getQueryPlanner(explainOutput).joinOptimizer;
         assert(joinOptimizer, "expected joinOptimizer in queryPlanner", {explainOutput});
-        assert.eq(joinOptimizer.hasOwnProperty("metrics"), expectDetails, "unexpected 'metrics'", {
-            joinOptimizer,
-        });
+        for (const field of ["metrics", "collectionsWithoutPageCount"]) {
+            assert.eq(joinOptimizer.hasOwnProperty(field), expectDetails, `unexpected '${field}'`, {
+                joinOptimizer,
+            });
+        }
 
         const joinStages = getAllPlanStages(getWinningPlanFromExplain(explainOutput)).filter(
             plannerStageIsJoinOptNode,

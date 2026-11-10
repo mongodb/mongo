@@ -896,6 +896,8 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
       _joinPlanCacheKeyHash{maybeExplainData ? maybeExplainData->joinPlanCacheKeyHash
                                              : boost::none},
       _planRankerReason{maybeExplainData ? maybeExplainData->planRankerReason : boost::none},
+      _joinCollectionsWithoutPageCount{
+          maybeExplainData ? maybeExplainData->joinCollectionsWithoutPageCount : boost::none},
       _classicRuntimePlannerExplainer{
           _classicRuntimePlannerStage  // If there were no multi-planning, this will be nullptr.
               ? plan_explainer_factory::make(_classicRuntimePlannerStage.get(),
@@ -1066,5 +1068,10 @@ PlanExplainerClassicRuntimePlannerForSBE::getFieldStatsMetadata() const {
 boost::optional<uint32_t> PlanExplainerClassicRuntimePlannerForSBE::getJoinPlanCacheKeyHash()
     const {
     return _joinPlanCacheKeyHash;
+}
+
+boost::optional<std::vector<NamespaceString>>
+PlanExplainerClassicRuntimePlannerForSBE::getJoinCollectionsWithoutPageCount() const {
+    return _joinCollectionsWithoutPageCount;
 }
 }  // namespace mongo

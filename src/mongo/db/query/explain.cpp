@@ -150,8 +150,16 @@ void appendQueryPlannerCommonInfo(PlanExecutor* exec,
                 metricsBob.appendNumber("planEnumerationTimeMicros",
                                         static_cast<long long>(pe->planEnumerationTimeMicros));
                 metricsBob.appendNumber("ceTimeMicros", static_cast<long long>(pe->ceTimeMicros));
-                // TODO SERVER-138850: Replace with 'joinOptimizer.collectionsWithoutPageCount'.
-                metricsBob.append("wtLeafPagesAvailable", pe->numApproxLeafPagesUnavailable == 0);
+            }
+            metricsBob.doneFast();
+
+            if (const auto collections = explainer.getJoinCollectionsWithoutPageCount()) {
+                BSONArrayBuilder collectionsBab(
+                    joinOptimizerBob.subarrayStart("collectionsWithoutPageCount"));
+                for (const auto& nss : *collections) {
+                    collectionsBab.append(
+                        NamespaceStringUtil::serialize(nss, serializationContext));
+                }
             }
         }
     }

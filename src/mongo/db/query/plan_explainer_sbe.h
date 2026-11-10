@@ -174,6 +174,8 @@ public:
     boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>> getFieldStatsMetadata()
         const override;
     boost::optional<uint32_t> getJoinPlanCacheKeyHash() const override;
+    boost::optional<std::vector<NamespaceString>> getJoinCollectionsWithoutPageCount()
+        const override;
     boost::optional<PlanRankerReason> getPlanRankerReason() const override {
         return _planRankerReason;
     }
@@ -211,6 +213,7 @@ private:
     // Copied out of the incoming PlanExplainerData for the same reason as the two fields above: the
     // data is moved into the embedded classic explainer, which does not exist on every path.
     boost::optional<PlanRankerReason> _planRankerReason;
+    boost::optional<std::vector<NamespaceString>> _joinCollectionsWithoutPageCount;
     // Do not call getCeSamplingMetadata() on this explainer; it returns boost::none because
     // ceSamplingMetadata is copied into _ceSamplingMetadata above. Callers should use
     // getCeSamplingMetadata() on PlanExplainerClassicRuntimePlannerForSBE instead.

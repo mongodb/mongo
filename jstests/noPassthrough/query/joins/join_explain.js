@@ -164,14 +164,12 @@ function assertJoinOptimizerMetrics(queryPlanner) {
         "cbrPlanningTimeMicros",
         "planEnumerationTimeMicros",
         "ceTimeMicros",
-        "wtLeafPagesAvailable",
     ]) {
         assert(joinMetrics.hasOwnProperty(field), field + " missing from joinOptimizer.metrics", {
             field,
             joinMetrics,
         });
     }
-    assert.eq("boolean", typeof joinMetrics.wtLeafPagesAvailable, joinMetrics);
 }
 
 // Runs the pipeline, and asserts that the join optimizer was used and that estimate information is
@@ -189,12 +187,22 @@ function runTest(pipeline, expectRejected) {
 
     const joinOptimizer = queryPlanner.joinOptimizer;
     assert(joinOptimizer, "joinOptimizer missing from queryPlanner", {queryPlanner});
-    assert(
-        !joinOptimizer.hasOwnProperty("metrics"),
-        "metrics should be absent when internalEnableDetailedJoinExplain is off",
-        {joinOptimizer},
+    for (const field of ["metrics", "collectionsWithoutPageCount"]) {
+        assert(
+            !joinOptimizer.hasOwnProperty(field),
+            field + " should be absent when internalEnableDetailedJoinExplain is off",
+            {joinOptimizer},
+        );
+    }
+    const detailedQueryPlanner = getQueryPlanner(explainWithDetailedJoinExplain(coll1, pipeline));
+    assertJoinOptimizerMetrics(detailedQueryPlanner);
+    // All three collections are small enough that their b-trees never split, so the storage engine
+    // reports no approximate leaf page count for any of them.
+    assert.eq(
+        [coll1, coll2, coll3].map((coll) => coll.getFullName()).sort(),
+        detailedQueryPlanner.joinOptimizer.collectionsWithoutPageCount,
+        detailedQueryPlanner.joinOptimizer,
     );
-    assertJoinOptimizerMetrics(getQueryPlanner(explainWithDetailedJoinExplain(coll1, pipeline)));
 
     jsTest.log.info("Explain output", {explain});
     const winningPlan = getWinningPlanFromExplain(explain);
@@ -419,6 +427,30 @@ runTest(pipeline, true /* expectRejected */);
             "Metadata" /* expectedNdvSource */,
         );
     }
+}
+
+// Test that 'collectionsWithoutPageCount' omits collections with an approximate leaf page count.
+{
+    // Insert enough data that the collection's b-tree splits into multiple leaf pages, then
+    // checkpoint so the storage engine can report its leaf page count.
+    const bigColl = db[jsTestName() + "_big"];
+    const pad = "x".repeat(10 * 1024);
+    assert.commandWorked(
+        bigColl.insertMany(Array.from({length: 1000}, (_, i) => ({_id: i, a: i, pad: pad}))),
+    );
+    // Add index for multikeyness info for path arrayness.
+    assert.commandWorked(bigColl.createIndex({dummy: 1, a: 1}));
+    assert.commandWorked(db.adminCommand({fsync: 1}));
+
+    const explain = explainWithDetailedJoinExplain(coll1, [
+        {$lookup: {from: bigColl.getName(), localField: "a", foreignField: "a", as: "big"}},
+        {$unwind: "$big"},
+    ]);
+    assert.eq(
+        [coll1.getFullName()],
+        getQueryPlanner(explain).joinOptimizer.collectionsWithoutPageCount,
+        {explain},
+    );
 }
 
 MongoRunner.stopMongod(conn);

@@ -688,15 +688,17 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                               .samplingEstimators = &samplingEstimators,
                               .explainMode = getExplainMode(*expCtx, qkc)};
 
-    // Count the distinct join-graph namespaces whose storage-engine approximate leaf page count is
-    // unavailable, forcing cost estimation onto the size-based fallback. 'collStats' covers every
-    // collection in 'mca', a superset of the join-graph namespaces; collections referenced only by
-    // the unoptimized suffix are never costed, so they are not counted.
-    const auto& graphNamespaces = model.getDistinctNamespaces();
-    peMetrics.numApproxLeafPagesUnavailable = static_cast<int>(
-        std::count_if(graphNamespaces.begin(), graphNamespaces.end(), [&](const auto& nss) {
-            return !ctx.catStats.collStats.at(nss).hasApproxNumLeafPages();
-        }));
+    // Collect the distinct join-graph namespaces whose storage-engine approximate leaf page count
+    // is unavailable, forcing cost estimation onto the size-based fallback. 'collStats' covers
+    // every collection in 'mca', a superset of the join-graph namespaces; collections referenced
+    // only by the unoptimized suffix are never costed, so they are not counted.
+    std::vector<NamespaceString> collectionsWithoutPageCount;
+    for (const auto& nss : model.getDistinctNamespaces()) {
+        if (!ctx.catStats.collStats.at(nss).hasApproxNumLeafPages()) {
+            collectionsWithoutPageCount.push_back(nss);
+        }
+    }
+    peMetrics.numApproxLeafPagesUnavailable = static_cast<int>(collectionsWithoutPageCount.size());
 
     JoinCardinalityEstimator cardEstimator(
         JoinCardinalityEstimator::make(ctx, samplingEstimators, peMetrics));
@@ -829,6 +831,9 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
             cacheMiss
                 ? cacheMiss->key
                 : makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), graphOnlyMca));
+        // Sort for a deterministic explain output.
+        std::ranges::sort(collectionsWithoutPageCount);
+        explainData.joinCollectionsWithoutPageCount = std::move(collectionsWithoutPageCount);
         // The join-reordering estimates cover the winning and the rejected plans, and are only
         // serialized by explain. The rejected plans were lowered above, so the map can be moved.
         explainData.estimates = std::move(reordered.estimates);
