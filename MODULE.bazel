@@ -673,6 +673,7 @@ single_version_override(
         "//bazel/rules_rust:cargo_build_script_windows_path.patch",
         "//bazel/rules_rust:cargo_build_script_windows_native_cc.patch",
         "//bazel/rules_rust:windows_cross_execution.patch",
+        "//bazel/rules_rust:cargo_build_script_reproducible_cflags.patch",
     ],
     version = "0.69.0",
 )

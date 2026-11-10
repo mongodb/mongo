@@ -296,6 +296,21 @@ class LinuxContainerActionWrapperTest(unittest.TestCase):
             args,
         )
 
+    def test_exec_env_preserves_proc_self_cwd_pwd(self) -> None:
+        # Bazel sets PWD=/proc/self/cwd so compilers record a path that
+        # -ffile-prefix-map=/proc/self/cwd=. can strip. Replacing it with the
+        # per-action sandbox path leaks that path into debug info.
+        with mock.patch.dict(
+            "os.environ", {"PATH": "/tool/bin", "PWD": "/proc/self/cwd"}, clear=True
+        ):
+            args = wrapper._exec_env(
+                pathlib.Path("/exec/root"),
+                pathlib.Path("/action/tmp"),
+                pathlib.Path("/output-base"),
+            )
+        self.assertEqual(["-e", "PWD=/proc/self/cwd"], args[:2])
+        self.assertNotIn("PWD=/exec/root", args)
+
     def test_exec_env_adds_external_libvoidstar_to_library_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             cwd = pathlib.Path(temp_dir)

@@ -1,0 +1,25 @@
+Reproducible cargo_build_script C/C++ objects.
+
+cc-rs passes absolute source paths under the per-action exec root (which, in the
+persistent-container strategy, contains a per-action sandbox number). The cc toolchain's
+-ffile-prefix-map=/proc/self/cwd=. does not match those, so the sandbox path leaked into
+DW_AT_comp_dir/DW_AT_name and every build-script-compiled object differed between builds.
+Append -ffile-prefix-map=${pwd}=. (the runner substitutes ${pwd} with the exec root).
+
+--- cargo/private/cargo_build_script.bzl
++++ cargo/private/cargo_build_script.bzl
+@@ -502,6 +502,14 @@
+         # for example, itself derived from the `macos_minimum_os` Bazel argument).
+         env["CFLAGS"] = " ".join(_pwd_flags(cc_c_args))
+         env["CXXFLAGS"] = " ".join(_pwd_flags(cc_cxx_args))
++
++        # cc-rs compiles with absolute paths under the (per-action) exec root, which the
++        # toolchain's /proc/self/cwd prefix map does not cover. Map the exec root to "." so
++        # build-script-compiled objects are reproducible.
++        if not cc_toolchain.compiler.startswith("msvc"):
++            prefix_map = "-ffile-prefix-map=${pwd}=."
++            env["CFLAGS"] = " ".join([env["CFLAGS"], prefix_map]).strip()
++            env["CXXFLAGS"] = " ".join([env["CXXFLAGS"], prefix_map]).strip()
+         # It may be tempting to forward ARFLAGS, but cc-rs is opinionated enough
+         # that doing so is more likely to hurt than help. If you need to change
+         # ARFLAGS, make changes to cc-rs.

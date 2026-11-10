@@ -1045,9 +1045,13 @@ def _exec_env(
     # exact environment Bazel computed for the action; this is what remote workers see.
     # Temporary and home directories are the exceptions: each local action gets an
     # isolated, writable directory instead of sharing persistent container state.
+    # Bazel sets PWD=/proc/self/cwd so compilers record a working directory that
+    # -ffile-prefix-map=/proc/self/cwd=. can strip; keep it so the per-action sandbox
+    # path is not baked into debug info.
+    pwd = "/proc/self/cwd" if os.environ.get("PWD") == "/proc/self/cwd" else str(cwd)
     env_args = [
         "-e",
-        f"PWD={cwd}",
+        f"PWD={pwd}",
         "-e",
         f"TMPDIR={temp_dir}",
         "-e",

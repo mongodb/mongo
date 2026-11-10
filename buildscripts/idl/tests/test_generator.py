@@ -788,6 +788,21 @@ class TestGenerator(testcase.IDLTestcase):
         expected = "static const std::int64_t rhs{2147483647};"
         self.assertIn(expected, source)
 
+    def test_bson_type_check_preserves_declaration_order(self) -> None:
+        """Test multi-type checks list BSON types in IDL order, independent of PYTHONHASHSEED."""
+        _, source = self.assert_generate_with_basic_types("""
+        structs:
+                MultiTypeStruct:
+                    description: MultiTypeStruct
+                    fields:
+                        field1: safeInt64
+        """)
+
+        bson_types = ["numberLong", "numberInt", "numberDecimal", "numberDouble"]
+        elems = ", ".join(f"::mongo::BSONType::{t}" for t in bson_types)
+        expected = f"std::array<BSONType, {len(bson_types)}>{{{elems}}}"
+        self.assertIn(expected, source)
+
     def test_generate_namespace_string_dbname_constructor(self) -> None:
         """Test command constructors that initialize both NamespaceString and dbName fields
         use class members instead of constructor arguments to perform initialization (prevent
