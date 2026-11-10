@@ -9,6 +9,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"

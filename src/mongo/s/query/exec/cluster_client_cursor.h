@@ -7,6 +7,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_shape/query_shape.h"

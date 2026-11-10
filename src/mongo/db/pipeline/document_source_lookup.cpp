@@ -12,6 +12,7 @@
 #include "mongo/db/extension/host/extension_search_server_status.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/namespace_string.h"

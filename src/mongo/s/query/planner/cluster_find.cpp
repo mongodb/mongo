@@ -30,6 +30,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"

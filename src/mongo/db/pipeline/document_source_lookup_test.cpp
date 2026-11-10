@@ -10,6 +10,7 @@
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"

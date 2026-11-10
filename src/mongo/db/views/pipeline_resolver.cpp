@@ -3,6 +3,7 @@
 
 #include "mongo/db/views/pipeline_resolver.h"
 
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"

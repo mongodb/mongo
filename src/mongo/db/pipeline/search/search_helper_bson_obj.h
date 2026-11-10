@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
 #include "mongo/db/pipeline/document_source_rank_fusion_gen.h"

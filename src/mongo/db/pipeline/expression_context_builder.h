@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/util/modules.h"

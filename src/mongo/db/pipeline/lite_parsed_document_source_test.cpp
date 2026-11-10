@@ -7,6 +7,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"

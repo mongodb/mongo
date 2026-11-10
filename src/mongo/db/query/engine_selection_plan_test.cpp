@@ -5,6 +5,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"

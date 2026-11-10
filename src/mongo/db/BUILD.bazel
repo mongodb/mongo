@@ -1449,6 +1449,7 @@ mongo_cc_library(
         "generic_argument_util.cpp",
         "ifr_flag_retry_info.cpp",
         "ifr_unrecognized_flag_info.cpp",
+        "incremental_feature_rollout.cpp",
         "index_names.cpp",
         "keypattern.cpp",
         "mirror_maestro_feature_flags_gen",

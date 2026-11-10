@@ -6,6 +6,7 @@
 #include "mongo/base/counter.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/ifr_flag_retry_info.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"

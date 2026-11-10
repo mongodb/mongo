@@ -7,6 +7,7 @@
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/feature_flag_test_gen.h"
 #include "mongo/db/ifr_unrecognized_flag_info.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context_test_fixture.h"

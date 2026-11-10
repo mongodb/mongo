@@ -67,17 +67,19 @@ filters:
       - 10gen/server-programmability
   - "ifr_context_decoration.*":
     approvers:
-      - 10gen/server-catalog-and-routing
-      - 10gen/query-execution
+      - 10gen/rollout-flag-engineers
   - "ifr_flag_registry.yml":
     approvers:
       - 10gen/rollout-flag-managers
   - "ifr_flag_retry_info*":
     approvers:
-      - 10gen/server-programmability
+      - 10gen/rollout-flag-engineers
   - "ifr_unrecognized_flag_info*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/rollout-flag-engineers
+  - "incremental_feature_rollout.*":
+    approvers:
+      - 10gen/rollout-flag-engineers
   - "index_names.*":
     approvers:
       - 10gen/query-execution-write-exec
@@ -412,8 +414,7 @@ filters:
       - 10gen/query-execution
   - "incremental_rollout_metrics.*":
     approvers:
-      - 10gen/server-catalog-and-routing
-      - 10gen/query-execution
+      - 10gen/rollout-flag-engineers
   - "feature_flag_test.idl.tpl":
     approvers:
       - 10gen/server-catalog-and-routing

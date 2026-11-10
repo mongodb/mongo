@@ -4,6 +4,7 @@
 #include "mongo/s/client_metadata_propagation_egress_hook.h"
 
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"

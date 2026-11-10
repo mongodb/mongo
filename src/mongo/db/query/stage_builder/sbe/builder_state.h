@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/util/modules.h"

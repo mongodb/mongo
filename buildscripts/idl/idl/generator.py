@@ -1230,6 +1230,15 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 return True
         return False
 
+    def _need_incremental_feature_rollout_headers(self, spec):
+        # type: (ast.IDLAST) -> bool
+        for param in spec.server_parameters:
+            if param.feature_flag_phase is not None and param.feature_flag_phase != (
+                ast.FeatureFlagRolloutPhase.NOT_FOR_INCREMENTAL_ROLLOUT
+            ):
+                return True
+        return False
+
     def _need_server_parameter_headers(self, spec):
         # type: (ast.IDLAST) -> bool
         for param in spec.server_parameters:
@@ -1311,6 +1320,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             if self._need_feature_flag_headers(spec):
                 header_list.append("mongo/db/feature_flag.h")
                 header_list.append("mongo/db/feature_flag_server_parameter.h")
+            if self._need_incremental_feature_rollout_headers(spec):
+                header_list.append("mongo/db/incremental_feature_rollout.h")
             if self._need_server_parameter_headers(spec):
                 header_list.append("mongo/db/feature_compatibility_version_parser.h")
             header_list.append("mongo/db/server_parameter.h")

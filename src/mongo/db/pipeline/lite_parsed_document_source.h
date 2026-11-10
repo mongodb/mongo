@@ -12,6 +12,7 @@
 #include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/stage_params.h"

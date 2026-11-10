@@ -10,6 +10,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"

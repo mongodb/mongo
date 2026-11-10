@@ -7,6 +7,7 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/modules.h"

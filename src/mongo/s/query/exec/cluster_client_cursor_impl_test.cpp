@@ -10,6 +10,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/feature_flag_test_gen.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_tester/mock_version_info.h"
 #include "mongo/db/service_context.h"

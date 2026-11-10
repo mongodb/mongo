@@ -1526,6 +1526,7 @@ class TestGenerator(testcase.IDLTestcase):
             header,
             ["mongo::BinaryCompatibleFeatureFlag gToaster;"],
         )
+        self.assertStringNotInFile(header, "mongo/db/incremental_feature_rollout.h")
         self.assertStringsInFile(
             source,
             [
@@ -1552,6 +1553,7 @@ class TestGenerator(testcase.IDLTestcase):
             header,
             ["mongo::BinaryCompatibleFeatureFlag gToaster;"],
         )
+        self.assertStringNotInFile(header, "mongo/db/incremental_feature_rollout.h")
         self.assertStringsInFile(
             source,
             [
@@ -1578,6 +1580,7 @@ class TestGenerator(testcase.IDLTestcase):
             header,
             ["mongo::FCVGatedFeatureFlag gToaster;"],
         )
+        self.assertStringNotInFile(header, "mongo/db/incremental_feature_rollout.h")
         self.assertStringsInFile(
             source,
             [
@@ -1749,7 +1752,10 @@ class TestGenerator(testcase.IDLTestcase):
         )
         self.assertStringsInFile(
             header,
-            ["mongo::IncrementalRolloutFeatureFlag gToaster;"],
+            [
+                "mongo/db/incremental_feature_rollout.h",
+                "mongo::IncrementalRolloutFeatureFlag gToaster;",
+            ],
         )
         self.assertStringsInFile(
             source,
@@ -1776,7 +1782,10 @@ class TestGenerator(testcase.IDLTestcase):
         )
         self.assertStringsInFile(
             header,
-            ["mongo::IncrementalRolloutFeatureFlag gToaster;"],
+            [
+                "mongo/db/incremental_feature_rollout.h",
+                "mongo::IncrementalRolloutFeatureFlag gToaster;",
+            ],
         )
         self.assertStringsInFile(
             source,
@@ -1803,7 +1812,10 @@ class TestGenerator(testcase.IDLTestcase):
         )
         self.assertStringsInFile(
             header,
-            ["mongo::IncrementalRolloutFeatureFlag gToaster;"],
+            [
+                "mongo/db/incremental_feature_rollout.h",
+                "mongo::IncrementalRolloutFeatureFlag gToaster;",
+            ],
         )
         self.assertStringsInFile(
             source,
@@ -1832,7 +1844,10 @@ class TestGenerator(testcase.IDLTestcase):
         )
         self.assertStringsInFile(
             header,
-            ["mongo::IncrementalRolloutFeatureFlag gToaster;"],
+            [
+                "mongo/db/incremental_feature_rollout.h",
+                "mongo::IncrementalRolloutFeatureFlag gToaster;",
+            ],
         )
         self.assertStringsInFile(
             source,

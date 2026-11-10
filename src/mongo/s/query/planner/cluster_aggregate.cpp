@@ -21,6 +21,7 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/global_catalog/type_collection_common_types_gen.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_hint_translation.h"

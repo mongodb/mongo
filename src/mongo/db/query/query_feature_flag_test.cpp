@@ -3,6 +3,7 @@
 
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/feature_flag_test_gen.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"

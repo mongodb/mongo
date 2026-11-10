@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"

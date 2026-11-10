@@ -10,6 +10,7 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/ifr_flag_retry_info.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"

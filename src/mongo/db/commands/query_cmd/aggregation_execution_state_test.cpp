@@ -9,6 +9,7 @@
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_mock.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"

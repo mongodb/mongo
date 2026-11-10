@@ -3,6 +3,7 @@
 
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 
 namespace mongo {
 namespace {
@@ -31,9 +32,9 @@ auto& incrementalRolloutSection =
          .forShard()
          .forRouter();
 
-// Surfaces the process-wide IFR wire-protocol counters (see feature_flag.cpp). Distinct from the
-// per-flag "incrementalRollout" section above: these are aggregate cluster-health signals for the
-// IFR wire protocol.
+// Surfaces the process-wide IFR wire-protocol counters (see incremental_feature_rollout.cpp).
+// Distinct from the per-flag "incrementalRollout" section above: these are aggregate cluster-health
+// signals for the IFR wire protocol.
 class IfrServerStatusSection : public ServerStatusSection {
 public:
     using ServerStatusSection::ServerStatusSection;

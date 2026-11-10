@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/stats/internal_operation.h"

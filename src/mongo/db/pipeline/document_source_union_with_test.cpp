@@ -13,6 +13,7 @@
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_facet.h"

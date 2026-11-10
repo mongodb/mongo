@@ -13,6 +13,7 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"

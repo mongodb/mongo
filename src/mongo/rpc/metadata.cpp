@@ -15,6 +15,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/server_options.h"

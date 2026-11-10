@@ -14,6 +14,7 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"

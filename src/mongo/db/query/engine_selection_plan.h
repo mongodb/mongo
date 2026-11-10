@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/engine_selection.h"
 #include "mongo/util/modules.h"

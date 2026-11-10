@@ -4,6 +4,7 @@
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/util/assert_util.h"

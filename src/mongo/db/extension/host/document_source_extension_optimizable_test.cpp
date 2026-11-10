@@ -21,6 +21,7 @@
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"

@@ -3,6 +3,7 @@
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/stats/counters.h"

@@ -9,6 +9,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_shape/query_shape.h"

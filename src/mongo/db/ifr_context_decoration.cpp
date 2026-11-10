@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 // The parts of IncrementalFeatureRolloutContext that operate on an OperationContext. They live
-// here (in the 'service_context' library), rather than in feature_flag.cpp (in the 'server_base'
-// library) because 'server_base' is also linked into small tools that carry no
+// here (in the 'service_context' library), rather than in incremental_feature_rollout.cpp (in the
+// 'server_base' library) because 'server_base' is also linked into small tools that carry no
 // Client/OperationContext machinery. Code that uses those types can require symbols from
 // 'service_context' (sanitizer builds, for example), which would break linking for any binary that
 // uses 'server_base' alone. See version_context_decoration.cpp for the same split.
 
 #include "mongo/db/client.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/server_options.h"
@@ -107,7 +108,7 @@ void IncrementalFeatureRolloutContext::installForRequestWithoutIfrFlags(Operatio
         // Defer cloning the all-flags-off template until a flag is actually consulted. If nothing
         // consults one, the context stays unmaterialized and no ifrFlags are forwarded downstream.
         getIfrContextOnOpCtx(opCtx).deferred =
-            DeferredIfrContext([] { return mutableShardServerDefaultTemplate().clone(); });
+            DeferredIfrContext([] { return cloneShardServerDefaultTemplate(); });
     } else if (clusterRole.hasExclusively(ClusterRole::RouterServer)) {
         // Avoid deferring initialization on mongos - we want to eagerly initialize to make sure
         // everyone's on the same page.

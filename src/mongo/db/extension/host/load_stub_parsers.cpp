@@ -10,6 +10,7 @@
 #include "mongo/db/extension/host/load_extension.h"
 #include "mongo/db/extension/host/stub_commands.h"
 #include "mongo/db/feature_flag_server_parameter.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"

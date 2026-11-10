@@ -9,4 +9,4 @@ filters:
       - 10gen/query-execution
   - "ifr_sender_version*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/rollout-flag-engineers

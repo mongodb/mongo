@@ -8,6 +8,7 @@
 #include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/query/client_cursor/generic_cursor_utils.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"

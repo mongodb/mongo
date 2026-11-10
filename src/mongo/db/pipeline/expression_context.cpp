@@ -8,6 +8,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/operation_context.h"

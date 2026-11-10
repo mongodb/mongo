@@ -8,6 +8,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"

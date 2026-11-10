@@ -10,6 +10,7 @@
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/ifr_flag_retry_info.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_exchange.h"

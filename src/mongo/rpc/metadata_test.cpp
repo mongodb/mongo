@@ -11,6 +11,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/feature_flag_test_gen.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/stats/internal_operation.h"
 #include "mongo/db/tenant_id.h"

@@ -3,6 +3,7 @@
 #include "mongo/db/query/engine_selection_plan.h"
 
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_solution_analyzer.h"
 #include "mongo/logv2/log.h"

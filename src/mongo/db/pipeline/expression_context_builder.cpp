@@ -4,6 +4,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
+#include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/collation/collator_interface.h"
