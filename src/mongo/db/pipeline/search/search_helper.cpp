@@ -196,20 +196,6 @@ constexpr std::array kVectorSearchTrustedFields{mongot_cursor::kVectorSearchCmd,
                                                 mongot_cursor::kCollectionUuidField,
                                                 mongot_cursor::kViewNameField};
 
-static const std::vector<std::string_view>& getInternalOnlyFieldNames() {
-    static const std::vector<std::string_view> fields = {
-        InternalSearchMongotRemoteSpec::kMongotQueryFieldName,
-        InternalSearchMongotRemoteSpec::kMetadataMergeProtocolVersionFieldName,
-        InternalSearchMongotRemoteSpec::kMergingPipelineFieldName,
-        InternalSearchMongotRemoteSpec::kLimitFieldName,
-        InternalSearchMongotRemoteSpec::kRequiresSearchSequenceTokenFieldName,
-        InternalSearchMongotRemoteSpec::kSortSpecFieldName,
-        InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
-        InternalSearchMongotRemoteSpec::kDocsNeededBoundsFieldName,
-        InternalSearchMongotRemoteSpec::kViewFieldName,
-    };
-    return fields;
-}
 }  // namespace
 
 void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -727,12 +713,19 @@ boost::optional<SearchQueryViewSpec> getViewFromBSONObj(const BSONObj& spec) {
     return boost::none;
 }
 
-void validateInternalSearchFieldsNotSetByUser(const OperationContext* opCtx, const BSONObj& spec) {
-    for (const auto& name : getInternalOnlyFieldNames()) {
-        if (spec.hasField(name)) {
-            assertAllowedInternalIfRequired(opCtx, name, AllowedWithClientType::kInternal);
-        }
-    }
+const std::vector<std::string_view>& getInternalOnlyFieldNames() {
+    static const std::vector<std::string_view> kInternalOnlyFieldNames = {
+        InternalSearchMongotRemoteSpec::kMongotQueryFieldName,
+        InternalSearchMongotRemoteSpec::kMetadataMergeProtocolVersionFieldName,
+        InternalSearchMongotRemoteSpec::kMergingPipelineFieldName,
+        InternalSearchMongotRemoteSpec::kLimitFieldName,
+        InternalSearchMongotRemoteSpec::kRequiresSearchSequenceTokenFieldName,
+        InternalSearchMongotRemoteSpec::kSortSpecFieldName,
+        InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
+        InternalSearchMongotRemoteSpec::kDocsNeededBoundsFieldName,
+        InternalSearchMongotRemoteSpec::kViewFieldName,
+    };
+    return kInternalOnlyFieldNames;
 }
 
 void validateUserSpecDoesNotOverrideTrustedFields(const BSONObj& spec) {

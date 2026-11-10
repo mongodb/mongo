@@ -160,6 +160,8 @@ public:
 
     void validate(const OperationContext* opCtx) const override;
 
+    const std::vector<std::string_view>& getInternalOnlyFieldNames() const final;
+
     // Moved from document_source_lookup.cpp so createFromBson can still call it.
     static void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline);
     static void validateLookupCollectionlessPipeline(const BSONElement& pipelineElem);

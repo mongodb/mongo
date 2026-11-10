@@ -91,6 +91,8 @@ public:
 
     bool requiresAuthzChecks() const override;
 
+    const std::vector<std::string_view>& getInternalOnlyFieldNames() const final;
+
     std::unique_ptr<StageParams> getStageParams() const override;
 
     bool hasExtensionVectorSearchStage() const override;

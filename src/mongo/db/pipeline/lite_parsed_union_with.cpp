@@ -84,6 +84,14 @@ bool LiteParsedUnionWith::requiresAuthzChecks() const {
     return false;
 }
 
+const std::vector<std::string_view>& LiteParsedUnionWith::getInternalOnlyFieldNames() const {
+    // Set by the server when it serializes a desugared hybrid-search sub-pipeline; a client must
+    // never supply it.
+    static const std::vector<std::string_view> kInternalOnlyFieldNames{
+        UnionWithSpec::kIsHybridSearchFieldName};
+    return kInternalOnlyFieldNames;
+}
+
 PrivilegeVector LiteParsedUnionWith::requiredPrivileges(bool isMongos,
                                                         bool bypassDocumentValidation) const {
     PrivilegeVector requiredPrivileges;

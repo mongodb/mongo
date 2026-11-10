@@ -8,6 +8,7 @@
 #include "mongo/util/modules.h"
 
 #include <string_view>
+#include <vector>
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
@@ -62,9 +63,10 @@ public:
                 str::stream() << this->getParseTimeName() << " value must be an object. Found: "
                               << typeName(this->_originalBson.type()),
                 this->_originalBson.type() == BSONType::object);
+    }
 
-        search_helpers::validateInternalSearchFieldsNotSetByUser(
-            opCtx, this->_originalBson.embeddedObject());
+    const std::vector<std::string_view>& getInternalOnlyFieldNames() const override {
+        return search_helpers::getInternalOnlyFieldNames();
     }
 
     // All search stages are unsupported on timeseries collections.

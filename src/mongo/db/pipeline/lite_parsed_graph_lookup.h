@@ -103,6 +103,8 @@ public:
 
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final;
 
+    const std::vector<std::string_view>& getInternalOnlyFieldNames() const final;
+
     Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                           bool inMultiDocumentTransaction) const override;
 

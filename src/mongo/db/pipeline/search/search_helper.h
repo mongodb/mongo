@@ -22,6 +22,7 @@
 
 #include <memory>
 #include <string_view>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -240,12 +241,9 @@ boost::optional<SearchQueryViewSpec> getViewFromExpCtx(
 
 boost::optional<SearchQueryViewSpec> getViewFromBSONObj(const BSONObj& spec);
 
-/**
- * Asserts that a spec does not contain internal search routing fields (e.g. 'mergingPipeline')
- * when the request comes from an external (non-internal) client. These fields are set exclusively
- * by the router during sharded search planning and must never be accepted from user requests.
- */
-void validateInternalSearchFieldsNotSetByUser(const OperationContext* opCtx, const BSONObj& spec);
+
+// Internal fields that should only be set by the router during sharded search planning.
+const std::vector<std::string_view>& getInternalOnlyFieldNames();
 
 /**
  * Rejects a user-supplied $vectorSearch spec that contains any of the security-trusted,

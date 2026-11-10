@@ -158,6 +158,26 @@ describe("internal aggregate field rejection on mongod", function () {
         it("rejects '$_isHybridSearch' from an external client", function () {
             assertHybridSearchFieldRejectedForAllPipelines(db, coll.getName());
         });
+
+        it("accepts a hybrid search pipeline on a view from an external client", function () {
+            assert.commandWorked(
+                db.createView("collView", coll.getName(), [{$match: {x: {$gte: 0}}}]),
+            );
+            try {
+                for (const {name, stage} of hybridSearchStages) {
+                    assert.commandWorked(
+                        db.runCommand({
+                            aggregate: "collView",
+                            pipeline: [stage],
+                            cursor: {},
+                        }),
+                        `${name} on a view should be accepted from an external client`,
+                    );
+                }
+            } finally {
+                db.collView.drop();
+            }
+        });
     });
 });
 

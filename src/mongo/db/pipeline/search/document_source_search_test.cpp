@@ -13,6 +13,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
@@ -361,8 +362,9 @@ TEST_F(SearchTest, ExternalClientCannotSupplyInternalSearchFields) {
     for (const auto& [fieldName, specJson] : kInternalSearchFieldCases) {
         SCOPED_TRACE(fieldName);
         const auto specBson = fromjson(specJson);
-        auto lpds = SearchLiteParsed::parse(nss, specBson.firstElement(), LiteParserOptions{});
-        ASSERT_THROWS_CODE(lpds->validate(externalOpCtx.get()), AssertionException, 5491300);
+        const std::vector<BSONObj> stages{specBson};
+        LiteParsedPipeline pipeline(nss, stages);
+        ASSERT_THROWS_CODE(pipeline.validate(externalOpCtx.get()), AssertionException, 5491300);
     }
 }
 
@@ -377,8 +379,9 @@ TEST_F(SearchTest, InternalClientCanSupplyInternalSearchFields) {
     for (const auto& [fieldName, specJson] : kInternalSearchFieldCases) {
         SCOPED_TRACE(fieldName);
         const auto specBson = fromjson(specJson);
-        auto lpds = SearchLiteParsed::parse(nss, specBson.firstElement(), LiteParserOptions{});
-        ASSERT_DOES_NOT_THROW(lpds->validate(opCtx));
+        const std::vector<BSONObj> stages{specBson};
+        LiteParsedPipeline pipeline(nss, stages);
+        ASSERT_DOES_NOT_THROW(pipeline.validate(opCtx));
     }
 }
 

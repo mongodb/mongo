@@ -20,6 +20,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+#include <vector>
+
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -282,6 +285,16 @@ void LiteParsedLookUp::validate(const OperationContext* opCtx) const {
             search_metrics::inLookupKickbackRetryCount,
             "The $search/$searchMeta extension stage is not supported in a $lookup");
     }
+}
+
+const std::vector<std::string_view>& LiteParsedLookUp::getInternalOnlyFieldNames() const {
+    // Set by the server when it rewrites or serializes a $lookup; a client must never supply them.
+    static const std::vector<std::string_view> kInternalOnlyFieldNames{
+        DocumentSourceLookupSpec::kInternalFieldMatchPipelineIdxFieldName,
+        DocumentSourceLookupSpec::kInternalFromIsAViewFieldName,
+        DocumentSourceLookupSpec::kIsHybridSearchFieldName,
+        DocumentSourceLookupSpec::kUnwindSpecFieldName};
+    return kInternalOnlyFieldNames;
 }
 
 void LiteParsedLookUp::validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline) {

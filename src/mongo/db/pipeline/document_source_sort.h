@@ -73,6 +73,8 @@ public:
     bool isSelectionStage() const final {
         return true;
     }
+
+    const std::vector<std::string_view>& getInternalOnlyFieldNames() const final;
 };
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalBoundedSort);
 

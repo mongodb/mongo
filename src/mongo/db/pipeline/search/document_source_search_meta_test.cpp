@@ -13,6 +13,7 @@
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
@@ -146,8 +147,9 @@ TEST_F(SearchMetaTest, ExternalClientCannotSupplyInternalSearchMetaFields) {
     for (const auto& [fieldName, specJson] : kInternalSearchMetaFieldCases) {
         SCOPED_TRACE(fieldName);
         const auto specBson = fromjson(specJson);
-        auto lpds = SearchMetaLiteParsed::parse(nss, specBson.firstElement(), LiteParserOptions{});
-        ASSERT_THROWS_CODE(lpds->validate(externalOpCtx.get()), AssertionException, 5491300);
+        const std::vector<BSONObj> stages{specBson};
+        LiteParsedPipeline pipeline(nss, stages);
+        ASSERT_THROWS_CODE(pipeline.validate(externalOpCtx.get()), AssertionException, 5491300);
     }
 }
 
@@ -160,8 +162,9 @@ TEST_F(SearchMetaTest, InternalClientCanSupplyInternalSearchMetaFields) {
     for (const auto& [fieldName, specJson] : kInternalSearchMetaFieldCases) {
         SCOPED_TRACE(fieldName);
         const auto specBson = fromjson(specJson);
-        auto lpds = SearchMetaLiteParsed::parse(nss, specBson.firstElement(), LiteParserOptions{});
-        ASSERT_DOES_NOT_THROW(lpds->validate(opCtx));
+        const std::vector<BSONObj> stages{specBson};
+        LiteParsedPipeline pipeline(nss, stages);
+        ASSERT_DOES_NOT_THROW(pipeline.validate(opCtx));
     }
 }
 

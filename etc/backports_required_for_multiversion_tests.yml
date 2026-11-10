@@ -93,6 +93,8 @@ last-patch:
       ticket: SERVER-134555
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
       ticket: SERVER-127661
+    - test_file: jstests/core/views/views_internal_only_fields.js
+      ticket: SERVER-136876
     - test_file: jstests/fle2/implicit_ecoc_creation.js
       ticket: SERVER-126384
     - test_file: jstests/noPassthrough/ddl/list_collections_and_indexes_with_write_conflicts.js
@@ -236,6 +238,8 @@ last-continuous:
       ticket: SERVER-134555
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
       ticket: SERVER-127661
+    - test_file: jstests/core/views/views_internal_only_fields.js
+      ticket: SERVER-136876
     - test_file: jstests/noPassthrough/catalog/list_catalog_secondary_read_timestamp.js
       ticket: SERVER-97245
     - test_file: jstests/noPassthrough/ddl/list_collections_and_indexes_with_write_conflicts.js
@@ -447,6 +451,8 @@ last-lts:
       ticket: SERVER-134555
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
       ticket: SERVER-127661
+    - test_file: jstests/core/views/views_internal_only_fields.js
+      ticket: SERVER-136876
     - test_file: jstests/noPassthrough/catalog/list_catalog_secondary_read_timestamp.js
       ticket: SERVER-97245
     - test_file: jstests/noPassthrough/ddl/list_collections_and_indexes_with_write_conflicts.js

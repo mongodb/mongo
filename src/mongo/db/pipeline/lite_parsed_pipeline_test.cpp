@@ -10,10 +10,16 @@
 #include "mongo/db/pipeline/lite_parsed_internal_hybrid_search.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/test_lite_parsed.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/scopeguard.h"
+
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -587,6 +593,120 @@ TEST_F(LiteParsedPipelineViewPolicyTest, PrependWhenDefaultPrependIsTrueForAllSt
     ASSERT_EQ(out[0]->getParseTimeName(), "$match");
     ASSERT_EQ(out[1]->getParseTimeName(), _defaultStageName);
     ASSERT_EQ(out[2]->getParseTimeName(), _defaultStageName);
+}
+
+TEST(LiteParsedPipelineTest, SortInternalFieldsAreRejectedFromExternalClient) {
+    service_context_test::ScopedGlobalServiceContextForTest serviceContext;
+    auto client = serviceContext.getService()->makeClient(
+        "external", transport::MockSession::create(/*tl=*/nullptr));
+    auto opCtx = client->makeOperationContext();
+
+    std::vector<BSONObj> stages = {BSON("$sort" << BSON("a" << 1 << "$_internalLimit" << 5))};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    ASSERT_THROWS_CODE(pipeline.validate(opCtx.get()), AssertionException, 5491300);
+}
+
+TEST(LiteParsedPipelineTest, SortInternalLimitIsRejectedInViewDefinition) {
+    std::vector<BSONObj> stages = {BSON("$sort" << BSON("a" << 1 << "$_internalLimit" << 5))};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    // No OperationContext is involved, so the check cannot depend on who is asking: a view
+    // definition is rejected for any client.
+    ASSERT_THROWS_CODE(pipeline.checkStagesAllowedInViewDefinition(),
+                       AssertionException,
+                       ErrorCodes::OptionNotSupportedOnView);
+}
+
+TEST(LiteParsedPipelineTest, SortOutputSortKeyMetadataIsRejectedInViewDefinition) {
+    std::vector<BSONObj> stages = {
+        BSON("$sort" << BSON("a" << 1 << "$_internalOutputSortKeyMetadata" << true))};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    ASSERT_THROWS_CODE(pipeline.checkStagesAllowedInViewDefinition(),
+                       AssertionException,
+                       ErrorCodes::OptionNotSupportedOnView);
+}
+
+TEST(LiteParsedPipelineTest, GraphLookupInternalFromPipelineIsRejectedInViewDefinition) {
+    std::vector<BSONObj> stages = {
+        BSON("$graphLookup" << BSON("from" << "otherCollection"
+                                           << "$_internalFromPipeline"
+                                           << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
+                                           << "joined"))};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    ASSERT_THROWS_CODE(pipeline.checkStagesAllowedInViewDefinition(),
+                       AssertionException,
+                       ErrorCodes::OptionNotSupportedOnView);
+}
+
+TEST(LiteParsedPipelineTest, LookupInternalFieldsAreRejectedInViewDefinition) {
+    // One spec per internal-only field $lookup declares, so dropping a field from
+    // LiteParsedLookUp::getInternalOnlyFieldNames() fails here.
+    const std::vector<std::pair<std::string_view, BSONObj>> kCases = {
+        {"$_internalFromIsAView",
+         BSON("$lookup" << BSON("from" << "otherCollection"
+                                       << "localField" << "a"
+                                       << "foreignField" << "b"
+                                       << "as" << "joined"
+                                       << "$_internalFromIsAView" << true))},
+        {"$_internalFieldMatchPipelineIdx",
+         BSON("$lookup" << BSON("from" << "otherCollection"
+                                       << "localField" << "a"
+                                       << "foreignField" << "b"
+                                       << "as" << "joined"
+                                       << "$_internalFieldMatchPipelineIdx" << 0LL))},
+        {"$_internalIsHybridSearch",
+         BSON("$lookup" << BSON("from" << "otherCollection"
+                                       << "localField" << "a"
+                                       << "foreignField" << "b"
+                                       << "as" << "joined"
+                                       << "$_internalIsHybridSearch" << true))},
+        {"$_internalUnwind",
+         BSON("$lookup" << BSON("from" << "otherCollection"
+                                       << "localField" << "a"
+                                       << "foreignField" << "b"
+                                       << "as" << "joined"
+                                       << "$_internalUnwind" << BSON("$unwind" << "$joined")))},
+    };
+
+    for (const auto& [fieldName, spec] : kCases) {
+        SCOPED_TRACE(fieldName);
+        std::vector<BSONObj> stages = {spec};
+        LiteParsedPipeline pipeline(kTestNss, stages);
+
+        ASSERT_THROWS_CODE(pipeline.checkStagesAllowedInViewDefinition(),
+                           AssertionException,
+                           ErrorCodes::OptionNotSupportedOnView);
+    }
+}
+
+TEST(LiteParsedPipelineTest, UnionWithInternalIsHybridSearchIsRejectedInViewDefinition) {
+    std::vector<BSONObj> stages = {
+        BSON("$unionWith" << BSON("coll" << "otherCollection"
+                                         << "pipeline" << BSONArray() << "$_internalIsHybridSearch"
+                                         << true))};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    ASSERT_THROWS_CODE(pipeline.checkStagesAllowedInViewDefinition(),
+                       AssertionException,
+                       ErrorCodes::OptionNotSupportedOnView);
+}
+
+TEST(LiteParsedPipelineTest, UnionWithInternalFieldIsRejectedFromExternalClient) {
+    service_context_test::ScopedGlobalServiceContextForTest serviceContext;
+    auto client = serviceContext.getService()->makeClient(
+        "external", transport::MockSession::create(/*tl=*/nullptr));
+    auto opCtx = client->makeOperationContext();
+
+    std::vector<BSONObj> stages = {
+        BSON("$unionWith" << BSON("coll" << "otherCollection"
+                                         << "pipeline" << BSONArray() << "$_internalIsHybridSearch"
+                                         << true))};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    ASSERT_THROWS_CODE(pipeline.validate(opCtx.get()), AssertionException, 5491300);
 }
 
 }  // namespace mongo
