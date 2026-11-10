@@ -449,14 +449,12 @@ mongo_cc_library(
         "sasl_sspi_options.cpp",
         "sasl_sspi_options_gen",
     ],
-    linkopts = [
-        "-lsasl2",
-    ] + select({
+    linkopts = select({
         "@platforms//os:windows": [
             "secur32.lib",
             "sasl2.lib",
         ],
-        "//conditions:default": [],
+        "//conditions:default": ["-lsasl2"],
     }),
     target_compatible_with = select({
         "//bazel/config:use_sasl_client_enabled": [],
