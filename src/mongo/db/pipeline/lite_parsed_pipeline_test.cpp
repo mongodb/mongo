@@ -628,12 +628,36 @@ TEST(LiteParsedPipelineTest, SortOutputSortKeyMetadataIsRejectedInViewDefinition
                        ErrorCodes::OptionNotSupportedOnView);
 }
 
+BSONObj makeSetVariableFromSubPipelineSpec() {
+    return BSON("$setVariableFromSubPipeline"
+                << BSON("setVariable" << "$$SEARCH_META" << "pipeline" << BSONArray()));
+}
+
+TEST(LiteParsedPipelineTest, InternalOnlyStageIsRejectedInViewDefinition) {
+    std::vector<BSONObj> stages = {makeSetVariableFromSubPipelineSpec()};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    ASSERT_THROWS_CODE(pipeline.checkStagesAllowedInViewDefinition(),
+                       AssertionException,
+                       ErrorCodes::OptionNotSupportedOnView);
+}
+
 TEST(LiteParsedPipelineTest, GraphLookupInternalFromPipelineIsRejectedInViewDefinition) {
     std::vector<BSONObj> stages = {
         BSON("$graphLookup" << BSON("from" << "otherCollection"
                                            << "$_internalFromPipeline"
                                            << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
                                            << "joined"))};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    ASSERT_THROWS_CODE(pipeline.checkStagesAllowedInViewDefinition(),
+                       AssertionException,
+                       ErrorCodes::OptionNotSupportedOnView);
+}
+
+TEST(LiteParsedPipelineTest, InternalOnlyStageNestedInSubPipelineIsRejectedInViewDefinition) {
+    std::vector<BSONObj> stages = {
+        BSON("$facet" << BSON("out" << BSON_ARRAY(makeSetVariableFromSubPipelineSpec())))};
     LiteParsedPipeline pipeline(kTestNss, stages);
 
     ASSERT_THROWS_CODE(pipeline.checkStagesAllowedInViewDefinition(),

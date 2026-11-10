@@ -48,6 +48,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <set>
@@ -946,6 +947,160 @@ TEST_F(ViewCatalogFixture, ModifyViewSucceedsAfterIfrFlagRetry) {
     auto viewDefinition = lookup(operationContext(), viewName);
     ASSERT(viewDefinition);
     ASSERT_EQ(viewDefinition->pipeline().size(), 1);
+}
+
+namespace {
+
+BSONObj makeSetVariableFromSubPipelineStage() {
+    return BSON("$setVariableFromSubPipeline"
+                << BSON("setVariable" << "$$SEARCH_META" << "pipeline" << BSONArray()));
+}
+
+// Creates a view whose definition is accepted without validation, so that tests can simulate a
+// view written by a binary that did not reject the definition.
+Status createViewWithoutValidation(OperationContext* opCtx,
+                                   const NamespaceString& viewName,
+                                   const NamespaceString& viewOn,
+                                   const BSONArray& pipeline) {
+    Lock::DBLock dbLock(opCtx, viewName.dbName(), MODE_IX);
+    Lock::CollectionLock collLock(opCtx, viewName, MODE_IX);
+    Lock::CollectionLock sysCollLock(
+        opCtx, NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X);
+
+    auto permissiveValidator =
+        [](OperationContext*,
+           const ViewDefinition&) -> StatusWith<stdx::unordered_set<NamespaceString>> {
+        return stdx::unordered_set<NamespaceString>{};
+    };
+
+    WriteUnitOfWork wuow(opCtx);
+    auto s = CollectionCatalog::get(opCtx)->createView(
+        opCtx, viewName, viewOn, pipeline, permissiveValidator, BSONObj());
+    wuow.commit();
+
+    return s;
+}
+
+}  // namespace
+
+TEST_F(ViewCatalogFixture, CreateViewFailsOnInternalOnlyStage) {
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
+
+    // The fixture's client is internal, so the per-stage gate in validate() would accept the
+    // stage; the view-definition check must reject it regardless of the connection.
+    auto pipeline = BSON_ARRAY(makeSetVariableFromSubPipelineStage());
+
+    ASSERT_THROWS_CODE(createView(operationContext(), viewName, viewOn, pipeline, emptyCollation),
+                       AssertionException,
+                       ErrorCodes::OptionNotSupportedOnView);
+}
+
+TEST_F(ViewCatalogFixture, StoredInternalOnlyStageIsRejectedWhenViewCatalogReloads) {
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
+
+    ASSERT_OK(createViewWithoutValidation(
+        operationContext(), viewName, viewOn, BSON_ARRAY(makeSetVariableFromSubPipelineStage())));
+
+    Lock::DBLock dbLock(operationContext(), viewName.dbName(), MODE_IX);
+    Lock::CollectionLock sysCollLock(
+        operationContext(),
+        NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()),
+        MODE_X);
+    WriteUnitOfWork wuow(operationContext());
+    getCatalog()->reloadViews(operationContext(), viewName.dbName());
+    wuow.commit();
+    // The fixture's client is internal, so the invalid view simply stops being resolvable.
+    ASSERT(!lookup(operationContext(), viewName));
+}
+
+TEST_F(ViewCatalogFixture,
+       StoredInternalOnlyStageNestedInSubPipelineIsRejectedWhenViewCatalogReloads) {
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
+
+    auto pipeline = BSON_ARRAY(
+        BSON("$facet" << BSON("out" << BSON_ARRAY(makeSetVariableFromSubPipelineStage()))));
+
+    ASSERT_OK(createViewWithoutValidation(operationContext(), viewName, viewOn, pipeline));
+
+    Lock::DBLock dbLock(operationContext(), viewName.dbName(), MODE_IX);
+    Lock::CollectionLock sysCollLock(
+        operationContext(),
+        NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()),
+        MODE_X);
+    WriteUnitOfWork wuow(operationContext());
+    getCatalog()->reloadViews(operationContext(), viewName.dbName());
+    wuow.commit();
+    ASSERT(!lookup(operationContext(), viewName));
+}
+
+TEST_F(ViewCatalogFixture, ViewOnStoredInternalOnlyStageNeverResolvesTheInternalPipeline) {
+    const NamespaceString poisonedViewName =
+        NamespaceString::createNamespaceString_forTest("db.poisoned");
+    const NamespaceString topLevelViewName =
+        NamespaceString::createNamespaceString_forTest("db.topLevel");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
+
+    ASSERT_OK(createViewWithoutValidation(operationContext(),
+                                          poisonedViewName,
+                                          viewOn,
+                                          BSON_ARRAY(makeSetVariableFromSubPipelineStage())));
+    ASSERT_OK(createView(
+        operationContext(), topLevelViewName, poisonedViewName, emptyPipeline, emptyCollation));
+
+    {
+        Lock::DBLock dbLock(operationContext(), viewOn.dbName(), MODE_IX);
+        Lock::CollectionLock sysCollLock(
+            operationContext(),
+            NamespaceString::makeSystemDotViewsNamespace(viewOn.dbName()),
+            MODE_X);
+        WriteUnitOfWork wuow(operationContext());
+        getCatalog()->reloadViews(operationContext(), viewOn.dbName());
+        wuow.commit();
+    }
+
+    // The poisoned view is invalid, so the clean view on top of it must load and resolve without
+    // pulling the internal stage into its pipeline.
+    ASSERT(!lookup(operationContext(), poisonedViewName));
+    ASSERT(lookup(operationContext(), topLevelViewName));
+    auto resolved = view_catalog_helpers::resolveView(
+        operationContext(), getCatalog(), topLevelViewName, boost::none);
+    ASSERT_OK(resolved.getStatus());
+    ASSERT(!std::any_of(resolved.getValue().getBsonPipeline().begin(),
+                        resolved.getValue().getBsonPipeline().end(),
+                        [](const BSONObj& stageSpec) {
+                            return stageSpec.firstElement().fieldNameStringData() ==
+                                "$setVariableFromSubPipeline";
+                        }));
+}
+
+TEST_F(ViewCatalogFixture, CreateAndResolveViewWithStageShapedLiteralData) {
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
+
+    // Argument data shaped like an internal stage specification is not a stage; the view must be
+    // creatable and resolvable, including after a catalog reload.
+    auto pipeline = BSON_ARRAY(BSON(
+        "$project" << BSON("value" << BSON("$literal" << makeSetVariableFromSubPipelineStage()))));
+
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, pipeline, emptyCollation));
+    auto resolved =
+        view_catalog_helpers::resolveView(operationContext(), getCatalog(), viewName, boost::none);
+    ASSERT_OK(resolved.getStatus());
+
+    {
+        Lock::DBLock dbLock(operationContext(), viewName.dbName(), MODE_IX);
+        Lock::CollectionLock sysCollLock(
+            operationContext(),
+            NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()),
+            MODE_X);
+        WriteUnitOfWork wuow(operationContext());
+        getCatalog()->reloadViews(operationContext(), viewName.dbName());
+        wuow.commit();
+    }
+    ASSERT(lookup(operationContext(), viewName));
 }
 
 }  // namespace

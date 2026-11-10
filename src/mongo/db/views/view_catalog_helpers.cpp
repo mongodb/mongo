@@ -35,6 +35,7 @@
 #include "mongo/util/version/releases.h"
 
 #include <algorithm>
+#include <functional>
 #include <iterator>
 #include <list>
 #include <utility>
@@ -52,31 +53,16 @@ namespace mongo {
 namespace view_catalog_helpers {
 
 namespace {
+
+// Lite-parses 'pipeline' (retrying on IFR flag rejections) and validates it for use as a view
+// definition.
 LiteParsedPipeline liteParseAndValidateWithIfrRetry(const OperationContext* opCtx,
                                                     const NamespaceString& nss,
                                                     const std::vector<BSONObj>& pipeline,
                                                     bool performApiVersionChecks) {
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
-
-    return retryOn<ErrorCodes::IFRFlagRetry>(
-        "validateViewPipeline",
-        [&] {
-            LiteParsedPipeline liteParsedPipeline(
-                nss, pipeline, false, LiteParserOptions{.ifrContext = ifrContext});
+    return LiteParsedPipeline::liteParseWithIfrRetry(
+        nss, pipeline, [&](LiteParsedPipeline& liteParsedPipeline) {
             liteParsedPipeline.validate(opCtx, performApiVersionChecks);
-            return liteParsedPipeline;
-        },
-        kDefaultMaxRetries,
-        [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex) {
-            auto retryInfo = ex.extraInfo<IFRFlagRetryInfo>();
-            tassert(13322500, "IFR retry is missing its IFRFlagRetryInfo", retryInfo);
-            std::string_view disabledFlagName = retryInfo->getDisabledFlagName();
-            auto* flag = IncrementalRolloutFeatureFlag::findByName(disabledFlagName);
-            tassert(13322501,
-                    str::stream() << "IFR retry referenced an unknown feature flag: "
-                                  << disabledFlagName,
-                    flag);
-            ifrContext->disableFlag(*flag);
         });
 }
 }  // namespace
