@@ -52,6 +52,12 @@ assert.eq(
     "expected host index to be dropped on config secondary before step up",
 );
 
+if (_isWindows()) {
+    assert.commandWorked(
+        configSecondary.adminCommand({setParameter: 1, win32MinidumpEnabled: false}),
+    );
+}
+
 // Step up without the bypass parameter should trip a tassert and then fassert during config
 // initialization. The replSetStepUp command itself succeeds; the node aborts asynchronously while
 // finishing onStepUpComplete.
