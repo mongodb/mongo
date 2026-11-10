@@ -7,10 +7,15 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/join/join_method.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
 namespace {
+JoinPlanCacheKey makeTestKey(std::string shape, query_settings::QuerySettings qs = {}) {
+    return JoinPlanCacheKey{std::move(shape), qs};
+}
 
 // A budget large enough that no entry used in these tests is ever evicted.
 constexpr size_t kLargeBudget = size_t{1} << 30;
@@ -57,90 +62,139 @@ JoinPlanCache largeBudgetSinglePartitionCache() {
 
 TEST(JoinPlanCacheTest, LookupOnEmptyCacheReturnsNull) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
-    ASSERT_EQ(nullptr, cache.lookup("key"));
+    ASSERT_EQ(nullptr, cache.lookup(makeTestKey("key")));
 }
 
 TEST(JoinPlanCacheTest, PutAndLookupRoundtrip) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
     auto entry = makeEntry();
     auto rawPtr = entry.get();
-    cache.put("key", std::move(entry));
-    ASSERT_EQ(rawPtr, cache.lookup("key").get());
+    cache.put(makeTestKey("key"), std::move(entry));
+    ASSERT_EQ(rawPtr, cache.lookup(makeTestKey("key")).get());
 }
 
 TEST(JoinPlanCacheTest, PutOverwritesExistingEntry) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
-    cache.put("key", makeEntry());
+    cache.put(makeTestKey("key"), makeEntry());
 
     auto newEntry = makeEntry();
     const JoinPlanCacheEntry* newRawPtr = newEntry.get();
-    cache.put("key", std::move(newEntry));
+    cache.put(makeTestKey("key"), std::move(newEntry));
 
-    auto result = cache.lookup("key");
+    auto result = cache.lookup(makeTestKey("key"));
     ASSERT_EQ(newRawPtr, result.get());
 }
 
 TEST(JoinPlanCacheTest, RemoveExistingEntry) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
-    cache.put("key", makeEntry());
-    cache.remove("key");
-    ASSERT_EQ(nullptr, cache.lookup("key"));
+    cache.put(makeTestKey("key"), makeEntry());
+    cache.remove(makeTestKey("key"));
+    ASSERT_EQ(nullptr, cache.lookup(makeTestKey("key")));
 }
 
 TEST(JoinPlanCacheTest, RemoveNonExistingEntry) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
     auto entry = makeEntry();
     const JoinPlanCacheEntry* rawPtr = entry.get();
-    cache.put("key", std::move(entry));
-    cache.remove("nonexistent");
-    ASSERT_EQ(rawPtr, cache.lookup("key").get());
+    cache.put(makeTestKey("key"), std::move(entry));
+    cache.remove(makeTestKey("nonexistent"));
+    ASSERT_EQ(rawPtr, cache.lookup(makeTestKey("key")).get());
 }
 
 TEST(JoinPlanCacheTest, RemoveIfMatchesRemovesTheEntryItWasGiven) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
-    cache.put("key", makeEntry());
+    cache.put(makeTestKey("key"), makeEntry());
 
-    auto held = cache.lookup("key");
-    ASSERT_TRUE(cache.removeIfMatches("key", held));
-    ASSERT_EQ(nullptr, cache.lookup("key"));
+    auto held = cache.lookup(makeTestKey("key"));
+    ASSERT_TRUE(cache.removeIfMatches(makeTestKey("key"), held));
+    ASSERT_EQ(nullptr, cache.lookup(makeTestKey("key")));
 }
 
 TEST(JoinPlanCacheTest, RemoveIfMatchesLeavesAnEntryReplacedSinceTheLookup) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
-    cache.put("key", makeEntry());
+    cache.put(makeTestKey("key"), makeEntry());
 
     // Store pointer to the current entry.
-    auto held = cache.lookup("key");
+    auto held = cache.lookup(makeTestKey("key"));
 
     // Replace entry in the cache.
     auto replacement = makeEntry();
     const JoinPlanCacheEntry* replacementRawPtr = replacement.get();
-    cache.put("key", std::move(replacement));
+    cache.put(makeTestKey("key"), std::move(replacement));
 
     // Removal of entry should not occur since 'held' is stale.
-    ASSERT_FALSE(cache.removeIfMatches("key", held));
-    ASSERT_EQ(replacementRawPtr, cache.lookup("key").get());
+    ASSERT_FALSE(cache.removeIfMatches(makeTestKey("key"), held));
+    ASSERT_EQ(replacementRawPtr, cache.lookup(makeTestKey("key")).get());
 }
 
 TEST(JoinPlanCacheTest, RemoveIfMatchesOnNonExistingKey) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
-    cache.put("key", makeEntry());
-    auto held = cache.lookup("key");
+    cache.put(makeTestKey("key"), makeEntry());
+    auto held = cache.lookup(makeTestKey("key"));
 
-    ASSERT_FALSE(cache.removeIfMatches("nonexistent", held));
-    ASSERT_EQ(held.get(), cache.lookup("key").get());
+    ASSERT_FALSE(cache.removeIfMatches(makeTestKey("nonexistent"), held));
+    ASSERT_EQ(held.get(), cache.lookup(makeTestKey("key")).get());
 }
 
 TEST(JoinPlanCacheTest, RemoveIfMatchesComparesIdentityNotContents) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
     auto entry = makeEntry();
     const JoinPlanCacheEntry* rawPtr = entry.get();
-    cache.put("key", std::move(entry));
+    cache.put(makeTestKey("key"), std::move(entry));
 
     // A distinct entry that has the same contents as the original entry.
     std::shared_ptr<JoinPlanCacheEntry> lookalike = makeEntry();
-    ASSERT_FALSE(cache.removeIfMatches("key", lookalike));
-    ASSERT_EQ(rawPtr, cache.lookup("key").get());
+    ASSERT_FALSE(cache.removeIfMatches(makeTestKey("key"), lookalike));
+    ASSERT_EQ(rawPtr, cache.lookup(makeTestKey("key")).get());
+}
+
+TEST(JoinPlanCacheTest, SameShapeWithDifferentQuerySettingsAreDistinctEntries) {
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
+
+    query_settings::QuerySettings classicSettings, sbeSettings;
+    classicSettings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+    sbeSettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
+
+    auto noSettingsEntry = makeEntry();
+    auto classicEntry = makeEntry();
+    auto sbeEntry = makeEntry();
+    const JoinPlanCacheEntry* noSettingsPtr = noSettingsEntry.get();
+    const JoinPlanCacheEntry* classicPtr = classicEntry.get();
+    const JoinPlanCacheEntry* sbePtr = sbeEntry.get();
+    cache.put(makeTestKey("key"), std::move(noSettingsEntry));
+    cache.put(makeTestKey("key", classicSettings), std::move(classicEntry));
+    cache.put(makeTestKey("key", sbeSettings), std::move(sbeEntry));
+
+    // Each (shape, settings) pair maps to its own entry; none overwrote another.
+    ASSERT_EQ(noSettingsPtr, cache.lookup(makeTestKey("key")).get());
+    ASSERT_EQ(classicPtr, cache.lookup(makeTestKey("key", classicSettings)).get());
+    ASSERT_EQ(sbePtr, cache.lookup(makeTestKey("key", sbeSettings)).get());
+
+    // The three lookups return pairwise distinct entries.
+    ASSERT_NE(cache.lookup(makeTestKey("key")), cache.lookup(makeTestKey("key", classicSettings)));
+    ASSERT_NE(cache.lookup(makeTestKey("key")), cache.lookup(makeTestKey("key", sbeSettings)));
+    ASSERT_NE(cache.lookup(makeTestKey("key", classicSettings)),
+              cache.lookup(makeTestKey("key", sbeSettings)));
+
+    // Removing one leaves the others in place.
+    cache.remove(makeTestKey("key", classicSettings));
+    ASSERT_EQ(noSettingsPtr, cache.lookup(makeTestKey("key")).get());
+    ASSERT_EQ(nullptr, cache.lookup(makeTestKey("key", classicSettings)));
+    ASSERT_EQ(sbePtr, cache.lookup(makeTestKey("key", sbeSettings)).get());
+}
+
+TEST(JoinPlanCacheTest, SameShapeWithEqualQuerySettingsShareAnEntry) {
+    JoinPlanCache cache = largeBudgetSinglePartitionCache();
+
+    query_settings::QuerySettings settings, sameSettings;
+    settings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+    sameSettings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+
+    auto entry = makeEntry();
+    const JoinPlanCacheEntry* rawPtr = entry.get();
+    cache.put(makeTestKey("key", settings), std::move(entry));
+
+    ASSERT_EQ(rawPtr, cache.lookup(makeTestKey("key", sameSettings)).get());
 }
 
 TEST(JoinPlanCacheTest, GetComplexEntry) {
@@ -154,9 +208,9 @@ TEST(JoinPlanCacheTest, GetComplexEntry) {
                                                       std::vector<NodeFingerprint>{},
                                                       baseline);
     const JoinPlanCacheEntry* rawPtr = entry.get();
-    cache.put("key", std::move(entry));
+    cache.put(makeTestKey("key"), std::move(entry));
 
-    auto result = cache.lookup("key");
+    auto result = cache.lookup(makeTestKey("key"));
     ASSERT_EQ(rawPtr, result.get());
     ASSERT_BSONOBJ_EQ(baseline.toBSON(), result->baseline.toBSON());
 }
@@ -351,11 +405,12 @@ TEST(JoinPlanCacheSizeTest, BudgetEstimatorSumsEntryAndKey) {
                                              std::vector<NodeFingerprint>{},
                                              JoinPlanBaseline{});
 
-    const JoinPlanCacheKey key = "some-encoded-shape";
-    ASSERT_EQ(entry->estimatedEntrySizeBytes + key.size(), estimator(key, entry));
+    const JoinPlanCacheKey key{"some-encoded-shape", query_settings::QuerySettings{}};
+    ASSERT_EQ(entry->estimatedEntrySizeBytes + key.keySizeInBytes(), estimator(key, entry));
 
     // A longer key contributes more budget.
-    const JoinPlanCacheKey longerKey = key + "-with-extra-discriminators";
+    const JoinPlanCacheKey longerKey{key.shape() + "-with-extra-discriminators",
+                                     query_settings::QuerySettings{}};
     ASSERT_GT(estimator(longerKey, entry), estimator(key, entry));
 }
 
@@ -370,9 +425,10 @@ TEST(JoinPlanCacheSizeTest, EstimateIsDeterministic) {
 }
 
 // The per-entry budget cost of a trivial entry under a key of the given length: the entry's own
-// estimated size plus the key string length (see JoinPlanCacheBudgetEstimator).
+// estimated size plus the key's size (see JoinPlanCacheBudgetEstimator).
 size_t trivialEntryCost(size_t keyLength) {
-    return makeEntry()->estimatedEntrySizeBytes + keyLength;
+    return makeEntry()->estimatedEntrySizeBytes +
+        makeTestKey(std::string(keyLength, 'k')).keySizeInBytes();
 }
 
 TEST(JoinPlanCacheEvictionTest, InsertingBeyondBudgetEvictsLeastRecentlyUsed) {
@@ -380,14 +436,14 @@ TEST(JoinPlanCacheEvictionTest, InsertingBeyondBudgetEvictsLeastRecentlyUsed) {
     // Budget for exactly one entry and one partition
     JoinPlanCache cache{perEntryCost, 1};
 
-    ASSERT_EQ(0, cache.put("a", makeEntry()));
+    ASSERT_EQ(0, cache.put(makeTestKey("a"), makeEntry()));
     // Evicts "a"
     auto bEntry = makeEntry();
     auto bRawPtr = bEntry.get();
-    ASSERT_EQ(1, cache.put("b", std::move(bEntry)));
+    ASSERT_EQ(1, cache.put(makeTestKey("b"), std::move(bEntry)));
 
-    ASSERT_EQ(nullptr, cache.lookup("a"));
-    ASSERT_EQ(bRawPtr, cache.lookup("b").get());
+    ASSERT_EQ(nullptr, cache.lookup(makeTestKey("a")));
+    ASSERT_EQ(bRawPtr, cache.lookup(makeTestKey("b")).get());
 }
 
 TEST(JoinPlanCacheEvictionTest, LookupPromotesEntryToMostRecentlyUsed) {
@@ -397,37 +453,37 @@ TEST(JoinPlanCacheEvictionTest, LookupPromotesEntryToMostRecentlyUsed) {
 
     auto aEntry = makeEntry();
     auto aRawPtr = aEntry.get();
-    cache.put("a", std::move(aEntry));
-    cache.put("b", makeEntry());
+    cache.put(makeTestKey("a"), std::move(aEntry));
+    cache.put(makeTestKey("b"), makeEntry());
     // Promotes "a" ahead of "b"
-    ASSERT_EQ(aRawPtr, cache.lookup("a").get());
+    ASSERT_EQ(aRawPtr, cache.lookup(makeTestKey("a")).get());
     // Over budget causes LRU eviction, which is now "b"
     auto cEntry = makeEntry();
     auto cRawPtr = cEntry.get();
-    cache.put("c", std::move(cEntry));
+    cache.put(makeTestKey("c"), std::move(cEntry));
 
-    ASSERT_EQ(aRawPtr, cache.lookup("a").get());
-    ASSERT_EQ(nullptr, cache.lookup("b"));
-    ASSERT_EQ(cRawPtr, cache.lookup("c").get());
+    ASSERT_EQ(aRawPtr, cache.lookup(makeTestKey("a")).get());
+    ASSERT_EQ(nullptr, cache.lookup(makeTestKey("b")));
+    ASSERT_EQ(cRawPtr, cache.lookup(makeTestKey("c")).get());
 }
 
 TEST(JoinPlanCacheEvictionTest, ResetToSmallerBudgetEvictsDownToFit) {
     const size_t perEntryCost = trivialEntryCost(1);
     JoinPlanCache cache{3 * perEntryCost, 1};
 
-    cache.put("a", makeEntry());
-    cache.put("b", makeEntry());
+    cache.put(makeTestKey("a"), makeEntry());
+    cache.put(makeTestKey("b"), makeEntry());
     auto cEntry = makeEntry();
     auto cRawPtr = cEntry.get();
-    cache.put("c", std::move(cEntry));
+    cache.put(makeTestKey("c"), std::move(cEntry));
     ASSERT_EQ(3 * perEntryCost, cache.size());
 
     // "c" is the most recently used, so "a" and "b" are evicted to fit the new budget.
     ASSERT_EQ(2, cache.reset(perEntryCost));
     ASSERT_EQ(perEntryCost, cache.size());
-    ASSERT_EQ(nullptr, cache.lookup("a"));
-    ASSERT_EQ(nullptr, cache.lookup("b"));
-    ASSERT_EQ(cRawPtr, cache.lookup("c").get());
+    ASSERT_EQ(nullptr, cache.lookup(makeTestKey("a")));
+    ASSERT_EQ(nullptr, cache.lookup(makeTestKey("b")));
+    ASSERT_EQ(cRawPtr, cache.lookup(makeTestKey("c")).get());
 }
 
 TEST(JoinPlanCacheClearTest, ClearEmptyCacheIsNoop) {
@@ -441,7 +497,7 @@ TEST(JoinPlanCacheClearTest, ClearRemovesAllEntries) {
     // Use several partitions so that the entries are spread across more than one of them.
     JoinPlanCache cache{kLargeBudget, 4};
     for (const char* key : {"a", "b", "c", "d", "e"}) {
-        cache.put(key, makeEntry());
+        cache.put(makeTestKey(key), makeEntry());
     }
     ASSERT_GT(cache.size(), 0);
     ASSERT_EQ(5u, cache.serializeEntries().size());
@@ -453,11 +509,11 @@ TEST(JoinPlanCacheClearTest, ClearRemovesAllEntries) {
 
 TEST(JoinPlanCacheClearTest, LookupMissesAfterClear) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
-    cache.put("key", makeEntry());
-    ASSERT_NE(nullptr, cache.lookup("key"));
+    cache.put(makeTestKey("key"), makeEntry());
+    ASSERT_NE(nullptr, cache.lookup(makeTestKey("key")));
 
     cache.clear();
-    ASSERT_EQ(nullptr, cache.lookup("key"));
+    ASSERT_EQ(nullptr, cache.lookup(makeTestKey("key")));
 }
 
 TEST(JoinPlanCacheClearTest, PutWorksAfterClear) {
@@ -465,13 +521,13 @@ TEST(JoinPlanCacheClearTest, PutWorksAfterClear) {
     // A budget for exactly one entry: if clear() failed to release the budget, this put() would
     // evict rather than insert cleanly.
     JoinPlanCache cache{perEntryCost, 1};
-    cache.put("a", makeEntry());
+    cache.put(makeTestKey("a"), makeEntry());
     cache.clear();
 
     auto entry = makeEntry();
     const JoinPlanCacheEntry* rawPtr = entry.get();
-    ASSERT_EQ(0, cache.put("b", std::move(entry)));
-    ASSERT_EQ(rawPtr, cache.lookup("b").get());
+    ASSERT_EQ(0, cache.put(makeTestKey("b"), std::move(entry)));
+    ASSERT_EQ(rawPtr, cache.lookup(makeTestKey("b")).get());
     ASSERT_EQ(perEntryCost, cache.size());
 }
 
@@ -480,11 +536,11 @@ TEST(JoinPlanCacheEvictionTest, SizeReflectsRunningByteTotal) {
     JoinPlanCache cache{kLargeBudget, 1};
 
     ASSERT_EQ(0, cache.size());
-    cache.put("a", makeEntry());
+    cache.put(makeTestKey("a"), makeEntry());
     ASSERT_EQ(perEntryCost, cache.size());
-    cache.put("b", makeEntry());
+    cache.put(makeTestKey("b"), makeEntry());
     ASSERT_EQ(2 * perEntryCost, cache.size());
-    cache.remove("a");
+    cache.remove(makeTestKey("a"));
     ASSERT_EQ(perEntryCost, cache.size());
 }
 
@@ -492,14 +548,14 @@ TEST(JoinPlanCacheEvictionTest, RemoveIfMatchesReleasesTheEntryBudget) {
     const size_t perEntryCost = trivialEntryCost(1);
     JoinPlanCache cache{kLargeBudget, 1};
 
-    cache.put("a", makeEntry());
+    cache.put(makeTestKey("a"), makeEntry());
     ASSERT_EQ(perEntryCost, cache.size());
 
     // A no-op removal must not disturb the accounting either.
-    ASSERT_FALSE(cache.removeIfMatches("a", makeEntry()));
+    ASSERT_FALSE(cache.removeIfMatches(makeTestKey("a"), makeEntry()));
     ASSERT_EQ(perEntryCost, cache.size());
 
-    ASSERT_TRUE(cache.removeIfMatches("a", cache.lookup("a")));
+    ASSERT_TRUE(cache.removeIfMatches(makeTestKey("a"), cache.lookup(makeTestKey("a"))));
     ASSERT_EQ(0, cache.size());
 }
 
@@ -510,8 +566,8 @@ TEST(JoinPlanCacheStatsTest, EmptyCacheProducesNoStats) {
 
 TEST(JoinPlanCacheStatsTest, StatsHaveOneEntryPerCachedPlan) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
-    cache.put("keyA", makeEntry());
-    cache.put("keyB", makeEntry());
+    cache.put(makeTestKey("keyA"), makeEntry());
+    cache.put(makeTestKey("keyB"), makeEntry());
 
     auto stats = cache.serializeEntries();
     ASSERT_EQ(2u, stats.size());
@@ -526,7 +582,7 @@ TEST(JoinPlanCacheStatsTest, StatsHaveOneEntryPerCachedPlan) {
 
 TEST(JoinPlanCacheStatsTest, StatsIncludeEntryBaseline) {
     JoinPlanCache cache = largeBudgetSinglePartitionCache();
-    cache.put("key",
+    cache.put(makeTestKey("key"),
               makeEntry(JoinPlanBaseline{
                   .numReads = 11, .numIntermediateRows = 22, .spilled = true, .numResults = 101}));
 
@@ -547,7 +603,7 @@ TEST(JoinPlanCacheStatsTest, SerializesBaseNodeAndSizeAndKeyHash) {
                                                       JoinPlanBaseline{});
     const auto expectedSize = static_cast<long long>(entry->estimatedEntrySizeBytes);
 
-    BSONObj obj = joinPlanCacheEntryToBSON("some-encoded-shape", *entry);
+    BSONObj obj = joinPlanCacheEntryToBSON(makeTestKey("some-encoded-shape"), *entry);
     ASSERT_EQ(7, obj["baseNode"].numberInt());
     ASSERT_EQ(expectedSize, obj["estimatedSizeBytes"].numberLong());
     // The key hash is rendered as a fixed-width, zero-padded hex string.
@@ -564,7 +620,7 @@ TEST(JoinPlanCacheStatsTest, SerializesComplexPlanTree) {
                                                       std::vector<NodeFingerprint>{},
                                                       JoinPlanBaseline{});
 
-    BSONObj obj = joinPlanCacheEntryToBSON("key", *entry);
+    BSONObj obj = joinPlanCacheEntryToBSON(makeTestKey("key"), *entry);
     ASSERT_TRUE(obj.hasField("plan"));
     BSONObj plan = obj["plan"].Obj();
     ASSERT_EQ(join_ordering::joinMethodToString(join_ordering::JoinMethod::HJ),
@@ -585,7 +641,7 @@ TEST(JoinPlanCacheStatsTest, SerializesComplexInljPlanTree) {
                                              std::vector<NodeFingerprint>{},
                                              JoinPlanBaseline{});
 
-    BSONObj obj = joinPlanCacheEntryToBSON("key", *entry);
+    BSONObj obj = joinPlanCacheEntryToBSON(makeTestKey("key"), *entry);
     ASSERT_TRUE(obj.hasField("plan"));
     BSONObj plan = obj["plan"].Obj();
     ASSERT_EQ(join_ordering::joinMethodToString(join_ordering::JoinMethod::INLJ),
@@ -609,7 +665,7 @@ TEST(JoinPlanCacheStatsTest, SerializesCollectionTags) {
                                                       std::vector<NodeFingerprint>{},
                                                       JoinPlanBaseline{});
 
-    BSONObj obj = joinPlanCacheEntryToBSON("key", *entry);
+    BSONObj obj = joinPlanCacheEntryToBSON(makeTestKey("key"), *entry);
     auto collections = obj["collections"].Array();
     ASSERT_EQ(1, collections.size());
     BSONObj tag = collections[0].Obj();
@@ -622,7 +678,7 @@ TEST(JoinPlanCacheStatsTest, SerializesBaseline) {
     auto entry = makeEntry(JoinPlanBaseline{
         .numReads = 42, .numIntermediateRows = 7, .spilled = true, .numResults = 3});
 
-    BSONObj obj = joinPlanCacheEntryToBSON("key", *entry);
+    BSONObj obj = joinPlanCacheEntryToBSON(makeTestKey("key"), *entry);
     BSONObj baseline = obj["baseline"].Obj();
     ASSERT_EQ(42, baseline["numReads"].numberLong());
     ASSERT_EQ(7, baseline["numIntermediateRows"].numberLong());
@@ -631,7 +687,7 @@ TEST(JoinPlanCacheStatsTest, SerializesBaseline) {
 }
 
 TEST(JoinPlanCacheStatsTest, DefaultBaselineIsZeros) {
-    BSONObj obj = joinPlanCacheEntryToBSON("key", *makeEntry());
+    BSONObj obj = joinPlanCacheEntryToBSON(makeTestKey("key"), *makeEntry());
     BSONObj baseline = obj["baseline"].Obj();
     ASSERT_EQ(0, baseline["numReads"].numberLong());
     ASSERT_EQ(0, baseline["numIntermediateRows"].numberLong());

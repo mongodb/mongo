@@ -7,15 +7,31 @@
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_info.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/query_settings/query_settings_hash.h"
+
+#include <boost/container_hash/hash.hpp>
 
 namespace mongo {
 
+JoinPlanCacheKey::JoinPlanCacheKey(std::string shape, query_settings::QuerySettings querySettings)
+    : _shape(std::move(shape)), _querySettings(std::move(querySettings)) {
+    // The key is immutable, so the hash and size are computed once. hash() runs several times
+    // per lookup, and keySizeInBytes() is called by the budget estimator on every insertion,
+    // eviction, replacement, and removal.
+    size_t h = canonical_query_encoder::computeHash(_shape);
+    boost::hash_combine(h, query_settings::hash(_querySettings));
+    _hash = static_cast<uint32_t>(h);
+    _keySizeInBytes = sizeof(*this) + _shape.size() + _querySettings.toBSON().objsize();
+}
+
 JoinPlanCacheKey makeJoinPlanCacheKey(const join_ordering::JoinGraph& graph,
                                       const std::vector<join_ordering::ResolvedPath>& resolvedPaths,
-                                      const MultipleCollectionAccessor& collections) {
+                                      const MultipleCollectionAccessor& collections,
+                                      const query_settings::QuerySettings& querySettings) {
     StringBuilder sb;
     sb << "n=" << graph.numNodes() << ";e=" << graph.numEdges() << '\n';
 
@@ -83,7 +99,7 @@ JoinPlanCacheKey makeJoinPlanCacheKey(const join_ordering::JoinGraph& graph,
         }
     }
 
-    return sb.str();
+    return JoinPlanCacheKey{sb.str(), querySettings};
 }
 
 }  // namespace mongo

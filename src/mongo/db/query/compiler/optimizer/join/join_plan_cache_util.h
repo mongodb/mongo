@@ -15,6 +15,7 @@
 #include "mongo/db/query/plan_cache/join_plan_cache.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 
@@ -48,7 +49,8 @@ bool canUseJoinPlanCache(const QueryKnobConfiguration& qkc, bool hasHint, bool i
 JoinPlanCacheLookupResult lookupInJoinPlanCache(OperationContext* opCtx,
                                                 const MultipleCollectionAccessor& graphOnlyMca,
                                                 const AggJoinModel& model,
-                                                const AvailableIndexes& perCollIdxs);
+                                                const AvailableIndexes& perCollIdxs,
+                                                const query_settings::QuerySettings& querySettings);
 
 /** Increments the join plan cache hits counter. */
 void recordJoinPlanCacheHit();

@@ -13,6 +13,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
+#include "mongo/db/query/plan_cache/join_plan_cache_key.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/platform/rwmutex.h"
@@ -31,9 +32,6 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
-
-// The cache key is an opaque string representing the normalized join graph shape.
-using JoinPlanCacheKey = std::string;
 
 // Forward-declared so CachedJoinNode can hold a recursive std::unique_ptr<CachedJoinPlan>.
 struct CachedJoinPlan;
@@ -270,26 +268,35 @@ CollectionTagValidationResult classifyCollectionTags(const std::vector<Collectio
 struct JoinPlanCacheBudgetEstimator {
     size_t operator()(const JoinPlanCacheKey& key,
                       const std::shared_ptr<JoinPlanCacheEntry>& entry) const {
-        return entry->estimatedEntrySizeBytes + key.size();
+        return entry->estimatedEntrySizeBytes + key.keySizeInBytes();
     }
 };
 
-// Maps a key to a partition id. The default Partitioner has no overload for std::string, so a
+// Hashes a key for the cache's hash map. The default KeyHasher is std::hash, which has no
+// specializations for JoinPlanCacheKey, so a custom functor is required.
+struct JoinPlanCacheKeyHasher {
+    std::size_t operator()(const JoinPlanCacheKey& key) const {
+        return key.hash();
+    }
+};
+
+// Maps a key to a partition id. The default Partitioner has no overload for JoinPlanCacheKey, so a
 // custom functor hashing the key is required.
 struct JoinPlanCacheKeyPartitioner {
     std::size_t operator()(const JoinPlanCacheKey& key, std::size_t nPartitions) const {
-        return std::hash<JoinPlanCacheKey>{}(key) % nPartitions;
+        return key.hash() % nPartitions;
     }
 };
 
 // The backing store: a budget-based, LRU-evicting PartitionedCache. The mapped type is a
 // shared_ptr so lookups can hand out a stable reference-counted handle on the entry, and the cache
-// copies the pointer rather than the entry. KeyHasher/Eq default to those for std::string.
+// copies the pointer rather than the entry.
 using JoinPlanCacheStore = PartitionedCache<JoinPlanCacheKey,
                                             std::shared_ptr<JoinPlanCacheEntry>,
                                             JoinPlanCacheBudgetEstimator,
                                             JoinPlanCacheKeyPartitioner,
-                                            NoopInsertionEvictionListener>;
+                                            NoopInsertionEvictionListener,
+                                            JoinPlanCacheKeyHasher>;
 
 namespace join_ordering {
 /*

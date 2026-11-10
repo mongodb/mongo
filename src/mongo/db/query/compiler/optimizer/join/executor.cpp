@@ -644,7 +644,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // is in use and the lookup missed.
     boost::optional<JoinPlanCacheMiss> cacheMiss;
     if (canUseJoinPlanCache(qkc, hintedStrat.has_value(), expCtx->getExplain().has_value())) {
-        auto lookup = lookupInJoinPlanCache(opCtx, graphOnlyMca, model, eligibleIdxs);
+        auto lookup = lookupInJoinPlanCache(
+            opCtx, graphOnlyMca, model, eligibleIdxs, expCtx->getQuerySettings());
         if (auto* hit = std::get_if<JoinPlanCacheHit>(&lookup)) {
             auto exec = buildExecutorFromCachedPlan(
                 opCtx, *hit->entry, mca, graphOnlyMca, model, eligibleIdxs, yieldPolicy, metrics);
@@ -827,10 +828,13 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         }
         // Compute the join plan cache key hash for explain regardless of whether the join plan
         // cache is enabled.
-        explainData.joinPlanCacheKeyHash = canonical_query_encoder::computeHash(
-            cacheMiss
-                ? cacheMiss->key
-                : makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), graphOnlyMca));
+        const JoinPlanCacheKey joinPlanCacheKey = cacheMiss
+            ? cacheMiss->key
+            : makeJoinPlanCacheKey(model.getGraph(),
+                                   model.getResolvedPaths(),
+                                   graphOnlyMca,
+                                   expCtx->getQuerySettings());
+        explainData.joinPlanCacheKeyHash = joinPlanCacheKey.hash();
         // Sort for a deterministic explain output.
         std::ranges::sort(collectionsWithoutPageCount);
         explainData.joinCollectionsWithoutPageCount = std::move(collectionsWithoutPageCount);

@@ -294,7 +294,7 @@ void bumpCollectionVersionForDDL(Collection* writableColl) {
 
 BSONObj joinPlanCacheEntryToBSON(const JoinPlanCacheKey& key, const JoinPlanCacheEntry& entry) {
     BSONObjBuilder bob;
-    bob.append("planCacheKey", zeroPaddedHex(canonical_query_encoder::computeHash(key)));
+    bob.append("planCacheKey", zeroPaddedHex(key.hash()));
     bob.append("baseNode", static_cast<int>(entry.baseNode));
     bob.append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
 
@@ -337,7 +337,7 @@ BSONObj collectionVersionsForLog(const std::vector<CollectionTag>& tags) {
 std::string joinPlanCacheKeyForLog(const JoinPlanCacheKey& key) {
     // Identical formatting to joinPlanCacheEntryToBSON's "planCacheKey" field, so a log line can be
     // cross-referenced with a $joinPlanCacheStats entry.
-    return zeroPaddedHex(canonical_query_encoder::computeHash(key));
+    return zeroPaddedHex(key.hash());
 }
 
 CollectionTagValidationResult classifyCollectionTags(const std::vector<CollectionTag>& tags,

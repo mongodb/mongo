@@ -21,6 +21,10 @@
 namespace mongo {
 namespace {
 
+JoinPlanCacheKey makeTestKey(std::string shape) {
+    return JoinPlanCacheKey{std::move(shape), query_settings::QuerySettings{}};
+}
+
 // RAII helper that enables the join optimization and join plan cache knobs for the duration of a
 // test and restores their prior values afterwards.
 template <bool enableJoin>
@@ -166,8 +170,8 @@ TEST_F(DocumentSourceJoinPlanCacheStatsTestCacheEnabled, IsCollectionlessFirstSt
 TEST_F(DocumentSourceJoinPlanCacheStatsTestCacheEnabled, ReturnsOneDocumentPerCacheEntry) {
     getExpCtx()->setNamespaceString(adminCollectionlessNss());
     auto& cache = JoinPlanCache::get(getExpCtx()->getOperationContext()->getServiceContext());
-    cache.put("keyA", makeCacheEntry());
-    cache.put("keyB", makeCacheEntry());
+    cache.put(makeTestKey("keyA"), makeCacheEntry());
+    cache.put(makeTestKey("keyB"), makeCacheEntry());
 
     // The queue is deferred, so it is only populated once execution begins.
     auto stage = exec::agg::buildStage(DocumentSourceJoinPlanCacheStats::createFromBson(
@@ -191,7 +195,7 @@ TEST_F(DocumentSourceJoinPlanCacheStatsTestCacheEnabled, TagsEntriesWithShardNam
     getExpCtx()->setFromRouter(true);
     getExpCtx()->setMongoProcessInterface(std::make_shared<ShardMongoProcessInterface>());
     JoinPlanCache::get(getExpCtx()->getOperationContext()->getServiceContext())
-        .put("keyA", makeCacheEntry());
+        .put(makeTestKey("keyA"), makeCacheEntry());
 
     auto stage = exec::agg::buildStage(DocumentSourceJoinPlanCacheStats::createFromBson(
         kEmptySpecObj.firstElement(), getExpCtx()));

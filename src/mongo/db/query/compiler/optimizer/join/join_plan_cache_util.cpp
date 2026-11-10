@@ -186,11 +186,14 @@ bool canUseJoinPlanCache(const QueryKnobConfiguration& qkc, bool hasHint, bool i
         qkc.getEnableJoinPlanCache() && !isExplain;
 }
 
-JoinPlanCacheLookupResult lookupInJoinPlanCache(OperationContext* opCtx,
-                                                const MultipleCollectionAccessor& graphOnlyMca,
-                                                const AggJoinModel& model,
-                                                const AvailableIndexes& perCollIdxs) {
-    auto cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), graphOnlyMca);
+JoinPlanCacheLookupResult lookupInJoinPlanCache(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& graphOnlyMca,
+    const AggJoinModel& model,
+    const AvailableIndexes& perCollIdxs,
+    const query_settings::QuerySettings& querySettings) {
+    auto cacheKey = makeJoinPlanCacheKey(
+        model.getGraph(), model.getResolvedPaths(), graphOnlyMca, querySettings);
     if (auto entry = lookupValidEntry(opCtx, cacheKey, graphOnlyMca, model, perCollIdxs)) {
         return JoinPlanCacheHit{.key = std::move(cacheKey), .entry = std::move(entry)};
     }

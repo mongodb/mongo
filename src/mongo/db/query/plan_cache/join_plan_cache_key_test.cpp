@@ -12,6 +12,8 @@
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
+#include "mongo/db/query/query_settings/query_knob_overrides.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -98,13 +100,41 @@ protected:
 
     // Builds a MultipleCollectionAccessor for the namespaces present in 'g' and calls
     // makeJoinPlanCacheKey. All namespaces in 'g' must have been created in setUp().
-    JoinPlanCacheKey makeKey(const JoinGraph& g, const std::vector<ResolvedPath>& rps) {
+    JoinPlanCacheKey makeKey(const JoinGraph& g,
+                             const std::vector<ResolvedPath>& rps,
+                             const query_settings::QuerySettings& qs = {}) {
         std::vector<NamespaceString> namespaces;
         for (size_t i = 0; i < g.numNodes(); ++i) {
             namespaces.push_back(g.getNode(static_cast<NodeId>(i)).collectionName);
         }
         return makeJoinPlanCacheKey(
-            g, rps, multipleCollectionAccessor(operationContext(), namespaces));
+            g, rps, multipleCollectionAccessor(operationContext(), namespaces), qs);
+    }
+
+    // Builds a JoinPlanCacheKey for the default two-node graph (empty filters, Eq predicate on
+    // "id") under the given query settings.
+    JoinPlanCacheKey makeKeyWithSettings(const query_settings::QuerySettings& qs = {}) {
+        auto [graph, rps] = makeTwoNodeGraph(kNss0, BSONObj{}, kNss1, BSONObj{}, "id", "id");
+        return makeKey(graph, rps, qs);
+    }
+
+    // Builds a QuerySettings holding only the given knob overrides.
+    query_settings::QuerySettings settingsWithKnobs(const BSONObj& knobs) {
+        auto overrides = query_settings::QuerySettingsKnobOverrides::fromBSON(knobs);
+        // Guard against test setup problems (e.g. an unregistered knob) silently producing empty
+        // overrides, which would make the "equal" tests pass and the "different" tests fail.
+        ASSERT_FALSE(overrides.hasErrors()) << knobs;
+        query_settings::QuerySettings qs;
+        qs.setQueryKnobs(std::move(overrides));
+        return qs;
+    }
+
+    NamespaceSpec makeNsSpec(const NamespaceString& nss) {
+        NamespaceSpec ns;
+        ns.setDb(DatabaseNameUtil::deserialize(
+            boost::none, nss.dbName().toString_forTest(), SerializationContext::stateDefault()));
+        ns.setColl(nss.coll());
+        return ns;
     }
 
     const NamespaceString kNss0 = NamespaceString::createNamespaceString_forTest("test.customers");
@@ -293,8 +323,8 @@ TEST_F(JoinPlanCacheKeyTest, ThreeNodeLinearGraphKey) {
     mg.addEdge(n1, n2, {{JoinPredicate::Eq, l1, r1}});
     JoinGraph graph(std::move(mg));
     auto key = makeKey(graph, rps);
-    ASSERT_FALSE(key.empty());
-    ASSERT_TRUE(key.find("n=3") != std::string::npos);
+    ASSERT_FALSE(key.shape().empty());
+    ASSERT_TRUE(key.shape().find("n=3") != std::string::npos);
 }
 
 // A sparse index on the join's access path collection must change the key, since the plan
@@ -352,6 +382,165 @@ TEST_F(JoinPlanCacheKeyTest, PartialIndexDiscriminatorChangesKey) {
     auto f2 = makeTwoNodeGraph(kNss0, fromjson("{score: {$gt: 20}}"), kNss1, BSONObj{}, "id", "id");
 
     ASSERT_NE(makeKey(f1.graph, f1.resolvedPaths), makeKey(f2.graph, f2.resolvedPaths));
+}
+
+TEST_F(JoinPlanCacheKeyTest, QueryFrameworkChangesKeyAndHash) {
+    query_settings::QuerySettings classic, sbe;
+    classic.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+    sbe.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
+    JoinPlanCacheKey key = makeKeyWithSettings();
+    JoinPlanCacheKey classicKey = makeKeyWithSettings(classic);
+    JoinPlanCacheKey sbeKey = makeKeyWithSettings(sbe);
+    ASSERT_NE(key, classicKey);
+    ASSERT_NE(key, sbeKey);
+    ASSERT_NE(classicKey, sbeKey);
+    ASSERT_NE(key.hash(), classicKey.hash());
+    ASSERT_NE(key.hash(), sbeKey.hash());
+    ASSERT_NE(classicKey.hash(), sbeKey.hash());
+}
+
+TEST_F(JoinPlanCacheKeyTest, RejectChangesKeyAndHash) {
+    query_settings::QuerySettings rejectFalse, rejectTrue;
+    rejectFalse.setReject(false);
+    rejectTrue.setReject(true);
+    JoinPlanCacheKey key = makeKeyWithSettings();
+    JoinPlanCacheKey rejectFalseKey = makeKeyWithSettings(rejectFalse);
+    JoinPlanCacheKey rejectTrueKey = makeKeyWithSettings(rejectTrue);
+    ASSERT_EQ(key, rejectFalseKey);
+    ASSERT_NE(key, rejectTrueKey);
+    ASSERT_NE(rejectTrueKey, rejectFalseKey);
+    ASSERT_EQ(key.hash(), rejectFalseKey.hash());
+    ASSERT_NE(key.hash(), rejectTrueKey.hash());
+    ASSERT_NE(rejectTrueKey.hash(), rejectFalseKey.hash());
+}
+
+TEST_F(JoinPlanCacheKeyTest, IndexHintsChangeKeyAndHash) {
+    const auto ns = makeNsSpec(kNss0);
+    query_settings::QuerySettings a1, a1Rebuilt, b;
+    a1.setIndexHints({{query_settings::IndexHintSpec(ns, {IndexHint("a_1")})}});
+    a1Rebuilt.setIndexHints({{query_settings::IndexHintSpec(ns, {IndexHint("a_1")})}});
+    b.setIndexHints({{query_settings::IndexHintSpec(ns, {IndexHint("b_1")})}});
+    JoinPlanCacheKey key = makeKeyWithSettings();
+    JoinPlanCacheKey a1Key = makeKeyWithSettings(a1);
+    JoinPlanCacheKey a1RebuiltKey = makeKeyWithSettings(a1Rebuilt);
+    JoinPlanCacheKey bKey = makeKeyWithSettings(b);
+    ASSERT_NE(key, a1Key);
+    ASSERT_NE(a1Key, bKey);
+    ASSERT_EQ(a1Key, a1RebuiltKey);
+    ASSERT_NE(key.hash(), a1Key.hash());
+    ASSERT_NE(a1Key.hash(), bKey.hash());
+    ASSERT_EQ(a1Key.hash(), a1RebuiltKey.hash());
+}
+
+TEST_F(JoinPlanCacheKeyTest, IndexHintsOnDifferentNamespacesChangeKeyAndHash) {
+    query_settings::QuerySettings onNss0, onNss1;
+    onNss0.setIndexHints({{query_settings::IndexHintSpec(makeNsSpec(kNss0), {IndexHint("a_1")})}});
+    onNss1.setIndexHints({{query_settings::IndexHintSpec(makeNsSpec(kNss1), {IndexHint("a_1")})}});
+    JoinPlanCacheKey nss0Key = makeKeyWithSettings(onNss0);
+    JoinPlanCacheKey nss1Key = makeKeyWithSettings(onNss1);
+    ASSERT_NE(nss0Key, nss1Key);
+    ASSERT_NE(nss0Key.hash(), nss1Key.hash());
+}
+
+TEST_F(JoinPlanCacheKeyTest, IndexHintsWithMultipleIndexesChangeKeyAndHash) {
+    const auto ns = makeNsSpec(kNss0);
+    query_settings::QuerySettings one, two;
+    one.setIndexHints({{query_settings::IndexHintSpec(ns, {IndexHint("a_1")})}});
+    two.setIndexHints({{query_settings::IndexHintSpec(ns, {IndexHint("a_1"), IndexHint("b_1")})}});
+    JoinPlanCacheKey oneKey = makeKeyWithSettings(one);
+    JoinPlanCacheKey twoKey = makeKeyWithSettings(two);
+    ASSERT_NE(oneKey, twoKey);
+    ASSERT_NE(oneKey.hash(), twoKey.hash());
+}
+
+TEST_F(JoinPlanCacheKeyTest, IndexHintSpecOrderChangesKeyAndHash) {
+    const auto spec0 = query_settings::IndexHintSpec(makeNsSpec(kNss0), {IndexHint("a_1")});
+    const auto spec1 = query_settings::IndexHintSpec(makeNsSpec(kNss1), {IndexHint("b_1")});
+    // The encoding is order-sensitive (like the classic key), so a reorder causes a cache miss.
+    query_settings::QuerySettings forward, reversed;
+    forward.setIndexHints({{spec0, spec1}});
+    reversed.setIndexHints({{spec1, spec0}});
+    JoinPlanCacheKey forwardKey = makeKeyWithSettings(forward);
+    JoinPlanCacheKey reversedKey = makeKeyWithSettings(reversed);
+    ASSERT_NE(forwardKey, reversedKey);
+    ASSERT_NE(forwardKey.hash(), reversedKey.hash());
+}
+
+TEST_F(JoinPlanCacheKeyTest, KnobsChangeKeysAndHash) {
+    query_settings::QuerySettings intOneKnob, intTwoKnob, boolKnob;
+    intOneKnob = settingsWithKnobs(BSON("testIntKnobWire" << 1));
+    intTwoKnob = settingsWithKnobs(BSON("testIntKnobWire" << 2));
+    boolKnob = settingsWithKnobs(BSON("testBoolKnobWire" << true));
+    JoinPlanCacheKey intOneKnobKey = makeKeyWithSettings(intOneKnob);
+    JoinPlanCacheKey intTwoKnobKey = makeKeyWithSettings(intTwoKnob);
+    JoinPlanCacheKey boolKnobKey = makeKeyWithSettings(boolKnob);
+    ASSERT_NE(intOneKnobKey, intTwoKnobKey);
+    ASSERT_NE(intOneKnobKey, boolKnobKey);
+    ASSERT_NE(intOneKnobKey.hash(), intTwoKnobKey.hash());
+    ASSERT_NE(intOneKnobKey.hash(), boolKnobKey.hash());
+}
+
+TEST_F(JoinPlanCacheKeyTest, KnobsAbsentVsPresentChangesKeyAndHash) {
+    query_settings::QuerySettings withServerDefault =
+        settingsWithKnobs(BSON("testIntKnobWire" << 42));
+    JoinPlanCacheKey key = makeKeyWithSettings();
+    JoinPlanCacheKey withServerDefaultKey = makeKeyWithSettings(withServerDefault);
+    ASSERT_NE(key, withServerDefaultKey);
+    ASSERT_NE(key.hash(), withServerDefaultKey.hash());
+}
+
+TEST_F(JoinPlanCacheKeyTest, EqualKnobOverridesBuiltDifferentlyProduceSameKeyAndHash) {
+    query_settings::QuerySettings intThenBool, boolThenInt, merged;
+    intThenBool = settingsWithKnobs(BSON("testIntKnobWire" << 1 << "testBoolKnobWire" << true));
+    boolThenInt = settingsWithKnobs(BSON("testBoolKnobWire" << true << "testIntKnobWire" << 1));
+    // The encoding relies on QuerySettingsKnobOverrides keeping its entries in a canonical order.
+    // Build the same overrides through fromBSON() in different field orders and through merge().
+    merged.setQueryKnobs(query_settings::QuerySettingsKnobOverrides::merge(
+        query_settings::QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 1)),
+        query_settings::QuerySettingsKnobOverrides::fromBSON(BSON("testBoolKnobWire" << true))));
+    JoinPlanCacheKey intThenBoolKey = makeKeyWithSettings(intThenBool);
+    JoinPlanCacheKey boolThenIntKey = makeKeyWithSettings(boolThenInt);
+    JoinPlanCacheKey mergedKey = makeKeyWithSettings(merged);
+    ASSERT_EQ(intThenBoolKey, boolThenIntKey);
+    ASSERT_EQ(intThenBoolKey, mergedKey);
+    ASSERT_EQ(intThenBoolKey.hash(), boolThenIntKey.hash());
+    ASSERT_EQ(intThenBoolKey.hash(), mergedKey.hash());
+}
+
+TEST_F(JoinPlanCacheKeyTest, MaxTimeMSChangesKeyButNotHash) {
+    query_settings::QuerySettings qs;
+    qs.setMaxTimeMS(1000);
+    JoinPlanCacheKey key = makeKeyWithSettings();
+    JoinPlanCacheKey maxTimeKey = makeKeyWithSettings(qs);
+    ASSERT_NE(key, maxTimeKey);
+    ASSERT_EQ(key.hash(), maxTimeKey.hash());
+}
+
+TEST_F(JoinPlanCacheKeyTest, CommentChangesKeyButNotHash) {
+    query_settings::QuerySettings qs;
+    qs.setComment(query_settings::Comment::parseFromBSON(BSON("c" << "x").firstElement()));
+    JoinPlanCacheKey key = makeKeyWithSettings();
+    JoinPlanCacheKey commentKey = makeKeyWithSettings(qs);
+    ASSERT_NE(key, commentKey);
+    ASSERT_EQ(key.hash(), commentKey.hash());
+}
+
+// Builds a JoinPlanCacheKey directly from a shape string, without a join graph or catalog.
+JoinPlanCacheKey makeTestKey(std::string shape, query_settings::QuerySettings qs = {}) {
+    return JoinPlanCacheKey{std::move(shape), std::move(qs)};
+}
+
+TEST(JoinPlanCacheKeySizeTest, KeySizeIsObjectPlusShapePlusQuerySettingsBson) {
+    const std::string shape(100, 's');
+    query_settings::QuerySettings emptySettings, classicSettings;
+    classicSettings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+
+    const JoinPlanCacheKey emptySettingsKey = makeTestKey(shape, emptySettings);
+    const JoinPlanCacheKey settingsKey = makeTestKey(shape, classicSettings);
+    ASSERT_EQ(sizeof(JoinPlanCacheKey) + shape.size() + emptySettings.toBSON().objsize(),
+              emptySettingsKey.keySizeInBytes());
+    ASSERT_EQ(sizeof(JoinPlanCacheKey) + shape.size() + classicSettings.toBSON().objsize(),
+              settingsKey.keySizeInBytes());
 }
 
 // Integration test fixture that bridges AggJoinModel pipeline construction
@@ -440,8 +629,10 @@ TEST_F(JoinPlanCacheKeyAggModelTest, DifferentSyntacticJoinOrderResultsInDiffere
         for (size_t i = 0; i < graph.numNodes(); ++i) {
             namespaces.push_back(graph.getNode(static_cast<NodeId>(i)).collectionName);
         }
-        return makeJoinPlanCacheKey(
-            graph, resolvedPaths, multipleCollectionAccessor(operationContext(), namespaces));
+        return makeJoinPlanCacheKey(graph,
+                                    resolvedPaths,
+                                    multipleCollectionAccessor(operationContext(), namespaces),
+                                    query_settings::QuerySettings{});
     };
 
     auto key = buildKey(pipelineJson);
