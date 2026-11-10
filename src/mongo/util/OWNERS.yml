@@ -36,10 +36,13 @@ filters:
   - "roaring_bitmaps*":
     approvers:
       - 10gen/query-optimization
+  - "heap_profiler*":
+    approvers:
+      - 10gen/server-workload-resilience
   - "latency_distribution*":
     approvers:
       - 10gen/server-workload-resilience
-  - "tcmalloc*":
+  - "*tcmalloc*":
     approvers:
       - 10gen/server-workload-resilience
   - "log_and_backoff*":
