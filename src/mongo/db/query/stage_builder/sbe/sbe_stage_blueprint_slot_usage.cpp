@@ -7,6 +7,8 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <type_traits>
+#include <utility>
 #include <variant>
 
 namespace mongo::stage_builder {
@@ -22,6 +24,29 @@ void growTo(std::vector<T>& v, size_t idx) {
         v.resize(idx + 1);
     }
 }
+
+/**
+ * Calls 'fn(slot, typeSig)' for each slot 'node' defines whose types are known.
+ */
+template <typename F>
+void forEachDefinedSlotType(const SbBlueprintNode& node, F&& fn) {
+    std::visit(
+        [&](const auto& n) {
+            using T = std::decay_t<decltype(n)>;
+            if constexpr (std::is_same_v<T, SbBlueprintScan> ||
+                          std::is_same_v<T, SbBlueprintMultiRangeScan> ||
+                          std::is_same_v<T, SbBlueprintFetch>) {
+                fn(n.info->recordSlot, TypeSignature::kObjectType);
+            } else if constexpr (std::is_same_v<T, SbBlueprintProject>) {
+                for (const auto& [expr, slot] : n.projects) {
+                    if (auto typeSig = expr.getTypeSignature()) {
+                        fn(slot.getId(), *typeSig);
+                    }
+                }
+            }
+        },
+        node);
+}
 }  // namespace
 
 SbBlueprintSlotUsage SbBlueprintSlotUsage::build(SbBlueprint& blueprint,
@@ -31,8 +56,8 @@ SbBlueprintSlotUsage SbBlueprintSlotUsage::build(SbBlueprint& blueprint,
     auto addUses = [&](const sbe::value::SlotVector& slots) {
         for (auto slot : slots) {
             const size_t idx = slotIndex(slot);
-            growTo(usage._numUses, idx);
-            ++usage._numUses[idx];
+            growTo(usage._slots, idx);
+            ++usage._slots[idx].numUses;
         }
     };
     addUses(rootUses);
@@ -55,56 +80,67 @@ SbBlueprintSlotUsage SbBlueprintSlotUsage::build(SbBlueprint& blueprint,
 
         for (auto slot : defs.slots()) {
             const size_t idx = slotIndex(slot);
-            growTo(usage._definingNode, idx);
+            growTo(usage._slots, idx);
+            auto& info = usage._slots[idx];
             tassert(13627003,
                     str::stream() << "Slot " << slot
                                   << " is defined by more than one blueprint node",
-                    !usage._definingNode[idx]);
-            usage._definingNode[idx] = node;
+                    !info.definingNode);
+            info.definingNode = node;
         }
+        forEachDefinedSlotType(n, [&](sbe::value::SlotId slot, TypeSignature typeSig) {
+            usage.getInfo(slot).typeSig = typeSig;
+        });
         addUses(uses.slots());
     }
-
-    // Every used slot has an entry in '_definingNode'.
-    if (usage._definingNode.size() < usage._numUses.size()) {
-        usage._definingNode.resize(usage._numUses.size());
-    }
     return usage;
+}
+
+const SbBlueprintSlotUsage::SlotInfo& SbBlueprintSlotUsage::getInfo(sbe::value::SlotId slot) const {
+    const size_t idx = slotIndex(slot);
+    tassert(
+        13627022, "Slot index is out of bounds in the blueprint slot summary", idx < _slots.size());
+    return _slots[idx];
+}
+
+SbBlueprintSlotUsage::SlotInfo& SbBlueprintSlotUsage::getInfo(sbe::value::SlotId slot) {
+    return const_cast<SlotInfo&>(std::as_const(*this).getInfo(slot));
 }
 
 boost::optional<SbBlueprintNodeIdx> SbBlueprintSlotUsage::getDefiningNode(
     sbe::value::SlotId slot) const {
     const size_t idx = slotIndex(slot);
-    return idx < _definingNode.size() ? _definingNode[idx] : boost::none;
+    return idx < _slots.size() ? _slots[idx].definingNode : boost::none;
 }
 
 size_t SbBlueprintSlotUsage::numUses(sbe::value::SlotId slot) const {
     const size_t idx = slotIndex(slot);
-    return idx < _numUses.size() ? _numUses[idx] : 0;
+    return idx < _slots.size() ? _slots[idx].numUses : 0;
 }
 
 size_t SbBlueprintSlotUsage::removeUse(sbe::value::SlotId slot) {
-    const size_t idx = slotIndex(slot);
-    tassert(13627009,
-            "Removed a use of a slot that has none",
-            idx < _numUses.size() && _numUses[idx] > 0);
-    return --_numUses[idx];
+    auto& info = getInfo(slot);
+    tassert(13627009, "Removed a use of a slot that has none", info.numUses > 0);
+    return --info.numUses;
 }
 
 void SbBlueprintSlotUsage::removeDef(sbe::value::SlotId slot) {
     const size_t idx = slotIndex(slot);
-    if (idx < _definingNode.size()) {
-        _definingNode[idx] = boost::none;
+    if (idx < _slots.size()) {
+        auto& info = _slots[idx];
+        info.definingNode = boost::none;
+        info.typeSig = TypeSignature::kAnyType;
     }
 }
 
 bool SbBlueprintSlotUsage::operator==(const SbBlueprintSlotUsage& other) const {
-    const size_t numSlots = std::max(
-        {_numUses.size(), other._numUses.size(), _definingNode.size(), other._definingNode.size()});
+    const SlotInfo empty;
+    const size_t numSlots = std::max(_slots.size(), other._slots.size());
     for (size_t idx = 0; idx < numSlots; ++idx) {
-        auto slot = static_cast<sbe::value::SlotId>(idx);
-        if (numUses(slot) != other.numUses(slot) ||
-            getDefiningNode(slot) != other.getDefiningNode(slot)) {
+        const auto& info = idx < _slots.size() ? _slots[idx] : empty;
+        const auto& otherInfo = idx < other._slots.size() ? other._slots[idx] : empty;
+        if (info.numUses != otherInfo.numUses || info.definingNode != otherInfo.definingNode ||
+            info.typeSig != otherInfo.typeSig) {
             return false;
         }
     }

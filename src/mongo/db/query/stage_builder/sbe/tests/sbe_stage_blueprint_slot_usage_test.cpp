@@ -8,6 +8,7 @@
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
+#include "mongo/db/query/stage_builder/sbe/type_signature.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -227,7 +228,79 @@ TEST_F(SbBlueprintSlotUsageEqualityTest, SlotsWithNoUsesAndNoDefinerDoNotAffectE
     ASSERT_TRUE(without == withOutside);
 }
 
+TEST_F(SbBlueprintSlotUsageTest, RecordsSlotTypeSignatures) {
+    SbBuilder b{*_state, 1};
+    auto [scan, recordSlot, recordIdSlot, fieldSlots] =
+        b.makeScan(UUID::gen(), DatabaseName::kAdmin, true, {"a"});
+    auto objectSlot = slot();
+    auto numberSlot = slot();
+    auto untypedSlot = slot();
+    auto [project, _] = b.makeProject(
+        std::move(scan),
+        std::pair{SbExpr{SbSlot{recordSlot.getId(), TypeSignature::kObjectType}}, objectSlot},
+        std::pair{SbExpr{SbSlot{fieldSlots[0].getId(), TypeSignature::kNumericType}}, numberSlot},
+        std::pair{SbExpr{SbSlot{fieldSlots[0].getId()}}, untypedSlot});
+
+    const auto usage = SbBlueprintSlotUsage::build(blueprint(), project.idx(), {});
+
+    // A scan record is always an object.
+    ASSERT_EQ(usage.getInfo(recordSlot.getId()).typeSig, TypeSignature::kObjectType);
+
+    // A project entry's values have the type of its expression.
+    ASSERT_EQ(usage.getInfo(objectSlot.getId()).typeSig, TypeSignature::kObjectType);
+    ASSERT_EQ(usage.getInfo(numberSlot.getId()).typeSig, TypeSignature::kNumericType);
+    ASSERT_EQ(usage.getInfo(untypedSlot.getId()).typeSig, TypeSignature::kAnyType);
+
+    // Nothing is known about a scan field.
+    ASSERT_EQ(usage.getInfo(fieldSlots[0].getId()).typeSig, TypeSignature::kAnyType);
+}
+
+TEST_F(SbBlueprintSlotUsageTest, RemovingDefinitionClearsTypeFactsAndPreservesUses) {
+    SbBuilder b{*_state, 1};
+    auto [scan, recordSlot, recordIdSlot, fieldSlots] =
+        b.makeScan(UUID::gen(), DatabaseName::kAdmin, true, {});
+    auto usage =
+        SbBlueprintSlotUsage::build(blueprint(), scan.idx(), sbe::makeSV(recordSlot.getId()));
+    ASSERT_EQ(usage.getInfo(recordSlot.getId()).typeSig, TypeSignature::kObjectType);
+
+    usage.removeDef(recordSlot.getId());
+    const auto& info = usage.getInfo(recordSlot.getId());
+    ASSERT_FALSE(info.definingNode);
+    ASSERT_EQ(info.typeSig, TypeSignature::kAnyType);
+    ASSERT_EQ(info.numUses, 1);
+
+    usage.removeDef(recordSlot.getId());
+    usage.removeDef(12345);
+    ASSERT_EQ(usage.numUses(recordSlot.getId()), 1);
+}
+
+TEST_F(SbBlueprintSlotUsageTest, FetchAndMultiRangeScanRecordsAreObjects) {
+    SbBuilder b{*_state, 1};
+    auto [scan, scanRecord, scanRecordId, scanFields] =
+        b.makeScan(UUID::gen(), DatabaseName::kAdmin, true, {}, RecordIdRangeList{});
+    const auto scanUsage = SbBlueprintSlotUsage::build(blueprint(), scan.idx(), {});
+    ASSERT_EQ(scanUsage.getInfo(scanRecord.getId()).typeSig, TypeSignature::kObjectType);
+
+    auto [fetch, fetchRecord, fetchRecordId, fetchFields] = b.makeFetch(std::move(scan),
+                                                                        UUID::gen(),
+                                                                        DatabaseName::kAdmin,
+                                                                        scanRecordId,
+                                                                        {},
+                                                                        SbIndexInfoSlots{},
+                                                                        {});
+    const auto fetchUsage = SbBlueprintSlotUsage::build(blueprint(), fetch.idx(), {});
+    ASSERT_EQ(fetchUsage.getInfo(fetchRecord.getId()).typeSig, TypeSignature::kObjectType);
+}
+
 using SbBlueprintSlotUsageDeathTest = SbBlueprintSlotUsageTest;
+
+DEATH_TEST_F(SbBlueprintSlotUsageDeathTest, RemovingUseOfUnusedSlotFails, "13627009") {
+    SbBuilder b{*_state, 1};
+    auto [scan, recordSlot, recordIdSlot, fieldSlots] =
+        b.makeScan(UUID::gen(), DatabaseName::kAdmin, true, {});
+    auto usage = SbBlueprintSlotUsage::build(blueprint(), scan.idx(), {});
+    usage.removeUse(recordSlot.getId());
+}
 
 DEATH_TEST_F(SbBlueprintSlotUsageDeathTest, SlotDefinedTwiceFails, "13627003") {
     SbBuilder b{*_state, 1};
@@ -238,6 +311,21 @@ DEATH_TEST_F(SbBlueprintSlotUsageDeathTest, SlotDefinedTwiceFails, "13627003") {
     projects.emplace_back(b.makeInt32Constant(1), recordSlot);
     auto [root, _] = b.makeProject(std::move(scan), std::move(projects));
     SbBlueprintSlotUsage::build(blueprint(), root.idx(), {});
+}
+DEATH_TEST_F(SbBlueprintSlotUsageDeathTest, UpdatingASlotNotInTheSummaryFails, "13627022") {
+    SbBuilder b{*_state, 1};
+    auto [scan, recordSlot, recordIdSlot, fieldSlots] =
+        b.makeScan(UUID::gen(), DatabaseName::kAdmin, true, {});
+    auto usage = SbBlueprintSlotUsage::build(blueprint(), scan.idx(), {});
+    usage.getInfo(12345);
+}
+
+DEATH_TEST_F(SbBlueprintSlotUsageDeathTest, ReadingASlotNotInTheSummaryFails, "13627022") {
+    SbBuilder b{*_state, 1};
+    auto [scan, recordSlot, recordIdSlot, fieldSlots] =
+        b.makeScan(UUID::gen(), DatabaseName::kAdmin, true, {});
+    const auto usage = SbBlueprintSlotUsage::build(blueprint(), scan.idx(), {});
+    usage.getInfo(12345);
 }
 }  // namespace
 }  // namespace mongo::stage_builder
