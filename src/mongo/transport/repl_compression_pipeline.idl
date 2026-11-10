@@ -1,0 +1,93 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    cpp_namespace: "mongo::transport"
+
+server_parameters:
+    internalReplPipelineCompressionEnabled:
+        description: >-
+            When true, compressed replies to replication oplog exhaust getMores are compressed on a
+            shared background pool instead of on the connection thread, which still sends them in
+            order. When false, replies are compressed inline.
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: gReplPipelineCompressionEnabled
+        default: false
+        redact: false
+
+    internalReplPipelineCompressionThreadPoolSize:
+        description: >-
+            Number of threads in the shared compression pool. 0 means max(1, min(4, numCores/2)).
+            Read once when the pool is created.
+        set_at: [startup]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: gReplPipelineCompressionThreadPoolSize
+        default: 0
+        validator:
+            gte: 0
+            lte: 64
+        redact: false
+
+    internalReplPipelineCompressionQueueDepth:
+        description: >-
+            Max batches per session that are submitted but not yet sent. 0 disables the pipeline.
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: gReplPipelineCompressionQueueDepth
+        default: 2
+        validator:
+            gte: 0
+            lte: 64
+        redact: false
+
+    internalReplPipelineCompressionMinResponseBytes:
+        description: >-
+            Smallest uncompressed reply, in bytes, that goes through the pipeline; smaller replies
+            are compressed inline. The effective threshold is max(4096, this value): replies under
+            4096 bytes are never pipelined, even when this is 0, so empty awaitData replies can't
+            keep waking each other.
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<long long>"
+        cpp_varname: gReplPipelineCompressionMinResponseBytes
+        default: 4194304
+        validator:
+            gte: 0
+        redact: false
+
+    internalReplPipelineCompressionMaxPendingBytes:
+        description: >-
+            Soft admission budget, in bytes, for buffers held by all pipelines; this is not a limit
+            on process memory. A batch counts the capacity of its raw reply buffer until compressed,
+            then the capacity of its result buffer (which can be the raw buffer when the reply is
+            sent uncompressed). When the total is at or over the budget, new replies are compressed
+            inline. 0 means 256 MB. The check and the reservation are one atomic step, but a batch
+            is admitted whenever the total is below the budget, so each admission can overshoot it
+            by up to its own batch, and a small value still admits a batch. The total can end up
+            further over the budget if the budget is lowered at runtime or a result is accounted
+            larger than its raw buffer; new work is then compressed inline until it drains. To turn
+            the pipeline off, use internalReplPipelineCompressionEnabled or a queue depth of 0. Not
+            counted, so actual memory use can be higher: memory used while compressing (the
+            worst-case output buffer, the copy made to shrink it, and compressor scratch memory),
+            recorded traffic, and replies already taken for sending.
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<long long>"
+        cpp_varname: gReplPipelineCompressionMaxPendingBytes
+        default: 0
+        validator:
+            gte: 0
+        redact: false
+
+    internalReplPipelineCompressionWakeAwaitData:
+        description: >-
+            When a compressed batch is ready and its getMore is parked in awaitData, end that wait
+            so the batch is sent right away. Without this the batch can wait up to a full awaitData
+            period (half the election timeout, at most 30s), which stalls w:majority writes. Only
+            that getMore's wait is released and the oplog notifier version is not advanced, so
+            other tailable readers keep waiting. No effect unless
+            internalReplPipelineCompressionEnabled is true.
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: gReplPipelineCompressionWakeAwaitData
+        default: true
+        redact: false

@@ -916,6 +916,8 @@ mongo_cc_library(
         "//src/mongo/db/transaction",
         "//src/mongo/rpc:command_status",
         "//src/mongo/s:common_s",
+        "//src/mongo/db/query:await_data_state",
+        "//src/mongo/transport:repl_compression_pipeline",
     ],
 )
 

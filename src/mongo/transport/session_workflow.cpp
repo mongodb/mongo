@@ -42,6 +42,8 @@
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/message_filter_hooks.h"
+#include "mongo/transport/repl_compression_pipeline.h"
+#include "mongo/transport/repl_compression_pipeline_gen.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
@@ -62,9 +64,11 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <ratio>
 #include <string>
 #include <string_view>
@@ -538,9 +542,35 @@ private:
 
     bool _inFirstIteration = true;
 
+    /**
+     * True if the reply to the current work should go through the compression pipeline: it is
+     * enabled, a compressor is negotiated, this is an internal oplog exhaust getMore, and the reply
+     * is big enough. Creates the pipeline on first use.
+     */
+    bool _shouldUsePipeline(size_t responseSize);
+
+    /**
+     * Sends pipelined batches in seq order, waiting for each to finish compressing. With all=false,
+     * sends just one batch to free a slot.
+     */
+    void _drainPipeline(bool all);
+
+    /** Sends batches that are already compressed, in seq order, without waiting. */
+    bool _flushReadyPipeline();
+
+    void _sendPipelineBatch(Message out, boost::optional<Message> recorderRequest);
+
     std::unique_ptr<WorkItem> _work;
     std::unique_ptr<WorkItem> _nextWork; /**< created by exhaust responses */
     boost::optional<IterationFrame> _iterationFrame;
+
+    // Null unless this session has served a pipelined reply. Only the connection thread writes it;
+    // terminate() reads it from another thread, hence the mutex.
+    std::shared_ptr<ReplyCompressionPipeline> _replPipeline;
+    std::mutex _replPipelineMutex;
+
+    // The current reply was handed to the pipeline instead of being compressed inline.
+    bool _responseSubmittedToPipeline = false;
 };
 
 class SessionWorkflow::Impl::WorkItem {
@@ -602,6 +632,10 @@ public:
         return !!_compressorId;
     }
 
+    boost::optional<MessageCompressorId> compressorId() const {
+        return _compressorId;
+    }
+
     Message consumeOut() {
         return std::move(*std::exchange(_out, {}));
     }
@@ -629,6 +663,32 @@ public:
         synth->_isExhaust = true;
         synth->_compressorId = _compressorId;
         return synth;
+    }
+
+    /** True for an exhaust getMore on local.oplog.* from an internal cluster client. */
+    bool isReplOplogExhaustGetMore(Client* client) {
+        if (!_isExhaust) {
+            return false;
+        }
+        if (!client || !client->isInternalClient()) {
+            return false;
+        }
+        auto inRequest = getRequestIfGetMoreOnExhaustCursor(client);
+        if (!inRequest) {
+            return false;
+        }
+        try {
+            const BSONObj& body = inRequest->body;
+            auto collElem = body["collection"];
+            if (collElem.type() != BSONType::string) {
+                return false;
+            }
+            const auto nss = NamespaceStringUtil::deserialize(inRequest->parseDbName(),
+                                                              collElem.valueStringData());
+            return nss.isOplog();
+        } catch (const DBException&) {
+            return false;
+        }
     }
 
     /**
@@ -730,6 +790,111 @@ void SessionWorkflow::Impl::_sendResponse() {
               "connectionId"_attr = session()->id());
         unsendableCompletedResponses.increment();
         throw;
+    }
+}
+
+bool SessionWorkflow::Impl::_shouldUsePipeline(size_t responseSize) {
+    if (!gReplPipelineCompressionEnabled.load()) {
+        return false;
+    }
+    if (ReplyCompressionPipeline::effectiveQueueDepth() == 0) {
+        return false;
+    }
+    // Small replies stay inline. The 4KB floor applies even when the minimum is 0: otherwise an
+    // empty awaitData reply would be pipelined, wake the next getMore, which returns another empty
+    // reply, and so on.
+    constexpr long long kAbsoluteMinBytes = 4096;
+    const long long minBytes =
+        std::max(kAbsoluteMinBytes, gReplPipelineCompressionMinResponseBytes.load());
+    if (static_cast<long long>(responseSize) < minBytes) {
+        return false;
+    }
+    if (!_work || !_work->hasCompressorId()) {
+        return false;
+    }
+    if (!_work->isReplOplogExhaustGetMore(client())) {
+        return false;
+    }
+    if (!_replPipeline) {
+        ReplCompressionThreadPool::get().ensureStarted();
+        auto pipeline = ReplyCompressionPipeline::make();
+        std::lock_guard<std::mutex> lk(_replPipelineMutex);
+        _replPipeline = std::move(pipeline);
+        // terminate() may already have run and found no pipeline to shut down.
+        if (_isTerminated.load()) {
+            _replPipeline->shutdown();
+        }
+    }
+    return true;
+}
+
+void SessionWorkflow::Impl::_sendPipelineBatch(Message out,
+                                               boost::optional<Message> recorderRequest) {
+    // Record what actually goes on the wire, in wire order.
+    if (recorderRequest) {
+        auto& rec = TrafficRecorder::get(_serviceContext);
+        rec.observeRequest(*session(), std::move(*recorderRequest));
+        rec.observeResponse(*session(), out);
+    }
+    try {
+        sessionWorkflowDelayOrFailSendMessage.execute([this](auto&& data) {
+            if (auto isDelay = data["millis"]; !isDelay.eoo()) {
+                Milliseconds delay{isDelay.safeNumberLong()};
+                LOGV2(10620101,
+                      "sendMessage: failpoint-induced delay (pipeline)",
+                      "delay"_attr = delay);
+                sleepFor(delay);
+            } else {
+                auto md = ClientMetadata::get(client());
+                if (md && (md->getApplicationName() == data["appName"].str())) {
+                    LOGV2(10620102, "sendMessage: failpoint-induced failure (pipeline)");
+                    uasserted(ErrorCodes::HostUnreachable, "Sink message failed");
+                }
+            }
+        });
+        uassertStatusOK(session()->sinkMessage(std::move(out)));
+        ReplyCompressionPipeline::recordBatchSent();
+    } catch (const DBException& ex) {
+        LOGV2(10620103,
+              "Error sending pipelined response to client. Ending connection from remote",
+              "error"_attr = ex,
+              "remote"_attr = session()->remote(),
+              "connectionId"_attr = session()->id());
+        unsendableCompletedResponses.increment();
+        throw;
+    }
+}
+
+bool SessionWorkflow::Impl::_flushReadyPipeline() {
+    if (!_replPipeline) {
+        return false;
+    }
+    bool sentAny = false;
+    Message out;
+    boost::optional<Message> recorderRequest;
+    while (_replPipeline->tryTakeNextReady(&out, &recorderRequest)) {
+        _sendPipelineBatch(std::move(out), std::move(recorderRequest));
+        sentAny = true;
+        out = Message{};
+        recorderRequest = boost::none;
+    }
+    return sentAny;
+}
+
+void SessionWorkflow::Impl::_drainPipeline(bool all) {
+    if (!_replPipeline) {
+        return;
+    }
+    while (_replPipeline->hasPending()) {
+        Message out;
+        boost::optional<Message> recorderRequest;
+        if (!_replPipeline->takeNextReady(&out, &recorderRequest)) {
+            break;  // Shut down.
+        }
+        _sendPipelineBatch(std::move(out), std::move(recorderRequest));
+        if (!all) {
+            break;
+        }
     }
 }
 
@@ -893,6 +1058,12 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
     // Pass sourced Message to handler to generate response.
     _work->initOperation();
 
+    // Let a worker wake this getMore out of awaitData when the next batch is ready. Cleared in
+    // _acceptResponse() before the opCtx is retired.
+    if (_replPipeline) {
+        _replPipeline->registerActiveOpCtx(_work->opCtx());
+    }
+
     if (requestForTrafficRecording) {
         // The opCtx has been initialized, stash the request.
         // If processing the request finds it to be "sensitive",
@@ -911,6 +1082,12 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
 
 void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     auto&& work = *_work;
+    // Must happen before the opCtx is marked pending destruction below.
+    if (_replPipeline) {
+        _replPipeline->clearActiveOpCtx();
+    }
+    // Reset before any early return below.
+    _responseSubmittedToPipeline = false;
     // The opCtx must be marked as pending destruction here so that the operation cannot show up in
     // currentOp results after the response reaches the client. We are assuming that the operation
     // has already been killed once we are accepting the response here, so marking it as pending
@@ -961,6 +1138,40 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     beforeCompressingExhaustResponse.executeIf(
         [&](auto&&) {}, [&](auto&&) { return work.hasCompressorId() && _nextWork; });
 
+    if (_shouldUsePipeline(static_cast<size_t>(toSink.size()))) {
+        // The worker can't touch the opCtx, so take the recorder request now. It is recorded with
+        // the compressed reply in _sendPipelineBatch().
+        boost::optional<Message> recorderRequest;
+        if (auto* opCtx = _work->opCtx()) {
+            if (auto request = StashedRequest::get(opCtx).take()) {
+                recorderRequest = std::move(*request);
+            }
+        }
+        // On failure (disabled, shut down, window or byte cap full) toSink is left untouched.
+        if (_replPipeline->trySubmit(toSink, *work.compressorId(), recorderRequest)) {
+            _responseSubmittedToPipeline = true;
+            return;
+        }
+        // Compress inline. The request was already taken from the opCtx, so record it here, after
+        // sending older batches to keep recording in wire order.
+        if (recorderRequest) {
+            if (_replPipeline && _replPipeline->hasPending()) {
+                _drainPipeline(true /* all */);
+            }
+            auto& rec = TrafficRecorder::get(_serviceContext);
+            rec.observeRequest(*session(), std::move(*recorderRequest));
+            toSink = work.compressResponse(std::move(toSink));
+            rec.observeResponse(*session(), toSink);
+            work.setOut(std::move(toSink));
+            return;
+        }
+    }
+
+    // Older pipelined batches must be sent, and recorded, before this reply.
+    if (_replPipeline && _replPipeline->hasPending()) {
+        _drainPipeline(true /* all */);
+    }
+
     toSink = work.compressResponse(toSink);
 
     // If opCtx is null, this is a case which returned a response before parsing
@@ -999,7 +1210,24 @@ Future<void> SessionWorkflow::Impl::_doOneIteration() {
         .then([&](auto rsp) {
             _acceptResponse(std::move(rsp));
             _iterationFrame->metrics.processed();
-            _sendResponse();
+            if (_responseSubmittedToPipeline) {
+                _flushReadyPipeline();
+                // Wait only if the window is full. Otherwise go run the next getMore while this
+                // batch compresses; waiting here would make the pipeline no faster than inline.
+                // Whatever is left is drained when the exhaust chain ends.
+                if (_replPipeline && _replPipeline->hasPending()) {
+                    const bool windowFull = _replPipeline->inFlight() >=
+                        ReplyCompressionPipeline::effectiveQueueDepth();
+                    if (windowFull) {
+                        _drainPipeline(false /* all */);
+                    }
+                }
+            } else {
+                if (_replPipeline && _replPipeline->hasPending()) {
+                    _drainPipeline(true /* all */);
+                }
+                _sendResponse();
+            }
             _iterationFrame->metrics.sent(*session());
             _yieldPointReached();
             _iterationFrame->metrics.yieldedAfterSend();
@@ -1039,6 +1267,8 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
                 _doOneIteration().get();
                 _work = nullptr;
             } while (_nextWork);
+            // The exhaust chain ended; send whatever is still in the pipeline.
+            _drainPipeline(true /* all */);
             _scheduleIteration();
         } catch (const DBException& ex) {
             _onLoopError(ex.toStatus());
@@ -1063,6 +1293,16 @@ void SessionWorkflow::Impl::terminate() {
     TrafficRecorder::get(_serviceContext).sessionEnded(*session());
 
     session()->end();
+
+    // Ending the session doesn't wake a sender blocked in takeNextReady(); shutdown() does.
+    std::shared_ptr<ReplyCompressionPipeline> pipeline;
+    {
+        std::lock_guard<std::mutex> lk(_replPipelineMutex);
+        pipeline = _replPipeline;
+    }
+    if (pipeline) {
+        pipeline->shutdown();
+    }
 }
 
 void SessionWorkflow::Impl::terminateIfTagsDontMatch(Client::TagMask tags) {
@@ -1118,6 +1358,10 @@ void SessionWorkflow::Impl::_cleanupExhaustResources() {
 void SessionWorkflow::Impl::_cleanupSession(const Status& status) {
     invariant(!status.isOK());
     LOGV2_DEBUG(5127900, 2, "Ending session", "error"_attr = status);
+    // Before the opCtxs are destroyed below, so no wake can target them.
+    if (_replPipeline) {
+        _replPipeline->shutdown();
+    }
     // Normally we want to defer destroying operation contexts until after we've sent the response
     // to the user, but in this case we're tearing down the session without sending a response and
     // so can destroy them immediately, and need to do so as some of the subsequent cleanup steps

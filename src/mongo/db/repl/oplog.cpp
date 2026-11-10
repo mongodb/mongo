@@ -38,6 +38,7 @@
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/await_data_state.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/delete.h"
@@ -129,6 +130,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/transport/repl_compression_pipeline.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -3701,6 +3703,20 @@ void signalOplogWaiters() {
     if (oplog) {
         oplog->capped()->getInsertNotifier()->notifyAll();
     }
+}
+
+// Hooks for the replication compression pipeline, which can't depend on db/query. They don't touch
+// the global oplog RecordStore and only wake the target getMore.
+MONGO_INITIALIZER(WireReplPipelineAwaitDataWake)(InitializerContext*) {
+    transport::setReplPipelineAwaitDataWakeFn([](void* opCtxTag) {
+        if (!opCtxTag) {
+            return;
+        }
+        signalAwaitDataPipelineReady(static_cast<OperationContext*>(opCtxTag));
+    });
+    transport::setReplPipelineArmOpCtxFn([](void* opCtxTag) {
+        setAwaitDataPipelineWakeEligible(static_cast<OperationContext*>(opCtxTag));
+    });
 }
 
 }  // namespace repl

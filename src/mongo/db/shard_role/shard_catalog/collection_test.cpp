@@ -43,11 +43,13 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_calculator.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -225,6 +227,61 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilInterrupt) {
     ASSERT_GTE(after - before, Milliseconds(25));
     thread.join();
     ASSERT_EQ(notifier->getVersion(), prevVersion);
+}
+
+TEST_F(CollectionTest, CappedNotifierWakeWithoutNewDataKeepsVersionAndOtherWaitersAsleep) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    makeCapped(nss);
+
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    auto notifier = coll.getCollectionPtr()->getRecordStore()->capped()->getInsertNotifier();
+    const auto prevVersion = notifier->getVersion();
+    AtomicWord<bool> targetReady{false};
+    AtomicWord<bool> otherReady{false};
+    AtomicWord<bool> otherReturned{false};
+
+    // The bystander waits only for new data or its own release flag; it never times out on its
+    // own, so the assertion below does not depend on scheduling latency.
+    stdx::thread other([&] {
+        ThreadClient client(getServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+        notifier->waitUntil(opCtx.get(), prevVersion, Date_t::now() + Minutes(5), [&] {
+            return otherReady.load();
+        });
+        otherReturned.store(true);
+    });
+    // Always release and join the bystander, even if an assertion below throws.
+    ON_BLOCK_EXIT([&] {
+        otherReady.store(true);
+        notifier->notifyWaitersWithoutNewData();
+        other.join();
+    });
+
+    stdx::thread waker([&] {
+        targetReady.store(true);
+        notifier->notifyWaitersWithoutNewData();
+    });
+    ON_BLOCK_EXIT([&] { waker.join(); });
+
+    notifier->waitUntil(operationContext(), prevVersion, Date_t::now() + Minutes(5), [&] {
+        return targetReady.load();
+    });
+    // The targeted wake did not advance the version, so the bystander re-checked an unchanged
+    // predicate and is still waiting.
+    ASSERT_EQ(notifier->getVersion(), prevVersion);
+    ASSERT_FALSE(otherReturned.load());
+}
+
+TEST_F(CollectionTest, CappedNotifierExtraPredicateAlreadyTrueReturnsImmediately) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    makeCapped(nss);
+
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    auto notifier = coll.getCollectionPtr()->getRecordStore()->capped()->getInsertNotifier();
+    auto before = Date_t::now();
+    notifier->waitUntil(
+        operationContext(), notifier->getVersion(), before + Seconds(25), [] { return true; });
+    ASSERT_LT(Date_t::now() - before, Seconds(25));
 }
 
 TEST_F(CollectionTest, HaveCappedWaiters) {

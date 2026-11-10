@@ -7,6 +7,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/await_data_state.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/optime.h"
@@ -17,12 +18,16 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <mutex>
 
 #include <boost/optional/optional.hpp>
 
@@ -46,6 +51,12 @@ public:
     // Blocks the caller until an insert event is fired or the deadline is hit.  Must be robust
     // to being called multiple times without an intervening read.
     virtual void waitUntil(OperationContext* opCtx, Date_t deadline) = 0;
+
+    // Returns a callable that ends a wait on this notifier from another thread, or an empty
+    // function if that isn't supported. It may outlive the notifier, so it owns what it uses.
+    virtual std::function<void()> makeExternalWaker() {
+        return {};
+    }
 };
 
 // Class used to notify listeners of local inserts into the capped collection.
@@ -61,11 +72,22 @@ public:
     }
 
     void waitUntil(OperationContext* opCtx, Date_t deadline) final {
-        _notifier->waitUntil(opCtx, _lastEOFVersion, deadline);
+        // Also return when the compression pipeline has a batch ready for this operation.
+        _notifier->waitUntil(opCtx, _lastEOFVersion, deadline, [opCtx] {
+            return awaitDataPipelineReadyToSend(opCtx);
+        });
     }
 
     void doneWaiting(OperationContext* opCtx) final {
         _lastEOFVersion = _currentVersion;
+    }
+
+    // Doesn't advance the version, so other readers on this notifier keep waiting. Holding the
+    // shared_ptr keeps the notifier valid even if the RecordStore goes away.
+    std::function<void()> makeExternalWaker() final {
+        return [notifier = _notifier] {
+            notifier->notifyWaitersWithoutNewData();
+        };
     }
 
 private:
@@ -90,9 +112,65 @@ public:
     }
 
     void waitUntil(OperationContext* opCtx, Date_t deadline) final {
-        auto majorityCommittedFuture = WaitForMajorityService::get(opCtx->getServiceContext())
-                                           .waitUntilMajorityForRead(_opTimeToBeMajorityCommitted,
-                                                                     opCtx->getCancellationToken());
+        if (!awaitDataPipelineWakeEligible(opCtx)) {
+            _waitForMajority(opCtx, deadline, opCtx->getCancellationToken());
+            return;
+        }
+
+        // A per-wait child of the operation's cancellation token: makeExternalWaker() cancels it to
+        // release only this wait (the replication compression pipeline), while killOp/shutdown
+        // still propagate through the parent token.
+        CancellationSource waitSource(opCtx->getCancellationToken());
+        {
+            std::lock_guard<std::mutex> lk(_wakeState->mutex);
+            _wakeState->source = waitSource;
+            _wakeState->armed = true;
+        }
+        ON_BLOCK_EXIT([&] {
+            std::lock_guard<std::mutex> lk(_wakeState->mutex);
+            _wakeState->armed = false;
+            _wakeState->source = boost::none;
+        });
+        // A wake sent before the source was armed shows up in the ready flag.
+        if (awaitDataPipelineReadyToSend(opCtx)) {
+            return;
+        }
+
+        _waitForMajority(opCtx, deadline, waitSource.token());
+    }
+
+    void doneWaiting(OperationContext* opCtx) final {}
+
+    // Cancels the current wait, if any. Outside a wait it does nothing; the ready flag covers that
+    // case.
+    std::function<void()> makeExternalWaker() final {
+        return [state = _wakeState] {
+            boost::optional<CancellationSource> source;
+            {
+                std::lock_guard<std::mutex> lk(state->mutex);
+                if (state->armed) {
+                    source = state->source;
+                }
+            }
+            if (source) {
+                source->cancel();
+            }
+        };
+    }
+
+private:
+    struct WakeState {
+        std::mutex mutex;
+        bool armed = false;
+        boost::optional<CancellationSource> source;
+    };
+
+    void _waitForMajority(OperationContext* opCtx,
+                          Date_t deadline,
+                          const CancellationToken& token) {
+        auto majorityCommittedFuture =
+            WaitForMajorityService::get(opCtx->getServiceContext())
+                .waitUntilMajorityForRead(_opTimeToBeMajorityCommitted, token);
         opCtx->runWithDeadline(deadline, opCtx->getTimeoutError(), [&] {
             auto status = majorityCommittedFuture.getNoThrow(opCtx);
             if (!status.isOK()) {
@@ -104,10 +182,8 @@ public:
         });
     }
 
-    void doneWaiting(OperationContext* opCtx) final {}
-
-private:
     repl::OpTime _opTimeToBeMajorityCommitted;
+    std::shared_ptr<WakeState> _wakeState = std::make_shared<WakeState>();
 };
 
 /**

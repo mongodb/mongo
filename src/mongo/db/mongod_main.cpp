@@ -222,6 +222,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/message_filter_hooks.h"
+#include "mongo/transport/repl_compression_pipeline.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
@@ -1933,6 +1934,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         LOGV2_OPTIONS(20562, {LogComponent::kNetwork}, "Shutdown: Closing open transport sessions");
         tlm->shutdown();
     }
+
+    transport::ReplCompressionThreadPool::get().shutdown();
 
     if (auto* healthLog = HealthLogInterface::get(serviceContext)) {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),

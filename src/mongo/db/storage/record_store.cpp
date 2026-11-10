@@ -23,6 +23,13 @@ uint64_t CappedInsertNotifier::getVersion() const {
     return _version;
 }
 
+void CappedInsertNotifier::notifyWaitersWithoutNewData() const {
+    // Taking the mutex orders this notify after the caller's predicate state change, so a waiter
+    // either observes the change in its predicate check or is already parked and receives it.
+    std::lock_guard<std::mutex> lk(_mutex);
+    _notifier.notify_all();
+}
+
 void CappedInsertNotifier::waitUntil(OperationContext* opCtx,
                                      uint64_t prevVersion,
                                      Date_t deadline) const {
@@ -30,6 +37,17 @@ void CappedInsertNotifier::waitUntil(OperationContext* opCtx,
     opCtx->waitForConditionOrInterruptUntil(_notifier, lk, deadline, [this, prevVersion]() {
         return _dead || prevVersion != _version;
     });
+}
+
+void CappedInsertNotifier::waitUntil(OperationContext* opCtx,
+                                     uint64_t prevVersion,
+                                     Date_t deadline,
+                                     const std::function<bool()>& extraWakePred) const {
+    std::unique_lock<std::mutex> lk(_mutex);
+    opCtx->waitForConditionOrInterruptUntil(
+        _notifier, lk, deadline, [this, prevVersion, &extraWakePred]() {
+            return _dead || prevVersion != _version || (extraWakePred && extraWakePred());
+        });
 }
 
 void CappedInsertNotifier::kill() {

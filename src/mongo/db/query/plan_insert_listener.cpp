@@ -4,6 +4,7 @@
 #include "mongo/db/query/plan_insert_listener.h"
 
 #include "mongo/db/curop.h"
+#include "mongo/db/query/await_data_state.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/plan_executor.h"
@@ -41,6 +42,12 @@ bool shouldWaitForInserts(OperationContext* opCtx,
     // If this is an awaitData-respecting operation and we have time left and we're not interrupted,
     // we should wait for inserts.
     if (shouldListenForInserts(opCtx, cq)) {
+        // The compression pipeline has a batch ready to send on this connection; return so it
+        // goes out instead of sitting behind this wait.
+        if (awaitDataPipelineReadyToSend(opCtx)) {
+            return false;
+        }
+
         // We expect awaitData cursors to be yielding.
         tassert(
             11321502,
@@ -97,9 +104,32 @@ void waitForInserts(OperationContext* opCtx,
     // notifier version change in order to wait.  This is sufficient to ensure we never wait
     // when data is available.
     notifier->prepareForWait(opCtx);
+
+    // Only operations armed by the compression pipeline install a waker. A signal sent before
+    // this point is caught by the ready-flag checks below.
+    const bool hasWaker = [&] {
+        if (!awaitDataPipelineWakeEligible(opCtx)) {
+            return false;
+        }
+        auto waker = notifier->makeExternalWaker();
+        if (!waker) {
+            return false;
+        }
+        setAwaitDataPipelineWaker(opCtx, std::move(waker));
+        return true;
+    }();
+    ON_BLOCK_EXIT([&] {
+        if (hasWaker) {
+            setAwaitDataPipelineWaker(opCtx, {});
+        }
+    });
+
     auto yieldResult = yieldPolicy->yieldOrInterrupt(
         opCtx,
         [opCtx, &notifier] {
+            if (awaitDataPipelineReadyToSend(opCtx)) {
+                return;
+            }
             const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
             auto curOp = CurOp::get(opCtx);
             curOp->pauseTimer();

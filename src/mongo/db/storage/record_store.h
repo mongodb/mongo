@@ -236,6 +236,22 @@ public:
     void waitUntil(OperationContext* opCtx, uint64_t prevVersion, Date_t deadline) const;
 
     /**
+     * Same as above, but also returns once 'extraWakePred' is true. The predicate is checked under
+     * the notifier mutex, so setting it and then calling notifyWaitersWithoutNewData() can't lose
+     * the wakeup.
+     */
+    void waitUntil(OperationContext* opCtx,
+                   uint64_t prevVersion,
+                   Date_t deadline,
+                   const std::function<bool()>& extraWakePred) const;
+
+    /**
+     * Wakes all waiters to recheck their predicate, without advancing the version. Waiters that
+     * only wait for new data go back to sleep; only those whose 'extraWakePred' is now true return.
+     */
+    void notifyWaitersWithoutNewData() const;
+
+    /**
      * Returns the version for use as an additional wake condition when used above.
      */
     uint64_t getVersion() const;

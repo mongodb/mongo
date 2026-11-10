@@ -804,8 +804,10 @@ mongo_cc_unit_test(
         "mongo_unittest_first_group",
     ],
     deps = [
+        ":await_data_state",
         ":canonical_query_test_util",
         "//src/mongo/db:query_exec",
+        "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution_test_util",

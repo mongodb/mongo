@@ -3,9 +3,16 @@
 
 #include "mongo/db/query/plan_executor_impl.h"
 
+#include "mongo/db/query/await_data_state.h"
+#include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/write_conflict_storm.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source.h"
 
+#include <atomic>
+#include <functional>
+#include <memory>
 #include <stdexcept>
 #include <type_traits>
 
@@ -170,6 +177,121 @@ TEST(WCStormWaiterGuard, MultipleConcurrentInstancesEachOwnSlot) {
         // the gauge back to `before` via their destructors.
     }
     ASSERT_EQ(PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest(), before);
+}
+
+class AwaitDataPipelineWaitTest : public ServiceContextTest {};
+
+class PipelineWaitNotifier : public insert_listener::Notifier {
+public:
+    void prepareForWait(OperationContext* opCtx) override {
+        ++prepares;
+        if (readyOnPrepare) {
+            signalAwaitDataPipelineReady(opCtx);
+        }
+    }
+    void doneWaiting(OperationContext*) override {
+        ++finishes;
+    }
+    void waitUntil(OperationContext*, Date_t) override {
+        ++waits;
+    }
+    std::function<void()> makeExternalWaker() override {
+        ++wakerRequests;
+        return [calls = wakerCalls] {
+            calls->fetch_add(1);
+        };
+    }
+
+    bool readyOnPrepare = false;
+    int prepares = 0;
+    int finishes = 0;
+    int waits = 0;
+    int wakerRequests = 0;
+    std::shared_ptr<std::atomic<int>> wakerCalls = std::make_shared<std::atomic<int>>(0);
+};
+
+class PipelineWaitYieldPolicy : public PlanYieldPolicy {
+public:
+    explicit PipelineWaitYieldPolicy(OperationContext* opCtx)
+        : PlanYieldPolicy(opCtx,
+                          YieldPolicy::YIELD_AUTO,
+                          opCtx->getServiceContext()->getFastClockSource(),
+                          1,
+                          Milliseconds(1),
+                          nullptr) {}
+
+    Status yieldOrInterrupt(OperationContext* opCtx,
+                            const std::function<void()>& whileYieldingFn,
+                            RestoreContext::RestoreType,
+                            const std::function<void()>&) override {
+        if (readyOnYield) {
+            signalAwaitDataPipelineReady(opCtx);
+        }
+        whileYieldingFn();
+        return Status::OK();
+    }
+
+    bool readyOnYield = false;
+
+private:
+    void saveState(OperationContext*) override {}
+    void restoreState(OperationContext*, const Yieldable*, RestoreContext::RestoreType) override {}
+};
+
+TEST_F(AwaitDataPipelineWaitTest, ReadyDuringPrepareSkipsWaitAndFinishesNotifier) {
+    auto opCtx = makeOperationContext();
+    PipelineWaitYieldPolicy yieldPolicy(opCtx.get());
+    auto probe = std::make_unique<PipelineWaitNotifier>();
+    auto* ptr = probe.get();
+    ptr->readyOnPrepare = true;
+    std::unique_ptr<insert_listener::Notifier> notifier = std::move(probe);
+    insert_listener::waitForInserts(opCtx.get(), &yieldPolicy, notifier);
+    ASSERT_EQ(ptr->prepares, 1);
+    ASSERT_EQ(ptr->finishes, 1);
+    ASSERT_EQ(ptr->waits, 0);
+}
+
+TEST_F(AwaitDataPipelineWaitTest, ReadyDuringYieldSkipsWaitAndFinishesNotifier) {
+    auto opCtx = makeOperationContext();
+    PipelineWaitYieldPolicy yieldPolicy(opCtx.get());
+    yieldPolicy.readyOnYield = true;
+    auto probe = std::make_unique<PipelineWaitNotifier>();
+    auto* ptr = probe.get();
+    std::unique_ptr<insert_listener::Notifier> notifier = std::move(probe);
+    insert_listener::waitForInserts(opCtx.get(), &yieldPolicy, notifier);
+    ASSERT_EQ(ptr->prepares, 1);
+    ASSERT_EQ(ptr->finishes, 1);
+    ASSERT_EQ(ptr->waits, 0);
+}
+
+// Operations the pipeline did not arm must not install a waker, so a pipeline signal never reaches
+// an ordinary tailable reader's notifier.
+TEST_F(AwaitDataPipelineWaitTest, UnarmedOperationDoesNotRegisterWaker) {
+    auto opCtx = makeOperationContext();
+    PipelineWaitYieldPolicy yieldPolicy(opCtx.get());
+    auto probe = std::make_unique<PipelineWaitNotifier>();
+    auto* ptr = probe.get();
+    ptr->readyOnPrepare = true;
+    std::unique_ptr<insert_listener::Notifier> notifier = std::move(probe);
+    insert_listener::waitForInserts(opCtx.get(), &yieldPolicy, notifier);
+    ASSERT_EQ(ptr->wakerRequests, 0);
+}
+
+TEST_F(AwaitDataPipelineWaitTest, ArmedOperationRegistersAndClearsWaker) {
+    auto opCtx = makeOperationContext();
+    setAwaitDataPipelineWakeEligible(opCtx.get());
+    PipelineWaitYieldPolicy yieldPolicy(opCtx.get());
+    auto probe = std::make_unique<PipelineWaitNotifier>();
+    auto* ptr = probe.get();
+    ptr->readyOnPrepare = true;
+    std::unique_ptr<insert_listener::Notifier> notifier = std::move(probe);
+    insert_listener::waitForInserts(opCtx.get(), &yieldPolicy, notifier);
+    ASSERT_EQ(ptr->wakerRequests, 1);
+    // The registration was cleared when waitForInserts() returned: a late signal must not invoke
+    // the waker.
+    const auto wakesBefore = ptr->wakerCalls->load();
+    signalAwaitDataPipelineReady(opCtx.get());
+    ASSERT_EQ(ptr->wakerCalls->load(), wakesBefore);
 }
 
 }  // namespace
