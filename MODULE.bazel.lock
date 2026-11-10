@@ -207,8 +207,8 @@
     "https://bcr.bazel.build/modules/rules_multirun/0.9.0/source.json": "e882ba77962fa6c5fe68619e5c7d0374ec9a219fb8d03c42eadaf6d0243771bd",
     "https://bcr.bazel.build/modules/rules_multitool/0.4.0/MODULE.bazel": "15517987d5c00c9e7faab41fbe22ee67a350b6eabcc1e08baded5c6d9025897f",
     "https://bcr.bazel.build/modules/rules_multitool/0.4.0/source.json": "d73b450b7c6d9683e400d6cebc463fbc2b870cc5d8e2e75080d6278805aaab08",
-    "https://bcr.bazel.build/modules/rules_nodejs/6.7.5/MODULE.bazel": "97e6794043821d23c013baa4a50fd1c599f2e6ae92b06e2c5f1cd7074fd83e7c",
-    "https://bcr.bazel.build/modules/rules_nodejs/6.7.5/source.json": "d60ee5a76258b1c8f99545ed24172b44d43ba64ca1a2dfc04371ef203df19fdf",
+    "https://bcr.bazel.build/modules/rules_nodejs/6.7.7/MODULE.bazel": "e80c95eebba3e38fa28ea0553ec580e4bffbbe8d0e8fa892457fa0e6b616f3d8",
+    "https://bcr.bazel.build/modules/rules_nodejs/6.7.7/source.json": "60081c2448d70db3c5c0e75f55c0a55a22b2144646c21977c46c4986dacacdb6",
     "https://bcr.bazel.build/modules/rules_perl/0.2.4/MODULE.bazel": "5f5af7be4bf5fb88d91af7469518f0fd2161718aefc606188f7cd51f436ca938",
     "https://bcr.bazel.build/modules/rules_perl/0.2.4/source.json": "574317d6b3c7e4843fe611b76f15e62a1889949f5570702e1ee4ad335ea3c339",
     "https://bcr.bazel.build/modules/rules_pkg/1.2.0/MODULE.bazel": "c7db3c2b407e673c7a39e3625dc05dc9f12d6682cbd82a3a5924a13b491eda7e",
@@ -481,7 +481,7 @@
     },
     "//bazel/repository_rules:jstestfuzz_repository.bzl%jstestfuzz_repository": {
       "general": {
-        "bzlTransitiveDigest": "9OwIxDA1aqxY+CZEMpPlE7Oj9eZvHmBug9VXlLe5wsA=",
+        "bzlTransitiveDigest": "4xOxl67Wr/W2baKe5mp2ky3uZRaE1t05gNnj52LeiXc=",
         "usagesDigest": "qjOrOHB7WEGjXEkrw0JxcLmJ9BTLfLTg0jl4tiHZn/w=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_tools bazel_tools",
@@ -505,7 +505,7 @@
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:git.bzl%git_repository",
             "attributes": {
               "remote": "https://github.com/10gen/jstestfuzz.git",
-              "commit": "4c568da85d23a3c579ecaff7790a2890460f763c",
+              "commit": "0584b664536e552181f7b085dd10e43ad0047678",
               "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\n# The whole prepared checkout (sources + installed node_modules + compiled\n# grammars + .jstestfuzz_commit_sha) as a single tarball. A tarball (rather\n# than a glob filegroup) because node_modules contains symlinks.\nfilegroup(\n    name = \"bundle\",\n    srcs = [\"jstestfuzz_bundle.tar\"],\n)\n",
               "patch_cmds": [
                 "git rev-parse HEAD > .jstestfuzz_commit_sha",

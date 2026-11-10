@@ -114,10 +114,10 @@ single_version_override(
     version = "2.7.0",
 )
 
-bazel_dep(name = "rules_nodejs", version = "6.7.5")
+bazel_dep(name = "rules_nodejs", version = "6.7.7")
 single_version_override(
     module_name = "rules_nodejs",
-    version = "6.7.5",
+    version = "6.7.7",
 )
 
 # rules_pycross reads uv.lock directly and generates Bazel-native targets
@@ -327,18 +327,13 @@ use_repo(multitool, "multitool")
 ###################### NODE / NPM ######################
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
 
-# Node.js runtime pinned to jstestfuzz's .nvmrc version. Only the root module
-# may name a node toolchain. The extension always passes register = False, so
-# this never competes with the default toolchain above; //bazel/resmoke selects
-# the platform repos explicitly.
-node.toolchain(
-    name = "nodejs16",
-    node_version = "16.18.1",
-)
+# Use the patched Node.js runtime for formatting, linting, and jstestfuzz.
+# The root module's version takes precedence over dependency defaults.
+node.toolchain(node_version = "22.23.4")
 use_repo(
     node,
-    "nodejs16_linux_amd64",
-    "nodejs16_linux_arm64",
+    "nodejs_linux_amd64",
+    "nodejs_linux_arm64",
 )
 
 npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")

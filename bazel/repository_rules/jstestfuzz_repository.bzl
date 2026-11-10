@@ -19,7 +19,7 @@ filegroup(
 """
 
 # The commit the deterministic fuzzer suites pin:
-_DETERMINISTIC_COMMIT = "4c568da85d23a3c579ecaff7790a2890460f763c"
+_DETERMINISTIC_COMMIT = "0584b664536e552181f7b085dd10e43ad0047678"
 
 def _fetch(name, branch, commit):
     git_repository(
