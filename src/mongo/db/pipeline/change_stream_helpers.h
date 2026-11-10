@@ -4,7 +4,9 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/change_stream_error_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
@@ -129,6 +131,39 @@ void recordActiveEventIdentity(const boost::intrusive_ptr<ExpressionContext>& ex
 // 'expCtx'; the caller owns clearing the recorded identity/source slots.
 boost::optional<Document> tryBuildErrorEvent(const DBException& ex,
                                              const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+// Builds an error event for an event that exceeded the BSON size limit. Reads the identity off
+// 'doc' itself, since the pipeline's identity slot has already been cleared. Returns boost::none
+// when the stream is not opted in.
+boost::optional<Document> tryBuildOversizedEventError(
+    const DBException& ex,
+    const Document& doc,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+// The result of serializing a change stream event the way the plan executor will.
+struct SerializedChangeStreamEvent {
+    // The BSON the plan executor emits for the (possibly converted) event.
+    BSONObj rawEvent;
+    // The event's metadata (e.g. the resume-token sort key), kept separately so it can be
+    // re-attached when 'rawEvent' does not carry the metadata fields.
+    DocumentMetadataFields metadata;
+    // Whether 'rawEvent' carries the metadata fields (mirrors the executor's serialization mode).
+    bool withMetadata;
+};
+
+// Serializes a change stream event as the plan executor will, converting an oversized event into
+// an error event and counting changeStreams.largeEventsFailed. Shared so the handling cannot
+// diverge.
+SerializedChangeStreamEvent serializeChangeStreamEventForExecutor(
+    Document event, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+// Increments changeStreams.largeEventsFailed (kept separate so the executor's flag-off fast path
+// preserves the metric without invoking the serialization helper on every event).
+void incrementLargeEventsFailedMetric();
+
+// Wraps 'serialized' as a BSON-backed Document so the executor's serialization is a cached no-op,
+// while preserving the event metadata (resume-token sort key, control-event flag).
+Document makeExecutorReadyChangeStreamEvent(SerializedChangeStreamEvent serialized);
 
 // Transient infrastructure failures (stale routing, snapshot, write conflict, lock, shard
 // availability, oplog position, cancellation) always propagate, also with showErrorsAsEvents:true:

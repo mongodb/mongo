@@ -7,6 +7,7 @@
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_convert_errors.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 #include <string_view>
 #include <utility>
@@ -31,6 +32,19 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamConvertErrors,
                            documentSourceChangeStreamConvertErrorsToStageFn)
 
 GetNextResult ChangeStreamConvertErrorsStage::doGetNext() {
+    // Drop the recorded identity and error source on every exit path -- whether the event below was
+    // delivered, the cursor paused or hit EOF, a bypass/gap event was released, an error event was
+    // converted, or an exception escaped this stage (e.g. a rethrow below, or a BSONObjectTooLarge
+    // raised while serializing the error event) -- so a failure in a later getNext() is never
+    // mislabeled by a stale identity from an earlier event. On the success path this runs after
+    // serialization, so the in-flight identity is still available for the oversized-event path to
+    // rebuild the error event from the pre-user-stage snapshot; everywhere else it runs as soon as
+    // the method leaves, which is exactly what is wanted for pause/EOF and exception exits.
+    ScopeGuard clearErrorState{[&] {
+        pExpCtx->clearActiveChangeStreamEvent();
+        pExpCtx->clearActiveChangeStreamErrorSource();
+    }};
+
     // Gather the document to return: a normal change event, or an error event converted from a
     // recoverable failure raised by the stages below.
     boost::optional<Document> event;
@@ -39,12 +53,6 @@ GetNextResult ChangeStreamConvertErrorsStage::doGetNext() {
         while (nextResult.isPaused()) {
             nextResult = pSource->getNext();
         }
-
-        // The event in flight has been delivered; drop its identity so a later failure is never
-        // attributed to it. Drop the error-source slot too: a rethrow that escaped the conversion
-        // point must not mislabel a later failure.
-        pExpCtx->clearActiveChangeStreamEvent();
-        pExpCtx->clearActiveChangeStreamErrorSource();
 
         if (!nextResult.isAdvanced()) {
             return nextResult;
@@ -58,10 +66,6 @@ GetNextResult ChangeStreamConvertErrorsStage::doGetNext() {
                 "change stream error event bypass without a stashed event",
                 stashed.has_value());
         event = std::move(*stashed);
-        // The resumed error event that the bypass carried has been delivered; drop the recorded
-        // identity and error source so a later failure is never attributed to it.
-        pExpCtx->clearActiveChangeStreamEvent();
-        pExpCtx->clearActiveChangeStreamErrorSource();
     } catch (const DBException& ex) {
         // A resume gap detected below the user stages: materialize it here, above them. Only the
         // gap signal itself releases it: the gap must not mask an unrelated failure that raced in
@@ -69,22 +73,17 @@ GetNextResult ChangeStreamConvertErrorsStage::doGetNext() {
         if (ex.code() == ErrorCodes::ChangeStreamHistoryLost) {
             if (auto gap = pExpCtx->releasePendingChangeStreamResumeGap()) {
                 event = std::move(*gap);
-                // The gap has been delivered; drop the recorded identity and error source so a
-                // later failure is never attributed to it.
-                pExpCtx->clearActiveChangeStreamEvent();
-                pExpCtx->clearActiveChangeStreamErrorSource();
             }
         }
+
         // A recoverable failure from below: build the error event here, above the user stages,
-        // labelled by the source the producer set. 'tryBuildErrorEvent' is pure, so this stage
-        // owns releasing the recorded identity/source slots once they've been consumed.
+        // labelled by the source the producer set.
         if (!event.has_value()) {
             if (auto errorEvent = change_stream::tryBuildErrorEvent(ex, pExpCtx)) {
                 event = std::move(*errorEvent);
-                // The identity was consumed to build the error event; clear it and the source slot.
-                pExpCtx->clearActiveChangeStreamEvent();
-                pExpCtx->clearActiveChangeStreamErrorSource();
             } else {
+                // Not convertible to an error event: let the failure propagate. The guard above
+                // clears the recorded identity/source on the way out.
                 throw;
             }
         }
@@ -95,7 +94,15 @@ GetNextResult ChangeStreamConvertErrorsStage::doGetNext() {
     // empty returned or rethrew.
     tassert(13731903, "expected an event after the conversion branches", event.has_value());
 
-    return GetNextResult{std::move(*event)};
+    // Serialize through the same helper the plan executor uses, then hand back a Document backed by
+    // that BSON so the executor's own serialization is a cached no-op. All BSON-size handling
+    // (including the 'changeStreams.largeEventsFailed' metric) lives in that helper. The in-flight
+    // identity is preserved until the guard at the top of this method runs (i.e. after
+    // serialization), so the oversized-event path can rebuild the error event from the pre-user
+    // stage snapshot, then it is cleared so a later failure is never attributed to this (now
+    // delivered) event.
+    return GetNextResult{change_stream::makeExecutorReadyChangeStreamEvent(
+        change_stream::serializeChangeStreamEventForExecutor(std::move(*event), pExpCtx))};
 }
 
 }  // namespace exec::agg

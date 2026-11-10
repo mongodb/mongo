@@ -5,6 +5,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
@@ -221,6 +222,102 @@ boost::optional<Document> tryBuildErrorEvent(
         source,
         *activeEvent,
         expCtx->getMongoProcessInterface()->getShardId(expCtx->getOperationContext()));
+}
+
+boost::optional<Document> tryBuildOversizedEventError(
+    const DBException& ex,
+    const Document& doc,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if (!changeStreamShowsErrorsAsEvents(expCtx)) {
+        return boost::none;
+    }
+    // An error event must not be re-wrapped: converting it would replace the original error's
+    // code and message with BSONObjectTooLarge. Fail the stream closed with ChangeStreamFatalError
+    // (consistent with the sibling path below for a converted error event that is still too large)
+    // rather than surfacing a misleading, retryable-looking BSONObjectTooLarge.
+    const Value opType = doc[DocumentSourceChangeStream::kOperationTypeField];
+    if (opType.getType() == BSONType::string &&
+        opType.getStringData() == DocumentSourceChangeStream::kErrorOpType) {
+        uasserted(ErrorCodes::ChangeStreamFatalError,
+                  "the change stream error event exceeded the BSON size limit and must not be "
+                  "re-wrapped");
+    }
+    // Prefer the pre-user-stage identity snapshot recorded by the transform: it carries the
+    // original event fields (documentKey, clusterTime, ...), independent of any $project/$addFields
+    // the user ran. Fall back to the outgoing 'doc' only when no snapshot is recorded (e.g. stages
+    // built in isolation in unit tests).
+    const auto& activeEvent = expCtx->getActiveChangeStreamEvent();
+    const Document source = activeEvent ? *activeEvent : doc;
+    return makeChangeStreamErrorEvent(
+        ex,
+        ChangeStreamErrorSource::kOversizedEvent,
+        source,
+        expCtx->getMongoProcessInterface()->getShardId(expCtx->getOperationContext()));
+}
+
+namespace {
+// Counts change stream events that could not be delivered because they exceeded the BSON size
+// limit, whether or not they were converted into error events. Registered at static-init time (the
+// serverStatus metric tree is frozen shortly after startup) and bumped in exactly one place, so no
+// serialization path can miss it. Lives here, not in the plan executor, because the top-level
+// conversion stage also serializes events for opted-in streams.
+auto& changeStreamsLargeEventsFailedCounter =
+    *MetricBuilder<Counter64>{"changeStreams.largeEventsFailed"};
+}  // namespace
+
+void incrementLargeEventsFailedMetric() {
+    changeStreamsLargeEventsFailedCounter.increment();
+}
+
+SerializedChangeStreamEvent serializeChangeStreamEventForExecutor(
+    Document event, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const bool withMetadata = expCtx->getNeedsMerge() || expCtx->getForPerShardCursor();
+    const auto serialize = [withMetadata](const Document& doc) {
+        return withMetadata ? doc.toBsonWithMetaData() : doc.toBson();
+    };
+
+    BSONObj rawEvent;
+    try {
+        rawEvent = serialize(event);
+    } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>& ex) {
+        incrementLargeEventsFailedMetric();
+        auto errorEvent = tryBuildOversizedEventError(ex, event, expCtx);
+        if (!errorEvent) {
+            throw;
+        }
+        event = std::move(*errorEvent);
+        try {
+            rawEvent = serialize(event);
+        } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+            // The error event itself (e.g. a very large documentKey) still exceeds the BSON size
+            // limit. There is nothing left to convert it into, so fail the stream closed rather
+            // than leaking a BSONObjectTooLarge that implies a retryable oversized event.
+            uasserted(ErrorCodes::ChangeStreamFatalError,
+                      "the error event generated for an oversized change stream event still "
+                      "exceeded the BSON size limit");
+        }
+    }
+
+    // Move (not copy) the metadata out of 'event' so the caller can re-attach it cheaply without
+    // carrying the whole event Document through the struct.
+    MutableDocument md(std::move(event));
+    return {std::move(rawEvent), md.releaseMetadata(), withMetadata};
+}
+
+Document makeExecutorReadyChangeStreamEvent(SerializedChangeStreamEvent serialized) {
+    if (serialized.withMetadata) {
+        // The BSON carries the metadata fields; re-parsing yields a Document that serializes back
+        // with metadata in O(1).
+        return Document::fromBsonWithMetaData(serialized.rawEvent);
+    }
+
+    // The BSON has no metadata fields, so re-attach the metadata (e.g. the resume-token sort key)
+    // out-of-band. This keeps the document trivially convertible back to BSON while preserving
+    // 'metadata()' for resume-token accounting and router validation.
+    MutableDocument md;
+    md.reset(serialized.rawEvent, /*bsonHasMetadata=*/false);
+    md.setMetadata(std::move(serialized.metadata));
+    return md.freeze();
 }
 
 repl::MutableOplogEntry createEndOfTransactionOplogEntry(

@@ -24,6 +24,11 @@ using namespace std::literals::string_view_literals;
 
 class ChangeStreamHelpersTest : public AggregationContextFixture {
 protected:
+    static ResumeTokenData requestedToken() {
+        static const UUID uuid = UUID::gen();
+        return {Timestamp(100, 1), 0, 0, uuid, Value(Document{{"_id", "tok"sv}})};
+    }
+
     // A change event carrying its resume token as '_id' and single-element sort key, plus the
     // optional identity fields, mirroring what the transform produces.
     static Document eventDoc(const Value& token,
@@ -160,6 +165,140 @@ TEST_F(ChangeStreamHelpersTest, ErrorEventIncludesShardIdWhenPresent) {
         ASSERT_TRUE(without[DocumentSourceChangeStream::kErrorField]
                            [DocumentSourceChangeStream::kShardIdField]
                                .missing());
+    }
+}
+
+TEST_F(ChangeStreamHelpersTest, OversizedEventErrorUsesTheEventIdentity) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setShowErrorsAsEvents(true);
+    getExpCtx()->setChangeStreamSpec(spec);
+
+    // A change event carrying its resume token as _id and sort key.
+    const auto tokenData = requestedToken();
+    const Value token(ResumeToken(tokenData).toDocument());
+    const auto event = eventDoc(
+        token, Value(tokenData.clusterTime), Value(), Value(), Value(Document{{"_id", 7}}));
+
+    try {
+        uasserted(ErrorCodes::BSONObjectTooLarge, "event too large");
+    } catch (const DBException& ex) {
+        auto error = tryBuildOversizedEventError(ex, event, getExpCtx());
+        ASSERT_TRUE(error.has_value());
+        ASSERT_EQ(error
+                      ->getField(DocumentSourceChangeStream::kErrorField)
+                          [DocumentSourceChangeStream::kErrorSourceField]
+                      .getStringData(),
+                  kCsOversizedEventSource);
+        ASSERT_EQ(error
+                      ->getField(DocumentSourceChangeStream::kErrorField)
+                          [DocumentSourceChangeStream::kErrorCodeField]
+                      .getInt(),
+                  static_cast<int>(ErrorCodes::BSONObjectTooLarge));
+        // The error event carries the oversized event's own resume token, as both _id and sort key.
+        ASSERT_VALUE_EQ(error->getField(DocumentSourceChangeStream::kIdField), token);
+        ASSERT_VALUE_EQ(error->metadata().getSortKey(), token);
+    }
+}
+
+TEST_F(ChangeStreamHelpersTest, OversizedEventErrorIsNoneWhenFlagIsOff) {
+    // No showErrorsAsEvents: nothing is converted.
+    const Value token(Document{{"_id", 1}});
+    try {
+        uasserted(ErrorCodes::BSONObjectTooLarge, "event too large");
+    } catch (const DBException& ex) {
+        ASSERT_FALSE(tryBuildOversizedEventError(ex, eventDoc(token), getExpCtx()).has_value());
+    }
+}
+
+// An oversized event whose '_id' a user stage rewrote ({$addFields: {_id: {a: 1}}}) must not yield
+// an error event carrying the user's value as its resume token: the stream fails closed with
+// ChangeStreamFatalError, exactly as delivering the unmodified-size event would on master.
+TEST_F(ChangeStreamHelpersTest, OversizedErrorFailsClosedWhenIdWasModified) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setShowErrorsAsEvents(true);
+    getExpCtx()->setChangeStreamSpec(spec);
+
+    const auto tokenData = requestedToken();
+    const Value token(ResumeToken(tokenData).toDocument());
+    for (const auto& userId : {Value(Document{{"a", 1}}), Value()}) {
+        MutableDocument md;
+        if (!userId.missing()) {
+            md.addField(DocumentSourceChangeStream::kIdField, userId);
+        }
+        md.addField(DocumentSourceChangeStream::kClusterTimeField, Value(tokenData.clusterTime));
+        md.metadata().setSortKey(token, true /* isSingleElementKey */);
+        const auto event = md.freeze();
+
+        try {
+            uasserted(ErrorCodes::BSONObjectTooLarge, "event too large");
+        } catch (const DBException& ex) {
+            ASSERT_THROWS_CODE(tryBuildOversizedEventError(ex, event, getExpCtx()),
+                               AssertionException,
+                               ErrorCodes::ChangeStreamFatalError);
+        }
+    }
+}
+
+// An oversized error event is not re-wrapped into a BSONObjectTooLarge error event: that would
+// replace the original error's code and message. Instead it fails closed with
+// ChangeStreamFatalError, consistent with the path that builds a converted error event which is
+// itself still too large.
+TEST_F(ChangeStreamHelpersTest, OversizedErrorEventIsNotRewrapped) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setShowErrorsAsEvents(true);
+    getExpCtx()->setChangeStreamSpec(spec);
+
+    const Value token(Document{{"_id", 1}});
+    MutableDocument md;
+    md.addField(DocumentSourceChangeStream::kOperationTypeField,
+                Value(DocumentSourceChangeStream::kErrorOpType));
+    md.addField(DocumentSourceChangeStream::kIdField, token);
+    md.metadata().setSortKey(token, true /* isSingleElementKey */);
+    const auto errorEvent = md.freeze();
+
+    try {
+        uasserted(ErrorCodes::BSONObjectTooLarge, "event too large");
+    } catch (const DBException& ex) {
+        // An oversized error event is not re-wrapped: that would replace the original error's code
+        // and message. It fails closed instead with ChangeStreamFatalError, consistent with the
+        // path that builds a converted error event which is itself still too large.
+        ASSERT_THROWS_CODE(tryBuildOversizedEventError(ex, errorEvent, getExpCtx()),
+                           AssertionException,
+                           ErrorCodes::ChangeStreamFatalError);
+    }
+}
+
+// The oversized-event error conversion must build the error event from the pre-user-stage identity
+// snapshot recorded on the ExpressionContext (as the transform does), not from the outgoing
+// document 'doc'. A user $project/$addFields may have rewritten fields on 'doc' (e.g. documentKey);
+// using 'doc' would leak those user-supplied values into the error event instead of the original
+// event's fields. The identity is preferred when present; 'doc' is only a fallback when no snapshot
+// is recorded (e.g. stages built in isolation in unit tests).
+TEST_F(ChangeStreamHelpersTest, OversizedErrorUsesRecordedIdentityNotRewrittenDoc) {
+    // The original identity the transform recorded for the in-flight event: pre-user-stage.
+    const Value originalDocKey(Document{{"_id"sv, "orig"sv}});
+    const Value token(Document{{"_id"sv, 42}});
+    change_stream::recordActiveEventIdentity(
+        getExpCtx(), eventDoc(token, Value(), Value(), Value(), originalDocKey));
+
+    // The user's pipeline rewrote documentKey in the outgoing (oversized) event.
+    DocumentSourceChangeStreamSpec spec;
+    spec.setShowErrorsAsEvents(true);
+    getExpCtx()->setChangeStreamSpec(spec);
+    auto doc = eventDoc(token);
+    MutableDocument rewritten(doc);
+    rewritten[DocumentSourceChangeStream::kDocumentKeyField] =
+        Value(Document{{"_id"sv, "user-rewritten"sv}});
+
+    try {
+        uasserted(ErrorCodes::BSONObjectTooLarge, "event too large");
+    } catch (const DBException& ex) {
+        auto error = tryBuildOversizedEventError(ex, rewritten.freeze(), getExpCtx());
+        ASSERT_TRUE(error.has_value());
+        // The error event carries the original documentKey from the recorded identity, not the
+        // value the user's stage injected into the outgoing 'doc'.
+        ASSERT_VALUE_EQ(error->getField(DocumentSourceChangeStream::kDocumentKeyField),
+                        originalDocKey);
     }
 }
 

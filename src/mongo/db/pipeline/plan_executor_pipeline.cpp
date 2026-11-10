@@ -5,7 +5,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
@@ -16,6 +15,7 @@
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
@@ -38,11 +38,6 @@ MONGO_FAIL_POINT_DEFINE(throwErrorBeforeGetNext);
 // scanned past its last returned event, and makes it possible to deterministically test how the
 // router handles a shard promise that refers to an internally swallowed control event.
 MONGO_FAIL_POINT_DEFINE(changeStreamKeepLastEventResumeTokenAsPBRT);
-
-namespace {
-auto& changeStreamsLargeEventsFailedCounter =
-    *MetricBuilder<Counter64>{"changeStreams.largeEventsFailed"};
-}  // namespace
 
 PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
                                            std::unique_ptr<Pipeline> pipeline,
@@ -137,15 +132,18 @@ boost::optional<Document> PlanExecutorPipeline::_tryGetNext() try {
     return Document::fromBsonWithMetaData(extraInfo->getStartAfterInvalidateEvent());
 }
 
-BSONObj PlanExecutorPipeline::_trySerializeToBson(const Document& doc) try {
+BSONObj PlanExecutorPipeline::_trySerializeToBson(const Document& doc) {
     // Include metadata if the output will be consumed by a merging node.
-    return _expCtx->getNeedsMerge() || _expCtx->getForPerShardCursor() ? doc.toBsonWithMetaData()
-                                                                       : doc.toBson();
-} catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
-    if (ResumableScanType::kChangeStream == _resumableScanType) {
-        changeStreamsLargeEventsFailedCounter.increment();
+    const bool withMetadata = _expCtx->getNeedsMerge() || _expCtx->getForPerShardCursor();
+
+    try {
+        return withMetadata ? doc.toBsonWithMetaData() : doc.toBson();
+    } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+        if (ResumableScanType::kChangeStream == _resumableScanType) {
+            change_stream::incrementLargeEventsFailedMetric();
+        }
+        throw;
     }
-    throw;
 }
 
 void PlanExecutorPipeline::_updateResumableScanState(const boost::optional<Document>& document) {
