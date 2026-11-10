@@ -13,6 +13,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #include <string_view>
 
@@ -21,12 +22,26 @@
 namespace mongo {
 namespace sbe {
 using namespace std::literals::string_view_literals;
-CompactHashAggStage::CompactHashAggStage(std::unique_ptr<PlanStage> input,
-                                         value::SlotVector gbs,
-                                         boost::optional<value::SlotId> collatorSlot,
-                                         PlanYieldPolicySBE* yieldPolicy,
-                                         PlanNodeId planNodeId,
-                                         bool participateInTrialRunTracking)
+
+namespace {
+CompactStateLayout buildLayout(
+    const std::vector<std::unique_ptr<CompactHashAggAccumulator>>& accumulators) {
+    CompactStateLayout layout;
+    for (const auto& accumulator : accumulators) {
+        accumulator->addState(layout);
+    }
+    return layout;
+}
+}  // namespace
+
+CompactHashAggStage::CompactHashAggStage(
+    std::unique_ptr<PlanStage> input,
+    value::SlotVector gbs,
+    std::vector<std::unique_ptr<CompactHashAggAccumulator>> accumulators,
+    boost::optional<value::SlotId> collatorSlot,
+    PlanYieldPolicySBE* yieldPolicy,
+    PlanNodeId planNodeId,
+    bool participateInTrialRunTracking)
     : HashAggBaseStage("compact_group"sv,
                        yieldPolicy,
                        planNodeId,
@@ -35,13 +50,20 @@ CompactHashAggStage::CompactHashAggStage(std::unique_ptr<PlanStage> input,
                        false /* allowDiskUse; the compact stage does not spill */,
                        /*forceIncreasedSpilling=*/false),
       _gbs(std::move(gbs)),
+      _accumulators(std::move(accumulators)),
+      _layout(buildLayout(_accumulators)),
       _collatorSlot(collatorSlot) {
     _children.emplace_back(std::move(input));
 }
 
 std::unique_ptr<PlanStage> CompactHashAggStage::clone() const {
+    std::vector<std::unique_ptr<CompactHashAggAccumulator>> accumulators;
+    for (const auto& accumulator : _accumulators) {
+        accumulators.push_back(accumulator->clone());
+    }
     return std::make_unique<CompactHashAggStage>(_children[0]->clone(),
                                                  _gbs,
+                                                 std::move(accumulators),
                                                  _collatorSlot,
                                                  _yieldPolicy,
                                                  _commonStats.nodeId,
@@ -49,6 +71,7 @@ std::unique_ptr<PlanStage> CompactHashAggStage::clone() const {
 }
 
 void CompactHashAggStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _children[0]->prepare(ctx);
 
     if (_collatorSlot) {
@@ -76,6 +99,14 @@ void CompactHashAggStage::prepare(CompileCtx& ctx) {
         _outAccessors[slot] = _outKeyAccessors.back().get();
 
         ++keyIdx;
+    }
+
+    for (const auto& accumulator : _accumulators) {
+        throwIfDupSlot(accumulator->getOutSlot());
+        _outAggAccessors.emplace_back(std::make_unique<value::OwnedValueAccessor>());
+        _outAccessors[accumulator->getOutSlot()] = _outAggAccessors.back().get();
+        ctx.root = this;
+        accumulator->prepare(ctx);
     }
 
     _compiled = true;
@@ -111,9 +142,9 @@ void CompactHashAggStage::open(bool reOpen) {
         auto collatorView = value::getCollatorView(collatorVal);
         const value::MaterializedRowHasher hasher(collatorView);
         _keyEq = value::MaterializedRowEq(collatorView);
-        _ht.emplace(0, hasher, _keyEq);
+        _ht.emplace(_layout, hasher, _keyEq);
     } else {
-        _ht.emplace();
+        _ht.emplace(_layout);
     }
 
     MemoryCheckData memoryCheckData;
@@ -132,18 +163,12 @@ void CompactHashAggStage::open(bool reOpen) {
                 key.reset(idx++, p->getViewOfValue());
             }
 
-            // Look up the key in the hash table and, only if it is not present, construct and
-            // insert an owned copy of the key together with a fresh, empty state buffer. Using
-            // lazy_emplace avoids hashing/probing the key twice (once in find() and again in
-            // emplace()) and avoids copying the key when the key is already present.
-            _htIt = _ht->lazy_emplace(key, [&](const CompactTableType::constructor& ctor) {
-                value::MaterializedRow keyCopy(key);
-                keyCopy.makeOwned();
-                ctor(std::move(keyCopy), std::vector<uint8_t>{});
-            });
-
-            dassert(_htIt == _ht->find(key));
+            _htIt = _ht->findOrInsert(key);
             firstDoc = false;
+        }
+
+        for (const auto& accumulator : _accumulators) {
+            accumulator->accumulate(*_bytecode, _htIt->second);
         }
 
         // If the group-by key is empty we will only ever aggregate into a single row so no
@@ -174,6 +199,9 @@ PlanState CompactHashAggStage::getNext() {
         return trackPlanState(PlanState::IS_EOF);
     }
 
+    for (size_t idx = 0; idx < _accumulators.size(); ++idx) {
+        _accumulators[idx]->finalize(_htIt->second, *_outAggAccessors[idx]);
+    }
     return trackPlanState(PlanState::ADVANCED);
 }
 
@@ -184,6 +212,14 @@ std::unique_ptr<PlanStageStats> CompactHashAggStage::getStats(bool includeDebugI
     if (includeDebugInfo) {
         BSONObjBuilder bob;
         bob.append("groupBySlots", _gbs.begin(), _gbs.end());
+        if (!_accumulators.empty()) {
+            DebugPrinter printer;
+            BSONObjBuilder exprBuilder(bob.subobjStart("expressions"));
+            for (const auto& accumulator : _accumulators) {
+                exprBuilder.append(str::stream() << accumulator->getOutSlot(),
+                                   printer.print(accumulator->debugPrint()));
+            }
+        }
 
         // Spilling stats.
         bob.appendBool("usedDisk", _specificStats.usedDisk);
@@ -222,6 +258,7 @@ void CompactHashAggStage::close() {
 
     trackClose();
     _ht = boost::none;
+    resetOutputs();
 
     _children[0]->close();
     _childOpened = false;
@@ -242,6 +279,18 @@ void CompactHashAggStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
+    ret.emplace_back(DebugPrinter::Block("[`"));
+    for (size_t idx = 0; idx < _accumulators.size(); ++idx) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
+
+        DebugPrinter::addIdentifier(ret, _accumulators[idx]->getOutSlot());
+        ret.emplace_back(DebugPrinter::Block("="));
+        DebugPrinter::addBlocks(ret, _accumulators[idx]->debugPrint());
+    }
+    ret.emplace_back(DebugPrinter::Block("`]"));
+
     if (_collatorSlot) {
         DebugPrinter::addIdentifier(ret, *_collatorSlot);
     }
@@ -255,7 +304,15 @@ size_t CompactHashAggStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
     size += size_estimator::estimate(_children);
     size += size_estimator::estimate(_gbs);
+    size += size_estimator::estimate(_accumulators);
+    size += _layout.heapSize();
     return size;
+}
+
+void CompactHashAggStage::resetOutputs() {
+    for (auto& accessor : _outAggAccessors) {
+        accessor->reset();
+    }
 }
 }  // namespace sbe
 }  // namespace mongo

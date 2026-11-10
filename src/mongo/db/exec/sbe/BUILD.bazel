@@ -632,6 +632,17 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "sbe_hash_agg_sum_bm",
+    srcs = [
+        "sbe_hash_agg_sum_bm.cpp",
+    ],
+    deps = [
+        ":query_sbe_stages",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "sbe_hash_lookup_bm",
     srcs = [
         "sbe_hash_lookup_shared_test.cpp",
