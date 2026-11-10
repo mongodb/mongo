@@ -62,5 +62,19 @@ TEST_F(SbeFnNamesCompileTest, UnknownFunctionDispatchUasserts) {
     ASSERT_THROWS_CODE(compileExpression(*expr), AssertionException, 4822847);
 }
 
+TEST_F(SbeFnNamesCompileTest, ArrayResultSetBuiltinsCompile) {
+    for (auto fn : {EFn::kSetUnionArray,
+                    EFn::kSetIntersectionArray,
+                    EFn::kSetDifferenceArray,
+                    EFn::kSetEqualsArray,
+                    EFn::kSetIsSubsetArray}) {
+        auto expr = makeE<EFunction>(fn,
+                                     makeEs(makeE<EConstant>(value::TypeTags::Nothing, 0),
+                                            makeC(value::makeNewArray()),
+                                            makeC(value::makeNewArray())));
+        ASSERT(compileExpression(*expr));
+    }
+}
+
 }  // namespace
 }  // namespace mongo::sbe

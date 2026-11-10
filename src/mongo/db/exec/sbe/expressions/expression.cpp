@@ -825,6 +825,18 @@ static stdx::unordered_map<EFn, BuiltinFn> kBuiltinFunctions = {
     {EFn::kValidateFromStringFormat,
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::validateFromStringFormat, false}},
     {EFn::kSetUnion, BuiltinFn{kAnyNumberOfArgs, vm::Builtin::setUnion, false}},
+    // Array-result set expressions use one interface for both collated and uncollated calls:
+    // the first argument is a collator or Nothing, followed by the array operands.
+    {EFn::kSetUnionArray,
+     BuiltinFn{[](size_t n) { return n >= 1; }, vm::Builtin::setUnionArray, false}},
+    {EFn::kSetIntersectionArray,
+     BuiltinFn{[](size_t n) { return n >= 1; }, vm::Builtin::setIntersectionArray, false}},
+    {EFn::kSetDifferenceArray,
+     BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::setDifferenceArray, false}},
+    {EFn::kSetEqualsArray,
+     BuiltinFn{[](size_t n) { return n >= 3; }, vm::Builtin::setEqualsArray, false}},
+    {EFn::kSetIsSubsetArray,
+     BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::setIsSubsetArray, false}},
     {EFn::kSetIntersection, BuiltinFn{kAnyNumberOfArgs, vm::Builtin::setIntersection, false}},
     {EFn::kSetDifference,
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::setDifference, false}},

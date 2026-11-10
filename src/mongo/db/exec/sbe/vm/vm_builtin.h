@@ -170,6 +170,13 @@ enum class Builtin : uint16_t {
     collSetDifference,
     collSetEquals,
     collSetIsSubset,
+    // Set expressions accepting a nullable collator and arrays (including prepared ArraySets).
+    // Results are ordinary Arrays for union/intersection/difference and Booleans otherwise.
+    setUnionArray,
+    setIntersectionArray,
+    setDifferenceArray,
+    setEqualsArray,
+    setIsSubsetArray,
     runJsPredicate,
     regexCompile,  // compile <pattern, options> into value::pcreRegex
     regexFind,

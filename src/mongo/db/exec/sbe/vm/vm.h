@@ -573,6 +573,11 @@ private:
     value::TagValueMaybeOwned builtinAddToSetCapped(ArityType arity);
     value::TagValueMaybeOwned builtinCollAddToSetCapped(ArityType arity);
     value::TagValueMaybeOwned builtinSetToArray(ArityType arity);
+    value::TagValueMaybeOwned builtinSetUnionArray(ArityType arity);
+    value::TagValueMaybeOwned builtinSetIntersectionArray(ArityType arity);
+    value::TagValueMaybeOwned builtinSetDifferenceArray(ArityType arity);
+    value::TagValueMaybeOwned builtinSetEqualsArray(ArityType arity);
+    value::TagValueMaybeOwned builtinSetIsSubsetArray(ArityType arity);
 
     value::TagValueMaybeOwned builtinSetUnionCapped(ArityType arity);
     value::TagValueMaybeOwned builtinCollSetUnionCapped(ArityType arity);

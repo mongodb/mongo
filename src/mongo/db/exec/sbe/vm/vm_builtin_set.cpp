@@ -9,6 +9,26 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
+value::TagValueMaybeOwned ByteCode::builtinSetUnionArray(ArityType arity) {
+    MONGO_UNREACHABLE_TASSERT(13890500);
+}
+
+value::TagValueMaybeOwned ByteCode::builtinSetIntersectionArray(ArityType arity) {
+    MONGO_UNREACHABLE_TASSERT(13890501);
+}
+
+value::TagValueMaybeOwned ByteCode::builtinSetDifferenceArray(ArityType arity) {
+    MONGO_UNREACHABLE_TASSERT(13890502);
+}
+
+value::TagValueMaybeOwned ByteCode::builtinSetEqualsArray(ArityType arity) {
+    MONGO_UNREACHABLE_TASSERT(13890503);
+}
+
+value::TagValueMaybeOwned ByteCode::builtinSetIsSubsetArray(ArityType arity) {
+    MONGO_UNREACHABLE_TASSERT(13890504);
+}
+
 value::TagValueMaybeOwned ByteCode::builtinAddToSet(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
     value::TagValueOwned field = moveOwnedFromStack(1);

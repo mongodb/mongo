@@ -223,6 +223,16 @@ std::string builtinToString(Builtin b) {
             return "validateFromStringFormat";
         case Builtin::setUnion:
             return "setUnion";
+        case Builtin::setUnionArray:
+            return "setUnionArray";
+        case Builtin::setIntersectionArray:
+            return "setIntersectionArray";
+        case Builtin::setDifferenceArray:
+            return "setDifferenceArray";
+        case Builtin::setEqualsArray:
+            return "setEqualsArray";
+        case Builtin::setIsSubsetArray:
+            return "setIsSubsetArray";
         case Builtin::setIsSubset:
             return "setIsSubset";
         case Builtin::setIntersection:
@@ -830,6 +840,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinCollArrayToSet(arity).releaseToRaw();
         case Builtin::setToArray:
             return builtinSetToArray(arity).releaseToRaw();
+        case Builtin::setUnionArray:
+            return builtinSetUnionArray(arity).releaseToRaw();
+        case Builtin::setIntersectionArray:
+            return builtinSetIntersectionArray(arity).releaseToRaw();
+        case Builtin::setDifferenceArray:
+            return builtinSetDifferenceArray(arity).releaseToRaw();
+        case Builtin::setEqualsArray:
+            return builtinSetEqualsArray(arity).releaseToRaw();
+        case Builtin::setIsSubsetArray:
+            return builtinSetIsSubsetArray(arity).releaseToRaw();
         case Builtin::fillType:
             return builtinFillType(arity).releaseToRaw();
         case Builtin::aggFirstNNeedsMoreInput:
