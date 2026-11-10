@@ -1,4 +1,5 @@
 base_suite: jstestfuzz_sharded
 overrides:
   - "multiversion.sharded_fixture_last_lts_new_old_old_new"
+  - "multiversion.disable_replicated_fast_count_on_new_binary"
   - "multiversion.jstestfuzz_sharded_multiversion_hooks"

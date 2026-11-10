@@ -29,6 +29,9 @@ executor:
       bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
+    new_binary_set_parameters:
+      failpoint.disableReplicatedFastCount:
+        mode: alwaysOn
     num_nodes: 3
     old_bin_version: last_lts
   hooks:

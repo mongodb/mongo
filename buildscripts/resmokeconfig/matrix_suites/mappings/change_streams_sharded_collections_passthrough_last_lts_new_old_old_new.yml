@@ -4,6 +4,7 @@ overrides:
   - "change_streams.mongos_passthrough"
   - "change_streams.base_eval"
   - "multiversion.sharded_fixture_last_lts_new_old_old_new"
+  - "multiversion.disable_replicated_fast_count_on_new_binary"
 eval:
   - "change_streams.sharded_collections_passthrough_eval"
   - "change_streams.causal_consistency_eval"

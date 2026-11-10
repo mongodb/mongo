@@ -1,5 +1,6 @@
 base_suite: concurrency_sharded_replication
 overrides:
   - "multiversion.sharded_fixture_last_continuous_new_old_old_new"
+  - "multiversion.disable_replicated_fast_count_on_new_binary"
 excludes:
   - "multiversion.concurrency_sharded_replication_backport_required_multiversion_exclude"

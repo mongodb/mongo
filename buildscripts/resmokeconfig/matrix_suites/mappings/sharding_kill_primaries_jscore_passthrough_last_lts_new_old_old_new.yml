@@ -1,6 +1,7 @@
 base_suite: sharding_jscore_passthrough_base
 overrides:
   - "multiversion.sharded_fixture_last_lts_3_nodes"
+  - "multiversion.disable_replicated_fast_count_on_new_binary"
   - "kill_primary.sharding_reconfig_hooks"
   - "kill_primary.sharding_reconfig_archive"
   - "kill_primary.sharding_shell_options"

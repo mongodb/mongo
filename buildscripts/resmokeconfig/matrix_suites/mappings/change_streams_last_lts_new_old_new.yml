@@ -1,3 +1,4 @@
 base_suite: change_streams
 overrides:
   - "multiversion.replica_fixture_last_lts_new_old_new"
+  - "multiversion.disable_replicated_fast_count_on_new_binary"
