@@ -606,6 +606,7 @@ struct __wt_connection_stats {
     int64_t eviction_server_slept;
     int64_t eviction_slow;
     int64_t eviction_walk_leaf_notfound;
+    int64_t eviction_server_walk_one_page_target_unproductive;
     int64_t eviction_server_walk_dominating_cache;
     int64_t eviction_server_walk_dominating_cache_unproductive;
     int64_t eviction_state;

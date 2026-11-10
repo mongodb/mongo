@@ -2,6 +2,16 @@
 
 WiredTiger is a high-performance, embedded key-value storage engine written in C. It is the default storage engine for MongoDB. Tests and tooling use C, C++, and Python.
 
+## Development restrictions
+
+### Lock-free programming rules
+
+- **Prefer established locks.** For newly introduced algorithms and synchronization points, agents must prefer existing mutexes or other established lock-based primitives over new atomics or lock-free synchronization.
+- **Leave lock-free correctness to developers.** Agents must not independently reason about, prove, or assess the correctness of lock-free algorithms or synchronization, or decide how atomic operations, memory ordering, or memory barriers should be changed.
+- **Require exact developer instructions.** Agents may introduce, modify, or remove atomic operations or lock-free synchronization only when a developer specifies the exact changes, including memory ordering where applicable. Implement only the prescribed changes; don't think about the completeness and reasoning behind the changes.
+- **Do not certify correctness.** Agents must not claim that a lock-free change is correct or safe. Such changes require appropriate human review; passing tests or sanitizers does not replace that review.
+- **Treat established lock-based primitives as locks.** Existing mutexes, spin-mutexes, and other established lock-based primitives are permitted under these rules even when implemented using atomics internally. Rely on their mutual-exclusion and memory-visibility guarantees, and follow their usage constraints. Using these primitives does not require the authorization above; changing their internal atomic operations does.
+
 ## Build & Test
 
 ```bash

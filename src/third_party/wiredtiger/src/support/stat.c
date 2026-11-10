@@ -2953,6 +2953,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: eviction server slept, because we did not make progress with eviction",
   "cache: eviction server unable to reach eviction goal",
   "cache: eviction server waiting for a leaf page",
+  "cache: eviction server walks trees that queue no pages for a one-page target",
   "cache: eviction server walks trees within their walk period because they dominate the cache",
   "cache: eviction server walks trees within their walk period because they dominate the cache but "
   "queues no pages",
@@ -4163,6 +4164,7 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_EVICTION_SERVER_SLEPT,
   WT_STAT_CONN_EVICTION_SLOW,
   WT_STAT_CONN_EVICTION_WALK_LEAF_NOTFOUND,
+  WT_STAT_CONN_EVICTION_SERVER_WALK_ONE_PAGE_TARGET_UNPRODUCTIVE,
   WT_STAT_CONN_EVICTION_SERVER_WALK_DOMINATING_CACHE,
   WT_STAT_CONN_EVICTION_SERVER_WALK_DOMINATING_CACHE_UNPRODUCTIVE,
   WT_STAT_CONN_EVICTION_STATE,
@@ -5369,6 +5371,7 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->eviction_server_slept = 0;
     stats->eviction_slow = 0;
     stats->eviction_walk_leaf_notfound = 0;
+    stats->eviction_server_walk_one_page_target_unproductive = 0;
     stats->eviction_server_walk_dominating_cache = 0;
     stats->eviction_server_walk_dominating_cache_unproductive = 0;
     /* not clearing eviction_state */
@@ -6600,6 +6603,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->eviction_server_slept += WT_STAT_CONN_READ(from, eviction_server_slept);
     to->eviction_slow += WT_STAT_CONN_READ(from, eviction_slow);
     to->eviction_walk_leaf_notfound += WT_STAT_CONN_READ(from, eviction_walk_leaf_notfound);
+    to->eviction_server_walk_one_page_target_unproductive +=
+      WT_STAT_CONN_READ(from, eviction_server_walk_one_page_target_unproductive);
     to->eviction_server_walk_dominating_cache +=
       WT_STAT_CONN_READ(from, eviction_server_walk_dominating_cache);
     to->eviction_server_walk_dominating_cache_unproductive +=

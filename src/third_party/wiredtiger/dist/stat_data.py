@@ -478,6 +478,7 @@ conn_stats = [
     EvictStat('eviction_server_slept', 'eviction server slept, because we did not make progress with eviction'),
     EvictStat('eviction_server_walk_dominating_cache', 'eviction server walks trees within their walk period because they dominate the cache'),
     EvictStat('eviction_server_walk_dominating_cache_unproductive', 'eviction server walks trees within their walk period because they dominate the cache but queues no pages'),
+    EvictStat('eviction_server_walk_one_page_target_unproductive', 'eviction server walks trees that queue no pages for a one-page target'),
     EvictStat('eviction_slow', 'eviction server unable to reach eviction goal'),
     EvictStat('eviction_stable_state_workers', 'eviction worker thread stable number', 'no_clear'),
     EvictStat('eviction_state', 'eviction state', 'no_clear,no_scale'),
