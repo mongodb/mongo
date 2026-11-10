@@ -235,7 +235,6 @@ platform = [
 
 testing = [
     "bazel-runfiles>=1.8.3,<2",
-    "curatorbin>=1.2.4,<2",
     # Pinned to exactly 5.29.3 because `buildscripts/bazel_spawn_pb2.py`
     # (protoc-generated) hardcodes `_runtime_version.ValidateProtobufRuntimeVersion(5, 29, 3, ...)`
     # — it validates at import time that the installed protobuf runtime

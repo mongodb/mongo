@@ -458,15 +458,6 @@ wheels = [
 ]
 
 [[package]]
-name = "curatorbin"
-version = "1.2.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2f/14/4fd165f69905bd50f4d10635c7d446807c82cd8212ddad5782172618c6a9/curatorbin-1.2.4.tar.gz", hash = "sha256:2516fc98a1e1942c6bf7a11ed3b0c9c10154417f9cbb5432421183290c41d457", size = 58992521, upload-time = "2022-01-28T16:14:58.594Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/07/ee/6cf3f189e43fbcd25aa6b63cea7348c6afec6452e7aae2515e5c5327dee8/curatorbin-1.2.4-py3-none-any.whl", hash = "sha256:7ca800232d98ef52931b2a864c46e7f4325cf028be21703a771ef350dc513465", size = 59400223, upload-time = "2022-01-28T16:14:54.806Z" },
-]
-
-[[package]]
 name = "cxxfilt"
 version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1436,7 +1427,6 @@ testing = [
     { name = "asn1crypto" },
     { name = "avro-python3" },
     { name = "bazel-runfiles" },
-    { name = "curatorbin" },
     { name = "distro" },
     { name = "dnspython" },
     { name = "docker" },
@@ -1615,7 +1605,6 @@ testing = [
     { name = "asn1crypto", specifier = ">=1.5.1,<2" },
     { name = "avro-python3", specifier = ">=1.10.2,<2" },
     { name = "bazel-runfiles", specifier = ">=1.8.3,<2" },
-    { name = "curatorbin", specifier = ">=1.2.4,<2" },
     { name = "distro", specifier = ">=1.9.0,<2" },
     { name = "dnspython", specifier = ">=2.6.1,<3" },
     { name = "docker", specifier = ">=7.1.0,<8" },
