@@ -6,9 +6,11 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_reordering.h"
+#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_hashed_field_accessors.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
@@ -54,14 +56,15 @@ namespace change_stream_filter {
  * Both the legacy and the 'featureFlagEndOfTransactionChangeEventSynthesis' behavior emit an
  * event only for a transaction that touched the stream's watched namespace, so both use the
  * 'o2.endOfTransaction' predicate. With 'kNone' no event is synthesized, so the predicate is never
- * consulted, unless 'requireEndOfTransaction' is set: a 'required' stream uses the predicate to
- * decide whether an ineligible transaction touches the watched namespace.
+ * consulted, unless the stream requires endOfTransaction events: a 'required' stream uses the
+ * predicate to decide whether an ineligible transaction touches the watched namespace.
  */
 std::unique_ptr<MatchExpression> buildEndOfTransactionFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     change_stream::EndOfTransactionBehavior behavior,
-    bool requireEndOfTransaction) {
-    if (behavior == change_stream::EndOfTransactionBehavior::kNone && !requireEndOfTransaction) {
+    exec::agg::EndOfTransactionMode mode) {
+    if (behavior == change_stream::EndOfTransactionBehavior::kNone &&
+        mode != exec::agg::EndOfTransactionMode::kRequired) {
         return std::make_unique<AlwaysTrueMatchExpression>();
     }
 
@@ -71,6 +74,56 @@ std::unique_ptr<MatchExpression> buildEndOfTransactionFilter(
 }  // namespace change_stream_filter
 
 namespace exec::agg {
+
+namespace {
+using namespace std::literals::string_view_literals;
+
+// The field carrying the commit-time accounting metadata on a coordinated transaction's commit
+// entry.
+constexpr std::string_view kEndOfTransactionScopesField = "endOfTransactionScopes"sv;
+
+// Returns true if the sub-document valued 'participants' maps 'fieldName' to an array of shard ids
+// that contains 'shardId'.
+bool participantMapContainsShard(const Value& participants,
+                                 std::string_view fieldName,
+                                 std::string_view shardId) {
+    if (participants.getType() != BSONType::object) {
+        return false;
+    }
+    for (auto it = participants.getDocument().fieldIterator(); it.more();) {
+        const auto [name, shards] = it.next();
+        if (name != fieldName) {
+            continue;
+        }
+        if (shards.getType() != BSONType::array) {
+            return false;
+        }
+        for (const auto& shard : shards.getArray()) {
+            if (shard.getType() == BSONType::string && shard.getStringData() == shardId) {
+                return true;
+            }
+        }
+        return false;
+    }
+    return false;
+}
+
+// Resolves the stream's endOfTransaction mode once, when the stage is created. 'required' is
+// enforced only on replica-set and router (mongos) streams. A shard-local stream runs entirely on
+// one shard and cannot count the other participants of a multi-shard transaction, so it treats
+// 'required' as 'whenAvailable' and never fails for a missing or ineligible event.
+EndOfTransactionMode resolveEndOfTransactionMode(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& spec = expCtx->getChangeStreamSpec();
+    if (!spec || !change_stream::showEndOfTransactionRequested(*spec)) {
+        return EndOfTransactionMode::kOff;
+    }
+    return change_stream::isEndOfTransactionRequired(*spec) &&
+            !change_stream::isShardLocalStream(expCtx)
+        ? EndOfTransactionMode::kRequired
+        : EndOfTransactionMode::kWhenAvailable;
+}
+}  // namespace
 
 REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamUnwindTransaction,
                            DocumentSourceChangeStreamUnwindTransaction::id,
@@ -82,10 +135,10 @@ ChangeStreamUnwindTransactionStage::ChangeStreamUnwindTransactionStage(
     BSONObj filter,
     std::shared_ptr<MatchExpression> expression)
     : Stage(stageName, pExpCtx),
-      _endOfTransactionBehavior(change_stream::determineEndOfTransactionBehavior(pExpCtx)),
-      _requireEndOfTransaction(
-          pExpCtx->getChangeStreamSpec() &&
-          change_stream::isEndOfTransactionRequired(*pExpCtx->getChangeStreamSpec())),
+      _endOfTransactionOptions({change_stream::determineEndOfTransactionBehavior(pExpCtx),
+                                resolveEndOfTransactionMode(pExpCtx),
+                                pExpCtx->getFromRouter()}),
+      _changeStream(ChangeStream::buildFromExpressionContext(pExpCtx)),
       _filter(std::move(filter)),
       _expression(std::move(expression)) {
     tassert(5543812,
@@ -93,7 +146,7 @@ ChangeStreamUnwindTransactionStage::ChangeStreamUnwindTransactionStage(
                           << " cannot be executed from router",
             !pExpCtx->getInRouter());
 
-    if (_requireEndOfTransaction) {
+    if (_endOfTransactionOptions.mode == EndOfTransactionMode::kRequired) {
         // Record on the operation so it rides onto the ClientCursor; the getMore precondition uses
         // it to fail the cursor if the feature flag or the 'allowEndOfTransaction' server parameter
         // is turned off after the stream was opened.
@@ -106,12 +159,56 @@ ChangeStreamUnwindTransactionStage::ChangeStreamUnwindTransactionStage(
     allowReordering(pExpCtx->getOperationContext(), _expression.get());
 }
 
+bool ChangeStreamUnwindTransactionStage::_endOfTransactionScopesCoverWatchedScope(
+    const Document& scopes) const {
+    // A record only carries information for the router if it comes from a write participant of the
+    // watched scope: the router completes a transaction once every participant of the watched scope
+    // has been seen, so a record from a shard that wrote only other collections is dropped there.
+    // Report only when this shard is one of the watched scope's participants, so such records are
+    // not sent to the router at all.
+    const Value shardId = scopes["shardId"sv];
+    if (shardId.getType() != BSONType::string) {
+        return false;
+    }
+    const std::string_view reportingShard = shardId.getStringData();
+    const boost::optional<NamespaceString> watchedNamespace = _changeStream.getNamespace();
+    switch (_changeStream.getChangeStreamType()) {
+        case ChangeStreamType::kCollection: {
+            const std::string key = str::stream()
+                << watchedNamespace->dbName().db(omitTenant) << "." << watchedNamespace->coll();
+            return participantMapContainsShard(
+                scopes["collectionParticipants"sv], key, reportingShard);
+        }
+        case ChangeStreamType::kDatabase: {
+            const std::string key{watchedNamespace->dbName().db(omitTenant)};
+            return participantMapContainsShard(
+                scopes["databaseParticipants"sv], key, reportingShard);
+        }
+        case ChangeStreamType::kAllDatabases:
+            // Every write participant is a cluster participant, so the reporting shard always
+            // covers a whole-cluster stream.
+            return true;
+    }
+    MONGO_UNREACHABLE_TASSERT(13875100);
+}
+
 GetNextResult ChangeStreamUnwindTransactionStage::doGetNext() {
     while (true) {
         // If we're unwinding an 'applyOps' from a transaction, check if there are any documents
         // we have stored that can be returned.
         if (_txnIterator) {
             if (auto next = _txnIterator->getNextTransactionOp(pExpCtx->getOperationContext())) {
+                // A coordinated transaction's accounting control event is marked as a change
+                // stream control event and must be returned with the control-document status so
+                // that the intervening stages pass it through unchanged and the router can consume
+                // it. Every other result is a regular, user-visible event.
+                if (next->metadata().isChangeStreamControlEvent()) {
+                    tassert(13875105,
+                            "expecting accounting control event",
+                            next->metadata().getChangeStreamControlEventType() ==
+                                DocumentMetadataFields::ChangeStreamControlEventType::kAccounting);
+                    return GetNextResult::makeAdvancedControlDocument(std::move(*next));
+                }
                 return std::move(*next);
             }
 
@@ -142,8 +239,7 @@ GetNextResult ChangeStreamUnwindTransactionStage::doGetNext() {
         // call 'getNextTransactionOp' on it. Note that is possible for the transaction iterator
         // to be empty of any relevant operations, meaning that this loop may need to execute
         // multiple times before it encounters a relevant change to return.
-        _txnIterator.emplace(
-            pExpCtx, doc, _expression.get(), _endOfTransactionBehavior, _requireEndOfTransaction);
+        _txnIterator.emplace(this, pExpCtx, doc, _expression.get(), _endOfTransactionOptions);
     }
 }
 
@@ -172,16 +268,17 @@ bool ChangeStreamUnwindTransactionStage::_isTransactionOplogEntry(const Document
 }
 
 ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator(
+    const ChangeStreamUnwindTransactionStage* stage,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const Document& input,
     const MatchExpression* expression,
-    change_stream::EndOfTransactionBehavior endOfTransactionBehavior,
-    bool requireEndOfTransaction)
+    EndOfTransactionOptions endOfTransactionOptions)
     : _mongoProcessInterface(expCtx->getMongoProcessInterface()),
       _expression(expression),
       _endOfTransactionExpression(change_stream_filter::buildEndOfTransactionFilter(
-          expCtx, endOfTransactionBehavior, requireEndOfTransaction)),
-      _endOfTransactionBehavior(endOfTransactionBehavior) {
+          expCtx, endOfTransactionOptions.behavior, endOfTransactionOptions.mode)),
+      _changeStreamTokenVersion(expCtx->getChangeStreamTokenVersion()),
+      _endOfTransactionBehavior(endOfTransactionOptions.behavior) {
 
     Value multiOpTypeValue = input[repl::OplogEntry::kMultiOpTypeFieldName];
     DocumentSourceChangeStream::checkValueTypeOrMissing(
@@ -298,8 +395,6 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
     // here. In the new mode, we only emit an "endOfTransaction" change event from here for the
     // final entry in an "applyOps" oplog entry. The path for emitting an "endOfTransaction" control
     // event from a "commitTransaction" oplog entry is not added here yet.
-    // TODO SERVER-138751 Add "endOfTransaction" control event emission for coordinated
-    // transactions.
     const bool behaviorAllowsEmit =
         _endOfTransactionBehavior == change_stream::EndOfTransactionBehavior::kLegacy
         ? isApplyOpsEntry
@@ -310,20 +405,55 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
     // this stage.
     const bool endOfTransactionCandidate = (isApplyOpsEntry || isCommitTransactionEntry) &&
         !isRetryableApplyOps && _lsid.has_value() && _txnNumber.has_value();
-    _shouldEmitEndOfTransaction =
-        endOfTransactionCandidate && behaviorAllowsEmit && !hasEndOfTransactionScopes;
-
-    // A 'required' stream must fail rather than silently omit an endOfTransaction event. An event
-    // can only be synthesized for a transaction that carries the 'allowEndOfTransaction' marker,
-    // which is written at commit time only while the write path was enabled. Without the marker the
-    // transaction is ineligible and no event can ever be produced, so the guarantee cannot be met:
-    // record that here so the iterator fails the stream if the transaction touches the watched
-    // namespace. When the marker is present the event is emitted normally via
-    // '_shouldEmitEndOfTransaction' and no failure is needed. A transaction that carries
-    // 'endOfTransactionScopes' is not ineligible: its event is produced from the accounting
-    // metadata by the router, so it must never fail a 'required' stream.
-    _requireEndOfTransaction = requireEndOfTransaction && endOfTransactionCandidate &&
-        !hasAllowEndOfTransaction && !hasEndOfTransactionScopes;
+    // Resolve what to do with this transaction once all of its operations have been consumed. A
+    // coordinated (multi-shard) transaction's commit entry carries the 'endOfTransactionScopes'
+    // accounting metadata; its event is produced from that metadata rather than synthesized from
+    // the entry's operations, so those cases are resolved first. Otherwise, a 'required' stream
+    // that reads an ineligible transaction must fail, and only then does a regular synthesized
+    // event remain possible.
+    if (hasEndOfTransactionScopes) {
+        // Only the synthesis behavior ('kNew') turns a coordinated commit entry into an event: the
+        // legacy behavior emits from the separate 'o2.endOfTransaction' entry, and the kill switch
+        // (or a disabled feature flag) resolves to 'kNone'. Gating on the behavior, not just the
+        // opt-in mode, is required for the kill switch to take effect: when no event can be
+        // synthesized the namespace predicate below is not applied, so emitting anyway would leak
+        // an unrelated transaction's session id, transaction number, commit timestamp and affected
+        // namespaces into the stream.
+        //
+        // A router-bound stream delivers the metadata to the router as an accounting control event,
+        // and only when the metadata references the watched scope. A passthrough / direct-to-mongod
+        // stream runs entirely on the shard and has no router to consume control events, so it
+        // emits the user-visible endOfTransaction event directly; whether the transaction touches
+        // the watched scope is decided later, by the same namespace-based predicate used for the
+        // unprepared path.
+        if (_endOfTransactionBehavior == change_stream::EndOfTransactionBehavior::kNew) {
+            if (endOfTransactionOptions.fromRouter) {
+                Document scopes = commandObj["endOfTransactionScopes"sv].getDocument();
+                if (stage->_endOfTransactionScopesCoverWatchedScope(scopes)) {
+                    _endOfTransactionAction = EndOfTransactionAction::kEmitAccountingControlEvent;
+                    _endOfTransactionScopes = std::move(scopes);
+                }
+            } else {
+                _endOfTransactionAction = EndOfTransactionAction::kEmitCoordinatedUserVisible;
+            }
+        }
+    } else if (endOfTransactionOptions.mode == EndOfTransactionMode::kRequired &&
+               endOfTransactionCandidate && !hasAllowEndOfTransaction) {
+        // A 'required' stream must fail rather than silently omit an endOfTransaction event. An
+        // event can only be synthesized for a transaction that carries the 'allowEndOfTransaction'
+        // marker, which is written at commit time only while the write path was enabled. Without
+        // the marker the transaction is ineligible and no event can ever be produced, so the
+        // guarantee cannot be met: record that here so the iterator fails the stream if the
+        // transaction touches the watched namespace. When the marker is present the event is
+        // emitted normally via 'kEmitUserVisible' and no failure is needed. A transaction that
+        // carries 'endOfTransactionScopes' is not ineligible: its event is produced from the
+        // accounting metadata by the router, so it must never fail a 'required' stream.
+        _endOfTransactionAction = EndOfTransactionAction::kFailIfIneligibleTouchesWatchedNamespace;
+    } else if (endOfTransactionCandidate && behaviorAllowsEmit) {
+        // The transaction is an eligible candidate and the resolved behavior allows emitting a
+        // synthesized event for it.
+        _endOfTransactionAction = EndOfTransactionAction::kEmitUserVisible;
+    }
 
     // When operations span multiple applyOps entries linked by 'prevOpTime', walk that chain to
     // gather them all. kApplyOpsAppliedSeparately entries are standalone, so there is no chain to
@@ -398,7 +528,7 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::getNextTransactionOp(
 
             _assertExpectedTransactionEventFormat(doc);
 
-            if (_shouldEmitEndOfTransaction || _requireEndOfTransaction) {
+            if (_needsAffectedNamespaces(_endOfTransactionAction)) {
                 _addAffectedNamespaces(doc);
             }
             // If the document is relevant, update it with the required txn fields before returning.
@@ -526,6 +656,24 @@ void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_collectAllOpTim
     }
 }
 
+bool ChangeStreamUnwindTransactionStage::TransactionOpIterator::_needsAffectedNamespaces(
+    EndOfTransactionAction action) {
+    switch (action) {
+        case EndOfTransactionAction::kEmitUserVisible:
+        case EndOfTransactionAction::kEmitCoordinatedUserVisible:
+        case EndOfTransactionAction::kFailIfIneligibleTouchesWatchedNamespace:
+            // These actions build the synthesized event and evaluate it against the namespace-based
+            // predicate, so the transaction's affected namespaces must be tracked.
+            return true;
+        case EndOfTransactionAction::kEmitAccountingControlEvent:
+        case EndOfTransactionAction::kNone:
+            // The accounting control event is built from the commit entry's
+            // 'endOfTransactionScopes' metadata, and the no-op case needs no event at all.
+            return false;
+    }
+    MONGO_UNREACHABLE_TASSERT(13875104);
+}
+
 void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_addAffectedNamespaces(
     const Document& doc) {
     const auto dbCmdNs = NamespaceStringUtil::deserialize(/*tenantId=*/boost::none,
@@ -580,27 +728,97 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::_makeEndOfTransaction
                     Value(static_cast<long long>(applyOpsIndex())));
     newDoc.addField(DocumentSourceChangeStream::kApplyOpsTsField, Value(applyOpsTs()));
 
+    // A prepared transaction carries its commit timestamp; emit it so the user-visible event
+    // matches the transaction's CRUD events. An unprepared transaction has no commit timestamp.
+    // The transform forwards the field only when the stream was opened with 'showCommitTimestamp'.
+    if (_commitTimestamp) {
+        newDoc.addField(DocumentSourceChangeStream::kCommitTimestampField,
+                        Value(*_commitTimestamp));
+    }
+
     return newDoc.freeze();
+}
+
+Document
+ChangeStreamUnwindTransactionStage::TransactionOpIterator::_makeEndOfTransactionControlEvent()
+    const {
+    tassert(13875101,
+            "expected endOfTransactionScopes metadata for a coordinated transaction",
+            _endOfTransactionScopes);
+    tassert(13875102,
+            "expected the coordinated transaction to carry an lsid and txnNumber",
+            _lsid && _txnNumber);
+
+    // The event identifier repeats the transaction identity so that accounting records for
+    // different shards that share a commit timestamp get distinct, deterministically ordered resume
+    // tokens.
+    MutableDocument operationDescription;
+    operationDescription.addField(DocumentSourceChangeStream::kLsidField, Value(*_lsid));
+    operationDescription.addField(DocumentSourceChangeStream::kTxnNumberField,
+                                  Value(static_cast<long long>(*_txnNumber)));
+
+    // The control event uses the same resume token as the user-visible event the router will
+    // synthesize from it: the commit entry's timestamp and the reserved sentinel index.
+    const ResumeTokenData resumeTokenData{_clusterTime,
+                                          _changeStreamTokenVersion,
+                                          kEndOfTransactionTxnOpIndex,
+                                          boost::none,
+                                          DocumentSourceChangeStream::kEndOfTransactionOpType,
+                                          Value(),
+                                          Value(operationDescription.freeze())};
+    const Value resumeToken = Value(ResumeToken(resumeTokenData).toDocument());
+
+    MutableDocument event;
+    event.addField(DocumentSourceChangeStream::kIdField, resumeToken);
+    event.metadata().setSortKey(resumeToken, /*isSingleElementKey=*/true);
+    event.addField(DocumentSourceChangeStream::kOperationTypeField,
+                   Value(DocumentSourceChangeStream::kEndOfTransactionOpType));
+    event.addField(DocumentSourceChangeStream::kClusterTimeField, Value(_clusterTime));
+    event.addField(DocumentSourceChangeStream::kWallTimeField, Value(_wallTime));
+    if (_commitTimestamp) {
+        event.addField(DocumentSourceChangeStream::kCommitTimestampField, Value(*_commitTimestamp));
+    }
+    event.addField(DocumentSourceChangeStream::kLsidField, Value(*_lsid));
+    event.addField(DocumentSourceChangeStream::kTxnNumberField,
+                   Value(static_cast<long long>(*_txnNumber)));
+    event.addField(kEndOfTransactionScopesField, Value(*_endOfTransactionScopes));
+
+    event.metadata().setChangeStreamControlEvent(
+        DocumentMetadataFields::ChangeStreamControlEventType::kAccounting);
+
+    return event.freeze();
 }
 
 boost::optional<Document>
 ChangeStreamUnwindTransactionStage::TransactionOpIterator::_createEndOfTransactionIfNeeded() {
-    if (_endOfTransactionReturned) {
+    // Capture the action; it is cleared once the event has been produced so that a later call (once
+    // the transaction is exhausted) does not produce it again.
+    const EndOfTransactionAction action = _endOfTransactionAction;
+    if (action == EndOfTransactionAction::kNone) {
         return boost::none;
     }
-    _endOfTransactionReturned = true;
+
+    // A coordinated (multi-shard) transaction delivers its event to the router as an accounting
+    // control event rather than a user-visible event. The router's synthesis stage turns it into
+    // the user-visible 'endOfTransaction' event once the transaction completes for the watched
+    // scope.
+    if (action == EndOfTransactionAction::kEmitAccountingControlEvent) {
+        _endOfTransactionAction = EndOfTransactionAction::kNone;
+        return _makeEndOfTransactionControlEvent();
+    }
 
     // A 'required' stream builds the event even for an ineligible transaction, to decide whether
-    // the transaction touched the watched namespace and must therefore fail the stream.
-    if (!_shouldEmitEndOfTransaction && !_requireEndOfTransaction) {
-        return boost::none;
-    }
-
+    // the transaction touched the watched namespace and must therefore fail the stream. A
+    // shard-local stream (a passthrough / direct-to-mongod stream) builds the user-visible event
+    // for a coordinated transaction directly. '_makeEndOfTransactionDocument' consults
+    // '_endOfTransactionAction', so build the document before clearing the action.
     const Document endOfTransaction = _makeEndOfTransactionDocument();
+    _endOfTransactionAction = EndOfTransactionAction::kNone;
+
     const bool touchesWatchedNamespace =
         exec::matcher::matchesBSON(_endOfTransactionExpression.get(), endOfTransaction.toBson());
 
-    if (_requireEndOfTransaction) {
+    if (action == EndOfTransactionAction::kFailIfIneligibleTouchesWatchedNamespace) {
         // The stream requires endOfTransaction events, but this transaction is ineligible: it
         // carries no 'allowEndOfTransaction' marker because the kill switch was off when it
         // committed. Fail only if the transaction touched the watched namespace.

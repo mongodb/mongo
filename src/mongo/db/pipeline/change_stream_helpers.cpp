@@ -156,6 +156,33 @@ bool isRouterOrNonShardedReplicaSet(const boost::intrusive_ptr<ExpressionContext
     }
 }
 
+bool isShardLocalStream(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if (expCtx->getInRouter()) {
+        return false;
+    }
+    if (expCtx->getFromRouter()) {
+        // A '$_passthroughToShard' cursor forwarded by a router has a router-side merge that
+        // consumes the accounting control events and enforces the 'required' guarantee, so it is
+        // not shard-local. This must be checked before the per-shard-cursor test below, which would
+        // otherwise also match a router-forwarded cursor.
+        return false;
+    }
+    if (expCtx->getForPerShardCursor()) {
+        // A user-requested '$_passthroughToShard' cursor running on a shard. Unlike a
+        // router-forwarded cursor, it has no router-side merge.
+        return true;
+    }
+    if (const auto* shardingState = ShardingState::get(expCtx->getOperationContext());
+        shardingState) {
+        // A direct-to-mongod stream on a shard mongod.
+        return shardingState->pollClusterRole().has_value();
+    }
+    // Sharding state is not initialized. This is the case in unit tests and on standalone mongods.
+    // Standalone mongods do not support change streams, so this is only reachable in tests; treat
+    // it as a non-shard-local stream so that the replica-set / router behavior is the default.
+    return false;
+}
+
 ResumeTokenData resolveResumeTokenFromSpec(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const DocumentSourceChangeStreamSpec& spec) {
 
@@ -355,6 +382,54 @@ repl::MutableOplogEntry createEndOfTransactionOplogEntry(
     oplogEntry.setTimestamp(timestamp);
     oplogEntry.setWallClockTime(wallClock);
     return oplogEntry;
+}
+
+Document makeEndOfTransactionChangeEvent(const Value& resumeToken,
+                                         Timestamp clusterTime,
+                                         Date_t wallTime,
+                                         boost::optional<LogicalSessionId> lsid,
+                                         boost::optional<TxnNumber> txnNumber,
+                                         boost::optional<Timestamp> commitTimestamp,
+                                         bool showExpandedEvents,
+                                         bool showCommitTimestamp) {
+    MutableDocument document;
+    document.addField(DocumentSourceChangeStream::kIdField, resumeToken);
+    document.metadata().setSortKey(resumeToken, true);
+    document.addField(DocumentSourceChangeStream::kOperationTypeField,
+                      Value(DocumentSourceChangeStream::kEndOfTransactionOpType));
+    document.addField(DocumentSourceChangeStream::kClusterTimeField, Value(clusterTime));
+    document.addField(DocumentSourceChangeStream::kWallTimeField, Value(wallTime));
+    if (commitTimestamp && showCommitTimestamp) {
+        document.addField(DocumentSourceChangeStream::kCommitTimestampField,
+                          Value(*commitTimestamp));
+    }
+
+    // The transaction identity is omitted rather than asserted on when absent, so a malformed
+    // 'o2.endOfTransaction' entry that drops it does not fail the stream with an invariant. The
+    // router-side caller always supplies both.
+    if (lsid) {
+        document.addField(DocumentSourceChangeStream::kLsidField, Value(lsid->toBSON()));
+    }
+    if (txnNumber) {
+        document.addField(DocumentSourceChangeStream::kTxnNumberField,
+                          Value(static_cast<long long>(*txnNumber)));
+    }
+
+    // The transaction identity is repeated inside 'operationDescription', which forms the event
+    // identifier of the resume token and distinguishes events that share a cluster time. Like
+    // regular change events, the field is user-visible only when the stream was opened with
+    // 'showExpandedEvents'.
+    if (showExpandedEvents && lsid && txnNumber) {
+        MutableDocument operationDescription;
+        operationDescription.addField(DocumentSourceChangeStream::kLsidField,
+                                      Value(lsid->toBSON()));
+        operationDescription.addField(DocumentSourceChangeStream::kTxnNumberField,
+                                      Value(static_cast<long long>(*txnNumber)));
+        document.addField(DocumentSourceChangeStream::kOperationDescriptionField,
+                          Value(operationDescription.freeze()));
+    }
+
+    return document.freeze();
 }
 
 }  // namespace mongo::change_stream

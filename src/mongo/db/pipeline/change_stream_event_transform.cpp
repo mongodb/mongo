@@ -592,10 +592,57 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                                  o2Field[DocumentSourceChangeStream::kReshardingUuidField]);
                 }
 
-                // Check if the 'txnNumber' and 'lsid' fields need to be added to the event. This is
-                // currently only true for 'endOfTransaction' events.
+                // The user-visible 'endOfTransaction' event is assembled by the shared helper the
+                // router-side synthesis stage also uses, so the shard-side and router-side paths
+                // cannot drift apart. The transaction identity is carried by the entry's 'o2'
+                // session fields.
                 if (operationType == DocumentSourceChangeStream::kEndOfTransactionOpType) {
-                    addTransactionIdFieldsIfPresent(o2Field, doc);
+                    auto resumeTokenData = makeResumeToken(ts,
+                                                           input[FieldAccessors::kTxnOpIndex],
+                                                           uuid,
+                                                           operationType,
+                                                           Value(),
+                                                           operationDescription);
+                    boost::optional<Timestamp> commitTimestamp;
+                    if (_changeStreamSpec.getShowCommitTimestamp()) {
+                        if (auto value = input[FieldAccessors::kCommitTimestamp];
+                            value.getType() == BSONType::timestamp) {
+                            commitTimestamp = value.getTimestamp();
+                        }
+                    }
+
+                    // Tolerate a malformed 'o2.endOfTransaction' entry that omits the transaction
+                    // identity: validate the type when present and omit the fields otherwise, as
+                    // the generic path does for other oplog fields, rather than failing the stream
+                    // with an invariant.
+                    boost::optional<LogicalSessionId> lsid;
+                    if (const auto value = o2Field[FieldAccessors::kLsid]; !value.missing()) {
+                        checkValueType(
+                            value, DocumentSourceChangeStream::kLsidField, BSONType::object);
+                        lsid = LogicalSessionId::parse(value.getDocument().toBson(),
+                                                       IDLParserContext("EndOfTransaction"));
+                    }
+                    boost::optional<TxnNumber> txnNumber;
+                    if (const auto value = o2Field[FieldAccessors::kTxnNumber]; !value.missing()) {
+                        checkValueType(value,
+                                       DocumentSourceChangeStream::kTxnNumberField,
+                                       BSONType::numberLong);
+                        txnNumber = value.getLong();
+                    }
+
+                    const auto wallClockTime = input[FieldAccessors::kWallClockTime];
+                    checkValueType(
+                        wallClockTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::date);
+
+                    return change_stream::makeEndOfTransactionChangeEvent(
+                        Value(ResumeToken(resumeTokenData).toDocument()),
+                        ts.getTimestamp(),
+                        wallClockTime.getDate(),
+                        lsid,
+                        txnNumber,
+                        commitTimestamp,
+                        _changeStreamSpec.getShowExpandedEvents(),
+                        _changeStreamSpec.getShowCommitTimestamp());
                 }
 
                 // Configured events do not require the UUID field to be present.
@@ -672,7 +719,8 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     doc.addField(DocumentSourceChangeStream::kClusterTimeField, Value(resumeTokenData.clusterTime));
 
     if (_changeStreamSpec.getShowCommitTimestamp()) {
-        // Commit timestamp for CRUD events in prepared transactions.
+        // Commit timestamp for CRUD events in prepared transactions and for an endOfTransaction
+        // event. It is present on the input only for those events.
         auto commitTimestamp = input[FieldAccessors::kCommitTimestamp];
         if (!commitTimestamp.missing()) {
             doc.addField(DocumentSourceChangeStream::kCommitTimestampField, commitTimestamp);

@@ -7,6 +7,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/exec/agg/change_stream_handle_topology_change_v2_metrics.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
@@ -886,6 +887,13 @@ Timestamp ChangeStreamHandleTopologyChangeV2Stage::extractTimestampFromDocument(
     return ResumeToken::extractClusterTime(input.metadata().getSortKey().getDocument());
 }
 
+bool ChangeStreamHandleTopologyChangeV2Stage::_isTopologyControlEvent(
+    const Document& controlEvent) {
+    return controlEvent.metadata().isChangeStreamControlEvent() &&
+        controlEvent.metadata().getChangeStreamControlEventType() ==
+        DocumentMetadataFields::ChangeStreamControlEventType::kTopology;
+}
+
 DocumentSource::GetNextResult ChangeStreamHandleTopologyChangeV2Stage::doGetNext() {
     // Continue advancing the state until there is either an event to return or an exception is
     // thrown.
@@ -1351,7 +1359,13 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingGettingChangeEvent(
         return input;
     }
 
-    // Advanced control document found.
+    // Accounting control events are consumed by the downstream end-of-transaction synthesis stage.
+    // Pass them through unchanged instead of treating them as topology events.
+    if (!_isTopologyControlEvent(input.getDocument())) {
+        return input;
+    }
+
+    // Topology control document found.
 
     // Shard targeter should always be already present here in non-testing mode, but it may be
     // missing when unit testing the individual states.
@@ -1496,7 +1510,13 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingNormalGettingChange
         return input;
     }
 
-    // Advanced control document found.
+    // Accounting control events are consumed by the downstream end-of-transaction synthesis stage.
+    // Pass them through unchanged instead of treating them as topology events.
+    if (!_isTopologyControlEvent(input.getDocument())) {
+        return input;
+    }
+
+    // Topology control document found.
 
     // Shard targeter should always be already present here in non-testing mode, but it may be
     // missing when unit testing the individual states.
@@ -1655,7 +1675,13 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
         return input;
     }
 
-    // Advanced control document found.
+    // Accounting control events are consumed by the downstream end-of-transaction synthesis stage.
+    // Pass them through unchanged instead of treating them as topology events.
+    if (!_isTopologyControlEvent(input.getDocument())) {
+        return input;
+    }
+
+    // Topology control document found.
 
     // Shard targeter should always be already present here in non-testing mode, but it may be
     // missing when unit testing the individual states.

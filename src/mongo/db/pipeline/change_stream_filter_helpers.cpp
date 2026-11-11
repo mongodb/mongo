@@ -374,6 +374,12 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
                                             << "o2.endOfTransaction" << nsMatch.firstElement());
     auto commitTransactionFilter = BSON("op" << "c"
                                              << "o.commitTransaction" << 1);
+    // A coordinated transaction's commit entries carry the 'endOfTransactionScopes' accounting
+    // metadata. Each participant echoes the transaction's global scope maps into its own commit
+    // entry, which the shard turns into an accounting control event the router accumulates.
+    auto accountingCommitFilter =
+        BSON("op" << "c" << "o.commitTransaction" << 1 << "o.endOfTransactionScopes"
+                  << BSON("$exists" << true));
 
     // The legacy endOfTransaction path writes a real 'o2.endOfTransaction' oplog entry for sharded
     // transactions, which must be matched here so that its namespace is filtered. Only the
@@ -389,15 +395,59 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
     auto transactionFilter = MatchExpressionParser::parseAndNormalize(
         backingBsonObjs.emplace_back(std::move(transactionFilterBson)), expCtx);
 
-    // All events in a transaction share the same clusterTime, lsid, and txNumber values. If the
-    // user wishes to filter out events based on these values, it is possible to rewrite these
-    // filters to filter out entire applyOps and commitTransaction entries before they are unwound.
-    if (auto rewrittenMatch = change_stream_rewrite::rewriteFilterForFields(
-            expCtx, userMatch, backingBsonObjs, {"clusterTime", "lsid", "txnNumber"})) {
+    // Every entry of a transaction shares the same lsid and txnNumber, so a user match on these
+    // fields can be rewritten to filter out entire applyOps and commitTransaction entries before
+    // they are unwound. The clusterTime is handled separately: it is shared by the operations of a
+    // single-shard transaction, but the commit entries of a coordinated (multi-shard) transaction
+    // are written by different shards and can carry different timestamps.
+    auto rewrittenTxnIdentity = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, userMatch, backingBsonObjs, {"lsid", "txnNumber"});
+    auto rewrittenClusterTime = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, userMatch, backingBsonObjs, {"clusterTime"});
+
+    // An accounting-bearing commit entry must not be dropped by the user's clusterTime predicate:
+    // the synthesized endOfTransaction event carries the clusterTime of the participant whose
+    // commit entry completes the transaction, not the clusterTime of this participant's commit
+    // entry, so the predicate cannot be applied to the individual commit entries. It is applied to
+    // the synthesized event on the router instead. The transaction identity predicates still
+    // apply, because every participant shares the transaction's lsid and txnNumber. The accepted
+    // cost is that accounting-bearing commit entries outside the user's clusterTime window are
+    // still scanned and unwound on the shard; this is bounded by the number of such entries in the
+    // scanned oplog range and only arises for streams that filter on clusterTime. Build this branch
+    // before the regular entries consume the rewritten predicates.
+    std::unique_ptr<MatchExpression> accountingFilter;
+    if (rewrittenClusterTime) {
+        accountingFilter = MatchExpressionParser::parseAndNormalize(
+            backingBsonObjs.emplace_back(accountingCommitFilter), expCtx);
+        if (rewrittenTxnIdentity) {
+            auto accountingFilterWithTxnIdentity = std::make_unique<AndMatchExpression>();
+            accountingFilterWithTxnIdentity->add(std::move(accountingFilter));
+            accountingFilterWithTxnIdentity->add(rewrittenTxnIdentity->clone());
+            accountingFilter = std::move(accountingFilterWithTxnIdentity);
+        }
+    }
+
+    // Apply the full user match to the regular transaction entries (applyOps and commit entries).
+    if (rewrittenClusterTime) {
         auto transactionFilterWithUserMatch = std::make_unique<AndMatchExpression>();
         transactionFilterWithUserMatch->add(std::move(transactionFilter));
-        transactionFilterWithUserMatch->add(std::move(rewrittenMatch));
+        transactionFilterWithUserMatch->add(std::move(rewrittenClusterTime));
         transactionFilter = std::move(transactionFilterWithUserMatch);
+    }
+    if (rewrittenTxnIdentity) {
+        auto transactionFilterWithUserMatch = std::make_unique<AndMatchExpression>();
+        transactionFilterWithUserMatch->add(std::move(transactionFilter));
+        transactionFilterWithUserMatch->add(std::move(rewrittenTxnIdentity));
+        transactionFilter = std::move(transactionFilterWithUserMatch);
+    }
+
+    // Union in the accounting-bearing commit entries, which are kept regardless of the user's
+    // clusterTime predicate so the router can still complete the transaction (see above).
+    if (accountingFilter) {
+        auto transactionFilterWithAccounting = std::make_unique<OrMatchExpression>();
+        transactionFilterWithAccounting->add(std::move(transactionFilter));
+        transactionFilterWithAccounting->add(std::move(accountingFilter));
+        transactionFilter = std::move(transactionFilterWithAccounting);
     }
 
     // For sharded clusters, additionally match control events for v2 change stream readers. The

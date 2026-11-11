@@ -712,6 +712,47 @@ DEATH_TEST_REGEX_F(DSV2StageCursorManagementAndErrorHandlingTestDeathTest,
     }
 }
 
+// An accounting control event is consumed by the downstream end-of-transaction synthesis stage, so
+// the topology stage passes it through unchanged instead of routing it to the shard targeter, in
+// strict mode as well.
+TEST_F(DSV2StageCursorManagementAndErrorHandlingTest,
+       StateFetchingGettingChangeEventAccountingControlEventPassesThrough) {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(23, 0), ChangeStreamReadMode::kStrict));
+
+    const BSONObj event = BSON(
+        "operationType" << "endOfTransaction" << "_id" << buildHighWaterMarkToken(Timestamp(23, 1))
+                        << Document::metaFieldChangeStreamControlEvent << "accounting");
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>();
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        DocumentSource::GetNextResult::makeAdvancedControlDocument(
+            Document::fromBsonWithMetaData(event))};
+
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+    auto params =
+        buildParametersForTest(getExpCtx(),
+                               V2StageTestHelpers::kDefaultMinAllocationToShardsPollPeriodSecs,
+                               changeStreamReaderBuilder.get(),
+                               dataToShardsAllocationQueryService.get(),
+                               source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
+    docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
+                                /*validateStateTransition=*/false);
+
+    auto result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->isAdvancedControlDocument());
+    ASSERT_EQ(result->getDocument().metadata().getChangeStreamControlEventType(),
+              DocumentMetadataFields::ChangeStreamControlEventType::kAccounting);
+    ASSERT_EQ(V2Stage::State::kFetchingGettingChangeEvent, docSource->getState_forTest());
+}
+
 // Tests state machine for input state kFetchingGettingChangeEvent for a control event where the
 // shard targeter returns kSwitchToV1. Expects the state to transition to kDowngrading, then to
 // kFinal.

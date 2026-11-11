@@ -11,6 +11,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -33,6 +34,39 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec::agg {
+
+/**
+ * How a change stream treats 'endOfTransaction' events. This is the resolved
+ * 'showEndOfTransaction' mode: 'required' is downgraded to 'whenAvailable' for a shard-local
+ * stream, which runs entirely on one shard and cannot count the other participants of a
+ * multi-shard transaction.
+ */
+enum class EndOfTransactionMode {
+    // The stream did not opt in via 'showEndOfTransaction'.
+    kOff,
+    // The stream opted in; an event is emitted whenever one is available.
+    kWhenAvailable,
+    // The stream opted in and requires an event; an ineligible transaction at the watched scope
+    // fails the stream.
+    kRequired,
+};
+
+/**
+ * Stream-level endOfTransaction settings, resolved once when the stage is created and shared with
+ * every TransactionOpIterator.
+ */
+struct EndOfTransactionOptions {
+    // How the stream synthesizes endOfTransaction events, resolved from the feature flags and the
+    // 'allowEndOfTransaction' server parameter.
+    change_stream::EndOfTransactionBehavior behavior;
+    // The stream's resolved 'showEndOfTransaction' mode.
+    EndOfTransactionMode mode;
+    // Whether the stream is router-bound (as opposed to a shard-local stream, which runs entirely
+    // on the shard and has no router to consume control events). A user-requested
+    // '$_passthroughToShard' cursor is forwarded to the shard with 'fromRouter: false' and is
+    // shard-local, so this flag alone distinguishes it from a router-forwarded cursor.
+    bool fromRouter;
+};
 
 /**
  * This class handles the execution part of the change stream unwind transaction aggregation stage
@@ -77,11 +111,11 @@ private:
         TransactionOpIterator(const TransactionOpIterator&) = delete;
         TransactionOpIterator& operator=(const TransactionOpIterator&) = delete;
 
-        TransactionOpIterator(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        TransactionOpIterator(const ChangeStreamUnwindTransactionStage* stage,
+                              const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const Document& input,
                               const MatchExpression* expression,
-                              change_stream::EndOfTransactionBehavior endOfTransactionBehavior,
-                              bool requireEndOfTransaction);
+                              EndOfTransactionOptions endOfTransactionOptions);
 
         /**
          * Returns the index for the last operation returned by getNextTransactionOp(). It is
@@ -168,9 +202,43 @@ private:
         // namespace.
         Document _makeEndOfTransactionDocument();
 
+        // Builds the internal accounting control event for a coordinated (multi-shard) transaction
+        // from the commit entry's 'endOfTransactionScopes' metadata. The event carries the public
+        // 'endOfTransaction' operation type and a resume token at the reserved
+        // 'kEndOfTransactionTxnOpIndex', and is marked as an 'accounting' change stream control
+        // event so that it is carried to the router unchanged.
+        Document _makeEndOfTransactionControlEvent() const;
+
         // Records all namespaces affected by the transaction. Used in generating an artificial
         // endOfTransaction oplog entry.
         void _addAffectedNamespaces(const Document& op);
+
+        // What the unwind stage must do with the current transaction once all of its operations
+        // have been consumed. Exactly one outcome applies to a given transaction, so it is modeled
+        // as a single value rather than as a set of interacting flags.
+        enum class EndOfTransactionAction {
+            // No endOfTransaction event is produced for this transaction.
+            kNone,
+            // Emit a synthesized, user-visible event if the transaction touched the watched
+            // namespace. Used for unprepared and prepared replica-set / single-shard transactions.
+            kEmitUserVisible,
+            // Emit a synthesized, user-visible event. Used for a coordinated (multi-shard)
+            // transaction on a shard-local stream, which has no router to synthesize the event from
+            // an accounting control event.
+            kEmitCoordinatedUserVisible,
+            // Emit the internal accounting control event consumed by the router. Used for a
+            // coordinated transaction on a router-bound stream whose accounting metadata
+            // references the watched scope (see '_makeEndOfTransactionControlEvent()').
+            kEmitAccountingControlEvent,
+            // The stream requested 'showEndOfTransaction: required' and this transaction is
+            // ineligible: fail the stream if the transaction touched the watched namespace,
+            // otherwise produce nothing.
+            kFailIfIneligibleTouchesWatchedNamespace,
+        };
+
+        // Returns whether the affected namespaces of the transaction must be tracked to carry out
+        // 'action'.
+        static bool _needsAffectedNamespaces(EndOfTransactionAction action);
 
         // This stack contains the timestamps for all oplog entries in this transaction that have
         // yet to be processed by the iterator. Each time the TransactionOpIterator finishes
@@ -220,14 +288,18 @@ private:
         const MatchExpression* _expression;
         std::unique_ptr<MatchExpression> _endOfTransactionExpression;
 
-        // Whether this transaction should produce a synthesized endOfTransaction event: it is an
-        // eligible candidate and the resolved behavior says an event must be emitted for it.
-        bool _shouldEmitEndOfTransaction;
+        // What to do with the current transaction once its operations are exhausted. Cleared once
+        // the action has been carried out, so that the event is produced at most once.
+        EndOfTransactionAction _endOfTransactionAction = EndOfTransactionAction::kNone;
 
-        // Set when the stream requested 'showEndOfTransaction: required' and this transaction
-        // carries no 'allowEndOfTransaction' marker: such a transaction is ineligible, so reading
-        // it at the watched namespace must fail the stream.
-        bool _requireEndOfTransaction = false;
+        // The raw 'endOfTransactionScopes' metadata of the current coordinated transaction, used to
+        // build the accounting control event. Only set when '_endOfTransactionAction' is
+        // 'kEmitAccountingControlEvent'.
+        boost::optional<Document> _endOfTransactionScopes;
+
+        // The change stream token version, used to build the accounting control event's resume
+        // token.
+        const int _changeStreamTokenVersion;
 
         // How this iterator synthesizes endOfTransaction events, resolved once when the stage was
         // created. A 'kNew' event uses the reserved 'kEndOfTransactionTxnOpIndex' rather than the
@@ -236,20 +308,22 @@ private:
 
         // Set of affected namespaces. Only needed if we need endOfTransaction.
         absl::flat_hash_set<NamespaceString> _affectedNamespaces;
-
-        // Set to true after iterator have returned endOfTransaction
-        bool _endOfTransactionReturned = false;
     };
+
+    // Returns true if this shard is a write participant of the scope watched by this change stream,
+    // according to the 'endOfTransactionScopes' accounting metadata of a coordinated transaction.
+    // A whole-cluster stream watches every scope, so every write participant qualifies.
+    bool _endOfTransactionScopesCoverWatchedScope(const Document& scopes) const;
 
     // Represents the current transaction we're unwinding, if any.
     boost::optional<TransactionOpIterator> _txnIterator;
 
     // Resolved once when the stage is created; shared with every TransactionOpIterator.
-    const change_stream::EndOfTransactionBehavior _endOfTransactionBehavior;
+    const EndOfTransactionOptions _endOfTransactionOptions;
 
-    // Set when the stream requested 'showEndOfTransaction: required'; shared with every
-    // TransactionOpIterator.
-    const bool _requireEndOfTransaction;
+    // The change stream watched by this stage, built once. Used to decide whether a coordinated
+    // transaction's accounting metadata covers the watched scope.
+    const ChangeStream _changeStream;
 
     // All transaction entries are filtered through this expression. This extra filtering step is
     // necessary because a transaction can contain a mix of operations from different namespaces. A

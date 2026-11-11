@@ -9,6 +9,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_end_of_transaction.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -145,32 +146,18 @@ EndOfTransactionControlEvent EndOfTransactionControlEvent::createFromDocument(
     return result;
 }
 
-Document EndOfTransactionControlEvent::toDocument(const Value& resumeToken) const {
-    MutableDocument document;
-    document.addField(DocumentSourceChangeStream::kIdField, resumeToken);
-    document.metadata().setSortKey(resumeToken, true);
-    document.addField(DocumentSourceChangeStream::kOperationTypeField,
-                      Value(DocumentSourceChangeStream::kEndOfTransactionOpType));
-    document.addField(DocumentSourceChangeStream::kClusterTimeField, Value(clusterTime));
-    document.addField(DocumentSourceChangeStream::kWallTimeField, Value(wallTime));
-    if (commitTimestamp) {
-        document.addField(DocumentSourceChangeStream::kCommitTimestampField,
-                          Value(*commitTimestamp));
-    }
-    document.addField(DocumentSourceChangeStream::kLsidField, Value(lsid.toBSON()));
-    document.addField(DocumentSourceChangeStream::kTxnNumberField,
-                      Value(static_cast<long long>(txnNumber)));
-
-    // The transaction identity is repeated inside 'operationDescription', which forms the event
-    // identifier of the resume token and distinguishes events that share a cluster time.
-    MutableDocument operationDescription;
-    operationDescription.addField(DocumentSourceChangeStream::kLsidField, Value(lsid.toBSON()));
-    operationDescription.addField(DocumentSourceChangeStream::kTxnNumberField,
-                                  Value(static_cast<long long>(txnNumber)));
-    document.addField(DocumentSourceChangeStream::kOperationDescriptionField,
-                      Value(operationDescription.freeze()));
-
-    return document.freeze();
+Document EndOfTransactionControlEvent::toDocument(const Value& resumeToken,
+                                                  bool showExpandedEvents,
+                                                  bool showCommitTimestamp) const {
+    // Share the event assembly with the shard-side event transform so the two paths cannot drift.
+    return change_stream::makeEndOfTransactionChangeEvent(resumeToken,
+                                                          clusterTime,
+                                                          wallTime,
+                                                          lsid,
+                                                          txnNumber,
+                                                          commitTimestamp,
+                                                          showExpandedEvents,
+                                                          showCommitTimestamp);
 }
 
 bool EndOfTransactionControlEvent::operator==(const EndOfTransactionControlEvent& other) const {
@@ -206,9 +193,30 @@ std::set<ShardId> EndOfTransactionAggregator::_expectedShardsForWatchedScope(
 
 boost::optional<EndOfTransactionControlEvent> EndOfTransactionAggregator::tryCompleteTransaction(
     const EndOfTransactionControlEvent& controlEvent) {
+    // Only track transactions whose metadata references the watched scope. A transaction that does
+    // not touch the scope can never complete for it, so it must not create an entry. The shard
+    // withholds accounting records for scopes it does not cover, so a record that reaches the
+    // router always references the watched scope; assert that in debug builds. The guard below
+    // keeps the stage failing closed in release builds, where an empty 'expected' would otherwise
+    // make 'std::includes' below report completion immediately and emit an event for an unrelated
+    // transaction.
+    const std::set<ShardId> expected = _expectedShardsForWatchedScope(controlEvent.scopes);
+    dassert(!expected.empty(), "accounting control event does not reference the watched scope");
+    if (expected.empty()) {
+        return boost::none;
+    }
+
+    // Ignore records emitted by shards that are not participants of the watched scope. The shard
+    // withholds such records, so this is defensive: accepting one would create an entry that no
+    // expected record can complete once the expected participants' records have erased it, growing
+    // the router-side state without bound.
+    if (!expected.contains(controlEvent.scopes.shardId)) {
+        return boost::none;
+    }
+
     const EndOfTransactionTxnId key{controlEvent.lsid, controlEvent.txnNumber};
     auto& entry = _entries[key];
-    entry.expected = _expectedShardsForWatchedScope(controlEvent.scopes);
+    entry.expected = std::move(expected);
     entry.seen.insert(controlEvent.scopes.shardId);
     // Accounting records are delivered in ascending (clusterTime, txnOpIndex) order, so the record
     // observed last carries the largest commit-entry timestamp.
@@ -216,8 +224,7 @@ boost::optional<EndOfTransactionControlEvent> EndOfTransactionAggregator::tryCom
 
     // The transaction is complete for the watched scope once every expected participant has been
     // observed. Membership is set-based, so a re-observed record for the same shard is idempotent.
-    if (entry.expected.empty() ||
-        !std::includes(
+    if (!std::includes(
             entry.seen.begin(), entry.seen.end(), entry.expected.begin(), entry.expected.end())) {
         return boost::none;
     }
@@ -234,7 +241,11 @@ ChangeStreamEndOfTransactionStage::ChangeStreamEndOfTransactionStage(
     : Stage(stageName, pExpCtx),
       _aggregator(pExpCtx),
       _userPipeline(std::move(userPipeline)),
-      _pbrtAdvancer([this](const Document& event) { _forwardPbrtToTopologyStage(event); }) {
+      _pbrtAdvancer([this](const Document& event) { _forwardPbrtToTopologyStage(event); }),
+      _showExpandedEvents(pExpCtx->getChangeStreamSpec() &&
+                          pExpCtx->getChangeStreamSpec()->getShowExpandedEvents()),
+      _showCommitTimestamp(pExpCtx->getChangeStreamSpec() &&
+                           pExpCtx->getChangeStreamSpec()->getShowCommitTimestamp()) {
     _buildSubPipeline();
 }
 
@@ -352,7 +363,8 @@ boost::optional<Document> ChangeStreamEndOfTransactionStage::_handleAccountingCo
     // change-stream control metadata nor the internal accounting metadata. Its resume token is the
     // completing record's token, which is also used as the sort key so the results merger can
     // advance the post-batch resume token to the event's token.
-    Document event = synthesized->toDocument(controlEvent.metadata().getSortKey());
+    Document event = synthesized->toDocument(
+        controlEvent.metadata().getSortKey(), _showExpandedEvents, _showCommitTimestamp);
 
     // Re-apply the user pipeline stages. An event filtered out by the user stages is not emitted
     // and does not advance the post-batch resume token.

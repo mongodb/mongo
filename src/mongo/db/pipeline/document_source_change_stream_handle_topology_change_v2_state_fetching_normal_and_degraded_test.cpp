@@ -162,6 +162,91 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest, StateFetchingNormalGettingChangeE
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
 }
 
+// An accounting control event is consumed by the downstream end-of-transaction synthesis stage, so
+// the topology stage passes it through unchanged instead of routing it to the shard targeter.
+TEST_F(DSV2StateFetchingNormalAndDegradedTest,
+       StateFetchingNormalGettingChangeEventAccountingControlEventPassesThrough) {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(23, 0), ChangeStreamReadMode::kIgnoreRemovedShards));
+
+    const BSONObj event = BSON(
+        "operationType" << "endOfTransaction" << "_id" << buildHighWaterMarkToken(Timestamp(23, 1))
+                        << Document::metaFieldChangeStreamControlEvent << "accounting");
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>();
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        DocumentSource::GetNextResult::makeAdvancedControlDocument(
+            Document::fromBsonWithMetaData(event))};
+
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+    auto params =
+        buildParametersForTest(getExpCtx(),
+                               V2StageTestHelpers::kDefaultMinAllocationToShardsPollPeriodSecs,
+                               changeStreamReaderBuilder.get(),
+                               dataToShardsAllocationQueryService.get(),
+                               source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
+
+    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
+                                /*validateStateTransition=*/false);
+
+    auto result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->isAdvancedControlDocument());
+    ASSERT_EQ(result->getDocument().metadata().getChangeStreamControlEventType(),
+              DocumentMetadataFields::ChangeStreamControlEventType::kAccounting);
+    ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
+}
+
+// An accounting control event passes through the degraded state unchanged too.
+TEST_F(DSV2StateFetchingNormalAndDegradedTest,
+       StateFetchingDegradedGettingChangeEventAccountingControlEventPassesThrough) {
+    const Timestamp ts = Timestamp(23, 0);
+    const Timestamp segmentEndTimestamp = Timestamp(23, 99);
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(ts, ChangeStreamReadMode::kIgnoreRemovedShards));
+
+    const BSONObj event = BSON(
+        "operationType" << "endOfTransaction" << "_id" << buildHighWaterMarkToken(Timestamp(23, 1))
+                        << "$sortKey" << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(23, 1)))
+                        << Document::metaFieldChangeStreamControlEvent << "accounting");
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>();
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        DocumentSource::GetNextResult::makeAdvancedControlDocument(
+            Document::fromBsonWithMetaData(event))};
+
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+    auto params =
+        buildParametersForTest(getExpCtx(),
+                               V2StageTestHelpers::kDefaultMinAllocationToShardsPollPeriodSecs,
+                               changeStreamReaderBuilder.get(),
+                               dataToShardsAllocationQueryService.get(),
+                               source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
+    docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
+                                /*validateStateTransition=*/false);
+    docSource->setSegmentStartTimestamp_forTest(ts);
+    docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
+
+    auto result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->isAdvancedControlDocument());
+    ASSERT_EQ(result->getDocument().metadata().getChangeStreamControlEventType(),
+              DocumentMetadataFields::ChangeStreamControlEventType::kAccounting);
+    ASSERT_EQ(V2Stage::State::kFetchingDegradedGettingChangeEvent, docSource->getState_forTest());
+}
+
 // Tests state machine for input state kFetching for a control event, when we try to open a new
 // cursor on a shard and this fails with 'ShardNotFound' exceptions. The state then transitions into
 // degraded mode.

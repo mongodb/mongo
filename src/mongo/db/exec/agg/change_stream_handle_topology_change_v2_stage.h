@@ -391,6 +391,13 @@ private:
     void _assertStrictMode(std::string_view context) const;
 
     /**
+     * Returns true if 'controlEvent' is a topology control event. Accounting control events belong
+     * to the downstream end-of-transaction synthesis stage and must be passed through unchanged.
+     * Keys on the control-event metadata flag and its category, never on the operation type alone.
+     */
+    static bool _isTopologyControlEvent(const Document& controlEvent);
+
+    /**
      * Ensures that the '_shardTargeter' instance variable is populated with a valid shard targeter
      * object.
      */

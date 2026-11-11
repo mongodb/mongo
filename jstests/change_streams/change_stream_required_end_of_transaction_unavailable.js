@@ -19,18 +19,22 @@
  *   # The failure is raised by the replica-set applyOps synthesis path on mongod; sharded streams
  *   # synthesize the event on the router instead. Exclude every mongos-based passthrough.
  *   assumes_against_mongod_not_mongos,
+ *   # A shard-local stream (a direct-to-mongod stream) treats 'required' as 'whenAvailable' and
+ *   # never fails for an ineligible transaction, so this test cannot run when traffic goes straight
+ *   # to a shard. See isShardLocalStream() in change_stream_helpers.cpp.
+ *   directly_against_shardsvrs_incompatible,
  * ]
  */
 
-import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {after, before, describe} from "jstests/libs/mochalite.js";
 import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
 import {
     assertChangeStreamEventEq,
-    ChangeStreamTest,
-    isEndOfTransactionUsable,
+    itWhenEndOfTransactionIsUsable,
+    withChangeStreamTest,
     withSession,
 } from "jstests/libs/query/change_stream_util.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
@@ -46,66 +50,62 @@ describe("showEndOfTransaction: required fails when an event cannot be synthesiz
         assertDropCollection(db, collName);
     });
 
-    it("fails after unspooling a transaction committed while the parameter was disabled", function () {
-        if (!isEndOfTransactionUsable(db)) {
-            jsTest.log.info("Skipping test: end-of-transaction change streams are not usable");
-            return;
-        }
-
-        const cst = new ChangeStreamTest(db);
-        try {
-            // Open the stream while the write path is enabled, so it resolves to the synthesis
-            // behavior and requires an endOfTransaction event for every eligible transaction.
-            runWithParamsAllNonConfigNodes(db, {allowEndOfTransaction: true}, () => {
-                const cursor = cst.startWatchingChanges({
-                    pipeline: [{$changeStream: {showEndOfTransaction: "required"}}],
-                    collection: collName,
-                });
-
-                // Commit a transaction while the parameter is disabled. Its final applyOps entry
-                // carries no 'allowEndOfTransaction' marker, so no event can ever be synthesized
-                // for it. The helper restores the parameter when it returns.
-                runWithParamsAllNonConfigNodes(db, {allowEndOfTransaction: false}, () => {
-                    withSession(db.getMongo(), (session) => {
-                        const sessionColl = session
-                            .getDatabase(db.getName())
-                            .getCollection(collName);
-                        session.startTransaction();
-                        assert.commandWorked(sessionColl.insertOne({_id: 1}, {session}));
-                        assert.commandWorked(sessionColl.insertOne({_id: 2}, {session}));
-                        assert.commandWorked(session.commitTransaction_forTesting());
+    itWhenEndOfTransactionIsUsable(
+        db,
+        "fails after unspooling a transaction committed while the parameter was disabled",
+        function () {
+            withChangeStreamTest(db, (cst) => {
+                // Open the stream while the write path is enabled, so it resolves to the synthesis
+                // behavior and requires an endOfTransaction event for every eligible transaction.
+                runWithParamsAllNonConfigNodes(db, {allowEndOfTransaction: true}, () => {
+                    const cursor = cst.startWatchingChanges({
+                        pipeline: [{$changeStream: {showEndOfTransaction: "required"}}],
+                        collection: collName,
                     });
-                });
 
-                // The stream returns the transaction's own events, then fails once the whole
-                // transaction has been unspooled because the required endOfTransaction event
-                // cannot be produced.
-                const changes = cst.getNextChanges(cursor, 2);
-                assertChangeStreamEventEq(changes[0], {
-                    operationType: "insert",
-                    ns: {db: db.getName(), coll: collName},
-                    documentKey: {_id: 1},
-                    fullDocument: {_id: 1},
-                });
-                assertChangeStreamEventEq(changes[1], {
-                    operationType: "insert",
-                    ns: {db: db.getName(), coll: collName},
-                    documentKey: {_id: 2},
-                    fullDocument: {_id: 2},
-                });
+                    // Commit a transaction while the parameter is disabled. Its final applyOps entry
+                    // carries no 'allowEndOfTransaction' marker, so no event can ever be synthesized
+                    // for it. The helper restores the parameter when it returns.
+                    runWithParamsAllNonConfigNodes(db, {allowEndOfTransaction: false}, () => {
+                        withSession(db.getMongo(), (session) => {
+                            const sessionColl = session
+                                .getDatabase(db.getName())
+                                .getCollection(collName);
+                            session.startTransaction();
+                            assert.commandWorked(sessionColl.insertOne({_id: 1}, {session}));
+                            assert.commandWorked(sessionColl.insertOne({_id: 2}, {session}));
+                            assert.commandWorked(session.commitTransaction_forTesting());
+                        });
+                    });
 
-                const error = assert.throwsWithCode(
-                    () => cst.getNextBatch(cursor),
-                    ErrorCodes.ChangeStreamFatalError,
-                );
-                assert(
-                    error.message.includes("no endOfTransaction event could be generated"),
-                    "unexpected error message for the unproducible endOfTransaction event",
-                    {error},
-                );
+                    // The stream returns the transaction's own events, then fails once the whole
+                    // transaction has been unspooled because the required endOfTransaction event
+                    // cannot be produced.
+                    const changes = cst.getNextChanges(cursor, 2);
+                    assertChangeStreamEventEq(changes[0], {
+                        operationType: "insert",
+                        ns: {db: db.getName(), coll: collName},
+                        documentKey: {_id: 1},
+                        fullDocument: {_id: 1},
+                    });
+                    assertChangeStreamEventEq(changes[1], {
+                        operationType: "insert",
+                        ns: {db: db.getName(), coll: collName},
+                        documentKey: {_id: 2},
+                        fullDocument: {_id: 2},
+                    });
+
+                    const error = assert.throwsWithCode(
+                        () => cst.getNextBatch(cursor),
+                        ErrorCodes.ChangeStreamFatalError,
+                    );
+                    assert(
+                        error.message.includes("no endOfTransaction event could be generated"),
+                        "unexpected error message for the unproducible endOfTransaction event",
+                        {error},
+                    );
+                });
             });
-        } finally {
-            cst.cleanUp();
-        }
-    });
+        },
+    );
 });

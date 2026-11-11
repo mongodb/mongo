@@ -6,6 +6,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {indexAccessOpsByName} from "jstests/libs/index_stats_utils.js";
 import {getLocalReadCount} from "jstests/libs/local_reads.js";
+import {it} from "jstests/libs/mochalite.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -2011,4 +2012,30 @@ export function isEndOfTransactionUsable(db) {
         return false;
     }
     return !FixtureHelpers.isMongos(db) || !TestData.implictChangeStreamV1;
+}
+
+/**
+ * Defines a mochalite test case that runs only if the end-of-transaction change stream feature is
+ * usable (see 'isEndOfTransactionUsable'). Otherwise the test is skipped.
+ *
+ * 'db' identifies the cluster to check. It may be a database object, or a function returning one,
+ * which is useful when the connection is only established by a 'before' hook and is therefore not
+ * available when the test case is registered.
+ *
+ * @example
+ *   itWhenEndOfTransactionIsUsable(db, "emits an endOfTransaction event", function () {
+ *       // test body
+ *   });
+ */
+export function itWhenEndOfTransactionIsUsable(db, name, block) {
+    it(name, function () {
+        const resolvedDb = typeof db === "function" ? db() : db;
+        if (!isEndOfTransactionUsable(resolvedDb)) {
+            jsTest.log.info("Skipping test: end-of-transaction change streams are not usable", {
+                name,
+            });
+            return;
+        }
+        return block.call(this);
+    });
 }

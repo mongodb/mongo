@@ -90,8 +90,12 @@ struct EndOfTransactionControlEvent {
 
     // Serializes the event into the user-visible 'endOfTransaction' change event document, using
     // 'resumeToken' as both the resume token ('_id') and the sort key. The internal accounting
-    // metadata is not part of the user-visible event and is omitted.
-    Document toDocument(const Value& resumeToken) const;
+    // metadata is not part of the user-visible event and is omitted. The 'operationDescription'
+    // field is emitted only when 'showExpandedEvents' is true and the 'commitTimestamp' field only
+    // when 'showCommitTimestamp' is true, mirroring regular change events.
+    Document toDocument(const Value& resumeToken,
+                        bool showExpandedEvents,
+                        bool showCommitTimestamp) const;
 
     bool operator==(const EndOfTransactionControlEvent& other) const;
 
@@ -238,6 +242,14 @@ private:
     exec::agg::QueueStage* _subExecQueue = nullptr;
 
     EndOfTransactionPbrtAdvancer _pbrtAdvancer;
+
+    // Whether the change stream was opened with 'showExpandedEvents'. Controls whether the
+    // synthesized event carries an 'operationDescription' field.
+    const bool _showExpandedEvents;
+
+    // Whether the change stream was opened with 'showCommitTimestamp'. Controls whether the
+    // synthesized event carries a 'commitTimestamp' field.
+    const bool _showCommitTimestamp;
 };
 
 }  // namespace mongo::exec::agg

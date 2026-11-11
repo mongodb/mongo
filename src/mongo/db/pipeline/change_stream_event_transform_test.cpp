@@ -417,6 +417,48 @@ TEST(
     ASSERT_DOCUMENT_EQ(applyTransformation(immutableEntry, nss, {"movePrimary"}), expectedDoc);
 }
 
+TEST(ChangeStreamEventTransformTest,
+     Given_EndOfTransactionNoopWithoutTransactionIdentity_Then_FieldsAreOmitted) {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
+
+    // A malformed 'o2.endOfTransaction' entry that omits 'lsid' and 'txnNumber'. The transform must
+    // tolerate the missing identity rather than failing the stream with an invariant.
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(nss);
+    oplogEntry.setObject(BSON("msg" << BSON("endOfTransaction" << 1)));
+    oplogEntry.setObject2(BSON("endOfTransaction" << BSON_ARRAY(nss.toString_forTest())));
+    oplogEntry.setOpTime(repl::OpTime(kDefaultTs, 0));
+    oplogEntry.setWallClockTime(Date_t());
+
+    auto event = applyTransformation(repl::OplogEntry(oplogEntry.toBSON()), nss);
+    ASSERT_EQ(event[DocumentSourceChangeStream::kOperationTypeField].getStringData(),
+              DocumentSourceChangeStream::kEndOfTransactionOpType);
+    ASSERT(event[DocumentSourceChangeStream::kLsidField].missing());
+    ASSERT(event[DocumentSourceChangeStream::kTxnNumberField].missing());
+}
+
+TEST(ChangeStreamEventTransformTest,
+     Given_EndOfTransactionNoopWithWrongTypeTransactionIdentity_Then_CleanError) {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
+
+    // A present but wrongly typed 'lsid' yields the generic change-stream type error rather than an
+    // invariant failure.
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(nss);
+    oplogEntry.setObject(BSON("msg" << BSON("endOfTransaction" << 1)));
+    oplogEntry.setObject2(BSON("endOfTransaction" << BSON_ARRAY(nss.toString_forTest()) << "lsid"
+                                                  << "not-an-object"));
+    oplogEntry.setOpTime(repl::OpTime(kDefaultTs, 0));
+    oplogEntry.setWallClockTime(Date_t());
+
+    ASSERT_THROWS_CODE(
+        applyTransformation(repl::OplogEntry(oplogEntry.toBSON()), nss), DBException, 40532);
+}
+
 DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
                  TestInvalidCommand,
                  "Tripwire assertion.*11352605.*Unsupported command type") {

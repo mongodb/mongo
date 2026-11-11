@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/config.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/change_stream_end_of_transaction_stage.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
@@ -27,6 +28,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/split_pipeline.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -53,6 +55,8 @@ using exec::agg::EndOfTransactionScopes;
 using exec::agg::GetNextResult;
 using exec::agg::MockStage;
 
+using ChangeStreamStageTestDeathTest = ChangeStreamStageTest;
+
 constexpr std::string_view kStageName = DocumentSourceChangeStreamEndOfTransaction::kStageName;
 
 Document makeControlEvent(const Document& fields,
@@ -71,11 +75,60 @@ Document makeControlEvent(const Document& fields,
 Document makeAccountingControlEvent(const BSONObj& lsid,
                                     std::string_view shardId,
                                     Timestamp ts,
-                                    long long txnNumber = 7) {
+                                    long long txnNumber = 7,
+                                    boost::optional<Timestamp> commitTimestamp = boost::none) {
     const BSONObj scopes = BSON(
         "shardId" << shardId << "collectionParticipants"
                   << BSON("unittests.change_stream" << BSON_ARRAY("shardA" << "shardB"))
                   << "databaseParticipants" << BSON("unittests" << BSON_ARRAY("shardA" << "shardB"))
+                  << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
+    BSONObjBuilder event;
+    event.append("_id", BSON("_data" << "resume-token"));
+    event.append("operationType", DocumentSourceChangeStream::kEndOfTransactionOpType);
+    event.append("clusterTime", ts);
+    event.append("wallTime", Date_t());
+    if (commitTimestamp) {
+        event.append("commitTimestamp", *commitTimestamp);
+    }
+    event.append("lsid", lsid);
+    event.append("txnNumber", txnNumber);
+    event.append("endOfTransactionScopes", scopes);
+    return makeControlEvent(Document(event.obj()),
+                            DocumentMetadataFields::ChangeStreamControlEventType::kAccounting,
+                            Value(Document(BSON("_data" << "resume-token"))));
+}
+
+// Builds an accounting control event whose metadata references a collection other than the watched
+// one, so the record is irrelevant to the stream.
+Document makeAccountingControlEventForUnwatchedScope(const BSONObj& lsid,
+                                                     std::string_view shardId,
+                                                     Timestamp ts,
+                                                     long long txnNumber = 7) {
+    const BSONObj scopes =
+        BSON("shardId" << shardId << "collectionParticipants"
+                       << BSON("someotherdb.someothercoll" << BSON_ARRAY("shardA" << "shardB")));
+    const BSONObj event =
+        BSON("_id" << BSON("_data" << "resume-token") << "operationType"
+                   << DocumentSourceChangeStream::kEndOfTransactionOpType << "clusterTime" << ts
+                   << "wallTime" << Date_t() << "lsid" << lsid << "txnNumber" << txnNumber
+                   << "endOfTransactionScopes" << scopes);
+    return makeControlEvent(Document(event),
+                            DocumentMetadataFields::ChangeStreamControlEventType::kAccounting,
+                            Value(Document(BSON("_data" << "resume-token"))));
+}
+
+// Builds an accounting control event for a transaction that wrote the watched collection only on
+// 'shardA' and a different collection on 'shardB'. The metadata names the watched scope, but the
+// reporting shard is not one of its participants. A shard withholds such a record, so the event is
+// constructed directly to exercise the router's defensive guard against it.
+Document makeAccountingControlEventWatchedScopeOnShardA(const BSONObj& lsid,
+                                                        std::string_view shardId,
+                                                        Timestamp ts,
+                                                        long long txnNumber = 7) {
+    const BSONObj scopes = BSON(
+        "shardId" << shardId << "collectionParticipants"
+                  << BSON("unittests.change_stream" << BSON_ARRAY("shardA") << "otherdb.othercoll"
+                                                    << BSON_ARRAY("shardB"))
                   << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     const BSONObj event =
         BSON("_id" << BSON("_data" << "resume-token") << "operationType"
@@ -157,6 +210,24 @@ void setShowEndOfTransaction(const boost::intrusive_ptr<ExpressionContext>& expC
     auto spec = expCtx->getChangeStreamSpec();
     ASSERT_TRUE(spec);
     spec->setShowEndOfTransaction(mode);
+    expCtx->setChangeStreamSpec(spec);
+}
+
+// Overrides the change stream spec's 'showExpandedEvents' flag on 'expCtx'.
+void setShowExpandedEvents(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           bool showExpandedEvents) {
+    auto spec = expCtx->getChangeStreamSpec();
+    ASSERT_TRUE(spec);
+    spec->setShowExpandedEvents(showExpandedEvents);
+    expCtx->setChangeStreamSpec(spec);
+}
+
+// Overrides the change stream spec's 'showCommitTimestamp' flag on 'expCtx'.
+void setShowCommitTimestamp(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            bool showCommitTimestamp) {
+    auto spec = expCtx->getChangeStreamSpec();
+    ASSERT_TRUE(spec);
+    spec->setShowCommitTimestamp(showCommitTimestamp);
     expCtx->setChangeStreamSpec(spec);
 }
 
@@ -451,7 +522,8 @@ TEST_F(ChangeStreamStageTest, EndOfTransactionControlEventSerializesToUserVisibl
     // The serialized form is the user-visible 'endOfTransaction' event: it uses the resume token as
     // both the '_id' and the sort key, keeps the event fields, and omits the internal accounting
     // metadata.
-    const Document event = parsed.toDocument(resumeToken);
+    const Document event =
+        parsed.toDocument(resumeToken, /*showExpandedEvents=*/true, /*showCommitTimestamp=*/true);
     ASSERT_BSONOBJ_EQ(event["_id"].getDocument().toBson(), BSON("_data" << "resume-token"));
     ASSERT_VALUE_EQ(event.metadata().getSortKey(), resumeToken);
     ASSERT_EQ(event["operationType"].getStringData(),
@@ -464,6 +536,24 @@ TEST_F(ChangeStreamStageTest, EndOfTransactionControlEventSerializesToUserVisibl
     ASSERT_BSONOBJ_EQ(event["operationDescription"].getDocument().toBson(),
                       BSON("lsid" << lsid.toBSON() << "txnNumber" << 7LL));
     ASSERT(event["endOfTransactionScopes"].missing());
+}
+
+TEST_F(ChangeStreamStageTest, EndOfTransactionControlEventHonorsShowCommitTimestamp) {
+    // The control event carries a commit timestamp.
+    const auto parsed = EndOfTransactionControlEvent::createFromDocument(
+        makeFullControlEvent(testLsid(), Timestamp(100, 5)));
+    ASSERT_TRUE(parsed.commitTimestamp);
+    const Value resumeToken{Document(BSON("_data" << "resume-token"))};
+
+    // Without 'showCommitTimestamp', the synthesized event omits the 'commitTimestamp' field.
+    const Document withoutCommitTimestamp =
+        parsed.toDocument(resumeToken, /*showExpandedEvents=*/false, /*showCommitTimestamp=*/false);
+    ASSERT(withoutCommitTimestamp["commitTimestamp"].missing());
+
+    // With it, the field is present.
+    const Document withCommitTimestamp =
+        parsed.toDocument(resumeToken, /*showExpandedEvents=*/false, /*showCommitTimestamp=*/true);
+    ASSERT_EQ(withCommitTimestamp["commitTimestamp"].getTimestamp(), Timestamp(1, 2));
 }
 
 TEST_F(ChangeStreamStageTest, EndOfTransactionControlEventEquality) {
@@ -582,6 +672,179 @@ TEST_F(ChangeStreamStageTest, EndOfTransactionAccumulatesAndEmitsOnCompletion) {
     ASSERT_EQ(stage->numTrackedTransactions_forTest(), 0UL);
 
     ASSERT_TRUE(stage->getNext().isEOF());
+}
+
+TEST_F(ChangeStreamStageTest, EndOfTransactionOperationDescriptionHonorsShowExpandedEvents) {
+    // Runs one transaction to completion with the given 'showExpandedEvents' setting and returns
+    // the synthesized event, or boost::none if none was emitted.
+    auto synthesizeEvent = [this](bool showExpandedEvents) -> boost::optional<Document> {
+        setShowExpandedEvents(getExpCtx(), showExpandedEvents);
+        auto stage = makeStage(getExpCtx());
+
+        const BSONObj lsid = testLsid().toBSON();
+        std::deque<GetNextResult> inputs;
+        inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+            makeAccountingControlEvent(lsid, "shardA", Timestamp(100, 1))));
+        inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+            makeAccountingControlEvent(lsid, "shardB", Timestamp(100, 2))));
+        inputs.push_back(GetNextResult::makeEOF());
+        auto mock = setSource(std::move(inputs), getExpCtx(), stage);
+        disablePbrtAdvancer(stage);
+
+        auto next = stage->getNext();
+        if (!next.isAdvanced()) {
+            return boost::none;
+        }
+        return next.getDocument();
+    };
+
+    // With 'showExpandedEvents', the synthesized event carries the 'operationDescription' field.
+    const auto expanded = synthesizeEvent(true);
+    ASSERT_TRUE(expanded);
+    ASSERT_BSONOBJ_EQ((*expanded)["operationDescription"].getDocument().toBson(),
+                      BSON("lsid" << testLsid().toBSON() << "txnNumber" << 7LL));
+
+    // Without it, the field is absent.
+    const auto notExpanded = synthesizeEvent(false);
+    ASSERT_TRUE(notExpanded);
+    ASSERT((*notExpanded)["operationDescription"].missing());
+}
+
+TEST_F(ChangeStreamStageTest, EndOfTransactionCommitTimestampHonorsShowCommitTimestamp) {
+    // Runs one transaction to completion with the given 'showCommitTimestamp' setting and returns
+    // the synthesized event, or boost::none if none was emitted.
+    auto synthesizeEvent = [this](bool showCommitTimestamp) -> boost::optional<Document> {
+        setShowCommitTimestamp(getExpCtx(), showCommitTimestamp);
+        auto stage = makeStage(getExpCtx());
+
+        const BSONObj lsid = testLsid().toBSON();
+        std::deque<GetNextResult> inputs;
+        inputs.push_back(GetNextResult::makeAdvancedControlDocument(makeAccountingControlEvent(
+            lsid, "shardA", Timestamp(100, 1), /*txnNumber=*/7, Timestamp(200, 5))));
+        inputs.push_back(GetNextResult::makeAdvancedControlDocument(makeAccountingControlEvent(
+            lsid, "shardB", Timestamp(100, 2), /*txnNumber=*/7, Timestamp(200, 5))));
+        inputs.push_back(GetNextResult::makeEOF());
+        auto mock = setSource(std::move(inputs), getExpCtx(), stage);
+        disablePbrtAdvancer(stage);
+
+        auto next = stage->getNext();
+        if (!next.isAdvanced()) {
+            return boost::none;
+        }
+        return next.getDocument();
+    };
+
+    // Without 'showCommitTimestamp', the synthesized event omits the 'commitTimestamp' field.
+    const auto withoutCommitTimestamp = synthesizeEvent(false);
+    ASSERT_TRUE(withoutCommitTimestamp);
+    ASSERT((*withoutCommitTimestamp)["commitTimestamp"].missing());
+
+    // With it, the field is present.
+    const auto withCommitTimestamp = synthesizeEvent(true);
+    ASSERT_TRUE(withCommitTimestamp);
+    ASSERT_EQ((*withCommitTimestamp)["commitTimestamp"].getTimestamp(), Timestamp(200, 5));
+}
+
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+// An accounting record whose metadata does not reference the watched scope is a defect: the shard
+// withholds such records, so the stage asserts on them in debug builds.
+DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
+                   EndOfTransactionAssertsOnUnwatchedScope,
+                   "accounting control event does not reference the watched scope") {
+    auto stage = makeStage(getExpCtx());
+
+    const BSONObj lsid = testLsid().toBSON();
+    std::deque<GetNextResult> inputs;
+    inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+        makeAccountingControlEventForUnwatchedScope(lsid, "shardA", Timestamp(100, 1))));
+    inputs.push_back(GetNextResult::makeEOF());
+    auto mock = setSource(std::move(inputs), getExpCtx(), stage);
+    disablePbrtAdvancer(stage);
+
+    // The debug assertion fires before the defensive guard can swallow the record.
+    stage->getNext();
+}
+#else
+TEST_F(ChangeStreamStageTest, EndOfTransactionIgnoresUnwatchedScope) {
+    // In release builds the debug assertion is compiled out, so the defensive guard swallows the
+    // record without creating a tracked transaction entry.
+    auto stage = makeStage(getExpCtx());
+
+    const BSONObj lsid = testLsid().toBSON();
+    std::deque<GetNextResult> inputs;
+    inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+        makeAccountingControlEventForUnwatchedScope(lsid, "shardA", Timestamp(100, 1))));
+    inputs.push_back(GetNextResult::makeEOF());
+    auto mock = setSource(std::move(inputs), getExpCtx(), stage);
+    disablePbrtAdvancer(stage);
+
+    ASSERT_TRUE(stage->getNext().isEOF());
+    ASSERT_EQ(stage->numTrackedTransactions_forTest(), 0UL);
+}
+#endif  // defined(MONGO_CONFIG_DEBUG_BUILD)
+
+TEST_F(ChangeStreamStageTest, EndOfTransactionIgnoresRecordsFromShardsOutsideWatchedScope) {
+    // A transaction wrote the watched collection only on 'shardA' and a different collection on
+    // 'shardB'. 'shardB' withholds its record, so this feeds one directly to exercise the router's
+    // defensive guard: the record names the watched scope but comes from a shard that is not one of
+    // its participants, arrives after 'shardA' completed and erased the transaction, and must be
+    // ignored instead of recreating an entry that can never complete.
+    const BSONObj lsid = testLsid().toBSON();
+
+    std::deque<GetNextResult> inputs;
+    inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+        makeAccountingControlEventWatchedScopeOnShardA(lsid, "shardA", Timestamp(100, 1))));
+    inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+        makeAccountingControlEventWatchedScopeOnShardA(lsid, "shardB", Timestamp(100, 2))));
+    inputs.push_back(GetNextResult::makeEOF());
+
+    auto stage = makeStage(getExpCtx());
+    auto mock = setSource(std::move(inputs), getExpCtx(), stage);
+    disablePbrtAdvancer(stage);
+
+    // 'shardA' is the only expected participant, so its record completes the transaction.
+    auto next = stage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_EQ(next.getDocument()["operationType"].getStringData(),
+              DocumentSourceChangeStream::kEndOfTransactionOpType);
+    ASSERT_EQ(stage->numTrackedTransactions_forTest(), 0UL);
+
+    // 'shardB' is not an expected participant, so its later record is swallowed without creating an
+    // entry, and the stream ends.
+    ASSERT_TRUE(stage->getNext().isEOF());
+    ASSERT_EQ(stage->numTrackedTransactions_forTest(), 0UL);
+}
+
+TEST_F(ChangeStreamStageTest, EndOfTransactionRecordFromNonParticipantCreatesNoEntry) {
+    // As above, but the non-participant's record arrives before the expected participant's record.
+    // It must be ignored without creating a tracked entry.
+    const BSONObj lsid = testLsid().toBSON();
+
+    std::deque<GetNextResult> inputs;
+    inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+        makeAccountingControlEventWatchedScopeOnShardA(lsid, "shardB", Timestamp(100, 1))));
+    inputs.push_back(GetNextResult(Document(BSON("operationType" << "insert" << "x" << 1))));
+    inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+        makeAccountingControlEventWatchedScopeOnShardA(lsid, "shardA", Timestamp(100, 2))));
+    inputs.push_back(GetNextResult::makeEOF());
+
+    auto stage = makeStage(getExpCtx());
+    auto mock = setSource(std::move(inputs), getExpCtx(), stage);
+    disablePbrtAdvancer(stage);
+
+    // The non-participant's record is swallowed without creating an entry; the unrelated insert
+    // passes through.
+    auto next = stage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_EQ(next.getDocument()["operationType"].getStringData(), "insert");
+    ASSERT_EQ(stage->numTrackedTransactions_forTest(), 0UL);
+
+    // The expected participant's record completes the transaction.
+    next = stage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_EQ(next.getDocument()["operationType"].getStringData(),
+              DocumentSourceChangeStream::kEndOfTransactionOpType);
+    ASSERT_EQ(stage->numTrackedTransactions_forTest(), 0UL);
 }
 
 TEST_F(ChangeStreamStageTest, EndOfTransactionAdvancesPbrtOnlyWhenEventIsEmitted) {

@@ -91,6 +91,15 @@ bool isEndOfTransactionRequired(const DocumentSourceChangeStreamSpec& spec);
 bool isRouterOrNonShardedReplicaSet(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
+ * Tests whether the change stream runs entirely on a shard mongod without a router, i.e. it is a
+ * user-requested '$_passthroughToShard' or direct-to-mongod stream. Such a stream has no
+ * router-side merge and cannot observe the transaction commits of the other participants of a
+ * multi-shard transaction. A '$_passthroughToShard' cursor forwarded by a router is not
+ * shard-local: its events are merged on the router.
+ */
+bool isShardLocalStream(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+/**
  * Extracts the resume token from the given spec. If a 'startAtOperationTime' is specified,
  * returns the equivalent high-watermark token. This method should only ever be called on a spec
  * where one of 'resumeAfter', 'startAfter', or 'startAtOperationTime' is populated.
@@ -241,6 +250,27 @@ repl::MutableOplogEntry createEndOfTransactionOplogEntry(
     const std::vector<NamespaceString>& affectedNamespaces,
     Timestamp timestamp,
     Date_t wallClock);
+
+/**
+ * Builds the user-visible 'endOfTransaction' change event from the transaction identity and the
+ * stream options. It is shared by the shard-side event transform (which serializes the synthesized
+ * or coordinator-written 'o2.endOfTransaction' oplog entry) and the router-side synthesis stage
+ * (which turns the shards' accounting control events into the event), so that the two paths cannot
+ * diverge in the fields they emit. 'resumeToken' is used as both the event's '_id' and its sort
+ * key. The 'commitTimestamp' field is emitted only when 'showCommitTimestamp' is set and a commit
+ * timestamp is available, and the 'operationDescription' field only when 'showExpandedEvents' is
+ * set. 'lsid' and 'txnNumber' are optional so the shard-side caller can tolerate a malformed
+ * 'o2.endOfTransaction' entry that omits the transaction identity, as other oplog fields are
+ * tolerated; the router-side caller always supplies both.
+ */
+Document makeEndOfTransactionChangeEvent(const Value& resumeToken,
+                                         Timestamp clusterTime,
+                                         Date_t wallTime,
+                                         boost::optional<LogicalSessionId> lsid,
+                                         boost::optional<TxnNumber> txnNumber,
+                                         boost::optional<Timestamp> commitTimestamp,
+                                         bool showExpandedEvents,
+                                         bool showCommitTimestamp);
 
 /**
  * Represents the change stream operation types that are NOT guarded behind the 'showExpandedEvents'
