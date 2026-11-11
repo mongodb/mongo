@@ -229,7 +229,10 @@ Status AuthorizationRouterImpl::rolesExist(OperationContext* opCtx,
 }
 
 bool AuthorizationRouterImpl::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
-    UsersInfoCommand usersInfoCmd{auth::UsersInfoCommandArg{}};
+    UsersInfoCommand usersInfoCmd{
+        auth::UsersInfoCommandArg{auth::UsersInfoCommandArg::AllForAllDBs{}}};
+    usersInfoCmd.setShowCustomData(false);
+
     try {
         // This method only considers users on the system (boost::none) tenant.
         const auto& usersInfoReply = _runUsersInfoCmd(opCtx, DatabaseName::kAdmin, usersInfoCmd);

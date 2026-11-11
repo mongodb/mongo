@@ -103,7 +103,5 @@ protected:
      * virtual to allow Mock to not lock anything.
      */
     virtual RolesSnapshot _snapshotRoles(OperationContext* opCtx);
-
-    Atomic<bool> _hasAnyPrivilegeDocuments{false};
 };
 }  // namespace mongo::auth
