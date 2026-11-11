@@ -132,7 +132,7 @@ BSONObj BSONObj::copy() const {
             "size"_attr = size);
     }
     memcpy(storage.get(), objdata(), size);
-    return BSONObj(std::move(storage));
+    return BSONObj(skipCheck, std::move(storage));
 }
 
 void BSONObj::makeOwned() {

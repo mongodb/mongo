@@ -594,7 +594,7 @@ public:
     */
     template <typename BSONTraits = BSONObj::DefaultSizeTrait>
     BSONObj done() {
-        return BSONObj(asDerived()._done(), BSONTraits{});
+        return BSONObj(BSONObj::skipCheck, asDerived()._done(), BSONTraits{});
     }
 
     // Like 'done' above, but does not construct a BSONObj to return to the caller.
@@ -620,7 +620,7 @@ public:
             _b.reserveBytes(1);       // Rereserve room for the real EOO
         });
 
-        return BSONObj(buffer, BSONObj::LargeSizeTrait());
+        return BSONObj(BSONObj::skipCheck, buffer, BSONObj::LargeSizeTrait());
     }
 
     /** Make it look as if "done" has been called, so that our destructor is a no-op. Do

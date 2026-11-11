@@ -852,4 +852,42 @@ TEST(BSONObj, nullByteInStringFull) {
     ASSERT_EQ(str, obj.getStringField("a"));
 }
 
+TEST(BSONObj, TrustedTag) {
+    BSONObj original = BSON("a" << 1 << "b" << BSON("c" << 2));
+
+    BSONObj unownedDefault(BSONObj::skipCheck, original.objdata(), BSONObj::DefaultSizeTrait{});
+    ASSERT_FALSE(unownedDefault.isOwned());
+    ASSERT_BSONOBJ_EQ(unownedDefault, original);
+
+    BSONObj fromSharedBuf(BSONObj::skipCheck, original.sharedBuffer());
+    ASSERT_TRUE(fromSharedBuf.isOwned());
+    ASSERT_EQ(fromSharedBuf.objdata(), original.objdata());
+    ASSERT_BSONOBJ_EQ(fromSharedBuf, original);
+}
+
+TEST(BSONObj, ConstructFromSharedBuffer) {
+    BSONObj original = BSON("a" << 1 << "b" << BSON("c" << 2));
+
+    BSONObj fromSharedBuf(original.sharedBuffer());
+    ASSERT_TRUE(fromSharedBuf.isOwned());
+    ASSERT_EQ(fromSharedBuf.objdata(), original.objdata());
+    ASSERT_BSONOBJ_EQ(fromSharedBuf, original);
+}
+
+TEST(BSONObj, CopyAndGetOwned) {
+    BSONObj original = BSON("a" << 1 << "b" << BSON("c" << 2));
+
+    BSONObj unowned(original.objdata());
+    ASSERT_FALSE(unowned.isOwned());
+
+    BSONObj ownedCopy = unowned.getOwned();
+    ASSERT_TRUE(ownedCopy.isOwned());
+    ASSERT_NE(ownedCopy.objdata(), original.objdata());
+    ASSERT_BSONOBJ_EQ(ownedCopy, original);
+
+    BSONObj alreadyOwned = ownedCopy.getOwned();
+    ASSERT_TRUE(alreadyOwned.isOwned());
+    ASSERT_EQ(alreadyOwned.objdata(), ownedCopy.objdata());
+}
+
 }  // unnamed namespace

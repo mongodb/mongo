@@ -127,6 +127,14 @@ inline void assertElementWithinBuffer(std::span<const char> buffer,
  */
 class BSONObj {
 public:
+    /**
+     * Construct a BSONObj when it is guaranteed that the data is structurally valid BSON.
+     */
+    struct TrustedTag {
+        explicit constexpr TrustedTag() = default;
+    };
+    static constexpr TrustedTag skipCheck{};
+
     struct DefaultSizeTrait {
         constexpr static int MaxSize = BSONObjMaxInternalSize;
     };
@@ -185,6 +193,30 @@ public:
             const auto size =
                 _checkSpanGetSize({_objdata, _ownedBuffer.capacity()}, LargeSizeTrait::MaxSize);
             _checkEoo(size);
+        }
+    }
+
+    template <typename Traits>
+    BSONObj(TrustedTag, const char* bsonData, Traits) : _objdata(bsonData) {
+        static_assert(Traits::MaxSize > 0 && Traits::MaxSize <= std::numeric_limits<int>::max(),
+                      "BSONObj maximum size must be within possible limits");
+        if constexpr (kDebugBuild) {
+            const auto size = objsize();
+            if (!isValid<Traits>())
+                _throwInvalidSize(size, Traits::MaxSize);
+            _checkEoo(size);
+        }
+    }
+
+    BSONObj(TrustedTag, ConstSharedBuffer ownedBuffer)
+        : _objdata(ownedBuffer.get() ? ownedBuffer.get() : BSONObj().objdata()),
+          _ownedBuffer(std::move(ownedBuffer)) {
+        if constexpr (kDebugBuild) {
+            if (_ownedBuffer.get()) {
+                const auto size =
+                    _checkSpanGetSize({_objdata, _ownedBuffer.capacity()}, LargeSizeTrait::MaxSize);
+                _checkEoo(size);
+            }
         }
     }
 
@@ -265,6 +297,10 @@ public:
     BSONObj& shareOwnershipWith(ConstSharedBuffer buffer) & {
         invariant(buffer);
         _ownedBuffer = std::move(buffer);
+        // Sharing ownership using a buffer from an already constructed BSONObj.
+        if constexpr (kDebugBuild) {
+            _checkEoo(objsize());
+        }
         return *this;
     }
     BSONObj& shareOwnershipWith(const BSONObj& other) & {
