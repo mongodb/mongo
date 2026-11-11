@@ -95,6 +95,16 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         cpp_type = self.get_cpp_type_name()
         return f'{mod_tag}constexpr std::string_view {_DEFAULT_PARSER_ADL_HOOK}({cpp_type}) {{ return "{cpp_type}"; }}'
 
+    def gen_values_declaration(self, indented_writer, mod_tag):
+        # type: (writer.IndentedTextWriter, str) -> None
+        """Generate a constexpr array of all enum values in declaration order."""
+        cpp_type = self.get_cpp_type_name()
+        with writer.IndentedScopedBlock(
+            indented_writer, f"{mod_tag}inline constexpr std::array {cpp_type}_values{{", "};"
+        ):
+            for e in self._enum.values:
+                indented_writer.write_line(f"{cpp_type}::{e.name},")
+
     def _get_populated_extra_values(self):
         # type: () -> List[Union[syntax.EnumValue,ast.EnumValue]]
         """Filter the enum values to just those containing extra_data."""
@@ -241,11 +251,6 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
         # type: (writer.IndentedTextWriter) -> None
         cpp_type = self.get_cpp_type_name()
         with writer.NamespaceScopeBlock(indented_writer, [""]):
-            with writer.IndentedScopedBlock(
-                indented_writer, f"constexpr std::array {cpp_type}_values{{", "};"
-            ):
-                for e in self._enum.values:
-                    indented_writer.write_line(f"{cpp_type}::{e.name},")
             with writer.IndentedScopedBlock(
                 indented_writer, f"constexpr std::array {cpp_type}_names{{", "};"
             ):

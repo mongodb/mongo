@@ -2673,6 +2673,16 @@ TEST(IDLEnum, NonContiguousIntEnum) {
     ASSERT_EQ(static_cast<int>(NonContiguousIntEnum::ten), 10);
 }
 
+TEST(IDLEnum, EnumValuesList) {
+    static_assert(StringEnumEnum_values ==
+                  std::array{StringEnumEnum::s0, StringEnumEnum::s1, StringEnumEnum::s2});
+    static_assert(IntEnum_values == std::array{IntEnum::a0, IntEnum::b1, IntEnum::c2});
+    static_assert(NonContiguousIntEnum_values ==
+                  std::array{NonContiguousIntEnum::one,
+                             NonContiguousIntEnum::five,
+                             NonContiguousIntEnum::ten});
+}
+
 OpMsgRequest makeOMR(BSONObj obj) {
     OpMsgRequest request;
     request.body = obj;

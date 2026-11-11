@@ -907,6 +907,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         if extra_data_decl is not None:
             self._writer.write_line("%s;" % (extra_data_decl))
 
+        self._writer.write_empty_line()
+        enum_type_info.gen_values_declaration(self._writer, mod_tag)
+
     def gen_enum_declaration(self, idl_enum):
         # type: (ast.Enum) -> None
         """Generate the declaration for an enum."""
@@ -1263,6 +1266,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # Generate system includes first
         header_list = [
             "algorithm",
+            "array",
             "boost/optional.hpp",
             "cstdint",
             "string",
