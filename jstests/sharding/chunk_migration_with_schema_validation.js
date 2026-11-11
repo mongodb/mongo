@@ -66,7 +66,32 @@ for (let i = 50; i < 75; ++i) {
     assert.commandWorked(testColl.remove({x: i}));
 }
 
+// This test runs on multiversion clusters, but only recipient binaries on 9.1 or newer have
+// the SERVER-137980 fix to bypass document validation when applying mods in steady state.
+const recipientVersion = assert.commandWorked(st.shard1.adminCommand({buildInfo: 1})).version;
+const testSteadyState = MongoRunner.compareBinVersions(recipientVersion, "9.1") >= 0;
+// Keep writes unblocked after catch-up so the invalid update is applied in steady state.
+const steadyStateFailpoint = testSteadyState
+    ? configureFailPoint(st.shard0, "moveChunkHangAtStep4")
+    : null;
 failpoint.off();
+if (testSteadyState) {
+    steadyStateFailpoint.wait();
+    assert.soon(
+        () =>
+            assert.commandWorked(st.shard1.adminCommand({_recvChunkStatus: 1})).state === "steady",
+    );
+
+    assert.commandWorked(
+        testColl.runCommand({
+            update: collName,
+            updates: [{q: {x: 75}, u: {$set: {name: "C"}}}],
+            bypassDocumentValidation: true,
+        }),
+    );
+
+    steadyStateFailpoint.off();
+}
 
 awaitResult();
 
@@ -83,5 +108,6 @@ assert.eq(
     "Number of documents on the recipient shard after moveChunk is incorrect.",
 );
 assert.eq(175, testColl.find().itcount(), "Number of total documents is incorrect");
+assert.eq(testSteadyState ? "C" : "A", testColl.findOne({x: 75}).name);
 
 st.stop();

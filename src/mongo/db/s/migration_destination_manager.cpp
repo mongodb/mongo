@@ -1903,6 +1903,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                     admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(
                         opCtx);
 
+                    // These documents were already accepted by the donor, possibly with validation
+                    // bypassed, so do not revalidate them on the recipient.
+                    DisableDocumentValidation documentValidationDisabler(
+                        opCtx,
+                        DocumentValidationSettings::kDisableSchemaValidationForInternalOp |
+                            DocumentValidationSettings::kDisableInternalValidation);
                     (void)_applyMigrateOp(opCtx, mods);
                     lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
                     continue;
