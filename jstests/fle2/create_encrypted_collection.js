@@ -11,16 +11,21 @@ let dbTest = db.getSiblingDB("create_encrypted_collection_db");
 
 dbTest.dropDatabase();
 
-const sampleEncryptedFields = {
-    "fields": [
-        {
-            "path": "firstName",
-            "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
-            "bsonType": "string",
-            "queries": {"queryType": "equality"}, // allow single object or array
-        },
-    ],
-};
+function encryptedFields(overrides = {}) {
+    const ef = {
+        "fields": [
+            {
+                "path": "firstName",
+                "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
+                "bsonType": "string",
+                "queries": {"queryType": "equality"},
+            },
+        ],
+    };
+    return Object.assign(ef, overrides);
+}
+
+const sampleEncryptedFields = encryptedFields();
 
 assert.commandFailedWithCode(
     dbTest.createCollection("basic", {viewOn: "foo", encryptedFields: sampleEncryptedFields}),
@@ -107,3 +112,28 @@ assert.commandWorked(
         },
     }),
 );
+
+// createCollection with invalid state collection names. The IDL validator only checks that each
+// name looks like enxcol_.<name>.(esc|ecoc), so names with the wrong suffix for their role, or that
+// are not bound to the collection, are rejected by the create command's binding check instead.
+const stateCollNameInvalidFormatTests = [
+    {escCollection: "legit.esc", ecocCollection: "enxcol_.legit.ecoc"},
+    {escCollection: "enxcol_.legit.ecoc", ecocCollection: "enxcol_.legit.ecoc"},
+    {escCollection: "enxcol_.legit.esc", ecocCollection: "legit.ecoc"},
+    {escCollection: "enxcol_.legit.esc", ecocCollection: "enxcol_.legit.esc"},
+    {escCollection: "enxcol_.invalid.esc", ecocCollection: "enxcol_.legit.ecoc"},
+    {escCollection: "enxcol_.legit.esc", ecocCollection: "enxcol_.invalid.ecoc"},
+];
+for (let testCase of stateCollNameInvalidFormatTests) {
+    const escParseError = 7406900;
+    const ecocParseError = 7406902;
+    const escRuntimeError = 13049800;
+    const ecocRuntimeError = 13049801;
+    assert.commandFailedWithCode(
+        dbTest.createCollection("legit", {
+            encryptedFields: encryptedFields(testCase),
+        }),
+        [escParseError, ecocParseError, escRuntimeError, ecocRuntimeError],
+        `createCollection should reject state collection names ${tojson(testCase)}`,
+    );
+}

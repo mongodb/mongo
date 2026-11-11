@@ -156,17 +156,17 @@ structs:
         cpp_validator_func: "validateEncryptedFieldConfig"
         fields:
             escCollection:
-                description: "Encrypted State Collection name, defaults to <collection>.esc"
+                description: "Encrypted State Collection name, defaults to enxcol_.<collection>.esc"
                 type: string
                 optional: true
                 stability: unstable
             eccCollection:
-                description: "Encrypted Cache Collection name, defaults to <collection>.ecc"
+                description: "(DEPRECATED) Encrypted Cache Collection name"
                 type: string
                 optional: true
                 stability: unstable
             ecocCollection:
-                description: "Encrypted Compaction Collection name, defaults to <collection>.ecoc"
+                description: "Encrypted Compaction Collection name, defaults to enxcol_.<collection>.ecoc"
                 type: string
                 optional: true
                 stability: unstable

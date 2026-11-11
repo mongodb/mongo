@@ -181,6 +181,9 @@ public:
                         "Encrypted collections are not supported on standalone",
                         repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
 
+                EncryptionInformationHelpers::validateStateCollectionNamespaces(
+                    cmd.getNamespace(), cmd.getEncryptedFields().get());
+
                 uassert(8575605,
                         "Cannot create a collection with an encrypted field with query "
                         "type rangePreview, as it is deprecated",

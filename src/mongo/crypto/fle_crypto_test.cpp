@@ -2583,7 +2583,7 @@ bool vectorContains(const std::vector<T>& vec, Func func) {
 }
 
 TEST_F(ServiceContextTest, EncryptionInformation_RoundTrip) {
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
+    NamespaceString ns = getTestNamespace();
 
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
     auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
@@ -2611,7 +2611,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_BadSchema) {
 }
 
 TEST_F(ServiceContextTest, EncryptionInformation_MissingStateCollection) {
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
+    NamespaceString ns = getTestNamespace();
 
     {
         EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
