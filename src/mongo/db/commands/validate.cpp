@@ -208,6 +208,10 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        // Validate holds only read locks, which step-up and step-down do not otherwise kill, and
+        // must not keep running on a node whose replication state has changed.
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
         if (MONGO_unlikely(validateCmdCollectionNotValid.shouldFail())) {
             result.appendBool("valid", false);
             return true;
