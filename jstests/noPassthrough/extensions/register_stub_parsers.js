@@ -76,18 +76,64 @@ function runFeatureFlagToggleTests(conn, fooExtensionLoaded) {
     testTestFooWithFeatureFlag(testDb, fooExtensionLoaded, true);
 }
 
+/**
+ * Test $testBinaryFlagStub behavior. It uses the extension's parser only when the extension is
+ * loaded and featureFlagExtensionStubParsersBinary is enabled; otherwise the stub throws.
+ */
+function testBinaryFlagStub(db, extensionLoaded, featureFlagEnabled) {
+    const coll = db[jsTestName()];
+    const pipeline = [{$testBinaryFlagStub: {}}];
+
+    if (extensionLoaded && featureFlagEnabled) {
+        assert.commandWorked(
+            db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
+        );
+    } else {
+        assertErrorCode(coll, pipeline, 10918500);
+    }
+}
+
+function binaryFlagOptions(enabled) {
+    return {setParameter: {featureFlagExtensionStubParsersBinary: enabled}};
+}
+
 // Test without any extensions loaded.
-withExtensions({}, (conn) => {
-    const testDb = conn.getDB("test");
+withExtensions(
+    {},
+    (conn) => {
+        const testDb = conn.getDB("test");
 
-    testStubStageAlwaysErrors(testDb);
-    runFeatureFlagToggleTests(conn, false);
-});
+        testStubStageAlwaysErrors(testDb);
+        runFeatureFlagToggleTests(conn, false);
+        testBinaryFlagStub(testDb, false, true);
+    },
+    ["standalone", "sharded"],
+    {},
+    binaryFlagOptions(true),
+);
 
-// Test with the foo extension loaded.
-withExtensions({"libfoo_mongo_extension.so": {}}, (conn) => {
-    const testDb = conn.getDB("test");
+// Test with the foo and binary_flag_stub extensions loaded.
+withExtensions(
+    {"libfoo_mongo_extension.so": {}, "libbinary_flag_stub_extension.so": {}},
+    (conn) => {
+        const testDb = conn.getDB("test");
 
-    testStubStageAlwaysErrors(testDb);
-    runFeatureFlagToggleTests(conn, true);
-});
+        testStubStageAlwaysErrors(testDb);
+        runFeatureFlagToggleTests(conn, true);
+        testBinaryFlagStub(testDb, true, true);
+    },
+    ["standalone", "sharded"],
+    {},
+    binaryFlagOptions(true),
+);
+
+// Test with the binary_flag_stub extension loaded and the binary flag disabled.
+withExtensions(
+    {"libbinary_flag_stub_extension.so": {}},
+    (conn) => {
+        testBinaryFlagStub(conn.getDB("test"), true, false);
+    },
+    ["standalone", "sharded"],
+    {},
+    binaryFlagOptions(false),
+);

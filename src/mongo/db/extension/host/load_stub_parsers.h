@@ -7,6 +7,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <string_view>
 
 namespace mongo::extension::host {
 /**
@@ -23,6 +24,13 @@ namespace mongo::extension::host {
  * error messages without a server release.
  */
 void registerUnloadedExtensionStubParsers();
+
+/**
+ * Returns the feature flag whose server parameter is named 'flagName' if it can gate a stub parser.
+ * Returns null if the stub parser is registered ungated. TODO SERVER-114028: Accept more feature
+ * flag types beyond IFR and BinaryCompatibleFeatureFlag.
+ */
+FeatureFlag* findStubParserFeatureFlag(std::string_view stageName, std::string_view flagName);
 
 /**
  * Register a fallback stub parser for an extension stage that is not loaded. This is useful when

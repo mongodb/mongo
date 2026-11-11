@@ -87,6 +87,7 @@ extensions_with_config(
         ":search_extension_signed_lib",
         ":search_index_management_extension_signed_lib",
         ":assert_deadline_increased_after_batch_extension_signed_lib",
+        ":binary_flag_stub_extension_signed_lib",
     ],
 )
 
@@ -341,4 +342,12 @@ signed_mongo_cc_extension_shared_library(
 signed_mongo_cc_extension_shared_library(
     name = "assert_deadline_increased_after_batch_extension",
     srcs = ["assert_deadline_increased_after_batch.cpp"],
+)
+
+# "binary_flag_stub" is used to test stub parsers gated on a binary-compatible feature flag. It must
+# not have the _mongo_extension suffix since its stage falls back to a stub whenever
+# featureFlagExtensionStubParsersBinary is disabled.
+signed_mongo_cc_extension_shared_library(
+    name = "binary_flag_stub_extension",
+    srcs = ["binary_flag_stub.cpp"],
 )

@@ -234,6 +234,12 @@ feature_flags:
         incremental_rollout_phase: in_development
         fcv_gated: false
 
+    featureFlagExtensionStubParsersBinary:
+        description: "Test feature flag for extension stub parser fallback registration. Used to test gating extension stage parsers on binary-compatible feature flags."
+        cpp_varname: gFeatureFlagExtensionStubParsersBinary
+        default: false
+        fcv_gated: false
+
     featureFlagExtensionCommands:
         description: "Feature flag to enable loading extension-defined commands via the Extensions API."
         cpp_varname: gFeatureFlagExtensionCommands

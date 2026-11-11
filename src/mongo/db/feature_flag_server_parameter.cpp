@@ -86,4 +86,10 @@ bool FeatureFlagServerParameter::isForIncrementalFeatureRollout() const {
 void FeatureFlagServerParameter::onRegistrationWithProcessGlobalParameterList() {
     _flag->registerFlag();
 }
+
+FeatureFlag* FeatureFlagServerParameter::findFeatureFlag(std::string_view name) {
+    auto* param = dynamic_cast<FeatureFlagServerParameter*>(
+        ServerParameterSet::getNodeParameterSet()->getIfExists(name));
+    return param ? param->_flag : nullptr;
+}
 }  // namespace mongo

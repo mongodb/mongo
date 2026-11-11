@@ -60,6 +60,12 @@ public:
 
     void onRegistrationWithProcessGlobalParameterList() override;
 
+    /**
+     * Returns the feature flag registered as a server parameter named 'name', or null if no such
+     * feature flag exists.
+     */
+    static FeatureFlag* findFeatureFlag(std::string_view name);
+
 private:
     FeatureFlag* _flag;
 };

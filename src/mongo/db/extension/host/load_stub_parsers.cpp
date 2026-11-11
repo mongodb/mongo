@@ -9,6 +9,7 @@
 #include "mongo/db/extension/host/extension_host_utils.h"
 #include "mongo/db/extension/host/load_extension.h"
 #include "mongo/db/extension/host/stub_commands.h"
+#include "mongo/db/feature_flag_server_parameter.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -116,6 +117,30 @@ void registerStubCommands(const BSONObj& obj, const std::filesystem::path& fileP
     }
 }
 }  // namespace
+
+FeatureFlag* findStubParserFeatureFlag(std::string_view stageName, std::string_view flagName) {
+    auto* flag = FeatureFlagServerParameter::findFeatureFlag(flagName);
+    if (!flag) {
+        LOGV2_WARNING_OPTIONS(11395402,
+                              {logv2::LogTag::kStartupWarnings},
+                              "Stub parser references unknown feature flag",
+                              "stageName"_attr = stageName,
+                              "featureFlagName"_attr = flagName);
+        return nullptr;
+    }
+
+    if (!dynamic_cast<IncrementalRolloutFeatureFlag*>(flag) &&
+        !dynamic_cast<BinaryCompatibleFeatureFlag*>(flag)) {
+        LOGV2_WARNING_OPTIONS(13841300,
+                              {logv2::LogTag::kStartupWarnings},
+                              "Stub parser feature flag must be an incremental rollout or "
+                              "binary-compatible feature flag",
+                              "stageName"_attr = stageName,
+                              "featureFlagName"_attr = flagName);
+        return nullptr;
+    }
+    return flag;
+}
 
 void registerStubParser(std::string stageName, std::string message, FeatureFlag* featureFlag) {
     LOGV2(10918509,
@@ -229,16 +254,7 @@ void registerUnloadedExtensionStubParsers() {
 
         FeatureFlag* featureFlag = nullptr;
         if (featureFlagElem.type() == BSONType::string) {
-            const auto featureFlagName = featureFlagElem.String();
-            // TODO SERVER-138413: Also look up binary-compatible feature flags by name.
-            featureFlag = IncrementalRolloutFeatureFlag::findByName(featureFlagName);
-            if (!featureFlag) {
-                LOGV2_WARNING_OPTIONS(11395402,
-                                      {logv2::LogTag::kStartupWarnings},
-                                      "Stub parser references unknown feature flag",
-                                      "stageName"_attr = stageName,
-                                      "featureFlagName"_attr = featureFlagName);
-            }
+            featureFlag = findStubParserFeatureFlag(stageName, featureFlagElem.valueStringData());
         }
 
         registerStubParser(std::move(stageName), std::move(message), featureFlag);
