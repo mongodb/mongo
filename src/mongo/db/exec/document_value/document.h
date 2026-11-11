@@ -490,6 +490,14 @@ public:
     }
 
     /**
+     * Returns the BSONObj backing this document's storage, or an empty object if there
+     * is no backing BSON.
+     */
+    const BSONObj& getBackingBson() const {
+        return storage().bsonObj();
+    }
+
+    /**
      * Returns true if the document has been modified (i.e. it differs from the underlying BSONObj).
      */
     auto isModified() const {

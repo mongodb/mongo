@@ -50,12 +50,30 @@ bool CursorStage::Batch::isEmpty() const {
     MONGO_UNREACHABLE;
 }
 
+void CursorStage::Batch::trackMemUsage(const Document& doc) {
+    size_t size = doc.getApproximateSize();
+    const BSONObj& backing = doc.getBackingBson();
+    if (backing.isOwned()) {
+        // TODO SERVER-139133 extend memory tracking logic to account
+        // for multi-way join BSON sharing.
+        if (backing.objdata() == _lastCountedBacking.objdata()) {
+            // Same backing as the last counted document, so don't count it.
+            size_t backingSize = backing.objsize();
+            dassert(size >= backingSize);
+            size -= backingSize;
+        } else {
+            _lastCountedBacking = backing;
+        }
+    }
+    _memUsageBytes += size;
+}
+
 void CursorStage::Batch::enqueue(Document&& doc, boost::optional<BSONObj> resumeToken) {
     switch (_type) {
         case CursorType::kRegular: {
             invariant(doc.isOwned());
             _batchOfDocs.push_back(std::move(doc));
-            _memUsageBytes += _batchOfDocs.back().getApproximateSize();
+            trackMemUsage(_batchOfDocs.back());
             if (resumeToken) {
                 _resumeTokens.push_back(*resumeToken);
                 dassert(_resumeTokens.size() == _batchOfDocs.size());
@@ -101,6 +119,7 @@ void CursorStage::Batch::clear() {
     _batchOfDocs.clear();
     _count = 0;
     _memUsageBytes = 0;
+    _lastCountedBacking = BSONObj();
 }
 
 CursorStage::CursorStage(std::string_view stageName,

@@ -179,6 +179,8 @@ private:
         }
 
     private:
+        void trackMemUsage(const Document& doc);
+
         // If 'kEmptyDocuments', then dependency analysis has indicated that all we need to execute
         // the query is a count of the incoming documents.
         const CursorType _type;
@@ -197,6 +199,11 @@ private:
         // The approximate memory footprint of the batch in bytes. Always kept at zero when '_type'
         // is 'kEmptyDocuments'.
         size_t _memUsageBytes = 0;
+
+        // Backing BSON of the last counted document. Consecutive documents sharing it (like SBE
+        // $lookup+$unwind data) count it once. Kept across batches so a backing larger than the
+        // byte limit doesn't force single-document batches.
+        BSONObj _lastCountedBacking;
     };
 
     /**

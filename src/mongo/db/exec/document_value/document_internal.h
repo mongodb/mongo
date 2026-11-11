@@ -609,7 +609,7 @@ public:
         return _metadataFields.isModified();
     }
 
-    auto bsonObj() const {
+    const BSONObj& bsonObj() const {
         return _bson;
     }
 
