@@ -259,7 +259,7 @@ public:
 
     /**
      * Records the outcome of comparing the accumulated collection hash against the expected one,
-     * adding a warning when they disagree. Returns true if they matched.
+     * adding an error without stopping validation when they disagree. Returns true if they matched.
      */
     bool recordHashComparison(uint64_t accumulated, int64_t expected);
 
