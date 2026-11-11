@@ -193,7 +193,13 @@ describe("join plan cache key in explain on a replica set with cluster-wide quer
         this.getKey = () => {
             const explain = this.baseColl.explain().aggregate(this.pipeline);
             assert(joinOptUsed(explain), "expected join optimization to be used", {explain});
-            return getQueryPlanner(explain).joinPlanCacheKey;
+            const planner = getQueryPlanner(explain);
+            assert(
+                planner.joinOptimizer?.hasOwnProperty("planCacheKey"),
+                "expected planCacheKey in queryPlanner.joinOptimizer",
+                {planner},
+            );
+            return planner.joinOptimizer.planCacheKey;
         };
 
         const qsutils = new QuerySettingsUtils(db, this.baseColl.getName());

@@ -33,11 +33,7 @@ describe("analyze with mode: 'sample' on unreplicated collections", function () 
         localColl.drop();
         assert.commandWorked(localColl.insertMany([{a: 1}, {a: 2}, {a: 3}]));
         assert.commandFailedWithCode(
-            localDb.runCommand({
-                analyze: localColl.getName(),
-                mode: "sample",
-                samplingMethod: "random",
-            }),
+            localDb.runCommand({analyze: localColl.getName(), mode: "sample"}),
             ErrorCodes.IllegalOperation,
             "analyze on a collection in the local database should fail with IllegalOperation",
         );
@@ -51,7 +47,7 @@ describe("analyze with mode: 'sample' on unreplicated collections", function () 
         assert.commandWorked(db.runCommand({ping: 1}));
         assert.commandWorked(db.setProfilingLevel(0));
         assert.commandFailedWithCode(
-            db.runCommand({analyze: "system.profile", mode: "sample", samplingMethod: "random"}),
+            db.runCommand({analyze: "system.profile", mode: "sample"}),
             ErrorCodes.IllegalOperation,
             "analyze on system.profile should fail with IllegalOperation",
         );
