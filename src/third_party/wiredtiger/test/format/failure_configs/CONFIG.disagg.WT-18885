@@ -29,6 +29,7 @@ checkpoint_threads=1
 compact.free_space_target=31
 debug.background_compact=0
 debug.checkpoint_retention=10
+debug.cursor_copy=0
 debug.cursor_reposition=0
 debug.disagg_slow_truncate_follower=1
 debug.eviction=0
