@@ -3,6 +3,7 @@
 
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -398,7 +399,10 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDrop(OperationContext
     }
 
     for (size_t retries = 1;; ++retries) {
-        auto status = _immediatelyAttemptToCompletePendingDrop(opCtx, ident, boost::none);
+        // immediatelyCompletePendingDrop() should only be called on tables which were never present
+        // in the catalog, so it should be impossible for the drop token to be live
+        auto status = _immediatelyAttemptToCompletePendingDrop(
+            opCtx, ident, DropUnreplicated{}, /*allowUnexpired=*/false);
         if (status != ErrorCodes::ObjectIsBusy) {
             invariant(status != ErrorCodes::LockBusy);
             return status;
@@ -451,7 +455,8 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDropAtTimestamp(Opera
     }
 
     for (size_t retries = 1;; ++retries) {
-        auto status = _immediatelyAttemptToCompletePendingDrop(opCtx, ident, timestamp);
+        auto status = _immediatelyAttemptToCompletePendingDrop(
+            opCtx, ident, DropAsReplicatedApply{timestamp}, /*allowUnexpired=*/true);
         if (status != ErrorCodes::ObjectIsBusy) {
             invariant(status != ErrorCodes::LockBusy);
             return status;
@@ -478,31 +483,27 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDropAtTimestamp(Opera
 Status KVDropPendingIdentReaper::_immediatelyAttemptToCompletePendingDrop(
     OperationContext* opCtx,
     std::string_view ident,
-    boost::optional<Timestamp> replicatedIdentDropTimestamp) {
+    DropExecution dropExecution,
+    bool allowUnexpired) {
     std::lock_guard dropLock(_dropMutex);
-    auto info = [&]() -> IdentInfo* {
+    IdentInfo* info = nullptr;
+    {
         std::lock_guard stateLock(_mutex);
         auto it = _dropPendingIdents.find(ident);
         if (it == _dropPendingIdents.end()) {
-            return nullptr;
+            // While we held no mutexes another thread completed the drop on this ident
+            return Status::OK();
         }
-        auto& info = it->second;
-        invariant(!info.dropInProgress);
-        invariant(info.dropToken.expired());
-        info.dropInProgress = true;
-        return &it->second;
-    }();
-
-    if (!info) {
-        // While we held no mutexes another thread completed the drop on this ident
-        return Status::OK();
+        info = &it->second;
+        invariant(!info->dropInProgress);
+        if (!info->dropToken.expired()) {
+            invariant(allowUnexpired);
+            return {ErrorCodes::ObjectIsBusy, "dropToken has not expired"};
+        }
+        info->dropInProgress = true;
     }
 
-    const DropExecution execution = replicatedIdentDropTimestamp
-        ? DropExecution{DropAsReplicatedApply{*replicatedIdentDropTimestamp}}
-        : DropExecution{DropUnreplicated{}};
-
-    return _tryToDrop(dropLock, opCtx, *info, execution);
+    return _tryToDrop(dropLock, opCtx, *info, dropExecution);
 }
 
 Status KVDropPendingIdentReaper::_tryToDrop(WithLock,

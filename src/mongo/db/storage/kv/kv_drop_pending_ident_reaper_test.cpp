@@ -24,6 +24,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
@@ -777,6 +778,60 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropAtTimestampReturnsInterruptS
               ErrorCodes::InterruptedAtShutdown);
     EXPECT_TRUE(engine->droppedIdents.empty());
     EXPECT_EQ(reaper.getAllIdentNames(), std::set{identName});
+}
+
+TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropAtTimestampTreatsLiveDropTokenAsBusy) {
+    const std::string identName = "ident";
+    const Timestamp dropTimestamp(50, 0);
+    const Timestamp replicatedIdentDropTimestamp(60, 0);
+
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+
+    // Hold the drop token to simulate a reader that still references the ident.
+    auto ident = std::make_shared<Ident>(identName);
+    reaper.addDropPendingIdent(StorageEngine::OldestTimestamp{dropTimestamp}, ident);
+
+    // Kill the operation so that the retry loop terminates. We only check for interrupts after
+    // attempting a drop, so this should fail to drop once and then interrupt before retrying.
+    auto opCtx = makeOpCtx();
+    opCtx->markKilled(ErrorCodes::InterruptedAtShutdown);
+
+    EXPECT_EQ(reaper.immediatelyCompletePendingDropAtTimestamp(
+                  opCtx.get(), identName, replicatedIdentDropTimestamp),
+              ErrorCodes::InterruptedAtShutdown);
+    EXPECT_TRUE(engine->droppedIdents.empty());
+    EXPECT_EQ(reaper.getAllIdentNames(), std::set{identName});
+}
+
+TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropAtTimestampCompletesAfterDropTokenReleased) {
+    const std::string identName = "ident";
+    const Timestamp dropTimestamp(50, 0);
+    const Timestamp replicatedIdentDropTimestamp(60, 0);
+    const uint64_t expectedSchemaEpoch = 42;
+
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+
+    auto ident = std::make_shared<Ident>(identName);
+    reaper.addDropPendingIdent(StorageEngine::OldestTimestamp{dropTimestamp}, ident);
+
+    expectSchemaEpochForTimestamp(replicatedIdentDropTimestamp, expectedSchemaEpoch);
+    auto opCtx = makeOpCtx();
+
+    // Release the last reference from another thread while the drop is being applied. Since this
+    // relies on sleep it may spuriously pass, but should never spuriously fail.
+    unittest::JoinThread releaser([ident = std::move(ident)]() mutable {
+        sleepmillis(50);
+        ident.reset();
+    });
+    ASSERT_OK(reaper.immediatelyCompletePendingDropAtTimestamp(
+        opCtx.get(), identName, replicatedIdentDropTimestamp));
+
+    EXPECT_EQ(engine->getDroppedIdentNames(), std::vector{identName});
+    ASSERT_EQUALS(engine->droppedIdents.size(), 1U);
+    EXPECT_EQ(engine->droppedIdents.front().schemaEpoch, expectedSchemaEpoch);
+    EXPECT_TRUE(reaper.getAllIdentNames().empty());
 }
 
 TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropAtTimestampTooEarlyReturnsObjectIsBusy) {

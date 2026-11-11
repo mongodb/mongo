@@ -173,10 +173,10 @@ private:
                       IdentInfo& identInfo,
                       DropExecution dropExecution);
 
-    Status _immediatelyAttemptToCompletePendingDrop(
-        OperationContext* opCtx,
-        std::string_view ident,
-        boost::optional<Timestamp> replicatedIdentDropTimestamp);
+    Status _immediatelyAttemptToCompletePendingDrop(OperationContext* opCtx,
+                                                    std::string_view ident,
+                                                    DropExecution dropExecution,
+                                                    bool allowUnexpired);
 
     template <typename Field>
     struct CompareByDropTime {
