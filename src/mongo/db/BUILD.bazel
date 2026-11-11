@@ -2627,7 +2627,7 @@ mongo_cc_library(
         ":index_key_validate",
         "//src/mongo/db/repl:local_oplog_info",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
-        "//src/mongo/db/validate:collection_validation",
+        "//src/mongo/db/validate:offline_validation",
         "//src/mongo/db/commands:mongod_fcv",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/repl:repl_settings",
@@ -2640,7 +2640,6 @@ mongo_cc_library(
         "//src/mongo/db/index_builds/primary_driven:enabled",
         # "//src/mongo/db/index_builds:rebuild_indexes",
         "//src/mongo/db/timeseries:timeseries_extended_range",
-        "//src/mongo/util:processinfo",
     ],
 )
 

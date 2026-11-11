@@ -120,6 +120,31 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "offline_validation",
+    srcs = [
+        "offline_validate.cpp",
+    ],
+    deps = [
+        ":collection_validation",
+        ":validate_results",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:profile_settings",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:server_options_storage",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
+        "//src/mongo/db/shard_role/shard_catalog:database_holder",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "db_validate_test",
     srcs = [
