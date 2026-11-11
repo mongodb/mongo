@@ -177,6 +177,10 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQueryMaxDegreeOfParallelismName,                                        \
          internalQueryMaxDegreeOfParallelism,                                             \
          getMaxDegreeOfParallelism)                                                       \
+    KNOB(kBypassParallelGates,                                                            \
+         kInternalQueryBypassParallelGatesName,                                           \
+         internalQueryBypassParallelGates,                                                \
+         isBypassParallelGatesEnabled)                                                    \
     /* Sampling / cardinality estimation */                                               \
     KNOB(kSamplingMarginOfError,                                                          \
          kSamplingMarginOfErrorName,                                                      \

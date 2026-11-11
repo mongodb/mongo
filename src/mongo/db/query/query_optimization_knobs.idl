@@ -746,6 +746,26 @@ server_parameters:
                 fcv:
                     min: "9.1"
 
+    internalQueryBypassParallelGates:
+        mod_visibility: needs_replacement
+        description: >-
+            Test-only. When true, the parallelism planner skips its collection size and cost gates,
+            so that it parallelizes eligible plans however small their input. It does not enable
+            parallel query on its own: internalQueryEnableParallelQuery must still be true,
+            internalQueryMaxDegreeOfParallelism must still be greater than 1, and the plan must
+            still be eligible for parallelism.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryBypassParallelGates"
+        cpp_vartype: Atomic<bool>
+        default: false
+        test_only: true
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: bypassParallelGates
+                fcv:
+                    min: "9.1"
+
     internalQueryMaxPipelineRewrites:
         mod_visibility: needs_replacement
         description: "Maximum number of pipeline rewrite rules to apply"

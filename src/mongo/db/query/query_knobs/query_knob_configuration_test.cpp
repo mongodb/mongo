@@ -56,6 +56,15 @@ TEST_F(QueryKnobConfigurationTest, ParallelQueryKnobsFollowSetParameter) {
     ASSERT_EQ(config.getMaxDegreeOfParallelism(), 8);
 }
 
+TEST_F(QueryKnobConfigurationTest, BypassParallelGatesIsOffByDefault) {
+    ASSERT_FALSE(makeConfig().isBypassParallelGatesEnabled());
+}
+
+TEST_F(QueryKnobConfigurationTest, BypassParallelGatesFollowsSetParameter) {
+    unittest::ServerParameterGuard bypassGuard{"internalQueryBypassParallelGates", true};
+    ASSERT_TRUE(makeConfig().isBypassParallelGatesEnabled());
+}
+
 // ---------------------------------------------------------------------------
 // getPlanRanker()
 // ---------------------------------------------------------------------------
