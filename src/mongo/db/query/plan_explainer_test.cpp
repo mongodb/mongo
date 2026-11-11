@@ -1702,6 +1702,7 @@ TEST_F(PlanExplainerTest, CBRSamplingMetadataReportsPagesForPersistedSample) {
                                          ce::SamplingTechniqueEnum::kRandom,
                                          kPersistedSampleSize,
                                          /*numChunks=*/boost::none,
+                                         /*genId=*/1,
                                          sample,
                                          Date_t::now());
     ASSERT_EQ(pages.size(), 1u);

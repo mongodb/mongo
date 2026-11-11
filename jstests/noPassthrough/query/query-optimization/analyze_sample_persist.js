@@ -5,11 +5,15 @@
  * @tags: [
  *   # Requires featureFlagPersistentStats for persisted samples.
  *   featureFlagPersistentStats,
+ *   uses_parallel_shell,
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
+import {getAnalyzeMetrics} from "jstests/libs/query/planning_metrics_utils.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
 
 const conn = MongoRunner.runMongod({
@@ -49,6 +53,15 @@ function insertDocs(n) {
 function runAnalyze(analyzeCmd) {
     assert.commandWorked(db.runCommand(analyzeCmd));
     PersistentSamplesUtils.assertSamplesCollClustered(db);
+}
+
+// Returns how many persisted samples hit no write conflict and how many hit at least one.
+function getWriteConflictCounts() {
+    const [noConflicts, ...someConflicts] = getAnalyzeMetrics(db).histograms.writeConflicts;
+    return {
+        none: Number(noConflicts.count),
+        some: someConflicts.reduce((sum, bucket) => sum + Number(bucket.count), 0),
+    };
 }
 
 function runAnalyzeWith({sampleSize, samplingMethod, numChunks}) {
@@ -113,7 +126,7 @@ insertDocs(20);
         PersistentSamplesUtils.sampleDocFieldNames.createdAtField
     ];
 
-    // Re-running analyze against an already-clustered samples collection must be a no-op create.
+    // Re-running analyze against an already-clustered samples collection must replace the existing sample document.
     runAnalyzeWith({sampleSize: 10, samplingMethod: "random"});
     const secondPages = PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
@@ -122,11 +135,127 @@ insertDocs(20);
         actualSampleSize: 10,
         expectedSchemaVersion: expectedSchemaVersion,
         expectedFields: sourceDocFields,
+        expectedGenId: PersistentSamplesUtils.kFirstPersistentSampleGenId + 1,
     });
     assert.gt(
         secondPages[0][PersistentSamplesUtils.sampleDocFieldNames.createdAtField],
         firstCreatedAt,
         "timestamp should be later on second run of same analyze command",
+    );
+}
+
+// Two concurrent analyze commands pick the same gen_id: the one that loses the race retries with
+// the next gen_id.
+cleanup();
+insertDocs(20);
+{
+    const analyzeCmd = {analyze: collName, mode: "sample"};
+    const expectedSample = {
+        sampledCollName: collName,
+        samplingMethod: "random",
+        requestedSampleSize: defaultSampleSize,
+        actualSampleSize: 20,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+        expectedGenId: PersistentSamplesUtils.kFirstPersistentSampleGenId,
+    };
+    const writeConflictsBefore = getWriteConflictCounts();
+    runAnalyze(analyzeCmd);
+    assert.docEq(
+        {none: writeConflictsBefore.none + 1, some: writeConflictsBefore.some},
+        getWriteConflictCounts(),
+        "an uncontended analyze should not hit a write conflict",
+    );
+
+    const fp = configureFailPoint(conn, "hangAfterFindingMaxPersistentSampleGenId");
+    const startAnalyze = () =>
+        startParallelShell(
+            funWithArgs(
+                async (dbName, cmd, expectedSample) => {
+                    const {validatePersistentSample} = await import(
+                        "jstests/libs/query/persistent_samples_utils.js"
+                    );
+                    const testDb = db.getSiblingDB(dbName);
+                    validatePersistentSample(testDb, expectedSample);
+                    assert.commandWorked(testDb.runCommand(cmd));
+                },
+                db.getName(),
+                analyzeCmd,
+                expectedSample,
+            ),
+            conn.port,
+        );
+    const awaitFirstAnalyze = startAnalyze();
+    const awaitSecondAnalyze = startAnalyze();
+    fp.wait({timesEntered: 2});
+    fp.off();
+
+    awaitFirstAnalyze();
+    awaitSecondAnalyze();
+
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        ...expectedSample,
+        expectedGenId: PersistentSamplesUtils.kFirstPersistentSampleGenId + 2,
+    });
+    assert.docEq(
+        {none: writeConflictsBefore.none + 2, some: writeConflictsBefore.some + 1},
+        getWriteConflictCounts(),
+        "only the analyze that lost the gen_id race should have hit a write conflict",
+    );
+}
+
+// Two concurrent analyze commands pick the first gen_id when no generation has been persisted yet:
+// the one that loses the race retries with the next gen_id.
+cleanup();
+insertDocs(20);
+{
+    const analyzeCmd = {analyze: collName, mode: "sample"};
+    const writeConflictsBefore = getWriteConflictCounts();
+
+    const fp = configureFailPoint(conn, "hangAfterFindingMaxPersistentSampleGenId");
+    const startAnalyze = () =>
+        startParallelShell(
+            funWithArgs(
+                async (dbName, cmd) => {
+                    const {getCollUUID, getSampleLookupFilter, getSamplesColl} = await import(
+                        "jstests/libs/query/persistent_samples_utils.js"
+                    );
+                    const testDb = db.getSiblingDB(dbName);
+                    const filter = getSampleLookupFilter(getCollUUID(testDb, cmd.analyze));
+                    assert.eq(
+                        0,
+                        getSamplesColl(testDb).find(filter).itcount(),
+                        "expected no sample",
+                        {filter},
+                    );
+                    assert.commandWorked(testDb.runCommand(cmd));
+                },
+                db.getName(),
+                analyzeCmd,
+            ),
+            conn.port,
+        );
+    const awaitFirstAnalyze = startAnalyze();
+    const awaitSecondAnalyze = startAnalyze();
+    fp.wait({timesEntered: 2});
+    fp.off();
+
+    awaitFirstAnalyze();
+    awaitSecondAnalyze();
+
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "random",
+        requestedSampleSize: defaultSampleSize,
+        actualSampleSize: 20,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+        expectedGenId: PersistentSamplesUtils.kFirstPersistentSampleGenId + 1,
+    });
+    assert.docEq(
+        {none: writeConflictsBefore.none + 1, some: writeConflictsBefore.some + 1},
+        getWriteConflictCounts(),
+        "only the analyze that lost the gen_id race should have hit a write conflict",
     );
 }
 

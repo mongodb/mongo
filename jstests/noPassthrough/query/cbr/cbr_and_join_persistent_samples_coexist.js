@@ -69,18 +69,6 @@ function setSampleSizeKnobs({cbrSampleSize, joinSampleSize}) {
     );
 }
 
-// Returns the persisted sample pages for 'collName' ordered by page number. At most one sample
-// exists per collection.
-function getSamplePages(collName) {
-    const filter = PersistentSamplesUtils.getSampleLookupFilter(
-        PersistentSamplesUtils.getCollUUID(db, collName),
-    );
-    return PersistentSamplesUtils.getSamplesColl(db)
-        .find(filter)
-        .sort({[PersistentSamplesUtils.sampleDocFieldNames.pageNoField]: 1})
-        .toArray();
-}
-
 // Asserts that a single ceSamplingMetadata entry key reports a sample of 'expectedSize' obtained from
 // 'expectedSource' ("persisted" or "onTheFly").
 function assertSampleMetadata(
@@ -207,28 +195,25 @@ describe("the single persisted sample shared by CBR and join optimization", () =
     it("persists a single sample per collection, replacing it on re-analyze", () => {
         setSampleSizeKnobs({cbrSampleSize: kSmallerSize, joinSampleSize: kLargerSize});
 
-        assert.commandWorked(db.runCommand({analyze: ordersName, mode: "sample"}));
-        PersistentSamplesUtils.validatePersistentSample(db, {
+        const expectedSample = {
             sampledCollName: ordersName,
             samplingMethod: kRandomSamplingMethod,
             requestedSampleSize: kLargerSize,
             actualSampleSize: kLargerSize,
-        });
-        const originalSamplePages = getSamplePages(ordersName);
-
-        // A second analyze replaces the sample rather than accumulating another one.
+        };
         assert.commandWorked(db.runCommand({analyze: ordersName, mode: "sample"}));
-        const updatedSamplePages = getSamplePages(ordersName);
-        assert.eq(
-            updatedSamplePages.length,
-            originalSamplePages.length,
-            "re-analyze should replace the sample, not add another",
+        const originalSamplePages = PersistentSamplesUtils.validatePersistentSample(
+            db,
+            expectedSample,
         );
-        assert.eq(
-            updatedSamplePages.map((p) => p._id),
-            originalSamplePages.map((p) => p._id),
-            "re-analyze should replace the same sample's pages in place",
-        );
+
+        // A second analyze replaces the sample with the next generation rather than accumulating
+        // another one.
+        assert.commandWorked(db.runCommand({analyze: ordersName, mode: "sample"}));
+        const updatedSamplePages = PersistentSamplesUtils.validatePersistentSample(db, {
+            ...expectedSample,
+            expectedGenId: PersistentSamplesUtils.kFirstPersistentSampleGenId + 1,
+        });
 
         const createdAtField = PersistentSamplesUtils.sampleDocFieldNames.createdAtField;
         assert.gt(

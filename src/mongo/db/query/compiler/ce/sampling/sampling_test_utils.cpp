@@ -603,13 +603,11 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  int pageNo,
                                  size_t numDocsDiscarded,
                                  boost::optional<uint64_t> genId,
-                                 boost::optional<int> numPages) {
+                                 int numPages) {
     BSONObjBuilder builder;
     builder.append("_id", makePersistentSampleId(collUuid, pageNo, genId));
     builder.append(PersistentSampleDoc::kPageNoFieldName, pageNo);
-    if (numPages.has_value()) {
-        builder.append(PersistentSampleDoc::kNumPagesFieldName, numPages.value());
-    }
+    builder.append(PersistentSampleDoc::kNumPagesFieldName, numPages);
     builder.append(PersistentSampleDoc::kCollectionUuidFieldName, collUuid.toString());
     builder.append(PersistentSampleDoc::kSchemaVersionFieldName, schemaVersion);
     builder.appendDate(PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());

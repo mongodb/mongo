@@ -10,6 +10,7 @@
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -18,6 +19,8 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -27,6 +30,27 @@ namespace {
 size_t countSamplesCollDocs(OperationContext* opCtx, const NamespaceString& samplesNss) {
     DBDirectClient client(opCtx);
     return static_cast<size_t>(client.count(samplesNss));
+}
+
+std::set<std::string> samplesCollIds(OperationContext* opCtx, const NamespaceString& samplesNss) {
+    DBDirectClient client(opCtx);
+    FindCommandRequest findCmd(samplesNss);
+    findCmd.setProjection(BSON("_id" << 1));
+    std::set<std::string> ids;
+    auto cursor = client.find(std::move(findCmd));
+    while (cursor->more()) {
+        ids.insert(cursor->next()["_id"].str());
+    }
+    return ids;
+}
+
+StatusWith<PersistedSampleSummary> refreshRandomSample(OperationContext* opCtx,
+                                                       const NamespaceString& nss,
+                                                       size_t sampleSize) {
+    SampleManager manager(
+        opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, nullptr /*customerQueryExpCtx*/);
+    return manager.refresh(makeSpec(
+        nss, sampleSize, SamplingCEMethodEnum::kRandom, SamplingSourceEnum::kOnTheFlySample));
 }
 
 }  // namespace
@@ -398,6 +422,122 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshPersistsNoNumChunksForFullColl
     ASSERT_FALSE(loaded.getValue().numChunks().has_value());
 }
 
+TEST_F(SamplingEstimatorTest, SampleManagerFirstRefreshWritesGenerationOne) {
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
+    const UUID uuid =
+        acquireCollectionForSampling(operationContext(), _kTestNss).getCollectionPtr()->uuid();
+    const auto samplesNss =
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
+    const auto summary = refreshRandomSample(operationContext(), _kTestNss, /*sampleSize=*/2);
+    ASSERT_OK(summary);
+    ASSERT_EQ(summary.getValue().genId, 1u);
+    ASSERT_EQ(samplesCollIds(operationContext(), samplesNss),
+              std::set<std::string>{makePersistentSampleId(uuid, /*pageNo=*/0, 1)});
+}
+
+TEST_F(SamplingEstimatorTest, SampleManagerRefreshWritesTheNextGenerationAndDeletesThePreviousOne) {
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
+    const UUID uuid =
+        acquireCollectionForSampling(operationContext(), _kTestNss).getCollectionPtr()->uuid();
+    const auto samplesNss =
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
+    for (uint64_t expectedGenId = 1; expectedGenId <= 3; ++expectedGenId) {
+        const auto summary = refreshRandomSample(operationContext(), _kTestNss, /*sampleSize=*/2);
+        ASSERT_OK(summary);
+        ASSERT_EQ(summary.getValue().genId, expectedGenId);
+        ASSERT_EQ(samplesCollIds(operationContext(), samplesNss),
+                  std::set<std::string>{makePersistentSampleId(uuid, /*pageNo=*/0, expectedGenId)});
+    }
+}
+
+TEST_F(SamplingEstimatorTest, SampleManagerRefreshCountsPagesWithoutGenIdAsGenerationZero) {
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
+    const UUID uuid =
+        acquireCollectionForSampling(operationContext(), _kTestNss).getCollectionPtr()->uuid();
+    const auto samplesNss =
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
+    createCollAndInsertDocuments(
+        operationContext(), samplesNss, {buildPage(uuid)}, /*clustered=*/true);
+
+    const auto summary = refreshRandomSample(operationContext(), _kTestNss, /*sampleSize=*/2);
+    ASSERT_OK(summary);
+    ASSERT_EQ(summary.getValue().genId, 1u);
+    ASSERT_EQ(samplesCollIds(operationContext(), samplesNss),
+              std::set<std::string>{makePersistentSampleId(uuid, /*pageNo=*/0, 1)});
+}
+
+TEST_F(SamplingEstimatorTest, SampleManagerRefreshComparesGenIdsAsNumbers) {
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
+    const UUID uuid =
+        acquireCollectionForSampling(operationContext(), _kTestNss).getCollectionPtr()->uuid();
+    const auto samplesNss =
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
+    createCollAndInsertDocuments(operationContext(),
+                                 samplesNss,
+                                 {buildPage(uuid, {.genId = 9}), buildPage(uuid, {.genId = 10})},
+                                 /*clustered=*/true);
+
+    const auto summary = refreshRandomSample(operationContext(), _kTestNss, /*sampleSize=*/2);
+    ASSERT_OK(summary);
+    ASSERT_EQ(summary.getValue().genId, 11u);
+    ASSERT_EQ(samplesCollIds(operationContext(), samplesNss),
+              std::set<std::string>{makePersistentSampleId(uuid, /*pageNo=*/0, 11)});
+}
+
+TEST_F(SamplingEstimatorTest, SampleManagerRefreshReplacesEveryExistingGeneration) {
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
+    const UUID uuid =
+        acquireCollectionForSampling(operationContext(), _kTestNss).getCollectionPtr()->uuid();
+    const auto samplesNss =
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
+    createCollAndInsertDocuments(operationContext(),
+                                 samplesNss,
+                                 {buildPage(uuid),
+                                  buildPage(uuid, {.genId = 4, .numPages = 2}),
+                                  buildPage(uuid, {.genId = 9}),
+                                  buildPage(uuid, {.genId = 99})},
+                                 /*clustered=*/true);
+
+    const auto summary = refreshRandomSample(operationContext(), _kTestNss, /*sampleSize=*/2);
+    ASSERT_OK(summary);
+    ASSERT_EQ(summary.getValue().genId, 100u);
+    ASSERT_EQ(samplesCollIds(operationContext(), samplesNss),
+              std::set<std::string>{makePersistentSampleId(uuid, /*pageNo=*/0, 100)});
+}
+
+TEST_F(SamplingEstimatorTest, SampleManagerRefreshLeavesOtherCollectionsSamplesUntouched) {
+    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(_kTestNss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
+    const UUID uuid =
+        acquireCollectionForSampling(operationContext(), _kTestNss).getCollectionPtr()->uuid();
+    const auto samplesNss =
+        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
+    const UUID otherUuid = UUID::gen();
+    createCollAndInsertDocuments(
+        operationContext(),
+        samplesNss,
+        {buildPage(uuid, {.genId = 5}), buildPage(otherUuid, {.genId = 7})},
+        /*clustered=*/true);
+
+    const auto summary = refreshRandomSample(operationContext(), _kTestNss, /*sampleSize=*/2);
+    ASSERT_OK(summary);
+    ASSERT_EQ(summary.getValue().genId, 6u);
+    ASSERT_EQ(samplesCollIds(operationContext(), samplesNss),
+              (std::set<std::string>{makePersistentSampleId(uuid, /*pageNo=*/0, 6),
+                                     makePersistentSampleId(otherUuid, /*pageNo=*/0, 7)}));
+}
+
 TEST_F(SamplingEstimatorTest, SampleManagerFallsBackToOnTheFlyWhenNoGenerationIsComplete) {
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(_kTestNss,
@@ -475,6 +615,7 @@ std::vector<BSONObj> makeRandomSamplePageDocs(const std::vector<BSONObj>& sample
                                         SamplingTechniqueEnum::kRandom,
                                         requestedSampleSize,
                                         /*numChunks=*/boost::none,
+                                        /*genId=*/1,
                                         sample,
                                         Date_t::now());
 }
@@ -774,6 +915,7 @@ TEST(MakePersistentSamplePageDocs, ProducesParseableRandomSampleDoc) {
                                                     SamplingTechniqueEnum::kRandom,
                                                     1000,
                                                     boost::none,
+                                                    /*genId=*/3,
                                                     sample,
                                                     now);
     ASSERT_EQ(pages.size(), 1u);
@@ -781,6 +923,7 @@ TEST(MakePersistentSamplePageDocs, ProducesParseableRandomSampleDoc) {
     auto swParsed = parsePersistentSample(pages[0]);
     ASSERT_OK(swParsed.getStatus());
     const PersistentSampleDoc& parsed = swParsed.getValue();
+    ASSERT_EQ(parsed.get_id(), makePersistentSampleId(uuid, /*pageNo=*/0, 3));
     ASSERT_EQ(parsed.getRequestedSampleSize(), 1000);
     ASSERT(parsed.getSamplingMethod() == SamplingTechniqueEnum::kRandom);
     ASSERT_EQ(parsed.getPageNo(), 0);
@@ -799,6 +942,7 @@ TEST(MakePersistentSamplePageDocs, ProducesParseableChunkSampleDoc) {
                                                     SamplingTechniqueEnum::kChunk,
                                                     1000,
                                                     numChunks,
+                                                    /*genId=*/3,
                                                     sample,
                                                     now);
     ASSERT_EQ(pages.size(), 1u);

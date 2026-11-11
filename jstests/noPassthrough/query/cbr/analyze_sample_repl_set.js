@@ -162,12 +162,11 @@ describe("analyze sample on replica sets", function () {
             rst.awaitReplication();
 
             const uuid = PersistentSamplesUtils.getCollUUID(primaryDB, kCollName);
-            const expectedId = PersistentSamplesUtils.getExpectedId(uuid);
+            const firstId = PersistentSamplesUtils.getExpectedId(uuid);
             const secondarySamplesColl = secondaryDB[PersistentSamplesUtils.samplesCollName];
-            const firstDoc = secondarySamplesColl.findOne({_id: expectedId});
-            assert(firstDoc, "Expected sample doc on secondary after first analyze", {expectedId});
+            const firstDoc = secondarySamplesColl.findOne({_id: firstId});
+            assert(firstDoc, "Expected sample doc on secondary after first analyze", {firstId});
 
-            // Second analyze run with the same parameters should upsert (update) the document.
             assert.commandWorked(
                 primaryDB.runCommand({
                     analyze: kCollName,
@@ -176,9 +175,20 @@ describe("analyze sample on replica sets", function () {
             );
             rst.awaitReplication();
 
-            // Still exactly one document with the same _id.
-            const allDocs = secondarySamplesColl.find({_id: expectedId}).toArray();
+            const secondId = PersistentSamplesUtils.getExpectedId(
+                uuid,
+                PersistentSamplesUtils.kPersistentSampleSchemaVersion,
+                0 /* pageNo */,
+                PersistentSamplesUtils.kFirstPersistentSampleGenId + 1,
+            );
+            const allDocs = secondarySamplesColl
+                .find(PersistentSamplesUtils.getSampleLookupFilter(uuid))
+                .toArray();
             assert.eq(allDocs.length, 1, "Expected exactly one sample doc after re-run", {allDocs});
+            assert.eq(allDocs[0]._id, secondId, "Expected the next generation after re-run", {
+                allDocs,
+            });
+            assertSampleDocReplicatedExactly(secondId);
 
             // createdAt must be strictly later on the second run.
             const secondDoc = allDocs[0];

@@ -95,23 +95,7 @@ TEST(MakePersistentSampleId, EveryIdentityFieldChangesTheId) {
     ASSERT_NE(baseline, makePersistentSampleId(kUuid, 1, /*genId=*/0));
 }
 
-// ── makePersistentSampleIdRange ───────────────────────────────────────────────────────────────
-
-TEST(MakePersistentSampleIdRange, BoundsAreThePageNumberExtremes) {
-    const auto [minId, maxId] = makePersistentSampleIdRange(kUuid);
-    ASSERT_EQ(minId, expectedId(0));
-    ASSERT_EQ(maxId, expectedId(9999999999));
-}
-
-TEST(MakePersistentSampleIdRange, BracketsEveryPageOfTheSample) {
-    const auto [minId, maxId] = makePersistentSampleIdRange(kUuid);
-    ASSERT_LTE(minId, maxId);
-    for (int pageNo : {0, 1, 42, 383, std::numeric_limits<int>::max()}) {
-        const auto id = makePersistentSampleId(kUuid, pageNo);
-        ASSERT_LTE(minId, id);
-        ASSERT_LTE(id, maxId);
-    }
-}
+// ── makePersistentSampleAllGenerationsIdRange ───────────────────────────────────────────────
 
 TEST(MakePersistentSampleAllGenerationsIdRange, BoundsAreTheIdentityPrefixAndItsSuccessor) {
     const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(kUuid);
@@ -313,7 +297,7 @@ TEST(SelectHighestCompleteGeneration, IdsWithoutGenIdBelongToGenerationZero) {
 }
 
 TEST(SelectHighestCompleteGeneration, MissingOrNonPositiveNumPagesIsUnsupportedFormat) {
-    for (auto&& page : {buildPage(kUuid, {.pageNo = 0}),
+    for (auto&& page : {buildPage(kUuid).removeField(PersistentSampleDoc::kNumPagesFieldName),
                         buildPage(kUuid, {.pageNo = 0, .numPages = 0}),
                         buildPage(kUuid, {.pageNo = 0, .numPages = -1})}) {
         const auto status = select({page}).getStatus();
@@ -480,22 +464,10 @@ TEST(ParsePersistentSample, RejectsEmptySample) {
 }
 
 TEST(ParsePersistentSample, RejectsMissingSchemaVersion) {
-    BSONObjBuilder b;
-    b.append(PersistentSampleDoc::kCollectionUuidFieldName, UUID::gen().toString());
-    b.append(PersistentSampleDoc::kRequestedSampleSizeFieldName,
-             static_cast<long long>(kStubSampleDocs.size()));
-    b.append(PersistentSampleDoc::kSamplingMethodFieldName,
-             idlSerialize(SamplingTechniqueEnum::kRandom));
-    b.append(PersistentSampleDoc::kRequestedSamplingMethodFieldName,
-             idlSerialize(SamplingTechniqueEnum::kRandom));
-    b.appendDate(PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
-    b.append(PersistentSampleDoc::kNumDocsDiscardedFieldName, static_cast<long long>(0));
-    BSONArrayBuilder arr(b.subarrayStart(PersistentSampleDoc::kDocsFieldName));
-    for (const auto& d : kStubSampleDocs) {
-        arr.append(d);
-    }
-    arr.done();
-    auto result = parsePersistentSample(b.obj());
+    auto result = parsePersistentSample(
+        buildPersistentSampleDoc(
+            UUID::gen(), SamplingTechniqueEnum::kRandom, kStubSampleDocs.size(), kStubSampleDocs)
+            .removeField(PersistentSampleDoc::kSchemaVersionFieldName));
     ASSERT_NOT_OK(result.getStatus());
 }
 
@@ -647,11 +619,12 @@ TEST(ParsePersistentSample, PopulatesNumPages) {
     ASSERT_EQ(result.getValue().getNumPages(), 3);
 }
 
-TEST(ParsePersistentSample, AcceptsMissingNumPages) {
-    auto result = parsePersistentSample(buildPersistentSampleDoc(
-        UUID::gen(), SamplingTechniqueEnum::kRandom, kStubSampleDocs.size(), kStubSampleDocs));
-    ASSERT_OK(result.getStatus());
-    ASSERT_FALSE(result.getValue().getNumPages().has_value());
+TEST(ParsePersistentSample, RejectsMissingNumPages) {
+    auto result = parsePersistentSample(
+        buildPersistentSampleDoc(
+            UUID::gen(), SamplingTechniqueEnum::kRandom, kStubSampleDocs.size(), kStubSampleDocs)
+            .removeField(PersistentSampleDoc::kNumPagesFieldName));
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(ParsePersistentSample, RejectsNonPositiveNumPages) {
@@ -697,21 +670,10 @@ TEST(ParsePersistentSample, RejectsNonDateCreatedAt) {
 }
 
 TEST(ParsePersistentSample, RejectsMissingDocsField) {
-    const UUID uuid = UUID::gen();
-    BSONObjBuilder b;
-    b.append("_id", makePersistentSampleId(uuid));
-    b.append(PersistentSampleDoc::kPageNoFieldName, 0);
-    b.append(PersistentSampleDoc::kCollectionUuidFieldName, uuid.toString());
-    b.append(PersistentSampleDoc::kSchemaVersionFieldName, kPersistentSampleSchemaVersion);
-    b.appendDate(PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
-    b.append(PersistentSampleDoc::kRequestedSampleSizeFieldName,
-             static_cast<long long>(kStubSampleDocs.size()));
-    b.append(PersistentSampleDoc::kSamplingMethodFieldName,
-             idlSerialize(SamplingTechniqueEnum::kRandom));
-    b.append(PersistentSampleDoc::kRequestedSamplingMethodFieldName,
-             idlSerialize(SamplingTechniqueEnum::kRandom));
-    b.append(PersistentSampleDoc::kNumDocsDiscardedFieldName, static_cast<long long>(0));
-    auto result = parsePersistentSample(b.obj());
+    auto result = parsePersistentSample(
+        buildPersistentSampleDoc(
+            UUID::gen(), SamplingTechniqueEnum::kRandom, kStubSampleDocs.size(), kStubSampleDocs)
+            .removeField(PersistentSampleDoc::kDocsFieldName));
     ASSERT_NOT_OK(result.getStatus());
 }
 

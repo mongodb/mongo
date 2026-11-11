@@ -39,24 +39,16 @@ inline constexpr size_t kPersistentSamplePageNoWidth = 10;
 /**
  * Builds the `_id` string for a persisted sample page document:
  *
- *     <collectionUuid>_<schemaVersion>_<pageNo>
- *
- * All pages of a given sample share an identical prefix up to (and including) the separator that
- * precedes the page number, so the pages of one sample - and only that sample - form a contiguous
- * run in lexicographic `_id` order. `pageNo` is zero-padded to so that lexicographic order matches
- * numeric order.
+ *     <collectionUuid>_<schemaVersion>_<genId>_<pageNo>
  */
 std::string makePersistentSampleId(const UUID& collectionUuid,
                                    int pageNo = 0,
-                                   // TODO SERVER-135416: Make non optional.
+                                   // TODO SERVER-135417: Make non optional.
                                    boost::optional<uint64_t> genId = boost::none);
 
 /**
- * Returns the inclusive [min, max] `_id` bounds spanning every page the collection's sample could
- * have, for `_id`s without a gen_id.
+ * Returns a pair of strings defining a lookup range for all generations of a persisted sample.
  */
-std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& collectionUuid);
-
 std::pair<std::string, std::string> makePersistentSampleAllGenerationsIdRange(
     const UUID& collectionUuid);
 

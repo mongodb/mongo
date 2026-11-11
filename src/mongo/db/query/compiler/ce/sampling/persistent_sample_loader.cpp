@@ -160,16 +160,6 @@ std::string makePersistentSampleId(const UUID& collectionUuid,
     return id;
 }
 
-std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& collectionUuid) {
-    // The bounds are the lowest and highest page-number components representable in the padding
-    // width, so they bracket every page this sample could have.
-    std::string minId = makePersistentSampleIdPrefix(collectionUuid);
-    std::string maxId = minId;
-    minId.append(kPersistentSamplePageNoWidth, '0');
-    maxId.append(kPersistentSamplePageNoWidth, '9');
-    return {std::move(minId), std::move(maxId)};
-}
-
 std::pair<std::string, std::string> makePersistentSampleAllGenerationsIdRange(
     const UUID& collectionUuid) {
     std::string minId = makePersistentSampleIdPrefix(collectionUuid);
@@ -204,7 +194,7 @@ StatusWith<uint64_t> parsePersistentSampleGenId(std::string_view id, const UUID&
     if (!std::all_of(pageNo.begin(), pageNo.end(), ctype::isDigit)) {
         return malformed();
     }
-    // TODO SERVER-135416. Remove this block once write path always adds a gen_id.
+    // TODO SERVER-135417. Remove this block once the read path refuses pages without a gen_id.
     if (genIdAndPageNo.size() == kPersistentSamplePageNoWidth) {
         return kDefaultPersistentSampleGenId;
     }

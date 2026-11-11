@@ -17,6 +17,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -37,6 +38,7 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                                   SamplingTechniqueEnum actualMethod,
                                                   size_t requestedSampleSize,
                                                   boost::optional<int> numChunks,
+                                                  uint64_t genId,
                                                   const std::vector<BSONObj>& sample,
                                                   Date_t createdAt);
 
@@ -45,6 +47,7 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
  */
 struct PersistedSampleSummary {
     SamplingTechniqueEnum samplingMethod;
+    uint64_t genId;
     size_t docsPersisted;
     size_t pagesPersisted;
     size_t bytesPersisted;

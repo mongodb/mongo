@@ -12,6 +12,10 @@ export const kPersistentSampleSchemaVersion = 1;
 // Mirrors ce::kPersistentSamplePageNoWidth.
 const kPageNoWidth = 10;
 
+export const kFirstPersistentSampleGenId = 1;
+
+const kIdSeparatorSuccessor = "`";
+
 // Field names mirroring persistent_sample.idl — update here if the IDL field names change.
 export const sampleDocFieldNames = {
     idField: "_id",
@@ -195,15 +199,16 @@ export function makeDocsOfTotalSize(numDocs, totalBytes) {
 
 // Returns the expected _id string for a sample page document. This must mirror
 // ce::makePersistentSampleId() in persistent_sample_loader.cpp:
-//     <collectionUuid>_<schemaVersion>_<pageNo>
+//     <collectionUuid>_<schemaVersion>_<genId>_<pageNo>
 // pageNo defaults to 0 (expected when only 1 page exists) and is zero-padded to a fixed width so
 // that lexicographic _id order matches page order.
 export function getExpectedId(
     uuid,
     expectedSchemaVersion = kPersistentSampleSchemaVersion,
     pageNo = 0,
+    genId = kFirstPersistentSampleGenId,
 ) {
-    return getExpectedIdPrefix(uuid, expectedSchemaVersion) + padPageNo(pageNo);
+    return getExpectedIdPrefix(uuid, expectedSchemaVersion) + `${genId}_` + padPageNo(pageNo);
 }
 
 // Returns the single sample page document matching the given _id.
@@ -217,9 +222,7 @@ export function getSampleDoc(samplesColl, expectedId) {
     return results[0];
 }
 
-// Returns a query filter that matches every page of a single sample. All pages of a sample share
-// an _id prefix and differ only in their zero-padded page number, so the filter is a bounded _id
-// range rather than a set of equalities on sub-fields of an object.
+// Returns a query filter that matches every page of a single sample.
 export function getSampleLookupFilter(
     uuid,
     expectedSchemaVersion = kPersistentSampleSchemaVersion,
@@ -227,8 +230,8 @@ export function getSampleLookupFilter(
     const prefix = getExpectedIdPrefix(uuid, expectedSchemaVersion);
     return {
         [sampleDocFieldNames.idField]: {
-            $gte: prefix + padPageNo(0),
-            $lte: prefix + "9".repeat(kPageNoWidth),
+            $gte: prefix,
+            $lt: prefix.slice(0, -1) + kIdSeparatorSuccessor,
         },
     };
 }
@@ -246,6 +249,7 @@ export function validatePersistentSample(
         expectedFields = [],
         expectedNumPages = 1,
         expectedNumDocsDiscarded = 0,
+        expectedGenId = kFirstPersistentSampleGenId,
     },
 ) {
     // The sampling method specified in the analyze command may be overridden by test-only knobs.
@@ -275,6 +279,7 @@ export function validatePersistentSample(
             numChunks,
             expectedFields,
             pageNo: i,
+            genId: expectedGenId,
             expectedNumDocsDiscarded,
             expectedNumPages,
         });
@@ -316,13 +321,14 @@ function validateSamplePage(
         numChunks = null,
         expectedFields = [],
         pageNo,
+        genId,
         expectedNumDocsDiscarded = 0,
         expectedNumPages = 1,
     },
 ) {
     assert.neq(null, page, "Expected to find a sample page, got null");
 
-    const expectedId = getExpectedId(sampledCollUuid, expectedSchemaVersion, pageNo);
+    const expectedId = getExpectedId(sampledCollUuid, expectedSchemaVersion, pageNo, genId);
     const sampleId = page[sampleDocFieldNames.idField];
 
     assert.eq(expectedId, sampleId, `Unexpected ${sampleDocFieldNames.idField}`, {expectedId});

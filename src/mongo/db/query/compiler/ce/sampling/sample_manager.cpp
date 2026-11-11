@@ -10,6 +10,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/server_status/histogram_server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/feature_flag.h"
@@ -36,6 +38,9 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -49,6 +54,13 @@ namespace mongo::ce {
 MONGO_FAIL_POINT_DEFINE(hangBeforePersistingSample);
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangAfterFindingMaxPersistentSampleGenId);
+
+// Write conflicts hit by each persisted sample. Bounds are 1 to 16 conflicts.
+auto& persistSampleWriteConflictsHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.analyze.sample.histograms.writeConflicts"}
+         .bind(HistogramServerStatusMetric::computeBounds<uint64_t>(5, 1, 2));
 
 /**
  * Maximum overhead a single object element could add to an open BSON array:
@@ -86,9 +98,10 @@ void appendSamplePageMetadata(BSONObjBuilder& builder,
                               SamplingTechniqueEnum actualMethod,
                               size_t requestedSampleSize,
                               boost::optional<int> numChunks,
+                              uint64_t genId,
                               int pageNo,
                               Date_t createdAt) {
-    const std::string id = makePersistentSampleId(collectionUuid, pageNo);
+    const std::string id = makePersistentSampleId(collectionUuid, pageNo, genId);
 
     builder.append(PersistentSampleDoc::k_idFieldName, id);
     builder.append(PersistentSampleDoc::kPageNoFieldName, pageNo);
@@ -104,6 +117,39 @@ void appendSamplePageMetadata(BSONObjBuilder& builder,
     }
 }
 
+uint64_t findMaxPersistentSampleGenId(OperationContext* opCtx,
+                                      const CollectionAcquisition& collection,
+                                      RecordIdBound minId,
+                                      RecordIdBound maxId,
+                                      const UUID& collectionUuid) {
+    // TODO SERVER-138844. Compare this approach to a query that sorts and limits 1.
+    auto exec = InternalPlanner::collectionScan(
+        opCtx,
+        collection,
+        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+        InternalPlanner::FORWARD,
+        /*resumeAfterRecordId=*/boost::none,
+        std::move(minId),
+        std::move(maxId),
+        CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly);
+
+    uint64_t maxGenId = kDefaultPersistentSampleGenId;
+    BSONObj page;
+    // page here is a view into WT's own buffer so adding a projection to only fetch the _id field
+    // would not be more efficient.
+    while (exec->getNext(&page, nullptr) == PlanExecutor::ADVANCED) {
+        const BSONElement idElem = page[PersistentSampleDoc::k_idFieldName];
+        if (idElem.type() != BSONType::string) {
+            continue;
+        }
+        const auto genId = parsePersistentSampleGenId(idElem.valueStringData(), collectionUuid);
+        if (genId.isOK()) {
+            maxGenId = std::max(maxGenId, genId.getValue());
+        }
+    }
+    return maxGenId;
+}
+
 }  // namespace
 
 std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
@@ -111,6 +157,7 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                                   SamplingTechniqueEnum actualMethod,
                                                   size_t requestedSampleSize,
                                                   boost::optional<int> numChunks,
+                                                  uint64_t genId,
                                                   const std::vector<BSONObj>& sample,
                                                   Date_t createdAt) {
     // The `numDocsDiscarded` field needs to be the same across all pages and we can't determine it
@@ -132,6 +179,7 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                  actualMethod,
                                  requestedSampleSize,
                                  numChunks,
+                                 genId,
                                  pageNo,
                                  createdAt);
         BSONArrayBuilder docsArr(builder.subarrayStart(PersistentSampleDoc::kDocsFieldName));
@@ -321,81 +369,104 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
         }
     }
 
-    // Serialize the sample into one or more page documents
-    std::vector<BSONObj> pageDocs = makePersistentSamplePageDocs(collectionUuid,
-                                                                 samplingMethodToPersist,
-                                                                 actualSamplingMethod,
-                                                                 spec.requestedSampleSize,
-                                                                 numChunks,
-                                                                 sample.docs(),
-                                                                 createdAt);
-    const size_t pagesPersisted = pageDocs.size();
+    const auto [minId, maxId] = makePersistentSampleAllGenerationsIdRange(collectionUuid);
+    const auto recordIdForId = [](std::string_view id) {
+        return RecordIdBound(
+            record_id_helpers::keyForObj(BSON(PersistentSampleDoc::k_idFieldName << id)));
+    };
+
+    uint64_t genId = 0;
+    size_t pagesPersisted = 0;
     size_t totalBytesPersisted = 0;
     // Tracks the actual number of docs persisted for server status metric on successful upsert.
     size_t docsPersistedCount = 0;
-    std::vector<InsertStatement> inserts;
-    inserts.reserve(pageDocs.size());
-    for (auto& pageDoc : pageDocs) {
-        totalBytesPersisted += pageDoc.objsize();
-        const BSONElement docsField = pageDoc.getField(PersistentSampleDoc::kDocsFieldName);
-        tassert(13106002,
-                str::stream() << "Expected " << PersistentSampleDoc::kDocsFieldName
-                              << " to be an array, but found " << typeName(docsField.type()),
-                docsField.type() == BSONType::array);
-        // kDocsFieldName is an array and nFields return its size
-        docsPersistedCount += static_cast<size_t>(docsField.Obj().nFields());
-        inserts.emplace_back(std::move(pageDoc));
-    }
 
-    const auto [minId, maxId] = makePersistentSampleIdRange(collectionUuid);
-
-    // Atomically insert the sample docs/replace the existing sample if one exists.
+    size_t writeConflicts = 0;
+    // A concurrent writer of the same generation makes the insert conflict, so the retry picks
+    // the next one.
     writeConflictRetry(_opCtx, "analyzePersistSample", samplesNss, [&] {
-        const auto collection =
-            acquireCollection(_opCtx,
-                              CollectionAcquisitionRequest::fromOpCtx(
-                                  _opCtx, samplesNss, AcquisitionPrerequisites::kWrite),
-                              MODE_IX);
-        uassert(12844400,
-                str::stream() << "Sample collection " << samplesNss.toStringForErrorMsg()
-                              << " does not exist",
-                collection.exists());
+        try {
+            const auto collection =
+                acquireCollection(_opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      _opCtx, samplesNss, AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+            uassert(12844400,
+                    str::stream() << "Sample collection " << samplesNss.toStringForErrorMsg()
+                                  << " does not exist",
+                    collection.exists());
 
-        tassert(13097201,
-                "Samples collection must be clustered on _id",
-                collection.getCollectionPtr()->isClustered());
+            tassert(13097201,
+                    "Samples collection must be clustered on _id",
+                    collection.getCollectionPtr()->isClustered());
 
-        WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::atomicGroup);
+            WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::atomicGroup);
 
-        // Remove all existing pages of the existing sample, if any.
-        const auto recordIdForId = [](std::string_view id) {
-            return RecordIdBound(
-                record_id_helpers::keyForObj(BSON(PersistentSampleDoc::k_idFieldName << id)));
-        };
-        DeleteStageParams deleteParams;
-        deleteParams.isMulti = true;
-        auto deleteExec = InternalPlanner::deleteWithCollectionScan(
-            _opCtx,
-            collection,
-            deleteParams,
-            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-            InternalPlanner::FORWARD,
-            recordIdForId(minId),
-            recordIdForId(maxId),
-            CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords);
-        deleteExec->executeDelete();
+            const uint64_t maxGenId = findMaxPersistentSampleGenId(
+                _opCtx, collection, recordIdForId(minId), recordIdForId(maxId), collectionUuid);
+            // TODO SERVER-138846 let it wrap to zero and handle it gracefully.
+            tassert(13541600,
+                    str::stream() << "Persistent sample gen_id of collection " << collectionUuid
+                                  << " cannot be incremented past " << maxGenId,
+                    maxGenId < std::numeric_limits<uint64_t>::max());
+            genId = maxGenId + 1;
+            hangAfterFindingMaxPersistentSampleGenId.pauseWhileSet(_opCtx);
 
-        // Insert the new sample.
-        uassertStatusOK(collection_internal::insertDocuments(_opCtx,
-                                                             collection.getCollectionPtr(),
-                                                             inserts.begin(),
-                                                             inserts.end(),
-                                                             /*opDebug=*/nullptr));
+            std::vector<BSONObj> pageDocs = makePersistentSamplePageDocs(collectionUuid,
+                                                                         samplingMethodToPersist,
+                                                                         actualSamplingMethod,
+                                                                         spec.requestedSampleSize,
+                                                                         numChunks,
+                                                                         genId,
+                                                                         sample.docs(),
+                                                                         createdAt);
+            pagesPersisted = pageDocs.size();
+            totalBytesPersisted = 0;
+            docsPersistedCount = 0;
+            std::vector<InsertStatement> inserts;
+            inserts.reserve(pageDocs.size());
+            for (auto& pageDoc : pageDocs) {
+                totalBytesPersisted += pageDoc.objsize();
+                const BSONElement docsField = pageDoc.getField(PersistentSampleDoc::kDocsFieldName);
+                tassert(13106002,
+                        str::stream()
+                            << "Expected " << PersistentSampleDoc::kDocsFieldName
+                            << " to be an array, but found " << typeName(docsField.type()),
+                        docsField.type() == BSONType::array);
+                // kDocsFieldName is an array and nFields return its size
+                docsPersistedCount += static_cast<size_t>(docsField.Obj().nFields());
+                inserts.emplace_back(std::move(pageDoc));
+            }
 
-        wuow.commit();
+            DeleteStageParams deleteParams;
+            deleteParams.isMulti = true;
+            auto deleteExec = InternalPlanner::deleteWithCollectionScan(
+                _opCtx,
+                collection,
+                deleteParams,
+                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                InternalPlanner::FORWARD,
+                recordIdForId(minId),
+                recordIdForId(maxId),
+                CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly);
+            deleteExec->executeDelete();
+
+            uassertStatusOK(collection_internal::insertDocuments(_opCtx,
+                                                                 collection.getCollectionPtr(),
+                                                                 inserts.begin(),
+                                                                 inserts.end(),
+                                                                 /*opDebug=*/nullptr));
+
+            wuow.commit();
+        } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
+            ++writeConflicts;
+            throw;
+        }
     });
+    persistSampleWriteConflictsHistogram.increment(writeConflicts);
 
     return PersistedSampleSummary{.samplingMethod = actualSamplingMethod,
+                                  .genId = genId,
                                   .docsPersisted = docsPersistedCount,
                                   .pagesPersisted = pagesPersisted,
                                   .bytesPersisted = totalBytesPersisted};
