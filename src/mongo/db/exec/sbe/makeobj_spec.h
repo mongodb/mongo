@@ -129,6 +129,18 @@ struct MakeObjSpec {
         const LambdaArg& getLambdaArg() const {
             return get<LambdaArg>(_data);
         }
+
+        // Returns the index of the argument this action reads. Only SetArg, AddArg and LambdaArg
+        // actions read an argument.
+        size_t getArgIdx() const {
+            if (isSetArg()) {
+                return getSetArgIdx();
+            }
+            if (isAddArg()) {
+                return getAddArgIdx();
+            }
+            return getLambdaArg().argIdx;
+        }
         const MakeObjSpec* getMakeObjSpec() const {
             return get<MakeObj>(_data).spec.get();
         }
@@ -193,6 +205,12 @@ struct MakeObjSpec {
     static constexpr size_t kInputArgPos = 1;
     static constexpr size_t kFirstActionArgPos = 2;
 
+    // Returns the position, in a makeObj() or makeBsonObj() call, of the argument that actions with
+    // argument index 'argIdx' refer to.
+    static constexpr size_t actionArgPos(size_t argIdx) {
+        return kFirstActionArgPos + argIdx;
+    }
+
     std::unique_ptr<MakeObjSpec> clone() const {
         return std::make_unique<MakeObjSpec>(*this);
     }
@@ -204,6 +222,13 @@ struct MakeObjSpec {
     bool fieldsScopeIsOpen() const {
         return fieldsScope == FieldListScope::kOpen;
     }
+
+    /**
+     * Returns the action for the field at position 'pos' in 'fields'. If 'pos' is npos, returns
+     * the action for the fields that 'fields' does not list: Keep if the field scope is open and
+     * Drop if it is closed.
+     */
+    const FieldAction& getAction(size_t pos) const;
 
     bool returnsNothingOnMissingInput() const {
         return nonObjInputBehavior != NonObjInputBehavior::kNewObj;

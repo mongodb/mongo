@@ -18,6 +18,24 @@ using MakeObj = MakeObjSpec::MakeObj;
 using NonObjInputBehavior = MakeObjSpec::NonObjInputBehavior;
 using FieldListScope = MakeObjSpec::FieldListScope;
 
+TEST(MakeObjSpecTest, GetActionOfAnUnlistedFieldDependsOnTheScope) {
+    std::vector<FieldAction> actions;
+    actions.emplace_back(SetArg{0});
+    MakeObjSpec open{FieldListScope::kOpen, std::vector<std::string>{"a"}, std::move(actions)};
+    ASSERT_TRUE(open.getAction(open.fields.findPos("a")).isSetArg());
+    ASSERT_TRUE(open.getAction(open.fields.findPos("b")).isKeep());
+
+    MakeObjSpec closed{FieldListScope::kClosed, std::vector<std::string>{"a"}};
+    ASSERT_TRUE(closed.getAction(closed.fields.findPos("a")).isKeep());
+    ASSERT_TRUE(closed.getAction(closed.fields.findPos("b")).isDrop());
+}
+
+TEST(MakeObjSpecTest, GetArgIdxReturnsTheIndexOfAnyArgumentAction) {
+    ASSERT_EQ(FieldAction{SetArg{1}}.getArgIdx(), 1u);
+    ASSERT_EQ(FieldAction{MakeObjSpec::AddArg{2}}.getArgIdx(), 2u);
+    ASSERT_EQ((FieldAction{LambdaArg{3, false}}.getArgIdx()), 3u);
+}
+
 std::vector<FieldAction> makeFieldActionVector(int depth = 2) {
     std::vector<FieldAction> fi;
     fi.emplace_back(Keep{});

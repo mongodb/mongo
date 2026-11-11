@@ -9,6 +9,15 @@ namespace mongo::sbe {
 MakeObjSpec::FieldAction MakeObjSpec::_singleKeepAction[1] = {
     MakeObjSpec::FieldAction{MakeObjSpec::Keep{}}};
 
+const MakeObjSpec::FieldAction& MakeObjSpec::getAction(size_t pos) const {
+    static const FieldAction kKeep{Keep{}};
+    static const FieldAction kDrop{Drop{}};
+    if (pos != npos) {
+        return actions[pos];
+    }
+    return fieldsScopeIsOpen() ? kKeep : kDrop;
+}
+
 StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names) {
     const bool isClosed = fieldsScopeIsClosed();
 
