@@ -205,9 +205,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.transitions = uniformDistTransitions($config.states);
 
     $config.setup = function (db, collName, cluster) {
-        db.getSiblingDB($config.data.succesfullSetFCVDbName)[
-            $config.data.succesfullSetFCVCollName
-        ].insert({count: 0});
+        $super.setup.call(this, db, collName, cluster);
+        assert.commandWorked(
+            db
+                .getSiblingDB(this.succesfullSetFCVDbName)
+                [this.succesfullSetFCVCollName].insert({count: 0}),
+        );
     };
 
     $config.teardown = function (db, collName, cluster) {

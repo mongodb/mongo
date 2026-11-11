@@ -218,6 +218,9 @@ executor:
       wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
       set_parameters:
         enableTestCommands: 1
+        # TODO SERVER-117511: Remove this failpoint once replicated size/count supports FCV upgrade/downgrade.
+        # Configure at startup so the failpoint survives the kill/terminate hook's restarts.
+        failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
         enableElectionHandoff: 0
         roleGraphInvalidationIsFatal: 1
         queryAnalysisWriterIntervalSecs: 1

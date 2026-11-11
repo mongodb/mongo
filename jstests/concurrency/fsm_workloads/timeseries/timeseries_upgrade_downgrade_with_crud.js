@@ -176,12 +176,29 @@ export const $config = (function () {
         },
     };
 
-    let setup = function (db, collName) {
+    // TODO SERVER-117511: Remove this failpoint handling once replicated size/count supports
+    // FCV upgrade/downgrade.
+    function setReplicatedFastCountFailPoint(cluster, mode) {
+        const configure = (nodeDB) => {
+            assert.commandWorked(
+                nodeDB.adminCommand({configureFailPoint: "disableReplicatedFastCount", mode}),
+            );
+        };
+        cluster.executeOnMongodNodes(configure);
+        if (cluster.isSharded()) {
+            cluster.executeOnConfigNodes(configure);
+        }
+    }
+
+    let setup = function (db, collName, cluster) {
+        setReplicatedFastCountFailPoint(cluster, "alwaysOn");
         const collNames = getCollNames();
         for (const collName of collNames) {
-            db.createCollection(collName, {
-                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
-            });
+            assert.commandWorked(
+                db.createCollection(collName, {
+                    timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+                }),
+            );
         }
     };
 

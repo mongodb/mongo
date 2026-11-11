@@ -41,6 +41,26 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.transitions = uniformDistTransitions($config.states);
 
+    // TODO SERVER-117511: Remove this failpoint handling once replicated size/count supports
+    // FCV upgrade/downgrade.
+    function setReplicatedFastCountFailPoint(cluster, mode) {
+        const configure = (nodeDB) => {
+            assert.commandWorked(
+                nodeDB.adminCommand({configureFailPoint: "disableReplicatedFastCount", mode}),
+            );
+        };
+        cluster.executeOnMongodNodes(configure);
+        if (cluster.isSharded()) {
+            cluster.executeOnConfigNodes(configure);
+        }
+    }
+
+    $config.setup = function (db, collName, cluster) {
+        // Leave replicated fast count disabled for the rest of the fixture's lifetime.
+        setReplicatedFastCountFailPoint(cluster, "alwaysOn");
+        $super.setup.call(this, db, collName, cluster);
+    };
+
     $config.teardown = function (db, collName, cluster) {
         setFCVWithRetryOnBackgroundOpInProgress(db, latestFCV);
     };

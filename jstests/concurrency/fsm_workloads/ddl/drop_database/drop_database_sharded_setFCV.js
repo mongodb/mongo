@@ -67,6 +67,25 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         setFCV: {enableSharding: 0.3, dropDatabase: 0.3, shardCollection: 0.3, setFCV: 0.1},
     };
 
+    // TODO SERVER-117511: Remove this failpoint handling once replicated size/count supports
+    // FCV upgrade/downgrade.
+    function setReplicatedFastCountFailPoint(cluster, mode) {
+        const configure = (nodeDB) => {
+            assert.commandWorked(
+                nodeDB.adminCommand({configureFailPoint: "disableReplicatedFastCount", mode}),
+            );
+        };
+        cluster.executeOnMongodNodes(configure);
+        if (cluster.isSharded()) {
+            cluster.executeOnConfigNodes(configure);
+        }
+    }
+
+    $config.setup = function (db, collName, cluster) {
+        setReplicatedFastCountFailPoint(cluster, "alwaysOn");
+        $super.setup.call(this, db, collName, cluster);
+    };
+
     $config.teardown = function (db, collName) {
         setFCVWithRetryOnBackgroundOpInProgress(db, latestFCV);
         $super.teardown(db, collName);
