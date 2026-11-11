@@ -26,6 +26,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -194,16 +195,18 @@ public:
                                    value::bitcastFrom<CollatorInterface*>(collator.release()));
         }
         auto [scanSlots, scanStage] = generateVirtualScanMulti(2, rows);
+        auto groupByOutSlot = generateSlotId();
         auto final = generateSlotId();
         auto partial = generateSlotId();
         auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                                 makeSV(scanSlots[0]),
+                                                makeSV(groupByOutSlot),
                                                 sums(scanSlots[1], final, partial),
                                                 collatorSlot,
                                                 /*yieldPolicy=*/nullptr,
                                                 kEmptyPlanNodeId);
         auto groups = drainGroups(
-            stage.get(), prepareTree(ctx.get(), stage.get(), {scanSlots[0], final, partial}));
+            stage.get(), prepareTree(ctx.get(), stage.get(), {groupByOutSlot, final, partial}));
         stage->close();
         return groups;
     }
@@ -218,6 +221,7 @@ public:
         }
         auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                                 makeSV(scanSlot),
+                                                makeSV(generateSlotId()),
                                                 std::move(accumulators),
                                                 boost::none,
                                                 /*yieldPolicy=*/nullptr,
@@ -251,14 +255,16 @@ void CompactHashAggStageTest::performCompactHashAgg(
     // Generate a mock scan from 'input' with a single output slot.
     auto [scanSlot, scanStage] = generateVirtualScan(inputArr);
 
+    auto groupByOutSlot = generateSlotId();
     auto stage =
         makeS<CompactHashAggStage>(std::move(scanStage),
                                    makeSV(scanSlot),
+                                   makeSV(groupByOutSlot),
                                    std::vector<std::unique_ptr<CompactHashAggAccumulator>>{},
                                    boost::optional<value::SlotId>{shouldUseCollator, collatorSlot},
                                    /*yieldPolicy=*/nullptr,
                                    kEmptyPlanNodeId);
-    auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), groupByOutSlot);
 
     std::set<std::string> results;
     while (stage->getNext() == PlanState::ADVANCED) {
@@ -284,6 +290,42 @@ TEST_F(CompactHashAggStageTest, CompactHashAggCollationTest) {
     performCompactHashAgg(inputArr, {"A", "a", "b", "B", "c"});
 }
 
+using CompactHashAggStageDeathTest = CompactHashAggStageTest;
+
+DEATH_TEST_REGEX_F(CompactHashAggStageDeathTest,
+                   GroupByOutputSlotsMustMatchGroupBySlots,
+                   "Tripwire assertion.*13913000") {
+    auto [scanSlot, scanStage] = generateVirtualScan(
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2))));
+    makeS<CompactHashAggStage>(std::move(scanStage),
+                               makeSV(scanSlot),
+                               makeSV(),
+                               std::vector<std::unique_ptr<CompactHashAggAccumulator>>{},
+                               boost::none,
+                               /*yieldPolicy=*/nullptr,
+                               kEmptyPlanNodeId);
+}
+
+DEATH_TEST_REGEX_F(CompactHashAggStageDeathTest,
+                   GroupByOutputSlotsMustNotRepeat,
+                   "Tripwire assertion.*13605503") {
+    auto [scanSlots, scanStage] =
+        generateVirtualScanMulti(2,
+                                 value::TagValueOwned::fromRaw(stage_builder::makeValue(
+                                     BSON_ARRAY(BSON_ARRAY(1 << 2) << BSON_ARRAY(3 << 4)))));
+    auto outSlot = generateSlotId();
+    auto stage =
+        makeS<CompactHashAggStage>(std::move(scanStage),
+                                   scanSlots,
+                                   makeSV(outSlot, outSlot),
+                                   std::vector<std::unique_ptr<CompactHashAggAccumulator>>{},
+                                   boost::none,
+                                   /*yieldPolicy=*/nullptr,
+                                   kEmptyPlanNodeId);
+    auto ctx = makeCompileCtx();
+    prepareTree(ctx.get(), stage.get(), outSlot);
+}
+
 TEST_F(CompactHashAggStageTest, CompactHashAggBasicNoSpill) {
     // The compact stage never spills; with plentiful memory the query completes in memory.
     auto ctx = makeCompileCtx();
@@ -291,14 +333,16 @@ TEST_F(CompactHashAggStageTest, CompactHashAggBasicNoSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [scanSlot, scanStage] = generateVirtualScan(jsonArray("[5, 6, 7, 5, 6, 7, 6, 7, 7]"));
 
+    auto groupByOutSlot = generateSlotId();
     auto stage =
         makeS<CompactHashAggStage>(std::move(scanStage),
                                    makeSV(scanSlot),
+                                   makeSV(groupByOutSlot),
                                    std::vector<std::unique_ptr<CompactHashAggAccumulator>>{},
                                    boost::none,
                                    /*yieldPolicy=*/nullptr,
                                    kEmptyPlanNodeId);
-    auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), groupByOutSlot);
 
     // Check that the results match the expected: one group per distinct key.
     auto results = collectIntKeys(stage.get(), resultAccessor);
@@ -325,6 +369,7 @@ TEST_F(CompactHashAggStageTest, CompactHashAggNoGroupByProducesSingleGroup) {
     // Build a CompactHashAggStage with an empty group-by slot list.
     auto stage =
         makeS<CompactHashAggStage>(std::move(scanStage),
+                                   makeSV(),
                                    makeSV(),
                                    std::vector<std::unique_ptr<CompactHashAggAccumulator>>{},
                                    boost::none,
@@ -361,21 +406,23 @@ TEST_F(CompactHashAggStageTest, CompactHashAggCloneTest) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [scanSlot, scanStage] = generateVirtualScan(jsonArray("[5, 6, 7, 5, 6, 7, 6, 7, 7]"));
 
+    auto groupByOutSlot = generateSlotId();
     auto stage =
         makeS<CompactHashAggStage>(std::move(scanStage),
                                    makeSV(scanSlot),
+                                   makeSV(groupByOutSlot),
                                    std::vector<std::unique_ptr<CompactHashAggAccumulator>>{},
                                    boost::none,
                                    /*yieldPolicy=*/nullptr,
                                    kEmptyPlanNodeId);
-    auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), groupByOutSlot);
     auto results = collectIntKeys(stage.get(), resultAccessor);
     stage->close();
 
     // The clone is independently prepared and produces the same groups.
     auto clonedCtx = makeCompileCtx();
     auto clone = stage->clone();
-    auto cloneAccessor = prepareTree(clonedCtx.get(), clone.get(), scanSlot);
+    auto cloneAccessor = prepareTree(clonedCtx.get(), clone.get(), groupByOutSlot);
     auto clonedResults = collectIntKeys(clone.get(), cloneAccessor);
     clone->close();
 
@@ -400,14 +447,16 @@ TEST_F(CompactHashAggStageTest, CompactHashAggWithRecordIds) {
     auto [scanSlot, scanStage] =
         generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
+    auto groupByOutSlot = generateSlotId();
     auto stage =
         makeS<CompactHashAggStage>(std::move(scanStage),
                                    makeSV(scanSlot),
+                                   makeSV(groupByOutSlot),
                                    std::vector<std::unique_ptr<CompactHashAggAccumulator>>{},
                                    boost::none,
                                    /*yieldPolicy=*/nullptr,
                                    kEmptyPlanNodeId);
-    auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), groupByOutSlot);
 
     // Read in all of the results.
     std::set<int64_t> results;
@@ -443,9 +492,11 @@ TEST_F(CompactHashAggStageTest, CompactHashAggMemoryLimitNoDiskUse) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [scanSlot, scanStage] = generateVirtualScan(jsonArray("[5, 6, 7, 5, 6, 7, 6, 7, 7]"));
 
+    auto groupByOutSlot = generateSlotId();
     auto stage =
         makeS<CompactHashAggStage>(std::move(scanStage),
                                    makeSV(scanSlot),
+                                   makeSV(groupByOutSlot),
                                    std::vector<std::unique_ptr<CompactHashAggAccumulator>>{},
                                    boost::none,
                                    /*yieldPolicy=*/nullptr,
@@ -455,7 +506,7 @@ TEST_F(CompactHashAggStageTest, CompactHashAggMemoryLimitNoDiskUse) {
     // table, instead of spilling.
     ASSERT_THROWS_CODE(
         [&] {
-            auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
+            auto resultAccessor = prepareTree(ctx.get(), stage.get(), groupByOutSlot);
             getAllResults(stage.get(), resultAccessor);
         }(),
         DBException,
@@ -477,6 +528,7 @@ TEST_F(CompactHashAggStageTest, CompactHashAggPushMemoryLimitNoDiskUse) {
         generateSlotId(), makeVariable(scanSlots[1]), std::numeric_limits<int32_t>::max()));
     auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                             makeSV(scanSlots[0]),
+                                            makeSV(generateSlotId()),
                                             std::move(accumulators),
                                             boost::none,
                                             /*yieldPolicy=*/nullptr,
@@ -496,6 +548,7 @@ TEST_F(CompactHashAggStageTest, CompactHashAggResetsOutputsOnClose) {
         out, makeVariable(scanSlots[1]), std::numeric_limits<int32_t>::max()));
     auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                             makeSV(scanSlots[0]),
+                                            makeSV(generateSlotId()),
                                             std::move(accumulators),
                                             boost::none,
                                             /*yieldPolicy=*/nullptr,
@@ -546,6 +599,7 @@ TEST_F(CompactHashAggStageTest, CompactHashAggSumNoGroupBy) {
     auto partial = generateSlotId();
     auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                             makeSV(),
+                                            makeSV(),
                                             sums(scanSlots[1], final, partial),
                                             boost::none,
                                             /*yieldPolicy=*/nullptr,
@@ -563,15 +617,17 @@ TEST_F(CompactHashAggStageTest, CompactHashAggSumReopenAndClone) {
     auto ctx = makeCompileCtx();
     auto [scanSlots, scanStage] =
         generateVirtualScanMulti(2, jsonArray("[[1, 2], [2, 3.5], [1, 4], [2, 1]]"));
+    auto groupByOutSlot = generateSlotId();
     auto final = generateSlotId();
     auto partial = generateSlotId();
     auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                             makeSV(scanSlots[0]),
+                                            makeSV(groupByOutSlot),
                                             sums(scanSlots[1], final, partial),
                                             boost::none,
                                             /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
-    auto accessors = prepareTree(ctx.get(), stage.get(), {scanSlots[0], final, partial});
+    auto accessors = prepareTree(ctx.get(), stage.get(), {groupByOutSlot, final, partial});
     auto groups = drainGroups(stage.get(), accessors);
     ASSERT_EQ(2, groups.size());
 
@@ -584,7 +640,7 @@ TEST_F(CompactHashAggStageTest, CompactHashAggSumReopenAndClone) {
     assertSameGroups(
         groups,
         drainGroups(clone.get(),
-                    prepareTree(cloneCtx.get(), clone.get(), {scanSlots[0], final, partial})));
+                    prepareTree(cloneCtx.get(), clone.get(), {groupByOutSlot, final, partial})));
     clone->close();
 }
 
@@ -711,15 +767,17 @@ TEST_F(CompactHashAggStageTest, CompactHashAggSumWithCollatorMatchesHashAggStage
     collatorAccessor.reset(value::TypeTags::collator,
                            value::bitcastFrom<CollatorInterface*>(makeCollator().release()));
     auto [scanSlots, scanStage] = generateVirtualScanMulti(2, rows);
+    auto groupByOutSlot = generateSlotId();
     auto final = generateSlotId();
     auto partial = generateSlotId();
     auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                             makeSV(scanSlots[0]),
+                                            makeSV(groupByOutSlot),
                                             sums(scanSlots[1], final, partial),
                                             collatorSlot,
                                             /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
-    auto accessors = prepareTree(ctx.get(), stage.get(), {scanSlots[0], final, partial});
+    auto accessors = prepareTree(ctx.get(), stage.get(), {groupByOutSlot, final, partial});
     assertSameGroups(expected, drainGroups(stage.get(), accessors));
 
     stage->open(true);

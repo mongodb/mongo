@@ -57,6 +57,7 @@ void run(benchmark::State& state, bool compact) {
             std::make_unique<CompactSumHashAggAccumulatorTerminal>(out, makeE<EVariable>(b)));
         root = makeS<CompactHashAggStage>(std::move(input),
                                           makeSV(a),
+                                          makeSV(keyOut),
                                           std::move(accumulators),
                                           boost::none,
                                           nullptr,

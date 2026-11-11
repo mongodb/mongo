@@ -38,7 +38,12 @@ namespace sbe {
  *
  * Since the data must be buffered in a hash table, this is a "binding reflector". This means
  * slots from the 'input' tree are not visible higher in tree. Stages higher in the tree can
- * only see the slots holding the group-by keys.
+ * only see the slots holding the group-by keys and accumulator results.
+ *
+ * The group-by keys are visible above the stage through the slots 'gbsOut', parallel to 'gbs'.
+ * 'gbsOut[i]' holds the key stored for the group: the first value of 'gbs[i]' seen for the group.
+ * It can differ from the value of 'gbs[i]' in other rows of the group, for example under a
+ * case-insensitive collation, or for numbers of different types that compare equal.
  *
  * The optional 'collatorSlot', if provided, changes the definition of string equality used when
  * determining whether two group-by keys are equal. For instance, the plan may require us to do a
@@ -51,7 +56,8 @@ namespace sbe {
  *
  * Debug string representation:
  *
- *  compact_group [<group by slots>] [slot_1 = accumulator_1, ..., slot_n = accumulator_n]
+ *  compact_group [<group by slots>] [gbsOut_1 = gbs_1, ..., gbsOut_k = gbs_k]
+ *      [slot_1 = accumulator_1, ..., slot_n = accumulator_n]
  *      collatorSlot?
  *      childStage
  */
@@ -61,6 +67,7 @@ class CompactHashAggStage final : public HashAggBaseStage<CompactHashAggStage> {
 public:
     CompactHashAggStage(std::unique_ptr<PlanStage> input,
                         value::SlotVector gbs,
+                        value::SlotVector gbsOut,
                         std::vector<std::unique_ptr<CompactHashAggAccumulator>> accumulators,
                         boost::optional<value::SlotId> collatorSlot,
                         PlanYieldPolicySBE* yieldPolicy,
@@ -135,6 +142,8 @@ private:
     // ---
 
     const value::SlotVector _gbs;
+    // The slots that expose the group-by keys above this stage, parallel to '_gbs'.
+    const value::SlotVector _gbsOut;
 
     const std::vector<std::unique_ptr<CompactHashAggAccumulator>> _accumulators;
 

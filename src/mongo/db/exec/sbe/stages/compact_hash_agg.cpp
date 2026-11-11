@@ -37,6 +37,7 @@ CompactStateLayout buildLayout(
 CompactHashAggStage::CompactHashAggStage(
     std::unique_ptr<PlanStage> input,
     value::SlotVector gbs,
+    value::SlotVector gbsOut,
     std::vector<std::unique_ptr<CompactHashAggAccumulator>> accumulators,
     boost::optional<value::SlotId> collatorSlot,
     PlanYieldPolicySBE* yieldPolicy,
@@ -50,10 +51,14 @@ CompactHashAggStage::CompactHashAggStage(
                        false /* allowDiskUse; the compact stage does not spill */,
                        /*forceIncreasedSpilling=*/false),
       _gbs(std::move(gbs)),
+      _gbsOut(std::move(gbsOut)),
       _accumulators(std::move(accumulators)),
       _layout(buildLayout(_accumulators)),
       _collatorSlot(collatorSlot) {
     _children.emplace_back(std::move(input));
+    tassert(13913000,
+            "CompactHashAggStage needs one output slot for each group-by slot",
+            _gbsOut.size() == _gbs.size());
 }
 
 std::unique_ptr<PlanStage> CompactHashAggStage::clone() const {
@@ -63,6 +68,7 @@ std::unique_ptr<PlanStage> CompactHashAggStage::clone() const {
     }
     return std::make_unique<CompactHashAggStage>(_children[0]->clone(),
                                                  _gbs,
+                                                 _gbsOut,
                                                  std::move(accumulators),
                                                  _collatorSlot,
                                                  _yieldPolicy,
@@ -88,15 +94,17 @@ void CompactHashAggStage::prepare(CompileCtx& ctx) {
     };
 
     size_t keyIdx = 0;
-    for (auto& slot : _gbs) {
+    for (size_t i = 0; i < _gbs.size(); ++i) {
+        auto slot = _gbs[i];
         throwIfDupSlot(slot);
+        throwIfDupSlot(_gbsOut[i]);
 
         _inKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
 
         // Construct an accessor for obtaining the key value from the hash table '_ht'.
         _outKeyAccessors.emplace_back(std::make_unique<CompactKeyAccessor>(_htIt, keyIdx));
 
-        _outAccessors[slot] = _outKeyAccessors.back().get();
+        _outAccessors[_gbsOut[i]] = _outKeyAccessors.back().get();
 
         ++keyIdx;
     }
@@ -212,6 +220,7 @@ std::unique_ptr<PlanStageStats> CompactHashAggStage::getStats(bool includeDebugI
     if (includeDebugInfo) {
         BSONObjBuilder bob;
         bob.append("groupBySlots", _gbs.begin(), _gbs.end());
+        bob.append("groupByOutSlots", _gbsOut.begin(), _gbsOut.end());
         if (!_accumulators.empty()) {
             DebugPrinter printer;
             BSONObjBuilder exprBuilder(bob.subobjStart("expressions"));
@@ -280,6 +289,18 @@ void CompactHashAggStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back(DebugPrinter::Block("[`"));
+    for (size_t idx = 0; idx < _gbs.size(); ++idx) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
+
+        DebugPrinter::addIdentifier(ret, _gbsOut[idx]);
+        ret.emplace_back("=");
+        DebugPrinter::addIdentifier(ret, _gbs[idx]);
+    }
+    ret.emplace_back(DebugPrinter::Block("`]"));
+
+    ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _accumulators.size(); ++idx) {
         if (idx) {
             ret.emplace_back(DebugPrinter::Block("`,"));
@@ -304,6 +325,7 @@ size_t CompactHashAggStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
     size += size_estimator::estimate(_children);
     size += size_estimator::estimate(_gbs);
+    size += size_estimator::estimate(_gbsOut);
     size += size_estimator::estimate(_accumulators);
     size += _layout.heapSize();
     return size;
