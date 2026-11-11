@@ -231,7 +231,7 @@ void StreamingAggStage::startNewGroupAt(size_t idx) {
     // Initialize a row buffer for the current group at 'idx' in _groupKeys/_groupAggs, reusing the
     // element at that position if present or extending the vectors.
     _curGroupIdx = idx;
-    tassert(13625704, "Too many groups seen in a single cluster", idx < kMaxGroupsPerClusterKey);
+    tassert(13625704, "Too many groups seen in a single cluster", idx < kMaxParallelGroups);
 
     value::MaterializedRow keyCopy(_inGroupKey);
     keyCopy.makeOwned();

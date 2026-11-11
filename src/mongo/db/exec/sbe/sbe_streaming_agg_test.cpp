@@ -569,6 +569,8 @@ TEST_F(StreamingAggStageTest, SeparatesAllCombinationsOfFourInterleavedKeyFields
             docs.append(bob.obj());
         }
     }
+    // One additional document in a different cluster
+    docs.append(BSON("a" << 2 << "v" << 100));
 
     BSONArrayBuilder expected;
     for (unsigned group = 0; group < 16; ++group) {
@@ -586,6 +588,8 @@ TEST_F(StreamingAggStageTest, SeparatesAllCombinationsOfFourInterleavedKeyFields
                               ));
         expected.append(row.arr());
     }
+    expected.append(
+        BSON_ARRAY(2 << "missing" << "missing" << "missing" << "missing" << BSON_ARRAY(100)));
 
     runGroupTest(docs.arr(),
                  {"a", "b", "c", "d", "e"},

@@ -84,7 +84,9 @@ protected:
 
 private:
     static constexpr size_t kMaxClusteredGroupKeys = 4;
-    static constexpr size_t kMaxGroupsPerClusterKey = 1 << kMaxClusteredGroupKeys;
+    // Limit on the number of parallel groups we expect to see at a single time. At most 2 values
+    // per clustered field, plus the first row of the next cluster.
+    static constexpr size_t kMaxParallelGroups = (1 << kMaxClusteredGroupKeys) + 1;
 
     void readInGroupKey();
     void readInClusterKey();
@@ -139,7 +141,7 @@ private:
     // Layout when reading:  [    ...groups being accumulated...     | groups to be reused ]
     // Layout when emitting: [ groups emitted | groups to be emitted | groups to be reused ]
     //                                        ^ _emitIdx             ^ _numLiveGroups
-    using GroupRows = absl::InlinedVector<value::MaterializedRow, kMaxGroupsPerClusterKey>;
+    using GroupRows = absl::InlinedVector<value::MaterializedRow, kMaxParallelGroups>;
     GroupRows _groupKeys;
     GroupRows _groupAggs;
     // End of range of valid groups in _groupKeys/_groupAggs
