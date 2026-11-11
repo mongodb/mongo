@@ -99,6 +99,9 @@ ALLOWED_NEW_ACCESS_CHECK_PRIVILEGES: dict[str, list[AllowedNewPrivilege]] = dict
     aggregate=[
         # Added in 9.1 for $collStats to support querying unfiltered metrics (SERVER-133544).
         AllowedNewPrivilege("cluster", ["getUnfilteredMetrics"], "collStats"),
+        # $changeStream showSystemEvents on whole-cluster streams checks system.js read access to
+        # decide whether to filter out system.js events (SERVER-135203).
+        AllowedNewPrivilege("collection", ["find", "changeStream"]),
     ],
     # This list is only used in unit-tests.
     complexChecksSupersetAllowed=[
