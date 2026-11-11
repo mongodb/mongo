@@ -70,6 +70,21 @@ def _resmoke_tags_file(candidate: CandidateFile) -> bool:
     )
 
 
+def _backports_multiversion_input(candidate: CandidateFile) -> bool:
+    removed_test = candidate.status in {
+        ChangeStatus.DELETED,
+        ChangeStatus.RENAMED,
+    } and _has_suffix(candidate, (".js",))
+    return removed_test or any(
+        path == "etc/backports_required_for_multiversion_tests.yml"
+        or (
+            path.startswith(("buildscripts/resmokeconfig/", "buildscripts/modules/"))
+            and path.endswith(".yml")
+        )
+        for path in candidate.selection_paths
+    )
+
+
 def _streams_file(candidate: CandidateFile) -> bool:
     return any(
         "jstests/streams" in path or "modules/streams/suites/streams" in path
@@ -300,6 +315,17 @@ CHECKS: tuple[RegisteredCheck, ...] = (
         ),
         _resmoke_tags_file,
         adapters.run_resmoke_tags,
+    ),
+    RegisteredCheck(
+        CheckSpec(
+            "lint.backports-multiversion",
+            "Multiversion backports file",
+            "lint",
+            CheckPhase.SHARED_STATE_SERIAL,
+            dependencies=_BAZEL_SERVER_DEPENDENCY,
+        ),
+        _backports_multiversion_input,
+        adapters.run_backports_multiversion,
     ),
     RegisteredCheck(
         CheckSpec(

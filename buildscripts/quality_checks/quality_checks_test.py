@@ -582,6 +582,22 @@ class AdapterTest(unittest.TestCase):
                     self.assertIn("//buildscripts:clang_format_version", command)
                     self.assertEqual("--check" in command, not fix)
 
+    @mock.patch.object(adapters, "run_subprocess", return_value=RunOutcome(0))
+    def test_backports_multiversion_forwards_requested_origin_branch(self, run):
+        context = _context(Path("."), ())
+        context.origin_branch = "HEAD"
+        context.expansions_file = "../expansions.yml"
+        for requested in ("auto", "origin/v8.0"):
+            with self.subTest(requested=requested):
+                context.requested_origin_branch = requested
+                adapters.run_backports_multiversion(context, ())
+                command = run.call_args.args[0]
+                tool_args = command[command.index("--") + 1 :]
+                self.assertEqual(
+                    tool_args,
+                    ["--origin-branch", requested, "--expansions-file", "../expansions.yml"],
+                )
+
     def test_formatter_version_pin_skips_unsupported_hosts(self):
         for system in ("Darwin", "Windows"):
             with (

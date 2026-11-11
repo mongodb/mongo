@@ -27,3 +27,9 @@ filters:
   - "test_mongolint.py":
     approvers:
       - 10gen/server-programmability
+  - "test_backports_required_multiversion.py":
+    approvers:
+      - 10gen/devprod-test-infrastructure
+  - "test_lint_backports_required_multiversion.py":
+    approvers:
+      - 10gen/devprod-test-infrastructure

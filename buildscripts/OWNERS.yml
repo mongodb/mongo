@@ -74,3 +74,9 @@ filters:
   - "jira_cve_links.py":
     approvers:
       - 10gen/server-release
+  - "backports_required_multiversion.py":
+    approvers:
+      - 10gen/devprod-test-infrastructure
+  - "lint_backports_required_multiversion.py":
+    approvers:
+      - 10gen/devprod-test-infrastructure

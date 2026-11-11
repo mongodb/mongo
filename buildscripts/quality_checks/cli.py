@@ -420,6 +420,7 @@ def main(
         bazel_options=tuple(args.bazel_option),
         expansions_file=args.expansions_file,
         codeowners_branch=args.codeowners_branch,
+        requested_origin_branch=args.origin_branch,
         is_ci=_truthy(os.environ.get("CI")),
         shared_tools=shared_tools,
     )

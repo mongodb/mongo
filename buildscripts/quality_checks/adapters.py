@@ -106,6 +106,7 @@ class CheckContext:
     bazel_options: tuple[str, ...] = ()
     expansions_file: str | None = None
     codeowners_branch: str | None = None
+    requested_origin_branch: str = "auto"
     is_ci: bool = False
     shared_tools: SharedTools = field(default_factory=SharedTools)
 
@@ -396,6 +397,20 @@ def run_yaml(context: CheckContext, files: tuple[str, ...]) -> RunOutcome:
 
 def run_resmoke_tags(context: CheckContext, files: tuple[str, ...]) -> RunOutcome:
     return _run_lint_stage(context, files, "resmoke-tags")
+
+
+def run_backports_multiversion(context: CheckContext, _files: tuple[str, ...]) -> RunOutcome:
+    # Forward the requested base, not context.origin_branch: discovery resolves "auto" to HEAD
+    # for --all, //... and --files, which would leave the lint no added entries to check.
+    tool_args = ["--origin-branch", context.requested_origin_branch]
+    if context.expansions_file:
+        tool_args.extend(["--expansions-file", context.expansions_file])
+    return run_subprocess(
+        _bazel_run_command(
+            context, "//buildscripts:lint_backports_required_multiversion", tool_args
+        ),
+        cwd=context.repo_root,
+    )
 
 
 def run_streams_coverage(context: CheckContext, files: tuple[str, ...]) -> RunOutcome:

@@ -616,6 +616,28 @@ py_test(
 )
 
 py_test(
+    name = "test_backports_required_multiversion",
+    srcs = ["test_backports_required_multiversion.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:backports_required_multiversion",
+    ],
+)
+
+py_test(
+    name = "test_lint_backports_required_multiversion",
+    srcs = ["test_lint_backports_required_multiversion.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:lint_backports_required_multiversion",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_test(
     name = "test_sort_backport_multiversion",
     srcs = ["test_sort_backport_multiversion.py"],
     visibility = ["//visibility:public"],

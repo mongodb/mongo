@@ -1052,6 +1052,45 @@ py_library(
 )
 
 py_library(
+    name = "backports_required_multiversion",
+    srcs = ["backports_required_multiversion.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pydantic",
+            group = "evergreen",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "lint_backports_required_multiversion",
+    srcs = ["lint_backports_required_multiversion.py"],
+    main = "lint_backports_required_multiversion.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":backports_required_multiversion",
+        "@bazel_rules_mongo//utils:evergreen_git",
+        dependency(
+            "pydantic",
+            group = "evergreen",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
     name = "sort_backport_multiversion",
     srcs = ["sort_backport_multiversion.py"],
     visibility = ["//visibility:public"],
