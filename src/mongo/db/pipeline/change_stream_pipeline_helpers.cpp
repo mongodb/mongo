@@ -12,6 +12,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
+#include "mongo/db/pipeline/document_source_change_stream_convert_errors.h"
 #include "mongo/db/pipeline/document_source_change_stream_end_of_transaction.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
@@ -54,6 +55,23 @@ const StringDataSet kExpectedUserStages = {
 };
 
 }  // namespace
+
+void addErrorConversionStageIfNeeded(Pipeline& pipeline) {
+    const auto& expCtx = pipeline.getContext();
+    if (!changeStreamShowsErrorsAsEvents(expCtx)) {
+        return;
+    }
+
+    // Idempotent: the stage is added at most once, even if this is called on a pipeline that was
+    // already injected (for example, a pipeline that is re-optimized).
+    const auto& sources = pipeline.getSources();
+    if (!sources.empty() &&
+        sources.back()->isInstanceOf<DocumentSourceChangeStreamConvertErrors>()) {
+        return;
+    }
+
+    pipeline.addFinalSource(DocumentSourceChangeStreamConvertErrors::create(expCtx));
+}
 
 std::vector<BSONObj> buildPipelineForConfigServerV2(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

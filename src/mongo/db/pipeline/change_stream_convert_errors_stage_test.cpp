@@ -215,6 +215,21 @@ TEST(ChangeStreamConvertErrorsDocumentSourceTest, SerializesForWire) {
                       BSON("$_internalChangeStreamConvertErrors" << BSONObj()));
 }
 
+// The stage is injected internally by the change stream pipeline, so it must not affect the query
+// shape of a change stream: shapifying omits it (returns missing), like the other internal
+// change-stream stages.
+TEST(ChangeStreamConvertErrorsDocumentSourceTest, EmptyForQueryShape) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto ds = DocumentSourceChangeStreamConvertErrors::create(expCtx);
+
+    ASSERT_BSONOBJ_EQ(ds->serialize().getDocument().toBson(),
+                      BSON("$_internalChangeStreamConvertErrors" << BSONObj()));
+
+    const auto shapifying = query_shape::SerializationOptions{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    ASSERT(ds->serialize(shapifying).missing());
+}
+
 // The stage must be the final stage of the pipeline: an error event is built there, above every
 // user stage, and must never be observed by a user stage below it.
 TEST(ChangeStreamConvertErrorsConstraintTest, MustBeFinalStage) {

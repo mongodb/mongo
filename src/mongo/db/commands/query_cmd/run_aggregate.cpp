@@ -29,6 +29,7 @@
 #include "mongo/db/pipeline/aggregation_hint_translation.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
+#include "mongo/db/pipeline/change_stream_pipeline_helpers.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
@@ -802,6 +803,10 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
         }
 
         for (auto&& pipelineIt : pipelines) {
+            // Add a top-level error conversion stage if requested, which wraps recoverable
+            // failures as error events and makes them visible in explain.
+            change_stream::pipeline_helpers::addErrorConversionStageIfNeeded(*pipelineIt);
+
             // There are separate ExpressionContexts for each exchange pipeline, so make sure to
             // pass the pipeline's ExpressionContext to the plan executor factory.
             auto pipelineExpCtx = pipelineIt->getContext();

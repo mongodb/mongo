@@ -838,6 +838,10 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
         // skip the expensive BSON->Document->BSON conversion.
         return convertPipelineToRouterStages(std::move(pipeline), std::move(cursorParams));
     }
+
+    // Opted-in change streams get a top-level error-conversion stage, above the router's user
+    // stages, so that recoverable failures become error events and are visible in explain.
+    change_stream::pipeline_helpers::addErrorConversionStageIfNeeded(*pipeline);
     return ClusterClientCursorImpl::make(
         opCtx, std::make_unique<RouterStagePipeline>(std::move(pipeline)), std::move(cursorParams));
 }

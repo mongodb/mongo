@@ -1643,6 +1643,7 @@ mongo_cc_unit_test(
     srcs = [
         "aggregation_request_test.cpp",
         "change_stream_convert_errors_stage_test.cpp",
+        "change_stream_pipeline_helpers_test.cpp",
         "data_to_shards_allocation_query_service_test.cpp",
         "dependencies_test.cpp",
         "dispatch_shard_pipeline_test.cpp",

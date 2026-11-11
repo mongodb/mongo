@@ -20,7 +20,21 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+namespace mongo {
+class Pipeline;
+}  // namespace mongo
+
 namespace mongo::change_stream::pipeline_helpers {
+
+/**
+ * Adds the top-level error-conversion stage ('$_internalChangeStreamConvertErrors') to an
+ * opted-in ('showErrorsAsEvents: true') change stream pipeline, if it is not already present.
+ *
+ * Must be called after optimization and before the pipeline is frozen, so that the optimizer never
+ * sees the stage while explain still reports it. No-op for non-change-stream pipelines and when the
+ * flag is off, and idempotent if called more than once.
+ */
+void addErrorConversionStageIfNeeded(Pipeline& pipeline);
 
 /**
  * Build a change stream pipeline for the config server, used by v2 change streams.
