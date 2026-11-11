@@ -60,8 +60,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -1826,6 +1828,53 @@ TEST_F(FleTagsTest, SampleMemoryLimit) {
         auto size = mongo::fle::sizeArrayElementsMemory(xp.count);
         ASSERT_EQ(xp.size, size);
     }
+}
+
+// A FLETagQueryInterface that returns caller-supplied counts so we can drive readTags() with tag
+// counts that are impractical to produce via real inserts (e.g. near the uint64_t max).
+class FLETagCountStubQuery : public FLETagQueryInterface {
+public:
+    explicit FLETagCountStubQuery(std::vector<uint64_t> counts) : _counts(std::move(counts)) {}
+
+    BSONObj getById(const NamespaceString& nss, BSONElement element) final {
+        return BSONObj();
+    }
+
+    std::vector<std::vector<FLEEdgeCountInfo>> getTags(
+        const NamespaceString& nss,
+        const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
+        FLETagQueryInterface::TagQueryType type) final {
+        std::vector<FLEEdgeCountInfo> countInfos;
+        for (auto count : _counts) {
+            countInfos.emplace_back(count, PrfBlock{});
+        }
+        return {countInfos};
+    }
+
+private:
+    std::vector<uint64_t> _counts;
+};
+
+// Tests that single count large enough that it exceeds the FLE tag limit must be rejected.
+TEST_F(FleTagsTest, TagCountExceedingLimitThrows) {
+    FLETagCountStubQuery stub({std::numeric_limits<uint64_t>::max()});
+    auto doc = BSON("encrypted" << "a");
+    ASSERT_THROWS_CODE(
+        mongo::fle::readTags(&stub, _escNs, getTestESCDataToken(doc), getTestEDCDataToken(doc), 0),
+        DBException,
+        ErrorCodes::FLEMaxTagLimitExceeded);
+}
+
+// Summing multiple large counts must stop at the 64-bit unsigned limit instead of wrapping around.
+TEST_F(FleTagsTest, TagCountOverflowSaturatesAndThrows) {
+    // Two counts whose sum overflows a uint64_t (and would wrap a uint32_t as well).
+    FLETagCountStubQuery stub(
+        {20, std::numeric_limits<uint64_t>::max() / 4, std::numeric_limits<uint64_t>::max()});
+    auto doc = BSON("encrypted" << "a");
+    ASSERT_THROWS_CODE(
+        mongo::fle::readTags(&stub, _escNs, getTestESCDataToken(doc), getTestEDCDataToken(doc), 0),
+        DBException,
+        ErrorCodes::FLEMaxTagLimitExceeded);
 }
 
 class QETextSearchCrudTest : public FleCrudTest {

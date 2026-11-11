@@ -10,6 +10,7 @@
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
@@ -121,11 +122,16 @@ std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
 
     // Count how many tags we will need and check once if we they will fit
     //
-    uint32_t totalTagCount = 0;
+    uint64_t totalTagCount = 0;
 
     for (const auto& countInfoSet : countInfoSets) {
         for (const auto& countInfo : countInfoSet) {
-            totalTagCount += countInfo.count;
+            uint64_t sum = 0;
+            if (overflow::add(totalTagCount, countInfo.count, &sum)) {
+                totalTagCount = std::numeric_limits<uint64_t>::max();
+                break;
+            }
+            totalTagCount = sum;
         }
     }
 
