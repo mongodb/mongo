@@ -545,19 +545,18 @@ protected:
     void trackReturn(const Record& record);
 
     /**
-     * Advances the cursor and returns the next RecordId, if one exists.
+     * Advances the cursor and returns the next Record, if one exists.
      */
-    RecordId nextIdCommon();
+    boost::optional<Record> nextCommon();
 
     /**
-     * Perform a bounded seek on the cursor, and return the next matching RecordId, if one exists.
+     * Perform a bounded seek on the cursor. Returns true if the cursor is positioned on a record,
+     * or false for eof.
      *
      * If countSeekMetric is false, does not record this seek towards metrics collection.
      * If restoring is true, this seek is part of a restore operation.
      */
-    RecordId seekIdCommon(const RecordId& id,
-                          BoundInclusion boundInclusion,
-                          bool restoring = false);
+    bool seekCommon(const RecordId& id, BoundInclusion boundInclusion, bool restoring = false);
 
     /**
      * Perform an exact seek on the cursor, and return the Record, if one exists.

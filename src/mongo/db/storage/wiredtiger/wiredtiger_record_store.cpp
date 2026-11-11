@@ -17,16 +17,15 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_oplog_manager.h"
-#include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
@@ -48,7 +47,6 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
-#include "mongo/util/timer.h"
 
 #include <algorithm>
 #include <cstring>
@@ -72,8 +70,7 @@ WiredTigerRecordStore::CursorKey makeCursorKey(const RecordId& rid, KeyFormat fo
     if (format == KeyFormat::Long) {
         return rid.getLong();
     } else {
-        auto str = rid.getStr();
-        return WiredTigerItem(str.data(), str.size());
+        return WiredTigerItem(rid.getStr());
     }
 }
 
@@ -120,24 +117,37 @@ std::size_t computeRecordIdSize(const RecordId& id) {
     return id.isStr() ? id.getStr().size() : 0;
 }
 
-RecordId getKey(WT_CURSOR* cursor, KeyFormat keyFormat) {
+RecordId decodeRecordIdBuffer(WT_SESSION* session, KeyFormat keyFormat, std::span<const char> key) {
     if (keyFormat == KeyFormat::String) {
-        WiredTigerItem item;
-        invariantWTOK(cursor->get_key(cursor, &item), cursor->session);
-        return RecordId(item);
-    } else {
-        std::int64_t recordId;
-        invariantWTOK(cursor->get_key(cursor, &recordId), cursor->session);
-        return RecordId(recordId);
+        return RecordId(key);
     }
+    int64_t id = 0;
+    invariantWTOK(wiredtiger_struct_unpack(session, key.data(), key.size(), "q", &id), session);
+    return RecordId(id);
+}
+
+RecordId getKey(WT_CURSOR* cursor, KeyFormat keyFormat) {
+    WiredTigerItem item;
+    invariantWTOK(cursor->get_raw_key_value(cursor, item.get(), nullptr), cursor->session);
+    return decodeRecordIdBuffer(cursor->session, keyFormat, item);
+}
+
+RecordData toRecordData(std::span<const char> value) {
+    return {value.data(), static_cast<int>(value.size())};
 }
 
 RecordData getRecordData(WT_CURSOR* c) {
-    WT_ITEM value;
-    invariantWTOK(c->get_value(c, &value), c->session);
-    return {static_cast<const char*>(value.data), static_cast<int>(value.size)};
+    WiredTigerItem value;
+    invariantWTOK(c->get_value(c, value.get()), c->session);
+    return toRecordData(value);
 }
 
+Record getRecord(WiredTigerCursor& cursor, KeyFormat keyFormat) {
+    auto c = cursor.get();
+    WiredTigerItem key, value;
+    invariantWTOK(c->get_raw_key_value(c, key.get(), value.get()), *cursor.getSession());
+    return Record{decodeRecordIdBuffer(c->session, keyFormat, key), toRecordData(value)};
+}
 
 void setKey(WT_CURSOR* cursor, const WiredTigerRecordStore::CursorKey* key) {
     if (auto itemPtr = get_if<WiredTigerItem>(key)) {
@@ -544,30 +554,15 @@ public:
     ~RandomCursor() override = default;
 
     boost::optional<Record> next() final {
+        auto c = _cursor->get();
         int advanceRet = wiredTigerPrepareConflictRetry(
             *_opCtx, StorageExecutionContext::get(_opCtx)->getPrepareConflictTracker(), *_ru, [&] {
-                return _cursor->get()->next(_cursor->get());
+                return c->next(c);
             });
         if (advanceRet == WT_NOTFOUND)
             return {};
         invariantWTOK(advanceRet, *_cursor->getSession());
-
-        RecordId id;
-        if (_keyFormat == KeyFormat::String) {
-            WiredTigerItem item;
-            invariantWTOK(_cursor->get()->get_key(_cursor->get(), &item), *_cursor->getSession());
-            id = RecordId(item);
-        } else {
-            int64_t key;
-            invariantWTOK(_cursor->get()->get_key(_cursor->get(), &key), *_cursor->getSession());
-            id = RecordId(key);
-        }
-
-        WT_ITEM value;
-        invariantWTOK(_cursor->get()->get_value(_cursor->get(), &value), *_cursor->getSession());
-
-        return {
-            {std::move(id), {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
+        return getRecord(*_cursor, _keyFormat);
     }
 
     void save() final {
@@ -990,13 +985,13 @@ StatusWith<RecordData> WiredTigerRecordStore::_updateWithDamages(
                       c->session);
 
 
-    WT_ITEM value;
-    invariantWTOK(c->get_value(c, &value), c->session);
+    WiredTigerItem value;
+    invariantWTOK(c->get_value(c, value.get()), c->session);
 
-    auto sizeDiff = static_cast<int64_t>(value.size) - static_cast<int64_t>(oldRec.size());
+    auto sizeDiff = static_cast<int64_t>(value.size()) - static_cast<int64_t>(oldRec.size());
     _changeNumRecordsAndDataSize(wtRu, 0, sizeDiff);
 
-    return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
+    return toRecordData(value).getOwned();
 }
 
 void WiredTigerRecordStore::printRecordMetadata(const RecordId& recordId,
@@ -1039,7 +1034,7 @@ void WiredTigerRecordStore::printRecordMetadata(const RecordId& recordId,
         uint64_t stopTs = 0, stopDurableTs = 0, stopPrepareTs = 0, stopPreparedId = 0;
         uint64_t startTxnId = 0, stopTxnId = 0;
         uint8_t flags = 0, location = 0, prepare = 0, type = 0;
-        WT_ITEM value;
+        WiredTigerItem value;
 
         invariantWTOK(cursor->get_value(cursor,
                                         &startTxnId,
@@ -1056,10 +1051,9 @@ void WiredTigerRecordStore::printRecordMetadata(const RecordId& recordId,
                                         &prepare,
                                         &flags,
                                         &location,
-                                        &value),
+                                        value.get()),
                       cursor->session);
 
-        RecordData recordData(static_cast<const char*>(value.data), value.size);
         LOGV2(6120300,
               "WiredTiger record metadata",
               "recordId"_attr = recordId,
@@ -1077,7 +1071,7 @@ void WiredTigerRecordStore::printRecordMetadata(const RecordId& recordId,
               "prepare"_attr = prepare,
               "flags"_attr = flags,
               "location"_attr = location,
-              "value"_attr = redact(recordData.toBson()));
+              "value"_attr = redact(toRecordData(value).toBson()));
 
         // Save all relevant timestamps that we just printed.
         if (recordTimestamps) {
@@ -1838,19 +1832,7 @@ void WiredTigerRecordStoreCursorBase::init() {
     _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
 }
 
-boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
-    auto id = nextIdCommon();
-    if (id.isNull()) {
-        return boost::none;
-    }
-
-    Record toReturn = {std::move(id), getRecordData(_cursor->get())};
-    checkOrder(toReturn.id);
-    trackReturn(toReturn);
-    return toReturn;
-}
-
-RecordId WiredTigerRecordStoreCursorBase::nextIdCommon() {
+boost::optional<Record> WiredTigerRecordStoreCursorBase::nextCommon() {
     invariant(_hasRestored);
     if (_eof)
         return {};
@@ -1862,7 +1844,6 @@ RecordId WiredTigerRecordStoreCursorBase::nextIdCommon() {
 
     WT_CURSOR* c = _cursor->get();
 
-    RecordId id;
     if (!_skipNextAdvance) {
         // Nothing after the next line can throw WCEs.
         // Note that an unpositioned (or eof) WT_CURSOR returns the first/last entry in the
@@ -1880,14 +1861,21 @@ RecordId WiredTigerRecordStoreCursorBase::nextIdCommon() {
             return {};
         }
         invariantWTOK(advanceRet, c->session);
-        id = getKey(c, _keyFormat);
-    } else if (!id.isValid()) {
-        id = getKey(c, _keyFormat);
     }
 
     _positioned = true;
     _skipNextAdvance = false;
-    return id;
+
+    return getRecord(*_cursor, _keyFormat);
+}
+
+boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
+    auto toReturn = nextCommon();
+    if (toReturn) {
+        checkOrder(toReturn->id);
+        trackReturn(*toReturn);
+    }
+    return toReturn;
 }
 
 void WiredTigerRecordStoreCursorBase::reportOutOfOrderRead(const RecordId& id,
@@ -1940,19 +1928,18 @@ void WiredTigerRecordStoreCursorBase::resetCursor() {
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seek(const RecordId& start,
                                                               BoundInclusion boundInclusion) {
-    auto id = seekIdCommon(start, boundInclusion);
-    if (id.isNull()) {
+    if (!seekCommon(start, boundInclusion)) {
         return boost::none;
     }
 
-    Record toReturn = {std::move(id), getRecordData(_cursor->get())};
+    Record toReturn = getRecord(*_cursor, _keyFormat);
     trackReturn(toReturn);
     return toReturn;
 }
 
-RecordId WiredTigerRecordStoreCursorBase::seekIdCommon(const RecordId& start,
-                                                       BoundInclusion boundInclusion,
-                                                       bool restoring) {
+bool WiredTigerRecordStoreCursorBase::seekCommon(const RecordId& start,
+                                                 BoundInclusion boundInclusion,
+                                                 bool restoring) {
     invariant(_hasRestored || restoring);
 
     // Ensure an active transaction is open.
@@ -1984,13 +1971,13 @@ RecordId WiredTigerRecordStoreCursorBase::seekIdCommon(const RecordId& start,
         });
     if (ret == WT_NOTFOUND) {
         _eof = true;
-        return {};
+        return false;
     }
     invariantWTOK(ret, c->session);
 
     _positioned = true;
     _eof = false;
-    return getKey(c, _keyFormat);
+    return true;
 }
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordId& id) {
@@ -2063,14 +2050,14 @@ bool WiredTigerRecordStoreCursorBase::restore(RecoveryUnit& ru, bool tolerateCap
         return true;
     }
 
-    auto foundId = seekIdCommon(_lastReturnedId, BoundInclusion::kInclude, /*restoring=*/true);
+    auto found = seekCommon(_lastReturnedId, BoundInclusion::kInclude, /*restoring=*/true);
     _hasRestored = true;
-    if (foundId.isNull()) {
+    if (!found) {
         _eof = true;
         return true;
     }
 
-    int cmp = foundId.compare(_lastReturnedId);
+    auto cmp = getKey(_cursor->get(), _keyFormat) <=> _lastReturnedId;
     if (cmp == 0) {
         return true;  // Landed right where we left off.
     }
@@ -2118,35 +2105,30 @@ boost::optional<Record> WiredTigerCappedCursorBase::seekExact(const RecordId& id
 
 boost::optional<Record> WiredTigerCappedCursorBase::seek(const RecordId& start,
                                                          BoundInclusion boundInclusion) {
-    auto id = seekIdCommon(start, boundInclusion);
-    if (id.isNull()) {
+    if (!seekCommon(start, boundInclusion)) {
         return boost::none;
     }
 
-    if (!isVisible(id)) {
+    Record toReturn = getRecord(*_cursor, _keyFormat);
+    if (!isVisible(toReturn.id)) {
         _eof = true;
         return {};
     }
 
-    Record toReturn = {std::move(id), getRecordData(_cursor->get())};
     trackReturn(toReturn);
     return toReturn;
 }
 
 boost::optional<Record> WiredTigerCappedCursorBase::next() {
-    auto id = nextIdCommon();
-    if (id.isNull()) {
-        return boost::none;
+    auto toReturn = nextCommon();
+    if (toReturn) {
+        if (!isVisible(toReturn->id)) {
+            _eof = true;
+            return {};
+        }
+        checkOrder(toReturn->id);
+        trackReturn(*toReturn);
     }
-
-    if (!isVisible(id)) {
-        _eof = true;
-        return {};
-    }
-
-    Record toReturn = {std::move(id), getRecordData(_cursor->get())};
-    checkOrder(toReturn.id);
-    trackReturn(toReturn);
     return toReturn;
 }
 
@@ -2175,9 +2157,9 @@ bool WiredTigerCappedCursorBase::restore(RecoveryUnit& ru, bool tolerateCappedRe
         return true;
     }
 
-    auto foundId = seekIdCommon(_lastReturnedId, BoundInclusion::kInclude, /*restoring=*/true);
+    bool found = seekCommon(_lastReturnedId, BoundInclusion::kInclude, /*restoring=*/true);
     _hasRestored = true;
-    if (foundId.isNull()) {
+    if (!found) {
         _eof = true;
         // Capped read collscans do not tolerate cursor repositioning. By contrast, write collscans
         // on a clustered collection like TTL deletion tolerate cursor repositioning like normal
@@ -2188,7 +2170,7 @@ bool WiredTigerCappedCursorBase::restore(RecoveryUnit& ru, bool tolerateCappedRe
         return true;
     }
 
-    int cmp = foundId.compare(_lastReturnedId);
+    auto cmp = getKey(_cursor->get(), _keyFormat) <=> _lastReturnedId;
     if (cmp == 0) {
         return true;  // Landed right where we left off.
     }
@@ -2261,64 +2243,53 @@ void WiredTigerOplogCursor::resetVisibility() {
 }
 
 boost::optional<Record> WiredTigerOplogCursor::next() {
-    auto id = nextIdCommon();
-    if (id.isNull()) {
-        return boost::none;
+    auto record = nextCommon();
+    if (!record) {
+        return record;
     }
-
-    auto cur = _cursor->get();
 
     // If we're using a read timestamp and we're a reverse cursor positioned outside of that bound,
     // walk backwards until we find a suitable record. This is exercised when doing a reverse
     // natural order collection scan.
     if (_readTimestampForOplog && !_forward) {
-        while (id.getLong() > *_readTimestampForOplog) {
-            int advanceRet = wiredTigerPrepareConflictRetry(
-                *_opCtx,
-                StorageExecutionContext::get(_opCtx)->getPrepareConflictTracker(),
-                *_ru,
-                [&] { return cur->prev(cur); });
-            if (advanceRet == WT_NOTFOUND) {
-                _positioned = false;
-                _eof = true;
-                return {};
+        while (record->id.getLong() > *_readTimestampForOplog) {
+            record = nextCommon();
+            if (!record) {
+                return record;
             }
-            invariantWTOK(advanceRet, cur->session);
-            id = getKey(cur, _keyFormat);
         }
     }
 
-    if (!isVisible(id)) {
+    if (!isVisible(record->id)) {
         _eof = true;
         return {};
     }
 
-    Record toReturn = {std::move(id), getRecordData(cur)};
-    checkOrder(toReturn.id);
-    trackReturn(toReturn);
-    return toReturn;
+    checkOrder(record->id);
+    trackReturn(*record);
+    return record;
 }
 
 boost::optional<Record> WiredTigerOplogCursor::seek(const RecordId& start,
                                                     BoundInclusion boundInclusion) {
-    RecordId id;
+    bool found = false;
     if (!_forward && _readTimestampForOplog && start.getLong() > *_readTimestampForOplog) {
         auto key = RecordId(*_readTimestampForOplog);
-        id = seekIdCommon(key, BoundInclusion::kInclude);
+        found = seekCommon(key, BoundInclusion::kInclude);
     } else {
-        id = seekIdCommon(start, boundInclusion);
+        found = seekCommon(start, boundInclusion);
     }
 
-    if (id.isNull()) {
+    if (!found) {
         return boost::none;
     }
 
-    if (!isVisible(id)) {
+    Record toReturn = getRecord(*_cursor, _keyFormat);
+    if (!isVisible(toReturn.id)) {
         _eof = true;
         return boost::none;
     }
 
-    Record toReturn = {std::move(id), getRecordData(_cursor->get())};
     trackReturn(toReturn);
     return toReturn;
 }
