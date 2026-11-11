@@ -6,6 +6,7 @@
  *   requires_sbe,
  * ]
  */
+import {getCurrentFCV, isFCVlt} from "jstests/libs/feature_compatibility_version.js";
 import {
     getAllPlanStages,
     getQueryPlanner,
@@ -31,6 +32,14 @@ describe("enableDetailedJoinExplain", function () {
         rst.startSet();
         rst.initiate();
         const db = rst.getPrimary().getDB(jsTestName());
+
+        // Query settings reject this knob below FCV 9.1, which some suites start at (e.g.
+        // disagg without all feature flags starts at the last stable FCV).
+        if (isFCVlt(db, "9.1")) {
+            jsTest.log.info(`Skipping ${jsTestName()}: FCV is below 9.1`, {fcv: getCurrentFCV(db)});
+            rst.stopSet();
+            quit();
+        }
 
         coll = db.base;
         const foreign = db.foreign;

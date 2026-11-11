@@ -436,7 +436,7 @@ runTest(pipeline, true /* expectRejected */);
     const bigColl = db[jsTestName() + "_big"];
     const pad = "x".repeat(10 * 1024);
     assert.commandWorked(
-        bigColl.insertMany(Array.from({length: 1000}, (_, i) => ({_id: i, a: i, pad: pad}))),
+        bigColl.insertMany(Array.from({length: 3000}, (_, i) => ({_id: i, a: i, pad: pad}))),
     );
     // Add index for multikeyness info for path arrayness.
     assert.commandWorked(bigColl.createIndex({dummy: 1, a: 1}));
