@@ -63,6 +63,50 @@ TEST(ExpressionTypingTest, EmptyOrMatchesNoDocument) {
     ASSERT_EQ(narrowedDebugString(expr, input, false), narrowedAssumeFalse);
 }
 
+TEST(ExpressionTypingTest, ConstantOutputType) {
+    ASSERT_EQ(outputTypeDebugString("{$const: 5}"), "int(S)");
+    ASSERT_EQ(outputTypeDebugString("{$const: null}"), "null");
+    ASSERT_EQ(outputTypeDebugString("{$const: {a: 'str'}}"), "{a: string(S)}");
+    ASSERT_EQ(outputTypeDebugString("{$const: [1, 'str']}"), "array(S)");
+}
+
+TEST(ExpressionTypingTest, ConstantOutputTypeMatchesEvaluationOnScalars) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    for (const auto& value : scalarRepresentatives()) {
+        auto expr = ExpressionConstant::create(expCtx.get(), value);
+        const Type output = getOutputType(Type::anyObject(), expr.get());
+        ASSERT_TRUE(output.hasValue(value))
+            << "constant " << value.toString() << " but inferred " << output.toDebugString();
+    }
+}
+
+/// Returns the type the field path expression evaluates to.
+std::string fieldPathOutputDebugString(const std::string& rawPath,
+                                       Type inputType = Type::anyObject()) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expr = ExpressionFieldPath::parse(expCtx.get(), rawPath, expCtx->variablesParseState);
+    return getOutputType(std::move(inputType), expr.get()).toDebugString();
+}
+
+TEST(ExpressionTypingTest, FieldPathOutputTypeReadsTheField) {
+    auto input = openObject({{"a", allValues(BSONType::numberInt)}});
+    ASSERT_EQ(fieldPathOutputDebugString("$a", input), "int");
+    ASSERT_EQ(fieldPathOutputDebugString("$a.b", input), "missing");
+    ASSERT_EQ(fieldPathOutputDebugString("$b", input), "any");
+}
+
+TEST(ExpressionTypingTest, FieldPathOutputTypeOfRoot) {
+    auto input = openObject({{"a", allValues(BSONType::numberInt)}});
+    ASSERT_EQ(fieldPathOutputDebugString("$$ROOT", input), input.toDebugString());
+    ASSERT_EQ(fieldPathOutputDebugString("$$CURRENT", input), input.toDebugString());
+    ASSERT_EQ(fieldPathOutputDebugString("$$ROOT.a", input), "int");
+}
+
+TEST(ExpressionTypingTest, FieldPathOutputTypeOfVariableIsAny) {
+    ASSERT_EQ(fieldPathOutputDebugString("$$NOW"), "any");
+    ASSERT_EQ(fieldPathOutputDebugString("$$NOW.x"), "any");
+}
+
 std::string traversedDebugString(const Type& inputType,
                                  const std::string& path,
                                  PathSemantics semantics = PathSemantics::kFieldPath) {

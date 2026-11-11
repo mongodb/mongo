@@ -21,6 +21,24 @@ struct GetOutputTypeExpressionVisitor final
 
     GetOutputTypeExpressionVisitor(const Type& inputType) : inputType(inputType) {}
 
+    void visit(const ExpressionConstant* expr) override {
+        outputType = Type::fromValue(expr->getValue());
+    }
+
+    void visit(const ExpressionFieldPath* expr) override {
+        if (expr->isVariableReference()) {
+            // The value of a variable other than ROOT/CURRENT is not modelled.
+            return;
+        }
+        if (expr->isROOT()) {
+            outputType = inputType;
+            return;
+        }
+        outputType = expression::traversePath(inputType,
+                                              expr->getFieldPathWithoutCurrentPrefix(),
+                                              expression::PathSemantics::kFieldPath);
+    }
+
     void visit(const ExpressionOr* expr) override {
         returnsBoolean();
     }

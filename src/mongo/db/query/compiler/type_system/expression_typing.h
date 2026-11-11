@@ -13,6 +13,7 @@ namespace mongo::pipeline::type_system {
  * Returns the output type of the expression when evaluated on a document of type 'inputType'.
  * A FieldPathExpression returns the type of the path, when evaluated on the document 'inputType'.
  * A CompareExpression of type $eq always evaluates to a boolean, regardless of the input.
+ * A ExpressionConstant always evaluates to the type of its constant value.
  */
 Type getOutputType(const Type& inputType, const Expression* expr);
 
