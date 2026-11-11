@@ -69,6 +69,10 @@ TEST(NetworkCounterOtelTest, ReplicationEgressCountersAreExported) {
     // replication metrics should still be counted towards total
     EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kNetworkEgressBytesIn));
     EXPECT_EQ(1, capturer.readInt64Counter(MetricNames::kNetworkEgressNumRequests));
+
+    nc.hitPhysicalIn(NetworkCounter::ConnectionType::kEgress, 200, ConnectionPurpose::kReplication);
+    EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kReplicationSecondaryPhysicalBytesIn));
+    EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kNetworkEgressPhysicalBytesIn));
 }
 
 TEST(NetworkCounterOtelTest, ReplicationIngressCountersAreExported) {
@@ -93,6 +97,7 @@ TEST(NetworkCounterOtelTest, ReplicationIngressCountersAreExported) {
     EXPECT_EQ(200,
               capturer.readInt64Counter(MetricNames::kReplicationPrimaryPhysicalBytesOut,
                                         std::make_tuple(int64_t{0})));
+    EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kNetworkIngressPhysicalBytesOut));
 }
 
 TEST(NetworkCounterOtelTest, EgressCountersAreExported) {
@@ -111,6 +116,32 @@ TEST(NetworkCounterOtelTest, EgressCountersAreExported) {
     EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kNetworkEgressBytesIn));
     EXPECT_EQ(80, capturer.readInt64Counter(MetricNames::kNetworkEgressBytesOut));
     EXPECT_EQ(1, capturer.readInt64Counter(MetricNames::kNetworkEgressNumRequests));
+}
+
+TEST(NetworkCounterOtelTest, PhysicalCountersAreExported) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not available";
+    }
+
+    NetworkCounter nc;
+
+    nc.hitPhysicalIn(NetworkCounter::ConnectionType::kIngress, 100);
+    nc.hitPhysicalIn(NetworkCounter::ConnectionType::kIngress, 50);
+    nc.hitPhysicalOut(NetworkCounter::ConnectionType::kIngress, 25);
+    nc.hitPhysicalIn(NetworkCounter::ConnectionType::kEgress, 200);
+    nc.hitPhysicalOut(NetworkCounter::ConnectionType::kEgress, 80);
+
+    EXPECT_EQ(150, capturer.readInt64Counter(MetricNames::kNetworkIngressPhysicalBytesIn));
+    EXPECT_EQ(25, capturer.readInt64Counter(MetricNames::kNetworkIngressPhysicalBytesOut));
+    EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kNetworkEgressPhysicalBytesIn));
+    EXPECT_EQ(80, capturer.readInt64Counter(MetricNames::kNetworkEgressPhysicalBytesOut));
+
+    BSONObj obj = getNetworkBson(nc);
+    EXPECT_EQ(150, obj["physicalBytesIn"].numberLong());
+    EXPECT_EQ(25, obj["physicalBytesOut"].numberLong());
+    EXPECT_EQ(200, obj["egress"]["physicalBytesIn"].numberLong());
+    EXPECT_EQ(80, obj["egress"]["physicalBytesOut"].numberLong());
 }
 
 TEST(NetworkCounterOtelTest, SlowDNSOperationsAreExported) {

@@ -43,7 +43,23 @@ const otel::metrics::AttributeDefinition<std::string_view>& compressorNameAttrib
 }  // namespace
 
 NetworkCounter::NetworkCounter()
-    : _replicationSecondaryPhysicalBytesIn(MetricsService::instance().createInt64Counter(
+    : _ingressPhysicalBytesIn(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkIngressPhysicalBytesIn,
+          "Total number of physical bytes received from ingress (wire-protocol) clients.",
+          MetricUnit::kBytes)),
+      _ingressPhysicalBytesOut(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkIngressPhysicalBytesOut,
+          "Total number of physical bytes sent to ingress (wire-protocol) clients.",
+          MetricUnit::kBytes)),
+      _egressPhysicalBytesIn(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkEgressPhysicalBytesIn,
+          "Total number of physical bytes received on egress (outbound client) connections.",
+          MetricUnit::kBytes)),
+      _egressPhysicalBytesOut(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkEgressPhysicalBytesOut,
+          "Total number of physical bytes sent on egress (outbound client) connections.",
+          MetricUnit::kBytes)),
+      _replicationSecondaryPhysicalBytesIn(MetricsService::instance().createInt64Counter(
           MetricNames::kReplicationSecondaryPhysicalBytesIn,
           "Total number of physical bytes received as a secondary over replication "
           "connections",
@@ -162,24 +178,13 @@ NetworkCounter::NetworkCounter()
 void NetworkCounter::hitPhysicalIn(ConnectionType connectionType,
                                    long long bytes,
                                    ConnectionPurpose connectionPurpose) {
-    static const int64_t MAX = 1ULL << 60;
-    // since this counter is hooked into otel, it cannot be nicely integrated with the
-    // rest of this function's logic
-    if (connectionType == ConnectionType::kEgress &&
-        connectionPurpose == ConnectionPurpose::kReplication) {
-        _replicationSecondaryPhysicalBytesIn.add(bytes);
-    }
-
-    auto& ref = connectionType == ConnectionType::kIngress ? _ingressPhysicalBytesIn
-                                                           : _egressPhysicalBytesIn;
-
-    // don't care about the race as its just a counter
-    const bool overflow = ref->loadRelaxed() > MAX;
-
-    if (overflow) {
-        ref->store(bytes);
+    if (connectionType == ConnectionType::kIngress) {
+        _ingressPhysicalBytesIn.add(bytes);
     } else {
-        ref->fetchAndAdd(bytes);
+        if (connectionPurpose == ConnectionPurpose::kReplication) {
+            _replicationSecondaryPhysicalBytesIn.add(bytes);
+        }
+        _egressPhysicalBytesIn.add(bytes);
     }
 }
 
@@ -187,22 +192,14 @@ void NetworkCounter::hitPhysicalOut(ConnectionType connectionType,
                                     long long bytes,
                                     ConnectionPurpose connectionPurpose,
                                     boost::optional<int64_t> replicationId) {
-    static const int64_t MAX = 1ULL << 60;
-    if (connectionType == ConnectionType::kIngress &&
-        connectionPurpose == ConnectionPurpose::kReplication) {
-        invariant(replicationId.has_value());
-        _replicationPrimaryPhysicalBytesOut.add(bytes, {replicationId.value()});
-    }
-    auto& ref = connectionType == ConnectionType::kIngress ? _ingressPhysicalBytesOut
-                                                           : _egressPhysicalBytesOut;
-
-    // don't care about the race as its just a counter
-    const bool overflow = ref->loadRelaxed() > MAX;
-
-    if (overflow) {
-        ref->store(bytes);
+    if (connectionType == ConnectionType::kIngress) {
+        if (connectionPurpose == ConnectionPurpose::kReplication) {
+            invariant(replicationId.has_value());
+            _replicationPrimaryPhysicalBytesOut.add(bytes, {replicationId.value()});
+        }
+        _ingressPhysicalBytesOut.add(bytes);
     } else {
-        ref->fetchAndAdd(bytes);
+        _egressPhysicalBytesOut.add(bytes);
     }
 }
 
@@ -288,16 +285,14 @@ void NetworkCounter::acceptedTFOIngress() {
 void NetworkCounter::append(BSONObjBuilder& b) {
     b.append("bytesIn", _ingressLogicalBytesIn.valueForLegacyUse());
     b.append("bytesOut", _ingressLogicalBytesOut.valueForLegacyUse());
-    b.append("physicalBytesIn", static_cast<long long>(_ingressPhysicalBytesIn->loadRelaxed()));
-    b.append("physicalBytesOut", static_cast<long long>(_ingressPhysicalBytesOut->loadRelaxed()));
+    b.append("physicalBytesIn", _ingressPhysicalBytesIn.valueForLegacyUse());
+    b.append("physicalBytesOut", _ingressPhysicalBytesOut.valueForLegacyUse());
 
     BSONObjBuilder egressBuilder(b.subobjStart("egress"));
     egressBuilder.append("bytesIn", _egressLogicalBytesIn.valueForLegacyUse());
     egressBuilder.append("bytesOut", _egressLogicalBytesOut.valueForLegacyUse());
-    egressBuilder.append("physicalBytesIn",
-                         static_cast<long long>(_egressPhysicalBytesIn->loadRelaxed()));
-    egressBuilder.append("physicalBytesOut",
-                         static_cast<long long>(_egressPhysicalBytesOut->loadRelaxed()));
+    egressBuilder.append("physicalBytesIn", _egressPhysicalBytesIn.valueForLegacyUse());
+    egressBuilder.append("physicalBytesOut", _egressPhysicalBytesOut.valueForLegacyUse());
     egressBuilder.append("numRequests", _egressNumRequests.valueForLegacyUse());
     egressBuilder.done();
 

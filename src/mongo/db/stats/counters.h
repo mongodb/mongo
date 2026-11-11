@@ -107,12 +107,10 @@ public:
     void append(BSONObjBuilder& b);
 
 private:
-    // Physical byte counters — not OTel-exported.
-    // TODO SERVER-127423: Replace these with OTel-exported counters.
-    CacheExclusive<Atomic<long long>> _ingressPhysicalBytesIn{0};
-    CacheExclusive<Atomic<long long>> _ingressPhysicalBytesOut{0};
-    CacheExclusive<Atomic<long long>> _egressPhysicalBytesIn{0};
-    CacheExclusive<Atomic<long long>> _egressPhysicalBytesOut{0};
+    otel::metrics::Counter<int64_t>& _ingressPhysicalBytesIn;
+    otel::metrics::Counter<int64_t>& _ingressPhysicalBytesOut;
+    otel::metrics::Counter<int64_t>& _egressPhysicalBytesIn;
+    otel::metrics::Counter<int64_t>& _egressPhysicalBytesOut;
 
     // Physical byte counter for replication connections
     otel::metrics::Counter<int64_t>& _replicationSecondaryPhysicalBytesIn;
