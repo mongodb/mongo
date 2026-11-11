@@ -23,6 +23,8 @@
 #include "mongo/db/time_proof_service.h"
 #include "mongo/db/topology/vector_clock/vector_clock_document_gen.h"
 #include "mongo/db/topology/vector_clock/vector_clock_gen.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
@@ -34,6 +36,8 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
@@ -396,8 +400,25 @@ void VectorClock::gossipIn(OperationContext* opCtx,
     auto isInternal = defaultIsInternalClient;
     if (opCtx) {
         if (const auto client = opCtx->getClient()) {
-            if (client->session() && !(client->getTags() & Client::kPending)) {
-                isInternal = client->isInternalClient();
+            if (client->session()) {
+                if (!(client->getTags() & Client::kPending)) {
+                    isInternal = client->isInternalClient();
+                }
+                if (!isInternal &&
+                    (timepoints.getDollarConfigTime() || timepoints.getDollarTopologyTime())) {
+                    static logv2::SeveritySuppressor unauthorizedGossipSuppressor{
+                        Minutes{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(1)};
+
+                    LOGV2_DEBUG(
+                        13916800,
+                        unauthorizedGossipSuppressor().toInt(),
+                        "Ignoring internal vector clock metadata from an unauthorized client",
+                        "remote"_attr = client->getRemote(),
+                        "claimsToBeInternalClient"_attr =
+                            client->isPossiblyUnauthenticatedInternalClient(),
+                        "configTime"_attr = timepoints.getDollarConfigTime(),
+                        "topologyTime"_attr = timepoints.getDollarTopologyTime());
+                }
             }
         }
     }
