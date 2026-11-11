@@ -1,7 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/s/resharding/resharding_state_transition_validation.h"
+#include "mongo/db/s/resharding/resharding_donor_transition_validation.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
@@ -39,12 +39,16 @@ DonorShardContext makeContext(DonorStateEnum state,
     return ctx;
 }
 
-// A context whose clone progress fields are all populated.
+/**
+ * A context whose clone progress fields are all populated.
+ */
 DonorShardContext progressing(DonorStateEnum state) {
     return makeContext(state, /*withProgress=*/true);
 }
 
-// A context that has progressed and carries an abort reason.
+/**
+ * A context that has progressed and carries an abort reason.
+ */
 DonorShardContext aborted(DonorStateEnum state) {
     return makeContext(state, /*withProgress=*/true, /*withAbortReason=*/true);
 }

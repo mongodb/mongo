@@ -1,10 +1,11 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/s/resharding/resharding_state_transition_validation.h"
+#include "mongo/db/s/resharding/resharding_donor_transition_validation.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/s/resharding/resharding_transition_validation_common.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 
@@ -21,80 +22,40 @@ using enum DonorStateEnum;
 using DonorPreConstraint = TransitionConstraint<DonorPreTransitionInput>;
 using DonorPostConstraint = TransitionConstraint<DonorPostTransitionInput>;
 
-Status violation(std::string reason) {
-    return {ErrorCodes::InternalError, std::move(reason)};
-}
-
-template <typename T>
-std::string describeValue(const boost::optional<T>& value) {
-    if (!value) {
-        return "unset";
-    }
-    return str::stream() << *value;
-}
-
-Status checkCloneStat(const char* field, const boost::optional<int64_t>& value) {
-    if (!value) {
-        return violation(str::stream() << field << " is unset");
-    }
-    if (*value < 0) {
-        return violation(str::stream() << field << " is negative: " << *value);
-    }
-    return Status::OK();
-}
-
-template <typename T>
-Status checkUnchanged(const char* field,
-                      const boost::optional<T>& before,
-                      const boost::optional<T>& proposed) {
-    if (before == proposed) {
-        return Status::OK();
-    }
-    return violation(str::stream() << field << " changed from " << describeValue(before) << " to "
-                                   << describeValue(proposed));
-}
-
 const DonorPreConstraint kHasMinFetchTimestamp{
     "hasMinFetchTimestamp", [](const DonorPreTransitionInput& in) -> Status {
         const auto& minFetchTimestamp = in.proposed.getMinFetchTimestamp();
         if (!minFetchTimestamp) {
-            return violation("minFetchTimestamp is unset");
+            return transitionViolation("minFetchTimestamp is unset");
         }
         if (minFetchTimestamp->isNull()) {
-            return violation("minFetchTimestamp is null");
+            return transitionViolation("minFetchTimestamp is null");
         }
         return Status::OK();
     }};
 
 const DonorPreConstraint kHasValidCloneStats{
     "hasValidCloneStats", [](const DonorPreTransitionInput& in) -> Status {
-        Status status = checkCloneStat("bytesToClone", in.proposed.getBytesToClone());
+        Status status = checkNonNegative("bytesToClone", in.proposed.getBytesToClone());
         if (!status.isOK()) {
             return status;
         }
-        status = checkCloneStat("documentsToClone", in.proposed.getDocumentsToClone());
+        status = checkNonNegative("documentsToClone", in.proposed.getDocumentsToClone());
         if (!status.isOK()) {
             return status;
         }
-        return checkCloneStat("indexCount", in.proposed.getIndexCount());
+        return checkNonNegative("indexCount", in.proposed.getIndexCount());
     }};
 
-const DonorPreConstraint kNoAbortReason{
-    "noAbortReason", [](const DonorPreTransitionInput& in) -> Status {
-        const auto& abortReason = in.proposed.getAbortReason();
-        if (!abortReason) {
-            return Status::OK();
-        }
-        return violation(str::stream() << "unexpected abort reason: " << *abortReason);
-    }};
+const DonorPreConstraint kNoAbortReason{"noAbortReason",
+                                        [](const DonorPreTransitionInput& in) -> Status {
+                                            return checkNoAbortReason(in.proposed.getAbortReason());
+                                        }};
 
-const DonorPreConstraint kHasAbortReason{"hasAbortReason",
-                                         [](const DonorPreTransitionInput& in) -> Status {
-                                             if (in.proposed.getAbortReason()) {
-                                                 return Status::OK();
-                                             }
-                                             return violation("abort reason is unset");
-                                         }};
+const DonorPreConstraint kHasAbortReason{
+    "hasAbortReason", [](const DonorPreTransitionInput& in) -> Status {
+        return checkHasAbortReason(in.proposed.getAbortReason());
+    }};
 
 const DonorPreConstraint kCloneDetailsUnchanged{
     "cloneDetailsUnchanged", [](const DonorPreTransitionInput& in) -> Status {
@@ -119,40 +80,21 @@ const DonorPreConstraint kCloneDetailsUnchanged{
 
 const DonorPreConstraint kExistingAbortReasonUnchanged{
     "existingAbortReasonUnchanged", [](const DonorPreTransitionInput& in) -> Status {
-        const auto& before = in.before.getAbortReason();
-        if (!before) {
-            return Status::OK();
-        }
-        const auto& proposed = in.proposed.getAbortReason();
-        if (proposed && before->binaryEqual(*proposed)) {
-            return Status::OK();
-        }
-        return violation(str::stream() << "abort reason changed from " << *before << " to "
-                                       << describeValue(proposed));
+        return checkAbortReasonUnchanged(in.before.getAbortReason(), in.proposed.getAbortReason());
     }};
 
 const DonorPostConstraint kDurableMatchesProposed{
     "durableMatchesProposed", [](const DonorPostTransitionInput& in) -> Status {
-        if (in.durable.toBSON().binaryEqual(in.proposed.toBSON())) {
-            return Status::OK();
-        }
-        return violation(str::stream() << "durable " << in.durable.toBSON() << " != proposed "
-                                       << in.proposed.toBSON());
+        return checkBsonMatches("durable", in.durable.toBSON(), in.proposed.toBSON());
     }};
 
 const DonorPostConstraint kInMemoryMatchesProposed{
     "inMemoryMatchesProposed", [](const DonorPostTransitionInput& in) -> Status {
-        if (in.inMemory.toBSON().binaryEqual(in.proposed.toBSON())) {
-            return Status::OK();
-        }
-        return violation(str::stream() << "in-memory " << in.inMemory.toBSON() << " != proposed "
-                                       << in.proposed.toBSON());
+        return checkBsonMatches("in-memory", in.inMemory.toBSON(), in.proposed.toBSON());
     }};
 
 TransitionCheck<DonorPreTransitionInput> preCheck(const DonorPreTransitionInput& in) {
-    return {describeTransitionEdge(in.before.getState(), in.proposed.getState()),
-            in,
-            ErrorCodes::ReshardingPreconditionFailure};
+    return makePreTransitionCheck(in, in.before.getState(), in.proposed.getState());
 }
 
 ConstraintResult validateEnteringDonatingInitialData(const DonorPreTransitionInput& in) {
@@ -214,10 +156,7 @@ ConstraintResult validateDonorPreTransition(const DonorPreTransitionInput& input
     const auto& validators = donorTransitionValidators();
     const auto it = validators.find({input.before.getState(), input.proposed.getState()});
     if (it == validators.end()) {
-        return {Status{ErrorCodes::ReshardingPreconditionFailure,
-                       describeTransitionEdge(input.before.getState(), input.proposed.getState()) +
-                           " is not allowed"},
-                {"isAllowedEdge"}};
+        return notAllowedTransition(input.before.getState(), input.proposed.getState());
     }
     return it->second(input);
 }
