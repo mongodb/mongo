@@ -67,6 +67,7 @@ public:
 private:
     Atomic<long long> _duplicateCounter{0};
     LazyRecordStore _keyConstraintsTable;
+    bool _skipNumResolvedCheck{false};
 };
 
 }  // namespace mongo

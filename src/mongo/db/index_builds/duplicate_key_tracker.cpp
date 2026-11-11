@@ -46,7 +46,8 @@ static constexpr std::string_view kKeyField = "key"sv;
 DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
                                          std::string_view ident,
                                          LazyRecordStore::CreateMode createMode)
-    : _keyConstraintsTable(opCtx, ident, createMode) {}
+    : _keyConstraintsTable(opCtx, ident, createMode),
+      _skipNumResolvedCheck(createMode == LazyRecordStore::CreateMode::openExisting) {}
 
 void DuplicateKeyTracker::createDeferredTable(OperationContext* opCtx) {
     _keyConstraintsTable.getOrCreateTable(opCtx);
@@ -187,7 +188,9 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
         progress.get(lk)->finished();
     }
 
-    invariant(resolved == _duplicateCounter.load());
+    if (!_skipNumResolvedCheck) {
+        invariant(resolved == _duplicateCounter.load());
+    }
 
     int logLevel = (resolved > 0) ? 0 : 1;
     LOGV2_DEBUG(20677,

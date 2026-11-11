@@ -762,7 +762,7 @@ export var IndexBuildTest = class {
  * the lines the test is looking for can be evicted before it gets to them. Thus, we set
  * `ramLogMaxLines` to a high value.
  */
-const kRamLogMaxLines = 4096;
+export const kRamLogMaxLines = 4096;
 
 export const ResumableIndexBuildTest = class {
     /**
