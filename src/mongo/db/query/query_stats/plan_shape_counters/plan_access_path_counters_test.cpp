@@ -176,8 +176,11 @@ public:
     std::vector<AccessPathTestCase> makeAccessPathTestCases() {
         std::vector<AccessPathTestCase> cases;
         auto add = [&](std::unique_ptr<QuerySolutionNode> root,
-                       std::initializer_list<AccessPathCounter> expected) {
-            cases.push_back({makePlan(std::move(root)), makeCounts(expected)});
+                       std::initializer_list<AccessPathCounter> expected,
+                       bool eligibleForBatchedIndexScanFetch = false) {
+            auto solution = makePlan(std::move(root));
+            solution->eligibleForBatchedIndexScanFetch = eligibleForBatchedIndexScanFetch;
+            cases.push_back({std::move(solution), makeCounts(expected)});
         };
 
         // Collection scans
@@ -195,6 +198,25 @@ public:
         add(makeIxScan(), {AccessPathCounter::kCoveredIxscan, AccessPathCounter::kBtreeIxscan});
         add(makeFetch(makeIxScan()),
             {AccessPathCounter::kIxscanFetch, AccessPathCounter::kBtreeIxscan});
+        // Batched fetches are still fetched access paths, not covered index scans.
+        add(std::make_unique<BatchedFetchNode>(makeIxScan(), _nss),
+            {AccessPathCounter::kIxscanFetch, AccessPathCounter::kBtreeIxscan});
+        // Eligibility is planning metadata, independent of whether the FETCH was rewritten.
+        add(makeFetch(makeIxScan()),
+            {AccessPathCounter::kIxscanFetch,
+             AccessPathCounter::kBtreeIxscan,
+             AccessPathCounter::kBatchedIndexScanFetchEligible},
+            true);
+        add(std::make_unique<BatchedFetchNode>(makeIxScan(), _nss),
+            {AccessPathCounter::kIxscanFetch,
+             AccessPathCounter::kBtreeIxscan,
+             AccessPathCounter::kBatchedIndexScanFetchEligible},
+            true);
+        // Fetch depth must be restored before visiting a covered sibling.
+        add(makeOr(std::make_unique<BatchedFetchNode>(makeIxScan(), _nss), makeIxScan()),
+            {AccessPathCounter::kIxscanFetch,
+             AccessPathCounter::kCoveredIxscan,
+             AccessPathCounter::kBtreeIxscan});
         add(makeFetch(makeOr(makeIxScan(), makeIxScan(BSON("b" << 1)))),
             {AccessPathCounter::kIxscanFetch, AccessPathCounter::kBtreeIxscan});
         add(makeOr(makeIxScan(), makeFetch(makeIxScan(BSON("b" << 1)))),
@@ -436,6 +458,24 @@ TEST_F(PlanAccessPathCountersTest, ExpectedAccessPathCounters) {
     }
 }
 
+TEST_F(PlanAccessPathCountersTest, BatchingEligibilityIsCountedOncePerPlan) {
+    auto solution = makePlan(
+        makeOr(makeFetch(makeIxScan()), std::make_unique<BatchedFetchNode>(makeIxScan(), _nss)));
+    ASSERT_FALSE(analyzePlanShapeForCounters(*solution).accessPathCounts.test(
+        AccessPathCounter::kBatchedIndexScanFetchEligible));
+    solution->eligibleForBatchedIndexScanFetch = true;
+
+    PlanShapeCounts counts;
+    analyzePlanShapeForCounters(*solution).addTo(counts);
+    ASSERT_EQ(counts.getCount(AccessPathCounter::kBatchedIndexScanFetchEligible), 1);
+    ASSERT_EQ(counts.getCount(AccessPathCounter::kIxscanFetch), 1);
+    ASSERT_EQ(counts.getCount(AccessPathCounter::kCoveredIxscan), 0);
+    ASSERT_EQ(counts.toBSON()["accessPaths"].Obj()["batchedIndexScanFetchEligible"].Long(), 1);
+    ASSERT_EQ(PlanShapeCounts::fromBSON(counts.toBSON())
+                  .getCount(AccessPathCounter::kBatchedIndexScanFetchEligible),
+              1);
+}
+
 // This test will fail in case access path counters are added to, but the new counter is not
 // tested.
 TEST_F(PlanAccessPathCountersTest, TestCasesCoverEveryCounter) {
@@ -464,11 +504,14 @@ TEST_F(PlanAccessPathCountersTest, CountsExcludeExtensionNodes) {
                                                    EqLookupNode::LookupStrategy::kNestedLoopJoin,
                                                    /*shouldProduceBson=*/false);
     auto solution = makePlan(makeFetch(makeIxScan()));
+    solution->eligibleForBatchedIndexScanFetch = true;
     solution->extendWith(std::move(eqLookup));
 
     // The foreign-side collection scan is not part of the find layer, so it is not counted.
     assertCounts(*solution,
-                 makeCounts({AccessPathCounter::kIxscanFetch, AccessPathCounter::kBtreeIxscan}),
+                 makeCounts({AccessPathCounter::kIxscanFetch,
+                             AccessPathCounter::kBtreeIxscan,
+                             AccessPathCounter::kBatchedIndexScanFetchEligible}),
                  "lookup-extended plan");
 }
 

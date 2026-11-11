@@ -203,6 +203,8 @@ function runPlanShapeCounterTest(coll) {
     // A COLLSCAN-SORT plan; when sharded, the shard-key index gives IXSCAN-FETCH-SORT on both
     // shards. Once the {a: 1, b: 1} index exists, the same query is answered with an
     // IXSCAN-SORT_MERGE-FETCH plan, accumulating alongside the earlier shape in the same entry.
+    // The sharded blocking-sort plans are not eligible for batched index-scan/fetch because
+    // SHARDING_FILTER separates FETCH from IXSCAN; eligibility requires a direct FETCH-IXSCAN pair.
     {
         reset();
         const query = () =>

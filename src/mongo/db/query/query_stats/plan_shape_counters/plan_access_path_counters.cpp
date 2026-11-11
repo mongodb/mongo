@@ -155,6 +155,7 @@ void AccessPathAnalyzer::preVisit(query_solution_analyzer::RuleEngine&,
             _counts.set(AccessPathCounter::kCountScan);
             break;
         case STAGE_FETCH:
+        case STAGE_BATCHED_FETCH:
             ++_fetchDepth;
             break;
         case STAGE_GEO_NEAR_2D:
@@ -173,7 +174,7 @@ void AccessPathAnalyzer::preVisit(query_solution_analyzer::RuleEngine&,
 
 void AccessPathAnalyzer::postVisit(query_solution_analyzer::RuleEngine&,
                                    const QuerySolutionNode& node) {
-    if (node.getType() == STAGE_FETCH) {
+    if (node.getType() == STAGE_FETCH || node.getType() == STAGE_BATCHED_FETCH) {
         --_fetchDepth;
     }
 }

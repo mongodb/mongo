@@ -70,9 +70,10 @@ using std::unique_ptr;
 using std::vector;
 namespace {
 
-std::unique_ptr<QuerySolutionNode> convertToBatchedFetch(std::unique_ptr<QuerySolutionNode> root,
-                                                         bool consumerIgnoresOrder,
-                                                         const MatchExpression& fullPredicate) {
+bool analyzeBatchedFetchEligibility(std::unique_ptr<QuerySolutionNode>& root,
+                                    bool consumerIgnoresOrder,
+                                    const MatchExpression& fullPredicate,
+                                    bool rewriteEnabled) {
     const auto type = root->getType();
     if (isSortStageType(type)) {
         // Top-K sorts can select different tied documents if fetch reorders their input.
@@ -91,35 +92,38 @@ std::unique_ptr<QuerySolutionNode> convertToBatchedFetch(std::unique_ptr<QuerySo
             // TODO SERVER-138141 Investigate supporting partial indexes
             if (!scan->filter && !scan->index.multikey && !scan->addKeyMetadata &&
                 !scan->index.filterExpr) {
-                scan->allowBatching = true;
-                auto* fetch = static_cast<FetchNode*>(root.get());
-                auto batchedFetch = std::make_unique<BatchedFetchNode>(std::move(*fetch));
-                // Documents may change after the index scan yields, so recheck the entire
-                // predicate rather than just the residual filter (see SERVER-16750).
-                batchedFetch->filter = fullPredicate.clone();
-                root = std::move(batchedFetch);
+                if (rewriteEnabled) {
+                    auto* fetch = static_cast<FetchNode*>(root.get());
+                    scan->allowBatching = true;
+                    auto batchedFetch = std::make_unique<BatchedFetchNode>(std::move(*fetch));
+                    // Documents may change after the index scan yields, so recheck the entire
+                    // predicate rather than just the residual filter (see SERVER-16750).
+                    batchedFetch->filter = fullPredicate.clone();
+                    root = std::move(batchedFetch);
+                }
+                return true;
             }
         }
     }
     for (auto& child : root->children) {
-        child = convertToBatchedFetch(std::move(child), consumerIgnoresOrder, fullPredicate);
+        if (analyzeBatchedFetchEligibility(
+                child, consumerIgnoresOrder, fullPredicate, rewriteEnabled)) {
+            return true;
+        }
     }
-    return root;
+    return false;
 }
 
-std::unique_ptr<QuerySolutionNode> attemptConvertToBatchedFetch(
-    const CanonicalQuery& query,
-    const QueryPlannerParams& params,
-    std::unique_ptr<QuerySolutionNode> root) {
+bool attemptConvertToBatchedFetch(const CanonicalQuery& query,
+                                  const QueryPlannerParams& params,
+                                  std::unique_ptr<QuerySolutionNode>& root) {
     // Count and distinct plans retain ordinary FETCH nodes for specialized scan rewrites. Skip and
     // limit nodes can make the results depend on fetch order even when there is a blocking stage
     // elsewhere in the tree.
     // TODO SERVER-137225: Remove isCountLike() check.
-    if (!query.getExpCtx()->getIfrContext()->getSavedFlagValue(
-            feature_flags::gFeatureFlagBatchedIndexScanFetch) ||
-        query.isCountLike() || query.getDistinct() || root->hasNode(STAGE_SKIP) ||
+    if (query.isCountLike() || query.getDistinct() || root->hasNode(STAGE_SKIP) ||
         root->hasNode(STAGE_LIMIT)) {
-        return root;
+        return false;
     }
 
     // A sort absorbed into the find must retain index order unless the plan itself has a
@@ -127,8 +131,10 @@ std::unique_ptr<QuerySolutionNode> attemptConvertToBatchedFetch(
     const bool callerConsumesAllAndIgnoresOrder =
         (params.mainCollectionInfo.options & QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE) &&
         !query.getSortPattern();
-    return convertToBatchedFetch(
-        std::move(root), callerConsumesAllAndIgnoresOrder, *query.getPrimaryMatchExpression());
+    const bool rewriteEnabled = query.getExpCtx()->getIfrContext()->getSavedFlagValue(
+        feature_flags::gFeatureFlagBatchedIndexScanFetch);
+    return analyzeBatchedFetchEligibility(
+        root, callerConsumesAllAndIgnoresOrder, *query.getPrimaryMatchExpression(), rewriteEnabled);
 }
 
 }  // namespace
@@ -1890,7 +1896,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
 
     // Replace nodes before setRoot() assigns their IDs and before the aggregation pipeline is
     // attached.
-    solnRoot = attemptConvertToBatchedFetch(query, params, std::move(solnRoot));
+    soln->eligibleForBatchedIndexScanFetch = attemptConvertToBatchedFetch(query, params, solnRoot);
 
     QueryPlannerAnalysis::removeImpreciseInternalExprFilters(params, *solnRoot);
 

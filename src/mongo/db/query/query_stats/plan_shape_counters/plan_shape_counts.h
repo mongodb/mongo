@@ -127,32 +127,33 @@ constexpr size_t kNumQsnNodeCounters = static_cast<size_t>(QsnNodeCounter::kNumC
  * an ixscan-fetch and a covered ixscan).
  * TODO SERVER-131101 split enum into different subtypes.
  */
-#define ACCESS_PATH_COUNTER_TABLE(F) \
-    F(kCollscan)                     \
-    F(kClusteredCollscan)            \
-    F(kCoveredIxscan)                \
-    F(kCountScan)                    \
-    F(kDistinctScan)                 \
-    F(kIxscanFetch)                  \
-    F(kDistinctScanFetch)            \
-    F(kGeoNear2d)                    \
-    F(kGeoNear2dSphere)              \
-    F(kOtherAccessPath)              \
-    F(kTextMatch)                    \
-    F(kBtreeIxscan)                  \
-    F(kWildcardIxscan)               \
-    F(kSparseIxscan)                 \
-    F(kUniqueIxscan)                 \
-    F(kHashedIxscan)                 \
-    F(kMultikeyIxscan)               \
-    F(kBoundsFullScan)               \
-    F(kBoundsPoint)                  \
-    F(kBoundsBoundedRange)           \
-    F(kBoundsMinKeyToValue)          \
-    F(kBoundsValueToMaxKey)          \
-    F(kBoundsMixture)                \
-    F(kBoundsUnionedSmall)           \
-    F(kBoundsUnionedLarge)           \
+#define ACCESS_PATH_COUNTER_TABLE(F)  \
+    F(kCollscan)                      \
+    F(kClusteredCollscan)             \
+    F(kCoveredIxscan)                 \
+    F(kCountScan)                     \
+    F(kDistinctScan)                  \
+    F(kIxscanFetch)                   \
+    F(kDistinctScanFetch)             \
+    F(kGeoNear2d)                     \
+    F(kGeoNear2dSphere)               \
+    F(kOtherAccessPath)               \
+    F(kTextMatch)                     \
+    F(kBtreeIxscan)                   \
+    F(kWildcardIxscan)                \
+    F(kSparseIxscan)                  \
+    F(kUniqueIxscan)                  \
+    F(kHashedIxscan)                  \
+    F(kMultikeyIxscan)                \
+    F(kBoundsFullScan)                \
+    F(kBoundsPoint)                   \
+    F(kBoundsBoundedRange)            \
+    F(kBoundsMinKeyToValue)           \
+    F(kBoundsValueToMaxKey)           \
+    F(kBoundsMixture)                 \
+    F(kBoundsUnionedSmall)            \
+    F(kBoundsUnionedLarge)            \
+    F(kBatchedIndexScanFetchEligible) \
     F(kNumCounters)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(AccessPathCounter, ACCESS_PATH_COUNTER_TABLE)

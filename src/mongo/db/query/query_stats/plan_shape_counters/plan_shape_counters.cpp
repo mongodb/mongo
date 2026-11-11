@@ -77,8 +77,13 @@ PlanShapeAnalysisResult analyzePlanShapeForCounters(const QuerySolution& solutio
     if (matched) {
         pattern = static_cast<PlanShapeCounter>(*planShapeMatcher.getMatchedTag());
     }
+    auto accessPathCounts = accessPaths.counts();
+    // TODO SERVER-139192: Track actually rewritten queries instead of the eligibility flag.
+    if (solution.eligibleForBatchedIndexScanFetch) {
+        accessPathCounts.set(AccessPathCounter::kBatchedIndexScanFetchEligible);
+    }
     return PlanShapeAnalysisResult{.pattern = pattern,
-                                   .accessPathCounts = accessPaths.counts(),
+                                   .accessPathCounts = accessPathCounts,
                                    .qsnNodeCounts = nodeCounts.counts()};
 }
 

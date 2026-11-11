@@ -530,6 +530,11 @@ public:
     // we would want to fall back on an alternate non-blocking solution.
     bool hasBlockingStage{false};
 
+    // Planning metadata for access-path counters, independent of whether the batching feature
+    // flag is enabled. True when the plan has a FETCH + IXSCAN pair that can safely batch and
+    // reorder output.
+    bool eligibleForBatchedIndexScanFetch{false};
+
     // TODO: SERVER-88503 Remove Index Filters feature.
     // Runner executing this solution might be interested in knowing
     // if the planning process for this solution was based on filtered indices.

@@ -4,6 +4,7 @@
 #include "mongo/db/query/planner_analysis.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
@@ -20,10 +21,12 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counters.h"
 #include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <cstdint>
 #include <map>
 #include <set>
 #include <string_view>
@@ -58,6 +61,13 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp,
 
 class BatchedFetchConversionTest : public QueryPlannerTest {
 protected:
+    int64_t eligibleAccessPaths(const QuerySolution& solution) {
+        plan_shape_counters::PlanShapeCounts counts;
+        plan_shape_counters::analyzePlanShapeForCounters(solution).addTo(counts);
+        return counts.getCount(
+            plan_shape_counters::AccessPathCounter::kBatchedIndexScanFetchEligible);
+    }
+
     std::unique_ptr<Pipeline> pipeline(std::initializer_list<const char*> stages) {
         std::vector<BSONObj> raw;
         for (auto stage : stages) {
@@ -148,6 +158,7 @@ TEST_F(BatchedFetchConversionTest, PipelineExtensionPreservesBatchingEligibility
     auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {});
     ASSERT(solution->hasExtension());
     check(*solution, true);
+    ASSERT_EQ(eligibleAccessPaths(*solution), 1);
 }
 
 TEST_F(BatchedFetchConversionTest,
@@ -307,6 +318,93 @@ TEST_F(BatchedFetchConversionTest, FlagDisabledLeavesDefaults) {
     addIndex(BSON("a" << 1));
     runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("a" << 1));
     check(*solns[0], false);
+}
+
+TEST_F(BatchedFetchConversionTest, ReportsEligibleBlockingSortAccessPathWithEitherFlagValue) {
+    addIndex(BSON("a" << 1));
+    for (bool enabled : {false, true}) {
+        unittest::ServerParameterGuard flag("featureFlagBatchedIndexScanFetch", enabled);
+        // Flag values are saved per operation, so each iteration needs a fresh IFR context.
+        IncrementalFeatureRolloutContext::set(opCtx.get(),
+                                              std::make_shared<IncrementalFeatureRolloutContext>());
+        runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("a" << 1));
+        ASSERT_EQ(solns.size(), 1);
+        ASSERT_EQ(eligibleAccessPaths(*solns[0]), 1);
+        check(*solns[0], enabled);
+    }
+}
+
+TEST_F(BatchedFetchConversionTest, ReportsEligibleConsumeAllAccessPathWithEitherFlagValue) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    addIndex(BSON("a" << 1));
+    for (bool enabled : {false, true}) {
+        unittest::ServerParameterGuard flag("featureFlagBatchedIndexScanFetch", enabled);
+        IncrementalFeatureRolloutContext::set(opCtx.get(),
+                                              std::make_shared<IncrementalFeatureRolloutContext>());
+        runQueryHint(BSON("a" << 1), BSON("a" << 1));
+        ASSERT_EQ(solns.size(), 1);
+        ASSERT_EQ(eligibleAccessPaths(*solns[0]), 1);
+        check(*solns[0], enabled);
+        auto pushedDown = pipeline({"{$group: {_id: null, total: {$sum: '$a'}}}"});
+        cq->setCqPipeline({pushedDown->getSources().front()}, true);
+        auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {});
+        ASSERT(solution->hasExtension());
+        ASSERT_EQ(eligibleAccessPaths(*solution), 1);
+    }
+}
+
+TEST_F(BatchedFetchConversionTest, ReportsEligibilityOnEachCandidateWithEitherFlagValue) {
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("a" << 1), "a_1"sv);
+    addIndex(BSON("b" << 1), "b_1"sv);
+    for (bool enabled : {false, true}) {
+        unittest::ServerParameterGuard flag("featureFlagBatchedIndexScanFetch", enabled);
+        IncrementalFeatureRolloutContext::set(opCtx.get(),
+                                              std::make_shared<IncrementalFeatureRolloutContext>());
+        runQuerySortProj(BSON("a" << 1 << "b" << 1), BSON("c" << 1), BSONObj());
+        ASSERT_EQ(solns.size(), 2);
+        for (const auto& solution : solns) {
+            ASSERT_EQ(eligibleAccessPaths(*solution), 1);
+            check(*solution, enabled);
+        }
+    }
+}
+
+TEST_F(BatchedFetchConversionTest, DoesNotReportIneligibleAccessPathsWithEitherFlagValue) {
+    addIndex(BSON("a" << 1));
+    for (bool enabled : {false, true}) {
+        unittest::ServerParameterGuard flag("featureFlagBatchedIndexScanFetch", enabled);
+        IncrementalFeatureRolloutContext::set(opCtx.get(),
+                                              std::make_shared<IncrementalFeatureRolloutContext>());
+        runQueryHint(BSON("a" << 1), BSON("a" << 1));
+        check(*solns[0], false);
+        ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
+        // Even a consume-all pipeline cannot override an explicit index-provided sort or limit.
+        params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+        runQuerySortHint(BSON("a" << BSON("$gte" << 1)), BSON("a" << 1), BSON("a" << 1));
+        check(*solns[0], false);
+        ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
+        runQuerySortProjSkipLimitHint(BSON("a" << 1), BSONObj(), BSONObj(), 0, 1, BSON("a" << 1));
+        check(*solns[0], false);
+        ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
+        // A blocking sort is insufficient when the index scan has a residual filter.
+        runQuerySortHint(fromjson("{a: {$mod: [2, 0]}}"), BSON("b" << 1), BSON("a" << 1));
+        check(*solns[0], false);
+        ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
+        params.mainCollectionInfo.options &= ~QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    }
+}
+
+TEST_F(BatchedFetchConversionTest, DoesNotReportMultikeyAccessPathsWithEitherFlagValue) {
+    addIndex(BSON("a" << 1), true);
+    for (bool enabled : {false, true}) {
+        unittest::ServerParameterGuard flag("featureFlagBatchedIndexScanFetch", enabled);
+        IncrementalFeatureRolloutContext::set(opCtx.get(),
+                                              std::make_shared<IncrementalFeatureRolloutContext>());
+        runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("a" << 1));
+        check(*solns[0], false);
+        ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
+    }
 }
 
 TEST_F(BatchedFetchConversionTest, FindLimitBeforePipelineBlockerDoesNotQualify) {

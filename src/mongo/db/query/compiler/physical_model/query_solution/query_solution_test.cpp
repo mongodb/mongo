@@ -166,6 +166,11 @@ TEST(QuerySolutionTest, IndexScanClonePreservesAllFields) {
     ASSERT_TRUE(cloned.filter->equivalent(scan.filter.get()));
 }
 
+TEST(QuerySolutionTest, BatchedIndexScanFetchEligibilityDefaultsToFalse) {
+    QuerySolution solution;
+    ASSERT_FALSE(solution.eligibleForBatchedIndexScanFetch);
+}
+
 TEST(QuerySolutionTest, FetchClonePreservesAllFields) {
     const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
     auto child = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1)));
