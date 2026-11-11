@@ -2,6 +2,7 @@ import {getPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 import {
     checkSbeAccumulatorExpressionsEnabled,
     checkSbeStatus,
+    checkSbeUnwindEnabled,
     checkJoinOptimizationStatus,
 } from "jstests/libs/query/sbe_util.js";
 
@@ -73,6 +74,12 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
         relativePathToExpectedOutput += "/featureFlagSbeAccumulatorExpressions";
     } else if (joinOptimizationStatus && joinOptimizationExpectedExists) {
         relativePathToExpectedOutput += "/internalEnableJoinOptimization";
+        // Join optimization outputs that differ for an SBE configuration (for example, because
+        // more of the pipeline is pushed down under 'trySbeEngine') live in a subdirectory named
+        // after the SBE status.
+        if (fileExists(relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName)) {
+            relativePathToExpectedOutput += "/" + sbeStatus;
+        }
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {
         // Both SBE and CBR expected outputs exist, bail.
         doassert(
@@ -82,6 +89,14 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
         );
     } else if (sbeExpectedExists) {
         relativePathToExpectedOutput += "/" + sbeStatus;
+        // SBE outputs that differ when $unwind is pushed down to SBE live in a
+        // 'featureFlagSbeUnwind' subdirectory of the SBE status directory.
+        if (
+            fileExists(relativePathToExpectedOutput + "/featureFlagSbeUnwind/" + outputName) &&
+            checkSbeUnwindEnabled(typeof db === "undefined" ? null : db)
+        ) {
+            relativePathToExpectedOutput += "/featureFlagSbeUnwind";
+        }
     } else if (planRankerModeExpectedExists) {
         relativePathToExpectedOutput = outputDirPlanRanking;
     }

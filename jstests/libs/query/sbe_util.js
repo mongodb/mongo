@@ -203,6 +203,26 @@ export function checkSbeAccumulatorExpressionsEnabled(theDB) {
 }
 
 /**
+ * Check if featureFlagSbeUnwind is enabled in the cluster.
+ *
+ * Quits test if there is no primary node and we are running in a mixed configuration.
+ */
+export function checkSbeUnwindEnabled(theDB) {
+    if (theDB !== null) {
+        return discoverNodesAndCheck(theDB, (conn) => {
+            return FeatureFlagUtil.isPresentAndEnabled(conn, "SbeUnwind");
+        });
+    } else {
+        // If we don't have a database available, we can only look at the TestData to see what
+        // parameters resmoke was given.
+        return (
+            TestData.setParameters.featureFlagSbeUnwind &&
+            TestData.setParameters.featureFlagSbeUnwind === "true"
+        );
+    }
+}
+
+/**
  * Check if featureFlagSbeFull is enabled in the cluster.
  *
  * Quits test if there is no primary node and we are running in a mixed configuration.
