@@ -164,12 +164,14 @@ BackgroundSync::BackgroundSync(
     ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
     ReplicationProcess* replicationProcess,
     OplogWriter* oplogWriter,
-    OplogApplier* oplogApplier)
+    OplogApplier* oplogApplier,
+    SyncSourceChangedCallback syncSourceChangedCallback)
     : _oplogWriter(oplogWriter),
       _oplogApplier(oplogApplier),
       _replCoord(replicationCoordinator),
       _replicationCoordinatorExternalState(replicationCoordinatorExternalState),
-      _replicationProcess(replicationProcess) {
+      _replicationProcess(replicationProcess),
+      _syncSourceChangedCallback(std::move(syncSourceChangedCallback)) {
     ObservableMutexRegistry::get().add("backgroundSyncMutex", _mutex);
 }
 
@@ -403,6 +405,7 @@ void BackgroundSync::_produce() {
             _syncSourceHost = syncSourceResp.getSyncSource();
             source = _syncSourceHost;
         }
+        _notifySyncSourceChanged(source);
         // If our sync source has not changed, it is likely caused by our heartbeat data map being
         // out of date. In that case we sleep for up to 1 second to reduce the amount we spin
         // waiting for our map to update.  If we are notified of heartbeat data change, we will
@@ -825,6 +828,12 @@ void BackgroundSync::clearSyncTarget() {
     LOGV2(21106, "Resetting sync source to empty", "previousSyncSource"_attr = _syncSourceHost);
     _syncSourceHost = HostAndPort();
     _notifySyncSourceSelectionDataChanged(lock);
+}
+
+void BackgroundSync::_notifySyncSourceChanged(const HostAndPort& newSyncSource) {
+    if (_syncSourceChangedCallback) {
+        _syncSourceChangedCallback(newSyncSource);
+    }
 }
 
 void BackgroundSync::_stop(WithLock lock, bool resetLastFetchedOptime) {

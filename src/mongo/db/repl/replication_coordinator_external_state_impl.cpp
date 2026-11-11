@@ -291,8 +291,15 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
         _workerPool.get());
 
     invariant(!_bgSync);
-    _bgSync = std::make_unique<BackgroundSync>(
-        replCoord, this, _replicationProcess, _oplogWriter.get(), _oplogApplier.get());
+    _bgSync =
+        std::make_unique<BackgroundSync>(replCoord,
+                                         this,
+                                         _replicationProcess,
+                                         _oplogWriter.get(),
+                                         _oplogApplier.get(),
+                                         [this](const HostAndPort& newSyncSource) {
+                                             _syncSourceFeedback.onSyncSourceChanged(newSyncSource);
+                                         });
 
     // Prevent the oplog producer from starting and having the primary read its own writes from its
     // sync source. This is a rare race that can happen if we step up when _bgSync had not been

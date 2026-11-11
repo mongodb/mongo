@@ -46,6 +46,12 @@ public:
              BackgroundSync* bgsync,
              ReplicationCoordinator* replCoord);
 
+    /**
+     * Called when the sync source is changed to 'newSyncSource'. Cancels
+     * in-flight requests to an old sync source.
+     */
+    void onSyncSourceChanged(const HostAndPort& newSyncSource);
+
     /// Signals the run() method to terminate.
     void shutdown();
 

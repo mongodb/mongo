@@ -98,6 +98,15 @@ void SyncSourceFeedback::forwardSecondaryProgress(bool prioritized) {
     }
 }
 
+void SyncSourceFeedback::onSyncSourceChanged(const HostAndPort& newSyncSource) {
+    std::lock_guard<std::mutex> lock(_mtx);
+    if (_reporter && _reporter->getTarget() != newSyncSource) {
+        _positionChanged = true;
+        _cond.notify_all();
+        _reporter->shutdown();
+    }
+}
+
 Status SyncSourceFeedback::_updateUpstream(Reporter* reporter) {
     auto syncTarget = reporter->getTarget();
 
@@ -112,7 +121,12 @@ Status SyncSourceFeedback::_updateUpstream(Reporter* reporter) {
 
     auto status = reporter->join();
 
-    if (!status.isOK()) {
+    if (status == ErrorCodes::CallbackCanceled) {
+        LOGV2(5011100,
+              "SyncSourceFeedback update canceled",
+              "syncTarget"_attr = syncTarget,
+              "error"_attr = status);
+    } else if (!status.isOK()) {
         LOGV2(21760,
               "SyncSourceFeedback error sending update",
               "syncTarget"_attr = syncTarget,
@@ -224,6 +238,12 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
             std::lock_guard<std::mutex> lock(_mtx);
             _reporter = nullptr;
         });
+        if (bgsync->getSyncTarget() != syncTarget) {
+            reporter.shutdown();
+            std::lock_guard<std::mutex> lock(_mtx);
+            _positionChanged = true;
+            continue;
+        }
 
         auto status = _updateUpstream(&reporter);
         if (!status.isOK()) {

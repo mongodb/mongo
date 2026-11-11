@@ -64,6 +64,11 @@ public:
     enum class ProducerState { Starting, Running, Stopped };
 
     /**
+     * Called, without any BackgroundSync locks held, whenever the sync source changes.
+     */
+    using SyncSourceChangedCallback = std::function<void(const HostAndPort&)>;
+
+    /**
      * Constructs a BackgroundSync to fetch oplog entries from a sync source.
      * The BackgroundSync does not own any of the components referenced by the constructor
      * arguments. All these components must outlive the BackgroundSync object.
@@ -72,7 +77,8 @@ public:
                    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
                    ReplicationProcess* replicationProcess,
                    OplogWriter* oplogWriter,
-                   OplogApplier* oplogApplier);
+                   OplogApplier* oplogApplier,
+                   SyncSourceChangedCallback syncSourceChangedCallback = {});
 
     // stop syncing (when this node becomes a primary, e.g.)
     // During stepdown, the last fetched optime is not reset in order to keep track of the lastest
@@ -183,12 +189,18 @@ private:
     long long _getRetrySleepMS();
 
     // Waits for the given time, or until we are notified that relevant sync source selection data
-    // has changed.  Takes _mutex, so don't call with _mutex held.
+    // has changed. Takes _mutex, so don't call with _mutex held.
     void _waitForNewSyncSourceSelectionData(long long waitTimeMillis);
 
     // Internal version of notifySyncSourceSelectionDataChanged(), to be used by callers
     // which already hold _mutex.
     void _notifySyncSourceSelectionDataChanged(WithLock);
+
+    /**
+     * Runs _syncSourceChangedCallback with the given sync source. Takes _mutex, so don't
+     * call with _mutex held.
+     */
+    void _notifySyncSourceChanged(const HostAndPort& newSyncSource);
 
     // This OplogWriter writes oplog entries fetched from the sync source and
     // feeds them to the OplogApplier.
@@ -206,6 +218,9 @@ private:
 
     // A pointer to the replication process.
     ReplicationProcess* _replicationProcess;
+
+    // A callback that notifies when the sync source is changed.
+    const SyncSourceChangedCallback _syncSourceChangedCallback;
 
     /**
      * All member variables are labeled with one of the following codes indicating the
