@@ -377,28 +377,24 @@ TEST(ValidateResultsTest, RecordHashComparisonReportsAMatch) {
     ASSERT_TRUE(vr.getHashComparison().has_value());
     EXPECT_EQ(toString(*vr.getHashComparison()), "matched");
     EXPECT_TRUE(vr.getWarnings().empty());
-    EXPECT_TRUE(vr.getErrors().empty());
-    EXPECT_TRUE(vr.isValid());
 
     BSONObjBuilder bob;
     vr.appendToResultObj(&bob, /*debugging=*/false);
     EXPECT_FALSE(bob.obj().hasField("xxh3AllDiff"));
 }
 
-TEST(ValidateResultsTest, RecordHashComparisonErrorsOnMismatch) {
+TEST(ValidateResultsTest, RecordHashComparisonWarnsOnMismatch) {
     ValidateResults vr;
     vr.setXxh3CollectionHash(0x1234);
     EXPECT_FALSE(vr.recordHashComparison(/*accumulated=*/0x1234, /*expected=*/int64_t{0x4321}));
 
     ASSERT_TRUE(vr.getHashComparison().has_value());
     EXPECT_EQ(toString(*vr.getHashComparison()), "mismatched");
-    EXPECT_TRUE(vr.getWarnings().empty());
-    ASSERT_EQ(vr.getErrors().size(), 1);
-    EXPECT_EQ(*vr.getErrors().begin(),
-              "The collection hash does not match the hash accumulated by continuous internode "
-              "validation.");
-    EXPECT_FALSE(vr.isValid());
-    EXPECT_TRUE(vr.continueValidation());
+    EXPECT_EQ(vr.getWarnings().size(), 1);
+
+    // A divergence is surfaced, but the comparison has enough moving parts that it must not by
+    // itself declare the collection invalid.
+    EXPECT_TRUE(vr.isValid());
 
     // Everything an operator acts on has to reach the reply, not just the results object.
     BSONObjBuilder bob;
@@ -408,10 +404,8 @@ TEST(ValidateResultsTest, RecordHashComparisonErrorsOnMismatch) {
     EXPECT_EQ(obj.getField("hashComparison").String(), "mismatched");
     // Folding the diff into the replicated metadata system's hash yields the accumulated one.
     EXPECT_EQ(obj.getField("xxh3AllDiff").Long(), int64_t{0x1234} ^ int64_t{0x4321});
-    EXPECT_TRUE(obj.getField("warnings").Array().empty());
-    ASSERT_EQ(obj.getField("errors").Array().size(), 1u);
-    EXPECT_EQ(obj.getField("errors").Array().front().String(), *vr.getErrors().begin());
-    EXPECT_FALSE(obj.getField("valid").Bool());
+    EXPECT_EQ(obj.getField("warnings").Array().size(), 1u);
+    EXPECT_TRUE(obj.getField("valid").Bool());
 }
 
 TEST(ValidateResultsTest, Xxh3CollectionHashDiffKeepsItsBitsWhenReported) {

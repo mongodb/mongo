@@ -109,11 +109,12 @@ bool ValidateResults::recordHashComparison(uint64_t accumulated, int64_t expecte
     const bool matches = static_cast<int64_t>(accumulated) == expected;
     setExpectedXxh3CollectionHash(expected);
     setHashComparison(matches ? HashComparison::kMatched : HashComparison::kMismatched);
+    // TODO SERVER-134248: Change this to an error after we get confidence in the persisted
+    // collection hashes.
     if (!matches) {
-        addError(
+        addWarning(
             "The collection hash does not match the hash accumulated by continuous internode "
-            "validation.",
-            /*stopValidation=*/false);
+            "validation.");
     }
     return matches;
 }
