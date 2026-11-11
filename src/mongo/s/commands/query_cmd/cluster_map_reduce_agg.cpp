@@ -254,6 +254,12 @@ bool _runMapReduceInRoutingContext(OperationContext* opCtx,
                 e.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
 
         e.addContext("MapReduce internal error");
+        // Do not retry a mapReduce that writes to a collection after ShardNotFound.
+        // The shard may already have applied some or all of the writes.
+        if (e.code() == ErrorCodes::ShardNotFound && !verbosity &&
+            parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
+            uasserted(ErrorCodes::QueryPlanKilled, e.toStatus().reason());
+        }
         throw;
     }
     auto aggResults = tempResults.done();
