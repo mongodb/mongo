@@ -216,6 +216,9 @@ public:
     boost::optional<int64_t> getOplogVisibilityTs() override;
     void setOplogVisibilityTs(boost::optional<int64_t> oplogVisibilityTs) override;
 
+    bool getReadOplogAheadOfVisibility() const override;
+    void setReadOplogAheadOfVisibility(bool value) override;
+
     void setOperationContext(OperationContext* opCtx) override;
 
     /**
@@ -359,6 +362,9 @@ private:
     // this timestamp if they want to avoid missing any entries in the oplog that may not yet have
     // committed ('holes'). @see StorageOplogManager::getOplogReadTimestamp
     boost::optional<int64_t> _oplogVisibleTs = boost::none;
+    // When set, oplog reads are exempt from the 'no holes' clamp above. This flag is used for oplog
+    // appliers where batches complete concurrently, so lastApplied value may lag.
+    bool _readOplogAheadOfVisibility = false;
     boost::optional<uint64_t> _schemaEpoch;
 
     WiredTigerStats _sessionStatsAfterLastOperation;

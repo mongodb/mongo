@@ -632,6 +632,18 @@ public:
     virtual void setOplogVisibilityTs(boost::optional<int64_t> oplogVisibilityTs) {}
 
     /**
+     * When set, oplog reads on this RecoveryUnit are not bound to the oplog visibility point, so
+     * oplog cursors see all durably committed oplog records. Intended for exact-optime point
+     * lookups of a committed oplog chain, such as transaction reassembly. Use
+     * ScopedReadOplogAheadOfVisibility rather than calling this directly. Base implementation is a
+     * no-op.
+     */
+    virtual bool getReadOplogAheadOfVisibility() const {
+        return false;
+    }
+    virtual void setReadOplogAheadOfVisibility(bool value) {}
+
+    /**
      * Pinning informs callers not to change the ReadSource on this RecoveryUnit. Callers are
      * expected to first check isReadSourcePinned before attempting to change the ReadSource. An
      * error may occur otherwise.
@@ -1190,6 +1202,43 @@ public:
 private:
     RecoveryUnit* _recoveryUnit;
     boost::optional<int64_t> _originalOplogVisibleTs;
+};
+
+
+/**
+ * RAII class that exempts oplog reads on the RecoveryUnit from the oplog visibility bound for the
+ * duration of the scope. The outermost scope requires no active snapshot on entry and abandons
+ * its snapshot on exit. Scopes must begin and end outside a unit of work. Nested scopes preserve
+ * the outer scope's snapshot. See RecoveryUnit::setReadOplogAheadOfVisibility.
+ */
+class ScopedReadOplogAheadOfVisibility {
+public:
+    explicit ScopedReadOplogAheadOfVisibility(RecoveryUnit* recoveryUnit)
+        : _recoveryUnit(recoveryUnit),
+          _originalValue(recoveryUnit->getReadOplogAheadOfVisibility()) {
+        invariant(!_recoveryUnit->inUnitOfWork());
+        if (!_originalValue) {
+            invariant(!_recoveryUnit->isActive());
+        }
+        _recoveryUnit->setReadOplogAheadOfVisibility(true);
+    }
+
+    ScopedReadOplogAheadOfVisibility(const ScopedReadOplogAheadOfVisibility&) = delete;
+    ScopedReadOplogAheadOfVisibility& operator=(const ScopedReadOplogAheadOfVisibility&) = delete;
+    ScopedReadOplogAheadOfVisibility(ScopedReadOplogAheadOfVisibility&&) = delete;
+    ScopedReadOplogAheadOfVisibility& operator=(ScopedReadOplogAheadOfVisibility&&) = delete;
+
+    ~ScopedReadOplogAheadOfVisibility() {
+        invariant(!_recoveryUnit->inUnitOfWork());
+        if (!_originalValue && _recoveryUnit->isActive()) {
+            _recoveryUnit->abandonSnapshot();
+        }
+        _recoveryUnit->setReadOplogAheadOfVisibility(_originalValue);
+    }
+
+private:
+    RecoveryUnit* _recoveryUnit;
+    bool _originalValue;
 };
 
 

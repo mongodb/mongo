@@ -386,6 +386,18 @@ void WiredTigerRecoveryUnit::setOplogVisibilityTs(boost::optional<int64_t> oplog
     _oplogVisibleTs = oplogVisibleTs;
 }
 
+bool WiredTigerRecoveryUnit::getReadOplogAheadOfVisibility() const {
+    return _readOplogAheadOfVisibility;
+}
+
+void WiredTigerRecoveryUnit::setReadOplogAheadOfVisibility(bool value) {
+    _readOplogAheadOfVisibility = value;
+    if (value) {
+        // Exempt already-open snapshots' future oplog cursors immediately.
+        _oplogVisibleTs = boost::none;
+    }
+}
+
 WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
     if (_isolation != Isolation::snapshot) {
         return getSessionNoTxn();
@@ -781,7 +793,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
 
     switch (_timestampReadSource) {
         case ReadSource::kNoTimestamp: {
-            if (_oplogManager) {
+            // Leave _oplogVisibleTs unset when reading oplog ahead of visibility.
+            if (_oplogManager && !_readOplogAheadOfVisibility) {
                 _oplogVisibleTs = static_cast<std::int64_t>(_oplogManager->getOplogReadTimestamp());
             }
             WiredTigerBeginTxnBlock(_session,

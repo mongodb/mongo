@@ -59,6 +59,13 @@ bool batchMustBeAppliedSerialized(OplogApplication::Mode mode,
     invariant(!ops.empty());
     const BatchStats batchStats;
     return std::any_of(ops.begin(), ops.end(), [&](const OplogEntry& entry) {
+        if (mode == OplogApplication::Mode::kSecondary &&
+            (entry.shouldPrepare() || entry.isPreparedCommitOrAbort())) {
+            // A prepared-transaction boundary batch must apply without other batches in flight,
+            // and its session update must be published before later batches dispatch.
+            // TODO SERVER-138432: Pipeline eligible split prepared transaction batches.
+            return true;
+        }
         // Entries above lastApplied may belong to batches still in flight, so they may be applied
         // concurrently with this batch; entries below it have already been published.
         const auto action = getBatchActionForEntry(mode, lastApplied, entry, batchStats);
@@ -220,9 +227,26 @@ void PipelinedOplogApplier::_dispatchBatch(OperationContext* opCtx, std::vector<
         if (!_drainWorkers()) {
             return;
         }
+        // Prepared commit and abort oplog entries resolve the split sessions their prepare entry
+        // created. The splits are returned to the pool once every worker of the resolving batch has
+        // finished, mirroring the classic applier's end-of-batch release, so a drained pipeline
+        // implies all resolved splits are released.
+        auto* splitSessManager = _replCoord->getSplitPrepareSessionManager();
+        std::vector<std::pair<LogicalSessionId, TxnNumber>> splitReleases;
+        if (getOptions().mode == OplogApplication::Mode::kSecondary) {
+            for (const auto& op : ops) {
+                if (op.isPreparedCommitOrAbort() &&
+                    splitSessManager->isSessionSplit(*op.getSessionId(), *op.getTxnNumber())) {
+                    splitReleases.emplace_back(*op.getSessionId(), *op.getTxnNumber());
+                }
+            }
+        }
         _dispatchBatchToWorkers(opCtx, std::move(ops));
         if (!_drainWorkers()) {
             return;
+        }
+        for (auto& [lsid, txnNumber] : splitReleases) {
+            splitSessManager->releaseSplitSessions(lsid, txnNumber);
         }
     } else {
         _dispatchBatchToWorkers(opCtx, std::move(ops));

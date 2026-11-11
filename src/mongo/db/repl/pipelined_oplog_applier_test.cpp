@@ -1158,6 +1158,32 @@ TEST_F(PipelinedBatchSerializationTest, SerializesTheTerminalEntryOfATransaction
     ASSERT_TRUE(serialized({terminal, insertOp(kNss, BSON("_id" << 3))}));
 }
 
+// Prepared-transaction boundary batches drain everything in flight first: the prepare and the
+// commit/abort batches apply serialized, while the prepare's partial entries stay pipelined like
+// an unprepared chain's.
+TEST_F(PipelinedBatchSerializationTest, SerializesPreparedTransactionBoundaryBatches) {
+    auto sessionInfo = makeSessionInfo();
+    auto partial = transactionApplyOpsOp({innerInsert(kNss, BSON("_id" << 0))},
+                                         sessionInfo,
+                                         OpTime() /* prevWriteOpTimeInTransaction: first entry */,
+                                         ApplyOpsType::kPartial);
+    auto prepare = transactionApplyOpsOp({innerInsert(kNss, BSON("_id" << 1))},
+                                         sessionInfo,
+                                         partial.getOpTime(),
+                                         ApplyOpsType::kPrepare);
+    ASSERT_TRUE(prepare.shouldPrepare());
+    auto commit = makeCommitTransactionOplogEntry(
+        nextOpTime(), sessionInfo, prepare.getOpTime().getTimestamp(), prepare.getOpTime());
+    auto abort = makeAbortTransactionOplogEntry(nextOpTime(), sessionInfo, prepare.getOpTime());
+
+    ASSERT_FALSE(serialized({partial, insertOp(kNss, BSON("_id" << 2))}));
+    ASSERT_TRUE(serialized({prepare, insertOp(kNss, BSON("_id" << 2))}));
+    ASSERT_TRUE(serialized({commit}));
+    ASSERT_TRUE(serialized({abort}));
+    // Multiple prepared commit/abort entries may share a batch; it still drains.
+    ASSERT_TRUE(serialized({commit, abort}));
+}
+
 // Runs the applier over a mock oplog buffer: the batcher pulls from the buffer, _run dispatches
 // each batch, and the workers apply it to real collections. Each write is attributed to the worker
 // thread that made it via the thread name the pool assigns,
@@ -1575,6 +1601,16 @@ protected:
         }
     }
 
+    // Scans 'nss' with the applier threads' prepare-conflict behavior: a plain standby read blocks
+    // behind an open prepared transaction's writes, so reading while a transaction is open — for
+    // example to check that its writes are invisible to committed readers — would hang.
+    std::vector<BSONObj> readAllDocsWhileTransactionOpen(const NamespaceString& nss) {
+        invariant(!shard_role_details::getRecoveryUnit(_opCtx.get())->isActive());
+        shard_role_details::getRecoveryUnit(_opCtx.get())
+            ->setPrepareConflictBehavior(PrepareConflictBehavior::ignoreAndAllowWrites);
+        return readAllDocs(nss);
+    }
+
     // Checks that a scan of 'nss' returns exactly 'expected' (compared by _id) and that the
     // collection's record count agrees with what the scan returned.
     void assertCollectionContainsExactly(const NamespaceString& nss,
@@ -1640,6 +1676,34 @@ protected:
                              sessionInfo,
                              OpTime() /* prevWriteOpTimeInTransaction */,
                              ApplyOpsType::kTerminal);
+    }
+
+    // A commitTransaction oplog entry resolving the prepared transaction whose prepare entry is at
+    // 'prepareOpTime', carrying the command namespace and fields of a real commit entry.
+    OplogEntry commitPreparedTxnOp(const OperationSessionInfo& sessionInfo,
+                                   const OpTime& prepareOpTime) {
+        auto commitOpTime = nextOpTime();
+        return makeCommandOplogEntryWithSessionInfoAndStmtIds(
+            commitOpTime,
+            kNss,
+            BSON("commitTransaction" << 1 << "commitTimestamp" << commitOpTime.getTimestamp()),
+            *sessionInfo.getSessionId(),
+            *sessionInfo.getTxnNumber(),
+            {} /* stmtIds */,
+            prepareOpTime);
+    }
+
+    // An abortTransaction oplog entry resolving the prepared transaction whose prepare entry is at
+    // 'prepareOpTime'.
+    OplogEntry abortPreparedTxnOp(const OperationSessionInfo& sessionInfo,
+                                  const OpTime& prepareOpTime) {
+        return makeCommandOplogEntryWithSessionInfoAndStmtIds(nextOpTime(),
+                                                              kNss,
+                                                              BSON("abortTransaction" << 1),
+                                                              *sessionInfo.getSessionId(),
+                                                              *sessionInfo.getTxnNumber(),
+                                                              {} /* stmtIds */,
+                                                              prepareOpTime);
     }
 
     // A single-statement retryable write, logged as an atomically-applied applyOps entry.
@@ -3226,6 +3290,206 @@ TEST_F(PipelinedOplogApplierRunTest, ReassemblesALargeUnpreparedTransactionFromT
     assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)});
     assertTxnTable(sessionInfo, terminal, DurableTxnStateEnum::kCommitted);
     assertPublished(terminal);
+}
+
+// A single-entry prepared transaction: the prepare applies the inner write inside an open
+// prepared storage transaction on the session (invisible to committed readers), and the commit
+// resolves it. The transaction's writes are prepared across split sessions that the
+// commit resolves and releases.
+TEST_F(PipelinedOplogApplierRunTest, AppliesSingleEntryPreparedTransactionAndCommits) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    auto prepare = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 0)}, sessionInfo, OpTime(), ApplyOpsType::kPrepare);
+    auto commit = commitPreparedTxnOp(sessionInfo, prepare.getOpTime());
+
+    applyThroughBuffer({prepare});
+    // The prepared write is invisible to a committed read while the transaction is open.
+    ASSERT_EQ(readAllDocsWhileTransactionOpen(kNss).size(), 0U);
+    assertTxnTable(sessionInfo, prepare, DurableTxnStateEnum::kPrepared, prepare.getOpTime());
+    assertPublished(prepare);
+
+    applyThroughBuffer({commit});
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0)});
+    assertTxnTable(sessionInfo, commit, DurableTxnStateEnum::kCommitted);
+    assertPublished(commit);
+}
+
+// A large prepared transaction with partial oplog entries forming an oplog chain: the prepare
+// reassembles the chain by re-reading the partial entries from the local oplog, applies the whole
+// transaction as one prepared storage transaction, and the commit makes it visible.
+TEST_F(PipelinedOplogApplierRunTest, ReassemblesALargePreparedTransactionFromTheOplog) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    // A transaction of three inserts: two in partial entries, the last in the prepare entry.
+    auto partial1 = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 0)}, sessionInfo, OpTime(), ApplyOpsType::kPartial);
+    auto partial2 = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 1)}, sessionInfo, partial1.getOpTime(), ApplyOpsType::kPartial);
+    auto prepare = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 2)}, sessionInfo, partial2.getOpTime(), ApplyOpsType::kPrepare);
+
+    applyThroughBuffer({partial1, partial2});
+    assertCollectionContainsExactly(kNss, {});
+    assertTxnTable(sessionInfo, partial1, DurableTxnStateEnum::kInProgress, partial1.getOpTime());
+    assertPublished(partial2);
+
+    // The prepare arrives in its own serialized batch and reassembles the chain by re-reading the
+    // partials from the local oplog. The pipelined applier does not itself persist fetched
+    // entries, so simulate the fetch path's oplog writes here.
+    writeToOplog(partial1);
+    writeToOplog(partial2);
+    applyThroughBuffer({prepare});
+
+    // The whole chain applied inside the open prepared transaction: nothing is visible to
+    // committed readers yet.
+    ASSERT_EQ(readAllDocsWhileTransactionOpen(kNss).size(), 0U);
+    assertTxnTable(sessionInfo, prepare, DurableTxnStateEnum::kPrepared, partial1.getOpTime());
+    assertPublished(prepare);
+
+    auto commit = commitPreparedTxnOp(sessionInfo, prepare.getOpTime());
+    applyThroughBuffer({commit});
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)});
+    assertTxnTable(sessionInfo, commit, DurableTxnStateEnum::kCommitted);
+    assertPublished(commit);
+}
+
+// An aborted prepared transaction: the prepare leaves the write invisible and the abort rolls the
+// open transaction back.
+TEST_F(PipelinedOplogApplierRunTest, AppliesSingleEntryPreparedTransactionAndAborts) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    auto prepare = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 0)}, sessionInfo, OpTime(), ApplyOpsType::kPrepare);
+    auto abort = abortPreparedTxnOp(sessionInfo, prepare.getOpTime());
+
+    applyThroughBuffer({prepare});
+    assertTxnTable(sessionInfo, prepare, DurableTxnStateEnum::kPrepared, prepare.getOpTime());
+
+    applyThroughBuffer({abort});
+    assertCollectionContainsExactly(kNss, {});
+    assertTxnTable(sessionInfo, abort, DurableTxnStateEnum::kAborted);
+    assertPublished(abort);
+}
+
+// An empty (read-only) prepared transaction: the prepare applies no writes but still prepares the
+// session's transaction, and the commit resolves it.
+TEST_F(PipelinedOplogApplierRunTest, AppliesAnEmptyPreparedTransactionAndCommits) {
+    createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    auto prepare = txnApplyOpsOp({}, sessionInfo, OpTime(), ApplyOpsType::kPrepare);
+    auto commit = commitPreparedTxnOp(sessionInfo, prepare.getOpTime());
+
+    applyThroughBuffer({prepare});
+    assertTxnTable(sessionInfo, prepare, DurableTxnStateEnum::kPrepared, prepare.getOpTime());
+
+    applyThroughBuffer({commit});
+    assertCollectionContainsExactly(kNss, {});
+    assertTxnTable(sessionInfo, commit, DurableTxnStateEnum::kCommitted);
+    assertPublished(commit);
+}
+
+// Between a prepare and its commit, the applier keeps dispatching other work: the open prepared
+// transaction holds no pipeline barrier, and its split sessions are released once the
+// commit's batch is applied.
+TEST_F(PipelinedOplogApplierRunTest, KeepsDispatchingWhileAPreparedTransactionIsOpen) {
+    createCollectionWithUuid(_opCtx.get(), kOtherNss);
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+
+    auto prepare = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 0)}, sessionInfo, OpTime(), ApplyOpsType::kPrepare);
+    // Built in push order: the other insert is applied while the transaction is open, before the
+    // commit resolves it.
+    auto otherInsert = insertOp(kOtherNss, BSON("_id" << 7));
+    auto commit = commitPreparedTxnOp(sessionInfo, prepare.getOpTime());
+
+    pushToBuffer({prepare});
+    startApplier();
+    const auto deadline = Date_t::now() + Seconds(60);
+    while (replCoord->getMyLastAppliedOpTime() < prepare.getOpTime()) {
+        ASSERT_LT(Date_t::now(), deadline);
+        sleepmillis(1);
+    }
+
+    // The prepare published with its split sessions tracked by the split-session manager.
+    auto* splitSessManager = replCoord->getSplitPrepareSessionManager();
+    ASSERT_TRUE(
+        splitSessManager->isSessionSplit(*sessionInfo.getSessionId(), *sessionInfo.getTxnNumber()));
+
+    // Normal dispatch continues while the transaction is open.
+    pushToBuffer({otherInsert});
+    while (replCoord->getMyLastAppliedOpTime() < otherInsert.getOpTime()) {
+        ASSERT_LT(Date_t::now(), deadline);
+        sleepmillis(1);
+    }
+    assertCollectionContainsExactly(kOtherNss, {BSON("_id" << 7)});
+
+    pushToBuffer({commit});
+    // Wait for the commit to be applied before shutting down: the batcher may otherwise drop the
+    // still-pending batch at shutdown.
+    while (replCoord->getMyLastAppliedOpTime() < commit.getOpTime()) {
+        ASSERT_LT(Date_t::now(), deadline);
+        sleepmillis(1);
+    }
+    finishApplier();
+
+    // The commit resolved the split sessions and released them for reuse.
+    ASSERT_FALSE(
+        splitSessManager->isSessionSplit(*sessionInfo.getSessionId(), *sessionInfo.getTxnNumber()));
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0)});
+    assertTxnTable(sessionInfo, commit, DurableTxnStateEnum::kCommitted);
+    assertPublished(commit);
+}
+
+// A prepared boundary batch drains everything in flight: a write from an earlier batch held
+// mid-application blocks the boundary batch from starting, and the boundary batch applies only
+// after the held batch finishes and publishes.
+TEST_F(PipelinedOplogApplierRunTest, BoundaryBatchDrainsInFlightWorkBeforeApplying) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+
+    // A data write from an earlier batch, held mid-application on its worker.
+    auto heldInsert = insertOp(kNss, BSON("_id" << 0));
+    auto& heldGate = watchWriteOf(0, /*hold=*/true);
+
+    auto prepare = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 1)}, sessionInfo, OpTime(), ApplyOpsType::kPrepare);
+    auto commit = commitPreparedTxnOp(sessionInfo, prepare.getOpTime());
+    const auto deadline = Date_t::now() + Seconds(60);
+
+    pushToBuffer({heldInsert});
+    startApplier();
+    waitForGate(heldGate);
+    ASSERT_LT(replCoord->getMyLastAppliedOpTime(), heldInsert.getOpTime());
+
+    // While the held batch is mid-application, the boundary batch has not started: the prepare's
+    // write has not been made.
+    pushToBuffer({prepare});
+    sleepmillis(500);
+    ASSERT_EQ(writesTo(kNss).size(), 1U);
+    ASSERT_BSONOBJ_EQ(writesTo(kNss)[0].doc, BSON("_id" << 0));
+
+    heldGate.release.set();
+    pushToBuffer({commit});
+    // Wait for the commit to be applied before shutting down: the batcher may otherwise drop the
+    // still-pending batch at shutdown.
+    while (replCoord->getMyLastAppliedOpTime() < commit.getOpTime()) {
+        ASSERT_LT(Date_t::now(), deadline);
+        sleepmillis(1);
+    }
+    finishApplier();
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1)});
+    assertTxnTable(sessionInfo, commit, DurableTxnStateEnum::kCommitted);
+    assertPublished(commit);
 }
 
 // A retryable write followed by a transaction on the same session: the transaction's session

@@ -197,6 +197,40 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, SetReadSource) {
     ASSERT_EQ(Timestamp(1, 1), ru1->getPointInTimeReadTimestamp());
 }
 
+TEST_F(WiredTigerRecoveryUnitTestFixture, ScopedReadOplogAheadOfVisibilityRestoresFlag) {
+    ASSERT_FALSE(ru1->getReadOplogAheadOfVisibility());
+    {
+        ScopedReadOplogAheadOfVisibility outer(ru1);
+        ASSERT_TRUE(ru1->getReadOplogAheadOfVisibility());
+        ru1->getSession();
+        ASSERT_TRUE(ru1->isActive());
+        const auto snapshotId = ru1->getSnapshotId();
+        {
+            // The inner scope restores the prior (exempt) value on exit.
+            ScopedReadOplogAheadOfVisibility inner(ru1);
+            ASSERT_TRUE(ru1->getReadOplogAheadOfVisibility());
+            ASSERT_EQ(snapshotId, ru1->getSnapshotId());
+        }
+        ASSERT_TRUE(ru1->getReadOplogAheadOfVisibility());
+        ASSERT_TRUE(ru1->isActive());
+        ASSERT_EQ(snapshotId, ru1->getSnapshotId());
+    }
+    // The outer scope restores the prior (non-exempt) value on exit.
+    ASSERT_FALSE(ru1->getReadOplogAheadOfVisibility());
+    ASSERT_FALSE(ru1->isActive());
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, ScopedReadOplogAheadOfVisibilityAbandonsSnapshotOnExit) {
+    {
+        ScopedReadOplogAheadOfVisibility scope(ru1);
+        // Opens the storage transaction, as the oplog reads of a chain walk do.
+        ru1->getSession();
+        ASSERT_TRUE(ru1->isActive());
+    }
+    // The snapshot opened while exempt is abandoned, leaving the recovery unit inactive.
+    ASSERT_FALSE(ru1->isActive());
+}
+
 TEST_F(WiredTigerRecoveryUnitTestFixture, CanReadLastUsedReadTimestamp) {
     OperationContext* opCtx1 = clientAndCtx1.second.get();
     std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx1, "a.b"));
@@ -556,6 +590,31 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, SnapshotIsolation) {
 
 
 using WiredTigerRecoveryUnitTestFixtureDeathTest = WiredTigerRecoveryUnitTestFixture;
+DEATH_TEST_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
+             ScopedReadOplogAheadOfVisibilityRejectsAnOpenSnapshot,
+             "!_recoveryUnit->isActive()") {
+    ru1->getSession();
+    ASSERT_TRUE(ru1->isActive());
+    ScopedReadOplogAheadOfVisibility scope(ru1);
+}
+
+DEATH_TEST_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
+             ScopedReadOplogAheadOfVisibilityRejectsEntryInUnitOfWork,
+             "!_recoveryUnit->inUnitOfWork()") {
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ASSERT_FALSE(ru1->isActive());
+    ScopedReadOplogAheadOfVisibility scope(ru1);
+}
+
+DEATH_TEST_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
+             ScopedReadOplogAheadOfVisibilityRejectsExitInUnitOfWork,
+             "!_recoveryUnit->inUnitOfWork()") {
+    ScopedReadOplogAheadOfVisibility scope(ru1);
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ru1->getSession();
+    ASSERT_TRUE(ru1->isActive());
+}
+
 DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
                    PrepareTimestampOlderThanStableTimestamp,
                    "prepare timestamp .* is not newer than the stable timestamp") {

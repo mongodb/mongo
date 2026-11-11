@@ -512,9 +512,25 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
     const std::vector<OplogEntry*>& cachedOps,
     const bool checkForCommands) noexcept {
     bool isTransactionWithCommand = false;
+    auto* recoveryUnit = shard_role_details::getRecoveryUnit(opCtx);
     // Ensure future transactions read without a timestamp.
-    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
+    invariant(RecoveryUnit::ReadSource::kNoTimestamp == recoveryUnit->getTimestampReadSource());
+
+    // Walk the transaction chain on a fresh snapshot. A snapshot opened earlier can miss
+    // partial transaction oplog entries committed after it opened.
+    recoveryUnit->abandonSnapshot();
+
+    // Acquiring local.oplog.rs lock-free to perform the chain-walk can reset
+    // the read source to kLastApplied and bound these reads to lastApplied, hiding chain entries
+    // that are durably committed but not yet applied. The read source is already kNoTimestamp, and
+    // we pin that here so the reads see the committed chain regardless of lastApplied.
+    PinReadSourceBlock pinReadSource(recoveryUnit);
+
+    // Oplog cursors are bound to the oplog visibility point, which can trail the oplog writer. For
+    // reading earlier transaction operations, we don't need to abide by the visibility point bound.
+    // These are exact-optime point lookups of committed chain entries that are guaranteed to exist
+    // in the oplog, so allow reading ahead of the visibility point.
+    ScopedReadOplogAheadOfVisibility scopedReadOplogAheadOfVisibility(recoveryUnit);
 
     std::vector<OplogEntry> ops;
 
