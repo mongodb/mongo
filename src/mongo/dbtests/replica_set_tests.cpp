@@ -18,7 +18,9 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 
 #include <memory>
 #include <utility>
@@ -64,11 +66,47 @@ protected:
         return *_storageInterface;
     }
 
+    std::unique_ptr<repl::ReplicationCoordinatorExternalStateImpl> makeExternalState() {
+        return std::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
+            cc().getServiceContext(), _storageInterface.get(), _replicationProcess.get());
+    }
+
 private:
     std::unique_ptr<repl::ReplicationCoordinatorExternalStateImpl> _replCoordExternalState;
     std::unique_ptr<repl::StorageInterface> _storageInterface;
     std::unique_ptr<repl::ReplicationProcess> _replicationProcess;
 };
+
+TEST_F(ReplicaSetTest, DisabledOplogWriterDoesNotCreateDedicatedPool) {
+    unittest::ServerParameterGuard threadCount("oplogWriterThreadCount", 0);
+    unittest::ServerParameterGuard featureFlag("featureFlagReduceMajorityWriteLatency", true);
+    FailPointEnableBlock fp("overrideOplogWriterPoolStartupThreadCount",
+                            BSON("startupThreads" << 0));
+    auto externalState = makeExternalState();
+    ASSERT(externalState);
+}
+
+TEST_F(ReplicaSetTest, DisabledWriterFeatureFlagDoesNotCreateDedicatedPool) {
+    unittest::ServerParameterGuard threadCount("oplogWriterThreadCount", 4);
+    unittest::ServerParameterGuard featureFlag("featureFlagReduceMajorityWriteLatency", false);
+    FailPointEnableBlock fp("overrideOplogWriterPoolStartupThreadCount",
+                            BSON("startupThreads" << 0));
+    // The pool factory would throw under this fail point.
+    auto externalState = makeExternalState();
+    ASSERT(externalState);
+}
+
+TEST_F(ReplicaSetTest, EnabledOplogWriterValidatesStartupWorkerCount) {
+    unittest::ServerParameterGuard threadCount("oplogWriterThreadCount", 4);
+    unittest::ServerParameterGuard featureFlag("featureFlagReduceMajorityWriteLatency", true);
+    for (int startupThreads : {0, 1}) {
+        FailPointEnableBlock fp("overrideOplogWriterPoolStartupThreadCount",
+                                BSON("startupThreads" << startupThreads));
+        ASSERT_THROWS_CODE(makeExternalState(), DBException, ErrorCodes::InternalError);
+    }
+    auto externalState = makeExternalState();
+    ASSERT(externalState);
+}
 
 TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
     auto opCtx = makeOpCtx();

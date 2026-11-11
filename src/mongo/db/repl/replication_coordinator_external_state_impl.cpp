@@ -36,6 +36,7 @@
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_buffer_batched_queue.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_writer_thread_pool_server_parameters_gen.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_metrics.h"
@@ -204,8 +206,19 @@ ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl
       _storageInterface(storageInterface),
       _replicationProcess(replicationProcess),
       _taskExecutor(makeTaskExecutor(service, "ReplCoordExternExecutorPool", "ReplCoordExtern")),
-      _workerPool(makeReplWorkerPool()) {
+      _workerPool(makeReplWorkerPool()),
+      _oplogWriterPool(gOplogWriterThreadCount > 0 &&
+                               feature_flags::gReduceMajorityWriteLatency.isEnabled()
+                           ? makeOplogWriterWorkerPool(gOplogWriterThreadCount)
+                           : nullptr) {
     uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
+
+    if (gOplogWriterThreadCount > 0 && !feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
+        LOGV2_WARNING(9700001,
+                      "oplogWriterThreadCount is set but featureFlagReduceMajorityWriteLatency is "
+                      "disabled; the dedicated oplog writer thread pool will not be created",
+                      "oplogWriterThreadCount"_attr = gOplogWriterThreadCount);
+    }
 }
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
@@ -271,7 +284,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
             _oplogWriterTaskExecutor.get(),
             _oplogWriteBuffer.get(),
             _oplogApplyBuffer.get(),
-            nullptr,
+            _oplogWriterPool.get(),
             replCoord,
             _storageInterface,
             _replicationProcess->getConsistencyMarkers(),
@@ -428,6 +441,13 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication(
     LOGV2(5698300, "Stopping replication applier writer pool");
     _workerPool->shutdown();
     _workerPool->join();
+
+    // Only after the OplogWriter has stopped, so it cannot schedule onto a shut down pool.
+    if (_oplogWriterPool) {
+        LOGV2(9700000, "Stopping dedicated oplog writer worker pool");
+        _oplogWriterPool->shutdown();
+        _oplogWriterPool->join();
+    }
 
     if (oldWriterExecutor) {
         LOGV2(8569802, "Stopping replication writer executor threads");
@@ -1030,10 +1050,23 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
     ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
         opCtx, AdmissionContext::Priority::kExempt);
 
+    // A node that steps down during catch-up or drain has not taken ownership of the truncate point
+    // yet, and the oplog writer may still own it for an unfinished batch. Clearing it then could
+    // leave a hole after a crash.
+    const bool truncatePointOwnedByPrimary = _replicationProcess->getConsistencyMarkers()
+                                                 ->isOplogTruncateAfterPointBeingUsedForPrimary();
+
     // Tell the system to stop updating the oplogTruncateAfterPoint asynchronously and to go
     // back to using last applied to update repl's durable timestamp instead of the truncate
     // point.
     _replicationProcess->getConsistencyMarkers()->stopUsingOplogTruncateAfterPointForPrimary();
+
+    if (!truncatePointOwnedByPrimary) {
+        LOGV2(10727101,
+              "Not clearing the oplogTruncateAfterPoint on stepdown because this node does not "
+              "own it");
+        return;
+    }
 
     // Interrupt the current JournalFlusher thread round, so it recognizes that it is no longer
     // primary. Otherwise the asynchronously running thread could race with setting the truncate

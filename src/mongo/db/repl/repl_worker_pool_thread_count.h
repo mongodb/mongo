@@ -19,6 +19,7 @@ Status validateUpdateReplWriterThreadCount(int count, const boost::optional<Tena
 Status onUpdateReplWriterThreadCount(int);
 Status validateUpdateReplWriterMinThreadCount(int count, const boost::optional<TenantId>&);
 Status onUpdateReplWriterMinThreadCount(int);
+Status validateOplogWriterThreadCount(int count, const boost::optional<TenantId>&);
 
 }  // namespace repl
 }  // namespace mongo

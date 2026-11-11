@@ -43,3 +43,22 @@ server_parameters:
             lte: 256
             callback: validateUpdateReplWriterMinThreadCount
         redact: false
+
+    oplogWriterThreadCount:
+        description: >-
+            Number of threads used by the steady-state oplog writer on secondaries to write each
+            oplog batch in parallel, separately from the oplog applier's threads. 0 (the default)
+            disables the dedicated pool and writes each batch on the writer thread. Enabled values
+            are 2 to 256; 1 is rejected because one worker cannot write a batch in parallel. The
+            threads are started at startup, and startup fails if they cannot all be created. Ignored
+            with a warning unless featureFlagReduceMajorityWriteLatency is enabled.
+        set_at: [startup]
+        cpp_vartype: int
+        cpp_varname: gOplogWriterThreadCount
+        default: 0
+        validator:
+            # validateOplogWriterThreadCount() also rejects 1.
+            gte: 0
+            lte: 256
+            callback: validateOplogWriterThreadCount
+        redact: false

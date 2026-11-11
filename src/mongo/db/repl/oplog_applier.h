@@ -260,5 +260,11 @@ extern NoopOplogApplierObserver noopOplogApplierObserver;
 std::unique_ptr<ThreadPool> makeReplWorkerPool();
 std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount);
 
+/**
+ * Creates a fixed-size pool of "OplogWriterWorker-*" threads for the steady-state OplogWriter.
+ * Requires threadCount >= 2. Throws if fewer than threadCount workers could be started.
+ */
+std::unique_ptr<ThreadPool> makeOplogWriterWorkerPool(size_t threadCount);
+
 }  // namespace repl
 }  // namespace mongo

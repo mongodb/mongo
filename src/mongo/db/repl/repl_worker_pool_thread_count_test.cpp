@@ -84,6 +84,15 @@ TEST_F(ReplWorkerPoolThreadCountParamsTest, SetFailure) {
     ASSERT_NOT_OK(validateUpdateReplWriterMinThreadCount(1000, boost::none));
 }
 
+TEST(OplogWriterThreadCountParamTest, AcceptsDisabledOrParallelCounts) {
+    for (int count : {0, 2, 4, 256}) {
+        ASSERT_OK(validateOplogWriterThreadCount(count, boost::none));
+    }
+    for (int count : {-1, 1, 257}) {
+        ASSERT_EQ(ErrorCodes::BadValue, validateOplogWriterThreadCount(count, boost::none));
+    }
+}
+
 TEST_F(ReplWorkerPoolThreadCountParamsTest, SetConcurrentSuccess) {
     const int newMinValue = 1;
     const int newMaxValue = _threadCountCap;
