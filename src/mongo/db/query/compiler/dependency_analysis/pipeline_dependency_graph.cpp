@@ -792,7 +792,14 @@ public:
     }
 
     Type getTypeFromSchema(std::string_view path) const {
-        return _collectionMetadata.getTypeFromSchema(path, _mainNss);
+        auto type = _collectionMetadata.getTypeFromSchema(path, _mainNss);
+        LOGV2_DEBUG(13907005,
+                    5,
+                    "Querying collection schema type",
+                    "ns"_attr = _mainNss,
+                    "path"_attr = path,
+                    "pathType"_attr = type.toDebugString());
+        return type;
     }
 
     Type getType(const DocumentSource* ds, PathRef path) const {
@@ -804,14 +811,14 @@ public:
      * visible to 'ds'. The callback may return false to indicate that we should exit early, for
      * example because the type was already narrowed to 'never'.
      */
-    template <std::predicate<const DocumentSourceMatch&> Callback>
+    template <std::predicate<const DocumentSourceMatch&, StageId> Callback>
     void forEachPossiblyNarrowingStage(const DocumentSource* ds,
                                        PathRef path,
                                        const Callback& cb) const {
         forEachPossiblyNarrowingStage(lookupPath(ds, path), cb);
     }
 
-    template <std::predicate<const DocumentSourceMatch&> Callback>
+    template <std::predicate<const DocumentSourceMatch&, StageId> Callback>
     void forEachPossiblyNarrowingStage(const PathMatch& pathMatch, const Callback& cb) const {
         // We need to determine the range of relevant stages. Any $match within this range may allow
         // us to constrain the set of possible types.
@@ -848,7 +855,7 @@ public:
             const Stage& stage = _stages[stageId];
             if (stage.type == StageType::kMatch) {
                 const auto& match = checked_cast<const DocumentSourceMatch&>(*stage.documentSource);
-                if (dependsOnPath(stage) && !cb(match)) {
+                if (dependsOnPath(stage) && !cb(match, stageId)) {
                     return;
                 }
             }
@@ -1120,14 +1127,39 @@ private:
 
     class Serializer;
 
+    static constexpr std::string_view kBaseDocumentLabel = "<base document>";
+
+    std::string formatStage(StageId stageId) const {
+        return fmt::format(
+            "{}:{}", _stages[stageId].documentSource->getSourceName(), stageId.value);
+    }
+
+    std::string formatPathOrigin(const PathMatch& pathMatch) const {
+        const auto stage = getPrevModifyingStage(pathMatch);
+        if (!stage) {
+            return std::string{kBaseDocumentLabel};
+        }
+        return formatStage(getStageId(stage.get()));
+    }
+
     bool canPathBeArray(const PathMatch& match) const {
-        if (!canPathBeArrayFromFieldMetadata(match)) {
-            return false;
-        }
-        if (!feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
-            return true;
-        }
-        return getType(match).hasType(BSONType::array);
+        const bool canBeArray = [&] {
+            if (!canPathBeArrayFromFieldMetadata(match)) {
+                return false;
+            }
+            if (!feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
+                return true;
+            }
+            return getType(match).hasType(BSONType::array);
+        }();
+        LOGV2_DEBUG(13907002,
+                    5,
+                    "Returning arrayness for path",
+                    "ns"_attr = _mainNss,
+                    "path"_attr = match.path,
+                    "origin"_attr = formatPathOrigin(match),
+                    "canPathBeArray"_attr = canBeArray);
+        return canBeArray;
     }
 
     /// Determines whether the field can be an array. For base document fields, which are not
@@ -1188,7 +1220,15 @@ private:
     Type getType(const PathMatch& pathMatch) const {
         // We first infer type of the whole top-level document containing the path and then resolve
         // the type of the requested path against the result.
-        return resolvePathType(getDocumentType(pathMatch), pathMatch.path);
+        auto pathType = resolvePathType(getDocumentType(pathMatch), pathMatch.path);
+        LOGV2_DEBUG(13907001,
+                    5,
+                    "Returning type for path",
+                    "ns"_attr = _mainNss,
+                    "path"_attr = pathMatch.path,
+                    "origin"_attr = formatPathOrigin(pathMatch),
+                    "pathType"_attr = pathType.toDebugString());
+        return pathType;
     }
 
     /**
@@ -1215,13 +1255,31 @@ private:
 
         //  We start with the type from the graph, and then apply the narrowing on top.
         Type rootType = getDocumentTypeFromGraph(pathMatch);
+        LOGV2_DEBUG(13907003,
+                    5,
+                    "Type before match narrowing",
+                    "ns"_attr = _mainNss,
+                    "path"_attr = pathMatch.path,
+                    "origin"_attr = formatPathOrigin(pathMatch),
+                    "pathType"_attr = resolvePathType(rootType, pathMatch.path).toDebugString());
         if (rootType.isNever()) {
             return rootType;
         }
-        forEachPossiblyNarrowingStage(pathMatch, [&](const DocumentSourceMatch& match) {
-            rootType = ts::narrowType(std::move(rootType), match.getMatchExpression(), true);
-            return !rootType.isNever();
-        });
+        forEachPossiblyNarrowingStage(
+            pathMatch, [&](const DocumentSourceMatch& match, StageId matchId) {
+                rootType = ts::narrowType(std::move(rootType), match.getMatchExpression(), true);
+                LOGV2_DEBUG(13907004,
+                            5,
+                            "Type after match narrowing",
+                            "ns"_attr = _mainNss,
+                            "path"_attr = pathMatch.path,
+                            "origin"_attr = formatPathOrigin(pathMatch),
+                            "pathType"_attr =
+                                resolvePathType(rootType, pathMatch.path).toDebugString(),
+                            "stage"_attr = formatStage(matchId),
+                            "match"_attr = redact(match.getMatchExpression()->serialize()));
+                return !rootType.isNever();
+            });
         return rootType;
     }
 
@@ -1910,7 +1968,14 @@ private:
     }
 
     bool canCollectionFieldBeArray(PathRef path) const {
-        return _collectionMetadata.canPathBeArray(path, _mainNss);
+        const bool canBeArray = _collectionMetadata.canPathBeArray(path, _mainNss);
+        LOGV2_DEBUG(13907006,
+                    5,
+                    "Querying collection path arrayness",
+                    "ns"_attr = _mainNss,
+                    "path"_attr = path,
+                    "canPathBeArray"_attr = canBeArray);
+        return canBeArray;
     }
 
     /**
@@ -2681,7 +2746,7 @@ ts::Type DependencyGraph::getType_forTest(const DocumentSource* ds, PathRef path
 std::vector<const DocumentSource*> DependencyGraph::getPossiblyNarrowingStages_forTest(
     const DocumentSource* ds, PathRef path) const {
     std::vector<const DocumentSource*> result;
-    _impl->forEachPossiblyNarrowingStage(ds, path, [&](const DocumentSourceMatch& match) {
+    _impl->forEachPossiblyNarrowingStage(ds, path, [&](const DocumentSourceMatch& match, StageId) {
         result.push_back(&match);
         return true;
     });
@@ -2801,7 +2866,7 @@ private:
 
     void serializeStage(StageId stageId, BSONObjBuilder& bob) {
         const auto& stage = _graph._stages[stageId];
-        BSONObjBuilder stageBob = bob.subobjStart(formatStage(stageId));
+        BSONObjBuilder stageBob = bob.subobjStart(_graph.formatStage(stageId));
         serializeScope(stage.scope, stageBob);
         serializeDependencies(stage.dependencies, stageBob);
         if (stage.subpipeline) {
@@ -2843,7 +2908,7 @@ private:
 
     void serializeField(FieldId fieldId, BSONObjBuilder& bob) {
         if (!fieldId) {
-            bob.append("source", "<base document>");
+            bob.append("source", kBaseDocumentLabel);
             return;
         }
         const auto& field = _graph._fields[fieldId];
@@ -2885,11 +2950,6 @@ private:
         }
     }
 
-    std::string formatStage(StageId stageId) const {
-        return fmt::format(
-            "{}:{}", _graph._stages[stageId].documentSource->getSourceName(), stageId.value);
-    }
-
     std::string formatScope(ScopeId scopeId) const {
         return fmt::format("scope:{}", _orderedScopeIds.get(scopeId).value);
     }
@@ -2904,7 +2964,7 @@ private:
 
     std::string resolveFieldName(FieldId fieldId) const {
         if (!fieldId) {
-            return "<base document>";
+            return std::string{kBaseDocumentLabel};
         }
         const auto& field = _graph._fields[fieldId];
         // The field doesn't know the field name. We need to find the name from the declaring scope,

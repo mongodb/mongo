@@ -26,6 +26,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -5058,6 +5059,26 @@ TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaFieldUnderProjectedScalarPref
     setPipeline("[{$project: {'x.y': 1}}]");
 
     ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "missing");
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeHasDebugLogging) {
+    unittest::MinimumLoggedSeverityGuard loggingGuard{logv2::LogComponent::kQuery,
+                                                      logv2::LogSeverity::Debug(5)};
+    setSchemaTypeFromMatch(R"({$or: [{x: {$type: 'number'}}, {x: {$exists: false}}]})");
+    ASSERT_EQ(schemaTypeInfo->getRootType().toDebugString(), "{x: missing|number|array(S), ...}");
+    setPipeline("[{$project: {'x': 1}}, {$match: {x: {$type: 'number'}}}]");
+    unittest::LogCaptureGuard logCapture;
+
+    ASSERT_TRUE(graph->canPathBeArray(nullptr, "x"));
+    ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "number|array(S)");
+
+    // Check that all of the logging statements ran.
+    ASSERT_TRUE(logCapture.countBSONContainingSubset(BSON("id" << 13907001)));
+    ASSERT_TRUE(logCapture.countBSONContainingSubset(BSON("id" << 13907002)));
+    ASSERT_TRUE(logCapture.countBSONContainingSubset(BSON("id" << 13907003)));
+    ASSERT_TRUE(logCapture.countBSONContainingSubset(BSON("id" << 13907004)));
+    ASSERT_TRUE(logCapture.countBSONContainingSubset(BSON("id" << 13907005)));
+    ASSERT_TRUE(logCapture.countBSONContainingSubset(BSON("id" << 13907006)));
 }
 
 }  // namespace
