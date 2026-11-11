@@ -926,6 +926,7 @@ mongo_cc_unit_test(
         "lockable_adapter_test.cpp",
         "log_with_sampling_test.cpp",
         "lru_cache_test.cpp",
+        "memory_charging_test.cpp",
         "optional_util_test.cpp",
         "out_of_line_executor_test.cpp",
         "overloaded_visitor_test.cpp",
@@ -977,6 +978,7 @@ mongo_cc_unit_test(
         ":dns_query",
         ":future_util",
         ":icu",
+        ":memory_charging",
         ":pcre_util",
         ":pcre_wrapper",
         ":periodic_runner_impl",
@@ -1274,6 +1276,11 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(name = "packaged_task")
+
+# Header only and dependency free on purpose, so that low level libraries (document_value, bson) can
+# see the charging interface without depending on db/memory_tracking, which pulls in commands and
+# service_context.
+mongo_cc_library(name = "memory_charging")
 
 py_binary(
     name = "pretty_printer_test",

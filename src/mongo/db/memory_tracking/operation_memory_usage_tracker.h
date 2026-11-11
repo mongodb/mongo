@@ -5,6 +5,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
+#include "mongo/util/memory_charging.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
@@ -37,11 +38,24 @@ namespace mongo {
  * - RunAggregateTest: TransferOperationMemoryUsageTracker
  * - ClusterAggregateMemoryTrackingTest: MemoryTrackingWorksOnRouter
  */
-class [[MONGO_MOD_NEEDS_REPLACEMENT]] OperationMemoryUsageTracker
-    : public SimpleMemoryUsageTracker {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] OperationMemoryUsageTracker : public SimpleMemoryUsageTracker,
+                                                                    public MemoryCharging {
     OperationMemoryUsageTracker() = delete;
 
 public:
+    /**
+     * 'chargeBytes' and 'releaseBytes' are used for charging and releasing memory when tracking is
+     * done using the Ambient Tracker mechanism.
+     */
+    void chargeBytes(int64_t bytes) override {
+        add(bytes);
+        assertWithinMemoryLimit(_opCtx, "allocation-time charge");
+    }
+
+    void releaseBytes(int64_t bytes) override {
+        add(-bytes);
+    }
+
     /**
      * Whether attachToOpCtxIfAvailable() should also point the tracker's CurOp reporting target at
      * the destination opCtx. See that method for details.
@@ -132,11 +146,16 @@ public:
 
     explicit OperationMemoryUsageTracker(OperationContext* opCtx);
 
+    /**
+     * Returns the tracker for this operation, creating it if it does not exist yet. Public so that
+     * the operation can install it as the ambient charger without relying on some stage having
+     * created it first.
+     */
+    static OperationMemoryUsageTracker* getOperationMemoryUsageTracker(OperationContext* opCtx);
+
 private:
     friend class RunAggregateTest;
     friend class ClusterAggregateMemoryTrackingTest;
-
-    static OperationMemoryUsageTracker* getOperationMemoryUsageTracker(OperationContext* opCtx);
 
     static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerImpl(
         OperationContext* opCtx,

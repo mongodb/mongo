@@ -92,6 +92,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db/query:query_knobs",
         "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/util:memory_charging",
     ],
 )
 

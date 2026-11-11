@@ -57,3 +57,6 @@ filters:
   - "moving_average*":
     approvers:
       - 10gen/query-integration-observability
+  - "memory_charging*":
+    approvers:
+      - 10gen/query-execution

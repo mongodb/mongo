@@ -13,6 +13,7 @@
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/memory_charging.h"
 
 namespace mongo {
 namespace {
@@ -461,6 +462,70 @@ TEST_F(OperationMemoryUsageTrackerTest, RebindMovesBothFigures) {
 
     stage.add(-100, -40);
     ASSERT_EQ(opTracker->inUseTrackedMemoryBytes(), 0);
+}
+
+/**
+ * Charging and releasing bytes moves the figure the limit is checked against and its peak. On the
+ * operation tracker that is the unique figure, so the two readers agree. The full figure is not
+ * readable.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, ChargeAndReleaseBytesMoveTheTrackedFigure) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    auto expCtx = getExpCtx();
+    OperationContext* opCtx = expCtx->getOperationContext();
+    auto* opTracker = OperationMemoryUsageTracker::getOperationMemoryUsageTracker(opCtx);
+
+    MemoryCharging* charging = opTracker;
+    charging->chargeBytes(100);
+    ASSERT_EQ(opTracker->inUseTrackedMemoryBytes(), 100);
+    ASSERT_EQ(opTracker->inUseUniqueMemoryBytes(), 100);
+    ASSERT_EQ(opTracker->peakTrackedMemoryBytes(), 100);
+
+    charging->releaseBytes(40);
+    ASSERT_EQ(opTracker->inUseTrackedMemoryBytes(), 60);
+    ASSERT_EQ(opTracker->inUseUniqueMemoryBytes(), 60);
+    ASSERT_EQ(opTracker->peakTrackedMemoryBytes(), 100);
+
+    charging->releaseBytes(60);
+    ASSERT_EQ(opTracker->inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(opTracker->inUseUniqueMemoryBytes(), 0);
+}
+
+TEST_F(OperationMemoryUsageTrackerTest, ChargeBytesEnforcesTheOperationLimit) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard perOpLimit("internalQueryMaxMemoryUsageBytesPerOperation", 50);
+    auto expCtx = getExpCtx();
+    OperationContext* opCtx = expCtx->getOperationContext();
+    auto* opTracker = OperationMemoryUsageTracker::getOperationMemoryUsageTracker(opCtx);
+
+    opTracker->chargeBytes(50);
+    ASSERT_THROWS_CODE(
+        opTracker->chargeBytes(1), AssertionException, ErrorCodes::ExceededMemoryLimit);
+
+    // The failing charge stays counted, so the error reports what the operation needed.
+    ASSERT_EQ(opTracker->inUseTrackedMemoryBytes(), 51);
+}
+
+TEST_F(OperationMemoryUsageTrackerTest, AmbientGuardChargesTheOperationTracker) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    auto expCtx = getExpCtx();
+    OperationContext* opCtx = expCtx->getOperationContext();
+    auto* opTracker = OperationMemoryUsageTracker::getOperationMemoryUsageTracker(opCtx);
+
+    {
+        AmbientMemoryChargingGuard guard(opTracker);
+        chargeAmbient(32);
+        ASSERT_EQ(opTracker->inUseTrackedMemoryBytes(), 32);
+
+        {
+            AmbientMemoryChargingGuard suspended(nullptr);
+            chargeAmbient(1000);
+            ASSERT_EQ(opTracker->inUseTrackedMemoryBytes(), 32);
+        }
+
+        releaseAmbient(32);
+        ASSERT_EQ(opTracker->inUseTrackedMemoryBytes(), 0);
+    }
 }
 
 }  // namespace
