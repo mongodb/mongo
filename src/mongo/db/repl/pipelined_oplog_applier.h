@@ -103,12 +103,15 @@ private:
 
 /**
  * Applies 'item' on the current worker thread, fasserting on any failure other than shutdown.
- * Records multikey changes from the work item.
+ * Records multikey changes from the work item. 'applier' is used to detect applier shutdown while
+ * paused at the pauseBatchApplicationBeforeCompletion fail point and may be null when the caller
+ * has no applier lifecycle (e.g. unit tests).
  */
 void consumeWorkItem(size_t workerIdx,
                      const OplogApplier::Options& options,
                      const PipelinedApplierWorkerPool::WorkItem& item,
-                     PipelinedApplierBatchTracker& batchTracker);
+                     PipelinedApplierBatchTracker& batchTracker,
+                     const OplogApplier* applier = nullptr);
 
 /**
  * Returns whether a batch must be applied serialized ("drain, dispatch, drain") because it

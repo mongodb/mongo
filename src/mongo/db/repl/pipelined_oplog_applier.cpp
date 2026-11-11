@@ -22,6 +22,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 #include <algorithm>
 #include <memory>
@@ -35,6 +36,34 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforePipelinedApplierPublish);
 MONGO_FAIL_POINT_DEFINE(hangBeforePipelinedApplierDrain);
+MONGO_FAIL_POINT_DEFINE(pausePipelinedApplierWorkerBeforeNextBatch);
+
+/**
+ * Blocks the calling worker while the 'pausePipelinedApplierWorkerBeforeNextBatch' fail point is
+ * enabled. Called after the worker has signaled completion of its slice, it keeps the worker from
+ * starting the next batch's slice, mirroring how 'pauseBatchApplicationBeforeCompletion' freezes
+ * the whole classic applier. Fatals if the owning applier begins shutting down while blocked
+ * ('applier' may be null in callers that cannot shut down, e.g. unit tests).
+ */
+void pauseWorkerBeforeNextBatch(const OplogApplier* applier, size_t workerIdx) {
+    if (MONGO_unlikely(pausePipelinedApplierWorkerBeforeNextBatch.shouldFail())) {
+        // Do not include "fail point enabled" in this message: tests that wait on
+        // pauseBatchApplicationBeforeCompletion's log output grep for that text plus the fail
+        // point name, and it must only match at the batch boundary in the advancer.
+        LOGV2(13735800,
+              "Holding pipelined oplog applier worker at "
+              "pausePipelinedApplierWorkerBeforeNextBatch",
+              "workerIdx"_attr = workerIdx);
+        while (MONGO_unlikely(pausePipelinedApplierWorkerBeforeNextBatch.shouldFail())) {
+            if (applier && applier->inShutdown()) {
+                LOGV2_FATAL_NOTRACE(13735801,
+                                    "Turn off pausePipelinedApplierWorkerBeforeNextBatch before "
+                                    "attempting clean shutdown");
+            }
+            sleepmillis(100);
+        }
+    }
+}
 
 /**
  * Configures 'opCtx' for oplog application: no constraint enforcement, prepare conflicts ignored.
@@ -85,7 +114,7 @@ PipelinedOplogApplier::PipelinedOplogApplier(executor::TaskExecutor* executor,
       _storageInterface(storageInterface),
       _workerPool(numWorkers,
                   [this](size_t workerIdx, const PipelinedApplierWorkerPool::WorkItem& item) {
-                      consumeWorkItem(workerIdx, getOptions(), item, _batchTracker);
+                      consumeWorkItem(workerIdx, getOptions(), item, _batchTracker, this);
                   }),
       _advancer(_batchTracker, [this](const auto& batch) { _publishBatch(batch); }) {
     _disableTransactionUpdateCoalescing =
@@ -210,6 +239,8 @@ StatusWith<OpTime> PipelinedOplogApplier::_applyOplogBatch(OperationContext* opC
 
 void PipelinedOplogApplier::_dispatchBatch(OperationContext* opCtx, std::vector<OplogEntry> ops) {
     invariant(!ops.empty());
+
+    pauseBatchApplicationAfterWritingOplogEntriesAndBeforeApplication(opCtx);
 
     // A batch containing any entry that must apply alone — e.g. DDL, the new-primary noop, or a
     // truncate — is applied serialized. This is done through a "drain, dispatch, drain" sequence:
@@ -338,6 +369,14 @@ bool PipelinedOplogApplier::_waitForAdvancerIdle() {
 void PipelinedOplogApplier::_publishBatch(
     const PipelinedApplierBatchTracker::InflightBatch& batch) {
     hangBeforePipelinedApplierPublish.pauseWhileSet();
+    // The advancer reaches a batch only after all of its workers have applied their slices, so
+    // pausing here holds the batch fully applied but unpublished, with lastApplied frozen: the
+    // classic applier's fail point position. This is where the log line tests wait on is emitted.
+    // The worker fail point is passed so the helper can require, via invariant, that tests
+    // pausing here have also paused the workers.
+    pauseBatchApplicationBeforeCompletionAndLastAppliedAdvancement(
+        this, &pausePipelinedApplierWorkerBeforeNextBatch);
+
     invariant(batch.multikeyMetadata);
     invariant(!batch.ops.empty());
 
@@ -407,7 +446,8 @@ Status applyWorkItem(OperationContext* opCtx,
 void consumeWorkItem(size_t workerIdx,
                      const OplogApplier::Options& options,
                      const PipelinedApplierWorkerPool::WorkItem& item,
-                     PipelinedApplierBatchTracker& batchTracker) {
+                     PipelinedApplierBatchTracker& batchTracker,
+                     const OplogApplier* applier) {
     invariant(!item.ops.empty());
     invariant(item.batchRemainingWorkers);
     invariant(item.multikeyPathInfo);
@@ -421,6 +461,12 @@ void consumeWorkItem(size_t workerIdx,
     }
     if (MONGO_likely(status.isOK())) {
         batchTracker.onWorkerCompletion(item.batchRemainingWorkers);
+        // Pause after signaling completion, so the batch still completes and the advancer reaches
+        // it, but this worker cannot start the next batch's slice. This is the pipelined
+        // counterpart of the classic applier's full stop under
+        // pauseBatchApplicationBeforeCompletion; tests enable both fail points together via the
+        // jstests helper configurePauseBatchApplicationBeforeCompletion().
+        pauseWorkerBeforeNextBatch(applier, workerIdx);
         return;
     }
     // A global-shutdown interrupt abandons the item unapplied; lastApplied stays below this

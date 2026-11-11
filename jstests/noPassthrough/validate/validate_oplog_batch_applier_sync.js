@@ -4,7 +4,7 @@
  * batch will result in validate being blocked due to waiting for a lock.
  */
 
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {configurePauseBatchApplicationBeforeCompletion} from "jstests/replsets/libs/pause_batch_application_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 2});
@@ -34,8 +34,7 @@ for (let i = 0; i < numDocs; ++i) {
 
 rst.awaitReplication();
 /* Enable the failpoint to stop oplog batch application before completion. */
-let failPoint = "pauseBatchApplicationBeforeCompletion";
-const fp = configureFailPoint(secDB, failPoint);
+const fp = configurePauseBatchApplicationBeforeCompletion(secDB);
 
 // Start oplog batch application.
 const awaitOplog = startParallelShell(function () {

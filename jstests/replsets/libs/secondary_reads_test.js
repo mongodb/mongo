@@ -2,6 +2,7 @@
  * This is a library for testing secondary reads against a replica set
  */
 
+import {configurePauseBatchApplicationBeforeCompletion} from "jstests/replsets/libs/pause_batch_application_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 export function SecondaryReadsTest(name = "secondary_reads_test") {
@@ -65,6 +66,7 @@ export function SecondaryReadsTest(name = "secondary_reads_test") {
     };
 
     let failPoint = "pauseBatchApplicationBeforeCompletion";
+    let pauseBatchFp;
 
     // This returns a function that should be called once after performing a replicated write on a
     // primary. The write will start a batch on a secondary and immediately pause before completion.
@@ -73,9 +75,7 @@ export function SecondaryReadsTest(name = "secondary_reads_test") {
     this.pauseSecondaryBatchApplication = function () {
         clearRawMongoProgramOutput();
 
-        assert.commandWorked(
-            secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}),
-        );
+        pauseBatchFp = configurePauseBatchApplicationBeforeCompletion(secondaryDB);
 
         return function () {
             assert.soon(function () {
@@ -85,9 +85,7 @@ export function SecondaryReadsTest(name = "secondary_reads_test") {
     };
 
     this.resumeSecondaryBatchApplication = function () {
-        assert.commandWorked(
-            secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "off"}),
-        );
+        pauseBatchFp.off();
     };
 
     this.getPrimaryDB = function () {

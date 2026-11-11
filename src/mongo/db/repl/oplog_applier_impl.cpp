@@ -476,6 +476,62 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
     }
 }
 
+void pauseBatchApplicationBeforeCompletionAndLastAppliedAdvancement(
+    const OplogApplier* applier, FailPoint* pipelinedWorkerPauseFailPoint) {
+    // Use this fail point to prevent the batch from completing.
+    if (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {
+        if (pipelinedWorkerPauseFailPoint) {
+            // This is just an additional guard to make sure that if POA is in use
+            // its workers have been paused.
+            invariant(pipelinedWorkerPauseFailPoint->shouldFail(),
+                      "POA requires enabling both pauseBatchApplicationBeforeCompletion and"
+                      "pausePipelinedApplierWorkerBeforeNextBatch.");
+        }
+        LOGV2(21232,
+              "pauseBatchApplicationBeforeCompletion fail point enabled. Blocking until fail "
+              "point is disabled");
+        while (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {
+            if (applier && applier->inShutdown()) {
+                LOGV2_FATAL_NOTRACE(50798,
+                                    "Turn off pauseBatchApplicationBeforeCompletion before "
+                                    "attempting clean shutdown");
+            }
+            sleepmillis(100);
+        }
+    }
+}
+
+void pauseBatchApplicationAfterWritingOplogEntriesAndBeforeApplication(OperationContext* opCtx) {
+    // Use this fail point to hang after we have written the oplog entries but before we have
+    // applied them.
+    pauseBatchApplicationAfterWritingOplogEntries.executeIf(
+        [&](const BSONObj& data) {
+            // Optional delay before the pause, if blockMS is provided
+            auto blockDuration =
+                Milliseconds{data.hasField("blockMS") ? data.getIntField("blockMS") : 0};
+            if (blockDuration.count() > 0) {
+                static mongo::PseudoRandom prng(Date_t::now().asInt64());
+                if (prng.nextInt32(100) == 0) {
+                    LOGV2(1084140,
+                          "pauseBatchApplicationAfterWritingOplogEntries fail point "
+                          "enabled with blockMS. "
+                          "Blocking oplog application",
+                          "duration"_attr = blockDuration);
+                }
+                opCtx->sleepFor(blockDuration);
+            }
+
+            LOGV2(21231,
+                  "pauseBatchApplicationAfterWritingOplogEntries fail point enabled. "
+                  "Blocking "
+                  "until fail point is disabled");
+            pauseBatchApplicationAfterWritingOplogEntries.pauseWhileSet(opCtx);
+
+            return true;
+        },
+        [](const BSONObj&) { return true; });
+}
+
 StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                                                       std::vector<OplogEntry> ops) {
     invariant(!ops.empty());
@@ -538,35 +594,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
             _oplogWriter->waitForScheduledWrites(opCtx);
         }
 
-        // Use this fail point to hang after we have written the oplog entries but before we have
-        // applied them.
-        pauseBatchApplicationAfterWritingOplogEntries.executeIf(
-            [&](const BSONObj& data) {
-                // Optional delay before the pause, if blockMS is provided
-                auto blockDuration =
-                    Milliseconds{data.hasField("blockMS") ? data.getIntField("blockMS") : 0};
-                if (blockDuration.count() > 0) {
-                    static mongo::PseudoRandom prng(Date_t::now().asInt64());
-                    if (prng.nextInt32(100) == 0) {
-                        LOGV2(1084140,
-                              "pauseBatchApplicationAfterWritingOplogEntries fail point "
-                              "enabled with blockMS. "
-                              "Blocking oplog application",
-                              "duration"_attr = blockDuration);
-                    }
-                    opCtx->sleepFor(blockDuration);
-                }
-
-                LOGV2(21231,
-                      "pauseBatchApplicationAfterWritingOplogEntries fail point enabled. "
-                      "Blocking "
-                      "until fail point is disabled");
-                pauseBatchApplicationAfterWritingOplogEntries.pauseWhileSet(opCtx);
-
-                return true;
-            },
-            [](const BSONObj&) { return true; });
-
+        pauseBatchApplicationAfterWritingOplogEntriesAndBeforeApplication(opCtx);
 
         // Compare with _minValid Optime.
         const bool isDataConsistent = getMinValid() < ops.front().getOpTime();
@@ -667,21 +695,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         }
     }
 
-    // Use this fail point to prevent the batch from completing.
-    if (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {
-        LOGV2(21232,
-              "pauseBatchApplicationBeforeCompletion fail point enabled. Blocking until fail "
-              "point is disabled");
-        while (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {
-            if (inShutdown()) {
-                LOGV2_FATAL_NOTRACE(
-                    50798,
-                    "Turn off pauseBatchApplicationBeforeCompletion before attempting "
-                    "clean shutdown");
-            }
-            sleepmillis(100);
-        }
-    }
+    pauseBatchApplicationBeforeCompletionAndLastAppliedAdvancement(this);
 
     fassert(50686,
             flushMultikeyPathInfo(opCtx,

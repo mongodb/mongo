@@ -10,7 +10,9 @@
  * at increasing timestamps.
  *
  * @tags: [requires_wiredtiger, requires_persistence, requires_replication,
- * requires_majority_read_concern, multiversion_incompatible]
+ * requires_majority_read_concern, multiversion_incompatible,
+ * # TODO(SERVER-139050): Enable this test under the pipelined oplog applier.
+ * incompatible_with_pipelined_oplog_applier]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";

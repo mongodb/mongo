@@ -27,6 +27,8 @@
 #include <vector>
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
+class FailPoint;
+
 namespace repl {
 
 /**
@@ -148,6 +150,27 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                        const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
                                        OplogApplication::Mode oplogApplicationMode,
                                        bool isDataConsistent);
+
+/**
+ * Blocks while the 'pauseBatchApplicationBeforeCompletion' fail point is enabled, after a batch's
+ * writes have been applied but before the batch is allowed to complete and lastApplied is
+ * advanced.
+ *
+ * The fail point is entered only once the entire batch has been applied: the classic applier
+ * calls this after the whole batch has been applied, and the pipelined applier's advancer calls
+ * it after every worker has applied its slice, right before publication.
+ *
+ * When 'pipelinedWorkerPauseFailPoint' is non-null (true in POA), the function requires that fail
+ * point to also be enabled so workers cannot start the next batch's slices while held.
+ */
+void pauseBatchApplicationBeforeCompletionAndLastAppliedAdvancement(
+    const OplogApplier* applier, FailPoint* pipelinedWorkerPauseFailPoint = nullptr);
+
+/**
+ * Blocks while the 'pauseBatchApplicationAfterWritingOplogEntries' fail point is enabled, after a
+ * batch's oplog entries have been written but before any of them are applied.
+ */
+void pauseBatchApplicationAfterWritingOplogEntriesAndBeforeApplication(OperationContext* opCtx);
 
 }  // namespace repl
 }  // namespace mongo

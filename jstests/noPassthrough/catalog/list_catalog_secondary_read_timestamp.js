@@ -14,9 +14,7 @@
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-
-const kFailpoint = "pauseBatchApplicationBeforeCompletion";
+import {configurePauseBatchApplicationBeforeCompletion} from "jstests/replsets/libs/pause_batch_application_util.js";
 
 /**
  * Verifies that collectionless $listCatalog with rc:local on a secondary does not expose
@@ -30,7 +28,7 @@ function testListCatalogDuringPausedBatch(rst, primary, secondary, dbName, exist
     // Pause the secondary's oplog applier after it writes a batch to storage but before it
     // advances lastApplied. This creates a window where data is on disk but not yet "committed"
     // from a replication consistency standpoint.
-    const fp = configureFailPoint(secondary, kFailpoint);
+    const fp = configurePauseBatchApplicationBeforeCompletion(secondary);
 
     // Create a new collection on the primary. Its oplog entry will be picked up by the
     // secondary and applied to storage, then the applier will block at the failpoint.
