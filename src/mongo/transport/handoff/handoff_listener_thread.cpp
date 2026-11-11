@@ -4,14 +4,20 @@
 #include "mongo/transport/handoff/handoff_listener_thread.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/commands/server_status/histogram_server_status_metric.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_histogram.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/transport/handoff/handoff_session.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/timer.h"
 
 #include <cstring>
 
@@ -28,6 +34,27 @@
 
 namespace mongo::transport {
 namespace {
+otel::metrics::Counter<int64_t>& totalHandoffListenerProcessingTimeMicros =
+    otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kHandoffListenerProcessingTime,
+        "Total time the handoff listener threads spent processing new ingress connections.",
+        otel::metrics::MetricUnit::kMicroseconds,
+        {.serverStatusOptions = otel::metrics::ServerStatusOptions{
+             .dottedPath = "network.handoff.listenerProcessingTime.durationMicros",
+             .role = ClusterRole::None}});
+
+otel::metrics::Histogram<int64_t>& handoffListenerProcessingTimesMicros =
+    otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kHandoffListenerProcessingLatency,
+        "The latency of processing a new ingress connection on a handoff listener thread.",
+        otel::metrics::MetricUnit::kMicroseconds,
+        {.serverStatusOptions =
+             otel::metrics::ServerStatusOptions{
+                 .dottedPath = "network.handoff.listenerProcessingTimeHistogram",
+                 .role = ClusterRole::None},
+         .explicitBucketBoundaries = HistogramServerStatusMetric::computeBounds<double>(10, 1, 5),
+         .serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts});
+
 /**
  * Logs the LOG_ID with a message and attributes indicated by the trailing arguments (...) at
  * DEFAULT_SEVERITY at most once every COOLDOWN_PERIOD, and at COOLDOWN_SEVERITY otherwise.
@@ -408,6 +435,13 @@ void HandoffListenerThread::_listenerLoop() {
                 // When we successfully accept a connection, reset the backoff timeout.
                 backoffMillis = startingBackoffMillis;
             }
+
+            Timer timer;
+            ScopeGuard recordProcessingTime([&] {
+                const Microseconds processingTime{timer.micros()};
+                totalHandoffListenerProcessingTimeMicros.add(processingTime.count());
+                handoffListenerProcessingTimesMicros.record(processingTime.count());
+            });
 
             if (const Status status = validatePeerGroupID(_posix, connFd, _socketGroupID);
                 !status.isOK()) {

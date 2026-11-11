@@ -4,9 +4,16 @@
 #include "mongo/transport/handoff/handoff_listener_thread.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/transport/handoff/handoff_test_util.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/time_support.h"
 
 #include <atomic>
 #include <barrier>
@@ -562,6 +569,66 @@ TEST(HandoffListenerThreadTest, SessionRemoteAddress) {
     listener.shutdown();
 }
 
+// Listener processing time tests
+// ------------------------------
+
+using otel::metrics::MetricNames;
+
+BSONObj handoffServerStatusMetrics() {
+    BSONObjBuilder bob;
+    globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+    return bob.obj()["metrics"]["network"]["handoff"].Obj().getOwned();
+}
+
+long long listenerProcessingTimeCount() {
+    return handoffServerStatusMetrics()["listenerProcessingTimeHistogram"]["totalCount"]
+        .numberLong();
+}
+
+long long listenerProcessingTimeMicros() {
+    return handoffServerStatusMetrics()["listenerProcessingTime"]["durationMicros"].numberLong();
+}
+
+// Each accepted connection records one listener processing time sample, and its duration is added
+// to the cumulative listener processing time.
+TEST(HandoffListenerThreadTest, ProcessingTimeRecordedForAcceptedConnections) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const long long countBefore = listenerProcessingTimeCount();
+    const long long microsBefore = listenerProcessingTimeMicros();
+    TemporaryDirectory dir;
+    // A handoff can take under 1us, which would let a never-incremented counter pass. Delay peer
+    // validation (which is timed) so a working counter must exceed a known minimum.
+    constexpr Milliseconds kMinProcessingTime{1};
+    MockPOSIXInterface posix;
+    posix.onGetpeereid = [&](int, uid_t*, gid_t* gid) {
+        sleepFor(kMinProcessingTime);
+        *gid = ::getegid();
+        return 0;
+    };
+    TestSessionManager sessionManager;
+    const std::filesystem::path socketPath = dir.path() / "handoff-mongodb.sock";
+    HandoffListenerThread listener(singleSocketParams(socketPath, sessionManager, posix));
+    ASSERT_OK(listener.setup({.s2nConfig = nullptr}));
+    ASSERT_OK(listener.listen());
+    listener.start();
+
+    connectAndGetSession(socketPath, sessionManager)->end();
+    connectAndGetSession(socketPath, sessionManager)->end();
+
+    // The sample is recorded after `startSession()` returns, so join the thread before reading.
+    listener.shutdown();
+    const long long minTotalMicros = 2 * durationCount<Microseconds>(kMinProcessingTime);
+    ASSERT_EQ(listenerProcessingTimeCount() - countBefore, 2);
+    ASSERT_GTE(listenerProcessingTimeMicros() - microsBefore, minTotalMicros);
+    if (capturer.canReadMetrics()) {
+        const auto totalMicros =
+            capturer.readInt64Counter(MetricNames::kHandoffListenerProcessingTime);
+        ASSERT_GTE(totalMicros, minTotalMicros);
+        ASSERT_EQ(totalMicros,
+                  capturer.readInt64Histogram(MetricNames::kHandoffListenerProcessingLatency).sum);
+    }
+}
+
 // Socket owner group ID validation tests
 // --------------------------------------
 
@@ -629,8 +696,10 @@ TEST(HandoffListenerThreadTest, ExplicitGroupOwnershipOfListenerSockets) {
 }
 
 // When getpeereid() returns a mismatched GID, the connection is closed and no session is created.
+// The rejected connection still records a listener processing time sample.
 TEST(HandoffListenerThreadTest, WrongGidImplicitConnectionClosed) {
     const std::size_t fdsBefore = numberOfOpenFileDescriptors();
+    const long long processingCountBefore = listenerProcessingTimeCount();
     TemporaryDirectory dir;
     MockPOSIXInterface posix;
     posix.onGetpeereid = [](int, uid_t*, gid_t* gid) {
@@ -659,6 +728,7 @@ TEST(HandoffListenerThreadTest, WrongGidImplicitConnectionClosed) {
     listener.shutdown();
     ASSERT_EQ(sessionManager.getNumSessionsStarted(), 0);
     ASSERT_EQ(numberOfOpenFileDescriptors(), fdsBefore);
+    ASSERT_EQ(listenerProcessingTimeCount() - processingCountBefore, 1);
 }
 
 // When getpeereid() returns a mismatched GID, the connection is closed and no session is created.

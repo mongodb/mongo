@@ -156,6 +156,8 @@ mongo_cc_library(
         ":handoff_posix_interface",
         ":handoff_session",
         "//src/mongo:base",
+        "//src/mongo/db/commands/server_status:histogram_server_status_metric",
+        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 
@@ -167,6 +169,8 @@ mongo_cc_unit_test(
     deps = [
         ":handoff_listener_thread",
         ":handoff_test_util",
+        "//src/mongo/db/commands/server_status:server_status_metric",
+        "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/util:processinfo",
     ],
 )
