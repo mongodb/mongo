@@ -833,6 +833,7 @@ mongo_cc_benchmark(
         "//src/mongo/db:read_write_concern_defaults_mock",
         "//src/mongo/db/auth:authserver",
         "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/otel/traces:benchmark_tracing",
         "//src/mongo/rpc:message",
         "//src/mongo/unittest:benchmark_util",
     ],

@@ -1,6 +1,7 @@
 load("//bazel:mongo_src_rules.bzl", "TCMALLOC_DEPS", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_fuzzer_test_deprecated", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library", "windows_rc")
 load("//bazel/config:render_template.bzl", "render_template")
 load("//bazel/uv:defs.bzl", "dependency")
+load("//src/mongo/otel:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -3756,6 +3757,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/db/topology/vector_clock:vector_clock_mongod",
+        "//src/mongo/otel/traces:benchmark_tracing",
         "//src/mongo/unittest:benchmark_util",
         "//src/mongo/util:periodic_runner_factory",
     ],
@@ -3764,6 +3766,7 @@ mongo_cc_benchmark(
 mongo_cc_benchmark(
     name = "crud_bm",
     srcs = ["crud_bm.cpp"],
+    private_hdrs = ["crud_bm_fixture.h"],
     tags = ["sep_bm"],
     deps = [
         ":metrics_policy_manager_mongod",
@@ -3790,6 +3793,47 @@ mongo_cc_benchmark(
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/db/topology/vector_clock:vector_clock_mongod",
         "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/otel/traces:benchmark_tracing",
+        "//src/mongo/unittest:benchmark_util",
+        "//src/mongo/util:periodic_runner_factory",
+    ],
+)
+
+# Not tagged sep_bm: measures the cost tracing adds on top of crud_bm, without adding to what the
+# gating benchmarks_sep task checks.
+mongo_cc_benchmark(
+    name = "crud_tracing_bm",
+    srcs = ["crud_tracing_bm.cpp"],
+    private_hdrs = ["crud_bm_fixture.h"],
+    # Every fixture here measures OTel tracing's cost, so there's nothing to measure when OTel
+    # isn't compiled in; crud_bm covers the plain CRUD baseline on every platform regardless.
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":metrics_policy_manager_mongod",
+        ":mongod_options_init",
+        ":read_write_concern_defaults_mock",
+        ":server_base",
+        ":service_context_d",
+        ":shard_role_api",
+        "//src/mongo/db/auth:authserver",
+        "//src/mongo/db/commands:standalone",
+        "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory",
+        "//src/mongo/db/query/query_settings:query_settings_command_hooks",
+        "//src/mongo/db/repl:repl_coordinator_impl",
+        "//src/mongo/db/repl:serveronly_repl",
+        "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/rss:persistence_provider_impl",
+        "//src/mongo/db/rss:service_lifecycle_impl",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_impl",
+        "//src/mongo/db/shard_role/shard_catalog:database_holder",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/db/topology/vector_clock:vector_clock_mongod",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/otel/traces:benchmark_tracing",
         "//src/mongo/unittest:benchmark_util",
         "//src/mongo/util:periodic_runner_factory",
     ],

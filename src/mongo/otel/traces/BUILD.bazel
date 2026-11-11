@@ -439,3 +439,49 @@ mongo_cc_unit_test(
         "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_grpc_exporter",
     ],
 )
+
+mongo_cc_library(
+    name = "benchmark_tracing",
+    srcs = [
+        "benchmark_tracing.cpp",
+    ],
+    hdrs = [
+        "benchmark_tracing.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/otel/traces/sampler:sampling_config",
+    ] + select({
+        "@//bazel/config:build_otel_enabled": [
+            ":tracer_provider_service",
+            ":tracer_provider_service_factory",
+            "//src/mongo/db:server_base",
+            "//src/mongo/otel/traces/sampler",
+            "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_http_exporter",
+            "//src/third_party/opentelemetry-cpp/ext:headers",
+            "//src/third_party/opentelemetry-cpp/sdk/src/trace",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "benchmark_tracing_test",
+    srcs = [
+        "benchmark_tracing_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+        "tracing_test",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":benchmark_tracing",
+        ":tracer_provider_service",
+        "//src/mongo/db:server_base",
+        "//src/mongo/otel",
+        "//src/mongo/otel/traces/sampler",
+        "//src/mongo/otel/traces/span",
+        "//src/mongo/otel/traces/span:span_names",
+    ],
+)

@@ -12,13 +12,16 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/otel/traces/benchmark_tracing.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/unittest/benchmark_util.h"
 
 #include <memory>
+#include <string>
 #include <type_traits>
+#include <vector>
 
 #include <benchmark/benchmark.h>
 
@@ -38,9 +41,11 @@ public:
         ReadWriteConcernDefaults::create(service, _lookupMock.getFetchDefaultsFn());
         _lookupMock.setLookupCallReturnValue({});
         setUpServiceContext(sc);
+        _tracing = setupTracingSession();
     }
 
     void tearDownSharedResources(benchmark::State& state) override {
+        _tracing.reset();
         tearDownServiceContext(getGlobalServiceContext());
         setGlobalServiceContext({});
         BenchmarkWithProfiler::tearDownSharedResources(state);
@@ -51,6 +56,13 @@ public:
     virtual void tearDownServiceContext(ServiceContext*) {}
 
     virtual ClusterRole getClusterRole() const = 0;
+
+    /**
+     * How tracing is configured while the benchmark runs, if at all.
+     */
+    virtual std::unique_ptr<otel::traces::BenchmarkTracingSession> setupTracingSession() const {
+        return nullptr;
+    }
 
     void doRequest(ServiceEntryPoint* sep, Client* client, Message& msg) {
         auto newOpCtx = client->makeOperationContext();
@@ -84,6 +96,8 @@ public:
 
 private:
     Atomic<uint64_t> _nextClientId{0};
+
+    std::unique_ptr<otel::traces::BenchmarkTracingSession> _tracing;
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 };

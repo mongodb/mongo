@@ -40,6 +40,8 @@ core:
     - src/mongo/util/
     - src/mongo/db/partitioned*
     - src/mongo/db/crud_bm.cpp
+    - src/mongo/db/crud_bm_fixture.h
+    - src/mongo/db/crud_tracing_bm.cpp
     - src/mongo/db/field_parser[._]*
     - src/mongo/db/generic_argument_util.*
     - src/mongo/db/nesting_depth_test.cpp

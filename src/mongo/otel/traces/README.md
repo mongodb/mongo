@@ -233,3 +233,64 @@ Traces are exported in [OTLP format](https://opentelemetry.io/docs/specs/otlp/) 
   `moreToCome` flag). A span is started with the name of the command when an RPC is sent (egress
   RPCs) with span kind `CLIENT` or `PRODUCER` (depending on the `moreToCome` flag). These are
   sampled by default on mongos only.
+
+## Benchmarking
+
+[`crud_tracing_bm`](../../db/crud_tracing_bm.cpp) measures what tracing costs CRUD commands.
+
+Each result line looks like:
+
+```
+CrudTraceMissBenchmarkFixture/BM_FIND_ONE/threads:1     844149 ns   844096 ns   824   cycles_per_iteration=102.883k  instructions_per_iteration=0
+```
+
+Columns are **Time** (wall clock per iteration), **CPU** (CPU time per iteration — use this one for
+comparisons, since it's insulated from scheduling noise that wall time picks up), **Iterations**,
+then counters (`instructions_per_iteration` isn't wired up here and is always 0). For `threads:16`
+rows, Time is divided across the 16 threads, while CPU is the aggregate CPU time across all threads
+for one iteration — compare CPU, not Time, across thread levels.
+
+Interspersed `[benchmark_tracing] ...` lines are printed to stderr once per setUp/tearDown cycle (so
+several per fixture — once per calibration pass plus the real run):
+
+```
+[benchmark_tracing] spans made=101 exported=101 dropped=0 export-thread CPU/span=13533ns
+```
+
+`made`/`exported`/`dropped` confirm the sampling config behaved as the fixture intends (e.g.
+`CrudTraceMissBenchmarkFixture` should show `made=0` almost always; any nonzero value is an actual
+trace hit, astronomically rare by design). `export-thread CPU/span` is the real exporter's per-span
+cost on the background thread — irrelevant to command latency, but useful for spotting an exporter
+regression.
+
+Point-lookup ops (`BM_FIND_ONE`, `BM_INSERT_ONE`) show the clearest signal, since tracing's fixed
+per-span overhead is a meaningful fraction of their small total cost. Heavier ops
+(`BM_FIND_COLLSCAN`, `BM_AGG_GROUP`) will show the overhead shrink toward (and sometimes below, due
+to noise) the measurement floor, since the fixed per-span cost barely moves the needle against
+milliseconds of query work.
+
+### Fixtures
+
+Each CRUD operation is benchmarked under three fixtures, so thresholds can compare them:
+
+- **`CrudBenchmarkFixture`** — no tracer provider installed at all. The floor: what the command
+  costs with tracing infrastructure entirely absent.
+- **`CrudTraceMissBenchmarkFixture`** — tracer provider live, the command's span registered with the
+  sampler at the smallest-possible nonzero rate, so the sampler's roll-and-compare always rejects
+  it. This is the realistic worst-case cost of tracing being "on" for a command that isn't actually
+  traced. The gap from `CrudBenchmarkFixture` here is overhead that tracing readiness shouldn't be
+  imposing on untraced commands and should be driven toward zero over time, not a necessary cost to
+  accept.
+- **`CrudTracedBenchmarkFixture`** — same, but sampled at 100%, with spans actually exported through
+  the real OTLP HTTP exporter against a local dummy collector on a background thread.
+
+### Building and running
+
+```bash
+bazel build //src/mongo/db:crud_tracing_bm
+
+./bazel-bin/src/mongo/db/crud_tracing_bm                                    # everything
+./bazel-bin/src/mongo/db/crud_tracing_bm --benchmark_min_time=0.5           # faster iteration
+./bazel-bin/src/mongo/db/crud_tracing_bm --benchmark_list_tests             # list without running
+./bazel-bin/src/mongo/db/crud_tracing_bm --benchmark_filter='BM_FIND_ONE/threads:1$'
+```

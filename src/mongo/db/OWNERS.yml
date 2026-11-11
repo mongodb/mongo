@@ -346,6 +346,13 @@ filters:
   - "crud_bm*":
     approvers:
       - 10gen/performance
+  - "service_entry_point_bm*":
+    approvers:
+      - 10gen/performance
+      - 10gen/query-integration-observability
+  - "crud_tracing_bm*":
+    approvers:
+      - 10gen/query-integration-observability
   - "tenant_id*":
     approvers:
       - 10gen/server-security
