@@ -9,8 +9,77 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
+namespace {
+template <class GetOwned>
+void insertUnionElement(value::Array& result,
+                        value::ValueSetType& membership,
+                        size_t& memoryBytes,
+                        size_t limit,
+                        value::TagValueView element,
+                        GetOwned&& getOwned) {
+    // The input holders outlive membership processing, even after a retained payload moves to
+    // the result array.
+    if (element.tag == value::TypeTags::Nothing || !membership.insert(element).second) {
+        return;
+    }
+    memoryBytes += value::getApproximateSize(element.tag, element.value);
+    uassert(ErrorCodes::ExceededMemoryLimit,
+            str::stream() << "$setUnion would use too much memory (" << memoryBytes
+                          << " bytes) and cannot spill to disk. Memory limit: " << limit
+                          << " bytes",
+            memoryBytes <= limit);
+    result.push_back(getOwned());
+}
+}  // namespace
+
 value::TagValueMaybeOwned ByteCode::builtinSetUnionArray(ArityType arity) {
-    MONGO_UNREACHABLE_TASSERT(13890500);
+    const CollatorInterface* collator = nullptr;
+    auto coll = viewFromStack(0);
+    tassert(13889300,
+            "Expected a collator or Nothing for setUnionArray",
+            coll.tag == value::TypeTags::collator || coll.tag == value::TypeTags::Nothing);
+    if (coll.tag == value::TypeTags::collator) {
+        collator = value::getCollatorView(coll.value);
+    }
+
+    // Arguments may be views (for example, field paths or constants). Keep owned inputs and
+    // their extracted elements alive until construction of the result is complete.
+    std::vector<value::TagValueMaybeOwned> inputs;
+    inputs.reserve(arity - 1);
+    for (size_t arg = 1; arg < arity; ++arg) {
+        if (!value::isArray(viewFromStack(arg).tag)) {
+            return value::TagValueMaybeOwned::nothing();
+        }
+        inputs.push_back(moveMaybeOwnedFromStack(arg));
+    }
+    auto result = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto array = value::getArrayView(result.value());
+    // The hash table stores views into the values owned by the arrays and doesn't copy anything:
+    //   hash table --> value <-- owning array
+    // Growing the result array does not move the values themselves, so the hash keys stay valid.
+    value::ValueSetType membership(0, value::ValueHash(collator), value::ValueEq(collator));
+    std::vector<std::vector<value::TagValueOwned>> ownedElements(inputs.size());
+    size_t memoryBytes = 0;
+    const auto limit = internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed();
+    for (size_t arg = 0; arg < inputs.size(); ++arg) {
+        auto& input = inputs[arg];
+        if (input.owned() && input.tag() == value::TypeTags::Array) {
+            ownedElements[arg] = value::getArrayView(input.value())->takeValues();
+            for (auto& element : ownedElements[arg]) {
+                insertUnionElement(*array, membership, memoryBytes, limit, element.view(), [&] {
+                    return std::move(element);
+                });
+            }
+        } else {
+            value::arrayForEach(input.tag(), input.value(), [&](auto tag, auto val) {
+                value::TagValueView element{tag, val};
+                insertUnionElement(*array, membership, memoryBytes, limit, element, [&] {
+                    return element.copy();
+                });
+            });
+        }
+    }
+    return std::move(result);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSetIntersectionArray(ArityType arity) {

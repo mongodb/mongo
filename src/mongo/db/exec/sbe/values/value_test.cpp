@@ -302,6 +302,24 @@ TEST_F(SbeValueTest, ArrayMoveIsDestructive) {
     ASSERT_EQ(arr1.size(), 0);  // NOLINT(bugprone-use-after-move)
 }
 
+TEST_F(SbeValueTest, ArrayTakeValuesTransfersOwnership) {
+    value::Array array;
+    auto string = value::TagValueOwned::fromRaw(value::makeBigString("an allocating string"));
+    auto original = string.view();
+    array.push_back(std::move(string));
+    array.push_back(value::TagValueOwned::numberInt32(42));
+    auto elements = array.takeValues();
+    ASSERT_EQ(array.size(), 0);
+    ASSERT_TRUE(array.takeValues().empty());
+    ASSERT_EQ(elements.size(), 2);
+    ASSERT_EQ(elements[0].tag(), original.tag);
+    ASSERT_EQ(elements[0].value(), original.value);
+    ASSERT_EQ(elements[1].value(), value::bitcastFrom<int32_t>(42));
+    array.push_back(value::TagValueOwned::numberInt32(7));
+    array.clear();
+    ASSERT_EQ(value::getStringView(elements[0].tag(), elements[0].value()), "an allocating string");
+}
+
 TEST_F(SbeValueTest, ArrayForEachMoveIsDestructive) {
     value::TagValueOwned arrOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
 

@@ -1484,6 +1484,21 @@ public:
         return {_vals[idx].first, _vals[idx].second};
     }
 
+    /**
+     * Transfers all elements into RAII holders without copying payloads, leaving an empty array.
+     * The caller must have exclusive access to this array.
+     */
+    std::vector<TagValueOwned> takeValues() {
+        std::vector<TagValueOwned> result;
+        // Allocate before transferring ownership. The remaining operations cannot throw.
+        result.reserve(_vals.size());
+        for (auto value : _vals) {
+            result.push_back(TagValueOwned::fromRaw(value));
+        }
+        _vals.clear();
+        return result;
+    }
+
     TagValueOwned swapAt(std::size_t idx, TypeTags tag, Value val) {
         if (idx >= _vals.size() || tag == TypeTags::Nothing) {
             return TagValueOwned::nothing();
