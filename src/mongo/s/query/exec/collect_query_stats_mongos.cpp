@@ -81,7 +81,7 @@ void collectQueryStatsMongosReadErrored(OperationContext* opCtx, ErrorCodes::Err
         return;
     }
 
-    // Writes register their key per statement at a separate opIndex, never the slot read here, so
+    // Writes register their key per-statement at a separate opIndex, never the slot read here, so
     // the lookup always misses for them. Batch writes additionally report per-statement failures in
     // 'writeErrors' under a top-level ok:1, where this hook is not called.
     auto& queryStatsInfo = CurOp::get(opCtx)->debug().getQueryStatsInfo();

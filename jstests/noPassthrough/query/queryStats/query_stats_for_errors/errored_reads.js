@@ -1,27 +1,23 @@
 /**
- * Tests that $queryStats records errors per query shape for read operations, on a mongod
- * (single-node replica set, so change streams are available) and on a sharded cluster.
+ * Tests that $queryStats records errors per query shape for read operations, on a mongod and on a
+ * sharded cluster.
  *
- * Only non-cursor read errors are collected: find/aggregate that error during the first batch, plus
- * count and distinct, which are inherently non-cursor. listDatabases, listCollections, listIndexes
- * and explain are not covered because they never register a query stats key.
- *
- * The aggregate-based write stages $out and $merge are covered here too (replica set only). They
- * register their key under the READ sampling rate, like any other aggregate, and their failpoints
- * fire before any internal insert batch runs, so the write sampling rate never comes into play.
- *
- * @tags: [featureFlagQueryStatsErrors, requires_sharding]
+ * @tags: [featureFlagQueryStatsErrors]
  */
-import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
-    describeErroredOpCases,
-    errorCountByName,
+    assertErrorRecorded,
+    assertNoErrorRecorded,
+    describeOnlyErroredOpCases,
     getLatestQueryStatsMetrics,
     kPlanExecutorFailErrorCode,
     kPlanExecutorFailErrorCodeName,
+    killCursorWhileIdle,
+    openFindCursor,
     queryStatsOptions,
     withCommandFailure,
     withFailPoint,
@@ -118,12 +114,9 @@ function readErrorCases() {
 }
 
 /**
- * The aggregate-based write stages $out and $merge. They run inside the aggregate command, which
- * registers their key under the READ sampling rate even though they write; the write rate is never
- * consulted because their hang failpoints fire before any internal insert batch runs. The
- * failpoints are interruptible, so a short maxTimeMS kills them; runCommand is used so maxTimeMS is
- * definitely sent (the shell aggregate helper does not always forward it), avoiding an unbounded
- * hang. The recorded shape's command is "aggregate".
+ * $out and $merge run inside the aggregate command, which register their key under the read sampling rate.
+ * Even though they write, the write rate is never consulted because their hang failpoints fire before any
+ * internal insert batch runs.
  */
 function outMergeErrorCases() {
     return [
@@ -162,6 +155,123 @@ function outMergeErrorCases() {
     ];
 }
 
+/**
+ * getMores that fail on a find or aggregate cursor. The error is recorded on the cursor and written
+ * when the cursor is disposed. A cursor that survives the error is disposed in 'afterAction'.
+ */
+function cursorGetMoreErrorCases() {
+    return [
+        {
+            name: "getMore on an aggregate cursor",
+            setup: (ctx) => {
+                const res = assert.commandWorked(
+                    ctx.testDB.runCommand({
+                        aggregate: ctx.collName,
+                        pipeline: [{$match: {a: {$gte: 0}}}],
+                        cursor: {batchSize: 1},
+                    }),
+                );
+                assert.neq(0, res.cursor.id, "expected a cursor to remain open", {res});
+                ctx.cursorId = res.cursor.id;
+            },
+            action: (ctx) =>
+                ctx.testDB.runCommand({getMore: ctx.cursorId, collection: ctx.collName}),
+            induce: {
+                failpoint: "failGetMoreAfterCursorCheckout",
+                data: {errorCode: ErrorCodes.MaxTimeMSExpired},
+            },
+            expectedErrorCode: ErrorCodes.MaxTimeMSExpired,
+            expectedErrorCodeName: "MaxTimeMSExpired",
+        },
+        {
+            // Fails because the getMore waits just before generating its batch until its deadline
+            // expires. We set the deadline on the find because a getMore on a non-awaitData cursor
+            // can't set its own 'maxTimeMS'.
+            name: "getMore killed by its deadline",
+            setup: (ctx) => {
+                ctx.cursorId = openFindCursor(ctx.testDB, ctx.collName, {maxTimeMS: 500});
+            },
+            action: (ctx) =>
+                ctx.testDB.runCommand({getMore: ctx.cursorId, collection: ctx.collName}),
+            induce: {
+                failpoint: "waitWithPinnedCursorDuringGetMoreBatch",
+                data: {shouldCheckForInterrupt: true},
+            },
+            expectedErrorCode: ErrorCodes.MaxTimeMSExpired,
+            expectedErrorCodeName: "MaxTimeMSExpired",
+        },
+        {
+            name: "getMore that fails before it iterates the cursor",
+            setup: (ctx) => {
+                ctx.cursorId = openFindCursor(ctx.testDB, ctx.collName);
+            },
+            action: (ctx) =>
+                ctx.testDB.runCommand({getMore: ctx.cursorId, collection: ctx.collName}),
+            induce: {
+                failpoint: "failGetMoreDuringCursorLockAcquisition",
+                data: {errorCode: ErrorCodes.QueryPlanKilled},
+            },
+            expectedErrorCode: ErrorCodes.QueryPlanKilled,
+            expectedErrorCodeName: "QueryPlanKilled",
+        },
+        {
+            // Fails while inheriting the cursor's settings, before any batch work starts.
+            name: "getMore that fails before its batch is generated",
+            setup: (ctx) => {
+                ctx.cursorId = openFindCursor(ctx.testDB, ctx.collName);
+            },
+            action: (ctx) =>
+                ctx.testDB.runCommand({
+                    getMore: ctx.cursorId,
+                    collection: ctx.collName,
+                    apiVersion: "1",
+                    apiStrict: false,
+                }),
+            afterAction: (ctx) =>
+                assert.commandWorked(
+                    ctx.testDB.runCommand({killCursors: ctx.collName, cursors: [ctx.cursorId]}),
+                ),
+            expectedErrorCode: ErrorCodes.APIMismatchError,
+            expectedErrorCodeName: "APIMismatchError",
+        },
+        {
+            name: "getMore that fails after its batch is generated",
+            setup: (ctx) => {
+                ctx.cursorId = openFindCursor(ctx.testDB, ctx.collName);
+            },
+            action: (ctx) =>
+                ctx.testDB.runCommand({
+                    getMore: ctx.cursorId,
+                    collection: ctx.collName,
+                    batchSize: 1,
+                }),
+            induce: {
+                failpoint: "failGetMoreAfterBatchGeneration",
+                data: {errorCode: ErrorCodes.Interrupted},
+            },
+            afterAction: (ctx) =>
+                assert.commandWorked(
+                    ctx.testDB.runCommand({killCursors: ctx.collName, cursors: [ctx.cursorId]}),
+                ),
+            expectedErrorCode: ErrorCodes.Interrupted,
+            expectedErrorCodeName: "Interrupted",
+        },
+        {
+            // The cursor is disposed while being pinned for the failing getMore, before it can
+            // iterate.
+            name: "getMore on a cursor that was killed while idle",
+            setup: (ctx) => {
+                ctx.cursorId = openFindCursor(ctx.testDB, ctx.collName, {maxTimeMS: 2000});
+                killCursorWhileIdle(ctx.conn, ctx.testDB, ctx.collName, ctx.cursorId);
+            },
+            action: (ctx) =>
+                ctx.testDB.runCommand({getMore: ctx.cursorId, collection: ctx.collName}),
+            expectedErrorCode: ErrorCodes.MaxTimeMSExpired,
+            expectedErrorCodeName: "MaxTimeMSExpired",
+        },
+    ];
+}
+
 describe("query stats errored reads (replica set)", function () {
     let rst, conn, testDB, coll, collName;
 
@@ -181,7 +291,7 @@ describe("query stats errored reads (replica set)", function () {
 
     // Drop and re-seed the collection, then reset the store so the seed insert does not appear as a
     // query stats entry. Each test point starts from this clean state.
-    function resetReadState() {
+    function resetCollectionAndQueryStatsStore() {
         coll.drop();
         assert.commandWorked(coll.insert(kSeedDocs));
         resetQueryStatsStore(conn, "1MB");
@@ -189,25 +299,27 @@ describe("query stats errored reads (replica set)", function () {
 
     const replSetHooks = {
         getCtx: () => ({conn, testDB, coll, collName}),
-        resetPerTest: resetReadState,
+        resetPerTest: resetCollectionAndQueryStatsStore,
         targetConnections: () => [conn],
         getMetrics: (ctx) => getLatestQueryStatsMetrics(ctx.conn, ctx.collName),
     };
 
-    describeErroredOpCases(readErrorCases(), replSetHooks);
-    describeErroredOpCases(outMergeErrorCases(), replSetHooks);
+    describeOnlyErroredOpCases(readErrorCases(), replSetHooks);
+    describeOnlyErroredOpCases(outMergeErrorCases(), replSetHooks);
+    describeOnlyErroredOpCases(cursorGetMoreErrorCases(), replSetHooks);
 
+    // The cases below don't fit the describeOnlyErroredOpCases fixture. Each either succeeds, runs
+    // a success on the shape first, or expects no error to be recorded.
     it("does not record errored fields on a successful execution", function () {
-        resetReadState();
+        resetCollectionAndQueryStatsStore();
         assert.eq(2, coll.find({a: {$gte: 2}}).itcount());
         const metrics = getLatestQueryStatsMetrics(conn, collName);
         assert.eq(1, metrics.execCount, "execCount", {metrics});
-        assert.eq(0, metrics.execCountErrored, "execCountErrored", {metrics});
-        assert(!metrics.hasOwnProperty("errors"), "unexpected errors array", {metrics});
+        assertNoErrorRecorded(metrics, "successful execution");
     });
 
     it("keeps successful timing when the same shape later errors", function () {
-        resetReadState();
+        resetCollectionAndQueryStatsStore();
         const filter = {a: {$gte: 0}};
         assert.commandWorked(testDB.runCommand({find: collName, filter}));
         const timingAfterSuccess = getLatestQueryStatsMetrics(conn, collName).totalExecMicros.sum;
@@ -223,11 +335,74 @@ describe("query stats errored reads (replica set)", function () {
 
         const metrics = getLatestQueryStatsMetrics(conn, collName);
         assert.eq(1, metrics.execCount, "execCount", {metrics});
-        assert.eq(1, metrics.execCountErrored, "execCountErrored", {metrics});
-        assert.eq(1, errorCountByName(metrics, kPlanExecutorFailErrorCodeName), "error count", {
+        assertErrorRecorded(
             metrics,
-        });
+            {execCountErrored: 1, errorCodeName: kPlanExecutorFailErrorCodeName, errorCodeCount: 1},
+            "error after a success",
+        );
         assert.eq(timingAfterSuccess, metrics.totalExecMicros.sum, "timing changed", {metrics});
+    });
+
+    it("does not record an error when the client closes a cursor early", function () {
+        resetCollectionAndQueryStatsStore();
+        // Closing a cursor early is a normal client choice.
+        const cursorId = openFindCursor(testDB, collName);
+        assert.commandWorked(testDB.runCommand({killCursors: collName, cursors: [cursorId]}));
+
+        const metrics = getLatestQueryStatsMetrics(conn, collName);
+        assert.eq(1, metrics.execCount, "execCount", {metrics});
+        assertNoErrorRecorded(metrics, "successful execution");
+    });
+
+    it("does not record a killed idle cursor reached by a request from another session", function () {
+        resetCollectionAndQueryStatsStore();
+        // The cursor belongs to an explicit session and dies while idle. A getMore from outside
+        // that session is not allowed to use the cursor, but still gets the error saying why it
+        // died. That error must not be recorded against the owner's query, since the owner never
+        // sent a failing request.
+        const session = conn.startSession();
+        const sessionDB = session.getDatabase(testDB.getName());
+        try {
+            const cursorId = openFindCursor(sessionDB, collName, {maxTimeMS: 2000});
+            killCursorWhileIdle(conn, sessionDB, collName, cursorId);
+
+            assert.commandFailedWithCode(
+                testDB.runCommand({getMore: cursorId, collection: collName}),
+                ErrorCodes.MaxTimeMSExpired,
+                "expected the getMore to report why the cursor was killed",
+            );
+
+            assertNoErrorRecorded(getLatestQueryStatsMetrics(conn, collName), "another session");
+        } finally {
+            session.endSession();
+        }
+    });
+
+    it("does not record an error for a cursor killed while idle that releaseMemory reports", function () {
+        resetCollectionAndQueryStatsStore();
+        // releaseMemory reports the cursor's kill reason in 'cursorsWithErrors' but returns ok: 1, so
+        // the client never sees a failed command and nothing should be recorded as errored.
+        const cursorId = openFindCursor(testDB, collName, {maxTimeMS: 2000});
+        killCursorWhileIdle(conn, testDB, collName, cursorId);
+
+        const releaseRes = assert.commandWorked(testDB.runCommand({releaseMemory: [cursorId]}));
+        assert.eq(
+            1,
+            releaseRes.cursorsWithErrors.length,
+            "expected the kill reason to be reported",
+            {releaseRes},
+        );
+        assert.eq(
+            ErrorCodes.MaxTimeMSExpired,
+            releaseRes.cursorsWithErrors[0].status.code,
+            "expected the reported error to be the kill reason",
+            {releaseRes},
+        );
+
+        const metrics = getLatestQueryStatsMetrics(conn, collName);
+        assert.eq(1, metrics.execCount, "execCount", {metrics});
+        // An ok:1 releaseMemory must not be recorded as errored.
+        assertNoErrorRecorded(metrics, "releaseMemory");
     });
 });
 
@@ -368,8 +543,10 @@ describe("query stats errored reads (mongos)", function () {
         getMetrics: (ctx) => getLatestQueryStatsMetrics(ctx.conn, ctx.collName),
     };
 
-    describeErroredOpCases(shardLevelReadCases(), hooks);
-    describeErroredOpCases(routerLevelReadCases(), hooks);
+    describeOnlyErroredOpCases(shardLevelReadCases(), hooks);
+    describeOnlyErroredOpCases(routerLevelReadCases(), hooks);
+
+    // The cases below don't fit describeOnlyErroredOpCases because the operation succeeds.
 
     // The cases above all induce a failure. This guards the success path through mongos, where the
     // read fans out to every shard and none fails; nothing errored should be recorded.
@@ -378,8 +555,7 @@ describe("query stats errored reads (mongos)", function () {
         assert.eq(2, coll.find({a: {$gte: 2}}).itcount());
         const metrics = getLatestQueryStatsMetrics(st.s, collName);
         assert.eq(1, metrics.execCount, "execCount", {metrics});
-        assert.eq(0, metrics.execCountErrored, "execCountErrored", {metrics});
-        assert(!metrics.hasOwnProperty("errors"), "unexpected errors array", {metrics});
+        assertNoErrorRecorded(metrics, "successful execution");
     });
 
     // allowPartialResults lets find/aggregate survive a failing shard, so the operation succeeds
@@ -419,13 +595,166 @@ describe("query stats errored reads (mongos)", function () {
 
                 const metrics = getLatestQueryStatsMetrics(st.s, collName);
                 assert.eq(1, metrics.execCount, `${name} execCount`, {metrics});
-                assert.eq(0, metrics.execCountErrored, `${name} execCountErrored`, {metrics});
-                assert(
-                    !metrics.hasOwnProperty("errors"),
-                    `${name}: a partial-results success must not be recorded as errored`,
-                    {metrics},
-                );
+                // A partial-results success must not be recorded as errored.
+                assertNoErrorRecorded(metrics, `${name} with partial results`);
             }
         });
+    });
+});
+
+/**
+ * Change stream getMores exercise paths the find/aggregate cases don't reach. A change stream
+ * writes an entry on the initial command and again on every successful getMore, so when one fails
+ * its key is already gone and the error is written without it. There are also change-stream-only
+ * checks that kill the cursor before the usual getMore error handling, so each records its error
+ * itself.
+ *
+ * These tests are separated from those above because the shape always has a prior success and
+ * the step-down case needs its own two-node replica set.
+ */
+describe("query stats errored getMores on change stream cursors", function () {
+    let rst, conn, testDB, coll, collName;
+
+    before(function () {
+        // Two nodes so that the last case can step the primary down.
+        rst = new ReplSetTest({nodes: 2, nodeOptions: queryStatsOptions({writeSampleRate: 0})});
+        rst.startSet();
+        rst.initiate();
+        conn = rst.getPrimary();
+        testDB = conn.getDB("test");
+        collName = jsTestName();
+        coll = testDB[collName];
+        coll.drop();
+        assert.commandWorked(coll.insert({_id: 0}));
+    });
+
+    beforeEach(function () {
+        resetQueryStatsStore(conn, "1MB");
+    });
+
+    after(function () {
+        rst.stopSet();
+    });
+
+    function openChangeStream() {
+        const res = assert.commandWorked(
+            testDB.runCommand({
+                aggregate: collName,
+                pipeline: [{$changeStream: {}}],
+                cursor: {},
+            }),
+        );
+        assert.neq(0, res.cursor.id, "expected a change stream cursor", {res});
+        return res.cursor.id;
+    }
+
+    it("keeps successful metrics when a later getMore errors", function () {
+        const cursorId = openChangeStream();
+
+        assert.eq(
+            1,
+            getLatestQueryStatsMetrics(conn, collName).execCount,
+            "establishment should record an execution",
+        );
+        assert.commandWorked(
+            testDB.runCommand({getMore: cursorId, collection: collName, maxTimeMS: 500}),
+        );
+        let metrics = getLatestQueryStatsMetrics(conn, collName);
+        assert.eq(2, metrics.execCount, "successful getMore", {metrics});
+        const timingAfterSuccess = metrics.totalExecMicros.sum;
+        assert.gt(timingAfterSuccess, 0, "successes should record timing", {metrics});
+
+        const fp = configureFailPoint(testDB, "failGetMoreAfterCursorCheckout", {
+            errorCode: ErrorCodes.Interrupted,
+        });
+        try {
+            assert.commandFailedWithCode(
+                testDB.runCommand({getMore: cursorId, collection: collName, maxTimeMS: 500}),
+                ErrorCodes.Interrupted,
+                "expected the change stream getMore to fail",
+            );
+        } finally {
+            fp.off();
+        }
+
+        metrics = getLatestQueryStatsMetrics(conn, collName);
+        assertErrorRecorded(
+            metrics,
+            {execCountErrored: 1, errorCodeName: "Interrupted", errorCodeCount: 1},
+            "change stream getMore failure",
+        );
+        assert.eq(2, metrics.execCount, "the failure must not count as an execution", {metrics});
+        assert.eq(
+            timingAfterSuccess,
+            metrics.totalExecMicros.sum,
+            "an error must not disturb the successful metrics",
+            {metrics},
+        );
+    });
+
+    it("records a change stream killed after its optimized lookup is disabled", function () {
+        // A stream built on the optimized lookup path is killed once that path is turned off.
+        const res = assert.commandWorked(
+            testDB.runCommand({
+                aggregate: collName,
+                pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+                cursor: {batchSize: 0},
+            }),
+        );
+        assert.neq(0, res.cursor.id, "expected a change stream cursor", {res});
+
+        const flag = "featureFlagChangeStreamOptimizedUpdateLookup";
+        assert.commandWorked(conn.adminCommand({setParameter: 1, [flag]: false}));
+        try {
+            assert.commandFailedWithCode(
+                testDB.runCommand({getMore: res.cursor.id, collection: collName}),
+                ErrorCodes.RetryChangeStream,
+                "expected the stream to be killed",
+            );
+        } finally {
+            assert.commandWorked(conn.adminCommand({setParameter: 1, [flag]: true}));
+        }
+
+        const metrics = getLatestQueryStatsMetrics(conn, collName);
+        assertErrorRecorded(
+            metrics,
+            {execCountErrored: 1, errorCodeName: "RetryChangeStream", errorCodeCount: 1},
+            "change stream killed after optimized lookup disabled",
+        );
+    });
+
+    // Must stay last in this block, since it changes which node is primary.
+    it("records a change stream killed after its primary steps down", function () {
+        // A stream opened with readPreference primary can no longer be served once that node
+        // steps down.
+        const res = assert.commandWorked(
+            testDB.runCommand({
+                aggregate: collName,
+                pipeline: [{$changeStream: {}}],
+                cursor: {},
+                $readPreference: {mode: "primary"},
+            }),
+        );
+        assert.neq(0, res.cursor.id, "expected a change stream cursor", {res});
+
+        assert.commandWorked(conn.adminCommand({replSetStepDown: 60, force: true}));
+        rst.awaitSecondaryNodes(null, [conn]);
+
+        assert.commandFailedWithCode(
+            testDB.runCommand({getMore: res.cursor.id, collection: collName}),
+            ErrorCodes.InterruptedDueToReplStateChange,
+            "expected the stream to be killed after the step-down",
+        );
+
+        const metrics = getLatestQueryStatsMetrics(conn, collName);
+        assertErrorRecorded(
+            metrics,
+            {
+                execCountErrored: 1,
+                errorCodeName: "InterruptedDueToReplStateChange",
+                errorCodeCount: 1,
+            },
+            "change stream killed after step-down",
+        );
     });
 });

@@ -201,6 +201,14 @@ public:
     }
 
     /**
+     * Attributes an error code to this cursor's query shape, to be recorded when the cursor is
+     * disposed. Only call for an error that is returned to the client.
+     */
+    void setQueryStatsErrorCode(ErrorCodes::Error code) {
+        _queryStatsErrorCode = code;
+    }
+
+    /**
      * Captures supplemental query stats metrics from the planning operation's OpDebug and stashes
      * them on the cursor. Later flushed by takeSupplementalMetrics() when the cursor is disposed
      * or when query stats are first written for change streams.
@@ -564,6 +572,9 @@ private:
 
     // The Key used by query stats to generate the query stats store key.
     std::unique_ptr<query_stats::Key> _queryStatsKey;
+
+    // The error an operation using this cursor failed with, or OK if none was surfaced.
+    ErrorCodes::Error _queryStatsErrorCode = ErrorCodes::OK;
 
     // Supplemental query stats metrics captured during planning from OpDebug on the initial batch.
     // boost::none means "not yet captured". After being captured and moved out, the optional still

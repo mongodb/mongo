@@ -25,6 +25,15 @@ struct CursorLocks {
     std::shared_ptr<ExternalDataSourceScopeGuard> extDataSourceScopeGuard;
     boost::optional<AutoStatsTracker> statsTracker;
     boost::optional<HandleTransactionResourcesFromStasher> txnResourcesHandler;
+
+private:
+    /**
+     * Restores the acquisitions and locks the cursor-creating command held, and starts tracking
+     * this operation in CurOp and Top.
+     */
+    void _restoreResourcesAndTrackStats(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        ClientCursorPin& cursorPin);
 };
 
 }  // namespace mongo

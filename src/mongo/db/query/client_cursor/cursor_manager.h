@@ -31,6 +31,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -142,11 +143,19 @@ public:
      * authorized to access the cursor with the given id.
      */
     enum AuthCheck { kCheckSession = true, kNoCheckSession = false };
+
+    /**
+     * Controls whether pinning a cursor that was killed while idle should record the kill error in
+     * query stats.
+     */
+    enum class PinFailureRecording : uint8_t { kOmitFromQueryStats, kRecordInQueryStats };
+
     StatusWith<ClientCursorPin> pinCursor(
         OperationContext* opCtx,
         CursorId id,
         std::string_view commandName,
         const std::function<void(const ClientCursor&)>& checkPinAllowed = {},
+        PinFailureRecording pinFailureRecording = PinFailureRecording::kOmitFromQueryStats,
         AuthCheck checkSessionAuth = kCheckSession);
 
     /**

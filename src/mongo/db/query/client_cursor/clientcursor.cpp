@@ -225,6 +225,7 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
                                                       _isChangeStreamQuery,
                                                       _firstResponseExecutionTime,
                                                       _metrics,
+                                                      _queryStatsErrorCode,
                                                       takeSupplementalMetrics());
 }
 

@@ -65,14 +65,9 @@ void collectQueryStatsMongodErrored(OperationContext* opCtx, ErrorCodes::Error e
     auto& opDebug = CurOp::get(opCtx)->debug();
     auto& queryStatsInfo = opDebug.getQueryStatsInfo();
 
-    // Only record errors when there is a live key still owned by this operation. A null
-    // key means we do not record error information for the following cases:
-    //  - Errors that occur before the key was created (e.g., command parsing, query shape
-    //  computation, etc.). We rely on registerRequest() to make a shape available to attribute the
-    //  error to.
-    //  - Errors that occur once the key was moved onto a cursor. Once the first batch is full on
-    //  mongod, the ClientCursor constructor moves the key off of OpDebug (e.g., getMores) so a plan
-    //  executor failure during that batch is still recorded here.
+    // Only record errors when there is a live key still owned by this operation. Without one, e.g.
+    // when the error occurs before the key is created (command parsing, query shape computation,
+    // etc.), there is no shape to attribute the error to.
     if (!queryStatsInfo.key) {
         return;
     }
@@ -84,6 +79,12 @@ void collectQueryStatsMongodErrored(OperationContext* opCtx, ErrorCodes::Error e
 
     query_stats::writeQueryStats(
         opCtx, queryStatsInfo.keyHash, std::move(queryStatsInfo.key), snapshot);
+}
+
+void markCursorErroredForQueryStats(ClientCursorPin& cursorPin, const DBException& ex) {
+    if (cursorPin.getCursor()) {
+        cursorPin->setQueryStatsErrorCode(ex.code());
+    }
 }
 
 }  // namespace mongo

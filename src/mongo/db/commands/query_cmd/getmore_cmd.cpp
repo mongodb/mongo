@@ -100,6 +100,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(rsStopGetMoreCmd);
 MONGO_FAIL_POINT_DEFINE(getMoreHangAfterPinCursor);
+MONGO_FAIL_POINT_DEFINE(failGetMoreAfterBatchGeneration);
 
 // The timeout when waiting for linearizable read concern on a getMore command.
 static constexpr Milliseconds kLinearizableReadConcernTimeout{15000};
@@ -146,9 +147,12 @@ void ensureChangeStreamReadPreferenceCanBeSatisfied(OperationContext* opCtx,
         // Kill the cursor before throwing. Without this, the ClientCursorPin destructor would just
         // unpin it back to idle in the CursorManager, leaking the cursor until timeout-based
         // garbage collection. Inside acquireLocksAndIterateCursor, a ScopeGuard handles this, but
-        // we're before that point.
+        // we're before that point. The cursor is gone by the time the error is thrown, so record
+        // it for query stats first.
+        constexpr auto kErrorCode = ErrorCodes::InterruptedDueToReplStateChange;
+        cursorPin->setQueryStatsErrorCode(kErrorCode);
         cursorPin.deleteUnderlying();
-        uasserted(ErrorCodes::InterruptedDueToReplStateChange,
+        uasserted(kErrorCode,
                   str::stream() << "Change stream readPreference '"
                                 << ReadPreferenceSetting(readPref).toString()
                                 << "' can no longer be satisfied after a replica set election");
@@ -178,9 +182,12 @@ void ensureChangeStreamOptimizedLookupStillEnabled(OperationContext* opCtx,
     }
 
     // The flag got turned off after this cursor was wired on the optimized path. Kill the cursor
-    // before throwing and surface a resumable change stream error.
+    // before throwing and surface a resumable change stream error, recording it for query stats
+    // while the cursor still exists.
+    constexpr auto kErrorCode = ErrorCodes::RetryChangeStream;
+    cursorPin->setQueryStatsErrorCode(kErrorCode);
     cursorPin.deleteUnderlying();
-    uasserted(ErrorCodes::RetryChangeStream,
+    uasserted(kErrorCode,
               "Optimized change-stream updateLookup was disabled; resuming on the legacy path");
 }
 
@@ -633,8 +640,6 @@ public:
                                           ClientCursorPin& cursorPin,
                                           CurOp* curOp,
                                           bool disableAwaitDataFailpointActive) {
-            const auto& cmd = request();
-
             NamespaceString nss = ns();
             CursorLocks locks{opCtx, nss, cursorPin};
 
@@ -645,6 +650,39 @@ public:
                     locks.txnResourcesHandler->dismissRestoredResources();
                 }
             });
+
+            CursorId respondWithId = 0;
+            try {
+                respondWithId = iterateCursor(
+                    opCtx, reply, nss, cursorPin, curOp, disableAwaitDataFailpointActive);
+            } catch (const DBException& ex) {
+                // Record the error before the guard above disposes the cursor.
+                markCursorErroredForQueryStats(cursorPin, ex);
+                throw;
+            }
+
+            if (respondWithId) {
+                cursorDeleter.dismiss();
+
+                if (opCtx->isExhaust()) {
+                    // Indicate that an exhaust message should be generated and the previous BSONObj
+                    // command parameters should be reused as the next BSONObj command parameters.
+                    reply->setNextInvocation(boost::none);
+                }
+            }
+        }
+
+        /**
+         * Generates the next batch for 'cursorPin'. Returns the cursor id to respond with, or 0 if
+         * the cursor should not be saved for a further getMore.
+         */
+        CursorId iterateCursor(OperationContext* opCtx,
+                               rpc::ReplyBuilderInterface* reply,
+                               const NamespaceString& nss,
+                               ClientCursorPin& cursorPin,
+                               CurOp* curOp,
+                               bool disableAwaitDataFailpointActive) {
+            const auto& cmd = request();
 
             if (MONGO_unlikely(waitAfterPinningCursorBeforeGetMoreBatch.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -858,15 +896,7 @@ public:
                            metrics,
                            SerializationContext::stateCommandReply(cmd.getSerializationContext()));
 
-            if (respondWithId) {
-                cursorDeleter.dismiss();
-
-                if (opCtx->isExhaust()) {
-                    // Indicate that an exhaust message should be generated and the previous BSONObj
-                    // command parameters should be reused as the next BSONObj command parameters.
-                    reply->setNextInvocation(boost::none);
-                }
-            }
+            return respondWithId;
         }
 
         ClientCursorPin pinCursorWithRetry(OperationContext* opCtx,
@@ -886,7 +916,11 @@ public:
             const size_t maxAttempts = internalQueryGetMoreMaxCursorPinRetryAttempts.loadRelaxed();
             for (size_t attempt = 1; attempt <= maxAttempts; ++attempt) {
                 auto statusWithCursorPin = CursorManager::get(opCtx)->pinCursor(
-                    opCtx, cursorId, definition()->getName(), pinCheck);
+                    opCtx,
+                    cursorId,
+                    definition()->getName(),
+                    pinCheck,
+                    CursorManager::PinFailureRecording::kRecordInQueryStats);
                 auto status = statusWithCursorPin.getStatus();
                 if (status.isOK()) {
                     return std::move(statusWithCursorPin.getValue());
@@ -999,68 +1033,87 @@ public:
 
             ClientCursorPin cursorPin = pinCursorWithRetry(opCtx, cursorId, nss);
 
-            // Run the change stream getMore preconditions before iterating the cursor.
-            ensureChangeStreamGetMorePreconditions(opCtx, cursorPin);
+            // Past this point a getMore either returns a batch or fails the command, so any
+            // escaping exception is client-visible and belongs to this query's shape.
+            try {
+                // Run the change stream getMore preconditions before iterating the cursor.
+                ensureChangeStreamGetMorePreconditions(opCtx, cursorPin);
 
-            if (cursorPin->isChangeStreamQuery()) {
-                change_stream::recordCursorOptionMetrics(cmd.getBatchSize(), cmd.getMaxTimeMS());
-            }
+                if (cursorPin->isChangeStreamQuery()) {
+                    change_stream::recordCursorOptionMetrics(cmd.getBatchSize(),
+                                                             cmd.getMaxTimeMS());
+                }
 
-            // Get the read concern level here in case the cursor is exhausted while iterating.
-            const auto isLinearizableReadConcern = cursorPin->getReadConcernArgs().getLevel() ==
-                repl::ReadConcernLevel::kLinearizableReadConcern;
+                // Get the read concern level here in case the cursor is exhausted while iterating.
+                const auto isLinearizableReadConcern = cursorPin->getReadConcernArgs().getLevel() ==
+                    repl::ReadConcernLevel::kLinearizableReadConcern;
 
-            // If in a multi-document transaction, save the size of transactionOperations for
-            // later checking of whether this invocation performed a write.
-            boost::optional<size_t> numTxnOpsPre = getNumTxnOps();
+                // If in a multi-document transaction, save the size of transactionOperations for
+                // later checking of whether this invocation performed a write.
+                boost::optional<size_t> numTxnOpsPre = getNumTxnOps();
 
-            const bool disableAwaitDataFailpointActive =
-                MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
+                const bool disableAwaitDataFailpointActive =
+                    MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
 
-            // Inherit properties like readConcern and maxTimeMS from our originating cursor. The
-            // returned guard runs the rest of the getMore under the cursor's lifespan (restoring
-            // the opCtx's previous lifespan on return); it is held to the end of the invocation so
-            // late steps (read-concern waits, unpin failpoints) still run under it.
-            auto queryLifespanRegion = setUpOperationContextAndCurOpStateForGetMore(
-                opCtx, curOp, *cursorPin.getCursor(), cmd, disableAwaitDataFailpointActive);
+                // Inherit properties like readConcern and maxTimeMS from our originating cursor.
+                // The returned guard runs the rest of the getMore under the cursor's lifespan
+                // (restoring the opCtx's previous lifespan on return); it is held to the end of the
+                // invocation so late steps (read-concern waits, unpin failpoints) still run under
+                // it.
+                auto queryLifespanRegion = setUpOperationContextAndCurOpStateForGetMore(
+                    opCtx, curOp, *cursorPin.getCursor(), cmd, disableAwaitDataFailpointActive);
 
-            acquireLocksAndIterateCursor(
-                opCtx, reply, cursorPin, curOp, disableAwaitDataFailpointActive);
+                acquireLocksAndIterateCursor(
+                    opCtx, reply, cursorPin, curOp, disableAwaitDataFailpointActive);
 
-            if (MONGO_unlikely(getMoreHangAfterPinCursor.shouldFail())) {
-                LOGV2(20477,
-                      "getMoreHangAfterPinCursor fail point enabled. Blocking until fail "
-                      "point is disabled",
-                      "cursorId"_attr = cursorId);
-                getMoreHangAfterPinCursor.pauseWhileSet(opCtx);
-            }
+                // Simulates a failure after the batch is built, like the linearizable read concern
+                // wait below. If the cursor was kept, the catch below records the error on it; if
+                // the batch exhausted it, the cursor is already gone and the error is not recorded.
+                failGetMoreAfterBatchGeneration.execute([](const BSONObj& data) {
+                    auto errorCode = (data["errorCode"] ? data["errorCode"].safeNumberLong()
+                                                        : ErrorCodes::InternalError);
+                    uasserted(errorCode, "Hit the 'failGetMoreAfterBatchGeneration' failpoint");
+                });
 
-            if (isLinearizableReadConcern) {
-                // waitForLinearizableReadConcern performs a NoOp write and waits for that write
-                // to have been majority committed. awaitReplication requires that we release all
-                // locks to prevent blocking for a long time while doing network activity. Since
-                // getMores do not have support for a maxTimeout duration, we hardcode the timeout
-                // to avoid waiting indefinitely.
-                uassertStatusOK(
-                    mongo::waitForLinearizableReadConcern(opCtx, kLinearizableReadConcernTimeout));
-            }
+                if (MONGO_unlikely(getMoreHangAfterPinCursor.shouldFail())) {
+                    LOGV2(20477,
+                          "getMoreHangAfterPinCursor fail point enabled. Blocking until fail "
+                          "point is disabled",
+                          "cursorId"_attr = cursorId);
+                    getMoreHangAfterPinCursor.pauseWhileSet(opCtx);
+                }
 
-            // We're about to unpin or delete the cursor as the ClientCursorPin goes out of scope.
-            // If the 'waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch' failpoint is active, we
-            // set the 'msg' field of this operation's CurOp to signal that we've hit this point and
-            // then spin until the failpoint is released.
-            if (MONGO_unlikely(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch.shouldFail())) {
-                CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                    &waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
-                    opCtx,
-                    "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch");
-            }
+                if (isLinearizableReadConcern) {
+                    // waitForLinearizableReadConcern performs a NoOp write and waits for that write
+                    // to have been majority committed. awaitReplication requires that we release
+                    // all locks to prevent blocking for a long time while doing network activity.
+                    // Since getMores do not have support for a maxTimeout duration, we hardcode the
+                    // timeout to avoid waiting indefinitely.
+                    uassertStatusOK(mongo::waitForLinearizableReadConcern(
+                        opCtx, kLinearizableReadConcernTimeout));
+                }
 
-            // getMore must not write if running inside a multi-document transaction.
-            invariantIfHasDoneWrites(numTxnOpsPre);
+                // We're about to unpin or delete the cursor as the ClientCursorPin goes out of
+                // scope. If the 'waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch' failpoint is
+                // active, we set the 'msg' field of this operation's CurOp to signal that we've hit
+                // this point and then spin until the failpoint is released.
+                if (MONGO_unlikely(
+                        waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch.shouldFail())) {
+                    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                        &waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
+                        opCtx,
+                        "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch");
+                }
 
-            if (getTestCommandsEnabled()) {
-                validateResult(opCtx, reply, nss.tenantId());
+                // getMore must not write if running inside a multi-document transaction.
+                invariantIfHasDoneWrites(numTxnOpsPre);
+
+                if (getTestCommandsEnabled()) {
+                    validateResult(opCtx, reply, nss.tenantId());
+                }
+            } catch (const DBException& ex) {
+                markCursorErroredForQueryStats(cursorPin, ex);
+                throw;
             }
         }
 

@@ -7,14 +7,14 @@
  * aggregate-based write stages ($out/$merge) live in errored_reads.js because they register under
  * the READ sampling rate, not the write rate enabled here.
  *
- * @tags: [featureFlagQueryStatsErrors, requires_sharding]
+ * @tags: [featureFlagQueryStatsErrors]
  */
 import {after, before, describe} from "jstests/libs/mochalite.js";
 import {resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
-    describeErroredOpCases,
+    describeOnlyErroredOpCases,
     getLatestQueryStatsMetrics,
     queryStatsOptions,
 } from "jstests/noPassthrough/query/queryStats/query_stats_for_errors/utils.js";
@@ -155,7 +155,7 @@ describe("query stats errored writes (replica set)", function () {
         rst?.stopSet();
     });
 
-    describeErroredOpCases(writeErrorCases(), {
+    describeOnlyErroredOpCases(writeErrorCases(), {
         getCtx: () => ({conn, testDB, coll, collName}),
         resetPerTest: () => {
             // Writes mutate the collection, so re-seed it, then reset the store so neither the seed
@@ -203,7 +203,7 @@ describe("query stats errored writes (mongos)", function () {
         st?.stop();
     });
 
-    describeErroredOpCases(shardLevelWriteCases(), {
+    describeOnlyErroredOpCases(shardLevelWriteCases(), {
         getCtx: () => ({conn: st.s, testDB, coll, collName}),
         resetPerTest: () => {
             assert.commandWorked(coll.deleteMany({}));

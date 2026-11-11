@@ -1,8 +1,7 @@
 /**
  * Shared helpers for $queryStats error-collection tests.
  *
- * When an operation fails while its query stats key is still owned by the operation (i.e. before it
- * is moved onto a cursor), $queryStats records the error against the query shape: an
+ * When an operation fails, $queryStats records the error against the query shape: an
  * `execCountErrored` counter and an LRU-bounded `errors` array of
  * {code, codeName, count, latestSeenTimestamp}. Errored executions are counted only by
  * `execCountErrored` and never contribute to `execCount` or the timing aggregates.
@@ -44,7 +43,7 @@ export function queryStatsOptions({
 /**
  * Returns the count recorded for `errorCodeName` in `metrics.errors`, or 0 if absent.
  */
-export function errorCountByName(metrics, errorCodeName) {
+function errorCountByName(metrics, errorCodeName) {
     const match = metrics?.errors?.find((e) => e.codeName === errorCodeName);
     return match?.count ?? 0;
 }
@@ -59,16 +58,13 @@ export function getLatestQueryStatsMetrics(conn, collName) {
 }
 
 /**
- * Asserts the invariants for a shape that has only ever errored.
+ * Asserts that the shape recorded `execCountErrored` errored executions, all with `errorCodeName`.
  */
-export function assertOnlyErroredEntry(
+export function assertErrorRecorded(
     metrics,
     {execCountErrored, errorCodeName, errorCodeCount},
     errorDescription,
 ) {
-    // Errored executions are counted only by 'execCountErrored', so a shape that has only ever
-    // errored leaves 'execCount' at 0.
-    assert.eq(0, metrics.execCount, `${errorDescription}: execCount`, {metrics});
     assert.eq(execCountErrored, metrics.execCountErrored, `${errorDescription}: execCountErrored`, {
         metrics,
     });
@@ -80,9 +76,34 @@ export function assertOnlyErroredEntry(
         errorCodeCount,
         errorCountByName(metrics, errorCodeName),
         `${errorDescription}: error count`,
-        {
-            metrics,
-        },
+        {metrics},
+    );
+}
+
+/**
+ * Asserts that the shape recorded no errors at all.
+ */
+export function assertNoErrorRecorded(metrics, description) {
+    assert.eq(0, metrics.execCountErrored, `${description}: execCountErrored`, {metrics});
+    assert(!metrics.hasOwnProperty("errors"), `${description}: unexpected errors array`, {metrics});
+}
+
+/**
+ * Asserts that the shape has only ever errored, i.e. never succeeded. The errors are recorded, and
+ * since errored executions drop their metrics, 'execCount' and timing stay at 0.
+ */
+function assertOnlyErroredEntry(
+    metrics,
+    {execCountErrored, errorCodeName, errorCodeCount},
+    errorDescription,
+) {
+    // Errored executions are counted only by 'execCountErrored'. A shape that has only ever
+    // errored leaves 'execCount' at 0.
+    assert.eq(0, metrics.execCount, `${errorDescription}: execCount`, {metrics});
+    assertErrorRecorded(
+        metrics,
+        {execCountErrored, errorCodeName, errorCodeCount},
+        errorDescription,
     );
     // An errored execution must not contribute timing samples.
     assert.eq(
@@ -126,7 +147,7 @@ export function withCommandFailure(conns, cmdNames, errorCode, fn) {
  * Asserts that running `action` fails with `expectedErrorCode`, whether it throws (shell CRUD
  * helpers) or returns a failed command result (runCommand).
  */
-export function expectOperationFailure(action, ctx, expectedErrorCode, desc) {
+function expectOperationFailure(action, ctx, expectedErrorCode, desc) {
     let result;
     let error;
     try {
@@ -142,9 +163,42 @@ export function expectOperationFailure(action, ctx, expectedErrorCode, desc) {
 }
 
 /**
+ * Opens a find cursor on 'collName' that stays open after its first batch and returns its id. The
+ * collection must hold more than one document.
+ */
+export function openFindCursor(db, collName, extraFields = {}) {
+    const res = assert.commandWorked(
+        db.runCommand(Object.assign({find: collName, batchSize: 1}, extraFields)),
+    );
+    assert.neq(0, res.cursor.id, "expected a cursor to remain open", {res});
+    return res.cursor.id;
+}
+
+/**
+ * Runs a successful getMore on 'cursorId' that is held until its deadline expires, then finishes
+ * its batch. That leaves the cursor idle with its executor marked as killed. 'cursorId' must have
+ * been opened with a maxTimeMS, or the getMore waits forever.
+ */
+export function killCursorWhileIdle(conn, db, collName, cursorId) {
+    withFailPoint(
+        [conn],
+        "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch",
+        {shouldContinueOnInterrupt: true},
+        () => {
+            assert.commandWorked(
+                db.runCommand({getMore: cursorId, collection: collName, batchSize: 1}),
+            );
+        },
+    );
+}
+
+/**
  * Registers one `it` per case in `cases`. Each test resets state via `resetPerTest`, runs the
  * operation under its failpoint, and asserts the error was recorded against the shape. Registering
  * one test per case keeps each test point independent: deleting a row deletes exactly one test.
+ *
+ * Only for cases where the operation fails and the error is all the shape records, since every case
+ * is checked with assertOnlyErroredEntry. Use a plain it() for anything else.
  *
  * Case shape:
  *   {
@@ -155,6 +209,7 @@ export function expectOperationFailure(action, ctx, expectedErrorCode, desc) {
  *     expectedErrorCodeName,      // errorCodeName expected in metrics.errors
  *     skip,                       // optional; if true the case is registered with it.skip
  *     setup(ctx),                 // optional per-case prep, run before the failpoint
+ *     afterAction(ctx),           // optional; run after action(), before the metrics are read
  *     expectedExecCountErrored, expectedErrorCodeCount,  // optional overrides
  *   }
  *
@@ -164,7 +219,7 @@ export function expectOperationFailure(action, ctx, expectedErrorCode, desc) {
  *   targetConnections(c)  -- connections to enable the failpoint on
  *   getMetrics(ctx, c)    -- the metrics to assert on
  */
-export function describeErroredOpCases(cases, hooks) {
+export function describeOnlyErroredOpCases(cases, hooks) {
     for (const testCase of cases) {
         const body = function () {
             hooks.resetPerTest();
@@ -189,6 +244,9 @@ export function describeErroredOpCases(cases, hooks) {
             } else {
                 run();
             }
+            if (testCase.afterAction) {
+                testCase.afterAction(ctx);
+            }
             assertOnlyErroredEntry(
                 hooks.getMetrics(ctx, testCase),
                 {
@@ -199,9 +257,7 @@ export function describeErroredOpCases(cases, hooks) {
                 testCase.name,
             );
         };
-        // `skip: true` marks a case the server cannot satisfy yet (see the case's own comment); it is
-        // registered with it.skip so it is honestly reported as untested rather than silently
-        // passing.
+        // `skip: true` marks a case the server cannot satisfy yet (see the case's own comment).
         if (testCase.skip) {
             it.skip(testCase.name, body);
         } else {

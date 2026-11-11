@@ -4,12 +4,17 @@
 #include "mongo/db/commands/query_cmd/acquire_locks.h"
 
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(failGetMoreDuringCursorLockAcquisition);
+
 void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArgs) {
     const auto isReplSet = repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
 
@@ -77,6 +82,20 @@ CursorLocks::CursorLocks(OperationContext* opCtx,
         }
     });
 
+    try {
+        _restoreResourcesAndTrackStats(opCtx, nss, cursorPin);
+    } catch (const DBException& ex) {
+        // Record the error before the guard above disposes the cursor.
+        markCursorErroredForQueryStats(cursorPin, ex);
+        throw;
+    }
+
+    cursorDeleter.dismiss();
+}
+
+void CursorLocks::_restoreResourcesAndTrackStats(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 ClientCursorPin& cursorPin) {
     // Cursors come in one of two flavors:
     //
     // - Cursors which read from a single collection, such as those generated via the
@@ -129,7 +148,11 @@ CursorLocks::CursorLocks(OperationContext* opCtx,
         }
     }
 
-    cursorDeleter.dismiss();
+    failGetMoreDuringCursorLockAcquisition.execute([&](const BSONObj& data) {
+        auto errorCode =
+            (data["errorCode"] ? data["errorCode"].safeNumberLong() : ErrorCodes::InternalError);
+        uasserted(errorCode, "Hit the 'failGetMoreDuringCursorLockAcquisition' failpoint");
+    });
 }
 
 }  // namespace mongo

@@ -20,8 +20,6 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_stats/agg_key.h"
@@ -41,7 +39,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/scopeguard.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -83,7 +80,7 @@ static const NamespaceStringOrUUID kDefaultTestNss =
     NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("testDB.testColl")};
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
-    static std::pair<std::unique_ptr<const Key>, boost::intrusive_ptr<ExpressionContextForTest>>
+    static std::pair<std::unique_ptr<Key>, boost::intrusive_ptr<ExpressionContextForTest>>
     makeFindKeyAndExpCtx(BSONObj filter) {
         auto expCtx = make_intrusive<ExpressionContextForTest>();
         auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
@@ -95,7 +92,9 @@ public:
         return {std::move(key), expCtx};
     }
 
-    static std::unique_ptr<const Key> makeFindKeyFromQuery(BSONObj filter) {
+    // Returns a non-const key so it can be passed to the query stats write functions. Hash it with
+    // absl::HashOf(*key): AbslHashValue is only overloaded for unique_ptr<const Key>.
+    static std::unique_ptr<Key> makeFindKeyFromQuery(BSONObj filter) {
         return makeFindKeyAndExpCtx(std::move(filter)).first;
     }
 
@@ -170,7 +169,7 @@ TEST_F(QueryStatsStoreTest, BasicUsage) {
 
     auto getMetrics = [&](BSONObj query) {
         auto key = makeFindKeyFromQuery(query);
-        auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
+        auto lookupResult = queryStatsStore.lookup(absl::HashOf(*key));
         ASSERT_OK(lookupResult);
         return *lookupResult.getValue();
     };
@@ -205,7 +204,7 @@ TEST_F(QueryStatsStoreTest, BasicUsage) {
 
     auto collectMetricsWithLock = [&](BSONObj& filter) {
         auto key = makeFindKeyFromQuery(filter);
-        auto [lookupResult, lock] = queryStatsStore.getWithPartitionLock(absl::HashOf(key));
+        auto [lookupResult, lock] = queryStatsStore.getWithPartitionLock(absl::HashOf(*key));
         ASSERT_OK(lookupResult);
         auto& metrics = *lookupResult.getValue();
         metrics.execCount += 1;
@@ -323,9 +322,8 @@ TEST_F(QueryStatsStoreTest, RecordErrorCodeEvictsLeastRecentlySeen) {
     // Pin the bound to the lowest value the knob's validator accepts, so that the eviction path is
     // exercised with a configuration production could actually run with.
     const size_t maxRecentErrors = 5;
-    const auto originalMax = internalQueryStatsMaxErrorCodesPerShape.load();
-    ON_BLOCK_EXIT([&] { internalQueryStatsMaxErrorCodesPerShape.store(originalMax); });
-    internalQueryStatsMaxErrorCodesPerShape.store(static_cast<int>(maxRecentErrors));
+    unittest::ServerParameterGuard maxErrorCodes("internalQueryStatsMaxErrorCodesPerShape",
+                                                 static_cast<int>(maxRecentErrors));
 
     auto query = BSON("query" << 1);
     auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
@@ -360,31 +358,19 @@ TEST_F(QueryStatsStoreTest, RecordErrorCodeEvictsLeastRecentlySeen) {
 }
 
 TEST_F(QueryStatsStoreTest, UpdateStatisticsGatesErrorCollectionBehindFeatureFlag) {
-    const bool originalFlagValue = feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled();
-    ON_BLOCK_EXIT([&] {
-        feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(originalFlagValue);
-    });
-
     auto opCtx = makeOperationContext();
-    auto makeMutableFindKey = [&](BSONObj filter) -> std::unique_ptr<Key> {
-        auto expCtx = make_intrusive<ExpressionContextForTest>();
-        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
-        fcr->setFilter(filter.getOwned());
-        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
-        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
-        return std::make_unique<FindKey>(
-            expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
-    };
 
     QueryStatsSnapshot erroredSnapshot{};
     erroredSnapshot.errorCode = ErrorCodes::BadValue;
 
-    // With the flag disabled, an errored execution must leave the shape's error-related counters
-    // untouched and execCount must stay zero'd out.
+    // With the flag disabled, the error is ignored: the error-related counters stay untouched and
+    // the execution is counted as a success. This keeps flag-off behavior unchanged, since without
+    // error tracking a cursor's stats are written on dispose with no record of a failed request on
+    // it.
     {
-        feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(false);
-        auto query = BSON("query" << 1 << "flag" << "disabled");
-        auto key = makeMutableFindKey(query);
+        unittest::ServerParameterGuard errorsEnabled("featureFlagQueryStatsErrors", false);
+        auto query = BSON("query" << 1 << "flagDisabled" << 1);
+        auto key = makeFindKeyFromQuery(query);
         auto keyHash = absl::HashOf(*key);
         query_stats::writeQueryStats(opCtx.get(), keyHash, std::move(key), erroredSnapshot);
 
@@ -392,7 +378,7 @@ TEST_F(QueryStatsStoreTest, UpdateStatisticsGatesErrorCollectionBehindFeatureFla
         auto lookupResult = queryStatsStore.lookup(keyHash);
         ASSERT_OK(lookupResult);
         auto& entry = *lookupResult.getValue();
-        ASSERT_EQ(entry.execCount, 0);
+        ASSERT_EQ(entry.execCount, 1);
         ASSERT_EQ(entry.execCountErrored, 0);
         ASSERT_TRUE(entry.recentErrors.empty());
     }
@@ -400,15 +386,15 @@ TEST_F(QueryStatsStoreTest, UpdateStatisticsGatesErrorCollectionBehindFeatureFla
     // With the flag enabled, an errored execution increments 'execCountErrored' and records the
     // error code.
     {
-        feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(true);
-        auto query = BSON("query" << 1 << "flag" << "enabled");
+        unittest::ServerParameterGuard errorsEnabled("featureFlagQueryStatsErrors", true);
+        auto query = BSON("query" << 1 << "flagEnabled" << 1);
         auto keyHash = [&] {
-            auto key = makeMutableFindKey(query);
+            auto key = makeFindKeyFromQuery(query);
             return absl::HashOf(*key);
         }();
 
         query_stats::writeQueryStats(
-            opCtx.get(), keyHash, makeMutableFindKey(query), erroredSnapshot);
+            opCtx.get(), keyHash, makeFindKeyFromQuery(query), erroredSnapshot);
 
         auto& queryStatsStore = getQueryStatsStore(opCtx.get());
         {
@@ -427,32 +413,24 @@ TEST_F(QueryStatsStoreTest, WriteQueryStatsRecordsSupplementalMetrics) {
     // writeQueryStats() must apply supplemental metrics on both the insert and the update path.
     // Test catches scenarios where supplemental metrics isn't correctly copied or updated.
     auto opCtx = makeOperationContext();
-    auto makeMutableFindKey = [&]() -> std::unique_ptr<Key> {
-        auto expCtx = make_intrusive<ExpressionContextForTest>();
-        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
-        fcr->setFilter(BSON("query" << 1));
-        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
-        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
-        return std::make_unique<FindKey>(
-            expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
-    };
+    auto query = BSON("query" << 1);
     auto makeSupplementalMetrics = [](double optimizationTimeMicros) {
         std::vector<std::unique_ptr<SupplementalStatsEntry>> metrics;
         metrics.push_back(
             std::make_unique<OptimizerMetricsClassicStatsEntry>(optimizationTimeMicros));
         return metrics;
     };
-    const auto keyHash = absl::HashOf(*makeMutableFindKey());
+    const auto keyHash = absl::HashOf(*makeFindKeyFromQuery(query));
 
     // The first write inserts a new entry; the second updates it.
     query_stats::writeQueryStats(opCtx.get(),
                                  keyHash,
-                                 makeMutableFindKey(),
+                                 makeFindKeyFromQuery(query),
                                  QueryStatsSnapshot{},
                                  makeSupplementalMetrics(1));
     query_stats::writeQueryStats(opCtx.get(),
                                  keyHash,
-                                 makeMutableFindKey(),
+                                 makeFindKeyFromQuery(query),
                                  QueryStatsSnapshot{},
                                  makeSupplementalMetrics(10));
 
@@ -727,6 +705,68 @@ TEST_F(QueryStatsStoreTest, InsertedEntryCachesKeyHash) {
     ASSERT_OK(entryStatus.getStatus());
     const auto& entry = *entryStatus.getValue();
     ASSERT_EQ(entry.userVisibleHash, userVisibleHash);
+}
+
+TEST_F(QueryStatsStoreTest, CursorDisposeRecordsErrorAndDropsMetrics) {
+    unittest::ServerParameterGuard errorsEnabled("featureFlagQueryStatsErrors", true);
+
+    auto opCtx = makeOperationContext();
+
+    OpDebug::AdditiveMetrics metrics;
+    metrics.executionTime = Microseconds(500);
+    metrics.nreturned = 3;
+
+    // An errored cursor records its error but not its metrics, since metrics from a failed
+    // execution would skew the success metrics (e.g. a cursor that fails early would pull execution
+    // time down).
+    auto key = makeFindKeyFromQuery(BSON("query" << 1 << "dispose" << "errored"));
+    auto keyHash = absl::HashOf(*key);
+    query_stats::writeQueryStatsOnCursorDisposeOrKill(opCtx.get(),
+                                                      keyHash,
+                                                      std::move(key),
+                                                      false /* isChangeStreamQuery */,
+                                                      boost::none,
+                                                      metrics,
+                                                      ErrorCodes::MaxTimeMSExpired);
+
+    auto lookupResult = getQueryStatsStore(opCtx.get()).lookup(keyHash);
+    ASSERT_OK(lookupResult);
+    auto& entry = *lookupResult.getValue();
+    ASSERT_EQ(entry.execCount, 0);
+    ASSERT_EQ(entry.lastExecutionMicros, 0);
+    ASSERT_EQ(entry.execCountErrored, 1);
+    ASSERT_EQ(entry.recentErrors.size(), 1);
+    ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::MaxTimeMSExpired));
+}
+
+TEST_F(QueryStatsStoreTest, CursorDisposeIgnoresErrorWhenFlagDisabled) {
+    unittest::ServerParameterGuard errorsEnabled("featureFlagQueryStatsErrors", false);
+
+    auto opCtx = makeOperationContext();
+
+    OpDebug::AdditiveMetrics metrics;
+    metrics.executionTime = Microseconds(500);
+
+    // With the flag off, an errored cursor is recorded as a success. This keeps flag-off behavior
+    // unchanged, since without error tracking a cursor's stats are written on dispose with no
+    // record of a failed request on it.
+    auto key = makeFindKeyFromQuery(BSON("query" << 1 << "dispose" << "flagOff"));
+    auto keyHash = absl::HashOf(*key);
+    query_stats::writeQueryStatsOnCursorDisposeOrKill(opCtx.get(),
+                                                      keyHash,
+                                                      std::move(key),
+                                                      false /* isChangeStreamQuery */,
+                                                      boost::none,
+                                                      metrics,
+                                                      ErrorCodes::MaxTimeMSExpired);
+
+    auto lookupResult = getQueryStatsStore(opCtx.get()).lookup(keyHash);
+    ASSERT_OK(lookupResult);
+    auto& entry = *lookupResult.getValue();
+    ASSERT_EQ(entry.execCount, 1);
+    ASSERT_EQ(entry.lastExecutionMicros, 500);
+    ASSERT_EQ(entry.execCountErrored, 0);
+    ASSERT_TRUE(entry.recentErrors.empty());
 }
 
 TEST_F(QueryStatsStoreTest, RegisterRequestSkipsShapeExceedingMaxUserSize) {
@@ -2347,7 +2387,7 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
 
         auto getMetrics = [&](BSONObj query) {
             auto key = makeFindKeyFromQuery(query);
-            auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
+            auto lookupResult = queryStatsStore.lookup(absl::HashOf(*key));
             ASSERT_OK(lookupResult);
             return *lookupResult.getValue();
         };
@@ -2478,7 +2518,7 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsageWithCBRMetrics) {
 
         auto getMetrics = [&](BSONObj query) {
             auto key = makeFindKeyFromQuery(query);
-            auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
+            auto lookupResult = queryStatsStore.lookup(absl::HashOf(*key));
             ASSERT_OK(lookupResult);
             return *lookupResult.getValue();
         };
@@ -2583,7 +2623,7 @@ TEST_F(QueryStatsStoreTest, BasicPlanShapeCounters) {
 
         auto getMetrics = [&](BSONObj query) {
             auto key = makeFindKeyFromQuery(query);
-            auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
+            auto lookupResult = queryStatsStore.lookup(absl::HashOf(*key));
             ASSERT_OK(lookupResult);
             return *lookupResult.getValue();
         };

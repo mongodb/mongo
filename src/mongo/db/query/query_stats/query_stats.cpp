@@ -267,12 +267,10 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
                       std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalStats) {
     toUpdate.latestSeenTimestamp = Date_t::now();
 
-    // 'featureFlagQueryStatsErrors' allows for errored snapshots arrive here. Errored snapshots
-    // carry partial metrics, so they are dropped.
-    if (snapshot.isErrored()) {
-        if (feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled()) {
-            toUpdate.recordErrorCode(snapshot.errorCode);
-        }
+    // An errored execution only records its error code. Its metrics are dropped so they do not skew
+    // the success metrics, e.g. a query that fails early would pull execution time down.
+    if (snapshot.isErrored() && feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled()) {
+        toUpdate.recordErrorCode(snapshot.errorCode);
         return;
     }
 
@@ -749,7 +747,7 @@ void writeQueryStats(OperationContext* opCtx,
     }
 
     // It is possible a cursor that lives forever has no key associated with it and its entry may
-    // have been evicted.
+    // have been evicted. With no key there is nothing to rebuild it from, so the error is lost too.
     if (isChangeStreamQuery && !key) {
         return;
     }
@@ -788,6 +786,7 @@ void writeQueryStatsOnCursorDisposeOrKill(
     bool isChangeStreamQuery,
     boost::optional<Microseconds> firstResponseExecutionTime,
     OpDebug::AdditiveMetrics metrics,
+    ErrorCodes::Error errorCode,
     std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics) {
     // It is discouraged but technically possible for a user to enable queryStats on the mongods of
     // a replica set. In this case, a cursor will be created for each mongod. However, the
@@ -805,6 +804,8 @@ void writeQueryStatsOnCursorDisposeOrKill(
         auto snapshot = query_stats::captureMetrics(
             opCtx, query_stats::microsecondsToUint64(firstResponseExecutionTime), metrics);
 
+        snapshot.errorCode = errorCode;
+
         query_stats::writeQueryStats(
             opCtx, storeKey, std::move(key), snapshot, std::move(supplementalMetrics));
     } else if (isChangeStreamQuery && opCtx) {
@@ -814,6 +815,8 @@ void writeQueryStatsOnCursorDisposeOrKill(
         // with it.
         auto snapshot = query_stats::captureMetrics(
             opCtx, query_stats::microsecondsToUint64(boost::none), OpDebug::AdditiveMetrics());
+
+        snapshot.errorCode = errorCode;
 
         query_stats::writeQueryStats(opCtx, storeKey, nullptr, snapshot, {}, isChangeStreamQuery);
     }

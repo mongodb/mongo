@@ -26,10 +26,16 @@ void collectQueryStatsMongod(OperationContext* opCtx,
 
 /**
  * Records query stats for reads and writes that error while the query stats key is still held by
- * the operation's OpDebug. It no-ops if no key was collected for this request or
- * if the key was moved onto a cursor.
+ * the operation's OpDebug. It no-ops if no key was collected for this request.
  */
 [[MONGO_MOD_PUBLIC]] void collectQueryStatsMongodErrored(OperationContext* opCtx,
                                                          ErrorCodes::Error errorCode);
+
+/**
+ * Marks the pinned cursor with 'ex', if it still has one, so that its query stats entry is written
+ * as errored when the cursor is disposed. No query stats are written here. Must be called before
+ * the cursor is deleted.
+ */
+void markCursorErroredForQueryStats(ClientCursorPin& cursorPin, const DBException& ex);
 
 }  // namespace mongo

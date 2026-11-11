@@ -59,6 +59,28 @@ ServiceContext::ConstructorActionRegisterer cursorManagerRegisterer{
         CursorManager::set(svcCtx, std::move(cursorManager));
     }};
 
+/**
+ * Checks whether the cursor can be pinned by the request on 'opCtx', using the same checks we run
+ * when pinning a cursor.
+ */
+bool callerMayPin(OperationContext* opCtx,
+                  const ClientCursor& cursor,
+                  const std::function<void(const ClientCursor&)>& checkPinAllowed,
+                  CursorManager::AuthCheck checkSessionAuth) {
+    if (checkSessionAuth == CursorManager::kCheckSession &&
+        !checkCursorSessionPrivilege(opCtx, cursor.getSessionId()).isOK()) {
+        return false;
+    }
+    if (checkPinAllowed) {
+        try {
+            checkPinAllowed(cursor);
+        } catch (const DBException&) {
+            return false;
+        }
+    }
+    return true;
+}
+
 }  // namespace
 
 CursorManager* CursorManager::get(ServiceContext* svcCtx) {
@@ -317,6 +339,7 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     CursorId id,
     std::string_view commandName,
     const std::function<void(const ClientCursor&)>& checkPinAllowed,
+    PinFailureRecording pinFailureRecording,
     AuthCheck checkSessionAuth) {
     auto lockedPartition = _cursorMap->lockOnePartition(id);
     auto it = lockedPartition->find(id);
@@ -342,6 +365,12 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
                     "Cursor was killed while it was idle",
                     "cursorId"_attr = cursor->cursorid(),
                     "killStatus"_attr = error);
+        // Only attribute the kill to this cursor's query if the request was allowed to use the
+        // cursor. Otherwise the failed request is someone else's.
+        if (pinFailureRecording == PinFailureRecording::kRecordInQueryStats &&
+            callerMayPin(opCtx, *cursor, checkPinAllowed, checkSessionAuth)) {
+            cursor->setQueryStatsErrorCode(error.code());
+        }
         deregisterAndDestroyCursor(std::move(lockedPartition),
                                    opCtx,
                                    std::unique_ptr<ClientCursor, ClientCursor::Deleter>(cursor));

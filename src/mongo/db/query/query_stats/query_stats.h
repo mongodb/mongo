@@ -367,6 +367,9 @@ void writeQueryStats(OperationContext* opCtx,
 /**
  * Called from ClientCursor::dispose/ClusterClientCursorImpl::kill to set up and writeQueryStats()
  * at the end of life of a cursor.
+ *
+ * If featureFlagQueryStatsErrors is enabled, a non-OK 'errorCode' will record the cursor as errored
+ * and drop its metrics.
  */
 void writeQueryStatsOnCursorDisposeOrKill(
     OperationContext* opCtx,
@@ -375,6 +378,7 @@ void writeQueryStatsOnCursorDisposeOrKill(
     bool isChangeStreamQuery,
     boost::optional<Microseconds> firstResponseExecutionTime,
     OpDebug::AdditiveMetrics metrics,
+    ErrorCodes::Error errorCode = ErrorCodes::OK,
     std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics = {});
 
 }  // namespace mongo::query_stats
