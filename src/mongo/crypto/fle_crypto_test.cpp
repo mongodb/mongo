@@ -951,6 +951,109 @@ TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_AllRecordTypes_NullAnchorHasOldAn
     ASSERT_EQ(res.cpos.value(), 79);
 }
 
+namespace {
+constexpr uint64_t kU64Max = std::numeric_limits<uint64_t>::max();
+
+// idGenerator that losslessly encodes a position into a PrfBlock (and back), so the mock reader
+// below can decide existence purely from the numeric position without inserting real documents.
+PrfBlock positionToId(uint64_t pos) {
+    PrfBlock id{};
+    std::memcpy(id.data(), &pos, sizeof(pos));
+    return id;
+}
+uint64_t idToPosition(const PrfBlock& id) {
+    uint64_t pos = 0;
+    std::memcpy(&pos, id.data(), sizeof(pos));
+    return pos;
+}
+
+// A FLEStateCollectionReader whose existsById() is driven by a supplied predicate over the
+// encoded position. This lets binarySearchCommon be exercised for any rho/lambda (including
+// values near UINT64_MAX) that would be infeasible to reach by inserting real ESC documents.
+class PredicateCollectionReader : public FLEStateCollectionReader {
+public:
+    explicit PredicateCollectionReader(std::function<bool(uint64_t)> exists)
+        : _exists(std::move(exists)) {}
+
+    uint64_t getDocumentCount() const override {
+        return 0;
+    }
+    BSONObj getById(PrfBlock) const override {
+        MONGO_UNREACHABLE;
+    }
+    bool existsById(PrfBlock id) const override {
+        return _exists(idToPosition(id));
+    }
+    ECStats getStats() const override {
+        return ECStats();
+    }
+
+private:
+    std::function<bool(uint64_t)> _exists;
+};
+
+boost::optional<uint64_t> runBinarySearch(std::function<bool(uint64_t)> exists,
+                                          uint64_t rho,
+                                          uint64_t lambda,
+                                          boost::optional<uint64_t> initial = boost::none) {
+    PredicateCollectionReader reader(std::move(exists));
+    auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
+    return fle_detail::binarySearchCommon(reader, rho, lambda, initial, positionToId, tracker);
+}
+}  // namespace
+
+TEST_F(ServiceContextTest, FLE_ESC_BinarySearchCommon_EdgeCases) {
+    const auto never = [](uint64_t) {
+        return false;
+    };
+    const auto always = [](uint64_t) {
+        return true;
+    };
+    // A contiguous run of "used" positions in (lambda, lambda + count]; i.e. cpos 1..count.
+    const auto usedRun = [](uint64_t lambda, uint64_t count) {
+        return [lambda, count](uint64_t pos) {
+            return pos > lambda && pos - lambda <= count;
+        };
+    };
+
+    // --- Precondition uasserts
+    // rho must be non-zero.
+    ASSERT_THROWS_CODE(runBinarySearch(always, 0, 0), DBException, 13096500);
+    // lambda cannot consume the entire position space.
+    ASSERT_THROWS_CODE(runBinarySearch(always, 2, kU64Max), DBException, 13096501);
+
+    // --- Position-space exhaustion
+    // (rho + lambda) overflows and the capped UINT64_MAX position is already used.
+    ASSERT_THROWS_CODE(runBinarySearch(always, 2, kU64Max - 1), DBException, 13096502);
+    // (rho + lambda) lands exactly on UINT64_MAX (no overflow) and that position is used.
+    ASSERT_THROWS_CODE(runBinarySearch(always, 2, kU64Max - 2), DBException, 13096502);
+    // Doubling rho saturates to UINT64_MAX (2*rho overflow) and every position is used.
+    ASSERT_THROWS_CODE(runBinarySearch(always, (kU64Max / 2) + 1, 0), DBException, 13096502);
+
+    // --- Normal, non-overflowing searches ---
+    // Nothing exists: the incoming value is returned unchanged (none, and a passed-through value).
+    ASSERT_FALSE(runBinarySearch(never, 2, 0).has_value());
+    ASSERT_FALSE(runBinarySearch(never, kU64Max, 0).has_value());
+    ASSERT_EQ(runBinarySearch(never, 2, 0, 123).value(), 123);
+    // Contiguous runs, lambda = 0. Answer is the highest used position.
+    ASSERT_EQ(runBinarySearch(usedRun(0, 5), 2, 0).value(), 5);
+    ASSERT_EQ(runBinarySearch(usedRun(0, 8), 2, 0).value(), 8);  // power-of-two boundary
+    // Only the very first position exists (exercises the explicit min==1 recheck).
+    ASSERT_EQ(runBinarySearch(usedRun(0, 1), 2, 0).value(), 1);
+    // Non-zero lambda offset: result is lambda-relative.
+    ASSERT_EQ(runBinarySearch(usedRun(100, 37), 2, 100).value(), 137);
+
+    // --- Overflow / saturation, but positions NOT exhausted (must not throw) ---
+    // (rho + lambda) overflows; UINT64_MAX unused; 5 used positions just above a huge lambda.
+    ASSERT_EQ(runBinarySearch(usedRun(kU64Max - 10, 5), 2, kU64Max - 10).value(), kU64Max - 5);
+    // 2*rho saturates to UINT64_MAX (lambda = 0) and search still pins the exact top used position.
+    const uint64_t bigTop = (uint64_t{1} << 63) + 12345;
+    ASSERT_EQ(runBinarySearch(usedRun(0, bigTop), 2, 0).value(), bigTop);
+    // Large lambda with everything below UINT64_MAX used; top position unused.
+    const uint64_t bigLambda = uint64_t{1} << 63;
+    ASSERT_EQ(runBinarySearch(usedRun(0, kU64Max - 1), 2, bigLambda).value(), kU64Max - 1);
+}
+
 using Operation = Fle2PlaceholderType;
 
 NamespaceString getTestNamespace() {

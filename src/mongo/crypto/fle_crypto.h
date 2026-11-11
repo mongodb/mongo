@@ -211,6 +211,23 @@ public:
     virtual ECStats getStats() const = 0;
 };
 
+namespace [[MONGO_MOD_PRIVATE]] fle_detail {
+/**
+ * Performs the exponential + binary search used by emuBinary to locate the highest used ESC
+ * position, starting from position (rho + lambda) and doubling rho until an unused position is
+ * found, then binary searching within the discovered bound. Handles unsigned overflow of
+ * (rho + lambda) and (2 * rho) gracefully, uasserting when all position values are exhausted.
+ *
+ * Exposed for unit testing; use ESCCollection::emuBinaryV2 in production code.
+ */
+boost::optional<uint64_t> binarySearchCommon(const FLEStateCollectionReader& reader,
+                                             uint64_t rho,
+                                             uint64_t lambda,
+                                             boost::optional<uint64_t> i,
+                                             std::function<PrfBlock(uint64_t)> idGenerator,
+                                             FLEStatusSection::EmuBinaryTracker& tracker);
+}  // namespace fle_detail
+
 template <class TagToken, class ValueToken>
 class ESCCollectionCommon {
 public:

@@ -2248,34 +2248,64 @@ StatusWith<ESCDocument> ESCCollectionCommon<TagToken, ValueToken>::decryptAnchor
     return decryptDocument(valueToken, doc);
 }
 
-namespace {
+namespace fle_detail {
 boost::optional<uint64_t> binarySearchCommon(const FLEStateCollectionReader& reader,
                                              uint64_t rho,
                                              uint64_t lambda,
                                              boost::optional<uint64_t> i,
                                              std::function<PrfBlock(uint64_t)> idGenerator,
                                              FLEStatusSection::EmuBinaryTracker& tracker) {
+    uassert(
+        13096500, "Starting value in Queryable Encryption binary search cannot be zero", rho > 0);
+    uassert(13096501,
+            "Counter offset value in Queryable Encryption binary search indicates all position "
+            "values have been used",
+            lambda < std::numeric_limits<uint64_t>::max());
 
+    // This loop performs an exponential search to find an upper bound to the series of
+    // used ESC "positions".
+    // For every i starting from 0, it tests whether an ESC entry can be found having the _id
+    // generated from position pos=(2^i * rho + lambda) and stops when no ESC document is found.
+    // If (2^i * rho + lambda) overflows, and an ESC document exists at pos=UINT64_MAX, then an
+    // error is thrown.
     bool flag = true;
     while (flag) {
-        bool docExists = reader.existsById(idGenerator(rho + lambda));
+        uint64_t pos = 0;
+        if (overflow::add(rho, lambda, &pos)) {
+            // rho + lambda would overflow:
+            // set pos to UINT64_MAX and fail later if this position is already used.
+            // cap rho to (UINT64_MAX-lambda); always non-zero because lambda can't be UINT64_MAX
+            pos = std::numeric_limits<uint64_t>::max();
+            rho = std::numeric_limits<uint64_t>::max() - lambda;
+        }
+        bool docExists = reader.existsById(idGenerator(pos));
 
-#ifdef DEBUG_ENUM_BINARY
-        std::cout << fmt::format("search1: rho: {},  doc: {}", rho, doc.toString()) << std::endl;
-#endif
         if (docExists) {
-            rho = 2 * rho;
+            uassert(13096502,
+                    "Queryable Encryption binary search failed because all position values have "
+                    "been used",
+                    pos < std::numeric_limits<uint64_t>::max());
+            uint64_t nextRho = 0;
+            if (overflow::mul(2, rho, &nextRho)) {
+                rho = std::numeric_limits<uint64_t>::max();
+            } else {
+                rho = nextRho;
+            }
         } else {
             flag = false;
         }
     }
+    // this guarantees it's safe to log2(rho) below.
+    invariant(rho > 0);
+    // this guarantees (median + lambda) below cannot overflow
+    invariant(rho <= (std::numeric_limits<uint64_t>::max() - lambda));
 
     uint64_t median = 0, min = 1, max = rho;
     uint64_t maxIterations = ceil(log2(rho));
 
     for (uint64_t j = 1; j <= maxIterations; j++) {
         tracker.recordSuboperation();
-        median = ceil(static_cast<double>(max - min) / 2) + min;
+        median = ((max - min + 1) / 2) + min;
 
         bool docExists = reader.existsById(idGenerator(median + lambda));
 
@@ -2312,7 +2342,7 @@ boost::optional<uint64_t> binarySearchCommon(const FLEStateCollectionReader& rea
 
     return i;
 }
-}  // namespace
+}  // namespace fle_detail
 
 EmuBinaryResult ESCCollection::emuBinaryV2(HmacContext* context,
                                            const FLEStateCollectionReader& reader,
@@ -2369,7 +2399,7 @@ boost::optional<uint64_t> ESCCollectionCommon<TagToken, ValueToken>::anchorBinar
                      "anchor binary search start: lambda: {}, i: {}, rho: {}", lambda, x, rho)
               << std::endl;
 #endif
-    return binarySearchCommon(reader, rho, lambda, x, idGenerator, tracker);
+    return fle_detail::binarySearchCommon(reader, rho, lambda, x, idGenerator, tracker);
 }
 
 boost::optional<uint64_t> ESCCollection::binaryHops(HmacContext* context,
@@ -2413,7 +2443,7 @@ boost::optional<uint64_t> ESCCollection::binaryHops(HmacContext* context,
     std::cout << fmt::format("binary search start: lambda: {}, i: {}, rho: {}", lambda, i, rho)
               << std::endl;
 #endif
-    return binarySearchCommon(reader, rho, lambda, i, idGenerator, tracker);
+    return fle_detail::binarySearchCommon(reader, rho, lambda, i, idGenerator, tracker);
 }
 
 std::vector<std::vector<FLEEdgeCountInfo>> ESCCollection::getTags(
