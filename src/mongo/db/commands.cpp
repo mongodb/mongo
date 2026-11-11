@@ -21,6 +21,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/version_context.h"
@@ -121,6 +122,36 @@ void checkAuthForRawData(OperationContext* opCtx,
         "Not authorized to run command with rawData",
         authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::performRawDataOperations) ||
             authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::internal));
+}
+
+/**
+ * Rejects a client-supplied readConcern.afterOpTime unless the client holds ActionType::internal.
+ *
+ * Both outcomes are counted in the 'readConcernCounters' server status section, so that operators
+ * can see how much the deprecated argument is still relied upon before it is removed.
+ */
+void checkAuthForAfterOpTime(OperationContext* opCtx, const GenericArguments& genArg) {
+    const auto& readConcern = genArg.getReadConcern();
+    if (MONGO_likely(!readConcern || !readConcern->getArgsOpTime()))
+        return;
+
+    auto* metrics = ServerReadConcernMetrics::get(opCtx);
+
+    if (MONGO_unlikely(repl::gAllowDeprecatedAfterOpTimeReadConcern.load())) {
+        metrics->recordAcceptedAfterOpTime();
+        return;
+    }
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    const bool isInternal = authSession->isAuthorizedForActionsOnResource(
+        ResourcePattern::forClusterResource(boost::none), ActionType::internal);
+    if (isInternal) {
+        metrics->recordAcceptedAfterOpTime();
+    } else {
+        metrics->recordRejectedAfterOpTime();
+        uasserted(ErrorCodes::Unauthorized,
+                  "Not authorized to run command with readConcern.afterOpTime");
+    }
 }
 
 auto getCommandInvocationHooks =
@@ -936,6 +967,7 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
         } else {
             try {
                 checkAuthForRawData(opCtx, getGenericArguments(), request);
+                checkAuthForAfterOpTime(opCtx, getGenericArguments());
                 doCheckAuthorization(opCtx);
             } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
                 namespace mmb = mutablebson;
