@@ -23,6 +23,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/default_max_time_ms_cluster_parameter.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/extension/host/stub_commands.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
@@ -464,12 +465,13 @@ void ParseAndRunCommand::_parseCommand() {
     auto const command = CommandHelpers::findCommand(opCtx, _commandName);
     if (!command) {
         const std::string errorMsg = fmt::format("no such cmd: {}", _commandName);
+        auto status = extension::host::getStubCommandError(_commandName)
+                          .value_or(Status(ErrorCodes::CommandNotFound, errorMsg));
         auto builder = replyBuilder->getBodyBuilder();
-        CommandHelpers::appendCommandStatusNoThrow(builder,
-                                                   {ErrorCodes::CommandNotFound, errorMsg});
+        CommandHelpers::appendCommandStatusNoThrow(builder, status);
         getCommandRegistry(opCtx)->incrementUnknownCommands();
         appendRequiredFieldsToResponse(opCtx, &builder);
-        iassert(Status(ErrorCodes::SkipCommandExecution, errorMsg));
+        iassert(Status(ErrorCodes::SkipCommandExecution, status.reason()));
     }
 
     _rec->setCommand(command);

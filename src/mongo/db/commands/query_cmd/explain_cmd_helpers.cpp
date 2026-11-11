@@ -3,6 +3,7 @@
 
 #include "mongo/db/commands/query_cmd/explain_cmd_helpers.h"
 
+#include "mongo/db/extension/host/stub_commands.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/util/serialization_context.h"
@@ -39,6 +40,12 @@ ExplainedCommand makeExplainedCommand(OperationContext* opCtx,
 
     auto explainedCommand =
         CommandHelpers::findCommand(opCtx, explainedObj.firstElementFieldNameStringData());
+    if (!explainedCommand) {
+        if (auto stubError = extension::host::getStubCommandError(
+                explainedObj.firstElementFieldNameStringData())) {
+            uassertStatusOK(*stubError);
+        }
+    }
     uassert(ErrorCodes::CommandNotFound,
             str::stream() << "Explain failed due to unknown command: "
                           << explainedObj.firstElementFieldName(),

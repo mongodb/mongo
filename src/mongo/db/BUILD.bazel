@@ -2561,6 +2561,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:mongod_fsync",
         "//src/mongo/db/commands:txn_cmd_request",
         "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/extension/host:extension_stub_commands",
         "//src/mongo/db/query:query_latency_accumulator",
         "//src/mongo/db/query:query_lifespan",
         "//src/mongo/db/query/client_cursor",

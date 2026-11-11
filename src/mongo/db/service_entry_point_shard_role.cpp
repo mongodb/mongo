@@ -40,6 +40,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/default_max_time_ms_cluster_parameter.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/extension/host/stub_commands.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/initialize_operation_session_info.h"
@@ -2281,6 +2282,9 @@ void executeCommand(HandleRequest::ExecutionContext& execContext) {
         getCommandRegistry(opCtx)->incrementUnknownCommands();
         LOGV2_DEBUG(
             21964, 2, "Command not found in registry", "command"_attr = request.getCommandName());
+        if (auto stubError = extension::host::getStubCommandError(request.getCommandName())) {
+            iasserted(*stubError);
+        }
         iasserted(Status(ErrorCodes::CommandNotFound,
                          fmt::format("no such command: '{}'", request.getCommandName())));
     }

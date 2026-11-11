@@ -162,6 +162,16 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "extension_stub_commands",
+    srcs = [
+        "stub_commands.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "extension_loader",
     srcs = [
         "load_extension.cpp",
@@ -175,6 +185,7 @@ mongo_cc_library(
     }),
     deps = [
         ":extension_host",
+        ":extension_stub_commands",
         "//src/mongo:base",
         "//src/mongo/db/query:query_knobs",
         "//src/third_party/yaml-cpp:yaml",
