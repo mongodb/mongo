@@ -15,9 +15,9 @@ RecordStore::Options getRecordStoreOptions(const NamespaceString& nss,
     bool isClustered = collectionOptions.clusteredIndex.has_value();
     recordStoreOptions.keyFormat = isClustered ? KeyFormat::String : KeyFormat::Long;
 
-    // Overwrites are disallowed for clustered collections and collections with replicated record
-    // IDs to guarantee record uniqueness and prevent accidental overwrites of existing records.
-    recordStoreOptions.allowOverwrite = !(isClustered || recordIdsReplicated);
+    // Overwrites are disallowed for all collections so that an insert colliding with an existing
+    // record fails with WT_DUPLICATE_KEY instead of silently overwriting a different document.
+    recordStoreOptions.allowOverwrite = false;
 
     recordStoreOptions.isCapped = collectionOptions.capped;
 

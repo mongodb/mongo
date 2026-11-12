@@ -370,8 +370,10 @@ RecordStore::Options MDBCatalog::_parseRecordStoreOptions(const NamespaceString&
             bool isClustered = clusteredElement.isABSONObj() || clusteredElement.booleanSafe();
             recordStoreOptions.keyFormat = isClustered ? KeyFormat::String : KeyFormat::Long;
 
-            bool recordIdsReplicated = mdElement["recordIdsReplicated"].trueValue();
-            recordStoreOptions.allowOverwrite = !(isClustered || recordIdsReplicated);
+            // Overwrites are disallowed for all collections so that an insert colliding with an
+            // existing record fails with WT_DUPLICATE_KEY instead of silently overwriting a
+            // different document.
+            recordStoreOptions.allowOverwrite = false;
 
             if (recordStoreOptions.isOplog) {
                 BSONElement cappedSizeElement = optionsObj["size"];

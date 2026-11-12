@@ -66,9 +66,9 @@ TEST_F(CollectionRecordStoreOptionsTest, DefaultRecordStoreOptions) {
     const auto actualRSOptions =
         getRecordStoreOptions(kBasicNss, collOptions, /*recordIdsReplicated=*/false);
 
-    // Default 'RecordStore::Options' should match those generated for the default
-    // 'CollectionOptions'.
-    const RecordStore::Options kDefaultRSOptions{};
+    // Default 'RecordStore::Options' match those generated for the default 'CollectionOptions',
+    // except that overwrites are disallowed for all collections.
+    const RecordStore::Options kDefaultRSOptions{.allowOverwrite = false};
     assertEQ(kDefaultRSOptions, actualRSOptions);
 }
 
@@ -96,7 +96,7 @@ TEST_F(CollectionRecordStoreOptionsTest, CappedRecordStoreOptionsBasic) {
     collOptions.capped = true;
     const auto actualRSOptions =
         getRecordStoreOptions(kBasicNss, collOptions, /*recordIdsReplicated=*/false);
-    RecordStore::Options expectedRSOptions{.isCapped = true};
+    RecordStore::Options expectedRSOptions{.isCapped = true, .allowOverwrite = false};
     assertEQ(expectedRSOptions, actualRSOptions);
 }
 
@@ -120,7 +120,7 @@ TEST_F(CollectionRecordStoreOptionsTest, CappedRecordStoreOptions) {
     collOptions.cappedSize = 100 /* arbitrary */;
     const auto actualRSOptions =
         getRecordStoreOptions(kBasicNss, collOptions, /*recordIdsReplicated=*/false);
-    RecordStore::Options expectedRSOptions{.isCapped = true};
+    RecordStore::Options expectedRSOptions{.isCapped = true, .allowOverwrite = false};
     assertEQ(expectedRSOptions, actualRSOptions);
 }
 
@@ -166,8 +166,10 @@ TEST_F(CollectionRecordStoreOptionsTest, OplogRecordStoreOptions) {
     collOptions.cappedSize = 100;
     const auto actualRSOptions = getRecordStoreOptions(
         NamespaceString::kRsOplogNamespace, collOptions, /*recordIdsReplicated=*/false);
-    RecordStore::Options expectedRSOptions{
-        .isCapped = true, .isOplog = true, .oplogMaxSize = collOptions.cappedSize};
+    RecordStore::Options expectedRSOptions{.isCapped = true,
+                                           .isOplog = true,
+                                           .oplogMaxSize = collOptions.cappedSize,
+                                           .allowOverwrite = false};
     assertEQ(expectedRSOptions, actualRSOptions);
 }
 
@@ -183,6 +185,7 @@ TEST_F(CollectionRecordStoreOptionsTest, TimeseriesRecordStoreOptionsNotClustere
     const auto actualRSOptions =
         getRecordStoreOptions(kBasicNss, collOptions, /*recordIdsReplicated=*/false);
     RecordStore::Options expectedRSOptions{
+        .allowOverwrite = false,
         .forceUpdateWithFullDocument = true /* exclusive for timeseries */,
         .customBlockCompressor =
             std::string{kDefaultTimeseriesCollectionCompressor} /* exclusive for timeseries */};
@@ -230,8 +233,8 @@ TEST_F(CollectionRecordStoreOptionsTest, RecordStoreOptionsWithStorageEngineColl
                       << BSON("wiredTiger" << BSON("configString" << "prefix_compression=true")));
     const auto actualRSOptions =
         getRecordStoreOptions(kBasicNss, collOptions, /*recordIdsReplicated=*/false);
-    RecordStore::Options expectedRSOptions{.storageEngineCollectionOptions =
-                                               collOptions.storageEngine};
+    RecordStore::Options expectedRSOptions{
+        .allowOverwrite = false, .storageEngineCollectionOptions = collOptions.storageEngine};
     assertEQ(expectedRSOptions, actualRSOptions);
 }
 
