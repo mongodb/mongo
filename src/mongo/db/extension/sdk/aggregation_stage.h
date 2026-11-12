@@ -7,6 +7,7 @@
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/distributed_plan_logic.h"
 #include "mongo/db/extension/sdk/expanded_array_container.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/sdk/operation_metrics_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"

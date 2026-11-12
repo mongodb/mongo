@@ -44,7 +44,8 @@ using VariantNodeHandle = std::variant<AggStageParseNodeHandle, AggStageAstNodeH
  * Wrapper function that converts an ExpandedArray to a vector of RAII handles.
  * Declared here; defined in parse_node.cpp where ArrayElemAsRaii specializations are visible.
  */
-std::vector<VariantNodeHandle> expandedArrayToRaiiVector(::MongoExtensionExpandedArray& arr);
+std::vector<VariantNodeHandle> expandedArrayToRaiiVector(::MongoExtensionExpandedArray& arr,
+                                                         const CapabilityVersion& capability);
 
 /**
  * Represents the possible types of elements that can be in a MongoExtensionDPLArray, as owned
@@ -60,7 +61,8 @@ using VariantDPLHandle = std::variant<AggStageParseNodeHandle, LogicalAggStageHa
  * This ensures template instantiation happens in parse_node.cpp where
  * the specializations are visible.
  */
-std::vector<VariantDPLHandle> dplArrayToRaiiVector(::MongoExtensionDPLArray& arr);
+std::vector<VariantDPLHandle> dplArrayToRaiiVector(::MongoExtensionDPLArray& arr,
+                                                   const CapabilityVersion& capability);
 
 /**
  * AggStageParseNodeAPI is a wrapper around a MongoExtensionAggStageParseNode vtable API.

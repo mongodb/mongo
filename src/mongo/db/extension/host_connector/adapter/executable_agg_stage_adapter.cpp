@@ -15,44 +15,47 @@ namespace mongo::extension::host_connector {
     ::MongoExtensionExecAggStage* execAggStage,
     ::MongoExtensionQueryExecutionContext* execCtxPtr,
     ::MongoExtensionGetNextResult* apiResult) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
-        apiResult->resultDocument = createEmptyByteContainer();
-        apiResult->resultMetadata = createEmptyByteContainer();
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
+            apiResult->resultDocument = createEmptyByteContainer();
+            apiResult->resultMetadata = createEmptyByteContainer();
 
-        auto& aggStageAdapter = *static_cast<HostExecAggStageAdapter*>(execAggStage);
+            auto& aggStageAdapter = *static_cast<HostExecAggStageAdapter*>(execAggStage);
 
-        // Keep the last getNextResult stable.
-        aggStageAdapter._lastGetNextResult =
-            CachedGetNextResult(aggStageAdapter.getImpl().getNext());
-        const auto hostStatusCode = aggStageAdapter._lastGetNextResult.getStatus();
-        // Shouldn't need to validate that the hostResult has a valid Document when the status
-        // is kAdvanced because the exec agg stage's implementation on the server should take
-        // care of that validation.
-        switch (hostStatusCode) {
-            using ReturnStatus = exec::agg::GetNextResult::ReturnStatus;
-            case ReturnStatus::kAdvanced: {
-                apiResult->code = ::MongoExtensionGetNextResultCode::kAdvanced;
-                aggStageAdapter._lastGetNextResult.getAsExtensionNextResult(*apiResult);
-                break;
+            // Keep the last getNextResult stable.
+            aggStageAdapter._lastGetNextResult =
+                CachedGetNextResult(aggStageAdapter.getImpl().getNext());
+            const auto hostStatusCode = aggStageAdapter._lastGetNextResult.getStatus();
+            // Shouldn't need to validate that the hostResult has a valid Document when the status
+            // is kAdvanced because the exec agg stage's implementation on the server should take
+            // care of that validation.
+            switch (hostStatusCode) {
+                using ReturnStatus = exec::agg::GetNextResult::ReturnStatus;
+                case ReturnStatus::kAdvanced: {
+                    apiResult->code = ::MongoExtensionGetNextResultCode::kAdvanced;
+                    aggStageAdapter._lastGetNextResult.getAsExtensionNextResult(*apiResult);
+                    break;
+                }
+                case ReturnStatus::kPauseExecution: {
+                    apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
+                    break;
+                }
+                case ReturnStatus::kEOF: {
+                    apiResult->code = ::MongoExtensionGetNextResultCode::kEOF;
+                    break;
+                }
+                default: {
+                    tasserted(
+                        11019500,
+                        str::stream()
+                            << "Cannot forward a GetNextResult with the following ReturnStatus: "
+                            << static_cast<int>(hostStatusCode));
+                    break;
+                }
             }
-            case ReturnStatus::kPauseExecution: {
-                apiResult->code = ::MongoExtensionGetNextResultCode::kPauseExecution;
-                break;
-            }
-            case ReturnStatus::kEOF: {
-                apiResult->code = ::MongoExtensionGetNextResultCode::kEOF;
-                break;
-            }
-            default: {
-                tasserted(11019500,
-                          str::stream()
-                              << "Cannot forward a GetNextResult with the following ReturnStatus: "
-                              << static_cast<int>(hostStatusCode));
-                break;
-            }
-        }
-    });
+        },
+        _capabilityOf(execAggStage));
 }
 
 ::MongoExtensionByteView HostExecAggStageAdapter::_hostGetName(

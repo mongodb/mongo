@@ -34,14 +34,16 @@ struct DPLCallbackOwner::State {
     DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec result;
 };
 
-DPLCallbackOwner::DPLCallbackOwner(CallbackInvoker invoker, std::function<void()> deleter)
+DPLCallbackOwner::DPLCallbackOwner(CallbackInvoker invoker,
+                                   const CapabilityVersion& capability,
+                                   std::function<void()> deleter)
     : _state((invoker || deleter) ? std::make_shared<State>(std::move(invoker), std::move(deleter))
-                                  : nullptr) {}
+                                  : nullptr),
+      _capability(capability) {}
 
 bool DPLCallbackOwner::hasCallback() const {
     return _state && _state->invoker;
 }
-// TODO SERVER-136921: Figure out a way to provide CapabilityVersion to this method.
 const DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec&
 DPLCallbackOwner::getOrInvoke(ExpressionContext* expCtx) const {
     tassert(12728604, "getOrInvoke() called without a DPL callback", hasCallback());
@@ -60,12 +62,14 @@ DPLCallbackOwner::getOrInvoke(ExpressionContext* expCtx) const {
     // conversion throws after the callback has already allocated them.
     ExtensionByteBufHandle sortHandle(nullptr);
     ExtensionByteBufHandle mergeHandle(nullptr);
-    invokeCAndConvertStatusToException([&] {
-        auto* status = state.invoker(expCtx, &rawSort, &rawMerge);
-        sortHandle = ExtensionByteBufHandle(rawSort);
-        mergeHandle = ExtensionByteBufHandle(rawMerge);
-        return status;
-    });
+    invokeCAndConvertStatusToException(
+        [&] {
+            auto* status = state.invoker(expCtx, &rawSort, &rawMerge);
+            sortHandle = ExtensionByteBufHandle(rawSort);
+            mergeHandle = ExtensionByteBufHandle(rawMerge);
+            return status;
+        },
+        _capability);
 
     // bsonObjFromByteView only checks the outer length; validate the interior so a malformed
     // extension buffer yields a clean error rather than an out-of-bounds read during traversal.

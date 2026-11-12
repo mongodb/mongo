@@ -79,8 +79,9 @@ void ExtensionStage::setSource(Stage* source) {
     }
 
     if (pSource) {
-        _sourceAggStageHandle = extension::ExecAggStageHandle{
-            new extension::host_connector::HostExecAggStageAdapter(ExecAggStage::make(pSource))};
+        _sourceAggStageHandle =
+            extension::ExecAggStageHandle{new extension::host_connector::HostExecAggStageAdapter(
+                ExecAggStage::make(pSource), _execAggStageHandle->getCapabilityVersion())};
         // Check if the allocation failed. This might be superfluous, as any allocation failure
         // would have likely oomed/bad_alloc.
         tassert(10957205, "_sourceAggStageHandle is invalid", _sourceAggStageHandle.isValid());
@@ -96,8 +97,8 @@ GetNextResult ExtensionStage::doGetNext() {
 
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(pExpCtx.get());
-    host_connector::QueryExecutionContextAdapter ctxAdapter(std::move(wrappedCtx),
-                                                            _dynamicBatchSize);
+    host_connector::QueryExecutionContextAdapter ctxAdapter(
+        std::move(wrappedCtx), _execAggStageHandle->getCapabilityVersion(), _dynamicBatchSize);
     tassert(11357601, "_execAggStageHandle is invalid", _execAggStageHandle.isValid());
     _lastGetNextResult = _execAggStageHandle->getNext(&ctxAdapter);
     switch (_lastGetNextResult.code) {
@@ -132,7 +133,8 @@ Document ExtensionStage::getExplainOutput(const query_shape::SerializationOption
 
     std::unique_ptr<extension::host::QueryExecutionContext> wrappedCtx =
         std::make_unique<extension::host::QueryExecutionContext>(pExpCtx.get());
-    extension::host_connector::QueryExecutionContextAdapter ctxAdapter(std::move(wrappedCtx));
+    extension::host_connector::QueryExecutionContextAdapter ctxAdapter(
+        std::move(wrappedCtx), _execAggStageHandle->getCapabilityVersion());
     BSONObj explainSerialization = _execAggStageHandle->explain(ctxAdapter, *opts.verbosity);
     for (auto elem : explainSerialization) {
         output.addField(elem.fieldName(), Value(elem));

@@ -60,7 +60,8 @@ Value DocumentSourceExtensionForQueryShape::serialize(
     // TODO SERVER-129346 Ideally we should tassert here that literals are being changed, but we
     // cannot because hybrid search desugars when running against query stats. Restore the tassert
     // when hybrid search can compute query shape without desugaring.
-    host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    host_connector::QueryShapeOptsAdapter adapter{
+        &opts, getExpCtx(), _parseNode->getCapabilityVersion()};
     BSONObj queryShape = _parseNode->getQueryShape(adapter);
     // An extension stage's query shape must be a single-field {$stageName: ...} object so it can be
     // reparsed on query stats store read.

@@ -4,6 +4,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/dpl_array_container.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/util/modules.h"

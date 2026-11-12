@@ -307,7 +307,8 @@ Value DocumentSourceExtensionOptimizable::serialize(
     const query_shape::SerializationOptions& opts) const {
     if (opts.isSerializingForExplain()) {
         auto wrappedCtx = std::make_unique<QueryExecutionContext>(getExpCtx().get());
-        host_connector::QueryExecutionContextAdapter ctxAdapter(std::move(wrappedCtx));
+        host_connector::QueryExecutionContextAdapter ctxAdapter(
+            std::move(wrappedCtx), _logicalStage->getCapabilityVersion());
         return Value(_logicalStage->explain(ctxAdapter, *opts.verbosity));
     }
 
@@ -633,7 +634,8 @@ void DocumentSourceExtensionOptimizable::applyPipelineSuffixDependencies(
 
 void DocumentSourceExtensionOptimizable::applyPipelineSuffixDependencies(
     const DepsTracker& deps, const std::set<std::string>& builtinVarRefs) {
-    const host_connector::PipelineDependenciesAdapter adapter(deps, builtinVarRefs);
+    const host_connector::PipelineDependenciesAdapter adapter(
+        deps, _logicalStage->getCapabilityVersion(), builtinVarRefs);
     applyPipelineSuffixDependencies(adapter);
 }
 
@@ -662,7 +664,9 @@ bool extensionApplyDependenciesTransform(
     rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) {
     auto* stage = checked_cast<DocumentSourceExtensionOptimizable*>(&ctx.current());
     const host_connector::PipelineDependenciesAdapter adapter(
-        ctx.getPipelineSuffixDependencies(), ctx.getBuiltInVariableRefsInPipelineSuffix());
+        ctx.getPipelineSuffixDependencies(),
+        stage->getExtensionCapabilityVersion(),
+        ctx.getBuiltInVariableRefsInPipelineSuffix());
     stage->applyPipelineSuffixDependencies(adapter);
     return false;
 }

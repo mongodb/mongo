@@ -19,7 +19,7 @@ namespace mongo::extension {
 template <typename ArrayElem_t>
 struct ArrayElemAsRaii {
     using VectorElem_t = RaiiVectorElemType<ArrayElem_t>::type;
-    static VectorElem_t consume(ArrayElem_t& elt);
+    static VectorElem_t consume(ArrayElem_t& elt, const CapabilityVersion& capability);
 };
 
 template <typename Array_t>
@@ -45,7 +45,8 @@ struct RaiiVector {
  * transferred into RAII objects, the remaining elements in the array will be cleaned up correctly.
  */
 template <typename Array_t>
-auto abiArrayToRaiiVector(Array_t& inputArray) -> RaiiVector<Array_t>::type {
+auto abiArrayToRaiiVector(Array_t& inputArray, const CapabilityVersion& capability)
+    -> RaiiVector<Array_t>::type {
     using ArrayElem_t = UnderlyingArrayElemType<Array_t>::type;
     using Vector_t = RaiiVector<Array_t>::type;
     using ArrayElemAsRaii_t = ArrayElemAsRaii<ArrayElem_t>;
@@ -70,7 +71,7 @@ auto abiArrayToRaiiVector(Array_t& inputArray) -> RaiiVector<Array_t>::type {
     outputVec.reserve(arrSize);
     for (size_t idx = 0; idx < arrSize; ++idx) {
         auto& elt = inputArray.elements[idx];
-        outputVec.emplace_back(ArrayElemAsRaii_t::consume(elt));
+        outputVec.emplace_back(ArrayElemAsRaii_t::consume(elt, capability));
         ++transferredCount;
     }
     guard.dismiss();

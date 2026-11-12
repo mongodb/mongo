@@ -50,8 +50,10 @@ public:
     // where the BSONObj can't be guaranteed to remain stable for the lifetime of the new
     // ExtensionGetNextResult. In this case, we allocate a new ByteBuf from which we can issue a
     // BSONObj as a view. It is primarily used from our tests.
-    static ExtensionBSONObj makeAsByteBuf(const BSONObj& bsonObj) {
-        return ExtensionBSONObj(ExtensionByteBufHandle(new ByteBuf(bsonObj)));
+    static ExtensionBSONObj makeAsByteBuf(const BSONObj& bsonObj,
+                                          const mongo::extension::CapabilityVersion& capability =
+                                              CapabilityVersion::legacyCapability()) {
+        return ExtensionBSONObj(ExtensionByteBufHandle(new ByteBuf(bsonObj), capability));
     }
 
     // This static method is used to instantiate an ExtensionBSONObj from an existing BSONObj,
@@ -64,9 +66,11 @@ public:
     }
 
     // This static method is used to instantiate an ExtensionBSONObj from a
-    // ::MongoExtensionByteContainer.
-    static ExtensionBSONObj makeFromByteContainer(::MongoExtensionByteContainer& container) {
-        return ExtensionBSONObj(container);
+    // ::MongoExtensionByteContainer. 'capability' is the version negotiated with the extension
+    // that produced the container, used to wrap any transferred byte buffer at that version.
+    static ExtensionBSONObj makeFromByteContainer(::MongoExtensionByteContainer& container,
+                                                  const CapabilityVersion& capability) {
+        return ExtensionBSONObj(container, capability);
     }
 
     // Converts this ExtensionBSONObj to a ::MongoExtensionByteContainer, transferring ownership of
@@ -98,7 +102,8 @@ public:
     }
 
 private:
-    explicit ExtensionBSONObj(::MongoExtensionByteContainer& container) {
+    explicit ExtensionBSONObj(::MongoExtensionByteContainer& container,
+                              const CapabilityVersion& capability) {
         switch (container.type) {
             case kByteBuf: {
                 // Make ExtensionBSONObj with a provided ExtensionByteBufHandle.
@@ -106,7 +111,7 @@ private:
                 // handle we create here.
                 // ExtensionByteBufHandle must remain consistent for the same lifetime as the
                 // BSONObj.
-                auto tmpHandle = ExtensionByteBufHandle{container.bytes.buf};
+                auto tmpHandle = ExtensionByteBufHandle{container.bytes.buf, capability};
                 _bson = bsonObjFromByteView(tmpHandle->getByteView());
                 _holder = std::move(tmpHandle);
             } break;
@@ -186,7 +191,7 @@ struct ExtensionGetNextResult {
      * resultMetadata is optional — if null, the returned result contains only the document.
      */
     static ExtensionGetNextResult makeAdvancedFromApiResult(
-        ::MongoExtensionGetNextResult& apiResult) {
+        ::MongoExtensionGetNextResult& apiResult, const CapabilityVersion& capability) {
         if (isEmptyByteContainer(apiResult.resultDocument)) {
             // An Advanced result must carry a valid result document; an empty/dangling byte view
             // (e.g. Rust Vec::as_ptr() on an empty Vec) is a contract violation. Surface it as a
@@ -195,13 +200,14 @@ struct ExtensionGetNextResult {
                       "Extension returned kAdvanced with an empty result document");
         }
 
-        auto doc = ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument);
+        auto doc = ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument, capability);
 
         // send back metadata only if present
         return isEmptyByteContainer(apiResult.resultMetadata)
             ? advanced(std::move(doc))
-            : advanced(std::move(doc),
-                       ExtensionBSONObj::makeFromByteContainer(apiResult.resultMetadata));
+            : advanced(
+                  std::move(doc),
+                  ExtensionBSONObj::makeFromByteContainer(apiResult.resultMetadata, capability));
     };
 
     // Whether the container has no bytes that can be parsed as a BSON document. In addition to
@@ -222,20 +228,23 @@ struct ExtensionGetNextResult {
      * Instantiates a ExtensionGetNextResult from the provided ::MongoExtensionGetNextResult.
      * Sets the code and results of the ExtensionGetNextResult accordingly. If the
      * MongoExtensionGetNextResult struct has an invalid code, asserts in that case.
+     * 'capability' is the version negotiated with the extension, used to wrap any byte buffers
+     * the extension transferred.
      */
-    static ExtensionGetNextResult makeFromApiResult(::MongoExtensionGetNextResult& apiResult) {
+    static ExtensionGetNextResult makeFromApiResult(::MongoExtensionGetNextResult& apiResult,
+                                                    const CapabilityVersion& capability) {
         // get_next() transfers ownership of any kByteBuf to the host regardless of the result
         // code, but only the kAdvanced path consumes the transferred bytes. Reclaim them on every
         // other path (including any assertions) so a misbehaving extension cannot leak a buffer.
         ScopeGuard reclaimTransferredBytes([&] {
-            destroyTransferredBytes(apiResult.resultDocument);
-            destroyTransferredBytes(apiResult.resultMetadata);
+            destroyTransferredBytes(apiResult.resultDocument, capability);
+            destroyTransferredBytes(apiResult.resultMetadata, capability);
         });
 
         ExtensionGetNextResult result;
         switch (apiResult.code) {
             case ::MongoExtensionGetNextResultCode::kAdvanced: {
-                result = ExtensionGetNextResult::makeAdvancedFromApiResult(apiResult);
+                result = ExtensionGetNextResult::makeAdvancedFromApiResult(apiResult, capability);
                 reclaimTransferredBytes.dismiss();
                 break;
             }
@@ -305,9 +314,10 @@ private:
     // Destroys a kByteBuf whose ownership was transferred to the host by an extension when the
     // current path does not consume it. kByteView memory is owned by the extension and must not
     // be freed here.
-    static void destroyTransferredBytes(::MongoExtensionByteContainer& container) {
+    static void destroyTransferredBytes(::MongoExtensionByteContainer& container,
+                                        const CapabilityVersion& capability) {
         if (container.type == MongoExtensionByteContainerType::kByteBuf && container.bytes.buf) {
-            ExtensionByteBufHandle{container.bytes.buf};
+            ExtensionByteBufHandle{container.bytes.buf, capability};
         }
     }
 

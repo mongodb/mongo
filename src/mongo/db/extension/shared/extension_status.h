@@ -5,24 +5,46 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/db/extension/shared/per_version_adapter.h"
 #include "mongo/util/modules.h"
 
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <exception>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace mongo::extension {
+
+template <uint32_t kPacked>
+class ExtensionStatusOK;
+
+/**
+ * getExtensionStatusOK returns the ExtensionStatusOK instance for the given negotiated
+ * capability version. This trampoline is the only way to obtain an ExtensionStatusOK: the
+ * per-version instances cannot be vended without a negotiated capability.
+ */
+::MongoExtensionStatus* getExtensionStatusOK(const CapabilityVersion& capability);
 
 /**
  * ExtensionStatusOK is an implementation of ::MongoExtensionStatus that is always OK.
  *
- * We use a singleton instance to avoid having to allocate a status every time we need to return
- * success across the API boundary.
+ * We use one instance per negotiable capability version to avoid having to allocate a status
+ * every time we need to return success across the API boundary. The version is baked into the
+ * type (and exposed via kCapability) rather than stored in a member: the negotiated version is
+ * session state, and a per-process singleton cannot hold per-session state. Instantiating per
+ * version keeps instances immutable and shared by all sessions that negotiated the same version.
+ *
+ * kPacked must be a valid CapabilityVersion packed value representation.
  */
+template <uint32_t kPacked>
 class ExtensionStatusOK final : public ::MongoExtensionStatus {
 public:
+    static constexpr CapabilityVersion kCapability = CapabilityVersion::fromPackedValue(kPacked);
+
     ~ExtensionStatusOK() {
         sInstanceCount--;
     }
@@ -35,21 +57,34 @@ public:
         return MONGO_EXTENSION_STATUS_OK;
     }
 
-    // Provide access to our singleton instance.
-    static ExtensionStatusOK& getInstance() {
-        static ExtensionStatusOK singleton;
-        return singleton;
+    constexpr const CapabilityVersion& getCapability() const {
+        return kCapability;
     }
 
-    static size_t getInstanceCount();
+    static size_t getInstanceCount() {
+        return sInstanceCount;
+    }
 
     static ::MongoExtensionStatusVTable getVTable() {
         return VTABLE;
     }
 
 private:
+    template <template <uint32_t> class InstanceT, typename CApiT>
+    friend CApiT* getNegotiatedVersionInstance(const CapabilityVersion&);
+
     ExtensionStatusOK() : ::MongoExtensionStatus{&VTABLE} {
         sInstanceCount++;
+    }
+
+    // Provide access to our per-version instance.
+    static ExtensionStatusOK& getInstance() {
+        static ExtensionStatusOK singleton;
+        return singleton;
+    }
+
+    static ::MongoExtensionStatus* getInstancePtr() {
+        return &getInstance();
     }
 
     static void _extDestroy(::MongoExtensionStatus* /*status*/) noexcept {
@@ -82,17 +117,54 @@ private:
     static size_t sInstanceCount;
 };
 
+template <uint32_t kPacked>
+const ::MongoExtensionStatusVTable ExtensionStatusOK<kPacked>::VTABLE = {
+    .destroy = &ExtensionStatusOK::_extDestroy,
+    .get_code = &ExtensionStatusOK::_extGetCode,
+    .get_reason = &ExtensionStatusOK::_extGetReason,
+    .set_code = &ExtensionStatusOK::_extSetCode,
+    .set_reason = &ExtensionStatusOK::_extSetReason,
+    .clone = &ExtensionStatusOK::_extClone,
+};
+
+template <uint32_t kPacked>
+size_t ExtensionStatusOK<kPacked>::sInstanceCount = 0;
+
+inline ::MongoExtensionStatus* getExtensionStatusOK(const CapabilityVersion& capability) {
+    // One ExtensionStatusOK instantiation per negotiable (major, minor), in a row-major table
+    // with one row per supported major and one column per negotiable minor of that major. The
+    // table holds factories so each instance is constructed lazily, on first negotiation of its
+    // version.
+    return getNegotiatedVersionInstance<ExtensionStatusOK, ::MongoExtensionStatus>(capability);
+}
+
 /**
  * ExtensionGenericStatus is an implementation of ::MongoExtensionStatus that can be set across the
  * API boundary.
  */
 class ExtensionGenericStatus final : public ::MongoExtensionStatus {
 public:
-    ExtensionGenericStatus()
-        : ::MongoExtensionStatus{&VTABLE}, _code(MONGO_EXTENSION_STATUS_OK), _reason("") {}
+    static constexpr CapabilityBounds kCapabilityBounds = CapabilityBounds(
+        CapabilityVersion::legacyCapability(), CapabilityVersion::latestCapability());
 
-    ExtensionGenericStatus(int32_t code, std::string reason)
-        : ::MongoExtensionStatus{&VTABLE}, _code(code), _reason(reason) {}
+    ExtensionGenericStatus(CapabilityVersion capability = CapabilityVersion::legacyCapability())
+        : ::MongoExtensionStatus{&VTABLE},
+          _code(MONGO_EXTENSION_STATUS_OK),
+          _reason(""),
+          _capability(capability) {
+        tassert(13692205,
+                "ExtensionGenericStatus constructed with an out-of-bounds capability version",
+                isSupported(_capability));
+    }
+
+    ExtensionGenericStatus(int32_t code,
+                           std::string reason,
+                           CapabilityVersion capability = CapabilityVersion::legacyCapability())
+        : ::MongoExtensionStatus{&VTABLE}, _code(code), _reason(reason), _capability(capability) {
+        tassert(13692206,
+                "ExtensionGenericStatus constructed with an out-of-bounds capability version",
+                isSupported(_capability));
+    }
 
     ~ExtensionGenericStatus() = default;
 
@@ -114,6 +186,14 @@ public:
 
     bool operator==(const auto& other) const {
         return _code == other.getCode() && _reason == other.getReason();
+    }
+
+    constexpr const CapabilityVersion& getCapability() const {
+        return _capability;
+    }
+
+    static constexpr bool isSupported(const CapabilityVersion& capability) {
+        return kCapabilityBounds.isSupported(capability);
     }
 
 private:
@@ -144,6 +224,7 @@ private:
 
     int32_t _code;
     std::string _reason;
+    const CapabilityVersion _capability;
 };
 
 /**
@@ -152,10 +233,22 @@ private:
  */
 class ExtensionStatusException final : public ::MongoExtensionStatus {
 public:
-    ExtensionStatusException(std::exception_ptr&& e,
+    static constexpr CapabilityBounds kCapabilityBounds = CapabilityBounds(
+        CapabilityVersion::legacyCapability(), CapabilityVersion::latestCapability());
+
+    ExtensionStatusException(CapabilityVersion capability,
+                             std::exception_ptr&& e,
                              int32_t code,
                              const std::string& reason = std::string(""))
-        : ::MongoExtensionStatus{&VTABLE}, _code(code), _reason(reason), _exception(std::move(e)) {}
+        : ::MongoExtensionStatus{&VTABLE},
+          _capability(std::move(capability)),
+          _code(code),
+          _reason(reason),
+          _exception(std::move(e)) {
+        tassert(13692207,
+                "ExtensionStatusException constructed with an out-of-bounds capability version",
+                kCapabilityBounds.isSupported(_capability));
+    }
 
     ~ExtensionStatusException() = default;
 
@@ -176,6 +269,10 @@ public:
         } else {
             return nullptr;
         }
+    }
+
+    constexpr const CapabilityVersion& getCapability() const {
+        return _capability;
     }
 
 private:
@@ -205,6 +302,7 @@ private:
 
     static const ::MongoExtensionStatusVTable VTABLE;
 
+    const CapabilityVersion _capability;
     /**
      * _code may be MONGO_EXTENSION_STATUS_RUNTIME_ERROR if there was no error code associated
      * with the exception.
@@ -213,6 +311,15 @@ private:
     std::string _reason;
     std::exception_ptr _exception;
 };
+
+template <typename... Args>
+inline ::MongoExtensionStatus* createExtensionStatusException(const CapabilityVersion& capability,
+                                                              Args&&... args) {
+    if (ExtensionStatusException::kCapabilityBounds.isSupported(capability)) {
+        return new ExtensionStatusException(capability, std::forward<Args>(args)...);
+    }
+    return nullptr;
+}
 
 class StatusAPI;
 
@@ -232,8 +339,7 @@ using StatusHandle = OwnedHandle<::MongoExtensionStatus>;
  */
 class StatusAPI : public VTableAPI<::MongoExtensionStatus> {
 public:
-    StatusAPI(::MongoExtensionStatus* status,
-              const CapabilityVersion& capability = CapabilityVersion::legacyCapability())
+    StatusAPI(::MongoExtensionStatus* status, const CapabilityVersion& capability)
         : VTableAPI<::MongoExtensionStatus>(status, capability) {}
 
     /**
@@ -320,6 +426,10 @@ public:
 
     StatusHandle extractStatus() {
         return std::move(_extensionStatus);
+    }
+
+    static constexpr bool isSupported(CapabilityVersion capability) {
+        return StatusHandle::isSupported(capability);
     }
 
 private:
@@ -420,31 +530,38 @@ private:
  * Host, is used when a call from the extension re-enters the Host side of the API boundary.
  */
 template <typename Fn>
-::MongoExtensionStatus* wrapCXXAndConvertExceptionToStatus(Fn&& fn) {
+::MongoExtensionStatus* wrapCXXAndConvertExceptionToStatus(Fn&& fn,
+                                                           const CapabilityVersion& capVersion) {
     MetricsGuard<MetricsGuardMode::kHostSide> metricsGuard;
+    ::MongoExtensionStatus* errorStatus{nullptr};
     try {
         metricsGuard.setContext(getGlobalObservabilityContext());
         fn();
         metricsGuard.markSuccess();
-        return &ExtensionStatusOK::getInstance();
+        return getExtensionStatusOK(capVersion);
     } catch (ExtensionDBException& e) {
         /**
          * If we caught an ExtensionDBException, we can propagate the underlying extension
          * status. Note that we catch here by non-const reference, because we must mutate the
          * exception object to extract the underlying extension status.
          */
-        return e.extractStatus().release();
+        errorStatus = e.extractStatus().release();
     } catch (const DBException& e) {
         /**
          * If we caught any other type of exception, we capture the current C++ exception in our
          * custom ExtensionStatusException type. If we ever re-enter into our C++ execution
          * context, we can rethrow the captured exception.
          */
-        return new ExtensionStatusException(std::current_exception(), e.code());
+        errorStatus =
+            createExtensionStatusException(capVersion, std::current_exception(), e.code());
     } catch (...) {
-        return new ExtensionStatusException(std::current_exception(),
-                                            MONGO_EXTENSION_STATUS_RUNTIME_ERROR);
+        errorStatus = createExtensionStatusException(
+            capVersion, std::current_exception(), MONGO_EXTENSION_STATUS_RUNTIME_ERROR);
     }
+    tassert(13692202,
+            "Unable to create ExtensionStatusException, invalid capVersion",
+            errorStatus != nullptr);
+    return errorStatus;
 }
 
 void convertStatusToException(StatusHandle status);
@@ -455,73 +572,92 @@ void convertStatusToException(StatusHandle status);
  * class). The provided functor must return a MongoExtensionStatus*, which this helper will
  * translate into a C++ exception.
  *
- * NOTE: ObservabilityContext is only expected to be non-null when this code is running on the host
- * side of the API, not on the extension. In this function, we update the
- * extensionSuccesses/extensionFailures metrics, because invokeCAndConvertStatusToException, when
- * used by the Host, is used when the host calls into the extension.
+ * NOTE: ObservabilityContext is only expected to be non-null when this code is running on the
+ * host side of the API, not on the extension. In this function, we update the
+ * extensionSuccesses/extensionFailures metrics, because invokeCAndConvertStatusToException,
+ * when used by the Host, is used when the host calls into the extension.
  */
 template <typename Fn>
-void invokeCAndConvertStatusToException(Fn&& fn) {
-    MetricsGuard<MetricsGuardMode::kExtensionSide> metricsGuard(getGlobalObservabilityContext());
-    StatusHandle status(fn());
-    if (auto code = status->getCode(); MONGO_unlikely(code != MONGO_EXTENSION_STATUS_OK)) {
-        return convertStatusToException(std::move(status));
+void invokeCAndConvertStatusToException(Fn&& fn, const CapabilityVersion& capability) {
+    if (MONGO_likely(StatusHandle::isSupported(capability))) {
+        MetricsGuard<MetricsGuardMode::kExtensionSide> metricsGuard(
+            getGlobalObservabilityContext());
+        StatusHandle status(fn(), capability);
+        if (auto code = status->getCode(); MONGO_unlikely(code != MONGO_EXTENSION_STATUS_OK)) {
+            return convertStatusToException(std::move(status));
+        }
+        metricsGuard.markSuccess();
+    } else {
+        tasserted(13692201, "Unsupported capability for invokeCAndConvertStatusToException");
     }
-    metricsGuard.markSuccess();
 }
 
 inline ::MongoExtensionStatus* ExtensionGenericStatus::_extSetReason(
     ::MongoExtensionStatus* status, MongoExtensionByteView newReason) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        static_cast<ExtensionGenericStatus*>(status)->setReason(byteViewAsStringView(newReason));
-    });
+    auto* genericStatus = static_cast<ExtensionGenericStatus*>(status);
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() { genericStatus->setReason(byteViewAsStringView(newReason)); },
+        genericStatus->getCapability());
 }
 
 inline MongoExtensionStatus* ExtensionGenericStatus::_extClone(
-    const ::MongoExtensionStatus* status, ::MongoExtensionStatus** output) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        tassert(11186300,
-                "Received invalid output target for ExtensionGenericStatus::clone",
-                output != nullptr);
-        const auto& instance = *static_cast<const ExtensionGenericStatus*>(status);
-        *output = new ExtensionGenericStatus(instance);
-    });
+    const ::MongoExtensionStatus* status, MongoExtensionStatus** output) noexcept {
+    const auto* genericStatus = static_cast<const ExtensionGenericStatus*>(status);
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            tassert(11186300,
+                    "Received invalid output target for ExtensionGenericStatus::clone",
+                    output != nullptr);
+            *output = new ExtensionGenericStatus(*genericStatus);
+        },
+        genericStatus->getCapability());
 }
 
-inline ::MongoExtensionStatus* ExtensionStatusOK::_extSetReason(
+template <uint32_t kPacked>
+inline ::MongoExtensionStatus* ExtensionStatusOK<kPacked>::_extSetReason(
     ::MongoExtensionStatus* status, MongoExtensionByteView newReason) noexcept {
     // Forbidden for ExtensionStatusOK
     return wrapCXXAndConvertExceptionToStatus(
-        []() { tasserted(11186303, "Calling setReason on ExtensionStatusOK is forbidden!"); });
+        []() { tasserted(11186303, "Calling setReason on ExtensionStatusOK is forbidden!"); },
+        kCapability);
 }
 
-inline MongoExtensionStatus* ExtensionStatusOK::_extClone(
+template <uint32_t kPacked>
+inline MongoExtensionStatus* ExtensionStatusOK<kPacked>::_extClone(
     const ::MongoExtensionStatus* status, ::MongoExtensionStatus** output) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        tassert(11186301,
-                "Received invalid output target for ExtensionStatusOK::clone",
-                output != nullptr);
-        *output = &ExtensionStatusOK::getInstance();
-    });
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            tassert(11186301,
+                    "Received invalid output target for ExtensionStatusOK::clone",
+                    output != nullptr);
+            // A clone of an OK status is the same per-version instance.
+            *output = &getInstance();
+        },
+        kCapability);
 }
 
 inline ::MongoExtensionStatus* ExtensionStatusException::_extSetReason(
     ::MongoExtensionStatus* status, MongoExtensionByteView newReason) noexcept {
     // Forbidden for ExtensionStatusException because the wrapped exception is immutable
     // and its error message is set at construction time
-    return wrapCXXAndConvertExceptionToStatus([]() {
-        tasserted(11186304, "Calling setReason on ExtensionStatusException is forbidden!");
-    });
+    const auto* exceptionStatus = static_cast<const ExtensionStatusException*>(status);
+    return wrapCXXAndConvertExceptionToStatus(
+        []() {
+            tasserted(11186304, "Calling setReason on ExtensionStatusException is forbidden!");
+        },
+        exceptionStatus->getCapability());
 }
 
 inline MongoExtensionStatus* ExtensionStatusException::_extClone(
     const ::MongoExtensionStatus* status, ::MongoExtensionStatus** output) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        tassert(11186302,
-                "Received invalid output target for ExtensionStatusException::clone",
-                output != nullptr);
-        const auto& instance = *static_cast<const ExtensionStatusException*>(status);
-        *output = new ExtensionStatusException(instance);
-    });
+    const auto& instance = *static_cast<const ExtensionStatusException*>(status);
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            tassert(11186302,
+                    "Received invalid output target for ExtensionStatusException::clone",
+                    output != nullptr);
+            *output = new ExtensionStatusException(instance);
+        },
+        instance.getCapability());
 }
 }  // namespace mongo::extension

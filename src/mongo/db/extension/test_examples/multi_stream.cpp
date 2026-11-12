@@ -376,7 +376,7 @@ DplCallbackBundle makeDplCallback(const BSONObj& args) {
         auto* d = static_cast<DplConfig*>(userData);
         *sortOut = new extension::ByteBuf(d->sortPattern);
         *mergeOut = d->mergePipeline.isEmpty() ? nullptr : new extension::ByteBuf(d->mergePipeline);
-        return &extension::ExtensionStatusOK::getInstance();
+        return extension::getExtensionStatusOK(sdk::negotiatedCapabilityVersion());
     };
     const auto destroy = [](void* userData) {
         delete static_cast<DplConfig*>(userData);

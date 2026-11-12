@@ -3,6 +3,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/extension_version.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/util/modules.h"
 
@@ -24,9 +25,12 @@ namespace mongo::extension::host_connector {
  */
 class PipelineDependenciesAdapter final : public ::MongoExtensionPipelineDependencies {
 public:
-    PipelineDependenciesAdapter(DepsTracker deps, std::set<std::string> variableRefs = {})
+    PipelineDependenciesAdapter(DepsTracker deps,
+                                const CapabilityVersion& capability,
+                                std::set<std::string> variableRefs = {})
         : ::MongoExtensionPipelineDependencies{&VTABLE},
           _deps(std::move(deps)),
+          _capability(capability),
           _variableRefs(std::move(variableRefs)) {}
 
     ~PipelineDependenciesAdapter() = default;
@@ -44,7 +48,16 @@ public:
         return _variableRefs;
     }
 
+    constexpr const CapabilityVersion& getCapabilityVersion() const {
+        return _capability;
+    }
+
 private:
+    static constexpr const CapabilityVersion& _capabilityOf(
+        const ::MongoExtensionPipelineDependencies* dependencies) {
+        return static_cast<const PipelineDependenciesAdapter*>(dependencies)->_capability;
+    }
+
     static ::MongoExtensionStatus* _hostNeedsMetadata(
         const ::MongoExtensionPipelineDependencies* deps,
         ::MongoExtensionByteView name,
@@ -67,6 +80,7 @@ private:
     };
 
     const DepsTracker _deps;
+    const CapabilityVersion _capability;
     const std::set<std::string> _variableRefs;
 };
 

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"

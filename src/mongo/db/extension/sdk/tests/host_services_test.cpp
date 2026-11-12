@@ -6,6 +6,7 @@
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_shape_opts_adapter.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
@@ -22,13 +23,12 @@
 namespace mongo::extension {
 namespace {
 
-class HostServicesTest : public unittest::Test {
+// These tests exercise HostServices and SDK objects without going through
+// get_mongodb_extension(), so the negotiated capability that SDK status conversion reads must be
+// established by hand. Inheriting from sdk::SdkTest establishes it, making each test
+// self-sufficient regardless of execution order or filtering.
+class HostServicesTest : public sdk::SdkTest {
 public:
-    void setUp() override {
-        sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get(),
-                                              CapabilityVersion::legacyCapability());
-    }
-
     auto getExpCtx() {
         return _expCtx;
     }
@@ -220,7 +220,7 @@ TEST_F(HostServicesTest, NestedFilterParseNodeBasicPredicate) {
 
     query_shape::SerializationOptions opts =
         query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions;
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(
         queryShape,
@@ -240,7 +240,7 @@ TEST_F(HostServicesTest, NestedFilterParseNodeComplexPredicate) {
 
     query_shape::SerializationOptions opts =
         query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions;
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(
         queryShape,
@@ -261,7 +261,7 @@ TEST_F(HostServicesTest, NestedFilterParseNodeRejectsInvalidPredicate1) {
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     query_shape::SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
 
     ASSERT_THROWS_CODE(handle->getQueryShape(adapter), DBException, ErrorCodes::BadValue);
 }
@@ -275,7 +275,7 @@ TEST_F(HostServicesTest, NestedFilterParseNodeRejectsInvalidPredicate2) {
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     query_shape::SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
 
     ASSERT_THROWS_CODE(handle->getQueryShape(adapter), DBException, ErrorCodes::BadValue);
 }
@@ -355,7 +355,7 @@ static ::MongoExtensionStatus* sdkTestDPLCallback(void* userData,
     s->called = true;
     *sortPatternOut = new mongo::extension::ByteBuf(BSON("score" << -1));
     *mergeOut = nullptr;
-    return &mongo::extension::ExtensionStatusOK::getInstance();
+    return mongo::extension::getExtensionStatusOK(sdk::SdkTest::kTestCapability);
 }
 
 static void sdkTestDPLCallbackDestroy(void* userData) {

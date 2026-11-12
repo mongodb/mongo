@@ -13,63 +13,79 @@ MongoExtensionStatus* PipelineRewriteContextAdapter::_hostGetNthNextStage(
     const MongoExtensionPipelineRewriteContext* ctx,
     size_t index,
     MongoExtensionLogicalAggStage** out) {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        *out = nullptr;
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            *out = nullptr;
 
-        const PipelineRewriteContextAdapter* pipelineRewriteContextAdapter =
-            static_cast<const PipelineRewriteContextAdapter*>(ctx);
-        const auto& pipelineRewriteCtx = pipelineRewriteContextAdapter->getCtxImpl();
+            const PipelineRewriteContextAdapter* pipelineRewriteContextAdapter =
+                static_cast<const PipelineRewriteContextAdapter*>(ctx);
+            const auto& pipelineRewriteCtx = pipelineRewriteContextAdapter->getCtxImpl();
 
-        boost::intrusive_ptr<DocumentSource> ds = pipelineRewriteCtx.getNthNextStage(index);
+            boost::intrusive_ptr<DocumentSource> ds = pipelineRewriteCtx.getNthNextStage(index);
 
-        pipelineRewriteContextAdapter->cachedNextStageResult =
-            std::make_unique<HostLogicalAggStageAdapter>(host::LogicalAggStage::make(ds.get()));
-        *out = static_cast<MongoExtensionLogicalAggStage*>(
-            pipelineRewriteContextAdapter->cachedNextStageResult.get());
-    });
+            // The host stage inherits the capability negotiated with the extension that is asking
+            // for it, so the stage is exposed at the same version as the context handing it over.
+            pipelineRewriteContextAdapter->cachedNextStageResult =
+                std::make_unique<HostLogicalAggStageAdapter>(
+                    host::LogicalAggStage::make(ds.get()),
+                    pipelineRewriteContextAdapter->getCapabilityVersion());
+            *out = static_cast<MongoExtensionLogicalAggStage*>(
+                pipelineRewriteContextAdapter->cachedNextStageResult.get());
+        },
+        _capabilityOf(ctx));
 }
 
 MongoExtensionStatus* PipelineRewriteContextAdapter::_hostEraseNthNextStage(
     MongoExtensionPipelineRewriteContext* ctx, size_t index, bool* result) {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        auto& pipelineRewriteCtx = static_cast<PipelineRewriteContextAdapter*>(ctx)->getCtxImpl();
-        *result = pipelineRewriteCtx.eraseNthNext(index);
-    });
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            auto& pipelineRewriteCtx =
+                static_cast<PipelineRewriteContextAdapter*>(ctx)->getCtxImpl();
+            *result = pipelineRewriteCtx.eraseNthNext(index);
+        },
+        _capabilityOf(ctx));
 }
 
 MongoExtensionStatus* PipelineRewriteContextAdapter::_hostHasAtLeastNNextStages(
     const MongoExtensionPipelineRewriteContext* ctx, size_t n, bool* result) {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& pipelineRewriteCtx =
-            static_cast<const PipelineRewriteContextAdapter*>(ctx)->getCtxImpl();
-        *result = pipelineRewriteCtx.hasAtLeastNNextStages(n);
-    });
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            const auto& pipelineRewriteCtx =
+                static_cast<const PipelineRewriteContextAdapter*>(ctx)->getCtxImpl();
+            *result = pipelineRewriteCtx.hasAtLeastNNextStages(n);
+        },
+        _capabilityOf(ctx));
 }
 
 MongoExtensionStatus* PipelineRewriteContextAdapter::_hostGetPipelineSuffixBounds(
     const MongoExtensionPipelineRewriteContext* ctx, MongoExtensionDocsNeededBounds* out) {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& hostCtx = static_cast<const PipelineRewriteContextAdapter*>(ctx)->getCtxImpl();
-        DocsNeededBounds bounds = hostCtx.getPipelineSuffixBounds();
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            const auto& hostCtx =
+                static_cast<const PipelineRewriteContextAdapter*>(ctx)->getCtxImpl();
+            DocsNeededBounds bounds = hostCtx.getPipelineSuffixBounds();
 
-        auto convertConstraint =
-            [](const DocsNeededConstraint& c) -> MongoExtensionDocsNeededConstraint {
-            return visit(OverloadedVisitor{
-                             [](long long v) -> MongoExtensionDocsNeededConstraint {
-                                 return {kDocsNeededConstraintDiscrete, static_cast<uint64_t>(v)};
-                             },
-                             [](docs_needed_bounds::NeedAll) -> MongoExtensionDocsNeededConstraint {
-                                 return {kDocsNeededConstraintNeedAll, 0};
-                             },
-                             [](docs_needed_bounds::Unknown) -> MongoExtensionDocsNeededConstraint {
-                                 return {kDocsNeededConstraintUnknown, 0};
-                             },
-                         },
-                         c);
-        };
+            auto convertConstraint =
+                [](const DocsNeededConstraint& c) -> MongoExtensionDocsNeededConstraint {
+                return visit(
+                    OverloadedVisitor{
+                        [](long long v) -> MongoExtensionDocsNeededConstraint {
+                            return {kDocsNeededConstraintDiscrete, static_cast<uint64_t>(v)};
+                        },
+                        [](docs_needed_bounds::NeedAll) -> MongoExtensionDocsNeededConstraint {
+                            return {kDocsNeededConstraintNeedAll, 0};
+                        },
+                        [](docs_needed_bounds::Unknown) -> MongoExtensionDocsNeededConstraint {
+                            return {kDocsNeededConstraintUnknown, 0};
+                        },
+                    },
+                    c);
+            };
 
-        *out = {convertConstraint(bounds.getMinBounds()), convertConstraint(bounds.getMaxBounds())};
-    });
+            *out = {convertConstraint(bounds.getMinBounds()),
+                    convertConstraint(bounds.getMaxBounds())};
+        },
+        _capabilityOf(ctx));
 }
 
 using PipelineRewriteContext = rule_based_rewrites::pipeline::PipelineRewriteContext;
@@ -91,15 +107,15 @@ HostPipelineRewriteRule wrapExtensionRule(const extension::PipelineRewriteRule& 
         .name = ruleName,
         .precondition = [extensionStage, ruleName](PipelineRewriteContext& ctx) -> bool {
             auto hostCtx = host::PipelineRewriteContext::make(&ctx);
-            auto hostAdapter =
-                std::make_unique<host_connector::PipelineRewriteContextAdapter>(std::move(hostCtx));
+            auto hostAdapter = std::make_unique<host_connector::PipelineRewriteContextAdapter>(
+                std::move(hostCtx), extensionStage->getCapabilityVersion());
             return extensionStage->evaluatePipelineRewriteRulePrecondition(
                 std::string_view(ruleName.data(), ruleName.size()), hostAdapter.get());
         },
         .transform = [extensionStage, ruleName](PipelineRewriteContext& ctx) mutable -> bool {
             auto hostCtx = host::PipelineRewriteContext::make(&ctx);
-            auto hostAdapter =
-                std::make_unique<host_connector::PipelineRewriteContextAdapter>(std::move(hostCtx));
+            auto hostAdapter = std::make_unique<host_connector::PipelineRewriteContextAdapter>(
+                std::move(hostCtx), extensionStage->getCapabilityVersion());
             return extensionStage->evaluatePipelineRewriteRuleTransform(
                 std::string_view(ruleName.data(), ruleName.size()), hostAdapter.get());
         },

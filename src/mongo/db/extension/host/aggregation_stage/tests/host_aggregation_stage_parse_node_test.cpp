@@ -4,6 +4,7 @@
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -52,7 +53,8 @@ TEST(HostParseNodeTest, GetSpec) {
     ASSERT_TRUE(parseNode.getBsonSpec().binaryEqual(spec));
 
     // Get BSON spec through handle.
-    auto noOpParseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make(spec));
+    auto noOpParseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make(spec),
+                                                                sdk::SdkTest::kTestCapability);
     auto handle = AggStageParseNodeHandle{noOpParseNode};
     ASSERT_TRUE(static_cast<host::HostAggStageParseNodeAdapter*>(handle.get())
                     ->getBsonSpec()
@@ -60,7 +62,8 @@ TEST(HostParseNodeTest, GetSpec) {
 }
 
 TEST(HostParseNodeTest, IsHostAllocated) {
-    auto noOpParseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make({}));
+    auto noOpParseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make({}),
+                                                                sdk::SdkTest::kTestCapability);
     auto handle = AggStageParseNodeHandle{noOpParseNode};
 
     ASSERT_TRUE(host::HostAggStageParseNodeAdapter::isHostAllocated(*handle.get()));
@@ -77,23 +80,24 @@ TEST(HostParseNodeTest, IsNotHostAllocated) {
 DEATH_TEST(HostParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetName, "517") {
     auto vtable = host::HostAggStageParseNodeAdapter::getVTable();
     vtable.get_name = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, sdk::SdkTest::kTestCapability);
 }
 
 DEATH_TEST(HostParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetQueryShape, "517") {
     auto vtable = host::HostAggStageParseNodeAdapter::getVTable();
     vtable.get_query_shape = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, sdk::SdkTest::kTestCapability);
 }
 
 DEATH_TEST(HostParseNodeVTableDeathTest, InvalidParseNodeVTableFailsExpand, "517") {
     auto vtable = host::HostAggStageParseNodeAdapter::getVTable();
     vtable.expand = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, sdk::SdkTest::kTestCapability);
 }
 
 DEATH_TEST(HostParseNodeTestDeathTest, HostExpandUnimplemented, "10977801") {
-    auto noOpParseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make({}));
+    auto noOpParseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make({}),
+                                                                sdk::SdkTest::kTestCapability);
     auto handle = AggStageParseNodeHandle{noOpParseNode};
 
     ::MongoExtensionExpandedArrayContainer* container = nullptr;
@@ -103,7 +107,8 @@ DEATH_TEST(HostParseNodeTestDeathTest, HostExpandUnimplemented, "10977801") {
 TEST(HostParseNodeCloneTest, CloneHostAllocatedParseNodePreservesSpec) {
     auto spec = BSON("$match" << BSON("x" << 1));
 
-    auto parseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make(spec));
+    auto parseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make(spec),
+                                                            sdk::SdkTest::kTestCapability);
     auto handle = AggStageParseNodeHandle{parseNode};
 
     // Clone the parse node.
@@ -120,7 +125,8 @@ TEST(HostParseNodeCloneTest, CloneHostAllocatedParseNodePreservesSpec) {
 TEST(HostParseNodeCloneTest, CloneHostAllocatedParseNodeIsIndependent) {
     auto spec = BSON("$skip" << 5);
 
-    auto parseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make(spec));
+    auto parseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make(spec),
+                                                            sdk::SdkTest::kTestCapability);
     auto handle = AggStageParseNodeHandle{parseNode};
 
     // Clone the parse node.
@@ -139,7 +145,8 @@ TEST(HostParseNodeCloneTest, ClonedParseNodeSurvivesOriginalDestruction) {
     AggStageParseNodeHandle clonedHandle{nullptr};
 
     {
-        auto parseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make(spec));
+        auto parseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make(spec),
+                                                                sdk::SdkTest::kTestCapability);
         auto handle = AggStageParseNodeHandle{parseNode};
 
         // Clone before original goes out of scope.
@@ -157,7 +164,8 @@ TEST(HostParseNodeCloneTest, ClonedParseNodeSurvivesOriginalDestruction) {
 TEST(HostParseNodeCloneTest, MultipleCloneAreIndependent) {
     auto spec = BSON("$match" << BSON("x" << 1));
 
-    auto parseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make(spec));
+    auto parseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make(spec),
+                                                            sdk::SdkTest::kTestCapability);
     auto handle = AggStageParseNodeHandle{parseNode};
 
     // Create multiple clones.

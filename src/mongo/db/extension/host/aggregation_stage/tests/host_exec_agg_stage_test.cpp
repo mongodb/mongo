@@ -7,6 +7,7 @@
 #include "mongo/db/extension/host/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/host_connector/adapter/executable_agg_stage_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -22,11 +23,17 @@ namespace mongo::extension {
 
 namespace {
 
-class ExecAggStageTest : public unittest::Test {
+// These host-side tests construct SDK adapters and call through them, and SDK status conversion
+// reads the library-wide negotiated capability that only get_mongodb_extension() sets in
+// production. Inheriting from sdk::SdkTest establishes that version by hand, so each test is
+// self-sufficient regardless of execution order or filtering.
+class ExecAggStageTest : public sdk::SdkTest {
 public:
     void setUp() override {
+        sdk::SdkTest::setUp();
         _execCtx = std::make_unique<host_connector::QueryExecutionContextAdapter>(
-            std::make_unique<sdk::shared_test_stages::MockQueryExecutionContext>());
+            std::make_unique<sdk::shared_test_stages::MockQueryExecutionContext>(),
+            kTestCapability);
     }
     std::unique_ptr<host_connector::QueryExecutionContextAdapter> _execCtx;
 };
@@ -55,7 +62,8 @@ TEST_F(ExecAggStageTest, GetNextResult) {
     ASSERT_EQ(ReturnStatus::kPauseExecution, getNextResult.getStatus());
 
     // Test getNext() via ExecAggStageHandle.
-    auto hostExecAggStage = new host_connector::HostExecAggStageAdapter(std::move(execAggStage));
+    auto hostExecAggStage =
+        new host_connector::HostExecAggStageAdapter(std::move(execAggStage), kTestCapability);
     auto handle = ExecAggStageHandle{hostExecAggStage};
 
     auto hostGetNextResult = handle->getNext(_execCtx.get());
@@ -81,7 +89,7 @@ TEST_F(ExecAggStageTest, GetNextResult) {
         host::ExecAggStage::make(duplicateMatchExecAggStage.get());
 
     auto duplicateHostExecAggStage =
-        new host_connector::HostExecAggStageAdapter(std::move(duplicateExecAgg));
+        new host_connector::HostExecAggStageAdapter(std::move(duplicateExecAgg), kTestCapability);
     handle = ExecAggStageHandle{duplicateHostExecAggStage};
 
     ASSERT_EQ(extension::GetNextCode::kEOF, hostGetNextResult.code);
@@ -102,7 +110,8 @@ TEST_F(ExecAggStageTest, GetNextResultEdgeCaseEof) {
         host::ExecAggStage::make(matchExecAggStage.get());
 
     // Test getNext() via ExecAggStageHandle.
-    auto hostExecAggStage = new host_connector::HostExecAggStageAdapter(std::move(execAggStage));
+    auto hostExecAggStage =
+        new host_connector::HostExecAggStageAdapter(std::move(execAggStage), kTestCapability);
     auto handle = ExecAggStageHandle{hostExecAggStage};
 
     auto hostGetNextResult = handle->getNext(_execCtx.get());
@@ -133,7 +142,8 @@ DEATH_TEST_F(ExecAggStageTestDeathTest, InvalidReturnStatusCode, "11019500") {
     std::unique_ptr<host::ExecAggStage> execAggStage =
         host::ExecAggStage::make(matchExecAggStage.get());
 
-    auto hostExecAggStage = new host_connector::HostExecAggStageAdapter(std::move(execAggStage));
+    auto hostExecAggStage =
+        new host_connector::HostExecAggStageAdapter(std::move(execAggStage), kTestCapability);
     auto handle = ExecAggStageHandle{hostExecAggStage};
 
     // This getNext() call should hit the tassert because the C API doesn't have a
@@ -146,7 +156,7 @@ TEST_F(ExecAggStageTest, IsHostAllocated) {
         DocumentSourceMatch::create(BSON("a" << 1), make_intrusive<ExpressionContextForTest>());
     exec::agg::StagePtr matchExecAggStage = exec::agg::buildStage(matchDocSourceStage);
     auto hostExecAggStage = new host_connector::HostExecAggStageAdapter(
-        host::ExecAggStage::make(matchExecAggStage.get()));
+        host::ExecAggStage::make(matchExecAggStage.get()), kTestCapability);
     auto handle = ExecAggStageHandle{hostExecAggStage};
 
     ASSERT_TRUE(host_connector::HostExecAggStageAdapter::isHostAllocated(*handle.get()));
@@ -178,7 +188,8 @@ TEST_F(ExecAggStageTest, GetNameFromHostStage) {
     std::unique_ptr<host::ExecAggStage> execAggStage =
         host::ExecAggStage::make(matchExecAggStage.get());
 
-    auto hostExecAggStage = new host_connector::HostExecAggStageAdapter(std::move(execAggStage));
+    auto hostExecAggStage =
+        new host_connector::HostExecAggStageAdapter(std::move(execAggStage), kTestCapability);
     auto handle = ExecAggStageHandle{hostExecAggStage};
 
     ASSERT_EQ(handle->getName(), "$match");

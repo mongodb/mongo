@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/extension/sdk/operation_metrics_adapter.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/extension/shared/handle/operation_metrics_handle.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -28,7 +29,9 @@ private:
     int _counter = 0;
 };
 
-TEST(OwnedOperationMetricsHandle, canUpdateAndSerialize) {
+class OperationMetricsTest : public sdk::SdkTest {};
+
+TEST_F(OperationMetricsTest, canUpdateAndSerialize) {
     // Create metrics.
     auto adapter = new sdk::OperationMetricsAdapter(std::make_unique<TestExtensionMetrics>());
 

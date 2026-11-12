@@ -10,10 +10,12 @@ namespace mongo::extension::host_connector {
 ::MongoExtensionStatus* HostPortalAdapter::_extRegisterStageDescriptor(
     const MongoExtensionHostPortal* hostPortal,
     const MongoExtensionAggStageDescriptor* stageDesc) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
-        impl.registerStageDescriptor(stageDesc);
-    });
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
+            impl.registerStageDescriptor(stageDesc);
+        },
+        static_cast<const HostPortalAdapter*>(hostPortal)->getImpl().getCapabilityVersion());
 }
 
 ::MongoExtensionStatus* HostPortalAdapter::_extRegisterStageRules(
@@ -21,19 +23,23 @@ namespace mongo::extension::host_connector {
     ::MongoExtensionByteView stageName,
     const ::MongoExtensionPipelineRewriteRule* rules,
     size_t numRules) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
-        impl.registerStageRules(stageName, rules, numRules);
-    });
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
+            impl.registerStageRules(stageName, rules, numRules);
+        },
+        static_cast<const HostPortalAdapter*>(hostPortal)->getImpl().getCapabilityVersion());
 }
 
 ::MongoExtensionStatus* HostPortalAdapter::_extRegisterCommandDescriptor(
     const ::MongoExtensionHostPortal* hostPortal,
     const ::MongoExtensionCommandDescriptor* cmdDesc) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
-        impl.registerCommandDescriptor(cmdDesc);
-    });
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
+            impl.registerCommandDescriptor(cmdDesc);
+        },
+        static_cast<const HostPortalAdapter*>(hostPortal)->getImpl().getCapabilityVersion());
 }
 
 ::MongoExtensionByteView HostPortalAdapter::_extGetOptions(

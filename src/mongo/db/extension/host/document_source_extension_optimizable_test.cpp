@@ -20,6 +20,7 @@
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/incremental_feature_rollout.h"
 #include "mongo/db/namespace_string_util.h"
@@ -90,9 +91,9 @@ public:
 
     void setUp() override {
         AggregationContextFixture::setUp();
-        extension::sdk::HostServicesAPI::setHostServices(
-            &extension::host_connector::HostServicesAdapter::get(),
-            CapabilityVersion::legacyCapability());
+        extension::sdk::HostServicesAPI::setHostServicesForTest(
+            extension::host_connector::getHostServices(sdk::SdkTest::kTestCapability),
+            sdk::SdkTest::kTestCapability);
     }
 
     /**
@@ -162,7 +163,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ParseTransformSuccess) {
     // Register the extension stage and try to reparse.
 
     std::unique_ptr<host::HostPortal> hostPortal =
-        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+        std::make_unique<host::HostPortal>(sdk::SdkTest::kTestCapability);
     host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
     portal.getImpl().registerStageDescriptor(&_transformStaticDescriptor);
 
@@ -190,7 +191,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ParseTransformSuccess) {
 
 TEST_F(DocumentSourceExtensionOptimizableTest, RegisterInternalStageRestrictsClientType) {
     std::unique_ptr<host::HostPortal> hostPortal =
-        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+        std::make_unique<host::HostPortal>(sdk::SdkTest::kTestCapability);
     host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
     portal.getImpl().registerStageDescriptor(&_internalTransformStaticDescriptor);
 
@@ -346,7 +347,8 @@ public:
         out.reserve(kExpansionSize);
         // $querySettings stage expects a document as argument
         out.emplace_back(new host::HostAggStageParseNodeAdapter(
-            sdk::shared_test_stages::TransformHostParseNode::make(kBadQuerySettingsSpec)));
+            sdk::shared_test_stages::TransformHostParseNode::make(kBadQuerySettingsSpec),
+            sdk::SdkTest::kTestCapability));
         return out;
     }
 
@@ -772,7 +774,8 @@ public:
         std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new host::HostAggStageParseNodeAdapter(
-            sdk::shared_test_stages::TransformHostParseNode::make(kSearchSpec)));
+            sdk::shared_test_stages::TransformHostParseNode::make(kSearchSpec),
+            sdk::SdkTest::kTestCapability));
         return expanded;
     }
 
@@ -914,7 +917,8 @@ public:
         std::vector<VariantNodeHandle> expanded;
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(new host::HostAggStageParseNodeAdapter(
-            sdk::shared_test_stages::TransformHostParseNode::make(kSearchSpec)));
+            sdk::shared_test_stages::TransformHostParseNode::make(kSearchSpec),
+            sdk::SdkTest::kTestCapability));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNodeAdapter(
             std::make_unique<SingleActionRequiredPrivilegesAggStageAstNode>()));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNodeAdapter(
@@ -2501,7 +2505,7 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
              "519") {
     // Register "$transformStage" as an extension stage.
     std::unique_ptr<host::HostPortal> hostPortal =
-        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+        std::make_unique<host::HostPortal>(sdk::SdkTest::kTestCapability);
     host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
     portal.getImpl().registerStageDescriptor(&_transformStaticDescriptor);
 
@@ -2609,11 +2613,13 @@ public:
         // 2) Host $match -> DocumentSourceMatch.
         out.emplace_back(new host::HostAggStageParseNodeAdapter(
             sdk::shared_test_stages::TransformHostParseNode::make(
-                BSON("$match" << BSON("merged" << true)))));
+                BSON("$match" << BSON("merged" << true))),
+            sdk::SdkTest::kTestCapability));
 
         // 3) Host $limit -> DocumentSourceLimit.
         out.emplace_back(new host::HostAggStageParseNodeAdapter(
-            sdk::shared_test_stages::TransformHostParseNode::make(BSON("$limit" << 10))));
+            sdk::shared_test_stages::TransformHostParseNode::make(BSON("$limit" << 10)),
+            sdk::SdkTest::kTestCapability));
 
         return out;
     }
@@ -3330,7 +3336,7 @@ TEST_F(StageRulesTest, UnregisteredStageHasNoRules) {
 
 TEST_F(StageRulesTest, HostPortalRegisterStageRulesConvertsRules) {
     std::unique_ptr<host::HostPortal> hostPortal =
-        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+        std::make_unique<host::HostPortal>(sdk::SdkTest::kTestCapability);
     host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
 
     MongoExtensionPipelineRewriteRule cRules[2] = {
@@ -3374,7 +3380,7 @@ using TestStageDescriptor =
 
 TEST_F(StageRulesTest, RegisterStageRulesUassertsOnEmptyRules) {
     std::unique_ptr<host::HostPortal> hostPortal =
-        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+        std::make_unique<host::HostPortal>(sdk::SdkTest::kTestCapability);
     host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
     sdk::HostPortalHandle portalHandle{&portal};
 
@@ -3386,7 +3392,7 @@ TEST_F(StageRulesTest, RegisterStageRulesUassertsOnEmptyRules) {
 
 TEST_F(StageRulesTest, RegisterStageRulesUassertsOnDuplicateRuleName) {
     std::unique_ptr<host::HostPortal> hostPortal =
-        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+        std::make_unique<host::HostPortal>(sdk::SdkTest::kTestCapability);
     host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
     sdk::HostPortalHandle portalHandle{&portal};
 

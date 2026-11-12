@@ -67,8 +67,11 @@ private:
  */
 class HostExecAggStageAdapter final : public ::MongoExtensionExecAggStage {
 public:
-    HostExecAggStageAdapter(std::unique_ptr<host::ExecAggStage> execAggStage)
-        : ::MongoExtensionExecAggStage(&VTABLE), _execAggStage(std::move(execAggStage)) {
+    HostExecAggStageAdapter(std::unique_ptr<host::ExecAggStage> execAggStage,
+                            const CapabilityVersion& capability)
+        : ::MongoExtensionExecAggStage(&VTABLE),
+          _execAggStage(std::move(execAggStage)),
+          _capability(capability) {
         tassert(10957207,
                 "The adapter's underlying host exec agg stage is invalid.",
                 _execAggStage != nullptr);
@@ -85,6 +88,10 @@ public:
     HostExecAggStageAdapter(HostExecAggStageAdapter&&) = delete;
     HostExecAggStageAdapter& operator=(HostExecAggStageAdapter&&) = delete;
 
+    constexpr const CapabilityVersion& getCapabilityVersion() const {
+        return _capability;
+    }
+
     /**
      * Specifies whether the provided exec agg stage was allocated by the host.
      *
@@ -100,6 +107,11 @@ public:
     }
 
 private:
+    static constexpr const CapabilityVersion& _capabilityOf(
+        const ::MongoExtensionExecAggStage* execStage) noexcept {
+        return static_cast<const HostExecAggStageAdapter*>(execStage)->_capability;
+    }
+
     const host::ExecAggStage& getImpl() const noexcept {
         return *_execAggStage;
     }
@@ -126,20 +138,24 @@ private:
     static MongoExtensionStatus* _hostCreateMetrics(
         const MongoExtensionExecAggStage* execAggStage,
         MongoExtensionOperationMetrics** metrics) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(11213501,
-                      "_hostCreateMetrics should not be called. Ensure that execAggStage is "
-                      "extension-allocated, not host-allocated.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(11213501,
+                          "_hostCreateMetrics should not be called. Ensure that execAggStage is "
+                          "extension-allocated, not host-allocated.");
+            },
+            _capabilityOf(execAggStage));
     }
 
     static MongoExtensionStatus* _hostSetSource(::MongoExtensionExecAggStage* execAggStage,
                                                 ::MongoExtensionExecAggStage* input) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(10957206,
-                      "_hostSetSource should not be called. Ensure that execAggStage is "
-                      "extension-allocated, not host-allocated.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(10957206,
+                          "_hostSetSource should not be called. Ensure that execAggStage is "
+                          "extension-allocated, not host-allocated.");
+            },
+            _capabilityOf(execAggStage));
     };
 
     /**
@@ -150,39 +166,47 @@ private:
      * these changes.
      */
     static ::MongoExtensionStatus* _hostOpen(::MongoExtensionExecAggStage* execAggStage) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(11216700,
-                      "_hostOpen should not be called. Ensure that execAggStage is "
-                      "extension-allocated, not host-allocated.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(11216700,
+                          "_hostOpen should not be called. Ensure that execAggStage is "
+                          "extension-allocated, not host-allocated.");
+            },
+            _capabilityOf(execAggStage));
     }
 
     static ::MongoExtensionStatus* _hostReopen(
         ::MongoExtensionExecAggStage* execAggStage) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(11216701,
-                      "_hostReopen should not be called. Ensure that execAggStage is "
-                      "extension-allocated, not host-allocated.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(11216701,
+                          "_hostReopen should not be called. Ensure that execAggStage is "
+                          "extension-allocated, not host-allocated.");
+            },
+            _capabilityOf(execAggStage));
     }
 
     static ::MongoExtensionStatus* _hostClose(::MongoExtensionExecAggStage* execAggStage) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(11216702,
-                      "_hostClose should not be called. Ensure that execAggStage is "
-                      "extension-allocated, not host-allocated.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(11216702,
+                          "_hostClose should not be called. Ensure that execAggStage is "
+                          "extension-allocated, not host-allocated.");
+            },
+            _capabilityOf(execAggStage));
     }
 
     static ::MongoExtensionStatus* _hostExplain(const ::MongoExtensionExecAggStage* execAggStage,
                                                 ::MongoExtensionQueryExecutionContext* execCtx,
                                                 ::MongoExtensionExplainVerbosity verbosity,
                                                 ::MongoExtensionByteBuf** output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12149000,
-                      "_hostExplain should not be called. Ensure that execAggStage is "
-                      "extension-allocated, not host-allocated.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(12149000,
+                          "_hostExplain should not be called. Ensure that execAggStage is "
+                          "extension-allocated, not host-allocated.");
+            },
+            _capabilityOf(execAggStage));
     }
 
     static constexpr ::MongoExtensionExecAggStageVTable VTABLE = {.destroy = &_hostDestroy,
@@ -197,6 +221,7 @@ private:
                                                                   .explain = &_hostExplain};
 
     std::unique_ptr<host::ExecAggStage> _execAggStage;
+    const CapabilityVersion _capability;
     CachedGetNextResult _lastGetNextResult;
 };
 

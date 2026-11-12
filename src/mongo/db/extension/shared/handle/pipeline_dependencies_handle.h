@@ -38,7 +38,8 @@ public:
     bool needsMetadata(std::string_view name) const {
         bool result = false;
         invokeCAndConvertStatusToException(
-            [&]() { return _vtable().needs_metadata(get(), stringViewAsByteView(name), &result); });
+            [&]() { return _vtable().needs_metadata(get(), stringViewAsByteView(name), &result); },
+            getCapabilityVersion());
         return result;
     }
 
@@ -49,7 +50,8 @@ public:
     bool needsVariable(std::string_view name) const {
         bool result = false;
         invokeCAndConvertStatusToException(
-            [&]() { return _vtable().needs_variable(get(), stringViewAsByteView(name), &result); });
+            [&]() { return _vtable().needs_variable(get(), stringViewAsByteView(name), &result); },
+            getCapabilityVersion());
         return result;
     }
 
@@ -59,7 +61,8 @@ public:
     bool needsWholeDocument() const {
         bool result = false;
         invokeCAndConvertStatusToException(
-            [&]() { return _vtable().needs_whole_document(get(), &result); });
+            [&]() { return _vtable().needs_whole_document(get(), &result); },
+            getCapabilityVersion());
         return result;
     }
 
@@ -71,7 +74,7 @@ public:
     boost::optional<BSONObj> getNeededFields() const {
         ::MongoExtensionByteBuf* buf{nullptr};
         invokeCAndConvertStatusToException(
-            [&]() { return _vtable().get_needed_fields(get(), &buf); });
+            [&]() { return _vtable().get_needed_fields(get(), &buf); }, getCapabilityVersion());
         if (!buf) {
             return boost::none;
         }

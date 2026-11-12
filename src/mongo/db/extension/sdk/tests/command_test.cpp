@@ -11,6 +11,7 @@
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_portal.h"
 #include "mongo/db/extension/sdk/host_services.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/extension/sdk/tests/shared_test_commands.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
@@ -43,17 +44,17 @@ struct TestCommandExecutionContext final : public ::MongoExtensionCommandExecuti
         ::MongoExtensionStatus* opStatus) noexcept {
         const auto* self = static_cast<const TestCommandExecutionContext*>(ctx);
         if (self->interruptCode != MONGO_EXTENSION_STATUS_OK) {
-            auto statusAPI = StatusAPI(opStatus);
+            auto statusAPI = StatusAPI(opStatus, CapabilityVersion::latestCapability());
             statusAPI.setCode(self->interruptCode);
             statusAPI.setReason("interrupted");
         }
-        return &ExtensionStatusOK::getInstance();
+        return getExtensionStatusOK(CapabilityVersion::latestCapability());
     }
 
     static ::MongoExtensionStatus* _extGetDeadlineTimestampMs(
         const ::MongoExtensionCommandExecutionContext* ctx, int64_t* deadlineTimestampMs) noexcept {
         *deadlineTimestampMs = static_cast<const TestCommandExecutionContext*>(ctx)->deadlineMs;
-        return &ExtensionStatusOK::getInstance();
+        return getExtensionStatusOK(CapabilityVersion::latestCapability());
     }
 
     static constexpr ::MongoExtensionCommandExecutionContextVTable VTABLE = {
@@ -130,7 +131,7 @@ struct CountingCommandDescriptor : public ::MongoExtensionCommandDescriptor {
     static ::MongoExtensionStatus* _extGetProperties(
         const ::MongoExtensionCommandDescriptor*, ::MongoExtensionByteBuf** properties) noexcept {
         *properties = new CountingByteBuf(BSON("clusterRole" << "shard"));
-        return &ExtensionStatusOK::getInstance();
+        return getExtensionStatusOK(CapabilityVersion::latestCapability());
     }
 
     static ::MongoExtensionStatus* _extRun(const ::MongoExtensionCommandDescriptor*,
@@ -139,7 +140,7 @@ struct CountingCommandDescriptor : public ::MongoExtensionCommandDescriptor {
                                            const ::MongoExtensionCommandExecutionContext*,
                                            ::MongoExtensionByteBuf** responseBson) noexcept {
         *responseBson = new CountingByteBuf(BSON("ok" << 1));
-        return &ExtensionStatusOK::getInstance();
+        return getExtensionStatusOK(CapabilityVersion::latestCapability());
     }
 
     static constexpr ::MongoExtensionCommandDescriptorVTable VTABLE = {
@@ -149,14 +150,8 @@ struct CountingCommandDescriptor : public ::MongoExtensionCommandDescriptor {
     };
 };
 
-class CommandDescriptorTest : public unittest::Test {
+class CommandDescriptorTest : public sdk::SdkTest {
 public:
-    void setUp() override {
-        // Initialize HostServices so that the SDK assertion helpers can reach the host.
-        HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get(),
-                                         CapabilityVersion::legacyCapability());
-    }
-
     template <class Descriptor>
     static std::unique_ptr<ExtensionCommandDescriptorAdapter> makeAdapter() {
         return std::make_unique<ExtensionCommandDescriptorAdapter>(std::make_unique<Descriptor>());
@@ -381,7 +376,7 @@ TEST_F(CommandDescriptorTest, RegisterCommandRejectsDuplicateInSameExtension) {
     vtable.register_command_descriptor =
         [](const ::MongoExtensionHostPortal*,
            const ::MongoExtensionCommandDescriptor*) -> ::MongoExtensionStatus* {
-        return &ExtensionStatusOK::getInstance();
+        return getExtensionStatusOK(CapabilityVersion::latestCapability());
     };
     ::MongoExtensionHostPortal portal{&vtable, {}, 0};
 

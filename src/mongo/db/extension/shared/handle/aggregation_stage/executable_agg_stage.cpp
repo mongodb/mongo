@@ -16,13 +16,14 @@ namespace mongo::extension {
 MONGO_FAIL_POINT_DEFINE(failExtensionGetNextInvalidResult);
 
 void ExecAggStageAPI::setSource(const ExecAggStageHandle& input) {
-    invokeCAndConvertStatusToException([&]() { return _vtable().set_source(get(), input.get()); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().set_source(get(), input.get()); },
+                                       getCapabilityVersion());
 }
 
 ExtensionGetNextResult ExecAggStageAPI::getNext(MongoExtensionQueryExecutionContext* execCtxPtr) {
     ::MongoExtensionGetNextResult result = createDefaultExtensionGetNext();
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().get_next(get(), execCtxPtr, &result); });
+        [&]() { return _vtable().get_next(get(), execCtxPtr, &result); }, getCapabilityVersion());
 
     failExtensionGetNextInvalidResult.execute([&](const BSONObj& data) {
         result.code = ::MongoExtensionGetNextResultCode::kAdvanced;
@@ -32,7 +33,7 @@ ExtensionGetNextResult ExecAggStageAPI::getNext(MongoExtensionQueryExecutionCont
         // Destroy a transferred kByteBuf before overwriting the container, else the owning
         // pointer is dropped and the buffer leaks.
         if (container.type == MongoExtensionByteContainerType::kByteBuf && container.bytes.buf) {
-            ExtensionByteBufHandle{container.bytes.buf};
+            ExtensionByteBufHandle{container.bytes.buf, getCapabilityVersion()};
         }
         container.type = MongoExtensionByteContainerType::kByteView;
         container.bytes.view = ::MongoExtensionByteView{
@@ -40,7 +41,7 @@ ExtensionGetNextResult ExecAggStageAPI::getNext(MongoExtensionQueryExecutionCont
             static_cast<size_t>(data.getIntField("len"))};
     });
 
-    return ExtensionGetNextResult::makeFromApiResult(result);
+    return ExtensionGetNextResult::makeFromApiResult(result, getCapabilityVersion());
 }
 
 std::string_view ExecAggStageAPI::getName() const {
@@ -49,7 +50,8 @@ std::string_view ExecAggStageAPI::getName() const {
 
 OwnedOperationMetricsHandle ExecAggStageAPI::createMetrics() const {
     MongoExtensionOperationMetrics* metrics = nullptr;
-    invokeCAndConvertStatusToException([&]() { return _vtable().create_metrics(get(), &metrics); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().create_metrics(get(), &metrics); },
+                                       getCapabilityVersion());
 
     tassert(ErrorCodes::ExtensionSerializationError,
             "Result of `create_metrics` was nullptr",
@@ -60,24 +62,29 @@ OwnedOperationMetricsHandle ExecAggStageAPI::createMetrics() const {
 }
 
 void ExecAggStageAPI::open() {
-    invokeCAndConvertStatusToException([&]() { return _vtable().open(get()); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().open(get()); },
+                                       getCapabilityVersion());
 }
 
 void ExecAggStageAPI::reopen() {
-    invokeCAndConvertStatusToException([&]() { return _vtable().reopen(get()); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().reopen(get()); },
+                                       getCapabilityVersion());
 }
 
 void ExecAggStageAPI::close() {
-    invokeCAndConvertStatusToException([&]() { return _vtable().close(get()); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().close(get()); },
+                                       getCapabilityVersion());
 }
 
 BSONObj ExecAggStageAPI::explain(MongoExtensionQueryExecutionContext& execCtx,
                                  mongo::ExplainOptions::Verbosity verbosity) const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    invokeCAndConvertStatusToException([&]() {
-        return _vtable().explain(
-            get(), &execCtx, convertHostVerbosityToExtVerbosity(verbosity), &buf);
-    });
+    invokeCAndConvertStatusToException(
+        [&]() {
+            return _vtable().explain(
+                get(), &execCtx, convertHostVerbosityToExtVerbosity(verbosity), &buf);
+        },
+        getCapabilityVersion());
 
     tassert(ErrorCodes::ExtensionSerializationError,
             "buffer returned from explain must not be null",

@@ -592,6 +592,15 @@ public:
                                          const std::set<std::string>& builtinVarRefs) override;
 
     /**
+     * The capability version negotiated with the extension that provides this stage. The logical
+     * stage handle carries it; exposed here for code paths that adapt host state back into the
+     * extension without a handle in hand.
+     */
+    const CapabilityVersion& getExtensionCapabilityVersion() const {
+        return _logicalStage->getCapabilityVersion();
+    }
+
+    /**
      * Overridden from WrappedExtensionSourceHooks. Notifies the underlying extension logical stage
      * that the metadata stream has been elided.
      */

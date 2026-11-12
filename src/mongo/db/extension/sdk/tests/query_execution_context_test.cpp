@@ -8,6 +8,7 @@
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/death_test.h"
@@ -18,9 +19,10 @@
 namespace mongo::extension {
 namespace {
 
-class QueryExecutionContextTestFixture : public unittest::Test {
+class QueryExecutionContextTestFixture : public sdk::SdkTest {
 protected:
     void setUp() override {
+        sdk::SdkTest::setUp();
         _opCtx = _testCtx.makeOperationContext();
         _nss = NamespaceString::createNamespaceString_forTest("db", "coll");
         _expCtx =
@@ -36,7 +38,7 @@ protected:
 TEST_F(QueryExecutionContextTestFixture, CheckForInterruptOk) {
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), kTestCapability);
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     ASSERT_EQ(handle->checkForInterrupt(), ExtensionGenericStatus());
@@ -47,7 +49,7 @@ TEST_F(QueryExecutionContextTestFixture, CheckForInterruptDefaultKillCode) {
 
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), kTestCapability);
     sdk::QueryExecutionContextHandle handle(&adapter);
     auto status = handle->checkForInterrupt();
 
@@ -61,7 +63,7 @@ TEST_F(QueryExecutionContextTestFixture, CheckForInterruptCustomKillCode) {
 
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), kTestCapability);
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     ASSERT_EQ(handle->checkForInterrupt(),
@@ -73,7 +75,7 @@ TEST_F(QueryExecutionContextTestFixture, CheckForDeadline) {
     const auto deadlineTimestampMs = _opCtx->getDeadline().asInt64();
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), kTestCapability);
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     ASSERT_EQ(handle->getDeadlineTimestampMs(), deadlineTimestampMs);
@@ -84,7 +86,7 @@ TEST_F(QueryExecutionContextTestFixture, GetDeadlineTimestampMsWhenNoDeadline) {
     const auto deadlineTimestampMs = _opCtx->getDeadline().asInt64();
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), kTestCapability);
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     ASSERT_EQ(handle->getDeadlineTimestampMs(), deadlineTimestampMs);
@@ -94,7 +96,7 @@ TEST_F(QueryExecutionContextTestFixture, GetDeadlineTimestampMsWhenNoDeadline) {
 TEST_F(QueryExecutionContextTestFixture, GetHostMetricsEmpty) {
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), kTestCapability);
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     BSONObj result = handle->getHostMetrics({});
@@ -105,7 +107,7 @@ TEST_F(QueryExecutionContextTestFixture, GetHostMetricsKnownFieldNotPopulated) {
     // Request a known OpDebug field that is not populated (searchIdLookupMetrics is null).
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), kTestCapability);
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     BSONObj result = handle->getHostMetrics({"docsSeenByIdLookup"});
@@ -123,7 +125,7 @@ TEST_F(QueryExecutionContextTestFixture, GetHostMetricsPopulatedFields) {
 
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), kTestCapability);
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     BSONObj result = handle->getHostMetrics({"docsSeenByIdLookup", "docsReturnedByIdLookup"});
@@ -134,80 +136,62 @@ TEST_F(QueryExecutionContextTestFixture, GetHostMetricsPopulatedFields) {
 TEST_F(QueryExecutionContextTestFixture, GetHostMetricsUnknownFieldThrows) {
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), kTestCapability);
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     // Requesting an unknown metric name must throw a DBException.
     ASSERT_THROWS(handle->getHostMetrics({"thisMetricDoesNotExist"}), DBException);
 }
 
-class QueryExecutionContextVTableDeathTest : public unittest::Test {
-public:
-    void setUp() override {
-        // Initialize HostServices so that aggregation stages will be able to access member
-        // functions, e.g. to run assertions.
-        extension::sdk::HostServicesAPI::setHostServices(
-            &extension::host_connector::HostServicesAdapter::get(),
-            CapabilityVersion::legacyCapability());
-    }
-};
+class QueryExecutionContextVTableDeathTest : public sdk::SdkTest {};
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidCheckForInterrupt, "11098300") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.check_for_interrupt = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
-                                                           CapabilityVersion::legacyCapability());
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable, kTestCapability);
 };
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetMetrics, "11213507") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.get_metrics = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
-                                                           CapabilityVersion::legacyCapability());
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable, kTestCapability);
 };
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetDeadlineTimestampMs, "11646100") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.get_deadline_timestamp_ms = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
-                                                           CapabilityVersion::legacyCapability());
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable, kTestCapability);
 };
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetHostMetrics, "12199900") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.get_host_metrics = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
-                                                           CapabilityVersion::legacyCapability());
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable, kTestCapability);
 };
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidSetBatchSize, "13150703") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.set_batch_size = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
-                                                           CapabilityVersion::legacyCapability());
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable, kTestCapability);
 };
 
 TEST_F(QueryExecutionContextTestFixture, ThrowsErrorWhenBatchSizeSetToZero) {
-    extension::sdk::HostServicesAPI::setHostServices(
-        &extension::host_connector::HostServicesAdapter::get(),
-        CapabilityVersion::legacyCapability());
     exec::agg::DynamicBatchSize dbs;
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), &dbs);
+    host_connector::QueryExecutionContextAdapter adapter(
+        std::move(wrappedCtx), kTestCapability, &dbs);
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     ASSERT_THROWS_CODE(handle->setBatchSize(0), DBException, 13150704);
 }
 
 TEST_F(QueryExecutionContextTestFixture, AdapterRejectsZeroBatchSize) {
-    extension::sdk::HostServicesAPI::setHostServices(
-        &extension::host_connector::HostServicesAdapter::get(),
-        CapabilityVersion::legacyCapability());
     exec::agg::DynamicBatchSize dbs;
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), &dbs);
+    host_connector::QueryExecutionContextAdapter adapter(
+        std::move(wrappedCtx), kTestCapability, &dbs);
 
     auto* status = adapter.vtable->set_batch_size(&adapter, 0);
     ASSERT(status);
@@ -218,7 +202,7 @@ TEST_F(QueryExecutionContextTestFixture, AdapterRejectsZeroBatchSize) {
 TEST_F(QueryExecutionContextTestFixture, SetBatchSizeWithoutDynamicBatchSizeThrows) {
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), kTestCapability);
     sdk::QueryExecutionContextHandle handle(&adapter);
 
     ASSERT_THROWS_CODE(handle->setBatchSize(1), DBException, 13150705);

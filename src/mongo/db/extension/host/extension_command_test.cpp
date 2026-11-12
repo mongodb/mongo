@@ -128,8 +128,8 @@ public:
 
     void setUp() override {
         ServiceContextTest::setUp();
-        sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get(),
-                                              kCapabilityVersion);
+        sdk::HostServicesAPI::setHostServicesForTest(
+            host_connector::getHostServices(kCapabilityVersion), kCapabilityVersion);
         auto resolver = std::make_unique<MockSearchIndexProcessInterface>();
         _resolver = resolver.get();
         SearchIndexProcessInterface::set(getServiceContext()->getService(), std::move(resolver));

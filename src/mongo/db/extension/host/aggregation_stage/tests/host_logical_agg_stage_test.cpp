@@ -3,6 +3,7 @@
 
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host_connector/adapter/logical_agg_stage_adapter.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -16,9 +17,14 @@ namespace mongo::extension {
 
 namespace {
 
-class HostLogicalAggStageAdapterTest : public unittest::Test {
+// These host-side tests construct SDK adapters (e.g. sdk::ExtensionAggStageAstNodeAdapter) and
+// call through them, and SDK status conversion reads the library-wide negotiated capability that
+// only get_mongodb_extension() sets in production. Inheriting from sdk::SdkTest establishes that
+// version by hand, so each test is self-sufficient regardless of execution order or filtering.
+class HostLogicalAggStageAdapterTest : public sdk::SdkTest {
 public:
     void setUp() override {
+        sdk::SdkTest::setUp();
         _expCtx = make_intrusive<ExpressionContextForTest>();
     }
 
@@ -29,8 +35,9 @@ protected:
 TEST_F(HostLogicalAggStageAdapterTest, GetNameFromServerStage) {
     auto sortDs = DocumentSourceSort::create(_expCtx, BSON("a" << 1));
 
-    host_connector::HostLogicalAggStageAdapter adapter(host::LogicalAggStage::make(sortDs.get()));
-    LogicalAggStageAPI api(&adapter, CapabilityVersion::legacyCapability());
+    host_connector::HostLogicalAggStageAdapter adapter(host::LogicalAggStage::make(sortDs.get()),
+                                                       kTestCapability);
+    LogicalAggStageAPI api(&adapter, kTestCapability);
 
     ASSERT_EQ(api.getName(), DocumentSourceSort::kStageName);
 }
@@ -43,7 +50,7 @@ TEST_F(HostLogicalAggStageAdapterTest, GetNameFromExtensionStage) {
     auto extensionDs =
         host::DocumentSourceExtensionOptimizable::create(_expCtx, std::move(astHandle));
     host_connector::HostLogicalAggStageAdapter adapter(
-        host::LogicalAggStage::make(extensionDs.get()));
+        host::LogicalAggStage::make(extensionDs.get()), kTestCapability);
     LogicalAggStageAPI api(&adapter);
 
     ASSERT_EQ(api.getName(), sdk::shared_test_stages::kTransformName);
@@ -52,7 +59,8 @@ TEST_F(HostLogicalAggStageAdapterTest, GetNameFromExtensionStage) {
 TEST_F(HostLogicalAggStageAdapterTest, GetFilterReturnsEmptyForStageThatHasNoFilter) {
     auto sortDs = DocumentSourceSort::create(_expCtx, BSON("a" << 1));
 
-    host_connector::HostLogicalAggStageAdapter adapter(host::LogicalAggStage::make(sortDs.get()));
+    host_connector::HostLogicalAggStageAdapter adapter(host::LogicalAggStage::make(sortDs.get()),
+                                                       kTestCapability);
     LogicalAggStageAPI api(&adapter);
 
     ASSERT_BSONOBJ_EQ(api.getFilter(), BSONObj());
@@ -62,7 +70,8 @@ TEST_F(HostLogicalAggStageAdapterTest, GetFilterReturnsBSONObjForStageThatHasFil
     auto filterBson = BSON("x" << 42);
     auto matchDs = DocumentSourceMatch::create(filterBson, _expCtx);
 
-    host_connector::HostLogicalAggStageAdapter adapter(host::LogicalAggStage::make(matchDs.get()));
+    host_connector::HostLogicalAggStageAdapter adapter(host::LogicalAggStage::make(matchDs.get()),
+                                                       kTestCapability);
     LogicalAggStageAPI api(&adapter);
 
     ASSERT_BSONOBJ_EQ(api.getFilter(), filterBson);

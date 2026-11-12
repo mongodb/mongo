@@ -66,25 +66,48 @@ MONGO_INITIALIZER(InitializeTestObservabilityContext)(InitializerContext*) {
     mongo::extension::setGlobalObservabilityContext(std::make_unique<TestObservabilityContext>());
 };
 
+// The only negotiable version today is (1, 0), so it vends the sole ExtensionStatusOK instance.
+using StatusOK10 = ExtensionStatusOK<static_cast<uint32_t>(CapabilityVersion::legacyCapability())>;
+constexpr CapabilityVersion kTestCapability = CapabilityVersion::legacyCapability();
+
+// One instance per negotiable (major, minor): each major contributes (max minor + 1) instances,
+// since minors are 0-indexed and inclusive. Exercises the multi-major arithmetic before a
+// second major exists.
+static_assert(totalNegotiableVersions(std::array{CapabilityVersion(1, 0)}) == 1);
+static_assert(totalNegotiableVersions(std::array{CapabilityVersion(1, 5),
+                                                 CapabilityVersion(2, 0)}) == 7);
+static_assert(totalNegotiableVersions(std::array{CapabilityVersion(1, 5),
+                                                 CapabilityVersion(2, 3)}) == 10);
+
+// Row start offsets are prefix sums of the row sizes, enabling direct (search-free) indexing.
+static_assert(negotiableVersionRowOffsets(std::array{CapabilityVersion(1, 0)}) ==
+              std::array<size_t, 1>{0});
+static_assert(negotiableVersionRowOffsets(std::array{CapabilityVersion(1, 5),
+                                                     CapabilityVersion(2, 0)}) ==
+              std::array<size_t, 2>{0, 6});
+
 TEST(ExtensionStatusTest, extensionStatusOKTest) {
     // StatusHandle going out of scope should call destroy, but not destroy our singleton.
-    auto* const statusOKSingleton = &ExtensionStatusOK::getInstance();
+    auto* const statusOKSingleton =
+        static_cast<StatusOK10*>(getExtensionStatusOK(CapabilityVersion::legacyCapability()));
     {
         StatusHandle statusHandle(statusOKSingleton);
         ASSERT_EQUALS(statusHandle->getCode(), 0);
         ASSERT_EQUALS(statusHandle->getReason().size(), 0);
     }
 
-    ASSERT_TRUE(statusOKSingleton == &ExtensionStatusOK::getInstance());
+    ASSERT_TRUE(statusOKSingleton == getExtensionStatusOK(CapabilityVersion::legacyCapability()));
 
-    ASSERT_EQUALS(ExtensionStatusOK::getInstance().getCode(), 0);
-    ASSERT_EQUALS(ExtensionStatusOK::getInstance().getReason().size(), 0);
-    ASSERT_EQUALS(ExtensionStatusOK::getInstanceCount(), 1);
+    ASSERT_EQUALS(statusOKSingleton->getCode(), 0);
+    ASSERT_EQUALS(statusOKSingleton->getReason().size(), 0);
+    ASSERT_EQUALS(statusOKSingleton->getCapability(), CapabilityVersion::legacyCapability());
+    ASSERT_EQUALS(StatusOK10::getInstanceCount(), 1);
 }
 
 TEST(ExtensionStatusTest, extensionStatusOKCloneTest) {
     // StatusHandle going out of scope should call destroy, but not destroy our singleton.
-    auto* const statusOKSingleton = &ExtensionStatusOK::getInstance();
+    auto* const statusOKSingleton =
+        static_cast<StatusOK10*>(getExtensionStatusOK(CapabilityVersion::legacyCapability()));
     {
         StatusHandle statusHandle(statusOKSingleton);
         ASSERT_EQUALS(statusHandle->getCode(), 0);
@@ -93,14 +116,14 @@ TEST(ExtensionStatusTest, extensionStatusOKCloneTest) {
         auto clonedHandle = statusHandle->clone();
         ASSERT_EQUALS(statusHandle->getCode(), 0);
         ASSERT_EQUALS(statusHandle->getReason().size(), 0);
-        ASSERT_EQUALS(ExtensionStatusOK::getInstanceCount(), 1);
+        ASSERT_EQUALS(StatusOK10::getInstanceCount(), 1);
     }
 
-    ASSERT_TRUE(statusOKSingleton == &ExtensionStatusOK::getInstance());
+    ASSERT_TRUE(statusOKSingleton == getExtensionStatusOK(CapabilityVersion::legacyCapability()));
 
-    ASSERT_EQUALS(ExtensionStatusOK::getInstance().getCode(), 0);
-    ASSERT_EQUALS(ExtensionStatusOK::getInstance().getReason().size(), 0);
-    ASSERT_EQUALS(ExtensionStatusOK::getInstanceCount(), 1);
+    ASSERT_EQUALS(statusOKSingleton->getCode(), 0);
+    ASSERT_EQUALS(statusOKSingleton->getReason().size(), 0);
+    ASSERT_EQUALS(StatusOK10::getInstanceCount(), 1);
 }
 
 TEST(ExtensionStatusTest, extensionGenericStatusCloneTest) {
@@ -112,7 +135,8 @@ TEST(ExtensionStatusTest, extensionGenericStatusCloneTest) {
 
 TEST(ExtensionStatusTest, ExtensionStatusExceptionCloneTest) {
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
-        [&]() { uasserted(11511001, "Failed with uassert in $noOpExtension parse."); }));
+        [&]() { uasserted(11511001, "Failed with uassert in $noOpExtension parse."); },
+        kTestCapability));
 
     auto clonedHandle = status->clone();
     ASSERT_EQUALS(status->getCode(), clonedHandle->getCode());
@@ -182,7 +206,8 @@ TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_stdE
     const auto* cast = dynamic_cast<const TestObservabilityContext*>(obsCtx);
     ASSERT(cast != nullptr);
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
-        [&]() { throw std::runtime_error("Runtime exception in $noOpExtension parse."); }));
+        [&]() { throw std::runtime_error("Runtime exception in $noOpExtension parse."); },
+        kTestCapability));
     ASSERT_TRUE(status->getCode() == MONGO_EXTENSION_STATUS_RUNTIME_ERROR);
     assertExpectedMetricsOnError(0, 1);
 }
@@ -193,11 +218,16 @@ TEST(
     ExtensionStatusTest,
     extensionStatusWrapCXXAndConvertExceptionToStatus_invokeCAndConvertStatusToException_rethrow_stdException) {
     TestObservabilityContext::resetCounters();
-    ASSERT_THROWS(invokeCAndConvertStatusToException([&]() {
-                      return wrapCXXAndConvertExceptionToStatus([&]() {
-                          throw std::runtime_error("Runtime exception in $noOpExtension parse.");
-                      });
-                  }),
+    ASSERT_THROWS(invokeCAndConvertStatusToException(
+                      [&]() {
+                          return wrapCXXAndConvertExceptionToStatus(
+                              [&]() {
+                                  throw std::runtime_error(
+                                      "Runtime exception in $noOpExtension parse.");
+                              },
+                              kTestCapability);
+                      },
+                      kTestCapability),
                   std::exception);
 
     assertExpectedMetricsOnError(1, 1);
@@ -208,7 +238,8 @@ TEST(
 TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_AssertionException) {
     TestObservabilityContext::resetCounters();
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
-        [&]() { uasserted(10596408, "Failed with uassert in $noOpExtension parse."); }));
+        [&]() { uasserted(10596408, "Failed with uassert in $noOpExtension parse."); },
+        kTestCapability));
     ASSERT_TRUE(status->getCode() == 10596408);
     assertExpectedMetricsOnError(0, 1);
 }
@@ -219,13 +250,16 @@ TEST(
     ExtensionStatusTest,
     extensionStatusWrapCXXAndConvertExceptionToStatus_invokeCAndConvertStatusToException_rethrow_AssertionException) {
     TestObservabilityContext::resetCounters();
-    ASSERT_THROWS_CODE(invokeCAndConvertStatusToException([&]() {
-                           return wrapCXXAndConvertExceptionToStatus([&]() {
-                               uasserted(10596409, "Failed with uassert in $noOpExtension parse.");
-                           });
-                       }),
-                       AssertionException,
-                       10596409);
+    ASSERT_THROWS_CODE(
+        invokeCAndConvertStatusToException(
+            [&]() {
+                return wrapCXXAndConvertExceptionToStatus(
+                    [&]() { uasserted(10596409, "Failed with uassert in $noOpExtension parse."); },
+                    kTestCapability);
+            },
+            kTestCapability),
+        AssertionException,
+        10596409);
     assertExpectedMetricsOnError(1, 1);
 }
 
@@ -241,14 +275,17 @@ TEST(
     extensionStatusInvokeCAndConvertStatusToException_wrapCXXAndConvertExceptionToStatus_ExtensionDBException) {
     const std::string& kErrorString =
         "Failed with an error which was not an ExtensionStatusException.";
-    auto extensionStatusPtr =
-        std::make_unique<ExtensionStatusException>(nullptr, 10596412, kErrorString);
+    auto extensionStatusPtr = std::make_unique<ExtensionStatusException>(
+        kTestCapability, nullptr, 10596412, kErrorString);
     const auto* extensionStatusOriginalPtr = extensionStatusPtr.get();
     TestObservabilityContext::resetCounters();
 
-    StatusHandle propagatedStatus(wrapCXXAndConvertExceptionToStatus([&]() {
-        invokeCAndConvertStatusToException([&]() { return extensionStatusPtr.release(); });
-    }));
+    StatusHandle propagatedStatus(wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            invokeCAndConvertStatusToException([&]() { return extensionStatusPtr.release(); },
+                                               kTestCapability);
+        },
+        kTestCapability));
 
     // Verify that the MongoExtensionStatus* we propagated through
     // wrapCXXAndConvertExceptionToStatus(invokeCAndConvertStatusToException(..)) is the same one we
@@ -259,7 +296,8 @@ TEST(
 
 TEST(ExtensionStatusTest, extensionStatusInvokeCAndConvertStatusToException_ExtensionStatusOK) {
     TestObservabilityContext::resetCounters();
-    invokeCAndConvertStatusToException([&]() { return &ExtensionStatusOK::getInstance(); });
+    invokeCAndConvertStatusToException([&]() { return getExtensionStatusOK(kTestCapability); },
+                                       kTestCapability);
     assertExpectedMetricsOnSuccess(1, 0);
 }
 
@@ -267,7 +305,8 @@ TEST(ExtensionStatusTest,
      extensionStatusInvokeCAndConvertStatusToException_wrapCXXAndConvertExceptionToStatus_Success) {
     TestObservabilityContext::resetCounters();
 
-    StatusHandle status(wrapCXXAndConvertExceptionToStatus([&]() { return true; }));
+    StatusHandle status(
+        wrapCXXAndConvertExceptionToStatus([&]() { return true; }, kTestCapability));
     ASSERT_TRUE(status->getCode() == MONGO_EXTENSION_STATUS_OK);
     assertExpectedMetricsOnSuccess(0, 1);
 }
@@ -277,12 +316,15 @@ TEST(ExtensionStatusTest, extensionStatusInvokeCAndConvertStatusToException_Exte
         "Failed with an error which was not an ExtensionStatusException.";
     TestObservabilityContext::resetCounters();
 
-    ASSERT_THROWS_CODE_AND_WHAT(
-        invokeCAndConvertStatusToException(
-            [&]() { return new ExtensionStatusException(nullptr, 10596412, kErrorString); }),
-        ExtensionDBException,
-        10596412,
-        kErrorString);
+    ASSERT_THROWS_CODE_AND_WHAT(invokeCAndConvertStatusToException(
+                                    [&]() {
+                                        return new ExtensionStatusException(
+                                            kTestCapability, nullptr, 10596412, kErrorString);
+                                    },
+                                    kTestCapability),
+                                ExtensionDBException,
+                                10596412,
+                                kErrorString);
     assertExpectedMetricsOnError(1, 0);
 }
 
@@ -299,73 +341,85 @@ TEST(
     TestObservabilityContext::resetCounters();
     // wrapCXX catches the rethrown exception, which is not an ExtensionDBException, so it
     // bumps the count again
-    StatusHandle propagatedStatus(wrapCXXAndConvertExceptionToStatus([&]() {
-        invokeCAndConvertStatusToException([&]() {
-            // wrapCXX catches the rethrown exception, which is not an ExtensionDBException, so it
-            // bumps the count again
-            return wrapCXXAndConvertExceptionToStatus([&]() {
-                invokeCAndConvertStatusToException([&]() {
-                    // wrapCXX increases failure count to 1. allocates ExtensionStatusException
+    StatusHandle propagatedStatus(wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            invokeCAndConvertStatusToException(
+                [&]() {
+                    // wrapCXX catches the rethrown exception, which is not an ExtensionDBException,
+                    // so it bumps the count again
                     return wrapCXXAndConvertExceptionToStatus(
-                        []() { uasserted(11569604, "Dummy error."); });
-                });
-            });
-        });
-    }));
+                        [&]() {
+                            invokeCAndConvertStatusToException(
+                                [&]() {
+                                    // wrapCXX increases failure count to 1. allocates
+                                    // ExtensionStatusException
+                                    return wrapCXXAndConvertExceptionToStatus(
+                                        []() { uasserted(11569604, "Dummy error."); },
+                                        kTestCapability);
+                                },
+                                kTestCapability);
+                        },
+                        kTestCapability);
+                },
+                kTestCapability);
+        },
+        kTestCapability));
 
     assertExpectedMetricsOnError(2, 3);
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsGetCode, "517") {
-    auto vtable = ExtensionStatusOK::getVTable();
+    auto vtable = StatusOK10::getVTable();
     vtable.get_code = nullptr;
     StatusAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsGetReason, "517") {
-    auto vtable = ExtensionStatusOK::getVTable();
+    auto vtable = StatusOK10::getVTable();
     vtable.get_reason = nullptr;
     StatusAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsSetCode, "517") {
-    auto vtable = ExtensionStatusOK::getVTable();
+    auto vtable = StatusOK10::getVTable();
     vtable.set_code = nullptr;
     StatusAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsSetReason, "517") {
-    auto vtable = ExtensionStatusOK::getVTable();
+    auto vtable = StatusOK10::getVTable();
     vtable.set_reason = nullptr;
     StatusAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsClone, "517") {
-    auto vtable = ExtensionStatusOK::getVTable();
+    auto vtable = StatusOK10::getVTable();
     vtable.clone = nullptr;
     StatusAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, ExtensionStatusOKSetReasonFails, "11186303") {
-    StatusHandle status(&ExtensionStatusOK::getInstance());
+    StatusHandle status(getExtensionStatusOK(kTestCapability));
     status->setReason("");
 }
 
 TEST(ExtensionStatusTest, ExtensionStatusOKSetCodeNoOp) {
-    StatusHandle status(&ExtensionStatusOK::getInstance());
+    StatusHandle status(getExtensionStatusOK(kTestCapability));
     status->setCode(100);
     ASSERT_EQ(status->getCode(), 0);
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, ExtensionStatusExceptionSetReasonFails, "11186304") {
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
-        [&]() { uasserted(11186311, "Failed with uassert in $noOpExtension parse."); }));
+        [&]() { uasserted(11186311, "Failed with uassert in $noOpExtension parse."); },
+        kTestCapability));
     status->setReason("");
 }
 
 TEST(ExtensionStatusTest, ExtensionStatusExceptionSetCodeNoOp) {
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
-        [&]() { uasserted(11186312, "Failed with uassert in $noOpExtension parse."); }));
+        [&]() { uasserted(11186312, "Failed with uassert in $noOpExtension parse."); },
+        kTestCapability));
     ASSERT_EQ(status->getCode(), 11186312);
     status->setCode(0);
     ASSERT_EQ(status->getCode(), 11186312);

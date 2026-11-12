@@ -225,8 +225,8 @@ public:
     std::vector<VariantNodeHandle> expand() const override {
         std::vector<VariantNodeHandle> out;
         out.reserve(kExpansionSize);
-        out.emplace_back(
-            new host::HostAggStageParseNodeAdapter(TransformHostParseNode::make(kMatchSpec)));
+        out.emplace_back(new host::HostAggStageParseNodeAdapter(
+            TransformHostParseNode::make(kMatchSpec), sdk::negotiatedCapabilityVersion()));
         return out;
     }
 
@@ -303,8 +303,8 @@ public:
             new sdk::ExtensionAggStageAstNodeAdapter(std::make_unique<TransformAggStageAstNode>()));
         out.emplace_back(new sdk::ExtensionAggStageParseNodeAdapter(
             std::make_unique<TransformAggStageParseNode>()));
-        out.emplace_back(
-            new host::HostAggStageParseNodeAdapter(TransformHostParseNode::make(kMatchSpec)));
+        out.emplace_back(new host::HostAggStageParseNodeAdapter(
+            TransformHostParseNode::make(kMatchSpec), sdk::negotiatedCapabilityVersion()));
         out.emplace_back(
             extension::sdk::HostServicesAPI::getInstance()->createIdLookup(kIdLookupSpec));
         return out;
@@ -936,7 +936,8 @@ public:
             std::vector<VariantDPLHandle> elements;
             // Host-defined parse node.
             elements.emplace_back(new host::HostAggStageParseNodeAdapter(
-                TransformHostParseNode::make(BSON("$match" << BSON("a" << 1)))));
+                TransformHostParseNode::make(BSON("$match" << BSON("a" << 1))),
+                sdk::negotiatedCapabilityVersion()));
             // Extension-defined parse node.
             elements.emplace_back(new sdk::ExtensionAggStageParseNodeAdapter(
                 std::make_unique<TransformAggStageParseNode>()));

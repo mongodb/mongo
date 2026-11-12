@@ -5,6 +5,7 @@
 #include "mongo/db/extension/host/pipeline_rewrite_context.h"
 #include "mongo/db/extension/host_connector/adapter/pipeline_dependencies_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/pipeline_rewrite_context_adapter.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 #include "mongo/db/extension/shared/handle/pipeline_dependencies_handle.h"
 #include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
@@ -33,7 +34,8 @@ TEST(PipelineRewriteContextAdapterTest, GetNthNextStageReturnsFirstNextStage) {
     container.push_back(DocumentSourceSkip::create(expCtx, 5));
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     auto stage = PipelineRewriteContextAPI(&adapter).getNthNextStage(1);
     ASSERT_NOT_EQUALS(nullptr, stage.get());
@@ -48,7 +50,8 @@ TEST(PipelineRewriteContextAdapterTest, GetNthNextStageReturnsSecondNextStage) {
     container.push_back(DocumentSourceLimit::create(expCtx, 3));
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     PipelineRewriteContextAPI api(&adapter);
     auto stage = api.getNthNextStage(2);
@@ -66,7 +69,8 @@ TEST(PipelineRewriteContextAdapterTest, GetNthNextStageResultUpdatedOnSubsequent
     container.push_back(DocumentSourceLimit::create(expCtx, 3));
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     PipelineRewriteContextAPI api(&adapter);
     ASSERT_EQUALS(DocumentSourceSkip::kStageName, api.getNthNextStage(1)->getName());
@@ -81,7 +85,8 @@ TEST(PipelineRewriteContextAdapterTest, EraseNthNextStageRemovesFirstNextStage) 
     container.push_back(DocumentSourceLimit::create(expCtx, 3));
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     PipelineRewriteContextAPI api(&adapter);
     ASSERT_TRUE(api.eraseNthNext(1));
@@ -99,7 +104,8 @@ TEST(PipelineRewriteContextAdapterTest, EraseNthNextStageRemovesNonAdjacentStage
     container.push_back(DocumentSourceLimit::create(expCtx, 3));
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     PipelineRewriteContextAPI api(&adapter);
     ASSERT_TRUE(api.eraseNthNext(2));
@@ -117,7 +123,8 @@ TEST(PipelineRewriteContextAdapterTest, HasAtLeastNNextStagesTrueWhenEnoughStage
     container.push_back(DocumentSourceLimit::create(expCtx, 3));
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     PipelineRewriteContextAPI api(&adapter);
     ASSERT_TRUE(api.hasAtLeastNNextStages(1));
@@ -131,7 +138,8 @@ TEST(PipelineRewriteContextAdapterTest, HasAtLeastNNextStagesFalseWhenNotEnoughS
     container.push_back(DocumentSourceSkip::create(expCtx, 5));
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     PipelineRewriteContextAPI api(&adapter);
     ASSERT_TRUE(api.hasAtLeastNNextStages(1));
@@ -145,7 +153,8 @@ TEST(PipelineRewriteContextAdapterTest, HasAtLeastNNextStagesFalseAtLastStage) {
     container.push_back(DocumentSourceLimit::create(expCtx, 10));
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     PipelineRewriteContextAPI api(&adapter);
     ASSERT_FALSE(api.hasAtLeastNNextStages(1));
@@ -193,8 +202,8 @@ TEST(PipelineRewriteContextAdapterTest, VariableRefsEmptyForUnknownVariable) {
 
     // Verify the adapter agrees.
     DepsTracker deps;
-    auto adapter =
-        host_connector::PipelineDependenciesAdapter(std::move(deps), std::move(variableRefs));
+    auto adapter = host_connector::PipelineDependenciesAdapter(
+        std::move(deps), sdk::SdkTest::kTestCapability, std::move(variableRefs));
     ASSERT_FALSE(PipelineDependenciesHandle(&adapter)->needsVariable("SOME_UNKNOWN_VARIABLE"));
 }
 
@@ -210,8 +219,8 @@ TEST(PipelineRewriteContextAdapterTest, VariableRefsDoNotContainUnreferencedVari
     ASSERT_FALSE(variableRefs.contains("SEARCH_META"));
 
     DepsTracker deps;
-    auto adapter =
-        host_connector::PipelineDependenciesAdapter(std::move(deps), std::move(variableRefs));
+    auto adapter = host_connector::PipelineDependenciesAdapter(
+        std::move(deps), sdk::SdkTest::kTestCapability, std::move(variableRefs));
     ASSERT_FALSE(PipelineDependenciesHandle(&adapter)->needsVariable("SEARCH_META"));
 }
 
@@ -227,36 +236,40 @@ TEST(PipelineRewriteContextAdapterTest, VariableRefsContainSearchMetaWhenReferen
     ASSERT_TRUE(variableRefs.contains("SEARCH_META"));
 
     DepsTracker deps;
-    auto adapter =
-        host_connector::PipelineDependenciesAdapter(std::move(deps), std::move(variableRefs));
+    auto adapter = host_connector::PipelineDependenciesAdapter(
+        std::move(deps), sdk::SdkTest::kTestCapability, std::move(variableRefs));
     ASSERT_TRUE(PipelineDependenciesHandle(&adapter)->needsVariable("SEARCH_META"));
 }
 
 TEST(PipelineDependenciesAdapterTest, NeedsWholeDocumentReturnsTrue) {
     DepsTracker deps;
     deps.needWholeDocument = true;
-    auto adapter = host_connector::PipelineDependenciesAdapter(std::move(deps));
+    auto adapter =
+        host_connector::PipelineDependenciesAdapter(std::move(deps), sdk::SdkTest::kTestCapability);
     ASSERT_TRUE(PipelineDependenciesHandle(&adapter)->needsWholeDocument());
 }
 
 TEST(PipelineDependenciesAdapterTest, NeedsWholeDocumentReturnsFalse) {
     DepsTracker deps;
     deps.needWholeDocument = false;
-    auto adapter = host_connector::PipelineDependenciesAdapter(std::move(deps));
+    auto adapter =
+        host_connector::PipelineDependenciesAdapter(std::move(deps), sdk::SdkTest::kTestCapability);
     ASSERT_FALSE(PipelineDependenciesHandle(&adapter)->needsWholeDocument());
 }
 
 TEST(PipelineDependenciesAdapterTest, NeedsMetadataReturnsTrueForSetMetadataType) {
     DepsTracker deps;
     deps.setNeedsMetadata(DocumentMetadataFields::kSearchScore);
-    auto adapter = host_connector::PipelineDependenciesAdapter(std::move(deps));
+    auto adapter =
+        host_connector::PipelineDependenciesAdapter(std::move(deps), sdk::SdkTest::kTestCapability);
     ASSERT_TRUE(PipelineDependenciesHandle(&adapter)->needsMetadata("searchScore"));
 }
 
 TEST(PipelineDependenciesAdapterTest, NeedsMetadataReturnsFalseForUnsetMetadataType) {
     DepsTracker deps;
     // Do not set kSearchScore.
-    auto adapter = host_connector::PipelineDependenciesAdapter(std::move(deps));
+    auto adapter =
+        host_connector::PipelineDependenciesAdapter(std::move(deps), sdk::SdkTest::kTestCapability);
     ASSERT_FALSE(PipelineDependenciesHandle(&adapter)->needsMetadata("searchScore"));
 }
 
@@ -265,7 +278,8 @@ TEST(PipelineDependenciesAdapterTest, GetNeededFieldsReturnsNullWhenNeedsWholeDo
     deps.needWholeDocument = true;
     deps.fields.insert("a");
     deps.fields.insert("b");
-    auto adapter = host_connector::PipelineDependenciesAdapter(std::move(deps));
+    auto adapter =
+        host_connector::PipelineDependenciesAdapter(std::move(deps), sdk::SdkTest::kTestCapability);
     auto result = PipelineDependenciesHandle(&adapter)->getNeededFields();
     ASSERT_FALSE(result.has_value());
 }
@@ -273,7 +287,8 @@ TEST(PipelineDependenciesAdapterTest, GetNeededFieldsReturnsNullWhenNeedsWholeDo
 TEST(PipelineDependenciesAdapterTest, GetNeededFieldsReturnsEmptyArrayWhenNoFieldsNeeded) {
     DepsTracker deps;
     deps.needWholeDocument = false;
-    auto adapter = host_connector::PipelineDependenciesAdapter(std::move(deps));
+    auto adapter =
+        host_connector::PipelineDependenciesAdapter(std::move(deps), sdk::SdkTest::kTestCapability);
     auto result = PipelineDependenciesHandle(&adapter)->getNeededFields();
     ASSERT_TRUE(result.has_value());
     ASSERT_BSONOBJ_EQ(*result, BSONArray());
@@ -285,7 +300,8 @@ TEST(PipelineDependenciesAdapterTest, GetNeededFieldsReturnsFieldPaths) {
     deps.fields.insert("x");
     deps.fields.insert("a");
     deps.fields.insert("a.b");
-    auto adapter = host_connector::PipelineDependenciesAdapter(std::move(deps));
+    auto adapter =
+        host_connector::PipelineDependenciesAdapter(std::move(deps), sdk::SdkTest::kTestCapability);
     auto result = PipelineDependenciesHandle(&adapter)->getNeededFields();
     ASSERT_TRUE(result.has_value());
     ASSERT_BSONOBJ_EQ(*result, BSON_ARRAY("a" << "a.b" << "x"));
@@ -299,7 +315,8 @@ TEST(PipelineRewriteContextAdapterTest, GetPipelineSuffixBoundsEmptySuffix) {
     container.push_back(DocumentSourceLimit::create(expCtx, 10));
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     auto bounds = PipelineRewriteContextAPI(&adapter).getPipelineSuffixBounds();
     ASSERT_EQUALS(kDocsNeededConstraintUnknown, bounds.minBounds.type);
@@ -314,7 +331,8 @@ TEST(PipelineRewriteContextAdapterTest, GetPipelineSuffixBoundsWithLimit) {
     container.push_back(DocumentSourceLimit::create(expCtx, 5));   // suffix
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     auto bounds = PipelineRewriteContextAPI(&adapter).getPipelineSuffixBounds();
     ASSERT_EQUALS(kDocsNeededConstraintDiscrete, bounds.minBounds.type);
@@ -331,7 +349,8 @@ TEST(PipelineRewriteContextAdapterTest, GetPipelineSuffixBoundsWithBlockingStage
     container.push_back(DocumentSourceSort::create(expCtx, BSON("a" << 1)));  // suffix
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     auto bounds = PipelineRewriteContextAPI(&adapter).getPipelineSuffixBounds();
     ASSERT_EQUALS(kDocsNeededConstraintNeedAll, bounds.minBounds.type);
@@ -348,7 +367,8 @@ TEST(PipelineRewriteContextAdapterTest, GetPipelineSuffixBoundsWithMixedBounds) 
     container.push_back(DocumentSourceLimit::create(expCtx, 12));
 
     PipelineRewriteContext rbrCtx(*expCtx, container);
-    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx),
+                                          sdk::SdkTest::kTestCapability);
 
     auto bounds = PipelineRewriteContextAPI(&adapter).getPipelineSuffixBounds();
     ASSERT_EQUALS(kDocsNeededConstraintDiscrete, bounds.minBounds.type);

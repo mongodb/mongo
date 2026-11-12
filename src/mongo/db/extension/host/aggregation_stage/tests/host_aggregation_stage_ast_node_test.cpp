@@ -3,6 +3,7 @@
 
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
@@ -57,7 +58,7 @@ host::DPLCallbackOwner::CallbackInvoker makeTestInvoker(
                                                     ::MongoExtensionByteBuf** mergeOut) {
     *sortOut = new ByteBuf(BSON("score" << -1));
     *mergeOut = nullptr;
-    return &ExtensionStatusOK::getInstance();
+    return getExtensionStatusOK(sdk::SdkTest::kTestCapability);
 }
 
 class NoOpExtensionAstNode : public sdk::AggStageAstNode {
@@ -90,7 +91,8 @@ TEST(HostAstNodeTest, DRMGetName) {
 }
 
 TEST(HostAstNodeTest, IsHostAllocated) {
-    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
+    auto noOpAstNode =
+        new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode(), sdk::SdkTest::kTestCapability);
     auto handle = AggStageAstNodeHandle{noOpAstNode};
 
     ASSERT_TRUE(host::HostAggStageAstNodeAdapter::isHostAllocated(*handle.get()));
@@ -125,7 +127,8 @@ TEST(HostAstNodeCloneTest, CloneDRMPreservesNameAndType) {
 }
 
 TEST(HostAstNodeCloneTest, CloneHostAllocatedAstNodeIsIndependent) {
-    auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
+    auto astNode =
+        new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode(), sdk::SdkTest::kTestCapability);
     auto handle = AggStageAstNodeHandle{astNode};
 
     // Clone the AST node.
@@ -143,7 +146,8 @@ TEST(HostAstNodeCloneTest, ClonedAstNodeSurvivesOriginalDestruction) {
     AggStageAstNodeHandle clonedHandle{nullptr};
 
     {
-        auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
+        auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode(),
+                                                            sdk::SdkTest::kTestCapability);
         auto handle = AggStageAstNodeHandle{astNode};
 
         // Clone before original goes out of scope.
@@ -158,7 +162,8 @@ TEST(HostAstNodeCloneTest, ClonedAstNodeSurvivesOriginalDestruction) {
 }
 
 TEST(HostAstNodeCloneTest, MultipleCloneAreIndependent) {
-    auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
+    auto astNode =
+        new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode(), sdk::SdkTest::kTestCapability);
     auto handle = AggStageAstNodeHandle{astNode};
 
     // Create multiple clones.
@@ -181,7 +186,8 @@ TEST(HostAstNodeCloneTest, MultipleCloneAreIndependent) {
 }
 
 TEST(HostAstNodeCloneTest, CloneDRMNodeViaAdapterPreservesName) {
-    auto astNode = new host::HostAggStageAstNodeAdapter(makeDRMAstNode());
+    auto astNode =
+        new host::HostAggStageAstNodeAdapter(makeDRMAstNode(), sdk::SdkTest::kTestCapability);
     auto handle = AggStageAstNodeHandle{astNode};
 
     auto clonedHandle = handle->clone();
@@ -208,6 +214,7 @@ TEST(HostAstNodeCloneTest, CloneDRMNodePreservesDPLCallback) {
     };
     {
         host::DPLCallbackOwner dplOwner{makeTestInvoker(callback, &destroyCount),
+                                        sdk::SdkTest::kTestCapability,
                                         [&destroyCount]() {
                                             ++destroyCount;
                                         }};
@@ -232,7 +239,8 @@ TEST(HostAstNodeDplTest, NullInvokerHasCallbackReturnsFalse) {
     host::DPLCallbackOwner owner;
     ASSERT_FALSE(owner.hasCallback());
 
-    host::DPLCallbackOwner ownerWithEmptyInvoker(host::DPLCallbackOwner::CallbackInvoker{});
+    host::DPLCallbackOwner ownerWithEmptyInvoker(host::DPLCallbackOwner::CallbackInvoker{},
+                                                 sdk::SdkTest::kTestCapability);
     ASSERT_FALSE(ownerWithEmptyInvoker.hasCallback());
 }
 
@@ -245,9 +253,9 @@ TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeParsesSortAndMergePipeline) {
                        ::MongoExtensionByteBuf** mergeOut) -> ::MongoExtensionStatus* {
         *sortOut = new ByteBuf(BSON("score" << -1));
         *mergeOut = new ByteBuf(BSON_ARRAY(BSON("$limit" << 1) << BSON("$skip" << 2)));
-        return &ExtensionStatusOK::getInstance();
+        return getExtensionStatusOK(sdk::SdkTest::kTestCapability);
     };
-    host::DPLCallbackOwner owner{makeTestInvoker(callback)};
+    host::DPLCallbackOwner owner{makeTestInvoker(callback), sdk::SdkTest::kTestCapability};
     ASSERT_TRUE(owner.hasCallback());
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
@@ -260,7 +268,8 @@ TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeParsesSortAndMergePipeline) {
 }
 
 TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeHandlesNullMergePipeline) {
-    host::DPLCallbackOwner owner{makeTestInvoker(scoreSortNoMergeDplCallback)};
+    host::DPLCallbackOwner owner{makeTestInvoker(scoreSortNoMergeDplCallback),
+                                 sdk::SdkTest::kTestCapability};
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto& result = owner.getOrInvoke(expCtx.get());
@@ -280,9 +289,10 @@ TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeInvokesAtMostOnce) {
         ++*static_cast<int*>(userData);
         *sortOut = new ByteBuf(BSON("score" << -1));
         *mergeOut = nullptr;
-        return &ExtensionStatusOK::getInstance();
+        return getExtensionStatusOK(sdk::SdkTest::kTestCapability);
     };
-    host::DPLCallbackOwner owner{makeTestInvoker(callback, &callCount)};
+    host::DPLCallbackOwner owner{makeTestInvoker(callback, &callCount),
+                                 sdk::SdkTest::kTestCapability};
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto& first = owner.getOrInvoke(expCtx.get());
@@ -296,8 +306,8 @@ TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeInvokesAtMostOnce) {
 // sharded-plan provider, so the resulting DocumentSource's distributedPlanLogic() (owned by
 // SERVER-126255) produces the merge sort pattern from the callback.
 TEST(HostAstNodeDplBridgeTest, ExpandWiresCallbackIntoDistributedPlanLogic) {
-    auto drmNode =
-        makeDRMAstNode(host::DPLCallbackOwner{makeTestInvoker(scoreSortNoMergeDplCallback)});
+    auto drmNode = makeDRMAstNode(host::DPLCallbackOwner{
+        makeTestInvoker(scoreSortNoMergeDplCallback), sdk::SdkTest::kTestCapability});
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto stages = drmNode->expandToDocumentSource(expCtx);
@@ -330,13 +340,15 @@ TEST(HostAstNodeExpandTest, DRMNodeExpandsToLiteParsedAfterClone) {
 DEATH_TEST(HostAstNodeViewPolicyTest,
            HostAstNodeCannotGetFirstStageViewApplicationPolicy,
            "11507401") {
-    auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
+    auto astNode =
+        new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode(), sdk::SdkTest::kTestCapability);
     auto handle = AggStageAstNodeHandle{astNode};
     handle->getFirstStageViewApplicationPolicy();
 }
 
 DEATH_TEST(HostAstNodeResolvedNamespaceTest, HostAstNodeCannotBindResolvedNamespace, "11507501") {
-    auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
+    auto astNode =
+        new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode(), sdk::SdkTest::kTestCapability);
     auto handle = AggStageAstNodeHandle{astNode};
 
     std::string dbName = "testDbName";

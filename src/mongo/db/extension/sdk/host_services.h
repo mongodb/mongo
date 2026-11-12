@@ -3,7 +3,9 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/sdk/logger.h"
+#include "mongo/db/extension/sdk/negotiated_capability.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/handle.h"
@@ -80,7 +82,7 @@ public:
         invokeCAndConvertStatusToException(
             [&] { return _vtable().mark_idle_thread_block(&idleThreadBlock, location); });
 
-        return IdleThreadBlockHandle{idleThreadBlock};
+        return IdleThreadBlockHandle{idleThreadBlock, getCapabilityVersion()};
     }
     /**
      * Sets the static HostServices instance. Called during get_mongodb_extension() so that
@@ -93,19 +95,34 @@ public:
         _sHostServices = UnownedHandle<const ::MongoExtensionHostServices>{services, capVersion};
     }
 
+    /**
+     * Test-only: simulates a fresh extension load by installing the HostServices handle and the
+     * negotiated capability version together.
+     *
+     * The two pieces of state describe the same negotiation and must never disagree, so tests
+     * should set them through here rather than calling setHostServices and
+     * setNegotiatedCapabilityVersionForTest separately. Unlike production loading, this may be
+     * called any number of times: each call models a fresh extension in the shared test process.
+     */
+    static void setHostServicesForTest(const ::MongoExtensionHostServices* services,
+                                       const CapabilityVersion& capVersion) {
+        setNegotiatedCapabilityVersionForTest(capVersion);
+        setHostServices(services, capVersion);
+    }
+
     AggStageParseNodeHandle createHostAggStageParseNode(BSONObj spec) const {
         ::MongoExtensionAggStageParseNode* result = nullptr;
         invokeCAndConvertStatusToException([&] {
             return _vtable().create_host_agg_stage_parse_node(objAsByteView(spec), &result);
         });
-        return AggStageParseNodeHandle{result};
+        return AggStageParseNodeHandle{result, getCapabilityVersion()};
     }
 
     AggStageAstNodeHandle createIdLookup(BSONObj spec) const {
         ::MongoExtensionAggStageAstNode* result = nullptr;
         invokeCAndConvertStatusToException(
             [&] { return _vtable().create_id_lookup(objAsByteView(spec), &result); });
-        return AggStageAstNodeHandle{result};
+        return AggStageAstNodeHandle{result, getCapabilityVersion()};
     }
 
     AggStageAstNodeHandle createDocumentResultsAndMetadata(
@@ -118,11 +135,11 @@ public:
             return _vtable().create_document_results_and_metadata(
                 objAsByteView(spec), dplCallback, dplCallbackUserData, dplCallbackDestroy, &result);
         });
-        return AggStageAstNodeHandle{result};
+        return AggStageAstNodeHandle{result, getCapabilityVersion()};
     }
 
     LoggerHandle getLogger() const {
-        return LoggerHandle(_vtable().get_logger());
+        return LoggerHandle(_vtable().get_logger(), getCapabilityVersion());
     }
 
     static void assertVTableConstraints(const VTable_t& vtable,

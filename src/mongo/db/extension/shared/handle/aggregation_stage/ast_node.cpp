@@ -9,7 +9,8 @@ namespace mongo::extension {
 
 MongoExtensionStaticProperties AggStageAstNodeAPI::getProperties() const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    invokeCAndConvertStatusToException([&]() { return _vtable().get_properties(get(), &buf); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().get_properties(get(), &buf); },
+                                       getCapabilityVersion());
 
     tassert(
         11347802,
@@ -27,7 +28,8 @@ LogicalAggStageHandle AggStageAstNodeAPI::promote(
 
     // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().promote(get(), &catalogContext, &logicalStagePtr); });
+        [&]() { return _vtable().promote(get(), &catalogContext, &logicalStagePtr); },
+        getCapabilityVersion());
 
     return LogicalAggStageHandle(logicalStagePtr);
 }
@@ -37,7 +39,8 @@ AggStageAstNodeHandle AggStageAstNodeAPI::clone() const {
     ::MongoExtensionAggStageAstNode* astNodePtr{nullptr};
 
     // The API's contract mandates that astNodePtr will only be allocated if status is OK.
-    invokeCAndConvertStatusToException([&]() { return _vtable().clone(get(), &astNodePtr); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().clone(get(), &astNodePtr); },
+                                       getCapabilityVersion());
 
     return AggStageAstNodeHandle(astNodePtr);
 }
@@ -47,13 +50,15 @@ AggStageAstNodeAPI::getFirstStageViewApplicationPolicy() const {
     MongoExtensionFirstStageViewApplicationPolicy policy =
         MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend;
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().get_first_stage_view_application_policy(get(), &policy); });
+        [&]() { return _vtable().get_first_stage_view_application_policy(get(), &policy); },
+        getCapabilityVersion());
     return policy;
 }
 
 void AggStageAstNodeAPI::bindResolvedNamespace(
     const ::MongoExtensionResolvedNamespace& resolvedNamespace) {
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().bind_resolved_namespace(get(), &resolvedNamespace); });
+        [&]() { return _vtable().bind_resolved_namespace(get(), &resolvedNamespace); },
+        getCapabilityVersion());
 }
 }  // namespace mongo::extension

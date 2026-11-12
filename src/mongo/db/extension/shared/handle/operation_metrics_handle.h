@@ -28,7 +28,8 @@ public:
     BSONObj serialize() const {
         ::MongoExtensionByteBuf* buf{nullptr};
 
-        invokeCAndConvertStatusToException([&]() { return _vtable().serialize(get(), &buf); });
+        invokeCAndConvertStatusToException([&]() { return _vtable().serialize(get(), &buf); },
+                                           getCapabilityVersion());
 
         tassert(ErrorCodes::ExtensionSerializationError,
                 "buffer returned from serialize function must not be null",
@@ -41,7 +42,8 @@ public:
     }
 
     void update(const MongoExtensionByteView& byteView) {
-        invokeCAndConvertStatusToException([&]() { return _vtable().update(get(), byteView); });
+        invokeCAndConvertStatusToException([&]() { return _vtable().update(get(), byteView); },
+                                           getCapabilityVersion());
     }
 
     static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {

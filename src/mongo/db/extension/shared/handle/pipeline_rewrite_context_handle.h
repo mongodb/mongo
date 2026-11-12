@@ -54,7 +54,8 @@ public:
     UnownedLogicalAggStageHandle getNthNextStage(size_t index) const {
         ::MongoExtensionLogicalAggStage* logicalAggStage{nullptr};
         invokeCAndConvertStatusToException(
-            [&]() { return _vtable().get_nth_next_stage(get(), index, &logicalAggStage); });
+            [&]() { return _vtable().get_nth_next_stage(get(), index, &logicalAggStage); },
+            getCapabilityVersion());
         return UnownedLogicalAggStageHandle(logicalAggStage);
     }
 
@@ -66,7 +67,8 @@ public:
     bool eraseNthNext(size_t index) {
         bool result = false;
         invokeCAndConvertStatusToException(
-            [&]() { return _vtable().erase_nth_next_stage(get(), index, &result); });
+            [&]() { return _vtable().erase_nth_next_stage(get(), index, &result); },
+            getCapabilityVersion());
         return result;
     }
 
@@ -77,7 +79,8 @@ public:
     bool hasAtLeastNNextStages(size_t n) const {
         bool result = false;
         invokeCAndConvertStatusToException(
-            [&]() { return _vtable().has_at_least_n_next_stages(get(), n, &result); });
+            [&]() { return _vtable().has_at_least_n_next_stages(get(), n, &result); },
+            getCapabilityVersion());
         return result;
     }
 
@@ -89,7 +92,8 @@ public:
         MongoExtensionDocsNeededBounds result{};
 
         invokeCAndConvertStatusToException(
-            [&]() { return _vtable().get_pipeline_suffix_bounds(get(), &result); });
+            [&]() { return _vtable().get_pipeline_suffix_bounds(get(), &result); },
+            getCapabilityVersion());
         return result;
     }
 

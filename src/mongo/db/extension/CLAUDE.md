@@ -110,6 +110,26 @@ extension negotiates a compatible version. MAJOR must match; host minor >= exten
 server supports two major versions simultaneously (N and N-1). Minor bumps add default SDK
 implementations; major bumps maintain frozen old API header snapshots.
 
+**Propagating the negotiated version.** Every C API object crossing the boundary carries the
+negotiated `CapabilityVersion`, because vtable layout and behavior can differ per version. There are
+two shapes, chosen by whether the C vtable entries receive a `self` pointer:
+
+- **Per-version instance.** For vtable entries that are plain function pointers with no `self`, an
+  instance cannot hold state its own entries could read, so the version is baked into the type: the
+  adapter or status is a template over the packed capability with a compile-time `kCapability`, and
+  instances are vended by `getNegotiatedVersionInstance` (`shared/per_version_adapter.h`) behind a
+  `getX(capability)` trampoline. Examples: `ExtensionStatusOK`, `HostServicesAdapter`,
+  `LoggerAdapter`.
+- **Capability member.** For vtable entries that do receive a `self`, the adapter stores
+  `const CapabilityVersion _capability` (set at construction) and reads it back through a
+  `_capabilityOf(ptr)` helper in its trampolines. Examples: `HostAggStageParseNodeAdapter`,
+  `QueryShapeOptsAdapter`, `PipelineDependenciesAdapter`.
+
+Handles carry the version as well (`Handle`/`VTableAPI::getCapabilityVersion()`). Status conversion
+takes it explicitly on the host side (`wrapCXXAndConvertExceptionToStatus(fn, cap)`), and the SDK
+supplies its library-wide negotiated version implicitly through the `sdk::` overloads over
+`negotiated_capability.h`.
+
 ### Where to Start Reading
 
 | Task                                      | Start here                                                                                               |
@@ -122,6 +142,7 @@ implementations; major bumps maintain frozen old API header snapshots.
 | Write a new test extension                | `test_examples/foo.cpp` (simplest), `test_examples/desugar/add_fields_match.cpp` (desugar pattern)       |
 | Understand test extension macros          | `sdk/test_extension_factory.h` (DEFAULT_PARSE_NODE, DEFAULT_EXTENSION macros)                            |
 | Understand the SDK base classes           | `sdk/extension.h`, `sdk/extension_factory.h`, `sdk/aggregation_stage.h`                                  |
+| Understand how the version propagates     | `shared/per_version_adapter.h`, `sdk/negotiated_capability.h`                                            |
 | Debug extension test config issues        | `buildscripts/resmokelib/extensions/README.md`, `test_examples/configurations.yml`                       |
 | Understand vector search extension        | `test_examples/vector_search.cpp` (test), `test_examples/desugar/native_vector_search.cpp` (native impl) |
 

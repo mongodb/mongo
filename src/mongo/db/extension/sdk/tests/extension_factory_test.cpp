@@ -6,7 +6,6 @@
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/unittest/unittest.h"
-
 /**
  * Test extension registered so that DEFINE_GET_EXTENSION() has a version to publish. The
  * registration and entry-point definitions live at global scope, mirroring real extensions.
@@ -26,32 +25,33 @@ namespace {
 
 class GetExtensionVersionRejectionTest : public unittest::Test {
 protected:
+    void setUp() override {
+        setNegotiatedCapabilityVersionForTest(CapabilityVersion::zeroCapability());
+    }
+
     /**
      * Invokes get_mongodb_extension with a real (non-null) HostServices pointer and returns the
      * resulting status. Ownership of the status is transferred to the caller.
      */
     ::MongoExtensionStatus* callGetMongoExtension(::MongoExtensionAPIVersion version) {
+        // Deliberately not derived from 'version': these tests feed in versions the extension is
+        // expected to reject, and getHostServices only vends instances for negotiable versions.
         return get_mongodb_extension(
-            version, &host_connector::HostServicesAdapter::get(), &_extension);
+            version,
+            host_connector::getHostServices(CapabilityVersion::legacyCapability()),
+            &_extension);
     }
 
     /**
-     * A rejected version must produce an error status, leave the extension unset, and - most
-     * importantly - return normally. Installing a HostServices handle with an unsupported
-     * capability version throws inside the noexcept setHostServices(), so a rejection that
-     * installs the handle first terminates the process instead of returning.
+     * A rejected version must leave the extension unset and - most importantly - return normally.
+     * These versions are all outside the bounds of every MongoExtensionStatus implementation, so
+     * no status the host would understand can be allocated; rejection surfaces as a null status,
+     * which load_extension.cpp reports as a load failure.
      */
     void assertRejection(::MongoExtensionAPIVersion version) {
         auto* status = callGetMongoExtension(version);
-        ASSERT_NE(status, nullptr);
-        ASSERT_EQ(status->vtable->get_code(status), 13693502);
+        ASSERT_EQ(status, nullptr);
         ASSERT_EQ(_extension, nullptr);
-
-        const std::string reason{byteViewAsStringView(status->vtable->get_reason(status))};
-        ASSERT_NE(reason.find("outside the extension's supported capability bounds"),
-                  std::string::npos);
-
-        status->vtable->destroy(status);
     }
 
     const ::MongoExtension* _extension = nullptr;

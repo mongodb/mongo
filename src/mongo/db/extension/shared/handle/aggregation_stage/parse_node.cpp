@@ -18,7 +18,7 @@ BSONObj AggStageParseNodeAPI::getQueryShape(const ::MongoExtensionHostQueryShape
     ::MongoExtensionByteBuf* buf{nullptr};
 
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().get_query_shape(get(), &opts, &buf); });
+        [&]() { return _vtable().get_query_shape(get(), &opts, &buf); }, getCapabilityVersion());
 
     tassert(ErrorCodes::ExtensionSerializationError,
             "buffer returned from get_query_shape must not be null",
@@ -39,19 +39,20 @@ template <>
 struct ArrayElemAsRaii<::MongoExtensionExpandedArrayElement> {
     using ArrayElem_t = ::MongoExtensionExpandedArrayElement;
     using RaiiElem_t = RaiiVectorElemType<ArrayElem_t>::type;
-    static RaiiElem_t consume(ArrayElem_t& elt) {
-        VariantNodeHandle handle = AggStageParseNodeHandle{nullptr};
+    static RaiiElem_t consume(ArrayElem_t& elt, const CapabilityVersion& capability) {
+        VariantNodeHandle handle = AggStageParseNodeHandle{nullptr, capability};
         if (MONGO_unlikely(failExtensionExpand.shouldFail())) {
             uasserted(11113805, "Injected failure in expand() during handle transfer");
         }
         switch (elt.type) {
             case kParseNode: {
-                handle = VariantNodeHandle(AggStageParseNodeHandle{elt.parseOrAst.parse});
+                handle =
+                    VariantNodeHandle(AggStageParseNodeHandle{elt.parseOrAst.parse, capability});
                 elt.parseOrAst.parse = nullptr;
                 break;
             }
             case kAstNode: {
-                handle = VariantNodeHandle(AggStageAstNodeHandle{elt.parseOrAst.ast});
+                handle = VariantNodeHandle(AggStageAstNodeHandle{elt.parseOrAst.ast, capability});
                 elt.parseOrAst.ast = nullptr;
                 break;
             }
@@ -65,16 +66,18 @@ struct ArrayElemAsRaii<::MongoExtensionExpandedArrayElement> {
 
 std::vector<VariantNodeHandle> AggStageParseNodeAPI::expand() const {
     ::MongoExtensionExpandedArrayContainer* container = nullptr;
-    invokeCAndConvertStatusToException([&]() { return _vtable().expand(get(), &container); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().expand(get(), &container); },
+                                       getCapabilityVersion());
     tassert(ErrorCodes::ExtensionError,
             "Container cannot be null after expand()",
             container != nullptr);
-    ExpandedArrayContainerHandle handle(container);
+    ExpandedArrayContainerHandle handle(container, getCapabilityVersion());
     return handle->transfer();
 }
 
-std::vector<VariantNodeHandle> expandedArrayToRaiiVector(::MongoExtensionExpandedArray& arr) {
-    return abiArrayToRaiiVector(arr);
+std::vector<VariantNodeHandle> expandedArrayToRaiiVector(::MongoExtensionExpandedArray& arr,
+                                                         const CapabilityVersion& capability) {
+    return abiArrayToRaiiVector(arr, capability);
 }
 
 AggStageParseNodeHandle AggStageParseNodeAPI::clone() const {
@@ -82,14 +85,16 @@ AggStageParseNodeHandle AggStageParseNodeAPI::clone() const {
     ::MongoExtensionAggStageParseNode* parseNodePtr{nullptr};
 
     // The API's contract mandates that parseNodePtr will only be allocated if status is OK.
-    invokeCAndConvertStatusToException([&] { return _vtable().clone(get(), &parseNodePtr); });
+    invokeCAndConvertStatusToException([&] { return _vtable().clone(get(), &parseNodePtr); },
+                                       getCapabilityVersion());
 
-    return AggStageParseNodeHandle(parseNodePtr);
+    return AggStageParseNodeHandle(parseNodePtr, getCapabilityVersion());
 }
 
 BSONObj AggStageParseNodeAPI::toBsonForLog() const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    invokeCAndConvertStatusToException([&]() { return _vtable().to_bson_for_log(get(), &buf); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().to_bson_for_log(get(), &buf); },
+                                       getCapabilityVersion());
 
     tassert(ErrorCodes::ExtensionSerializationError,
             "Extension implementation of `to_bson_for_log` encountered nullptr",
@@ -108,19 +113,21 @@ template <>
 struct ArrayElemAsRaii<::MongoExtensionDPLArrayElement> {
     using ArrayElem_t = ::MongoExtensionDPLArrayElement;
     using RaiiElem_t = RaiiVectorElemType<ArrayElem_t>::type;
-    static RaiiElem_t consume(ArrayElem_t& elt) {
-        VariantDPLHandle handle = AggStageParseNodeHandle{nullptr};
+    static RaiiElem_t consume(ArrayElem_t& elt, const CapabilityVersion& capability) {
+        VariantDPLHandle handle = AggStageParseNodeHandle{nullptr, capability};
         if (MONGO_unlikely(failExtensionDPL.shouldFail())) {
             uasserted(11365502, "Injected failure in DPL during handle transfer");
         }
         switch (elt.type) {
             case kParse: {
-                handle = VariantDPLHandle(AggStageParseNodeHandle{elt.element.parseNode});
+                handle =
+                    VariantDPLHandle(AggStageParseNodeHandle{elt.element.parseNode, capability});
                 elt.element.parseNode = nullptr;
                 break;
             }
             case kLogical: {
-                handle = VariantDPLHandle(LogicalAggStageHandle{elt.element.logicalStage});
+                handle =
+                    VariantDPLHandle(LogicalAggStageHandle{elt.element.logicalStage, capability});
                 elt.element.logicalStage = nullptr;
                 break;
             }
@@ -132,8 +139,9 @@ struct ArrayElemAsRaii<::MongoExtensionDPLArrayElement> {
     }
 };
 
-std::vector<VariantDPLHandle> dplArrayToRaiiVector(::MongoExtensionDPLArray& arr) {
-    return abiArrayToRaiiVector(arr);
+std::vector<VariantDPLHandle> dplArrayToRaiiVector(::MongoExtensionDPLArray& arr,
+                                                   const CapabilityVersion& capability) {
+    return abiArrayToRaiiVector(arr, capability);
 }
 
 }  // namespace mongo::extension

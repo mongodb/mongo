@@ -41,59 +41,137 @@ private:
     };
 };
 /**
+ * The host services implementations, shared by every negotiated capability version.
+ *
+ * None of the MongoExtensionHostServicesVTable entries take a 'self' pointer -- they are plain C
+ * functions -- so an adapter instance cannot carry per-extension state that its own vtable
+ * functions could read. The negotiated capability instead reaches them through the identity of
+ * the function, by instantiating HostServicesAdapter once per version (below).
+ */
+namespace detail {
+::MongoExtensionStatus* userAsserted(::MongoExtensionByteView structuredErrorMessage,
+                                     const CapabilityVersion& capability);
+
+::MongoExtensionStatus* tripwireAsserted(::MongoExtensionByteView structuredErrorMessage,
+                                         const CapabilityVersion& capability);
+
+::MongoExtensionStatus* markIdleThreadBlock(::MongoExtensionIdleThreadBlock** idleThreadBlock,
+                                            const char* location,
+                                            const CapabilityVersion& capability);
+
+::MongoExtensionStatus* createHostAggStageParseNode(::MongoExtensionByteView spec,
+                                                    ::MongoExtensionAggStageParseNode** node,
+                                                    const CapabilityVersion& capability);
+
+::MongoExtensionStatus* createIdLookup(::MongoExtensionByteView bsonSpec,
+                                       ::MongoExtensionAggStageAstNode** node,
+                                       const CapabilityVersion& capability);
+
+::MongoExtensionStatus* createDocumentResultsAndMetadata(
+    ::MongoExtensionByteView bsonSpec,
+    ::MongoExtensionDocResultsDPLCallback dplCallback,
+    void* dplCallbackUserData,
+    void (*dplCallbackDestroy)(void*),
+    ::MongoExtensionAggStageAstNode** node,
+    const CapabilityVersion& capability);
+}  // namespace detail
+
+template <uint32_t kPacked>
+class HostServicesAdapter;
+
+/**
+ * getHostServices returns the HostServicesAdapter instance for the given negotiated capability
+ * version. This trampoline is the only way to obtain one: the per-version instances cannot be
+ * vended without a negotiated capability.
+ */
+::MongoExtensionHostServices* getHostServices(const CapabilityVersion& capability);
+
+/**
  * HostServicesAdapter is an implementation of ::MongoExtensionHostServices, providing host
  * services to extensions.
  *
  * For each function in the MongoExtensionHostServicesVTable, this adapter has a corresponding
  * function that translates between the C API and the core implementation of the host services.
  *
- * The HostServicesAdapter instance is a singleton, and is accessible via
- * HostServicesAdapter::get(). The pointer to the singleton instance is passed to extensions
- * during initialization, and is expected to be valid for the lifetime of the extension.
+ * We use one instance per negotiable capability version. The version is baked into the type (and
+ * exposed via kCapability) rather than stored in a member because none of the vtable entries
+ * receive a 'self' pointer, so a member would be unreachable from the very functions that need
+ * it. Each instantiation gets its own VTABLE whose entries point at that instantiation's statics,
+ * which is what makes kCapability recoverable inside them.
+ *
+ * Instances are shared by every extension that negotiated the same version; the capability is the
+ * only per-extension state these functions require. The pointer is passed to an extension during
+ * initialization and is expected to be valid for the lifetime of the extension.
+ *
+ * kPacked must be a valid CapabilityVersion packed value representation.
  */
+template <uint32_t kPacked>
 class HostServicesAdapter final : public ::MongoExtensionHostServices {
 public:
-    HostServicesAdapter() : ::MongoExtensionHostServices{&VTABLE} {}
+    static constexpr CapabilityVersion kCapability = CapabilityVersion::fromPackedValue(kPacked);
 
     HostServicesAdapter(const HostServicesAdapter&) = delete;
     HostServicesAdapter& operator=(const HostServicesAdapter&) = delete;
     HostServicesAdapter(HostServicesAdapter&&) = delete;
     HostServicesAdapter& operator=(HostServicesAdapter&&) = delete;
 
-    static HostServicesAdapter& get() {
+    static ::MongoExtensionHostServicesVTable getVTable() {
+        return VTABLE;
+    }
+
+private:
+    template <template <uint32_t> class InstanceT, typename CApiT>
+    friend CApiT* mongo::extension::getNegotiatedVersionInstance(const CapabilityVersion&);
+
+    HostServicesAdapter() : ::MongoExtensionHostServices{&VTABLE} {}
+
+    static HostServicesAdapter& getInstance() {
         static HostServicesAdapter sInstance;
         return sInstance;
     }
 
-private:
+    static ::MongoExtensionHostServices* getInstancePtr() {
+        return &getInstance();
+    }
+
     static ::MongoExtensionLogger* _extGetLogger() {
-        return LoggerAdapter::get();
+        return getLogger(kCapability);
     }
 
     static ::MongoExtensionStatus* _extUserAsserted(
-        ::MongoExtensionByteView structuredErrorMessage);
-
-    static ::MongoExtensionStatus* _extMarkIdleThreadBlock(
-        ::MongoExtensionIdleThreadBlock** idleThreadBlock, const char* location) {
-        return wrapCXXAndConvertExceptionToStatus(
-            [&]() { *idleThreadBlock = new IdleThreadBlockAdapter(location); });
+        ::MongoExtensionByteView structuredErrorMessage) {
+        return detail::userAsserted(structuredErrorMessage, kCapability);
     }
 
     static ::MongoExtensionStatus* _extTripwireAsserted(
-        ::MongoExtensionByteView structuredErrorMessage);
+        ::MongoExtensionByteView structuredErrorMessage) {
+        return detail::tripwireAsserted(structuredErrorMessage, kCapability);
+    }
 
-    static MongoExtensionStatus* _extCreateHostAggStageParseNode(
-        ::MongoExtensionByteView spec, ::MongoExtensionAggStageParseNode** node) noexcept;
+    static ::MongoExtensionStatus* _extMarkIdleThreadBlock(
+        ::MongoExtensionIdleThreadBlock** idleThreadBlock, const char* location) {
+        return detail::markIdleThreadBlock(idleThreadBlock, location, kCapability);
+    }
+
+    static ::MongoExtensionStatus* _extCreateHostAggStageParseNode(
+        ::MongoExtensionByteView spec, ::MongoExtensionAggStageParseNode** node) noexcept {
+        return detail::createHostAggStageParseNode(spec, node, kCapability);
+    }
 
     static ::MongoExtensionStatus* _extCreateIdLookup(
-        ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept;
+        ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept {
+        return detail::createIdLookup(bsonSpec, node, kCapability);
+    }
 
     static ::MongoExtensionStatus* _extCreateDocumentResultsAndMetadata(
         ::MongoExtensionByteView bsonSpec,
         ::MongoExtensionDocResultsDPLCallback dplCallback,
         void* dplCallbackUserData,
         void (*dplCallbackDestroy)(void*),
-        ::MongoExtensionAggStageAstNode** node) noexcept;
+        ::MongoExtensionAggStageAstNode** node) noexcept {
+        return detail::createDocumentResultsAndMetadata(
+            bsonSpec, dplCallback, dplCallbackUserData, dplCallbackDestroy, node, kCapability);
+    }
 
     static constexpr ::MongoExtensionHostServicesVTable VTABLE = {
         .get_logger = &_extGetLogger,
@@ -104,4 +182,14 @@ private:
         .create_id_lookup = &_extCreateIdLookup,
         .create_document_results_and_metadata = &_extCreateDocumentResultsAndMetadata};
 };
+
+inline ::MongoExtensionHostServices* getHostServices(const CapabilityVersion& capability) {
+    // One HostServicesAdapter instantiation per negotiable (major, minor), in a row-major table
+    // with one row per supported major and one column per negotiable minor of that major. The
+    // table holds factories so each instance is constructed lazily, on first negotiation of its
+    // version. This mirrors getExtensionStatusOK; the row-size and offset helpers it uses are not
+    // StatusOK-specific, they just walk kSupportedVersionMaxima.
+    return getNegotiatedVersionInstance<HostServicesAdapter, ::MongoExtensionHostServices>(
+        capability);
+}
 }  // namespace mongo::extension::host_connector

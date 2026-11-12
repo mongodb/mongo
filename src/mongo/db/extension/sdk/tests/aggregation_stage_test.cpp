@@ -19,6 +19,7 @@
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/raii_vector_to_abi_array.h"
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/array/abi_array_to_raii_vector.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
@@ -58,15 +59,12 @@ const extension::AggStageParseNodeHandle& asParse(const Variant& v) {
     return std::get<extension::AggStageParseNodeHandle>(v);
 }
 
-class AggStageTest : public unittest::Test {
+class AggStageTest : public SdkTest {
 public:
     void setUp() override {
-        // Initialize HostServices so that aggregation stages will be able to access member
-        // functions, e.g. to run assertions.
-        sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get(),
-                                              CapabilityVersion::legacyCapability());
+        SdkTest::setUp();
         _execCtx = std::make_unique<host_connector::QueryExecutionContextAdapter>(
-            std::make_unique<shared_test_stages::MockQueryExecutionContext>());
+            std::make_unique<shared_test_stages::MockQueryExecutionContext>(), kTestCapability);
     }
 
     auto getExpCtx() {
@@ -438,7 +436,7 @@ public:
     }
 };
 
-TEST(AggregationStageTest, SimpleSerializationSucceeds) {
+TEST_F(AggStageTest, SimpleSerializationSucceeds) {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         SimpleSerializationLogicalStage::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
@@ -449,12 +447,12 @@ TEST(AggregationStageTest, SimpleSerializationSucceeds) {
                       serialized);
 }
 
-TEST(AggregationStageTest, ExplainQueryPlanner) {
+TEST_F(AggStageTest, ExplainQueryPlanner) {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         SimpleSerializationLogicalStage::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
     host_connector::QueryExecutionContextAdapter ctxAdapter(
-        std::make_unique<shared_test_stages::MockQueryExecutionContext>());
+        std::make_unique<shared_test_stages::MockQueryExecutionContext>(), kTestCapability);
 
     // Test that different verbosity levels can be passed through to the extension implementation
     // correctly.
@@ -481,12 +479,12 @@ TEST(AggregationStageTest, ExplainQueryPlanner) {
 }
 
 
-TEST(AggregationStageTest, ExplainExecutionStats) {
+TEST_F(AggStageTest, ExplainExecutionStats) {
     auto validExecAggStage = new extension::sdk::ExtensionExecAggStageAdapter(
         shared_test_stages::ValidExtensionExecAggStage::make());
     auto handle = extension::ExecAggStageHandle{validExecAggStage};
     host_connector::QueryExecutionContextAdapter ctxAdapter(
-        std::make_unique<shared_test_stages::MockQueryExecutionContext>());
+        std::make_unique<shared_test_stages::MockQueryExecutionContext>(), kTestCapability);
 
     // Test that different verbosity levels can be passed through to the extension implementation
     // correctly.
@@ -546,7 +544,7 @@ TEST_F(AggStageTest, SimpleComputeQueryShapeSucceeds) {
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     query_shape::SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(
         BSON(SimpleQueryShapeParseNode::kStageName << SimpleQueryShapeParseNode::kStageSpec),
@@ -596,7 +594,7 @@ TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithNoTransformation
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     query_shape::SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(BSON(IdentifierQueryShapeParseNode::kStageName
                            << BSON(IdentifierQueryShapeParseNode::kIndexFieldName
@@ -613,7 +611,7 @@ TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithTransformation) 
     opts.transformIdentifiers = true;
     opts.transformIdentifiersCallback = IdentifierQueryShapeParseNode::applyHmacForTest;
 
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(BSON(IdentifierQueryShapeParseNode::kStageName
                            << BSON(IdentifierQueryShapeParseNode::kIndexFieldName
@@ -694,7 +692,7 @@ TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithNoTransformation)
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     query_shape::SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     auto queryShape = handle->getQueryShape(adapter);
 
     ASSERT_BSONOBJ_EQ(BSON(FieldPathQueryShapeParseNode::kStageName
@@ -713,7 +711,7 @@ TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithTransformation) {
     opts.transformIdentifiers = true;
     opts.transformIdentifiersCallback = FieldPathQueryShapeParseNode::applyHmacForTest;
 
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     auto queryShape = handle->getQueryShape(adapter);
 
     auto transformedSingleField =
@@ -801,7 +799,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithNoTransformation) {
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     query_shape::SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     auto queryShape = handle->getQueryShape(adapter);
 
     BSONObjBuilder specBuilder;
@@ -826,7 +824,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithDebugShape) {
 
     query_shape::SerializationOptions opts =
         query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions;
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     auto queryShape = handle->getQueryShape(adapter);
 
     BSONObjBuilder specBuilder;
@@ -846,7 +844,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValue
 
     query_shape::SerializationOptions opts =
         query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     auto queryShape = handle->getQueryShape(adapter);
 
     BSONObjBuilder specBuilder;
@@ -938,7 +936,7 @@ TEST_F(AggStageTest, ValidateStructStateAfterConvertingStructToGetNextResult) {
     ASSERT_THROWS_WITH_CHECK(
         [&] {
             [[maybe_unused]] auto converted =
-                extension::ExtensionGetNextResult::makeFromApiResult(result);
+                extension::ExtensionGetNextResult::makeFromApiResult(result, kTestCapability);
         }(),
         AssertionException,
         [](const AssertionException& ex) {
@@ -1012,7 +1010,7 @@ public:
     }
 };
 
-TEST(AggregationStageTest, GetMetricsExtensionExecAggStageSucceeds) {
+TEST_F(AggStageTest, GetMetricsExtensionExecAggStageSucceeds) {
     QueryTestServiceContext testCtx;
     auto opCtx = testCtx.makeOperationContext();
 
@@ -1027,7 +1025,7 @@ TEST(AggregationStageTest, GetMetricsExtensionExecAggStageSucceeds) {
         SerializationContext());
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(expCtx.get());
-    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), kTestCapability);
 
     // Call getNext which triggers the getMetrics call logic.
     auto getNext = handle->getNext(&adapter);
@@ -1193,7 +1191,7 @@ TEST_F(AggStageTest, TestDPLRaiiVecToAbiArrayRoundTrip) {
     ASSERT_NE(abiArray[1].element.parseNode, nullptr);
 
     // Convert ABI array to vector of RAII handles (round-trip)
-    auto roundTripVector = extension::dplArrayToRaiiVector(abiArr);
+    auto roundTripVector = extension::dplArrayToRaiiVector(abiArr, kTestCapability);
 
     // Verify handle vector is correctly populated.
     ASSERT_EQ(roundTripVector.size(), 2U);
@@ -1500,7 +1498,7 @@ TEST_F(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodePreservesQuerySha
 
     // Verify query shape is preserved (CloneableExtensionParseNode returns _spec as query shape).
     query_shape::SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     ASSERT_BSONOBJ_EQ(handle->getQueryShape(adapter), clonedHandle->getQueryShape(adapter));
 }
 
@@ -1556,7 +1554,7 @@ TEST_F(HostParseNodeCloneTest, ClonedParseNodeQueryShapeUnaffectedByExpandOnOthe
 
     // Get query shape before expand.
     query_shape::SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx(), kTestCapability};
     auto originalQueryShape = handle->getQueryShape(adapter);
     auto clonedQueryShape = clonedHandle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(originalQueryShape, clonedQueryShape);
@@ -1594,7 +1592,9 @@ private:
     BSONObj _properties;
 };
 
-TEST(HostAstNodeCloneTest, CloneExtensionAllocatedAstNodePreservesName) {
+using HostAstNodeCloneTest = AggStageTest;
+
+TEST_F(HostAstNodeCloneTest, CloneExtensionAllocatedAstNodePreservesName) {
     auto properties = BSON("needsMerge" << true);
 
     auto extensionAstNode =
@@ -1611,7 +1611,7 @@ TEST(HostAstNodeCloneTest, CloneExtensionAllocatedAstNodePreservesName) {
     ASSERT_EQ(handle->getName(), clonedHandle->getName());
 }
 
-TEST(HostAstNodeCloneTest, CloneExtensionAllocatedAstNodeIsIndependent) {
+TEST_F(HostAstNodeCloneTest, CloneExtensionAllocatedAstNodeIsIndependent) {
     auto properties = BSON("streamable" << false);
 
     auto extensionAstNode =
@@ -1629,7 +1629,7 @@ TEST(HostAstNodeCloneTest, CloneExtensionAllocatedAstNodeIsIndependent) {
     ASSERT_TRUE(clonedHandle.isValid());
 }
 
-TEST(HostAstNodeCloneTest, CloneExtensionAllocatedAstNodePreservesProperties) {
+TEST_F(HostAstNodeCloneTest, CloneExtensionAllocatedAstNodePreservesProperties) {
     auto properties = BSON("position" << "first");
 
     auto extensionAstNode =
@@ -1942,7 +1942,7 @@ public:
 
 const BSONObj FilteredLogicalStage::kFilter = BSON("field" << "value");
 
-TEST(AggregationStageTest, GetFilterReturnsEmptyBSONObjByDefault) {
+TEST_F(AggStageTest, GetFilterReturnsEmptyBSONObjByDefault) {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         sdk::shared_test_stages::TransformLogicalAggStage::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
@@ -1950,7 +1950,7 @@ TEST(AggregationStageTest, GetFilterReturnsEmptyBSONObjByDefault) {
     ASSERT_BSONOBJ_EQ(BSONObj(), handle->getFilter());
 }
 
-TEST(AggregationStageTest, GetFilterReturnsFilterWhenOverridden) {
+TEST_F(AggStageTest, GetFilterReturnsFilterWhenOverridden) {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         std::make_unique<FilteredLogicalStage>());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
@@ -1976,7 +1976,7 @@ public:
     }
 };
 
-TEST(AggregationStageTest, SkipStreamOverrideIsCalledWithCorrectStreamType) {
+TEST_F(AggStageTest, SkipStreamOverrideIsCalledWithCorrectStreamType) {
     auto skipStreamImpl = std::make_unique<SkipStreamRecordingStage>();
     auto* skipStreamPtr = skipStreamImpl.get();
     auto logicalStage =
@@ -1990,7 +1990,7 @@ TEST(AggregationStageTest, SkipStreamOverrideIsCalledWithCorrectStreamType) {
               ::MongoExtensionStreamType::kMongoExtensionStreamTypeMetaResult);
 }
 
-TEST(AggregationStageTest, SkipStreamDefaultNoOpDoesNotCrash) {
+TEST_F(AggStageTest, SkipStreamDefaultNoOpDoesNotCrash) {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         sdk::shared_test_stages::TransformLogicalAggStage::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};

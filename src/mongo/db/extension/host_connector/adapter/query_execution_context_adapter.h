@@ -41,9 +41,11 @@ public:
 class QueryExecutionContextAdapter final : public ::MongoExtensionQueryExecutionContext {
 public:
     QueryExecutionContextAdapter(std::unique_ptr<QueryExecutionContextBase> ctx,
+                                 const CapabilityVersion& capability,
                                  exec::agg::DynamicBatchSize* dynamicBatchSize = nullptr)
         : ::MongoExtensionQueryExecutionContext{&VTABLE},
           _ctx(std::move(ctx)),
+          _capability(capability),
           _dynamicBatchSize(dynamicBatchSize) {
         tassert(11417100, "Provided QueryExecutionContextBase is null", _ctx != nullptr);
     }
@@ -61,7 +63,16 @@ public:
         return VTABLE;
     }
 
+    constexpr const CapabilityVersion& getCapabilityVersion() const {
+        return _capability;
+    }
+
 private:
+    static const CapabilityVersion& _capabilityOf(
+        const ::MongoExtensionQueryExecutionContext* ctx) noexcept {
+        return static_cast<const QueryExecutionContextAdapter*>(ctx)->_capability;
+    }
+
     static MongoExtensionStatus* _extCheckForInterrupt(
         const MongoExtensionQueryExecutionContext* ctx, MongoExtensionStatus* queryStatus) noexcept;
 
@@ -88,6 +99,7 @@ private:
         .set_batch_size = &_extSetBatchSize};
 
     std::unique_ptr<QueryExecutionContextBase> _ctx;
+    const CapabilityVersion _capability;
     exec::agg::DynamicBatchSize* _dynamicBatchSize{nullptr};
 };
 

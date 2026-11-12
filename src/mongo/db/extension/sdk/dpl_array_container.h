@@ -3,6 +3,7 @@
 #pragma once
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/assert_util.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/sdk/raii_vector_to_abi_array.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/util/modules.h"

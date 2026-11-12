@@ -17,47 +17,56 @@ namespace mongo::extension::host_connector {
     const ::MongoExtensionPipelineDependencies* deps,
     ::MongoExtensionByteView name,
     bool* result) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto sv = byteViewAsStringView(name);
-        *result = static_cast<const PipelineDependenciesAdapter*>(deps)->getImpl().getNeedsMetadata(
-            DocumentMetadataFields::parseMetaType(sv));
-    });
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            const auto sv = byteViewAsStringView(name);
+            *result =
+                static_cast<const PipelineDependenciesAdapter*>(deps)->getImpl().getNeedsMetadata(
+                    DocumentMetadataFields::parseMetaType(sv));
+        },
+        _capabilityOf(deps));
 }
 
 ::MongoExtensionStatus* PipelineDependenciesAdapter::_hostNeedsVariable(
     const ::MongoExtensionPipelineDependencies* deps,
     ::MongoExtensionByteView name,
     bool* result) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto sv = byteViewAsStringView(name);
-        const auto& variableRefs =
-            static_cast<const PipelineDependenciesAdapter*>(deps)->getVariableRefs();
-        *result = variableRefs.contains(std::string(sv));
-    });
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            const auto sv = byteViewAsStringView(name);
+            const auto& variableRefs =
+                static_cast<const PipelineDependenciesAdapter*>(deps)->getVariableRefs();
+            *result = variableRefs.contains(std::string(sv));
+        },
+        _capabilityOf(deps));
 }
 
 ::MongoExtensionStatus* PipelineDependenciesAdapter::_hostNeedsWholeDocument(
     const ::MongoExtensionPipelineDependencies* deps, bool* result) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        *result =
-            static_cast<const PipelineDependenciesAdapter*>(deps)->getImpl().needWholeDocument;
-    });
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            *result =
+                static_cast<const PipelineDependenciesAdapter*>(deps)->getImpl().needWholeDocument;
+        },
+        _capabilityOf(deps));
 }
 
 ::MongoExtensionStatus* PipelineDependenciesAdapter::_hostGetNeededFields(
     const ::MongoExtensionPipelineDependencies* deps, ::MongoExtensionByteBuf** result) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl = static_cast<const PipelineDependenciesAdapter*>(deps)->getImpl();
-        if (impl.needWholeDocument) {
-            *result = nullptr;
-            return;
-        }
-        BSONArrayBuilder builder;
-        for (const auto& field : impl.fields) {
-            builder.append(field);
-        }
-        *result = new ByteBuf(builder.arr());
-    });
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            const auto& impl = static_cast<const PipelineDependenciesAdapter*>(deps)->getImpl();
+            if (impl.needWholeDocument) {
+                *result = nullptr;
+                return;
+            }
+            BSONArrayBuilder builder;
+            for (const auto& field : impl.fields) {
+                builder.append(field);
+            }
+            *result = new ByteBuf(builder.arr());
+        },
+        _capabilityOf(deps));
 }
 
 }  // namespace mongo::extension::host_connector

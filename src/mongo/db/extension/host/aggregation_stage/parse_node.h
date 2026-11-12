@@ -69,8 +69,11 @@ private:
  */
 class HostAggStageParseNodeAdapter final : public ::MongoExtensionAggStageParseNode {
 public:
-    HostAggStageParseNodeAdapter(std::unique_ptr<AggStageParseNode> parseNode)
-        : ::MongoExtensionAggStageParseNode(&VTABLE), _parseNode(std::move(parseNode)) {}
+    HostAggStageParseNodeAdapter(std::unique_ptr<AggStageParseNode> parseNode,
+                                 const CapabilityVersion& capability)
+        : ::MongoExtensionAggStageParseNode(&VTABLE),
+          _parseNode(std::move(parseNode)),
+          _capability(capability) {}
 
     ~HostAggStageParseNodeAdapter() = default;
 
@@ -101,7 +104,16 @@ public:
         return VTABLE;
     }
 
+    constexpr const CapabilityVersion& getCapabilityVersion() const {
+        return _capability;
+    }
+
 private:
+    static const constexpr CapabilityVersion& _capabilityOf(
+        const ::MongoExtensionAggStageParseNode* parseNode) noexcept {
+        return static_cast<const HostAggStageParseNodeAdapter*>(parseNode)->_capability;
+    }
+
     const AggStageParseNode& getImpl() const noexcept {
         return *_parseNode;
     }
@@ -125,62 +137,73 @@ private:
         const ::MongoExtensionAggStageParseNode* parseNode,
         const ::MongoExtensionHostQueryShapeOpts* ctx,
         ::MongoExtensionByteBuf** queryShape) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([&]() {
-            uassert(11717600, "Received invalid query shape opts pointer", ctx != nullptr);
-            uassert(11717601,
-                    "A host parse node can only use host-generated query shape opts",
-                    host_connector::QueryShapeOptsAdapter::isHostAllocated(*ctx));
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() {
+                uassert(11717600, "Received invalid query shape opts pointer", ctx != nullptr);
+                uassert(11717601,
+                        "A host parse node can only use host-generated query shape opts",
+                        host_connector::QueryShapeOptsAdapter::isHostAllocated(*ctx));
 
-            *queryShape = nullptr;
-            auto bsonSpec =
-                static_cast<const HostAggStageParseNodeAdapter*>(parseNode)->getBsonSpec();
+                *queryShape = nullptr;
+                auto bsonSpec =
+                    static_cast<const HostAggStageParseNodeAdapter*>(parseNode)->getBsonSpec();
 
-            // TODO SERVER-117619: Remove expression context from QueryShapeOptsAdapter once you can
-            // generate a query shape without going to DocumentSource.
-            const auto* optsAdapter =
-                static_cast<const host_connector::QueryShapeOptsAdapter*>(ctx);
+                // TODO SERVER-117619: Remove expression context from QueryShapeOptsAdapter once you
+                // can generate a query shape without going to DocumentSource.
+                const auto* optsAdapter =
+                    static_cast<const host_connector::QueryShapeOptsAdapter*>(ctx);
 
-            auto parsedStage = DocumentSource::parse(optsAdapter->getExpCtx(), bsonSpec);
-            uassert(11717602,
-                    "It is not supported for a host parse node to generate query shape for a "
-                    "desugar stage",
-                    parsedStage.size() == 1);
+                auto parsedStage = DocumentSource::parse(optsAdapter->getExpCtx(), bsonSpec);
+                uassert(11717602,
+                        "It is not supported for a host parse node to generate query shape for a "
+                        "desugar stage",
+                        parsedStage.size() == 1);
 
-            Value serialized = parsedStage.front()->serialize(*optsAdapter->getOptsImpl());
-            *queryShape = new ByteBuf(serialized.getDocument().toBson());
-        });
+                Value serialized = parsedStage.front()->serialize(*optsAdapter->getOptsImpl());
+                *queryShape = new ByteBuf(serialized.getDocument().toBson());
+            },
+            _capabilityOf(parseNode));
     };
 
     static ::MongoExtensionStatus* _hostExpand(
         const ::MongoExtensionAggStageParseNode* parseNode,
         ::MongoExtensionExpandedArrayContainer** outExpanded) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(10977801,
-                      "_hostExpand should not be called. Ensure that parseNode is "
-                      "extension-allocated, not host-allocated.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(10977801,
+                          "_hostExpand should not be called. Ensure that parseNode is "
+                          "extension-allocated, not host-allocated.");
+            },
+            _capabilityOf(parseNode));
     }
 
     static ::MongoExtensionStatus* _hostClone(const ::MongoExtensionAggStageParseNode* parseNode,
                                               ::MongoExtensionAggStageParseNode** output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([&]() {
-            auto* hostParseNode = static_cast<const HostAggStageParseNodeAdapter*>(parseNode);
-            auto clonedParseNode =
-                std::make_unique<AggStageParseNode>(hostParseNode->getBsonSpec());
-            *output = new HostAggStageParseNodeAdapter(std::move(clonedParseNode));
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() {
+                auto* hostParseNode = static_cast<const HostAggStageParseNodeAdapter*>(parseNode);
+                auto clonedParseNode =
+                    std::make_unique<AggStageParseNode>(hostParseNode->getBsonSpec());
+                // The clone is exposed to the same extension as its source, so it inherits the
+                // same negotiated capability.
+                *output = new HostAggStageParseNodeAdapter(std::move(clonedParseNode),
+                                                           hostParseNode->getCapabilityVersion());
+            },
+            _capabilityOf(parseNode));
     }
 
     static ::MongoExtensionStatus* _hostToBsonForLog(
         const ::MongoExtensionAggStageParseNode* parseNode,
         ::MongoExtensionByteBuf** output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([&]() {
-            *output = nullptr;
-            const auto& impl =
-                static_cast<const HostAggStageParseNodeAdapter*>(parseNode)->getImpl();
-            // Allocate a buffer on the heap. Ownership is transferred to the caller.
-            *output = new ByteBuf(impl.toBsonForLog());
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() {
+                *output = nullptr;
+                const auto& impl =
+                    static_cast<const HostAggStageParseNodeAdapter*>(parseNode)->getImpl();
+                // Allocate a buffer on the heap. Ownership is transferred to the caller.
+                *output = new ByteBuf(impl.toBsonForLog());
+            },
+            _capabilityOf(parseNode));
     }
 
     static constexpr ::MongoExtensionAggStageParseNodeVTable VTABLE = {
@@ -192,5 +215,6 @@ private:
         .to_bson_for_log = &_hostToBsonForLog};
 
     std::unique_ptr<AggStageParseNode> _parseNode;
+    const CapabilityVersion _capability;
 };
 };  // namespace mongo::extension::host

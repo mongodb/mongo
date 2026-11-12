@@ -3,6 +3,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 
 #include "mongo/db/extension/sdk/assert_util.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/sdk/raii_vector_to_abi_array.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"

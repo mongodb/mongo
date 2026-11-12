@@ -138,9 +138,9 @@ public:
 
     void setUp() override {
         AggregationContextFixture::setUp();
-        extension::sdk::HostServicesAPI::setHostServices(
-            &extension::host_connector::HostServicesAdapter::get(),
-            extension::CapabilityVersion::legacyCapability());
+        const auto capability = mongo::extension::CapabilityVersion::legacyCapability();
+        extension::sdk::HostServicesAPI::setHostServicesForTest(
+            extension::host_connector::getHostServices(capability), capability);
     }
 
     BSONObj makeLookupWithSubpipeline(const std::vector<BSONObj>& subpipelineStages) {

@@ -123,7 +123,8 @@ TEST(ExtensionBSONObjTest, makeFromByteContainerByteBufRoundtrip) {
     auto byteBufHandle = guardedByteContainer.releaseByteBuf();
     ::MongoExtensionByteContainer newContainer{.type = ::MongoExtensionByteContainerType::kByteBuf};
     newContainer.bytes.buf = byteBufHandle.release();
-    extensionBSONObj = ExtensionBSONObj::makeFromByteContainer(newContainer);
+    extensionBSONObj = ExtensionBSONObj::makeFromByteContainer(
+        newContainer, CapabilityVersion::latestCapability());
     ASSERT_BSONOBJ_EQ(BSON("meow" << "santiago"), extensionBSONObj.getUnownedBSONObj());
 }
 
@@ -151,7 +152,8 @@ TEST(ExtensionBSONObjTest, makeFromByteContainerByteViewRoundtrip) {
     ::MongoExtensionByteContainer newContainer{.type =
                                                    ::MongoExtensionByteContainerType::kByteView};
     newContainer.bytes.view = guardedByteContainer.getByteView();
-    extensionBSONObj = ExtensionBSONObj::makeFromByteContainer(newContainer);
+    extensionBSONObj = ExtensionBSONObj::makeFromByteContainer(
+        newContainer, CapabilityVersion::latestCapability());
     ASSERT_BSONOBJ_EQ(BSON("meow" << "santiago"), extensionBSONObj.getUnownedBSONObj());
 }
 
@@ -185,9 +187,10 @@ TEST(ExtensionGetNextResultTest, makeFromApiResultAdvancedEmptyDocumentThrows) {
         ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(0x1), 0};
     apiResult.resultMetadata = createEmptyByteContainer();
 
-    ASSERT_THROWS_CODE(ExtensionGetNextResult::makeFromApiResult(apiResult),
-                       DBException,
-                       ErrorCodes::ExtensionSerializationError);
+    ASSERT_THROWS_CODE(
+        ExtensionGetNextResult::makeFromApiResult(apiResult, CapabilityVersion::latestCapability()),
+        DBException,
+        ErrorCodes::ExtensionSerializationError);
 }
 
 TEST(ExtensionGetNextResultTest, makeFromApiResultAdvancedDanglingEmptyMetadataSkipsMetadata) {
@@ -200,7 +203,8 @@ TEST(ExtensionGetNextResultTest, makeFromApiResultAdvancedDanglingEmptyMetadataS
     apiResult.resultMetadata.bytes.view =
         ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(0x1), 0};
 
-    auto result = ExtensionGetNextResult::makeFromApiResult(apiResult);
+    auto result =
+        ExtensionGetNextResult::makeFromApiResult(apiResult, CapabilityVersion::latestCapability());
     ASSERT_EQ(GetNextCode::kAdvanced, result.code);
     ASSERT_TRUE(result.resultDocument.has_value());
     ASSERT_FALSE(result.resultMetadata.has_value());  // dangling-empty metadata skipped
@@ -215,9 +219,10 @@ TEST(ExtensionGetNextResultTest, makeFromApiResultAdvancedNullDataWithBogusLengt
     apiResult.resultDocument.bytes.view = ::MongoExtensionByteView{nullptr, 5};
     apiResult.resultMetadata = createEmptyByteContainer();
 
-    ASSERT_THROWS_CODE(ExtensionGetNextResult::makeFromApiResult(apiResult),
-                       DBException,
-                       ErrorCodes::ExtensionSerializationError);
+    ASSERT_THROWS_CODE(
+        ExtensionGetNextResult::makeFromApiResult(apiResult, CapabilityVersion::latestCapability()),
+        DBException,
+        ErrorCodes::ExtensionSerializationError);
 }
 
 TEST(ExtensionGetNextResultTest, makeFromApiResultPauseReclaimsTransferredDocumentBuf) {
@@ -227,7 +232,8 @@ TEST(ExtensionGetNextResultTest, makeFromApiResultPauseReclaimsTransferredDocume
     auto byteBufObj = ExtensionBSONObj::makeAsByteBuf(doc);
     byteBufObj.toByteContainer(apiResult.resultDocument);
 
-    auto result = ExtensionGetNextResult::makeFromApiResult(apiResult);
+    auto result =
+        ExtensionGetNextResult::makeFromApiResult(apiResult, CapabilityVersion::latestCapability());
     ASSERT_EQ(GetNextCode::kPauseExecution, result.code);
     ASSERT_FALSE(result.resultDocument.has_value());
     ASSERT_FALSE(result.resultMetadata.has_value());
@@ -240,7 +246,8 @@ TEST(ExtensionGetNextResultTest, makeFromApiResultEOFReclaimsTransferredMetadata
     auto byteBufObj = ExtensionBSONObj::makeAsByteBuf(doc);
     byteBufObj.toByteContainer(apiResult.resultMetadata);
 
-    auto result = ExtensionGetNextResult::makeFromApiResult(apiResult);
+    auto result =
+        ExtensionGetNextResult::makeFromApiResult(apiResult, CapabilityVersion::latestCapability());
     ASSERT_EQ(GetNextCode::kEOF, result.code);
     ASSERT_FALSE(result.resultDocument.has_value());
     ASSERT_FALSE(result.resultMetadata.has_value());

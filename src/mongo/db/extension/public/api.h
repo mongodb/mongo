@@ -1542,7 +1542,10 @@ typedef struct MongoExtensionVTable {
  * extension for later use.
  *
  * Returns a MongoExtensionStatus indicating whether the parameter MongoExtension was successfully
- * initialized.
+ * initialized, or nullptr if no status could be allocated for the requested version. An extension
+ * returns nullptr when the requested version is invalid or outside the range of versions for which
+ * it can produce a status the host would understand; the host treats a nullptr return as a load
+ * failure.
  */
 #define GET_MONGODB_EXTENSION_SYMBOL "get_mongodb_extension"
 typedef MongoExtensionStatus* (*get_mongo_extension_t)(

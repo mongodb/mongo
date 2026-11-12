@@ -20,18 +20,20 @@ namespace mongo::extension::host_connector {
 ::MongoExtensionStatus* HostLogicalAggStageAdapter::_hostGetFilter(
     const ::MongoExtensionLogicalAggStage* logicalStage,
     ::MongoExtensionByteBuf** output) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        *output = nullptr;
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            *output = nullptr;
 
-        auto filter =
-            static_cast<const HostLogicalAggStageAdapter*>(logicalStage)->getImpl().getFilter();
+            auto filter =
+                static_cast<const HostLogicalAggStageAdapter*>(logicalStage)->getImpl().getFilter();
 
-        // Null output indicates no filter - only initialize 'output' when we have a non-empty
-        // filter.
-        if (!filter.isEmpty()) {
-            *output = new ByteBuf(filter);
-        }
-    });
+            // Null output indicates no filter - only initialize 'output' when we have a non-empty
+            // filter.
+            if (!filter.isEmpty()) {
+                *output = new ByteBuf(filter);
+            }
+        },
+        _capabilityOf(logicalStage));
 }
 
 }  // namespace mongo::extension::host_connector

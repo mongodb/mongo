@@ -12,6 +12,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
+#include "mongo/db/extension/sdk/tests/sdk_test.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
@@ -41,13 +42,14 @@ makeAdapterWithMock() {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto mock = DocumentSourceMock::createForTest({}, expCtx);
     auto logicalStage = host::LogicalAggStage::make(mock.get());
-    auto adapter =
-        std::make_unique<host_connector::HostLogicalAggStageAdapter>(std::move(logicalStage));
+    auto adapter = std::make_unique<host_connector::HostLogicalAggStageAdapter>(
+        std::move(logicalStage), sdk::SdkTest::kTestCapability);
     return {std::move(mock), std::move(adapter)};
 }
 
 DEATH_TEST(HostLogicalAggStageAdapterDeathTest, NullUnderlyingStageAsserts, "12303709") {
-    [[maybe_unused]] host_connector::HostLogicalAggStageAdapter adapter(nullptr);
+    [[maybe_unused]] host_connector::HostLogicalAggStageAdapter adapter(
+        nullptr, sdk::SdkTest::kTestCapability);
 }
 
 DEATH_TEST(HostLogicalAggStageAdapterDeathTest, SerializeOnHostAllocatedStageTasserts, "12303700") {
@@ -60,7 +62,8 @@ DEATH_TEST(HostLogicalAggStageAdapterDeathTest, ExplainOnHostAllocatedStageTasse
     auto [mock, adapter] = makeAdapterWithMock();
     LogicalAggStageAPI api(adapter.get());
     host_connector::QueryExecutionContextAdapter ctxAdapter(
-        std::make_unique<sdk::shared_test_stages::MockQueryExecutionContext>());
+        std::make_unique<sdk::shared_test_stages::MockQueryExecutionContext>(),
+        sdk::SdkTest::kTestCapability);
     [[maybe_unused]] auto result =
         api.explain(ctxAdapter, ExplainOptions::Verbosity::kQueryPlanner);
 }
@@ -191,7 +194,8 @@ DEATH_TEST(PipelineRewriteContextAPIDeathTest, NullGetPipelineSuffixBoundsTasser
 // ---- PipelineRewriteContextAdapter death tests ----
 
 DEATH_TEST(PipelineRewriteContextAdapterDeathTest, NullCtxAtConstructionTasserts, "12200604") {
-    [[maybe_unused]] host_connector::PipelineRewriteContextAdapter adapter(nullptr);
+    [[maybe_unused]] host_connector::PipelineRewriteContextAdapter adapter(
+        nullptr, sdk::SdkTest::kTestCapability);
 }
 
 DEATH_TEST(PipelineRewriteContextAdapterDeathTest, GetNthNextStageOutOfBoundsTasserts, "12200602") {
@@ -202,7 +206,7 @@ DEATH_TEST(PipelineRewriteContextAdapterDeathTest, GetNthNextStageOutOfBoundsTas
     // Context is positioned at the only stage — no next stages exist.
     rule_based_rewrites::pipeline::PipelineRewriteContext rbrCtx(*expCtx, container);
     host_connector::PipelineRewriteContextAdapter adapter(
-        host::PipelineRewriteContext::make(&rbrCtx));
+        host::PipelineRewriteContext::make(&rbrCtx), sdk::SdkTest::kTestCapability);
 
     [[maybe_unused]] auto stage = PipelineRewriteContextAPI(&adapter).getNthNextStage(1);
 }
@@ -217,27 +221,20 @@ DEATH_TEST(PipelineRewriteContextAdapterDeathTest,
     // Context is positioned at the only stage — no next stages exist.
     rule_based_rewrites::pipeline::PipelineRewriteContext rbrCtx(*expCtx, container);
     host_connector::PipelineRewriteContextAdapter adapter(
-        host::PipelineRewriteContext::make(&rbrCtx));
+        host::PipelineRewriteContext::make(&rbrCtx), sdk::SdkTest::kTestCapability);
 
     PipelineRewriteContextAPI(&adapter).eraseNthNext(1);
 }
 
 // ---- Host exec agg stage adapter/handle death tests ----
 
-class HostExecAggStageAdapterDeathTest : public unittest::Test {
-public:
-    void setUp() override {
-        // Initialize HostServices so that aggregation stages will be able to access member
-        // functions, e.g. to run assertions.
-        sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get(),
-                                              CapabilityVersion::legacyCapability());
-    }
-};
+class HostExecAggStageAdapterDeathTest : public sdk::SdkTest {};
 
 DEATH_TEST_F(HostExecAggStageAdapterDeathTest,
              HostExecAggStageAdapterNullStageAsserts,
              "10957207") {
-    [[maybe_unused]] auto adapter = host_connector::HostExecAggStageAdapter{nullptr};
+    [[maybe_unused]] auto adapter =
+        host_connector::HostExecAggStageAdapter{nullptr, kTestCapability};
 }
 
 DEATH_TEST_F(HostExecAggStageAdapterDeathTest, SetSourceOnSourceStageFails, "10957210") {
@@ -283,19 +280,19 @@ std::unique_ptr<host::AggStageAstNode> makeIdLookupAstNode() {
 DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetName, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.get_name = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, sdk::SdkTest::kTestCapability);
 }
 
 DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetProperties, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.get_properties = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, sdk::SdkTest::kTestCapability);
 }
 
 DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsPromote, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.promote = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, sdk::SdkTest::kTestCapability);
 }
 
 DEATH_TEST(HostAstNodeVTableDeathTest,
@@ -303,17 +300,18 @@ DEATH_TEST(HostAstNodeVTableDeathTest,
            "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.get_first_stage_view_application_policy = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, sdk::SdkTest::kTestCapability);
 }
 
 DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsBindResolvedNamespace, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.bind_resolved_namespace = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, sdk::SdkTest::kTestCapability);
 }
 
 DEATH_TEST(HostAstNodeTestDeathTest, HostGetPropertiesUnimplemented, "11347801") {
-    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
+    auto noOpAstNode =
+        new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode(), sdk::SdkTest::kTestCapability);
     auto handle = AggStageAstNodeHandle{noOpAstNode};
 
     ::MongoExtensionByteBuf** buf = nullptr;
@@ -321,7 +319,8 @@ DEATH_TEST(HostAstNodeTestDeathTest, HostGetPropertiesUnimplemented, "11347801")
 }
 
 DEATH_TEST(HostAstNodeTestDeathTest, HostPromoteUnimplemented, "11133600") {
-    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
+    auto noOpAstNode =
+        new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode(), sdk::SdkTest::kTestCapability);
     auto handle = AggStageAstNodeHandle{noOpAstNode};
 
     ::MongoExtensionLogicalAggStage** bind = nullptr;

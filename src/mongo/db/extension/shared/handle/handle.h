@@ -129,6 +129,10 @@ public:
             capabilityVersion <= kMaxSupportedCapability;
     }
 
+    const CapabilityVersion& getCapabilityVersion() const {
+        return _capability;
+    }
+
 protected:
     VTable_t& _vtable() const {
         assertValid();
@@ -150,10 +154,6 @@ protected:
                     isSupported(_capability));
             API::assertVTableConstraints(_vtable(), _capability);
         }
-    }
-
-    CapabilityVersion _getCapabilityVersion() const {
-        return _capability;
     }
 
 private:
@@ -300,6 +300,10 @@ public:
 
     const LogicalConstCppApi_t* operator->() const {
         return &_api;
+    }
+
+    static constexpr bool isSupported(const CapabilityVersion& capabilityVersion) {
+        return CppApi_t::isSupported(capabilityVersion);
     }
 
 private:

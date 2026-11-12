@@ -10,7 +10,8 @@ namespace mongo::extension {
 BSONObj CommandDescriptorAPI::getProperties() const {
     ::MongoExtensionByteBuf* buf{nullptr};
 
-    invokeCAndConvertStatusToException([&]() { return _vtable().get_properties(get(), &buf); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().get_properties(get(), &buf); },
+                                       getCapabilityVersion());
 
     tassert(ErrorCodes::ExtensionSerializationError,
             "buffer returned from get_properties must not be null",
@@ -18,7 +19,7 @@ BSONObj CommandDescriptorAPI::getProperties() const {
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.
-    ExtensionByteBufHandle ownedBuf{buf};
+    ExtensionByteBufHandle ownedBuf{buf, getCapabilityVersion()};
     return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
 
@@ -29,7 +30,9 @@ void CommandDescriptorAPI::run(const BSONObj& requestBson,
     ::MongoExtensionByteBuf* buf{nullptr};
 
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().run(get(), objAsByteView(requestBson), &ctx, &execCtx, &buf); });
+        [&]() { return _vtable().run(get(), objAsByteView(requestBson), &ctx, &execCtx, &buf); },
+        getCapabilityVersion());
+
 
     tassert(ErrorCodes::ExtensionSerializationError,
             "buffer returned from run must not be null",
@@ -37,7 +40,7 @@ void CommandDescriptorAPI::run(const BSONObj& requestBson,
 
     // Take ownership of the returned buffer so that it gets cleaned up, and append the response
     // while the buffer is still alive to avoid an intermediate owned copy.
-    ExtensionByteBufHandle ownedBuf{buf};
+    ExtensionByteBufHandle ownedBuf{buf, getCapabilityVersion()};
     result.appendElements(bsonObjFromByteView(ownedBuf->getByteView()));
 }
 

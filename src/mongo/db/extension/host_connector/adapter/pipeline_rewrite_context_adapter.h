@@ -14,8 +14,11 @@ namespace mongo::extension::host_connector {
 
 class PipelineRewriteContextAdapter final : public ::MongoExtensionPipelineRewriteContext {
 public:
-    PipelineRewriteContextAdapter(std::unique_ptr<host::PipelineRewriteContext> ctx)
-        : ::MongoExtensionPipelineRewriteContext(&VTABLE), _ctx(std::move(ctx)) {
+    PipelineRewriteContextAdapter(std::unique_ptr<host::PipelineRewriteContext> ctx,
+                                  const CapabilityVersion& capability)
+        : ::MongoExtensionPipelineRewriteContext(&VTABLE),
+          _ctx(std::move(ctx)),
+          _capability(capability) {
         tassert(12200604,
                 "The adapter's underlying host pipeline rewrite context is invalid.",
                 _ctx != nullptr);
@@ -42,7 +45,16 @@ public:
         return *_ctx;
     }
 
+    constexpr const CapabilityVersion& getCapabilityVersion() const {
+        return _capability;
+    }
+
 private:
+    static const constexpr CapabilityVersion& _capabilityOf(
+        const ::MongoExtensionPipelineRewriteContext* ctx) noexcept {
+        return static_cast<const PipelineRewriteContextAdapter*>(ctx)->_capability;
+    }
+
     static MongoExtensionStatus* _hostGetNthNextStage(
         const MongoExtensionPipelineRewriteContext* extCtx,
         size_t index,
@@ -62,6 +74,7 @@ private:
     };
 
     std::unique_ptr<host::PipelineRewriteContext> _ctx;
+    const CapabilityVersion _capability;
     // The resulting stage of _hostGetNthNextStage (the Nth next stage) is cached and ultimately
     // replaced during the next invocation of _hostGetNthNextStage. Note that this field is mutable
     // because conceptually the PipelineRewriteContextAdapter should be const because its underlying

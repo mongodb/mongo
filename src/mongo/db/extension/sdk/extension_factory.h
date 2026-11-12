@@ -7,6 +7,7 @@
 #include "mongo/db/extension/sdk/api_version_vector_to_span.h"
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/command.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/extension/sdk/host_portal.h"
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/versioned_extension.h"
@@ -195,7 +196,6 @@ private:
             extensionVersions->versions = nullptr;                                                 \
         }                                                                                          \
     }                                                                                              \
-                                                                                                   \
     ::MongoExtensionStatus* get_mongodb_extension(                                                 \
         ::MongoExtensionAPIVersion version,                                                        \
         const ::MongoExtensionHostServices* hostServices,                                          \
@@ -203,10 +203,11 @@ private:
         if (mongo::extension::CapabilityVersion::isValidVersion(version.major, version.minor)) {   \
             const auto capabilityVersion =                                                         \
                 mongo::extension::CapabilityVersion(version.major, version.minor);                 \
+            mongo::extension::sdk::setNegotiatedCapabilityVersion(capabilityVersion);              \
             if (mongo::extension::sdk::HostServicesAPI::isSupported(capabilityVersion)) {          \
                 mongo::extension::sdk::HostServicesAPI::setHostServices(hostServices,              \
                                                                         capabilityVersion);        \
-                return mongo::extension::wrapCXXAndConvertExceptionToStatus([&] {                  \
+                return mongo::extension::sdk::wrapCXXAndConvertExceptionToStatus([&] {             \
                     const auto& container =                                                        \
                         mongo::extension::sdk::VersionedExtensionContainer::getInstance();         \
                     sdk_uassert(                                                                   \
@@ -222,13 +223,24 @@ private:
                             container.getVersionedExtension(version));                             \
                     *extension = reinterpret_cast<const ::MongoExtension*>(wrapper.get());         \
                 });                                                                                \
+            } else {                                                                               \
+                /* Unreachable today: HostServicesAPI and ExtensionGenericStatus share the same    \
+                 * bounds, so a version HostServices rejects is rejected here too. Goes live only  \
+                 * if those bounds diverge. */                                                     \
+                if (mongo::extension::ExtensionGenericStatus::isSupported(capabilityVersion)) {    \
+                    return new mongo::extension::ExtensionGenericStatus(                           \
+                        13692204,                                                                  \
+                        mongo::str::stream()                                                       \
+                            << "Extension rejected host-negotiated API version " << version.major  \
+                            << "." << version.minor                                                \
+                            << ": outside the extension's supported capability bounds");           \
+                }                                                                                  \
             }                                                                                      \
         }                                                                                          \
-        return new mongo::extension::ExtensionGenericStatus(                                       \
-            13693502,                                                                              \
-            mongo::str::stream() << "Extension rejected host-negotiated API version "              \
-                                 << version.major << "." << version.minor                          \
-                                 << ": outside the extension's supported capability bounds");      \
+        /* If the requested CapabilityVersion is invalid or unsupported by our extension, we're    \
+         * unable to allocate any MongoExtensionStatus that would be understood by the Host.       \
+         * Return a nullptr and let the error surface this way instead. */                         \
+        return nullptr;                                                                            \
     }                                                                                              \
     }
 

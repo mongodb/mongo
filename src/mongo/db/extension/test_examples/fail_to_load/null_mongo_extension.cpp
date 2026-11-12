@@ -17,6 +17,7 @@ void get_mongodb_extension_versions(::MongoExtensionAPIVersionVector* extensionV
                                               const ::MongoExtensionHostServices*,
                                               const ::MongoExtension**) {
     // Intentionally leaves '*extension' as nullptr; the host should fire 10615503.
-    return mongo::extension::wrapCXXAndConvertExceptionToStatus([&]() {});
+    return mongo::extension::wrapCXXAndConvertExceptionToStatus(
+        [&]() {}, mongo::extension::CapabilityVersion::legacyCapability());
 }
 }

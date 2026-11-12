@@ -41,7 +41,7 @@ public:
         ::MongoExtensionDPLArray targetArray{arraySize, sdkAbiArray.data()};
         _transferInternal(targetArray);
 
-        return dplArrayToRaiiVector(targetArray);
+        return dplArrayToRaiiVector(targetArray, getCapabilityVersion());
     }
 
     static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
@@ -59,7 +59,8 @@ protected:
      * Callers of this function must have already verified isValid().
      */
     void _transferInternal(::MongoExtensionDPLArray& arr) {
-        invokeCAndConvertStatusToException([&]() { return _vtable().transfer(get(), &arr); });
+        invokeCAndConvertStatusToException([&]() { return _vtable().transfer(get(), &arr); },
+                                           getCapabilityVersion());
     }
 };
 

@@ -6,9 +6,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/command.h"
-#include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/command/command_descriptor.h"
-#include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
@@ -32,8 +30,8 @@ using HostPortalHandle = UnownedHandle<const ::MongoExtensionHostPortal>;
  * Wrapper for ::MongoExtensionHostPortal providing safe access to its public API via the
  * vtable.
  *
- * The HostPortal always remains fully owned by the host, and ownership is never transferred to the
- * extension. Therefore, the extension should only use this API via an UnownedHandle.
+ * The HostPortal always remains fully owned by the host, and ownership is never transferred to
+ * the extension. Therefore, the extension should only use this API via an UnownedHandle.
  *
  * Note that the host portal pointer is only valid during initialization and should not be
  * retained by the extension.
@@ -69,8 +67,8 @@ public:
         sdk_uassert(13730000,
                     (str::stream() << "Extension commands require API version 1.1, but the host "
                                       "negotiated "
-                                   << _getCapabilityVersion().toString()),
-                    _getCapabilityVersion() >= CommandDescriptorAPI::kMinSupportedCapability);
+                                   << getCapabilityVersion().toString()),
+                    getCapabilityVersion() >= CommandDescriptorAPI::kMinSupportedCapability);
         invokeCAndConvertStatusToException(
             [&] { return _vtable().register_command_descriptor(get(), commandDesc); });
     }

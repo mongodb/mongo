@@ -239,7 +239,7 @@ bool ExtensionCommand::run(OperationContext* opCtx,
             },
     };
     host_connector::CommandExecutionContextAdapter execCtx(
-        std::make_unique<CommandExecutionContext>(opCtx));
+        std::make_unique<CommandExecutionContext>(opCtx), _descriptor->getCapabilityVersion());
     _descriptor->run(cmdObj, ctx, execCtx, result);
 
     const auto reply = result.asTempObj();

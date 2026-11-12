@@ -20,7 +20,8 @@ std::string_view LogicalAggStageAPI::getName() const {
 
 BSONObj LogicalAggStageAPI::serialize() const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    invokeCAndConvertStatusToException([&]() { return _vtable().serialize(get(), &buf); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().serialize(get(), &buf); },
+                                       getCapabilityVersion());
 
     tassert(ErrorCodes::ExtensionSerializationError,
             "Extension implementation of `serialize` encountered nullptr inside the output buffer.",
@@ -35,10 +36,12 @@ BSONObj LogicalAggStageAPI::serialize() const {
 BSONObj LogicalAggStageAPI::explain(MongoExtensionQueryExecutionContext& execCtx,
                                     mongo::ExplainOptions::Verbosity verbosity) const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    invokeCAndConvertStatusToException([&]() {
-        return _vtable().explain(
-            get(), &execCtx, convertHostVerbosityToExtVerbosity(verbosity), &buf);
-    });
+    invokeCAndConvertStatusToException(
+        [&]() {
+            return _vtable().explain(
+                get(), &execCtx, convertHostVerbosityToExtVerbosity(verbosity), &buf);
+        },
+        getCapabilityVersion());
 
     tassert(ErrorCodes::ExtensionSerializationError,
             "buffer returned from explain must not be null",
@@ -52,7 +55,8 @@ BSONObj LogicalAggStageAPI::explain(MongoExtensionQueryExecutionContext& execCtx
 
 ExecAggStageHandle LogicalAggStageAPI::compile() const {
     ::MongoExtensionExecAggStage* execAggStage{nullptr};
-    invokeCAndConvertStatusToException([&]() { return _vtable().compile(get(), &execAggStage); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().compile(get(), &execAggStage); },
+                                       getCapabilityVersion());
 
     return ExecAggStageHandle(execAggStage);
 }
@@ -60,28 +64,33 @@ ExecAggStageHandle LogicalAggStageAPI::compile() const {
 DistributedPlanLogicHandle LogicalAggStageAPI::getDistributedPlanLogic() const {
     ::MongoExtensionDistributedPlanLogic* dpl{nullptr};
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().get_distributed_plan_logic(get(), &dpl); });
+        [&]() { return _vtable().get_distributed_plan_logic(get(), &dpl); },
+        getCapabilityVersion());
 
     return DistributedPlanLogicHandle(dpl);
 }
 
 LogicalAggStageHandle LogicalAggStageAPI::clone() const {
     ::MongoExtensionLogicalAggStage* logicalAggStage{nullptr};
-    invokeCAndConvertStatusToException([&]() { return _vtable().clone(get(), &logicalAggStage); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().clone(get(), &logicalAggStage); },
+                                       getCapabilityVersion());
 
     return LogicalAggStageHandle(logicalAggStage);
 }
 
 void LogicalAggStageAPI::setExtractedLimitVal_deprecated(
     boost::optional<long long> extractedLimitVal) {
-    invokeCAndConvertStatusToException([&]() {
-        if (extractedLimitVal.has_value()) {
-            return _vtable().set_vector_search_limit_for_optimization_deprecated(
-                get(), &extractedLimitVal.get());
-        } else {
-            return _vtable().set_vector_search_limit_for_optimization_deprecated(get(), nullptr);
-        }
-    });
+    invokeCAndConvertStatusToException(
+        [&]() {
+            if (extractedLimitVal.has_value()) {
+                return _vtable().set_vector_search_limit_for_optimization_deprecated(
+                    get(), &extractedLimitVal.get());
+            } else {
+                return _vtable().set_vector_search_limit_for_optimization_deprecated(get(),
+                                                                                     nullptr);
+            }
+        },
+        getCapabilityVersion());
 }
 
 bool LogicalAggStageAPI::evaluatePipelineRewriteRulePrecondition(
@@ -89,10 +98,12 @@ bool LogicalAggStageAPI::evaluatePipelineRewriteRulePrecondition(
     bool result = false;
     auto nameView = ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(ruleName.data()),
                                              ruleName.size()};
-    invokeCAndConvertStatusToException([&]() {
-        return _vtable().evaluate_pipeline_rewrite_rule_precondition(
-            get(), nameView, pipelineRewriteContext, &result);
-    });
+    invokeCAndConvertStatusToException(
+        [&]() {
+            return _vtable().evaluate_pipeline_rewrite_rule_precondition(
+                get(), nameView, pipelineRewriteContext, &result);
+        },
+        getCapabilityVersion());
     return result;
 }
 
@@ -101,16 +112,19 @@ bool LogicalAggStageAPI::evaluatePipelineRewriteRuleTransform(
     bool result = false;
     auto nameView = ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(ruleName.data()),
                                              ruleName.size()};
-    invokeCAndConvertStatusToException([&]() {
-        return _vtable().evaluate_pipeline_rewrite_rule_transform(
-            get(), nameView, pipelineRewriteContext, &result);
-    });
+    invokeCAndConvertStatusToException(
+        [&]() {
+            return _vtable().evaluate_pipeline_rewrite_rule_transform(
+                get(), nameView, pipelineRewriteContext, &result);
+        },
+        getCapabilityVersion());
     return result;
 }
 
 BSONObj LogicalAggStageAPI::getFilter() const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    invokeCAndConvertStatusToException([&]() { return _vtable().get_filter(get(), &buf); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().get_filter(get(), &buf); },
+                                       getCapabilityVersion());
 
     if (!buf) {
         // 'buf' will be null if the logical stage does not have a filter.
@@ -119,19 +133,21 @@ BSONObj LogicalAggStageAPI::getFilter() const {
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.
-    ExtensionByteBufHandle ownedBuf{buf};
+    ExtensionByteBufHandle ownedBuf{buf, getCapabilityVersion()};
     return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
 
 void LogicalAggStageAPI::applyPipelineSuffixDependencies(
     const ::MongoExtensionPipelineDependencies* deps) {
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().apply_pipeline_suffix_dependencies(get(), deps); });
+        [&]() { return _vtable().apply_pipeline_suffix_dependencies(get(), deps); },
+        getCapabilityVersion());
 }
 
 
 void LogicalAggStageAPI::skipStream(::MongoExtensionStreamType streamType) {
-    invokeCAndConvertStatusToException([&]() { return _vtable().skip_stream(get(), streamType); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().skip_stream(get(), streamType); },
+                                       getCapabilityVersion());
 }
 
 /**
@@ -140,7 +156,8 @@ void LogicalAggStageAPI::skipStream(::MongoExtensionStreamType streamType) {
  */
 BSONObj LogicalAggStageAPI::getSortPattern() const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    invokeCAndConvertStatusToException([&]() { return _vtable().get_sort_pattern(get(), &buf); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().get_sort_pattern(get(), &buf); },
+                                       getCapabilityVersion());
 
     if (!buf) {
         return BSONObj();
@@ -154,13 +171,13 @@ boost::optional<MongoExtensionDocsNeededBoundsInfo> LogicalAggStageAPI::getDocsN
     const {
     ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().get_docs_needed_bounds(get(), &buf); });
+        [&]() { return _vtable().get_docs_needed_bounds(get(), &buf); }, getCapabilityVersion());
 
     if (!buf) {
         return boost::none;
     }
 
-    ExtensionByteBufHandle ownedBuf{buf};
+    ExtensionByteBufHandle ownedBuf{buf, getCapabilityVersion()};
     auto bson = bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
     return MongoExtensionDocsNeededBoundsInfo::parse(bson);
 }

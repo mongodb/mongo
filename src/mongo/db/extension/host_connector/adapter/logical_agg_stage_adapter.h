@@ -23,8 +23,11 @@ namespace mongo::extension::host_connector {
  */
 class HostLogicalAggStageAdapter final : public ::MongoExtensionLogicalAggStage {
 public:
-    HostLogicalAggStageAdapter(std::unique_ptr<host::LogicalAggStage> logicalAggStage)
-        : ::MongoExtensionLogicalAggStage(&VTABLE), _logicalAggStage(std::move(logicalAggStage)) {
+    HostLogicalAggStageAdapter(std::unique_ptr<host::LogicalAggStage> logicalAggStage,
+                               const CapabilityVersion& capability)
+        : ::MongoExtensionLogicalAggStage(&VTABLE),
+          _logicalAggStage(std::move(logicalAggStage)),
+          _capability(capability) {
         tassert(12303709,
                 "The adapter's underlying host logical stage is invalid.",
                 _logicalAggStage != nullptr);
@@ -55,7 +58,16 @@ public:
         return logicalAggStage.vtable == &VTABLE;
     }
 
+    constexpr const CapabilityVersion& getCapabilityVersion() const {
+        return _capability;
+    }
+
 private:
+    static const constexpr CapabilityVersion& _capabilityOf(
+        const ::MongoExtensionLogicalAggStage* logicalStage) noexcept {
+        return static_cast<const HostLogicalAggStageAdapter*>(logicalStage)->_capability;
+    }
+
     const host::LogicalAggStage& getImpl() const noexcept {
         return *_logicalAggStage;
     }
@@ -73,55 +85,67 @@ private:
     static ::MongoExtensionStatus* _hostSerialize(
         const ::MongoExtensionLogicalAggStage* logicalStage,
         ::MongoExtensionByteBuf** output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12303700,
-                      "_hostSerialize should not be called on host-allocated logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(12303700,
+                          "_hostSerialize should not be called on host-allocated logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static ::MongoExtensionStatus* _hostExplain(const ::MongoExtensionLogicalAggStage* logicalStage,
                                                 ::MongoExtensionQueryExecutionContext* execCtxPtr,
                                                 ::MongoExtensionExplainVerbosity verbosity,
                                                 ::MongoExtensionByteBuf** output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12303701,
-                      "_hostExplain should not be called on a host-allocated logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(12303701,
+                          "_hostExplain should not be called on a host-allocated logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static ::MongoExtensionStatus* _hostCompile(const ::MongoExtensionLogicalAggStage* logicalStage,
                                                 ::MongoExtensionExecAggStage** output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12303702,
-                      "_hostCompile should not be called on a host-allocated logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(12303702,
+                          "_hostCompile should not be called on a host-allocated logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static ::MongoExtensionStatus* _hostGetDistributedPlanLogic(
         const ::MongoExtensionLogicalAggStage* logicalStage,
         ::MongoExtensionDistributedPlanLogic** output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12303703,
-                      "_hostGetDistributedPlanLogic should not be called on a host-allocated "
-                      "logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(12303703,
+                          "_hostGetDistributedPlanLogic should not be called on a host-allocated "
+                          "logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static ::MongoExtensionStatus* _hostClone(const ::MongoExtensionLogicalAggStage* logicalStage,
                                               ::MongoExtensionLogicalAggStage** output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12303704,
-                      "_hostClone should not be called on a host-allocated logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(12303704,
+                          "_hostClone should not be called on a host-allocated logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static ::MongoExtensionStatus* _hostSetVectorSearchLimitForOptimization(
         ::MongoExtensionLogicalAggStage* logicalStage, long long* extractedLimitVal) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12303706,
-                      "_hostSetVectorSearchLimitForOptimization should not be called on a "
-                      "host-allocated logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(12303706,
+                          "_hostSetVectorSearchLimitForOptimization should not be called on a "
+                          "host-allocated logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static ::MongoExtensionStatus* _hostEvaluatePipelineRewriteRulePrecondition(
@@ -129,11 +153,13 @@ private:
         ::MongoExtensionByteView ruleName,
         const ::MongoExtensionPipelineRewriteContext* ctx,
         bool* result) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12303707,
-                      "_hostEvaluatePipelineRewriteRulePrecondition should not be called on a "
-                      "host-allocated logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(12303707,
+                          "_hostEvaluatePipelineRewriteRulePrecondition should not be called on a "
+                          "host-allocated logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static ::MongoExtensionStatus* _hostEvaluatePipelineRewriteRuleTransform(
@@ -141,12 +167,14 @@ private:
         ::MongoExtensionByteView ruleName,
         ::MongoExtensionPipelineRewriteContext* ctx,
         bool* result) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12303708,
-                      "_hostEvaluatePipelineRewriteRuleTransform should not be called on a "
-                      "host-allocated "
-                      "logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(12303708,
+                          "_hostEvaluatePipelineRewriteRuleTransform should not be called on a "
+                          "host-allocated "
+                          "logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static ::MongoExtensionStatus* _hostGetFilter(
@@ -156,39 +184,48 @@ private:
     static ::MongoExtensionStatus* _hostApplyPipelineSuffixDependencies(
         ::MongoExtensionLogicalAggStage* logicalStage,
         const ::MongoExtensionPipelineDependencies* deps) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12200104,
-                      "_hostApplyPipelineSuffixDependencies should not be called on a "
-                      "host-allocated logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(12200104,
+                          "_hostApplyPipelineSuffixDependencies should not be called on a "
+                          "host-allocated logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static ::MongoExtensionStatus* _hostGetSortPattern(
         const ::MongoExtensionLogicalAggStage* logicalStage,
         ::MongoExtensionByteBuf** output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([&]() {
-            tasserted(
-                12327101,
-                "_hostGetSortPattern should not be called on a host-allocated logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() {
+                tasserted(
+                    12327101,
+                    "_hostGetSortPattern should not be called on a host-allocated logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static ::MongoExtensionStatus* _hostSkipStream(::MongoExtensionLogicalAggStage* logicalStage,
                                                    ::MongoExtensionStreamType streamType) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12601401,
-                      "_hostSkipStream should not be called on a host-allocated logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(
+                    12601401,
+                    "_hostSkipStream should not be called on a host-allocated logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static ::MongoExtensionStatus* _hostGetDocsNeededBounds(
         const ::MongoExtensionLogicalAggStage* logicalStage,
         ::MongoExtensionByteBuf** output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(
-                11842301,
-                "_hostGetDocsNeededBounds should not be called on a host-allocated logical stage.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(11842301,
+                          "_hostGetDocsNeededBounds should not be called on a host-allocated "
+                          "logical stage.");
+            },
+            _capabilityOf(logicalStage));
     }
 
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
@@ -212,5 +249,6 @@ private:
     };
 
     std::unique_ptr<host::LogicalAggStage> _logicalAggStage;
+    const CapabilityVersion _capability;
 };
 };  // namespace mongo::extension::host_connector

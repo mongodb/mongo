@@ -461,7 +461,7 @@ private:
     void _assertFeatureSupported(CapabilityVersion capVersion) const {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "Widget feature is not available at the negotiated API minor",
-                _getCapabilityVersion() >= capVersion);
+                getCapabilityVersion() >= capVersion);
     }
 };
 

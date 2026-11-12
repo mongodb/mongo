@@ -119,7 +119,9 @@ public:
                                               ::MongoExtensionByteBuf** rawMerge)>;
 
     DPLCallbackOwner() = default;
-    DPLCallbackOwner(CallbackInvoker invoker, std::function<void()> deleter = {});
+    DPLCallbackOwner(CallbackInvoker invoker,
+                     const CapabilityVersion& capability,
+                     std::function<void()> deleter = {});
 
     /**
      * True if an extension DPL callback is present.
@@ -137,9 +139,14 @@ public:
     const DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec& getOrInvoke(
         ExpressionContext* expCtx) const;
 
+    constexpr const CapabilityVersion& getCapabilityVersion() const {
+        return _capability;
+    }
+
 private:
     struct State;
     std::shared_ptr<State> _state;
+    CapabilityVersion _capability = CapabilityVersion::zeroCapability();
 };
 
 /**
@@ -196,8 +203,11 @@ private:
  */
 class HostAggStageAstNodeAdapter final : public ::MongoExtensionAggStageAstNode {
 public:
-    HostAggStageAstNodeAdapter(std::unique_ptr<AggStageAstNode> astNode)
-        : ::MongoExtensionAggStageAstNode(&VTABLE), _astNode(std::move(astNode)) {}
+    HostAggStageAstNodeAdapter(std::unique_ptr<AggStageAstNode> astNode,
+                               const CapabilityVersion& capability)
+        : ::MongoExtensionAggStageAstNode(&VTABLE),
+          _astNode(std::move(astNode)),
+          _capability(capability) {}
 
     ~HostAggStageAstNodeAdapter() = default;
 
@@ -242,7 +252,16 @@ public:
         return VTABLE;
     }
 
+    constexpr const CapabilityVersion& getCapabilityVersion() const {
+        return _capability;
+    }
+
 private:
+    static const constexpr CapabilityVersion& _capabilityOf(
+        const ::MongoExtensionAggStageAstNode* astNode) noexcept {
+        return static_cast<const HostAggStageAstNodeAdapter*>(astNode)->_capability;
+    }
+
     const AggStageAstNode& getImpl() const noexcept {
         return *_astNode;
     }
@@ -264,50 +283,62 @@ private:
     static ::MongoExtensionStatus* _hostGetProperties(
         const ::MongoExtensionAggStageAstNode* astNode,
         ::MongoExtensionByteBuf** properties) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(11347801,
-                      "_hostGetProperties should not be called. Ensure that astNode is "
-                      "extension-allocated, not host-allocated.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(11347801,
+                          "_hostGetProperties should not be called. Ensure that astNode is "
+                          "extension-allocated, not host-allocated.");
+            },
+            _capabilityOf(astNode));
     }
 
     static ::MongoExtensionStatus* _hostPromote(
         const ::MongoExtensionAggStageAstNode* astNode,
         const ::MongoExtensionCatalogContext* catalogContext,
         ::MongoExtensionLogicalAggStage** logicalStage) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(11133600,
-                      "_hostPromote should not be called. Ensure that astNode is "
-                      "extension-allocated, not host-allocated.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            []() {
+                tasserted(11133600,
+                          "_hostPromote should not be called. Ensure that astNode is "
+                          "extension-allocated, not host-allocated.");
+            },
+            _capabilityOf(astNode));
     }
 
     static ::MongoExtensionStatus* _hostClone(const ::MongoExtensionAggStageAstNode* astNode,
                                               ::MongoExtensionAggStageAstNode** output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([&]() {
-            auto* hostAstNode = static_cast<const HostAggStageAstNodeAdapter*>(astNode);
-            *output = new HostAggStageAstNodeAdapter(hostAstNode->getImpl().clone());
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() {
+                auto* hostAstNode = static_cast<const HostAggStageAstNodeAdapter*>(astNode);
+                *output = new HostAggStageAstNodeAdapter(hostAstNode->getImpl().clone(),
+                                                         hostAstNode->getCapabilityVersion());
+            },
+            _capabilityOf(astNode));
     }
 
     static ::MongoExtensionStatus* _hostGetFirstStageViewApplicationPolicy(
         const ::MongoExtensionAggStageAstNode* astNode,
         ::MongoExtensionFirstStageViewApplicationPolicy* output) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([&]() {
-            tasserted(11507401,
-                      "_hostGetFirstStageViewApplicationPolicy should not be called. Ensure that "
-                      "astNode is extension-allocated, not host-allocated");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() {
+                tasserted(
+                    11507401,
+                    "_hostGetFirstStageViewApplicationPolicy should not be called. Ensure that "
+                    "astNode is extension-allocated, not host-allocated");
+            },
+            _capabilityOf(astNode));
     }
 
     static ::MongoExtensionStatus* _hostBindResolvedNamespace(
         ::MongoExtensionAggStageAstNode* astNode,
         const ::MongoExtensionResolvedNamespace* resolvedNamespace) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([&]() {
-            tasserted(11507501,
-                      "_hostBindResolvedNamespace should not be called. Ensure that astNode is "
-                      "extension-allocated, not host-allocated.");
-        });
+        return wrapCXXAndConvertExceptionToStatus(
+            [&]() {
+                tasserted(11507501,
+                          "_hostBindResolvedNamespace should not be called. Ensure that astNode is "
+                          "extension-allocated, not host-allocated.");
+            },
+            _capabilityOf(astNode));
     }
 
     static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE = {
@@ -320,5 +351,6 @@ private:
         .bind_resolved_namespace = &_hostBindResolvedNamespace};
 
     std::unique_ptr<AggStageAstNode> _astNode;
+    const CapabilityVersion _capability;
 };
 };  // namespace mongo::extension::host

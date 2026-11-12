@@ -33,119 +33,144 @@ void uassertWellFormedStageSpec(const BSONObj& specObj,
 }
 }  // namespace
 
-::MongoExtensionStatus* HostServicesAdapter::_extUserAsserted(
-    ::MongoExtensionByteView structuredErrorMessage) {
+::MongoExtensionStatus* detail::userAsserted(::MongoExtensionByteView structuredErrorMessage,
+                                             const CapabilityVersion& capability) {
     // We throw the exception here so that we get a stack trace that looks like a host exception but
     // originates from within the extension, so that we have a complete stack trace for diagnostic
     // information. At the same time, we are not allowed to throw an exception across the API
     // boundary, so we immediately convert this to a MongoExtensionStatus. It will be rethrown after
     // being passed through the boundary.
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        BSONObj errorBson = bsonObjFromByteView(structuredErrorMessage);
-        auto exceptionInfo = mongo::extension::ExtensionExceptionInformation::parse(
-            errorBson, IDLParserContext("extUassert"));
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            BSONObj errorBson = bsonObjFromByteView(structuredErrorMessage);
+            auto exceptionInfo = mongo::extension::ExtensionExceptionInformation::parse(
+                errorBson, IDLParserContext("extUassert"));
 
-        // Call the host's uassert implementation.
-        uasserted(exceptionInfo.getErrorCode(), exceptionInfo.getMessage());
-    });
+            // Call the host's uassert implementation.
+            uasserted(exceptionInfo.getErrorCode(), exceptionInfo.getMessage());
+        },
+        capability);
 }
 
-::MongoExtensionStatus* HostServicesAdapter::_extTripwireAsserted(
-    ::MongoExtensionByteView structuredErrorMessage) {
+::MongoExtensionStatus* detail::tripwireAsserted(::MongoExtensionByteView structuredErrorMessage,
+                                                 const CapabilityVersion& capability) {
     // We follow the same throw-then-catch pattern here as in _extUserAsserted, for the same
     // reasons.
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        BSONObj errorBson = bsonObjFromByteView(structuredErrorMessage);
-        auto exceptionInfo = mongo::extension::ExtensionExceptionInformation::parse(
-            errorBson, IDLParserContext("extTassert"));
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            BSONObj errorBson = bsonObjFromByteView(structuredErrorMessage);
+            auto exceptionInfo = mongo::extension::ExtensionExceptionInformation::parse(
+                errorBson, IDLParserContext("extTassert"));
 
-        // Call the host's tassert implementation.
-        tasserted(exceptionInfo.getErrorCode(),
-                  "Extension encountered error: " + std::string{exceptionInfo.getMessage()});
-    });
+            // Call the host's tassert implementation.
+            tasserted(exceptionInfo.getErrorCode(),
+                      "Extension encountered error: " + std::string{exceptionInfo.getMessage()});
+        },
+        capability);
 }
 
-::MongoExtensionStatus* HostServicesAdapter::_extCreateHostAggStageParseNode(
-    ::MongoExtensionByteView spec, ::MongoExtensionAggStageParseNode** node) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        *node = nullptr;
-        auto parseNode = std::make_unique<host::AggStageParseNode>(bsonObjFromByteView(spec));
-        *node = static_cast<::MongoExtensionAggStageParseNode*>(
-            new host::HostAggStageParseNodeAdapter(std::move(parseNode)));
-    });
+::MongoExtensionStatus* detail::createHostAggStageParseNode(
+    ::MongoExtensionByteView spec,
+    ::MongoExtensionAggStageParseNode** node,
+    const CapabilityVersion& capability) {
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            *node = nullptr;
+            auto parseNode = std::make_unique<host::AggStageParseNode>(bsonObjFromByteView(spec));
+            *node = static_cast<::MongoExtensionAggStageParseNode*>(
+                new host::HostAggStageParseNodeAdapter(std::move(parseNode), capability));
+        },
+        capability);
 }
 
-::MongoExtensionStatus* HostServicesAdapter::_extCreateIdLookup(
-    ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        *node = nullptr;
-        BSONObj specObj = bsonObjFromByteView(bsonSpec).getOwned();
+::MongoExtensionStatus* detail::createIdLookup(::MongoExtensionByteView bsonSpec,
+                                               ::MongoExtensionAggStageAstNode** node,
+                                               const CapabilityVersion& capability) {
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            *node = nullptr;
+            BSONObj specObj = bsonObjFromByteView(bsonSpec).getOwned();
 
-        uassertWellFormedStageSpec(
-            specObj,
-            DocumentSourceInternalSearchIdLookUp::kStageName,
-            11134200,
-            "create_id_lookup requires a well-formed $_internalSearchIdLookup");
+            uassertWellFormedStageSpec(
+                specObj,
+                DocumentSourceInternalSearchIdLookUp::kStageName,
+                11134200,
+                "create_id_lookup requires a well-formed $_internalSearchIdLookup");
 
-        // Extract the inner spec object from the full stage BSON.
-        auto innerSpec = specObj.firstElement().Obj().getOwned();
-        auto spec = DocumentSourceIdLookupSpec::parseOwned(
-            std::move(innerSpec),
-            IDLParserContext(DocumentSourceInternalSearchIdLookUp::kStageName));
+            // Extract the inner spec object from the full stage BSON.
+            auto innerSpec = specObj.firstElement().Obj().getOwned();
+            auto spec = DocumentSourceIdLookupSpec::parseOwned(
+                std::move(innerSpec),
+                IDLParserContext(DocumentSourceInternalSearchIdLookUp::kStageName));
 
-        // Use the full stage BSON element for the LiteParsed constructor.
-        auto liteParsed = std::make_unique<LiteParsedInternalSearchIdLookUp>(std::move(spec));
-        liteParsed->makeOwned();
+            // Use the full stage BSON element for the LiteParsed constructor.
+            auto liteParsed = std::make_unique<LiteParsedInternalSearchIdLookUp>(std::move(spec));
+            liteParsed->makeOwned();
 
-        *node = static_cast<::MongoExtensionAggStageAstNode*>(new host::HostAggStageAstNodeAdapter(
-            std::make_unique<host::IdLookupAstNode>(std::move(liteParsed))));
-    });
+            *node =
+                static_cast<::MongoExtensionAggStageAstNode*>(new host::HostAggStageAstNodeAdapter(
+                    std::make_unique<host::IdLookupAstNode>(std::move(liteParsed)), capability));
+        },
+        capability);
 }
 
-::MongoExtensionStatus* HostServicesAdapter::_extCreateDocumentResultsAndMetadata(
+::MongoExtensionStatus* detail::createDocumentResultsAndMetadata(
     ::MongoExtensionByteView bsonSpec,
     ::MongoExtensionDocResultsDPLCallback dplCallback,
     void* dplCallbackUserData,
     void (*dplCallbackDestroy)(void*),
-    ::MongoExtensionAggStageAstNode** node) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        *node = nullptr;
+    ::MongoExtensionAggStageAstNode** node,
+    const CapabilityVersion& capability) {
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            *node = nullptr;
 
-        // Wrap the raw C callback and destroy hook into std::function up front, before anything
-        // that can throw, so the deleter runs exactly once even when stage-spec parsing or
-        // validation below fails (otherwise a malformed bsonSpec would leak userData).
-        host::DPLCallbackOwner::CallbackInvoker invoker;
-        if (dplCallback) {
-            invoker = [dplCallback, dplCallbackUserData](
-                          ExpressionContext* expCtx,
-                          ::MongoExtensionByteBuf** rawSort,
-                          ::MongoExtensionByteBuf** rawMerge) -> ::MongoExtensionStatus* {
-                auto wrappedCtx = std::make_unique<host::QueryExecutionContext>(expCtx);
-                QueryExecutionContextAdapter execCtxAdapter(std::move(wrappedCtx));
-                return dplCallback(dplCallbackUserData, &execCtxAdapter, rawSort, rawMerge);
-            };
-        }
-        std::function<void()> deleter;
-        if (dplCallbackDestroy) {
-            deleter = [dplCallbackDestroy, dplCallbackUserData]() {
-                dplCallbackDestroy(dplCallbackUserData);
-            };
-        }
-        host::DPLCallbackOwner dplOwner(std::move(invoker), std::move(deleter));
+            // Wrap the raw C callback and destroy hook into std::function up front, before anything
+            // that can throw, so the deleter runs exactly once even when stage-spec parsing or
+            // validation below fails (otherwise a malformed bsonSpec would leak userData).
+            host::DPLCallbackOwner::CallbackInvoker invoker;
+            if (dplCallback) {
+                invoker = [dplCallback, dplCallbackUserData, capability](
+                              ExpressionContext* expCtx,
+                              ::MongoExtensionByteBuf** rawSort,
+                              ::MongoExtensionByteBuf** rawMerge) -> ::MongoExtensionStatus* {
+                    auto wrappedCtx = std::make_unique<host::QueryExecutionContext>(expCtx);
+                    QueryExecutionContextAdapter execCtxAdapter(std::move(wrappedCtx), capability);
+                    return dplCallback(dplCallbackUserData, &execCtxAdapter, rawSort, rawMerge);
+                };
+            }
+            std::function<void()> deleter;
+            if (dplCallbackDestroy) {
+                deleter = [dplCallbackDestroy, dplCallbackUserData]() {
+                    dplCallbackDestroy(dplCallbackUserData);
+                };
+            }
+            host::DPLCallbackOwner dplOwner(std::move(invoker), capability, std::move(deleter));
 
-        // The DocumentResultsAndMetadataAstNode constructor takes its own owned copy, so the view
-        // here does not need to be owned.
-        BSONObj specObj = bsonObjFromByteView(bsonSpec);
+            // The DocumentResultsAndMetadataAstNode constructor takes its own owned copy, so the
+            // view here does not need to be owned.
+            BSONObj specObj = bsonObjFromByteView(bsonSpec);
 
-        uassertWellFormedStageSpec(specObj,
-                                   DocumentSourceInternalDocumentResultsAndMetadata::kStageName,
-                                   12601501,
-                                   "create_document_results_and_metadata requires a well-formed "
-                                   "$_internalDocumentResultsAndMetadata stage");
+            uassertWellFormedStageSpec(
+                specObj,
+                DocumentSourceInternalDocumentResultsAndMetadata::kStageName,
+                12601501,
+                "create_document_results_and_metadata requires a well-formed "
+                "$_internalDocumentResultsAndMetadata stage");
 
-        *node = static_cast<::MongoExtensionAggStageAstNode*>(new host::HostAggStageAstNodeAdapter(
-            std::make_unique<host::DocumentResultsAndMetadataAstNode>(std::move(specObj),
-                                                                      std::move(dplOwner))));
-    });
+            *node =
+                static_cast<::MongoExtensionAggStageAstNode*>(new host::HostAggStageAstNodeAdapter(
+                    std::make_unique<host::DocumentResultsAndMetadataAstNode>(std::move(specObj),
+                                                                              std::move(dplOwner)),
+                    capability));
+        },
+        capability);
+}
+::MongoExtensionStatus* detail::markIdleThreadBlock(
+    ::MongoExtensionIdleThreadBlock** idleThreadBlock,
+    const char* location,
+    const CapabilityVersion& capability) {
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() { *idleThreadBlock = new IdleThreadBlockAdapter(location); }, capability);
 }
 }  // namespace mongo::extension::host_connector

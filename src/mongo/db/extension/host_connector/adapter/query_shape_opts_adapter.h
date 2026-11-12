@@ -3,6 +3,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/extension_version.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/modules.h"
@@ -15,8 +16,12 @@ namespace mongo::extension::host_connector {
 class QueryShapeOptsAdapter final : public ::MongoExtensionHostQueryShapeOpts {
 public:
     QueryShapeOptsAdapter(const query_shape::SerializationOptions* opts,
-                          boost::intrusive_ptr<ExpressionContext> expCtx)
-        : ::MongoExtensionHostQueryShapeOpts{&VTABLE}, _opts(opts), _expCtx(std::move(expCtx)) {
+                          boost::intrusive_ptr<ExpressionContext> expCtx,
+                          const CapabilityVersion& capability)
+        : ::MongoExtensionHostQueryShapeOpts{&VTABLE},
+          _opts(opts),
+          _expCtx(std::move(expCtx)),
+          _capability(capability) {
         uassert(11717605, "ExpressionContext pointer cannot be null", _expCtx != nullptr);
     }
 
@@ -32,7 +37,16 @@ public:
         return opts.vtable == &VTABLE;
     }
 
+    constexpr const CapabilityVersion& getCapabilityVersion() const {
+        return _capability;
+    }
+
 private:
+    static const CapabilityVersion& _capabilityOf(
+        const ::MongoExtensionHostQueryShapeOpts* ctx) noexcept {
+        return static_cast<const QueryShapeOptsAdapter*>(ctx)->_capability;
+    }
+
     static MongoExtensionStatus* _extSerializeIdentifier(
         const ::MongoExtensionHostQueryShapeOpts* ctx,
         ::MongoExtensionByteView identifier,
@@ -55,5 +69,6 @@ private:
 
     const query_shape::SerializationOptions* _opts;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
+    const CapabilityVersion _capability;
 };
 }  // namespace mongo::extension::host_connector

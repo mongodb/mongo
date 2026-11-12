@@ -36,7 +36,8 @@ public:
      * The HostPortal pointer is only valid during the call to initialize() and must not be saved.
      */
     void initialize(const MongoExtensionHostPortal* portal) const {
-        invokeCAndConvertStatusToException([&] { return _vtable().initialize(get(), portal); });
+        invokeCAndConvertStatusToException([&] { return _vtable().initialize(get(), portal); },
+                                           getCapabilityVersion());
     }
 
     ::MongoExtensionAPIVersion getVersion() const {

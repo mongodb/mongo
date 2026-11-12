@@ -5,6 +5,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <array>
 #include <compare>
 #include <string>
 
@@ -98,4 +99,20 @@ private:
     CapabilityVersion _min;
     CapabilityVersion _max;
 };
+
+/**
+ * The (major, max negotiable minor) pairs this binary supports, oldest to newest. Negotiation
+ * never settles above the entry for the negotiated major, so these bounds are exhaustive for any
+ * version this binary can negotiate.
+ *
+ * MONGODB_EXTENSION_API_MINOR_VERSION describes only the current major, so previous majors' final
+ * minors are recorded explicitly: when a new major is introduced, replace the macro in the
+ * outgoing major's entry with its final minor value and append a new entry for the new major.
+ * The static_assert pins the final entry to the living header's macros, so bumping
+ * MONGODB_EXTENSION_API_MAJOR_VERSION without updating this list fails the build.
+ */
+inline constexpr std::array kSupportedVersionMaxima = {
+    CapabilityVersion(1, MONGODB_EXTENSION_API_MINOR_VERSION),
+};
+static_assert(kSupportedVersionMaxima.back() == CapabilityVersion::latestCapability());
 }  // namespace mongo::extension

@@ -119,17 +119,20 @@ host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
                           << "' failed: " << swGetExtensionFn.getStatus().reason(),
             swGetExtensionFn.isOK());
 
-    // Phase 2: extension instantiates at the chosen version, receiving the matching
-    // HostServices. Currently, a single major version is supported, so HostServicesAdapter::get()
-    // is guaranteed to be the compatible API.
+    // Phase 2: extension instantiates at the chosen version, receiving the matching HostServices.
+    // getHostServices vends the instance whose type carries the negotiated capability, so an
+    // extension only ever sees host services at the version it agreed to.
     const ::MongoExtension* extension = nullptr;
-    invokeCAndConvertStatusToException([&]() {
-        return swGetExtensionFn.getValue()(
-            MongoExtensionAPIVersion{capabilityVersion.majorVersion(),
-                                     capabilityVersion.minorVersion()},
-            &host_connector::HostServicesAdapter::get(),
-            &extension);
-    });
+    auto* const statusPtr =
+        swGetExtensionFn.getValue()(MongoExtensionAPIVersion{capabilityVersion.majorVersion(),
+                                                             capabilityVersion.minorVersion()},
+                                    host_connector::getHostServices(capabilityVersion),
+                                    &extension);
+    uassert(13692200,
+            str::stream() << "Failed to load extension '" << extensionPath
+                          << "': get_mongodb_extension failed to return a status",
+            statusPtr != nullptr);
+    invokeCAndConvertStatusToException([&]() { return statusPtr; }, capabilityVersion);
     uassert(10615503,
             str::stream() << "Failed to load extension '" << extensionPath
                           << "': get_mongodb_extension failed to set an extension",

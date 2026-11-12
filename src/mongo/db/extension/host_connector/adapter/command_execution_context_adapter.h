@@ -4,6 +4,7 @@
 
 #include "mongo/db/extension/host_connector/adapter/execution_context_base.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/extension_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -35,8 +36,11 @@ public:
  */
 class CommandExecutionContextAdapter final : public ::MongoExtensionCommandExecutionContext {
 public:
-    explicit CommandExecutionContextAdapter(std::unique_ptr<CommandExecutionContextBase> ctx)
-        : ::MongoExtensionCommandExecutionContext{&VTABLE}, _ctx(std::move(ctx)) {
+    CommandExecutionContextAdapter(std::unique_ptr<CommandExecutionContextBase> ctx,
+                                   CapabilityVersion version)
+        : ::MongoExtensionCommandExecutionContext{&VTABLE},
+          _ctx(std::move(ctx)),
+          _capability(std::move(version)) {
         tassert(13729700, "Provided CommandExecutionContextBase is null", _ctx != nullptr);
     }
 
@@ -50,6 +54,11 @@ public:
     }
 
 private:
+    static const CapabilityVersion& _capabilityOf(
+        const ::MongoExtensionCommandExecutionContext* ctx) noexcept {
+        return static_cast<const CommandExecutionContextAdapter*>(ctx)->_capability;
+    }
+
     static MongoExtensionStatus* _extCheckForInterrupt(
         const MongoExtensionCommandExecutionContext* ctx, MongoExtensionStatus* opStatus) noexcept;
 
@@ -62,6 +71,7 @@ private:
     };
 
     std::unique_ptr<CommandExecutionContextBase> _ctx;
+    const CapabilityVersion _capability;
 };
 
 }  // namespace mongo::extension::host_connector

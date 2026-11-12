@@ -38,6 +38,7 @@ void get_mongodb_extension_versions(::MongoExtensionAPIVersionVector* extensionV
                                               const ::MongoExtensionHostServices* hostServices,
                                               const ::MongoExtension** extension) {
     return mongo::extension::wrapCXXAndConvertExceptionToStatus(
-        [&]() { *extension = &my_extension; });
+        [&]() { *extension = &my_extension; },
+        mongo::extension::CapabilityVersion(version.major, version.minor));
 }
 }

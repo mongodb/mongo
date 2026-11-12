@@ -11,21 +11,6 @@
 
 namespace mongo::extension {
 
-size_t ExtensionStatusOK::sInstanceCount = 0;
-
-size_t ExtensionStatusOK::getInstanceCount() {
-    return sInstanceCount;
-}
-
-const ::MongoExtensionStatusVTable extension::ExtensionStatusOK::VTABLE = {
-    .destroy = &ExtensionStatusOK::_extDestroy,
-    .get_code = &ExtensionStatusOK::_extGetCode,
-    .get_reason = &ExtensionStatusOK::_extGetReason,
-    .set_code = &ExtensionStatusOK::_extSetCode,
-    .set_reason = &ExtensionStatusOK::_extSetReason,
-    .clone = &ExtensionStatusOK::_extClone,
-};
-
 const ::MongoExtensionStatusVTable extension::ExtensionStatusException::VTABLE = {
     .destroy = &ExtensionStatusException::_extDestroy,
     .get_code = &ExtensionStatusException::_extGetCode,
@@ -68,6 +53,17 @@ void setGlobalObservabilityContext(std::unique_ptr<ObservabilityContext> obsCtx)
     currObsCtx = std::move(obsCtx);
 }
 
+// This function is a helper that allows extracting exceptions from a generic MongoExtensionStatus.
+// If a new adapter is added in the future (i.e ExtensionStatusException_v1_x), we need to
+// accommodate it here.
+std::exception_ptr extractExceptionFromExtensionStatusException(
+    ::MongoExtensionStatus& status, const CapabilityVersion& capability) {
+    tassert(13692203,
+            "Unsupported CapabilityVersion for ExtensionStatusException",
+            ExtensionStatusException::kCapabilityBounds.isSupported(capability));
+    return ExtensionStatusException::extractException(status);
+}
+
 void convertStatusToException(StatusHandle status) {
     /**
      * If we can extract an exception pointer from the received status from the C API call, it means
@@ -78,7 +74,8 @@ void convertStatusToException(StatusHandle status) {
      * execution context, so we throw our ExtensionDBException which will allow us to rethrow this
      * exception later if we happen to cross the API boundary again.
      */
-    if (auto exceptionPtr = ExtensionStatusException::extractException(*status.get());
+    if (auto exceptionPtr = extractExceptionFromExtensionStatusException(
+            *status.get(), status->getCapabilityVersion());
         exceptionPtr) {
         std::rethrow_exception(std::move(exceptionPtr));
     }
@@ -91,12 +88,14 @@ void StatusAPI::setCode(int code) {
 
 void StatusAPI::setReason(std::string_view reason) {
     auto byteView = stringViewAsByteView(reason);
-    invokeCAndConvertStatusToException([&]() { return _vtable().set_reason(get(), byteView); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().set_reason(get(), byteView); },
+                                       getCapabilityVersion());
 }
 
 StatusHandle StatusAPI::clone() const {
     ::MongoExtensionStatus* cloneTarget{nullptr};
-    invokeCAndConvertStatusToException([&]() { return _vtable().clone(get(), &cloneTarget); });
-    return StatusHandle(cloneTarget);
+    invokeCAndConvertStatusToException([&]() { return _vtable().clone(get(), &cloneTarget); },
+                                       getCapabilityVersion());
+    return StatusHandle(cloneTarget, getCapabilityVersion());
 }
 }  // namespace mongo::extension

@@ -10,10 +10,23 @@
 
 namespace mongo::extension::host_connector {
 
-// Initialize the static instance of LoggerAdapter.
-LoggerAdapter LoggerAdapter::_loggerAdapter;
-
 namespace {
+/**
+ * Converts a C API severity to its logv2 equivalent. Lives here rather than on the adapter so it
+ * is not instantiated once per negotiated version.
+ */
+constexpr logv2::LogSeverity convertSeverity(::MongoExtensionLogSeverity severity) {
+    switch (severity) {
+        case ::MongoExtensionLogSeverity::kWarning:
+            return logv2::LogSeverity::Warning();
+        case ::MongoExtensionLogSeverity::kError:
+            return logv2::LogSeverity::Error();
+        case ::MongoExtensionLogSeverity::kInfo:
+        default:
+            return logv2::LogSeverity::Info();
+    }
+}
+
 logv2::DynamicAttributes createLogAttributes(const ::MongoExtensionLogMessage* logMessage) {
     logv2::DynamicAttributes attrs;
     if (logMessage->attributes.size == 0) {
@@ -32,58 +45,63 @@ logv2::DynamicAttributes createLogAttributes(const ::MongoExtensionLogMessage* l
 }
 }  // namespace
 
-MongoExtensionStatus* LoggerAdapter::_extLog(
-    const ::MongoExtensionLogMessage* logMessage) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        // For now we always log extension messages under the EXTENSION-MONGOT component. Someday
-        // we'd like to dynamically create EXTENSION sub-components per extension.
-        logv2::LogOptions options(logv2::LogComponent::kExtensionMongot);
+::MongoExtensionStatus* detail::log(const ::MongoExtensionLogMessage* logMessage,
+                                    const CapabilityVersion& capability) {
+    return wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            // For now we always log extension messages under the EXTENSION-MONGOT component.
+            // Someday we'd like to dynamically create EXTENSION sub-components per extension.
+            logv2::LogOptions options(logv2::LogComponent::kExtensionMongot);
 
-        // Extract message from byte view.
-        auto messageView = byteViewAsStringView(logMessage->message);
-        std::string_view message(messageView.data(), messageView.size());
+            // Extract message from byte view.
+            auto messageView = byteViewAsStringView(logMessage->message);
+            std::string_view message(messageView.data(), messageView.size());
 
-        // Extract code.
-        std::int32_t code = static_cast<std::int32_t>(logMessage->code);
+            // Extract code.
+            std::int32_t code = static_cast<std::int32_t>(logMessage->code);
 
-        logv2::LogSeverity severity = logv2::LogSeverity::Error();  // Dummy initialization
-        switch (logMessage->type) {
-            case ::MongoExtensionLogType::kDebug: {
-                // Extract level from union and trim to the range [1, 5] since we want to make sure
-                // that the log line is using one of the server's logv2 debug severities.
-                std::int32_t level = logMessage->severityOrLevel.level;
-                severity = logv2::LogSeverity::Debug(std::min(5, std::max(1, level)));
-                break;
-            }
-            case ::MongoExtensionLogType::kLog: {
-                // Convert C enum to logv2 severity.
-                severity = convertSeverity(logMessage->severityOrLevel.severity);
-                break;
-            }
-        };
+            logv2::LogSeverity severity = logv2::LogSeverity::Error();  // Dummy initialization
+            switch (logMessage->type) {
+                case ::MongoExtensionLogType::kDebug: {
+                    // Extract level from union and trim to the range [1, 5] since we want to make
+                    // sure that the log line is using one of the server's logv2 debug severities.
+                    std::int32_t level = logMessage->severityOrLevel.level;
+                    severity = logv2::LogSeverity::Debug(std::min(5, std::max(1, level)));
+                    break;
+                }
+                case ::MongoExtensionLogType::kLog: {
+                    // Convert C enum to logv2 severity.
+                    severity = convertSeverity(logMessage->severityOrLevel.severity);
+                    break;
+                }
+            };
 
-        logv2::DynamicAttributes dynamicAttrs = createLogAttributes(logMessage);
-        logv2::TypeErasedAttributeStorage attrs(dynamicAttrs);
+            logv2::DynamicAttributes dynamicAttrs = createLogAttributes(logMessage);
+            logv2::TypeErasedAttributeStorage attrs(dynamicAttrs);
 
-        // We must go through logv2::detail::doLogImpl since the LOGV2 macros expect a static string
-        // literal for the message, but we have to log the message received at runtime from the
-        // extension.
-        logv2::detail::doLogImpl(code, severity, options, message, attrs);
-    });
+            // We must go through logv2::detail::doLogImpl since the LOGV2 macros expect a static
+            // string literal for the message, but we have to log the message received at runtime
+            // from the extension.
+            logv2::detail::doLogImpl(code, severity, options, message, attrs);
+        },
+        capability);
 }
 
-MongoExtensionStatus* LoggerAdapter::_extShouldLog(::MongoExtensionLogSeverity levelOrSeverity,
-                                                   ::MongoExtensionLogType logType,
-                                                   bool* out) noexcept {
-    return extension::wrapCXXAndConvertExceptionToStatus([&]() {
-        logv2::LogSeverity severity = logv2::LogSeverity::Debug(5);  // Dummy initialization.
-        if (logType == ::MongoExtensionLogType::kDebug) {
-            severity =
-                logv2::LogSeverity::Debug(std::min(5, std::max(1, int32_t(levelOrSeverity))));
-        } else {
-            severity = convertSeverity(levelOrSeverity);
-        }
-        *out = logv2::shouldLog(logv2::LogComponent::kExtensionMongot, severity);
-    });
+::MongoExtensionStatus* detail::shouldLog(::MongoExtensionLogSeverity levelOrSeverity,
+                                          ::MongoExtensionLogType logType,
+                                          bool* out,
+                                          const CapabilityVersion& capability) {
+    return extension::wrapCXXAndConvertExceptionToStatus(
+        [&]() {
+            logv2::LogSeverity severity = logv2::LogSeverity::Debug(5);  // Dummy initialization.
+            if (logType == ::MongoExtensionLogType::kDebug) {
+                severity =
+                    logv2::LogSeverity::Debug(std::min(5, std::max(1, int32_t(levelOrSeverity))));
+            } else {
+                severity = convertSeverity(levelOrSeverity);
+            }
+            *out = logv2::shouldLog(logv2::LogComponent::kExtensionMongot, severity);
+        },
+        capability);
 }
 }  // namespace mongo::extension::host_connector
