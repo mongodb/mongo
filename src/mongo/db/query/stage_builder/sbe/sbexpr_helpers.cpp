@@ -714,6 +714,50 @@ SbStage SbBuilder::makeSort(const VariableTypes& varTypes,
                         &varTypes);
 }
 
+namespace {
+
+// Converts 'accumulatorList' into blueprint accumulators, allocating an out slot for each
+// accumulator that doesn't already have one. Also returns the out slots in accumulator order.
+std::pair<std::vector<SbBlueprintHashAggAccumulator>, SbSlotVector> toBlueprintAccumulators(
+    StageBuilderState& state, const SbHashAggAccumulatorVector& accumulatorList) {
+    using AccumulatorImpl = decltype(SbHashAggAccumulator::implementation);
+
+    std::vector<SbBlueprintHashAggAccumulator> accumulators;
+    accumulators.reserve(accumulatorList.size());
+    SbSlotVector aggOutSlots;
+    for (auto& sbAccumulator : accumulatorList) {
+        auto outSlot = sbAccumulator.outSlot ? *sbAccumulator.outSlot : SbSlot{state.slotId()};
+        aggOutSlots.emplace_back(outSlot);
+
+        auto implementation = std::visit(
+            OverloadedVisitor{
+                [](const SbHashAggCompiledAccumulator& impl) -> AccumulatorImpl {
+                    return SbHashAggCompiledAccumulator{
+                        impl.init.clone(), impl.agg.clone(), impl.merge.clone()};
+                },
+                []<class Implementation>(
+                    const SbHashAggSinglePurposeScalarAccumulator<Implementation>& impl)
+                    -> AccumulatorImpl {
+                    return SbHashAggSinglePurposeScalarAccumulator<Implementation>{
+                        impl.transform.clone()};
+                },
+                []<class Implementation>(
+                    const SbHashAggMinMaxNAccumulator<Implementation>& impl) -> AccumulatorImpl {
+                    return SbHashAggMinMaxNAccumulator<Implementation>{
+                        impl.transform.clone(), impl.maxSizeExpr.clone(), impl.memLimit};
+                }},
+            sbAccumulator.implementation);
+
+        accumulators.push_back(
+            SbBlueprintHashAggAccumulator{.outSlot = outSlot.getId(),
+                                          .spillSlot = sbAccumulator.spillSlot.getId(),
+                                          .implementation = std::move(implementation)});
+    }
+    return {std::move(accumulators), std::move(aggOutSlots)};
+}
+
+}  // namespace
+
 std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
     const VariableTypes& varTypes,
     SbStage stage,
@@ -746,39 +790,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
         groupByOutSlots.emplace_back(it->second, sbSlot.getTypeSignature());
     }
 
-    using AccumulatorImpl = decltype(SbHashAggAccumulator::implementation);
-
-    std::vector<SbBlueprintHashAggAccumulator> accumulators;
-    accumulators.reserve(accumulatorList.size());
-    SbSlotVector aggOutSlots;
-    for (auto& sbAccumulator : accumulatorList) {
-        auto outSlot = sbAccumulator.outSlot ? *sbAccumulator.outSlot : SbSlot{_state.slotId()};
-        aggOutSlots.emplace_back(outSlot);
-
-        auto implementation = std::visit(
-            OverloadedVisitor{
-                [](const SbHashAggCompiledAccumulator& impl) -> AccumulatorImpl {
-                    return SbHashAggCompiledAccumulator{
-                        impl.init.clone(), impl.agg.clone(), impl.merge.clone()};
-                },
-                []<class Implementation>(
-                    const SbHashAggSinglePurposeScalarAccumulator<Implementation>& impl)
-                    -> AccumulatorImpl {
-                    return SbHashAggSinglePurposeScalarAccumulator<Implementation>{
-                        impl.transform.clone()};
-                },
-                []<class Implementation>(
-                    const SbHashAggMinMaxNAccumulator<Implementation>& impl) -> AccumulatorImpl {
-                    return SbHashAggMinMaxNAccumulator<Implementation>{
-                        impl.transform.clone(), impl.maxSizeExpr.clone(), impl.memLimit};
-                }},
-            sbAccumulator.implementation);
-
-        accumulators.push_back(
-            SbBlueprintHashAggAccumulator{.outSlot = outSlot.getId(),
-                                          .spillSlot = sbAccumulator.spillSlot.getId(),
-                                          .implementation = std::move(implementation)});
-    }
+    auto [accumulators, aggOutSlots] = toBlueprintAccumulators(_state, accumulatorList);
 
     stage = addBlueprint(_state,
                          SbBlueprintHashAgg{.child = stage.release(),
@@ -788,6 +800,57 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
                                             .accumulators = std::move(accumulators),
                                             .collatorSlot = collatorSlot,
                                             .forceIncreasedSpilling = forceIncreasedSpilling},
+                         &varTypes);
+
+    return {std::move(stage), std::move(groupByOutSlots), std::move(aggOutSlots)};
+}
+
+std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeStreamingAgg(
+    const VariableTypes& varTypes,
+    SbStage stage,
+    const SbSlotVector& gbs,
+    const SbSlotVector& cks,
+    const SbHashAggAccumulatorVector& accumulatorList,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
+    tassert(13865601, "Expected one cluster key slot per group by slot", gbs.size() == cks.size());
+
+    // Copy unique slot IDs from 'gbs' to 'groupBySlots', giving each one a new output slot and
+    // keeping the cluster key slot at the same position. Two group by keys that share a slot also
+    // share a cluster key. 'groupByOutSlots' is parallel to 'gbs'.
+    sbe::value::SlotVector groupBySlots;
+    sbe::value::SlotVector groupByOutSlotIds;
+    sbe::value::SlotVector clusterKeySlots;
+    SbSlotVector groupByOutSlots;
+    absl::flat_hash_map<sbe::value::SlotId, std::pair<sbe::value::SlotId, sbe::value::SlotId>>
+        outSlotIds;
+    sbe::value::SlotSet uniqueClusterKeys;
+    for (size_t i = 0; i < gbs.size(); ++i) {
+        auto [it, inserted] = outSlotIds.try_emplace(gbs[i].getId());
+        if (inserted) {
+            it->second = {_state.slotId(), cks[i].getId()};
+            groupBySlots.push_back(gbs[i].getId());
+            groupByOutSlotIds.push_back(it->second.first);
+            clusterKeySlots.push_back(cks[i].getId());
+            tassert(13865603,
+                    "Cluster key slots must be unique",
+                    uniqueClusterKeys.insert(cks[i].getId()).second);
+        }
+        tassert(13865602,
+                "Group by keys that share a slot must share a cluster key slot",
+                it->second.second == cks[i].getId());
+        groupByOutSlots.emplace_back(it->second.first, gbs[i].getTypeSignature());
+    }
+
+    auto [accumulators, aggOutSlots] = toBlueprintAccumulators(_state, accumulatorList);
+
+    stage = addBlueprint(_state,
+                         SbBlueprintStreamingAgg{.child = stage.release(),
+                                                 .nodeId = _nodeId,
+                                                 .groupBySlots = std::move(groupBySlots),
+                                                 .groupByOutSlots = std::move(groupByOutSlotIds),
+                                                 .clusterKeySlots = std::move(clusterKeySlots),
+                                                 .accumulators = std::move(accumulators),
+                                                 .collatorSlot = collatorSlot},
                          &varTypes);
 
     return {std::move(stage), std::move(groupByOutSlots), std::move(aggOutSlots)};

@@ -369,6 +369,55 @@ void checkHashAgg(SlotMembershipChecker& c) {
              maxSizeSlot});
 }
 
+void checkStreamingAgg(SlotMembershipChecker& c) {
+    auto groupBy = c.slot();
+    auto groupByOut = c.slot();
+    auto clusterKey = c.slot();
+    auto collator = c.slot();
+    auto compiledOut = c.slot();
+    auto compiledSpill = c.slot();
+    auto [init, initSlot] = c.expr();
+    auto [agg, aggSlot] = c.expr();
+    auto [merge, mergeSlot] = c.expr();
+    auto nativeOut = c.slot();
+    auto nativeSpill = c.slot();
+    auto [transform, transformSlot] = c.expr();
+    auto minNOut = c.slot();
+    auto minNSpill = c.slot();
+    auto [minNTransform, minNTransformSlot] = c.expr();
+    auto [maxSize, maxSizeSlot] = c.expr();
+    SbBlueprintStreamingAgg streamingAgg;
+    streamingAgg.groupBySlots = {groupBy};
+    streamingAgg.groupByOutSlots = {groupByOut};
+    streamingAgg.clusterKeySlots = {clusterKey};
+    streamingAgg.collatorSlot = collator;
+    streamingAgg.accumulators.emplace_back(
+        compiledOut,
+        compiledSpill,
+        SbHashAggCompiledAccumulator{std::move(init), std::move(agg), std::move(merge)});
+    streamingAgg.accumulators.emplace_back(
+        nativeOut,
+        nativeSpill,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::AddToSetHashAggAccumulator>{
+            std::move(transform)});
+    streamingAgg.accumulators.emplace_back(
+        minNOut,
+        minNSpill,
+        SbHashAggMinMaxNAccumulator<sbe::MinNHashAggAccumulator>{
+            std::move(minNTransform), std::move(maxSize), 0 /* memLimit */});
+    c.check(streamingAgg,
+            {groupByOut, compiledOut, compiledSpill, nativeOut, nativeSpill, minNOut, minNSpill},
+            {groupBy,
+             clusterKey,
+             collator,
+             initSlot,
+             aggSlot,
+             mergeSlot,
+             transformSlot,
+             minNTransformSlot,
+             maxSizeSlot});
+}
+
 void checkBlockHashAgg(SlotMembershipChecker& c) {
     auto groupBy = c.slot();
     auto groupByOut = c.slot();
@@ -534,6 +583,7 @@ TEST(SbBlueprintNodeSlotMembership, EverySlotMemberIsReported) {
     checkHashJoin(c);
     checkMergeJoin(c);
     checkHashAgg(c);
+    checkStreamingAgg(c);
     checkBlockHashAgg(c);
     checkAggProject(c);
     checkBlockToRow(c);

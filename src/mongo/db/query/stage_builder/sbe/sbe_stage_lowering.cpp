@@ -25,6 +25,7 @@
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
+#include "mongo/db/exec/sbe/stages/streaming_agg.h"
 #include "mongo/db/exec/sbe/stages/ts_bucket_to_cell_block.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
@@ -68,6 +69,66 @@ struct Lowerer {
     // ----------------------------------------------------------------
     std::unique_ptr<sbe::EExpression> le(SbExpr& e) {
         return e.lower(_state, _varTypes);
+    }
+
+    // Lowers the accumulators of a HashAgg or StreamingAgg node.
+    std::vector<std::unique_ptr<sbe::HashAggAccumulator>> lowerAccumulators(
+        std::vector<SbBlueprintHashAggAccumulator>& accumulators,
+        boost::optional<sbe::value::SlotId> collatorSlot) {
+        const auto& knobConfig = _state.expCtx->getQueryKnobConfiguration();
+
+        std::vector<std::unique_ptr<sbe::HashAggAccumulator>> loweredAccumulators;
+        loweredAccumulators.reserve(accumulators.size());
+
+        for (auto& acc : accumulators) {
+            auto lowered = std::visit(
+                OverloadedVisitor{
+                    [&](SbHashAggCompiledAccumulator& impl)
+                        -> std::unique_ptr<sbe::HashAggAccumulator> {
+                        return std::make_unique<sbe::CompiledHashAggAccumulator>(acc.outSlot,
+                                                                                 acc.spillSlot,
+                                                                                 le(impl.agg),
+                                                                                 le(impl.merge),
+                                                                                 le(impl.init));
+                    },
+                    [&](SbHashAggSinglePurposeScalarAccumulator<sbe::AddToSetHashAggAccumulator>&
+                            impl) -> std::unique_ptr<sbe::HashAggAccumulator> {
+                        return std::make_unique<sbe::AddToSetHashAggAccumulator>(
+                            acc.outSlot,
+                            acc.spillSlot,
+                            le(impl.transform),
+                            collatorSlot,
+                            knobConfig.getMaxAddToSetBytes());
+                    },
+                    [&](SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>& impl)
+                        -> std::unique_ptr<sbe::HashAggAccumulator> {
+                        return std::make_unique<sbe::PushHashAggAccumulator>(
+                            acc.outSlot,
+                            acc.spillSlot,
+                            le(impl.transform),
+                            collatorSlot,
+                            knobConfig.getMaxPushBytes());
+                    },
+                    [&]<class Impl>(SbHashAggSinglePurposeScalarAccumulator<Impl>& impl)
+                        -> std::unique_ptr<sbe::HashAggAccumulator> {
+                        return std::make_unique<Impl>(
+                            acc.outSlot, acc.spillSlot, le(impl.transform), collatorSlot);
+                    },
+                    [&]<class Impl>(SbHashAggMinMaxNAccumulator<Impl>& impl)
+                        -> std::unique_ptr<sbe::HashAggAccumulator> {
+                        return std::make_unique<Impl>(acc.outSlot,
+                                                      acc.spillSlot,
+                                                      le(impl.transform),
+                                                      collatorSlot,
+                                                      le(impl.maxSizeExpr),
+                                                      impl.memLimit);
+                    }},
+                acc.implementation);
+
+            loweredAccumulators.push_back(std::move(lowered));
+        }
+
+        return loweredAccumulators;
     }
 
     sbe::SlotExprPairVector lowerSlotExprPair(SbExprSlotVector& esv,
@@ -279,58 +340,7 @@ struct Lowerer {
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintHashAgg node) {
         auto child = lower(node.child);
 
-        const auto& knobConfig = _state.expCtx->getQueryKnobConfiguration();
-
-        std::vector<std::unique_ptr<sbe::HashAggAccumulator>> loweredAccumulators;
-        loweredAccumulators.reserve(node.accumulators.size());
-
-        for (auto& acc : node.accumulators) {
-            auto lowered = std::visit(
-                OverloadedVisitor{
-                    [&](SbHashAggCompiledAccumulator& impl)
-                        -> std::unique_ptr<sbe::HashAggAccumulator> {
-                        return std::make_unique<sbe::CompiledHashAggAccumulator>(acc.outSlot,
-                                                                                 acc.spillSlot,
-                                                                                 le(impl.agg),
-                                                                                 le(impl.merge),
-                                                                                 le(impl.init));
-                    },
-                    [&](SbHashAggSinglePurposeScalarAccumulator<sbe::AddToSetHashAggAccumulator>&
-                            impl) -> std::unique_ptr<sbe::HashAggAccumulator> {
-                        return std::make_unique<sbe::AddToSetHashAggAccumulator>(
-                            acc.outSlot,
-                            acc.spillSlot,
-                            le(impl.transform),
-                            node.collatorSlot,
-                            knobConfig.getMaxAddToSetBytes());
-                    },
-                    [&](SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>& impl)
-                        -> std::unique_ptr<sbe::HashAggAccumulator> {
-                        return std::make_unique<sbe::PushHashAggAccumulator>(
-                            acc.outSlot,
-                            acc.spillSlot,
-                            le(impl.transform),
-                            node.collatorSlot,
-                            knobConfig.getMaxPushBytes());
-                    },
-                    [&]<class Impl>(SbHashAggSinglePurposeScalarAccumulator<Impl>& impl)
-                        -> std::unique_ptr<sbe::HashAggAccumulator> {
-                        return std::make_unique<Impl>(
-                            acc.outSlot, acc.spillSlot, le(impl.transform), node.collatorSlot);
-                    },
-                    [&]<class Impl>(SbHashAggMinMaxNAccumulator<Impl>& impl)
-                        -> std::unique_ptr<sbe::HashAggAccumulator> {
-                        return std::make_unique<Impl>(acc.outSlot,
-                                                      acc.spillSlot,
-                                                      le(impl.transform),
-                                                      node.collatorSlot,
-                                                      le(impl.maxSizeExpr),
-                                                      impl.memLimit);
-                    }},
-                acc.implementation);
-
-            loweredAccumulators.push_back(std::move(lowered));
-        }
+        auto loweredAccumulators = lowerAccumulators(node.accumulators, node.collatorSlot);
 
         return sbe::makeS<sbe::HashAggStage>(std::move(child),
                                              std::move(node.groupBySlots),
@@ -343,6 +353,20 @@ struct Lowerer {
                                              node.nodeId,
                                              /*participateInTrialRunTracking=*/true,
                                              node.forceIncreasedSpilling);
+    }
+
+    std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintStreamingAgg node) {
+        auto child = lower(node.child);
+
+        auto loweredAccumulators = lowerAccumulators(node.accumulators, node.collatorSlot);
+
+        return sbe::makeS<sbe::StreamingAggStage>(std::move(child),
+                                                  std::move(node.groupBySlots),
+                                                  std::move(node.groupByOutSlots),
+                                                  std::move(node.clusterKeySlots),
+                                                  node.collatorSlot,
+                                                  std::move(loweredAccumulators),
+                                                  node.nodeId);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintBlockHashAgg node) {

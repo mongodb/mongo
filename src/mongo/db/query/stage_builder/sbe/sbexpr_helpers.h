@@ -516,6 +516,14 @@ public:
         const SbHashAggAccumulatorVector& accumulatorList,
         boost::optional<sbe::value::SlotId> collatorSlot);
 
+    std::tuple<SbStage, SbSlotVector, SbSlotVector> makeStreamingAgg(
+        const VariableTypes& varTypes,
+        SbStage stage,
+        const SbSlotVector& gbs,
+        const SbSlotVector& cks,
+        const SbHashAggAccumulatorVector& accumulatorList,
+        boost::optional<sbe::value::SlotId> collatorSlot);
+
     // Returns the stage, the group-by output slots (parallel to 'groupBySlots'), the accumulator
     // output slots and the output selectivity bitmap slot.
     std::tuple<SbStage, SbSlotVector, SbSlotVector, SbSlot> makeBlockHashAgg(

@@ -978,6 +978,77 @@ struct SbBlueprintHashAgg {
     }
 };
 
+/**
+ * StreamingAggStage (streaming group-by aggregation over input that is clustered by
+ * 'clusterKeySlots'). 'groupBySlots' must already be de-duplicated, and 'clusterKeySlots' holds one
+ * slot per entry of 'groupBySlots'. The stage exposes the group-by keys above it through
+ * 'groupByOutSlots', parallel to 'groupBySlots'. The accumulators are shared with HashAggStage, but
+ * the stage never spills, so their merge expressions and spill slots are never evaluated.
+ */
+struct SbBlueprintStreamingAgg {
+    SbBlueprintNodeIdx child;
+    PlanNodeId nodeId{kEmptyPlanNodeId};
+    sbe::value::SlotVector groupBySlots;
+    sbe::value::SlotVector groupByOutSlots;
+    sbe::value::SlotVector clusterKeySlots;
+    std::vector<SbBlueprintHashAggAccumulator> accumulators;
+    boost::optional<sbe::value::SlotId> collatorSlot;
+
+    void def(SbSlotCollector& out) const {
+        out.add(groupByOutSlots);
+        for (const auto& acc : accumulators) {
+            out.add(acc.outSlot);
+            out.add(acc.spillSlot);
+        }
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(groupBySlots);
+        out.add(clusterKeySlots);
+        out.add(collatorSlot);
+        for (const auto& acc : accumulators) {
+            std::visit(
+                OverloadedVisitor{[&](const SbHashAggCompiledAccumulator& impl) {
+                                      out.add(impl.init);
+                                      out.add(impl.agg);
+                                      out.add(impl.merge);
+                                  },
+                                  [&]<class Impl>(const SbHashAggMinMaxNAccumulator<Impl>& impl) {
+                                      out.add(impl.transform);
+                                      out.add(impl.maxSizeExpr);
+                                  },
+                                  [&](const auto& impl) {
+                                      out.add(impl.transform);
+                                  }},
+                acc.implementation);
+        }
+    }
+
+    template <typename F>
+    void visitChildren(F&& fn) {
+        fn(child);
+    }
+
+    template <typename F>
+    void visitExprs(F&& fn) {
+        for (auto& acc : accumulators) {
+            std::visit(OverloadedVisitor{[&](SbHashAggCompiledAccumulator& impl) {
+                                             fn(impl.init);
+                                             fn(impl.agg);
+                                             fn(impl.merge);
+                                         },
+                                         [&]<class Impl>(SbHashAggMinMaxNAccumulator<Impl>& impl) {
+                                             fn(impl.transform);
+                                             fn(impl.maxSizeExpr);
+                                         },
+                                         [&](auto& impl) {
+                                             fn(impl.transform);
+                                         }},
+                       acc.implementation);
+        }
+    }
+};
+
 struct SbBlueprintBlockHashAggInfo {
     SbBlueprintNodeIdx child;
     sbe::value::SlotVector groupBySlots;
@@ -1451,6 +1522,7 @@ using SbBlueprintNode = std::variant<SbBlueprintLowered,
                                      SbBlueprintHashJoin,
                                      SbBlueprintMergeJoin,
                                      SbBlueprintHashAgg,
+                                     SbBlueprintStreamingAgg,
                                      SbBlueprintBlockHashAgg,
                                      SbBlueprintAggProject,
                                      SbBlueprintBlockToRow,

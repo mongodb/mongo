@@ -10,6 +10,7 @@
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -18,6 +19,7 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo::stage_builder {
 namespace {
@@ -253,6 +255,34 @@ TEST_F(SbBlueprintLoweringTest, OutOfLineNodeLowersAndReadsBack) {
     ASSERT_EQ(getNodeId(_state->blueprint()[scan.idx()]), 7);
 }
 
+TEST_F(SbBlueprintLoweringTest, StreamingAggDedupesGroupBySlotsAndKeepsClusterKeys) {
+    SbBuilder b{*_state, 3};
+    SbSlot gb1{_state->slotId()};
+    SbSlot gb2{_state->slotId()};
+    SbSlot ck1{_state->slotId()};
+
+    // 'gb1' is repeated and clustered by 'ck1'. 'gb2' is its own cluster key.
+    auto [stage, groupByOutSlots, aggOutSlots] = b.makeStreamingAgg(
+        VariableTypes{}, b.makeCoScan(), {gb1, gb1, gb2}, {ck1, ck1, gb2}, {}, boost::none);
+
+    // The output slots are parallel to the inputs, and repeated inputs share an output slot.
+    ASSERT_EQ(groupByOutSlots.size(), 3u);
+    ASSERT_TRUE(aggOutSlots.empty());
+    ASSERT_EQ(groupByOutSlots[0].getId(), groupByOutSlots[1].getId());
+    ASSERT_NE(groupByOutSlots[0].getId(), groupByOutSlots[2].getId());
+
+    const auto& node = std::get<SbBlueprintStreamingAgg>(_state->blueprint()[stage.idx()]);
+    ASSERT_EQ(node.groupBySlots, sbe::makeSV(gb1.getId(), gb2.getId()));
+    ASSERT_EQ(node.groupByOutSlots,
+              sbe::makeSV(groupByOutSlots[0].getId(), groupByOutSlots[2].getId()));
+    ASSERT_EQ(node.clusterKeySlots, sbe::makeSV(ck1.getId(), gb2.getId()));
+
+    auto str = lowerAndPrint(std::move(stage));
+    ASSERT_STRING_CONTAINS(str, fmt::format("s{} = s{}", groupByOutSlots[0].getId(), gb1.getId()));
+    ASSERT_STRING_CONTAINS(str, fmt::format("s{} = s{}", groupByOutSlots[2].getId(), gb2.getId()));
+    ASSERT_STRING_CONTAINS(str, fmt::format("clustered [s{}", ck1.getId()));
+}
+
 class SbBlueprintLoweringDeathTest : public SbBlueprintLoweringTest {};
 
 DEATH_TEST_F(SbBlueprintLoweringDeathTest, LowerOutOfRangeIndexFails, "12702000") {
@@ -279,6 +309,30 @@ DEATH_TEST_F(SbBlueprintLoweringDeathTest, LowerWithUnreachableNodeFails, "12702
     blueprint.add(SbBlueprintCoScan{});
     auto root = blueprint.add(SbBlueprintCoScan{});
     lowerSbeBlueprint(blueprint, root, *_state);
+}
+
+DEATH_TEST_F(SbBlueprintLoweringDeathTest, StreamingAggClusterKeyCountMismatchFails, "13865601") {
+    SbBuilder b{*_state, 3};
+    SbSlot gb{_state->slotId()};
+    b.makeStreamingAgg(VariableTypes{}, b.makeCoScan(), {gb}, {}, {}, boost::none);
+}
+
+DEATH_TEST_F(SbBlueprintLoweringDeathTest,
+             StreamingAggSharedGroupBySlotNeedsSharedClusterKey,
+             "13865602") {
+    SbBuilder b{*_state, 3};
+    SbSlot gb{_state->slotId()};
+    SbSlot ck1{_state->slotId()};
+    SbSlot ck2{_state->slotId()};
+    b.makeStreamingAgg(VariableTypes{}, b.makeCoScan(), {gb, gb}, {ck1, ck2}, {}, boost::none);
+}
+
+DEATH_TEST_F(SbBlueprintLoweringDeathTest, StreamingAggDuplicateClusterKeyFails, "13865603") {
+    SbBuilder b{*_state, 3};
+    SbSlot gb1{_state->slotId()};
+    SbSlot gb2{_state->slotId()};
+    SbSlot ck{_state->slotId()};
+    b.makeStreamingAgg(VariableTypes{}, b.makeCoScan(), {gb1, gb2}, {ck, ck}, {}, boost::none);
 }
 
 }  // namespace
