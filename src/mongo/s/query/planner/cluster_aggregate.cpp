@@ -1548,23 +1548,37 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                        LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx});
             }
 
-            aggregationStatus = runAggregateImpl(opCtx,
-                                                 routingCtx,
-                                                 state.currentNamespaces,
-                                                 currentRequest,
-                                                 liteParsedToUse,
-                                                 privileges,
-                                                 state.resolvedView,
-                                                 state.originalRequest,
-                                                 verbosity,
-                                                 result,
-                                                 ifrContext,
-                                                 state.alreadyDesugared,
-                                                 state.preResolvedNamespaces);
+            try {
+                aggregationStatus = runAggregateImpl(opCtx,
+                                                     routingCtx,
+                                                     state.currentNamespaces,
+                                                     currentRequest,
+                                                     liteParsedToUse,
+                                                     privileges,
+                                                     state.resolvedView,
+                                                     state.originalRequest,
+                                                     verbosity,
+                                                     result,
+                                                     ifrContext,
+                                                     state.alreadyDesugared,
+                                                     state.preResolvedNamespaces);
 
-            // If aggregation returned an error, propagate it immediately so the outer retry loop
-            // can handle it.
-            uassertStatusOK(aggregationStatus);
+                // If aggregation returned an error, propagate it immediately so the outer retry
+                // loop can handle it.
+                uassertStatusOK(aggregationStatus);
+            } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& ex) {
+                // A set 'verbosity' means explain. Rethrow so the router can retry explains and
+                // reads.
+                if (verbosity || !liteParsedToUse.endsWithWriteStage()) {
+                    throw;
+                }
+                // Do not retry ShardNotFound for a pipeline ending in $out or $merge: we do not
+                // know whether the shard has already performed writes.
+                aggregationStatus =
+                    Status(ErrorCodes::QueryPlanKilled, ex.toStatus().reason())
+                        .withContext("Cannot retry the aggregation because a shard was not found");
+                uassertStatusOK(aggregationStatus);
+            }
             return Status::OK();
         };
 
