@@ -5,7 +5,6 @@
 
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -763,39 +762,52 @@ public:
     template <typename T>
     static T get(const Element& elem) {
         if constexpr (std::is_same_v<T, double>) {
-            return BSONElementValue(elem.value()).Double();
+            return elem.Double();
         } else if constexpr (std::is_same_v<T, std::string_view>) {
-            return BSONElementValue(elem.value()).String();
+            return elem.checkAndGetStringData();
         } else if constexpr (std::is_same_v<T, BSONObj>) {
-            return BSONElementValue(elem.value()).Obj();
+            return elem.Obj();
         } else if constexpr (std::is_same_v<T, BSONArray>) {
-            return BSONElementValue(elem.value()).Array();
+            return BSONArray(elem.Obj());
         } else if constexpr (std::is_same_v<T, BSONBinData>) {
-            return BSONElementValue(elem.value()).BinData();
+            const std::span<const char> value = [](const Element& elem) {
+                int valueSize;
+                const char* const binData = elem.binData(valueSize);
+                invariant(valueSize >= 0);
+                return std::span(binData, static_cast<size_t>(valueSize));
+            }(elem);
+            return {value.data(), static_cast<int>(value.size()), elem.binDataType()};
         } else if constexpr (std::is_same_v<T, OID>) {
-            return BSONElementValue(elem.value()).ObjectID();
+            return elem.OID();
         } else if constexpr (std::is_same_v<T, bool>) {
-            return BSONElementValue(elem.value()).Boolean();
+            return elem.boolean();
         } else if constexpr (std::is_same_v<T, Date_t>) {
-            return BSONElementValue(elem.value()).Date();
+            return elem.date();
         } else if constexpr (std::is_same_v<T, BSONRegEx>) {
-            return BSONElementValue(elem.value()).Regex();
+            static constexpr int kStringTerminatorBytes = 1;
+            const char* const pattern = elem.regex();
+            const char* const flags = elem.regexFlags();
+            return BSONRegEx(std::string_view(pattern, flags - pattern - kStringTerminatorBytes),
+                             std::string_view(flags));
         } else if constexpr (std::is_same_v<T, BSONDBRef>) {
-            return BSONElementValue(elem.value()).DBRef();
+            return BSONDBRef(elem.valueStringData(), elem.dbrefOID());
         } else if constexpr (std::is_same_v<T, BSONCode>) {
-            return BSONElementValue(elem.value()).Code();
+            return BSONCode(elem.valueStringData());
         } else if constexpr (std::is_same_v<T, BSONSymbol>) {
-            return BSONElementValue(elem.value()).Symbol();
+            return BSONSymbol(elem.valueStringData());
         } else if constexpr (std::is_same_v<T, BSONCodeWScope>) {
-            return BSONElementValue(elem.value()).CodeWScope();
+            const auto codeLen = elem.codeWScopeCodeLen();
+            invariant(codeLen >= 0);
+            std::string_view code{elem.codeWScopeCode(), static_cast<size_t>(codeLen)};
+            return BSONCodeWScope(code, elem.codeWScopeObject());
         } else if constexpr (std::is_same_v<T, int32_t>) {
-            return BSONElementValue(elem.value()).Int32();
+            return elem.Int();
         } else if constexpr (std::is_same_v<T, Timestamp>) {
-            return BSONElementValue(elem.value()).timestamp();
+            return elem.timestamp();
         } else if constexpr (std::is_same_v<T, int64_t>) {
-            return BSONElementValue(elem.value()).Int64();
+            return elem.Long();
         } else if constexpr (std::is_same_v<T, Decimal128>) {
-            return BSONElementValue(elem.value()).Decimal();
+            return elem.Decimal();
         }
         invariant(false);
         return T{};
