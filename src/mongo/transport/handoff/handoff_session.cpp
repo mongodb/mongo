@@ -702,7 +702,8 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
         *this, proxyBuf.data(), proxyBuf.size(), /*isUnixSocket=*/true);
 
     std::string_view proxyData(proxyBuf.data(), proxyBuf.size());
-    auto results = transport::parseProxyProtocolHeader(proxyData, /*isProxyUnixSock=*/true);
+    auto results =
+        transport::parseProxyProtocolHeader(proxyData, /*isProxyUnixSock=*/true, maxHeaderSize);
     uassert(ErrorCodes::ProtocolError,
             "Failed to parse PROXY v2 header on proxy UDS",
             results.has_value());

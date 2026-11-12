@@ -570,13 +570,15 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
         : kDefaultProxyProtocolHeaderReadSize;
 
     auto buffer = std::make_shared<std::vector<char>>(headerReadSize);
-    return AsyncTry([this, buffer] {
+    return AsyncTry([this, buffer, headerReadSize] {
                const auto bytesRead =
                    peekASIOStream(_socket, asio::buffer(buffer->data(), buffer->size()));
                MessageHooks::onProxyHeaderReceived(
                    *this, buffer->data(), bytesRead, isConnectedToProxyUnixSocket());
                return transport::parseProxyProtocolHeader(
-                   std::string_view(buffer->data(), bytesRead), isConnectedToProxyUnixSocket());
+                   std::string_view(buffer->data(), bytesRead),
+                   isConnectedToProxyUnixSocket(),
+                   headerReadSize);
            })
         .until([deadline, proxyHeaderTimeout, reactor](
                    StatusWith<boost::optional<ParserResults>> sw) {

@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 
 #include <boost/optional/optional.hpp>
@@ -33,6 +34,39 @@ inline constexpr std::string_view kProxyV2Signature = []() {
  * the minimum TCP MTU.
  */
 inline constexpr size_t kDefaultProxyProtocolHeaderReadSize = 536;
+
+/**
+ * PROXY protocol version 1 header limit, including the "PROXY" signature and the terminating CRLF.
+ * Specified by https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt.
+ */
+inline constexpr size_t kMaximumV1HeaderSize = 107;
+
+/**
+ * PROXY protocol version 2 fixed header: 12-byte signature, version/command, address family and
+ * transport protocol, and the 16-bit length of the bytes that follow.
+ */
+inline constexpr size_t kProxyProtocolV2FixedHeaderSize =
+    kProxyV2Signature.size() + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t);
+
+/**
+ * Transport protocol, address family, and body length from a PROXY v2 fixed header.
+ * `length` is the number of address and TLV bytes that follow the fixed header.
+ */
+struct ProxyProtocolV2FixedHeader {
+    int addressFamily = 0;
+    uint8_t protocol = 0;
+    uint16_t length = 0;
+};
+
+/**
+ * Decodes the PROXY v2 fixed header at the front of `buffer`.
+ *
+ * On success, advances `buffer` past the fixed header. Returns none when `buffer` does not yet
+ * contain every byte through the length field. Throws FailedToParse when the version, command,
+ * address family, or protocol is invalid, or when the declared total size exceeds `maxHeaderSize`.
+ */
+boost::optional<ProxyProtocolV2FixedHeader> parseProxyProtocolV2FixedHeader(
+    std::string_view& buffer, size_t maxHeaderSize);
 
 /**
  * Adapted from https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
@@ -129,10 +163,15 @@ struct ParserResults {
  * (`isProxyUnixSock`). If the string begins with a partial but incomplete header, returns an empty
  * optional; otherwise, returns a ParserResults with the results of the parse.
  *
+ * `headerReadSize` is the maximum number of bytes the caller will read for this header. A version 2
+ * header whose declared total size exceeds that limit is rejected. A header that is merely not yet
+ * fully buffered, and still fits in `headerReadSize`, returns an empty optional.
+ *
  * Will throw eagerly on a malformed header.
  */
 boost::optional<ParserResults> parseProxyProtocolHeader(std::string_view buffer,
-                                                        bool isProxyUnixSock);
+                                                        bool isProxyUnixSock,
+                                                        size_t headerReadSize);
 
 /**
  * Peek a buffer for at least 12 bytes to determine if it may be a proxy protocol header.

@@ -47,6 +47,23 @@ bool isValidTLVType(uint8_t type) {
     return (type >= 0x01 && type <= 0x05) || (type >= 0x20 && type <= 0x25) || (type == 0x30) ||
         (type >= 0xE0 && type <= 0xEF);
 }
+
+// Interprets the first sizeof(T) bytes of data as a T and returns it, advancing the data cursor
+// by the same amount. Does not account for endianness of the data buffer.
+template <typename T>
+T extract(std::string_view& data) {
+    MONGO_STATIC_ASSERT(std::is_trivially_copyable_v<T>);
+    static constexpr size_t numBytes = sizeof(T);
+    if (data.size() < numBytes) {
+        throw std::out_of_range(
+            fmt::format("Not enough space to extract object of size {}", numBytes));
+    }
+
+    T result;
+    memcpy(&result, data.data(), numBytes);
+    data = data.substr(numBytes);
+    return result;
+}
 }  // namespace
 
 namespace proxy_protocol_details {
@@ -155,29 +172,84 @@ void validateIpv6Address(std::string_view addr) {
 
 }  // namespace proxy_protocol_details
 
+boost::optional<ProxyProtocolV2FixedHeader> parseProxyProtocolV2FixedHeader(
+    std::string_view& buffer, size_t maxHeaderSize) {
+    try {
+        const char protocolVersionAndCommandByte = extract<char>(buffer);
+
+        bool isLocal = false;
+        // The high nibble must be 2 (version 2) and the low nibble must be either 0 or 1 (local
+        // or remote).
+        if (protocolVersionAndCommandByte == '\x20') {
+            isLocal = true;
+        } else if (protocolVersionAndCommandByte != '\x21') {
+            uasserted(
+                ErrorCodes::FailedToParse,
+                fmt::format("Invalid version or command byte given in Proxy Protocol header V2: {}",
+                            protocolVersionAndCommandByte));
+        }
+
+        const auto transportProtocolAndAddressFamilyByte = extract<uint8_t>(buffer);
+
+        int aFamily = AF_UNSPEC;
+        {
+            // Discard the family if this is a local connection.
+            const uint8_t aFamilyByte =
+                isLocal ? 0 : (transportProtocolAndAddressFamilyByte & 0xF0) >> 4;
+            switch (aFamilyByte) {
+                case 0:
+                    aFamily = AF_UNSPEC;
+                    break;
+                case 1:
+                    aFamily = AF_INET;
+                    break;
+                case 2:
+                    aFamily = AF_INET6;
+                    break;
+                case 3:
+                    aFamily = AF_UNIX;
+                    break;
+                default:
+                    uasserted(
+                        ErrorCodes::FailedToParse,
+                        fmt::format("Invalid address family given in Proxy Protocol header V2: {}",
+                                    aFamilyByte));
+            }
+        }
+
+        const uint8_t protocol = transportProtocolAndAddressFamilyByte & 0xF;
+        uassert(ErrorCodes::FailedToParse,
+                fmt::format("Invalid protocol given in Proxy Protocol header V2: {}", protocol),
+                protocol <= 0x2);
+
+        // If protocol is unspecified, we should also ignore address information.
+        if (protocol == 0) {
+            aFamily = AF_UNSPEC;
+        }
+
+        const uint16_t length = endian::bigToNative(extract<uint16_t>(buffer));
+
+        const size_t totalHeaderSize =
+            kProxyProtocolV2FixedHeaderSize + static_cast<size_t>(length);
+        uassert(ErrorCodes::FailedToParse,
+                fmt::format("Proxy protocol V2 header length {} exceeds maximum header size {}",
+                            totalHeaderSize,
+                            maxHeaderSize),
+                totalHeaderSize <= maxHeaderSize);
+
+        return ProxyProtocolV2FixedHeader{aFamily, protocol, length};
+    } catch (const std::out_of_range&) {
+        // extract throws when the fixed header is not fully present yet.
+        return {};
+    }
+}
+
 namespace {
 
 void parseTLVVectors(std::string_view buffer,
                      std::vector<ProxiedSupplementaryDataEntry>& data,
                      boost::optional<ProxiedSSLData>& sslTlvs);
 void parseSubTLVVectors(std::string_view buffer, boost::optional<ProxiedSSLData>& sslTlvs);
-
-// Interprets the first sizeof(T) bytes of data as a T and returns it, advancing the data cursor
-// by the same amount. Does not account for endianness of the data buffer.
-template <typename T>
-T extract(std::string_view& data) {
-    MONGO_STATIC_ASSERT(std::is_trivially_copyable_v<T>);
-    static constexpr size_t numBytes = sizeof(T);
-    if (data.size() < numBytes) {
-        throw std::out_of_range(
-            fmt::format("Not enough space to extract object of size {}", numBytes));
-    }
-
-    T result;
-    memcpy(&result, data.data(), numBytes);
-    data = data.substr(numBytes);
-    return result;
-}
 
 void parseSubTLVVectors(std::string_view buffer, boost::optional<ProxiedSSLData>& sslTlvs) {
     static constexpr size_t kSubTLVHeaderSize = 5;
@@ -234,8 +306,8 @@ void parseTLVVectors(std::string_view buffer,
     }
 }
 
+// Parse a proxy protocol V1 header, with the signature already stripped.
 bool parseV1Buffer(std::string_view& buffer, boost::optional<ProxiedEndpoints>& endpoints) {
-    buffer = buffer.substr(kProxyV1Signature.size());
     if (buffer.empty())
         return false;
 
@@ -244,21 +316,31 @@ bool parseV1Buffer(std::string_view& buffer, boost::optional<ProxiedEndpoints>& 
     static constexpr std::string_view crlf = "\x0D\x0A"sv;
     const auto crlfPos = buffer.find(crlf);
 
-    static constexpr size_t kMaximumV1HeaderSize = 107;
     static constexpr size_t kMaximumV1InetLineSize =
         kMaximumV1HeaderSize - kProxyV1Signature.size();
     if (crlfPos == std::string::npos) {
         // If we couldn't find a newline sequence, then fail if there cannot be enough room
-        // for one to appear in the future.
-        uassert(ErrorCodes::FailedToParse,
-                fmt::format("No terminating newline found in Proxy Protocol header V1: {}", buffer),
-                buffer.size() <= kMaximumV1InetLineSize);
+        // for one to appear in the future. A buffer that already fills the maximum line has no
+        // room left for the CRLF.
+        if (buffer.size() > kMaximumV1InetLineSize - 1) {
+            uasserted(ErrorCodes::FailedToParse,
+                      fmt::format("No terminating newline found in Proxy Protocol header V1: {}",
+                                  buffer));
+        } else if (buffer.size() == kMaximumV1InetLineSize - 1) {
+            uassert(ErrorCodes::FailedToParse,
+                    fmt::format("No room for terminating newline in Proxy Protocol header V1: {}",
+                                buffer),
+                    buffer.back() == '\x0D');
+        }
         return false;
     } else {
         // If we could, then fail if the sequence doesn't occur within the maximum line length.
-        uassert(ErrorCodes::FailedToParse,
-                fmt::format("No terminating newline found in Proxy Protocol header V1: {}", buffer),
-                crlfPos + crlf.size() <= kMaximumV1InetLineSize);
+        uassert(
+            ErrorCodes::FailedToParse,
+            fmt::format(
+                "Terminating newline exceeds maximum header size in Proxy Protocol header V1: {}",
+                buffer),
+            crlfPos + crlf.size() <= kMaximumV1InetLineSize);
     }
 
     // Prepare a result buffer pointing to just after the crlf sequence.
@@ -328,71 +410,23 @@ bool parseV1Buffer(std::string_view& buffer, boost::optional<ProxiedEndpoints>& 
     }
 }
 
-bool parseV2Buffer(std::string_view& buffer, ParserResults& results, bool isProxyUnixSock) {
+// Parse a proxy protocol V2 header, with the signature already stripped.
+bool parseV2Buffer(std::string_view& buffer,
+                   ParserResults& results,
+                   bool isProxyUnixSock,
+                   size_t headerReadSize) {
     auto& endpoints = results.endpoints;
-    buffer = buffer.substr(kProxyV2Signature.size());
-    if (buffer.empty())
-        return false;
 
     try {
-        const char protocolVersionAndCommandByte = extract<char>(buffer);
-
-        bool isLocal = false;
-        // The high nibble must be 2 (version 2) and the low nibble must be either 0 or 1 (local or
-        // remote).
-        if (protocolVersionAndCommandByte == '\x20') {
-            isLocal = true;
-        } else if (protocolVersionAndCommandByte != '\x21') {
-            uasserted(
-                ErrorCodes::FailedToParse,
-                fmt::format("Invalid version or command byte given in Proxy Protocol header V2: {}",
-                            protocolVersionAndCommandByte));
-        }
-
-        if (buffer.empty())
+        // If the reported length exceeds headerReadSize, we will never be able to completely read
+        // this proxy header, and it should be rejected.
+        const auto hdr = parseProxyProtocolV2FixedHeader(buffer, headerReadSize);
+        if (!hdr) {
             return false;
-
-        const uint8_t transportProtocolAndAddressFamilyByte = extract<uint8_t>(buffer);
-
-        int aFamily = 0;
-        {
-            // Discard the family if this is a local connection.
-            uint8_t aFamilyByte = isLocal ? 0 : (transportProtocolAndAddressFamilyByte & 0xF0) >> 4;
-            switch (aFamilyByte) {
-                case 0:
-                    aFamily = AF_UNSPEC;
-                    break;
-                case 1:
-                    aFamily = AF_INET;
-                    break;
-                case 2:
-                    aFamily = AF_INET6;
-                    break;
-                case 3:
-                    aFamily = AF_UNIX;
-                    break;
-                default:
-                    uasserted(
-                        ErrorCodes::FailedToParse,
-                        fmt::format("Invalid address family given in Proxy Protocol header V2: {}",
-                                    aFamilyByte));
-            }
         }
 
-        uint8_t protocol = (transportProtocolAndAddressFamilyByte & 0xF);
-        uassert(ErrorCodes::FailedToParse,
-                fmt::format("Invalid protocol given in Proxy Protocol header V2: {}", protocol),
-                protocol <= 0x2);
-
-        // If protocol is unspecified, we should also ignore address information.
-        if (protocol == 0) {
-            aFamily = AF_UNSPEC;
-        }
-
-        if (buffer.size() < sizeof(uint16_t))
-            return false;
-
-        const size_t length = endian::bigToNative(extract<uint16_t>(buffer));
+        const int aFamily = hdr->addressFamily;
+        const size_t length = hdr->length;
         if (buffer.size() < length)
             return false;
 
@@ -498,7 +532,8 @@ bool parseV2Buffer(std::string_view& buffer, ParserResults& results, bool isProx
 }  // namespace
 
 boost::optional<ParserResults> parseProxyProtocolHeader(std::string_view buffer,
-                                                        bool isProxyUnixSock) {
+                                                        bool isProxyUnixSock,
+                                                        size_t headerReadSize) {
     // Check if the buffer presented is V1, V2, or neither.
     const size_t originalBufferSize = buffer.size();
 
@@ -508,9 +543,11 @@ boost::optional<ParserResults> parseProxyProtocolHeader(std::string_view buffer,
         uassert(ErrorCodes::FailedToParse,
                 "Proxy protocol V1 is not supported on the proxy unix socket",
                 !isProxyUnixSock);
+        buffer.remove_prefix(kProxyV1Signature.size());
         complete = parseV1Buffer(buffer, results.endpoints);
     } else if (buffer.starts_with(kProxyV2Signature)) {
-        complete = parseV2Buffer(buffer, results, isProxyUnixSock);
+        buffer.remove_prefix(kProxyV2Signature.size());
+        complete = parseV2Buffer(buffer, results, isProxyUnixSock, headerReadSize);
     } else {
         uassert(ErrorCodes::FailedToParse,
                 fmt::format("Initial Proxy Protocol header bytes invalid: {}; "

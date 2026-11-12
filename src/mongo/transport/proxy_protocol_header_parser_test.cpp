@@ -32,11 +32,14 @@ MATCHER_P2(ProxiedEndpointsAre, src, dst, "") {
     return ExplainMatchResult(FieldsAre(src, dst), arg, result_listener);
 }
 
+// Fits every fixture in this file. Production callers pass the configured read size.
+constexpr size_t kProxyHeaderReadSizeForTest = kDefaultProxyProtocolHeaderReadSize;
+
 ParserResults parseAllPrefixes(std::string_view s) {
     boost::optional<ParserResults> results;
     for (size_t len = 0; len <= s.size(); ++len) {
         std::string_view sub = s.substr(0, len);
-        results = parseProxyProtocolHeader(sub, false);
+        results = parseProxyProtocolHeader(sub, false, kProxyHeaderReadSizeForTest);
         if (len < s.size()) {
             ASSERT_FALSE(results) << fmt::format("size={}, sub={}", len, sub);
         }
@@ -60,7 +63,7 @@ boost::optional<ProxiedEndpoints> parseStringExpectSuccess(std::string_view s) {
 
     // Also test that adding garbage to the end doesn't increase the bytesParsed amount.
     const boost::optional<ParserResults> possibleResultsWithGarbage =
-        parseProxyProtocolHeader(std::string{s} + "garbage", false);
+        parseProxyProtocolHeader(std::string{s} + "garbage", false, kProxyHeaderReadSizeForTest);
     ASSERT_TRUE(possibleResultsWithGarbage);
     const ParserResults resultsWithGarbage = *possibleResultsWithGarbage;
     ASSERT_THAT(resultsWithGarbage.bytesParsed, Eq(s.size()));
@@ -194,11 +197,15 @@ TEST(ProxyProtocolHeaderParser, MalformedV1Headers) {
     std::pair<std::string, std::string> testCases[] = {
         {"PORXY ", "header bytes invalid"},
 
-        {"PROXY " + std::string(200, '1'), "No terminating newline"},
+        {"PROXY " + std::string(200, '1'), "No room for terminating newline"},
 
         // Even if there is a terminating newline, it has to happen before the longest possible
         // header length is seen.
-        {"PROXY UNKNOWN " + std::string(92, '1') + "\r\n", "No terminating newline"},
+        {"PROXY UNKNOWN " + std::string(92, '1') + "\r\n", "No room for terminating newline"},
+
+        // If \r is not followed by \n, the failure won't be detected until the buffer is completely
+        // full.
+        {"PROXY UNKNOWN " + std::string(91, '1') + "\r1", "No terminating newline found"},
 
         {"PROXY " + std::string(50, '\r') + "1" + "\r\r\n", "address string malformed"},
         {"PROXY TCP4 \r\n", "address string malformed"},
@@ -263,6 +270,30 @@ TEST(ProxyProtocolHeaderParser, WellFormedV1Headers) {
     // The longest possible V1 header
     ASSERT_FALSE(
         parseStringExpectSuccess(fmt::format("PROXY UNKNOWN {} {} 65535 65535\r\n", allFs, allFs)));
+}
+
+TEST(ProxyProtocolHeaderParser, V1HeaderFillingMaximumWithoutCrlfThrows) {
+    std::string header(kMaximumV1HeaderSize, 'x');
+    ASSERT_EQ(header.size(), kMaximumV1HeaderSize);
+    std::memcpy(header.data(), kProxyV1Signature.data(), kProxyV1Signature.size());
+    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header, false, kProxyHeaderReadSizeForTest),
+                       DBException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST(ProxyProtocolHeaderParser, V1HeaderOneShortOfMaximumDependsOnTrailingCr) {
+    // One byte short of the maximum. A trailing CR can still be completed by LF. Any other
+    // last byte cannot form a CRLF inside the limit.
+    std::string header(kMaximumV1HeaderSize - 1, 'x');
+    ASSERT_EQ(header.size(), kMaximumV1HeaderSize - 1);
+    std::memcpy(header.data(), kProxyV1Signature.data(), kProxyV1Signature.size());
+    ASSERT_NE(header.back(), '\r');
+    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header, false, kProxyHeaderReadSizeForTest),
+                       DBException,
+                       ErrorCodes::FailedToParse);
+
+    header.back() = '\r';
+    ASSERT_FALSE(parseProxyProtocolHeader(header, false, kProxyHeaderReadSizeForTest));
 }
 
 struct TestV2Header {
@@ -495,6 +526,67 @@ TEST(ProxyProtocolHeaderParser, WellFormedV2Headers) {
     ASSERT_FALSE(parseStringExpectSuccess(header.toString()));
 }
 
+TEST(ProxyProtocolHeaderParser, V2FixedHeader) {
+    // The signature is stripped before parseV2Buffer calls this parser. The length field contains
+    // a NUL, so this cannot be built with a C string literal.
+    std::string bytes;
+    bytes.push_back('\x21');
+    bytes.push_back('\x12');
+    bytes.push_back('\x00');
+    bytes.push_back('\x0C');
+    std::string_view view(bytes);
+    const auto fixed = parseProxyProtocolV2FixedHeader(view, kDefaultProxyProtocolHeaderReadSize);
+    ASSERT_TRUE(fixed);
+    ASSERT_EQ(fixed->addressFamily, AF_INET);
+    ASSERT_EQ(fixed->protocol, 0x2);
+    ASSERT_EQ(fixed->length, 12);
+    ASSERT_TRUE(view.empty());
+
+    std::string_view empty;
+    ASSERT_FALSE(parseProxyProtocolV2FixedHeader(empty, kDefaultProxyProtocolHeaderReadSize));
+
+    std::string_view missingLength(bytes.data(), bytes.size() - 1);
+    ASSERT_FALSE(
+        parseProxyProtocolV2FixedHeader(missingLength, kDefaultProxyProtocolHeaderReadSize));
+
+    std::string badVersion;
+    badVersion.push_back('\x22');
+    badVersion.push_back('\x12');
+    badVersion.push_back('\x00');
+    badVersion.push_back('\x0C');
+    std::string_view badView(badVersion);
+    ASSERT_THROWS_CODE(
+        parseProxyProtocolV2FixedHeader(badView, kDefaultProxyProtocolHeaderReadSize),
+        DBException,
+        ErrorCodes::FailedToParse);
+
+    std::string_view oversized(bytes);
+    ASSERT_THROWS_CODE(parseProxyProtocolV2FixedHeader(oversized, kProxyProtocolV2FixedHeaderSize),
+                       DBException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST(ProxyProtocolHeaderParser, V2DeclaredLengthExceedsHeaderReadSizeThrows) {
+    // Only the fixed header is buffered. The declared body makes the total larger than the
+    // caller's read limit, so this is a rejected header rather than one that is still arriving.
+    std::string bytes(kProxyV2Signature);
+    bytes.push_back('\x21');
+    bytes.push_back('\x11');
+    bytes.push_back('\xFF');
+    bytes.push_back('\xFF');
+    ASSERT_THROWS_CODE(
+        parseProxyProtocolHeader(bytes, /*isProxyUnixSock=*/false, kProxyHeaderReadSizeForTest),
+        DBException,
+        ErrorCodes::FailedToParse);
+
+    // The same fixed header with a body length that still fits, but is not yet buffered, is
+    // incomplete.
+    bytes[bytes.size() - 2] = '\x00';
+    bytes[bytes.size() - 1] = '\x0C';
+    ASSERT_FALSE(
+        parseProxyProtocolHeader(bytes, /*isProxyUnixSock=*/false, kProxyHeaderReadSizeForTest));
+}
+
 struct TestSockAddrUnLinux {
     sa_family_t sun_family;
     char sun_path[108];
@@ -593,7 +685,8 @@ TEST(ProxyProtocolHeaderParser, MacSockAddrUnParsing) {
 
 boost::optional<ParserResults> parseWithTLV(AddressFamily type, const std::string& tlvData) {
     auto header = buildValidPP2Header(type, tlvData);
-    return parseProxyProtocolHeader(header.toString(), /*isProxyUnixSock=*/true);
+    return parseProxyProtocolHeader(
+        header.toString(), /*isProxyUnixSock=*/true, kProxyHeaderReadSizeForTest);
 }
 
 std::string buildTLV(uint8_t type, const std::string& data) {
@@ -682,7 +775,9 @@ TEST_P(ProxyProtocolParameterizedTestFixture, BufferIncludesDataAfterProxyProtoc
     auto header = buildValidPP2Header(type);
     header.metadata = "Adding some junk data";
 
-    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header.toString(), /*isProxyUnixSock=*/true),
+    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header.toString(),
+                                                /*isProxyUnixSock=*/true,
+                                                kProxyHeaderReadSizeForTest),
                        DBException,
                        ErrorCodes::FailedToParse);
 }
@@ -693,7 +788,8 @@ TEST_P(ProxyProtocolParameterizedTestFixture, BufferIncludesDataAfterProxyProtoc
     auto header = buildValidPP2Header(type, tlvData);
     header.metadata = "Adding some junk data";
 
-    auto result = parseProxyProtocolHeader(header.toString(), /*isProxyUnixSock=*/true);
+    auto result = parseProxyProtocolHeader(
+        header.toString(), /*isProxyUnixSock=*/true, kProxyHeaderReadSizeForTest);
     ASSERT_TRUE(result);
     ASSERT_TRUE(result->endpoints);
     ASSERT_EQ(result->tlvs.size(), 1u);
@@ -703,9 +799,10 @@ TEST_P(ProxyProtocolParameterizedTestFixture, BufferIncludesDataAfterProxyProtoc
 
 TEST_P(ProxyProtocolParameterizedTestFixture, UnixProxySocketWithV1ProtocolIsRejected) {
     auto header = "PROXY TCP4 1.1.1.1 2.2.2.2 10 300\r\n";
-    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header, /*isProxyUnixSock=*/true),
-                       DBException,
-                       ErrorCodes::FailedToParse);
+    ASSERT_THROWS_CODE(
+        parseProxyProtocolHeader(header, /*isProxyUnixSock=*/true, kProxyHeaderReadSizeForTest),
+        DBException,
+        ErrorCodes::FailedToParse);
 }
 
 // Helper to build the raw payload for an SSL TLV.
