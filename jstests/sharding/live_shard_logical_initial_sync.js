@@ -7,6 +7,7 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ShardingStateTest} from "jstests/sharding/libs/sharding_state_test.js";
 
 const st = new ShardingTest({config: 1, shards: {rs0: {nodes: 1}}});
@@ -28,6 +29,8 @@ ShardingStateTest.checkShardingState(st);
 
 jsTestLog("Checking sharding state after failover.");
 ShardingStateTest.failoverToMember(rs, newNode);
+//Ensure that mongos has discovered the new primary.
+awaitRSClientHosts(st.s, newNode, {ok: true, ismaster: true}, rs);
 ShardingStateTest.checkShardingState(st);
 
 st.stop();
