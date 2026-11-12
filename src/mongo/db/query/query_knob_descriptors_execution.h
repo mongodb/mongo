@@ -45,6 +45,14 @@
          kInternalQuerySbeBlueprintRewriteMaxFiringsName,                                 \
          internalQuerySbeBlueprintRewriteMaxFirings,                                      \
          getSbeBlueprintRewriteMaxFirings)                                                \
+    KNOB(kChangeStreamEndOfTransactionMaxLookbackSeconds,                                 \
+         kInternalChangeStreamEndOfTransactionMaxLookbackSecondsName,                     \
+         internalChangeStreamEndOfTransactionMaxLookbackSeconds,                          \
+         getChangeStreamEndOfTransactionMaxLookbackSeconds)                               \
+    KNOB(kChangeStreamEndOfTransactionMaxRebuilds,                                        \
+         kInternalChangeStreamEndOfTransactionMaxRebuildsName,                            \
+         internalChangeStreamEndOfTransactionMaxRebuilds,                                 \
+         getChangeStreamEndOfTransactionMaxRebuilds)                                      \
     KNOB(kMaxGroupAccumulatorsInSbe,                                                      \
          kInternalMaxGroupAccumulatorsInSbeName,                                          \
          gInternalMaxGroupAccumulatorsInSbe,                                              \

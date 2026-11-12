@@ -472,6 +472,50 @@ server_parameters:
             query_knob:
                 wire_name: sbeBlueprintRewriteMaxFirings
 
+    internalChangeStreamEndOfTransactionMaxLookbackSeconds:
+        description: >-
+            Maximum oplog timestamp distance, in seconds, between a change stream's resume point
+            (T0) and the lookback floor (F, the commitFloor) that a single on-demand endOfTransaction
+            lookback ("backfill") may cover. A lookback with T0 - F above this value is refused.
+            The default of one hour is well above the transaction lifetime limit (60 seconds by
+            default), so legitimate floors are not refused while a stuck resume point cannot
+            trigger an unbounded oplog scan.
+        set_at: [startup, runtime]
+        cpp_varname: "internalChangeStreamEndOfTransactionMaxLookbackSeconds"
+        cpp_vartype: Atomic<int>
+        default: 3600
+        validator:
+            gt: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: changeStreamEndOfTransactionMaxLookbackSeconds
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
+    internalChangeStreamEndOfTransactionMaxRebuilds:
+        description: >-
+            Maximum number of kickback-driven rebuilds a single change stream may perform over its
+            lifetime. This is a backstop for the one-round-per-rebuild invariant and bounds the
+            total number of rebuilds; it does not bound an individual lookback (see
+            internalChangeStreamEndOfTransactionMaxLookbackSeconds). A healthy stream needs only a
+            handful of rebuilds, so the default leaves headroom while making a runaway fail fast.
+        set_at: [startup, runtime]
+        cpp_varname: "internalChangeStreamEndOfTransactionMaxRebuilds"
+        cpp_vartype: Atomic<int>
+        default: 10
+        validator:
+            gt: 0
+            lte: 1000
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: changeStreamEndOfTransactionMaxRebuilds
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
     internalQueryMaxDocValidationErrorConsideredValues:
         mod_visibility: needs_replacement
         description: >-
