@@ -27,6 +27,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -182,8 +183,9 @@ public:
         for (auto strategy : kStrategies) {
             out << std::endl
                 << "## " << EqLookupNode::serializeLookupStrategy(strategy) << std::endl;
-            auto run =
-                runStrategy(strategy, pipeline(EqLookupNode::serializeLookupStrategy(strategy)));
+            auto run = runStrategy(strategy,
+                                   pipeline(EqLookupNode::serializeLookupStrategy(strategy)),
+                                   std::make_unique<CollectionScanNode>(_nss));
             if (!run) {
                 out << "Pipeline is not entirely pushed down to SBE." << std::endl;
                 continue;
@@ -209,8 +211,10 @@ public:
         _gctx->verifyOutput();
     }
 
-private:
-    boost::optional<PlanRun> runStrategy(Strategy strategy, const std::vector<BSONObj>& stages) {
+protected:
+    boost::optional<PlanRun> runStrategy(Strategy strategy,
+                                         const std::vector<BSONObj>& stages,
+                                         std::unique_ptr<QuerySolutionNode> local) {
         const auto foreign = foreignNss(strategy);
         boost::intrusive_ptr<ExpressionContext> expCtx =
             make_intrusive<ExpressionContextForTest>(operationContext(), _nss);
@@ -242,9 +246,8 @@ private:
 
         auto plannerParams = makePlannerParams();
         plannerParams->fillOutSecondaryCollectionsPlannerParams(operationContext(), *cq, colls);
-        auto scan = std::make_unique<CollectionScanNode>(_nss);
         auto solution = QueryPlanner::extendWithAggPipeline(
-            *cq, makeQuerySolution(std::move(scan)), plannerParams->secondaryCollectionsInfo);
+            *cq, makeQuerySolution(std::move(local)), plannerParams->secondaryCollectionsInfo);
 
         const auto* lookup = findEqLookup(solution->root());
         ASSERT_TRUE(lookup);
@@ -300,6 +303,155 @@ LOOKUP_UNWIND_TEST(Flat, Preserve, IndexOnLocalKey, Project)
 LOOKUP_UNWIND_TEST(Flat, Preserve, IndexOnLocalKey, AddFields)
 LOOKUP_UNWIND_TEST(Flat, NoPreserve, IndexOnLocalKey, Project)
 LOOKUP_UNWIND_TEST(Flat, NoPreserve, IndexOnLocalKey, AddFields)
+
+constexpr std::array kLocalAccessStrategies{Strategy::kHashJoin, Strategy::kIndexedLoopJoin};
+
+constexpr uint64_t kSortMaxMemoryUsageBytes = 100 * 1024 * 1024;
+
+enum class LocalAccess {
+    kFetchIxscan,
+    kFetchSortIxscan,
+    kFetchOrIxscan,
+    kFetchSortMergeIxscan,
+    kOrFetchIxscan,
+    kSortMergeFetchIxscan,
+};
+
+std::string_view localAccessName(LocalAccess access) {
+    switch (access) {
+        case LocalAccess::kFetchIxscan:
+            return "FETCH -> IXSCAN";
+        case LocalAccess::kFetchSortIxscan:
+            return "FETCH -> SORT -> IXSCAN";
+        case LocalAccess::kFetchOrIxscan:
+            return "FETCH -> OR -> [IXSCAN, IXSCAN]";
+        case LocalAccess::kFetchSortMergeIxscan:
+            return "FETCH -> SORT_MERGE -> [IXSCAN, IXSCAN]";
+        case LocalAccess::kOrFetchIxscan:
+            return "OR -> [FETCH -> IXSCAN, FETCH -> IXSCAN]";
+        case LocalAccess::kSortMergeFetchIxscan:
+            return "SORT_MERGE -> [FETCH -> IXSCAN, FETCH -> IXSCAN]";
+    }
+    MONGO_UNREACHABLE;
+}
+
+std::unique_ptr<OrNode> makeOrNode(std::unique_ptr<QuerySolutionNode> first,
+                                   std::unique_ptr<QuerySolutionNode> second) {
+    auto orNode = std::make_unique<OrNode>();
+    orNode->children.push_back(std::move(first));
+    orNode->children.push_back(std::move(second));
+    orNode->dedup = true;
+    return orNode;
+}
+
+std::unique_ptr<MergeSortNode> makeMergeSortNode(std::unique_ptr<QuerySolutionNode> first,
+                                                 std::unique_ptr<QuerySolutionNode> second) {
+    auto mergeSort = std::make_unique<MergeSortNode>();
+    mergeSort->children.push_back(std::move(first));
+    mergeSort->children.push_back(std::move(second));
+    mergeSort->sort = BSON("n" << 1);
+    mergeSort->dedup = true;
+    return mergeSort;
+}
+
+/**
+ * Golden tests for a $lookup + $unwind over different local access paths.
+ */
+class LookupUnwindLocalAccessGoldenTest : public LookupUnwindStrategyGoldenTest {
+public:
+    void runLocalAccess(LocalAccess access) {
+        createCollection({}, _localIndex);
+        for (auto strategy : kLocalAccessStrategies) {
+            createSecondaryCollection(foreignNss(strategy), {}, foreignIndexSpecs(strategy));
+        }
+
+        auto pipeline = [](std::string_view from) {
+            return std::vector<BSONObj>{
+                BSON("$lookup" << BSON("from" << from << "localField" << "lkey" << "foreignField"
+                                              << "fkey" << "as" << "joined")),
+                BSON("$unwind" << "$joined")};
+        };
+
+        auto& out = _gctx->outStream();
+        _gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
+        out << "Local access path: " << localAccessName(access) << std::endl;
+        for (const auto& stage : pipeline("<strategy>")) {
+            out << stage << std::endl;
+        }
+
+        for (auto strategy : kLocalAccessStrategies) {
+            out << std::endl
+                << "## " << EqLookupNode::serializeLookupStrategy(strategy) << std::endl;
+            auto run = runStrategy(strategy,
+                                   pipeline(EqLookupNode::serializeLookupStrategy(strategy)),
+                                   makeLocalAccess(access));
+            ASSERT_TRUE(run);
+            out << run->explain;
+        }
+        _gctx->verifyOutput();
+    }
+
+private:
+    std::unique_ptr<QuerySolutionNode> makeLocalAccess(LocalAccess access) {
+        auto fetch = [&](std::unique_ptr<QuerySolutionNode> child) {
+            return std::make_unique<FetchNode>(std::move(child), _nss);
+        };
+        switch (access) {
+            case LocalAccess::kFetchIxscan:
+                return fetch(makeIndexScan(1, 6));
+            case LocalAccess::kFetchSortIxscan:
+                return fetch(std::make_unique<SortNodeDefault>(makeIndexScan(1, 6),
+                                                               BSON("n" << -1),
+                                                               /*limit=*/0,
+                                                               LimitSkipParameterization::Disabled,
+                                                               kSortMaxMemoryUsageBytes));
+            case LocalAccess::kFetchOrIxscan:
+                return fetch(makeOrNode(makeIndexScan(1, 3), makeIndexScan(4, 6)));
+            case LocalAccess::kFetchSortMergeIxscan:
+                return fetch(makeMergeSortNode(makeIndexScan(1, 3), makeIndexScan(4, 6)));
+            case LocalAccess::kOrFetchIxscan:
+                return makeOrNode(fetch(makeIndexScan(1, 3)), fetch(makeIndexScan(4, 6)));
+            case LocalAccess::kSortMergeFetchIxscan:
+                return makeMergeSortNode(fetch(makeIndexScan(1, 3)), fetch(makeIndexScan(4, 6)));
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    std::unique_ptr<IndexScanNode> makeIndexScan(int low, int high) {
+        auto indexScan = std::make_unique<IndexScanNode>(_nss, makeIndexEntry(_localIndex));
+        OrderedIntervalList oil("n");
+        oil.intervals.emplace_back(BSON("" << low << "" << high), true, true);
+        indexScan->bounds.fields.push_back(std::move(oil));
+        indexScan->sortSet = ProvidedSortSet{_localIndex};
+        return indexScan;
+    }
+
+    const BSONObj _localIndex = BSON("n" << 1);
+};
+
+TEST_F(LookupUnwindLocalAccessGoldenTest, FetchIxscan) {
+    runLocalAccess(LocalAccess::kFetchIxscan);
+}
+
+TEST_F(LookupUnwindLocalAccessGoldenTest, FetchSortIxscan) {
+    runLocalAccess(LocalAccess::kFetchSortIxscan);
+}
+
+TEST_F(LookupUnwindLocalAccessGoldenTest, FetchOrIxscan) {
+    runLocalAccess(LocalAccess::kFetchOrIxscan);
+}
+
+TEST_F(LookupUnwindLocalAccessGoldenTest, FetchSortMergeIxscan) {
+    runLocalAccess(LocalAccess::kFetchSortMergeIxscan);
+}
+
+TEST_F(LookupUnwindLocalAccessGoldenTest, OrFetchIxscan) {
+    runLocalAccess(LocalAccess::kOrFetchIxscan);
+}
+
+TEST_F(LookupUnwindLocalAccessGoldenTest, SortMergeFetchIxscan) {
+    runLocalAccess(LocalAccess::kSortMergeFetchIxscan);
+}
 
 }  // namespace
 }  // namespace mongo

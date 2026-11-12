@@ -61,6 +61,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/test_output/query/stage_builder/sbe/golden_sbe_filter_builder_elem_match_shadow_fixture:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/golden_sbe_filter_builder_test_fixture:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/golden_sbe_stage_builder_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/lookup_unwind_local_access_golden_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/lookup_unwind_strategy_golden_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/sb_blueprint_dead_slot_elimination_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/sbe_timeseries_test:test_data",

@@ -1,0 +1,70 @@
+# Golden test output of LookupUnwindLocalAccessGoldenTest/FetchSortIxscan
+Local access path: FETCH -> SORT -> IXSCAN
+{ $lookup: { from: "<strategy>", localField: "lkey", foreignField: "fkey", as: "joined" } }
+{ $unwind: "$joined" }
+
+## HashJoin
+$$RESULT=s8 $$RESULT_CHANGES=open{joined=set(s16)} env: { s6 = {"n" : 1} }
+[5] hash_lookup_unwind inner s16 
+    outer s14 
+        [5] project [s14 = arrayToSet(
+            if (isArray(s10) ?: false) 
+            then 
+                if isArrayEmpty(s10) 
+                then [null] 
+                else s10 
+            
+            else newArray((s10 ?: null)) 
+       )] 
+        [3] fetch s1 = seek, s8 = result, s9 = recordId, s5 = inSnapshotId, s3 = inIndexIdent, s4 = inIndexKey, s6 = inIndexKeyPattern [s10 = lkey] @"UUID" 
+        [2] sort [s7] [desc] [s1, s2, s3, s4, s5] 
+        [2] project [s7 = (s2 ?: null)] 
+        [1] ixseek seekKeyLow = KS(2B0201) seekKeyHigh = KS(2B0CFE) [s4 = indexKey, s1 = recordId, s5 = snapshotId, s3 = indexIdent] [s2 = 0] @"UUID" @"n_1" forward 
+    inner s15 s11 
+        [5] project [s15 = arrayToSet(
+            let [
+                l3.0 = (s13 ?: null) 
+            ] 
+            in 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
+       )] 
+        [4] scan generic [s11 = record, s12 = recordId] [s13 = fkey] @"UUID" 
+
+## IndexedLoopJoin
+$$RESULT=s8 $$RESULT_CHANGES=open{joined=set(s18)} env: { s6 = {"n" : 1}, s17 = {"fkey" : 1} }
+[6] nlj inner [s8, s10] [s21] 
+    left 
+        [6] project [s21 = arrayToSet(
+            if (isArray(s10) ?: false) 
+            then 
+                if isArrayEmpty(s10) 
+                then [null] 
+                else s10 
+            
+            else newArray((s10 ?: null)) 
+       )] 
+        [3] fetch s1 = seek, s8 = result, s9 = recordId, s5 = inSnapshotId, s3 = inIndexIdent, s4 = inIndexKey, s6 = inIndexKeyPattern [s10 = lkey] @"UUID" 
+        [2] sort [s7] [desc] [s1, s2, s3, s4, s5] 
+        [2] project [s7 = (s2 ?: null)] 
+        [1] ixseek seekKeyLow = KS(2B0201) seekKeyHigh = KS(2B0CFE) [s4 = indexKey, s1 = recordId, s5 = snapshotId, s3 = indexIdent] [s2 = 0] @"UUID" @"n_1" forward 
+    right 
+        [6] filter {traverseF((s20 ?: null), lambda(l9.0) { isMember(move(l9.0), s21) }, true)} 
+        [6] nlj inner [] [s11, s12] 
+            left 
+                [6] project [s11 = ks(1ll, 0, s23, 1ll), s12 = ks(1ll, 0, s23, 2ll)] 
+                [6] unwind s23 = outField, s24 = outIndex, s22 = inField _preserveNullAndEmptyArrays 
+                [6] project [s22 = 
+                    if traverseF(s21, lambda(l7.0) { isArray(move(l7.0)) }, false) 
+                    then arrayToSet(concatArrays(s21, traverseP(s21, lambda(l8.0) { 
+                        if isArray(l8.0) 
+                        then (getElement(move(l8.0), 0) ?: undefined) 
+                        else move(l8.0) 
+                    }, 1))) 
+                    else s21 
+               ] 
+                [6] coscan 1 
+            right 
+                [5] fetch s13 = seek, s18 = result, s19 = recordId, s16 = inSnapshotId, s14 = inIndexIdent, s15 = inIndexKey, s17 = inIndexKeyPattern [s20 = fkey] @"UUID" 
+                [4] ixseek seekKeyLow = s11 seekKeyHigh = s12 [s15 = indexKey, s13 = recordId, s16 = snapshotId, s14 = indexIdent] [] @"UUID" @"fkey_1" forward 

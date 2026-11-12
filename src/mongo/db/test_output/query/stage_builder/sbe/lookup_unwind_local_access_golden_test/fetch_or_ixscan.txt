@@ -1,0 +1,76 @@
+# Golden test output of LookupUnwindLocalAccessGoldenTest/FetchOrIxscan
+Local access path: FETCH -> OR -> [IXSCAN, IXSCAN]
+{ $lookup: { from: "<strategy>", localField: "lkey", foreignField: "fkey", as: "joined" } }
+{ $unwind: "$joined" }
+
+## HashJoin
+$$RESULT=s15 $$RESULT_CHANGES=open{joined=set(s23)} env: { s5 = {"n" : 1} }
+[6] hash_lookup_unwind inner s23 
+    outer s21 
+        [6] project [s21 = arrayToSet(
+            if (isArray(s17) ?: false) 
+            then 
+                if isArrayEmpty(s17) 
+                then [null] 
+                else s17 
+            
+            else newArray((s17 ?: null)) 
+       )] 
+        [4] fetch s13 = seek, s15 = result, s16 = recordId, s14 = inSnapshotId, s10 = inIndexIdent, s11 = inIndexKey, s12 = inIndexKeyPattern [s17 = lkey] @"UUID" 
+        [3] unique_roaring s13 
+        [3] union [s10, s11, s12, s13, s14] 
+            branch0 [s2, s3, s5, s1, s4] 
+                [1] ixseek seekKeyLow = KS(2B0201) seekKeyHigh = KS(2B06FE) [s3 = indexKey, s1 = recordId, s4 = snapshotId, s2 = indexIdent] [] @"UUID" @"n_1" forward 
+            branch1 [s7, s8, s5, s6, s9] 
+                [2] ixseek seekKeyLow = KS(2B0801) seekKeyHigh = KS(2B0CFE) [s8 = indexKey, s6 = recordId, s9 = snapshotId, s7 = indexIdent] [] @"UUID" @"n_1" forward 
+    inner s22 s18 
+        [6] project [s22 = arrayToSet(
+            let [
+                l3.0 = (s20 ?: null) 
+            ] 
+            in 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
+       )] 
+        [5] scan generic [s18 = record, s19 = recordId] [s20 = fkey] @"UUID" 
+
+## IndexedLoopJoin
+$$RESULT=s15 $$RESULT_CHANGES=open{joined=set(s25)} env: { s5 = {"n" : 1}, s24 = {"fkey" : 1} }
+[7] nlj inner [s15, s17] [s28] 
+    left 
+        [7] project [s28 = arrayToSet(
+            if (isArray(s17) ?: false) 
+            then 
+                if isArrayEmpty(s17) 
+                then [null] 
+                else s17 
+            
+            else newArray((s17 ?: null)) 
+       )] 
+        [4] fetch s13 = seek, s15 = result, s16 = recordId, s14 = inSnapshotId, s10 = inIndexIdent, s11 = inIndexKey, s12 = inIndexKeyPattern [s17 = lkey] @"UUID" 
+        [3] unique_roaring s13 
+        [3] union [s10, s11, s12, s13, s14] 
+            branch0 [s2, s3, s5, s1, s4] 
+                [1] ixseek seekKeyLow = KS(2B0201) seekKeyHigh = KS(2B06FE) [s3 = indexKey, s1 = recordId, s4 = snapshotId, s2 = indexIdent] [] @"UUID" @"n_1" forward 
+            branch1 [s7, s8, s5, s6, s9] 
+                [2] ixseek seekKeyLow = KS(2B0801) seekKeyHigh = KS(2B0CFE) [s8 = indexKey, s6 = recordId, s9 = snapshotId, s7 = indexIdent] [] @"UUID" @"n_1" forward 
+    right 
+        [7] filter {traverseF((s27 ?: null), lambda(l9.0) { isMember(move(l9.0), s28) }, true)} 
+        [7] nlj inner [] [s18, s19] 
+            left 
+                [7] project [s18 = ks(1ll, 0, s30, 1ll), s19 = ks(1ll, 0, s30, 2ll)] 
+                [7] unwind s30 = outField, s31 = outIndex, s29 = inField _preserveNullAndEmptyArrays 
+                [7] project [s29 = 
+                    if traverseF(s28, lambda(l7.0) { isArray(move(l7.0)) }, false) 
+                    then arrayToSet(concatArrays(s28, traverseP(s28, lambda(l8.0) { 
+                        if isArray(l8.0) 
+                        then (getElement(move(l8.0), 0) ?: undefined) 
+                        else move(l8.0) 
+                    }, 1))) 
+                    else s28 
+               ] 
+                [7] coscan 1 
+            right 
+                [6] fetch s20 = seek, s25 = result, s26 = recordId, s23 = inSnapshotId, s21 = inIndexIdent, s22 = inIndexKey, s24 = inIndexKeyPattern [s27 = fkey] @"UUID" 
+                [5] ixseek seekKeyLow = s18 seekKeyHigh = s19 [s22 = indexKey, s20 = recordId, s23 = snapshotId, s21 = indexIdent] [] @"UUID" @"fkey_1" forward 

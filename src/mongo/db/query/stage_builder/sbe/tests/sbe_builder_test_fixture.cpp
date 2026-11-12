@@ -116,6 +116,9 @@ SbeStageBuilderTestFixture::buildPlanStage(std::unique_ptr<QuerySolution> queryS
 
 void SbeStageBuilderTestFixture::insertDocuments(const NamespaceString& nss,
                                                  const std::vector<BSONObj>& docs) {
+    if (docs.empty()) {
+        return;
+    }
     auto coll = acquireCollection(
         operationContext(),
         CollectionAcquisitionRequest(nss,
