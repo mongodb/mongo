@@ -70,17 +70,16 @@ bool isSimpleIdQuery(const BSONObj& query) {
             hasID = true;
 
             if (elt.type() == BSONType::object) {
-                // If the value is an object, it must either be exactly {$eq: <value>} or a literal
-                // object with no '$'-prefixed fields.
-                BSONObj idObj = elt.Obj();
-                if (idObj.nFields() == 1 && idObj.firstElementFieldNameStringData() == "$eq") {
-                    if (!Indexability::isExactBoundsGenerating(idObj.firstElement())) {
+                // If the value is an object, it can only have one field and that field can only be
+                // a query operator if the operator is $eq.
+                if (elt.Obj().firstElementFieldNameStringData().starts_with('$')) {
+                    if (elt.Obj().nFields() > 1 ||
+                        std::strcmp(elt.Obj().firstElementFieldName(), "$eq") != 0) {
                         return false;
                     }
-                } else if (std::any_of(idObj.begin(), idObj.end(), [](const BSONElement& e) {
-                               return e.fieldNameStringData().starts_with('$');
-                           })) {
-                    return false;
+                    if (!Indexability::isExactBoundsGenerating(elt["$eq"])) {
+                        return false;
+                    }
                 }
             } else if (!Indexability::isExactBoundsGenerating(elt)) {
                 // In addition to objects, some other BSON elements are not suitable for exact index
