@@ -21,7 +21,7 @@ import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {restartServerReplication} from "jstests/libs/write_concern_util.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 import {getOplogEntriesForTxnOnNode} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const kAbsentMultikeyPath = BinData(0, "AA=="); // bytes: [0] -> {}
@@ -192,6 +192,17 @@ function getPrecedingOplogTimestamp(node, ts, description) {
 }
 
 function stopSecondaryReplicationAfterBarrier(primary, secondary, label) {
+    if (isDisagg(primary)) {
+        // DSC receives oplog entries through the log service rather than the fetcher. Pause the
+        // secondary's applier so it stays behind while the primary completes the transaction.
+        const pauseOplogApplicationFailPoint = configureFailPoint(
+            secondary,
+            "pauseOplogApplication",
+        );
+        pauseOplogApplicationFailPoint.wait();
+        return pauseOplogApplicationFailPoint;
+    }
+
     const stopReplProducerFailPoint = configureFailPoint(secondary, "stopReplProducer");
 
     // Force a write to ensure the oplog fetcher is not idle and will observe stopReplProducer immediately.
@@ -201,6 +212,7 @@ function stopSecondaryReplicationAfterBarrier(primary, secondary, label) {
         primary.getDB(dbName).replication_barrier.insert({_id: label}, {writeConcern: {w: 1}}),
     );
     stopReplProducerFailPoint.wait();
+    return stopReplProducerFailPoint;
 }
 
 function formatMultikeyTimestampMismatch(field, snapshotTs, transition, expectedPath) {
@@ -506,7 +518,7 @@ function runLargeTransactionCase(txnCase, rst, primary, secondary) {
         rst.awaitReplication();
     }
 
-    stopSecondaryReplicationAfterBarrier(primary, secondary, txnCase.name);
+    const replicationPause = stopSecondaryReplicationAfterBarrier(primary, secondary, txnCase.name);
 
     const session = primary.startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
@@ -549,7 +561,7 @@ function runLargeTransactionCase(txnCase, rst, primary, secondary) {
         assertTransactionOplogChainSplit(primary, session, txnCase);
     } finally {
         session.endSession();
-        restartServerReplication(secondary);
+        replicationPause.off();
     }
     rst.awaitReplication();
 
