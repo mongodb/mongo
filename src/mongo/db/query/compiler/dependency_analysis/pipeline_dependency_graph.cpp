@@ -1150,7 +1150,7 @@ private:
             if (!feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
                 return true;
             }
-            return getType(match).hasType(BSONType::array);
+            return getType(match, true /*arraynessOnly*/).hasType(BSONType::array);
         }();
         LOGV2_DEBUG(13907002,
                     5,
@@ -1217,10 +1217,10 @@ private:
         MONGO_UNREACHABLE_TASSERT(12266805);
     }
 
-    Type getType(const PathMatch& pathMatch) const {
+    Type getType(const PathMatch& pathMatch, bool arraynessOnly = false) const {
         // We first infer type of the whole top-level document containing the path and then resolve
         // the type of the requested path against the result.
-        auto pathType = resolvePathType(getDocumentType(pathMatch), pathMatch.path);
+        auto pathType = resolvePathType(getDocumentType(pathMatch, arraynessOnly), pathMatch.path);
         LOGV2_DEBUG(13907001,
                     5,
                     "Returning type for path",
@@ -1234,7 +1234,7 @@ private:
     /**
      * Returns a document type containing the matched path.
      */
-    Type getDocumentType(const PathMatch& pathMatch) const {
+    Type getDocumentType(const PathMatch& pathMatch, bool arraynessOnly) const {
         // Each source of type information produces top-level document containing the matched path.
         // This allows prefix types to intersect first. Imagine two sources of a document type, A
         // and B (could be type from schema and type from $match).
@@ -1254,7 +1254,7 @@ private:
         // resolvePath('x.y', A ∩ B) => number
 
         //  We start with the type from the graph, and then apply the narrowing on top.
-        Type rootType = getDocumentTypeFromGraph(pathMatch);
+        Type rootType = getDocumentTypeFromGraph(pathMatch, arraynessOnly);
         LOGV2_DEBUG(13907003,
                     5,
                     "Type before match narrowing",
@@ -1265,9 +1265,11 @@ private:
         if (rootType.isNever()) {
             return rootType;
         }
+        const ts::PathFilter pathFilter{FieldRef(pathMatch.path), arraynessOnly};
         forEachPossiblyNarrowingStage(
             pathMatch, [&](const DocumentSourceMatch& match, StageId matchId) {
-                rootType = ts::narrowType(std::move(rootType), match.getMatchExpression(), true);
+                rootType = ts::narrowType(
+                    std::move(rootType), match.getMatchExpression(), true, pathFilter);
                 LOGV2_DEBUG(13907004,
                             5,
                             "Type after match narrowing",
@@ -1317,7 +1319,7 @@ private:
      * Returns an object type containing the path, with type information filled in from the graph
      * and possibly a subpipeline.
      */
-    Type getDocumentTypeFromGraph(const PathMatch& pathMatch) const {
+    Type getDocumentTypeFromGraph(const PathMatch& pathMatch, bool arraynessOnly) const {
         Type fieldType = Type::any();
         switch (pathMatch.field.type) {
             case FieldMatchType::kExact:
@@ -1330,7 +1332,7 @@ private:
                 }
                 if (auto* subGraph = getSubpipelineForValuePreservingPath(pathMatch)) {
                     fieldType = subGraph->_impl->getDocumentType(
-                        subGraph->_impl->lookupPath(nullptr, pathMatch.suffix()));
+                        subGraph->_impl->lookupPath(nullptr, pathMatch.suffix()), arraynessOnly);
                     break;
                 }
                 break;

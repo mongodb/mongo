@@ -13,6 +13,7 @@
 #include "mongo/db/query/compiler/type_system/expression_typing.h"
 #include "mongo/util/assert_util.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace mongo::pipeline::type_system {
@@ -37,11 +38,14 @@ Type narrowByAlwaysFalse(Type inputType, bool assumeTrue) {
  * Returns the type to assume when every child matches. This is represented by the intersection of
  * their constraints. 'expr' must have at least 1 child.
  */
-Type narrowByEveryChild(Type inputType, const ListOfMatchExpression* expr, bool assumeTrue) {
+Type narrowByEveryChild(Type inputType,
+                        const ListOfMatchExpression* expr,
+                        bool assumeTrue,
+                        const PathFilter& filter) {
     tassert(13493401, "Expression must have a child", expr->numChildren() > 0);
     for (size_t i = 0; i < expr->numChildren(); ++i) {
         // Repeatedly narrow the input using every child.
-        inputType = narrowType(std::move(inputType), expr->getChild(i), assumeTrue);
+        inputType = narrowType(std::move(inputType), expr->getChild(i), assumeTrue, filter);
     }
     return inputType;
 }
@@ -50,24 +54,30 @@ Type narrowByEveryChild(Type inputType, const ListOfMatchExpression* expr, bool 
  * Returns the type to assume when at least one child matches. This is represented by the union of
  * their constraints. 'expr' must have at least 1 child.
  */
-Type narrowBySomeChild(Type inputType, const ListOfMatchExpression* expr, bool assumeTrue) {
+Type narrowBySomeChild(Type inputType,
+                       const ListOfMatchExpression* expr,
+                       bool assumeTrue,
+                       const PathFilter& filter) {
     tassert(13493402, "Expression must have a child", expr->numChildren() > 0);
     if (expr->numChildren() == 1) {
         // When we have a single child we can std::move the input to avoid copying.
-        return narrowType(std::move(inputType), expr->getChild(0), assumeTrue);
+        return narrowType(std::move(inputType), expr->getChild(0), assumeTrue, filter);
     }
     // We union all of the types of the children here, starting with nothing matching.
     Type narrowed = Type::never();
     for (size_t i = 0; i < expr->numChildren(); ++i) {
         // Independently evaluate the type that would match at this branch.
-        Type childType = narrowType(inputType, expr->getChild(i), assumeTrue);
+        Type childType = narrowType(inputType, expr->getChild(i), assumeTrue, filter);
         narrowed = unionType(std::move(narrowed), std::move(childType));
     }
     return narrowed;
 }
 
 /// Returns the type to assume when the conjunction of the children of 'expr' is 'assumeTrue'.
-Type narrowByConjunction(Type inputType, const ListOfMatchExpression* expr, bool assumeTrue) {
+Type narrowByConjunction(Type inputType,
+                         const ListOfMatchExpression* expr,
+                         bool assumeTrue,
+                         const PathFilter& filter) {
     if (expr->numChildren() == 0) {
         // An empty conjunction matches every document. This is $and: [] and $alwaysTrue which is
         // what the $and case rewrites into.
@@ -75,14 +85,17 @@ Type narrowByConjunction(Type inputType, const ListOfMatchExpression* expr, bool
     }
     if (assumeTrue) {
         // Under conjunction, every child must match.
-        return narrowByEveryChild(std::move(inputType), expr, true);
+        return narrowByEveryChild(std::move(inputType), expr, true, filter);
     }
     // De Morgan: not (A and B) = (not A) or (not B)
-    return narrowBySomeChild(std::move(inputType), expr, false);
+    return narrowBySomeChild(std::move(inputType), expr, false, filter);
 }
 
 /// Returns the type to assume when the disjunction of the children of 'expr' is 'assumeTrue'.
-Type narrowByDisjunction(Type inputType, const ListOfMatchExpression* expr, bool assumeTrue) {
+Type narrowByDisjunction(Type inputType,
+                         const ListOfMatchExpression* expr,
+                         bool assumeTrue,
+                         const PathFilter& filter) {
     if (expr->numChildren() == 0) {
         // An empty disjunction matches no document. This is $or: [] and $alwaysFalse which is what
         // the $or case rewrites into.
@@ -90,10 +103,10 @@ Type narrowByDisjunction(Type inputType, const ListOfMatchExpression* expr, bool
     }
     if (assumeTrue) {
         // Under disjunction, at least one child must match, and we do not know which one.
-        return narrowBySomeChild(std::move(inputType), expr, true);
+        return narrowBySomeChild(std::move(inputType), expr, true, filter);
     }
     // De Morgan: not (A or B) = (not A) and (not B)
-    return narrowByEveryChild(std::move(inputType), expr, false);
+    return narrowByEveryChild(std::move(inputType), expr, false, filter);
 }
 
 /**
@@ -103,8 +116,8 @@ Type narrowByDisjunction(Type inputType, const ListOfMatchExpression* expr, bool
 struct NarrowTypeMatchExpressionVisitor final : public SelectiveMatchExpressionVisitorBase<true> {
     using SelectiveMatchExpressionVisitorBase<true>::visit;
 
-    NarrowTypeMatchExpressionVisitor(Type inputType, bool assumeTrue)
-        : type(std::move(inputType)), assumeTrue(assumeTrue) {}
+    NarrowTypeMatchExpressionVisitor(Type inputType, bool assumeTrue, const PathFilter& filter)
+        : type(std::move(inputType)), assumeTrue(assumeTrue), filter(filter) {}
 
     void visit(const TypeMatchExpression* expr) override {
         applyPathConstraint(expr, Type::fromMatcherTypeSet(expr->typeSet()));
@@ -128,12 +141,11 @@ struct NarrowTypeMatchExpressionVisitor final : public SelectiveMatchExpressionV
         if (!assumeTrue) {
             constraint = unionType(std::move(constraint), complement(Type::anyObject()));
         }
-        type =
-            matcher::narrowPath(std::move(type), *expr->elementPath(), std::move(constraint), true);
+        applyPathConstraint(expr, std::move(constraint), true);
     }
 
     void visit(const NotMatchExpression* expr) override {
-        type = narrowType(std::move(type), expr->getChild(0), !assumeTrue);
+        type = narrowType(std::move(type), expr->getChild(0), !assumeTrue, filter);
     }
 
     void visit(const AlwaysTrueMatchExpression* expr) override {
@@ -145,16 +157,16 @@ struct NarrowTypeMatchExpressionVisitor final : public SelectiveMatchExpressionV
     }
 
     void visit(const AndMatchExpression* expr) override {
-        type = narrowByConjunction(std::move(type), expr, assumeTrue);
+        type = narrowByConjunction(std::move(type), expr, assumeTrue, filter);
     }
 
     void visit(const OrMatchExpression* expr) override {
-        type = narrowByDisjunction(std::move(type), expr, assumeTrue);
+        type = narrowByDisjunction(std::move(type), expr, assumeTrue, filter);
     }
 
     void visit(const NorMatchExpression* expr) override {
         // $nor is just a negated $or.
-        type = narrowByDisjunction(std::move(type), expr, !assumeTrue);
+        type = narrowByDisjunction(std::move(type), expr, !assumeTrue, filter);
     }
 
     void visit(const ExprMatchExpression* expr) override {
@@ -165,25 +177,61 @@ struct NarrowTypeMatchExpressionVisitor final : public SelectiveMatchExpressionV
      * Applies the 'constraint' type to the path the predicate matches on.
      */
     void applyPathConstraint(const PathMatchExpression* expr, Type constraint) {
-        type = matcher::narrowPath(
-            std::move(type), *expr->elementPath(), std::move(constraint), assumeTrue);
+        applyPathConstraint(expr, std::move(constraint), assumeTrue);
+    }
+
+    void applyPathConstraint(const PathMatchExpression* expr, Type constraint, bool matched) {
+        const ElementPath& path = *expr->elementPath();
+        if (!filter.canRefine(path, constraint, matched)) {
+            return;
+        }
+        type = matcher::narrowPath(std::move(type), path, std::move(constraint), matched);
     }
 
     /// The input type, narrowed by every expression which carries type information so far.
     Type type;
     bool assumeTrue;
+    const PathFilter& filter;
 };
 
 }  // namespace
 
-Type narrowType(Type inputType, const MatchExpression* expr, bool assumeTrue) {
+bool PathFilter::canRefine(const ElementPath& predicatePath,
+                           const Type& constraint,
+                           bool assumeTrue) const {
+    // The empty path denotes that we don't want to filter anything.
+    if (path.empty()) {
+        return true;
+    }
+    // If the paths diverge, the predicate doesn't apply to our given path.
+    if (!path.fullyOverlapsWith(predicatePath.fieldRef())) {
+        return false;
+    }
+    // Predicates on 'path' or its prefixes always apply. If we only care about arrayness, we might
+    // be able to skip this predicate if it's on a subfield 'path'.
+    if (!arraynessOnly || predicatePath.fieldRef().numParts() <= path.numParts()) {
+        return true;
+    }
+    // If we got this far, we have a predicate on a subfield of 'path' and only care about
+    // arrayness. If the leaf can be missing, we can't rule out arrays.
+    if (assumeTrue == constraint.hasType(BSONType::eoo)) {
+        return false;
+    }
+    // Since we know the leaf can't be missing, we can remove arrays if they are not traversed.
+    return predicatePath.nonLeafArrayBehavior() != ElementPath::NonLeafArrayBehavior::kTraverse;
+}
+
+Type narrowType(Type inputType,
+                const MatchExpression* expr,
+                bool assumeTrue,
+                const PathFilter& filter) {
     // A document which cannot exist cannot be narrowed any further.
     if (inputType.isNever()) {
         return inputType;
     }
     tassert(13459201, "Input type must be an object type", inputType.hasOnlyType(BSONType::object));
 
-    NarrowTypeMatchExpressionVisitor visitor(std::move(inputType), assumeTrue);
+    NarrowTypeMatchExpressionVisitor visitor(std::move(inputType), assumeTrue, filter);
     expr->acceptVisitor(&visitor);
 
     tassert(13459202,

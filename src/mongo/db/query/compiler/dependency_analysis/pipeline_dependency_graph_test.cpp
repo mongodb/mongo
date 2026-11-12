@@ -4561,6 +4561,33 @@ TEST_F(PipelineDependencyGraphTest, CanPathBeArrayWithTypePredicateMatchingArray
     runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "x")); });
 }
 
+TEST_F(PipelineDependencyGraphTest, GetTypeSkipsPredicatesOnUnrelatedPaths) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {'x.y': {$exists: true}, z: {$exists: true}}},
+        {$match: {z: {$exists: false}}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(),
+                  "{y: ~missing, ...}|array(S)");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x.y").toDebugString(), "~missing");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "z").toDebugString(), "never");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayAfterRenameConsidersSubpathPredicates) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {x: {$not: {$type: 'array'}}, 'x.y': {$not: {$type: 'array'}}}},
+        {$set: {w: '$x'}}
+    ])");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "w"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "w.y"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, GetTypeSkipsMatchOnUnrelatedDeclaredField) {
     setPipeline(R"([
         {$project: {x: '$b', y: '$c'}},
@@ -4826,7 +4853,8 @@ TEST_F(PipelineDependencyGraphTest, GetTypeRenameOfNever) {
         ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "never");
         ASSERT_EQ(graph->getType_forTest(nullptr, "y").toDebugString(), "never");
         // TODO(SERVER-137963): 'a.b.c' cannot be missing here.
-        ASSERT_EQ(graph->getType_forTest(nullptr, "a.b.c").toDebugString(), "missing");
+        // The arrayness of 'a' is inferred without the predicates on 'x', so 'a' may be an array.
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a.b.c").toDebugString(), "missing|array(S)");
     });
 }
 

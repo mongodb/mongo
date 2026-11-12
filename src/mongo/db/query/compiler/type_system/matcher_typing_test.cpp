@@ -1390,6 +1390,149 @@ TEST(MatcherTypingTest, NorOfDottedPathsRemovesTheTypeOfEveryLeaf) {
     ASSERT_EQ(narrowedDebugString(predicate, input), expected);
 }
 
+/// Narrows 'Type::anyObject()' using the given query and the given path filter.
+std::string narrowedDebugString(const std::string& query,
+                                const PathFilter& filter,
+                                bool assumeTrue = true) {
+    return narrowType(Type::anyObject(), parseMatchExpr(query).get(), assumeTrue, filter)
+        .toDebugString();
+}
+
+TEST(MatcherTypingTest, PathFilterSkipsPredicatesOnUnrelatedPaths) {
+    const PathFilter filter{FieldRef("x")};
+    for (auto query : {"{y: {$not: {$type: 'array'}}}",
+                       "{xy: {$not: {$type: 'array'}}}",
+                       "{'y.x': {$not: {$type: 'array'}}}"}) {
+        ASSERT_EQ(narrowedDebugString(query, filter), "object") << query;
+    }
+}
+
+TEST(MatcherTypingTest, PathFilterKeepsPredicatesOnPathAndItsPrefixes) {
+    const PathFilter filter{FieldRef("a.b"), true /*arraynessOnly*/};
+    auto query = "{a: {$not: {$type: 'array'}}, 'a.b': {$not: {$type: 'array'}}}";
+    ASSERT_EQ(narrowedDebugString(query, filter), narrowedDebugString(query, Type::anyObject()));
+}
+
+TEST(MatcherTypingTest, PathFilterSkipsPredicatesOnSiblingsOfDottedPath) {
+    const PathFilter filter{FieldRef("a.b")};
+    auto query = "{'a.b': {$not: {$type: 'array'}}, 'a.c': {$type: 'number'}}";
+    ASSERT_EQ(narrowedDebugString(query, filter), "{a: ~(object|array(S))|{b: ~array, ...}, ...}");
+}
+
+TEST(MatcherTypingTest, PathFilterKeepsPredicatesOnSubpathsWhenSubfieldsAreNeeded) {
+    const PathFilter filter{FieldRef("x"), false /*arraynessOnly*/};
+    auto query =
+        "{x: {$not: {$type: 'array'}}, 'x.y': {$type: 'number'}, 'x.z': {$type: 'string'}}";
+    ASSERT_EQ(narrowedDebugString(query, filter),
+              "{x: {y: number|array(S), z: string|array(S), ...}, ...}");
+}
+
+TEST(MatcherTypingTest, PathFilterSkipsSubpathPredicateWhichTraversesArrays) {
+    const PathFilter filter{FieldRef("x"), true /*arraynessOnly*/};
+    auto query =
+        "{x: {$not: {$type: 'array'}}, 'x.y': {$type: 'number'}, 'x.z': {$type: 'string'}}";
+    ASSERT_EQ(narrowedDebugString(query, filter), "{x: ~array, ...}");
+}
+
+TEST(MatcherTypingTest, PathFilterSkipsSubpathPredicateWhoseLeafCanBeMissing) {
+    const PathFilter filter{FieldRef("x"), true /*arraynessOnly*/};
+    ASSERT_EQ(narrowedDebugString("{'x.y': {$not: {$type: 'array'}}}", filter), "object");
+    ASSERT_EQ(narrowedDebugString("{'x.y': {$exists: false}}", filter), "object");
+    ASSERT_EQ(narrowedDebugString("{'x.y': {$type: 'number'}}", filter, false), "object");
+}
+
+TEST(MatcherTypingTest, PathFilterKeepsSubpathPredicateWithoutTraversalOnlyIfLeafCannotBeMissing) {
+    const PathFilter filter{FieldRef("x"), true /*arraynessOnly*/};
+    const ElementPath traversed("x.y");
+    const ElementPath notTraversed("x.y",
+                                   ElementPath::LeafArrayBehavior::kTraverse,
+                                   ElementPath::NonLeafArrayBehavior::kNoTraversal);
+    ASSERT_FALSE(filter.canRefine(traversed, Type::null(), true));
+    ASSERT_TRUE(filter.canRefine(notTraversed, Type::null(), true));
+    ASSERT_FALSE(filter.canRefine(notTraversed, Type::null(), false));
+}
+
+TEST(MatcherTypingTest, PathFilterAppliesToInternalSchemaObjectMatch) {
+    const PathFilter filter{FieldRef("x"), true /*arraynessOnly*/};
+    auto subpathQuery =
+        "{'x.a': {$_internalSchemaObjectMatch: {b: {$_internalSchemaType: 'number'}}}}";
+    ASSERT_EQ(
+        narrowedDebugString(
+            "{y: {$_internalSchemaObjectMatch: {b: {$_internalSchemaType: 'number'}}}}", filter),
+        "object");
+    ASSERT_EQ(narrowedDebugString(subpathQuery, PathFilter{FieldRef("x")}),
+              "{x: {a: {b: number, ...}, ...}|array(S), ...}");
+    ASSERT_EQ(narrowedDebugString(subpathQuery, filter), "object");
+    ASSERT_EQ(narrowedDebugString(subpathQuery, filter, false), "object");
+    auto objectQuery =
+        "{x: {$type: 'object'}, 'x.a': {$_internalSchemaObjectMatch: {b: {$exists: true}}}}";
+    ASSERT_EQ(narrowedDebugString(objectQuery, filter),
+              narrowedDebugString("{x: {$type: 'object'}}", filter));
+}
+
+TEST(MatcherTypingTest, PathFilterTreatsSkippedPredicatesAsUnknown) {
+    const PathFilter filter{FieldRef("x")};
+    auto query = "{$or: [{x: {$type: 'number'}}, {y: {$type: 'string'}}]}";
+    ASSERT_EQ(narrowedDebugString(query, filter), "object");
+    ASSERT_EQ(narrowedDebugString(query, filter, false), "{x: ~(number|array(S)), ...}");
+    ASSERT_EQ(narrowedDebugString("{$nor: [{y: {$type: 'string'}}]}", filter), "object");
+}
+
+TEST(MatcherTypingTest, PathFilterIgnoresContradictionOnUnrelatedPath) {
+    auto query = "{$and: [{y: {$exists: true}}, {y: {$exists: false}}]}";
+    ASSERT_EQ(narrowedDebugString(query, Type::anyObject()), "never");
+    ASSERT_EQ(narrowedDebugString(query, PathFilter{FieldRef("x")}), "object");
+}
+
+TEST(MatcherTypingTest, PathFilterKeepsPredicatesWithoutPath) {
+    const PathFilter filter{FieldRef("x"), true /*arraynessOnly*/};
+    for (auto query : {"{$alwaysFalse: 1}", "{$expr: {$or: []}}"}) {
+        ASSERT_EQ(narrowedDebugString(query, filter), "never") << query;
+    }
+}
+
+TEST(MatcherTypingTest, EmptyPathFilterKeepsEveryPredicate) {
+    auto query = "{x: {$type: 'object'}, 'x.y': {$type: 'number'}, z: {$type: 'string'}}";
+    for (bool arraynessOnly : {false, true}) {
+        ASSERT_EQ(narrowedDebugString(query, PathFilter{FieldRef(), arraynessOnly}),
+                  narrowedDebugString(query, Type::anyObject()));
+    }
+}
+
+TEST(MatcherTypingTest, PathFilterAdmitsEveryDocumentMatcherLeavesPossible) {
+    const auto documents =
+        generateCombinedCorpus({"a.b.c", "a.0.b", "a.c"}, ScalarCorpus::kMatchTraversal);
+    const auto queries = {
+        "{a: {$type: 'object'}, 'a.b': {$type: 'number'}}",
+        "{a: {$not: {$type: 'array'}}, 'a.b.c': {$type: 'number'}, 'a.c': {$type: 'null'}}",
+        "{$or: [{'a.b': {$type: 'number'}}, {'a.c': {$exists: false}}]}",
+        "{$nor: [{a: {$type: 'array'}}, {'a.b': {$exists: false}}, {'a.0': {$type: 'number'}}]}",
+        "{$or: [{a: {$_internalSchemaObjectMatch: {b: {$_internalSchemaType: 'number'}}}}, "
+        "       {'a.b': {$_internalSchemaObjectMatch: {c: {$exists: true}}}}]}",
+        "{a: {$not: {$type: 'array'}}, 'a.b': {$_internalSchemaObjectMatch: {}}}"};
+    for (auto query : queries) {
+        const auto expr = parseMatchExpr(query);
+        for (auto path : {"a", "a.b", "a.c", "a.0"}) {
+            for (bool arraynessOnly : {false, true}) {
+                for (bool assumeTrue : {true, false}) {
+                    const PathFilter filter{FieldRef(path), arraynessOnly};
+                    const Type narrowed =
+                        narrowType(Type::anyObject(), expr.get(), assumeTrue, filter);
+                    for (const auto& document : documents) {
+                        if (matches(expr.get(), document) != assumeTrue) {
+                            continue;
+                        }
+                        ASSERT_TRUE(narrowed.hasValue(Value(document)))
+                            << query << " filtered by " << path << " assumeTrue " << assumeTrue
+                            << " admits " << document << " but inferred "
+                            << narrowed.toDebugString();
+                    }
+                }
+            }
+        }
+    }
+}
+
 TEST(MatcherTypingTest, ExistsTrueNarrowsLeaf) {
     auto input = Type::anyObject();
     auto predicate = "{x: {$exists: true}}";
