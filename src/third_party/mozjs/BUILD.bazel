@@ -284,6 +284,8 @@ mongo_cc_library(
     defines = [
         "JS_USE_CUSTOM_ALLOCATOR=1",
         "STATIC_JS_API=1",
+        # Public MFBT declarations belong to the standalone static SpiderMonkey library.
+        "JS_STANDALONE=1",
     ] + select({
         "//bazel/config:spider_monkey_dbg_enabled": [
             "DEBUG",
