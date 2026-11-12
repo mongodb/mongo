@@ -24,15 +24,31 @@ overrides:
     - task: sharded_collections_jscore_passthrough_rate_limited
       exec_timeout: 180 # 3 hours
 
-  # The historic per-test runtimes vastly underestimate this suite because most of its runtime
+  # The historic per-test runtimes vastly underestimate these suites because most of their runtime
   # comes from the DisaggPeriodicPITRestore hook, which is not accounted for at the test level.
   enterprise-amazon-linux2023-arm64-all-feature-flags-extra-system-deps:
     - task: ^disagg_backup_restore_jscore_passthrough$
       exec_timeout: 80 # 1 hour 20 minutes
       idle_timeout: 16
+    - task: ^disagg_backup_restore_jscore_passthrough_ese_rotation$
+      exec_timeout: 80 # 1 hour 20 minutes
+      idle_timeout: 16
 
   enterprise-amazon-linux2023-arm64-disagg-no-feature-flags-extra-system-deps:
     - task: ^disagg_backup_restore_jscore_passthrough$
+      exec_timeout: 80 # 1 hour 20 minutes
+      idle_timeout: 16
+    - task: ^disagg_backup_restore_jscore_passthrough_ese_rotation$
+      exec_timeout: 80 # 1 hour 20 minutes
+      idle_timeout: 16
+
+  enterprise-amazon-linux2023-arm64-disagg-no-schema-epochs:
+    - task: ^disagg_backup_restore_jscore_passthrough_ese_rotation$
+      exec_timeout: 80 # 1 hour 20 minutes
+      idle_timeout: 16
+
+  enterprise-amazon-linux2023-arm64-disagg-poa:
+    - task: ^disagg_backup_restore_jscore_passthrough_ese_rotation$
       exec_timeout: 80 # 1 hour 20 minutes
       idle_timeout: 16
 
