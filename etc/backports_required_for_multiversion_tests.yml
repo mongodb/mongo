@@ -97,6 +97,8 @@ last-patch:
       ticket: SERVER-136876
     - test_file: jstests/core/views/views_internal_only_stages.js
       ticket: SERVER-137361
+    - test_file: jstests/fle2/create_encrypted_collection.js
+      ticket: SERVER-130498
     - test_file: jstests/fle2/implicit_ecoc_creation.js
       ticket: SERVER-126384
     - test_file: jstests/noPassthrough/ddl/list_collections_and_indexes_with_write_conflicts.js
