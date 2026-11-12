@@ -6662,9 +6662,9 @@
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"$or":[{"$nor":[{"field34_str_idx":{"$regex":{"$regex":"ms","$options":""}},"field14_dict_idx":{"$lte":{"b":1}},"field43_str":{"$ne":"q"}},{"field40_list":{"$gt":81},"field19_datetime_idx":{"$lt":"2024-01-25T00:00:00.000Z"}}]},{"$and":[{"field24_mixed_idx":{"$elemMatch":{"$in":[6,763,307,506,414,72],"$lte":557}},"field33_mixed_idx":{"$exists":false},"field25_str_idx":{"$eq":"Bi"},"field14_dict_idx":{"$exists":true}},{"field28_datetime_idx":{"$gt":null},"field19_datetime_idx":{"$lt":"2024-02-21T00:00:00.000Z"},"field13_list_idx":{"$gte":75},"field1_datetime_idx":{"$gt":"2024-05-08T00:00:00.000Z"}}]},{"field13_list_idx":75,"field40_list":{"$gte":"w"}}],"field29_Timestamp_idx":{"$type":"timestamp"},"field2_Timestamp_idx":{"$gt":{"$timestamp":{"t":1754038828,"i":0}}},"field15_mixed_idx":{"$type":"int"},"field9_bool_idx":{"$gte":true}}},{"$sort":{"field27_bool_idx":1}}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field9_bool_idx_-1_field35_int_idx_1","indexBounds":{"field9_bool_idx":["[true, true]"],"field35_int_idx":["[MinKey, MaxKey]"]}}}},
-    "keys" :  11751,
-    "docs" :  11751,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","filter":true,"indexName":"field15_mixed_idx_1","indexBounds":{"field15_mixed_idx":["[nan, inf]"]}}}},
+    "keys" :  12712,
+    "docs" :  12712,
     "sorts":   5793,
     "plans":      5,
     "rows" :    759},
@@ -8262,7 +8262,7 @@
     "rows" :  96224}
 
 ],
-">>>totals": {"pipelines": 1032, "plans": 7958, "keys": 28038345, "docs": 27165291, "sorts": 8159581, "rows": 10011323, "errors":      0},
+">>>totals": {"pipelines": 1032, "plans": 7958, "keys": 28039306, "docs": 27166252, "sorts": 8159581, "rows": 10011323, "errors":      0},
 ">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryPlanRanker":"costBased","internalQueryCBRCEMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false,"internalQuerySamplingByStrides":true}}
 
 

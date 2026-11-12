@@ -421,6 +421,16 @@ feature_flags:
         fcv_gated: false
         incremental_rollout_phase: release
 
+    featureFlagSamplingCEKeystringEstimation:
+        description:
+            "Feature flag to enable sampling CE estimation of hashed, wildcard and collated index
+            scans through index keystring extraction. When disabled, such index scans are not
+            estimable and their plans fall back to multi-planner ranking."
+        cpp_varname: gFeatureFlagSamplingCEKeystringEstimation
+        default: true
+        fcv_gated: false
+        incremental_rollout_phase: release
+
     featureFlagSbeEqLookupUnwindHashJoin:
         description: "Enables executing $lookup-$unwind in SBE using the hash join strategy."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindHashJoin

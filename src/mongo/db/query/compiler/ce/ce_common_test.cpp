@@ -32,7 +32,7 @@ static size_t countUniqueKeysBtree(
     std::vector<const char*> fieldNames;
     std::vector<BSONElement> fixed;
     for (const auto& f : fields) {
-        fieldNames.push_back(f.path.fullPath().c_str());
+        fieldNames.push_back(f.path.c_str());
         fixed.emplace_back();  // EOO placeholder; BtreeKeyGenerator requires parallel vectors
     }
 

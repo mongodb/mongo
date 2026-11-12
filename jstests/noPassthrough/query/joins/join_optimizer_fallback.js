@@ -1064,6 +1064,48 @@ assertResultsStableAndJoinOptUsed(
     });
 }
 
+// Hashed/wildcard/collated indices fall back.
+{
+    for (const [baseIndexArgs, eligible] of [
+        [[{a: 1}], true],
+        // Note that numeric queries can use collated indices even if the query does not have one.
+        [[{a: 1}, {collation: {locale: "en", strength: 2}}], false],
+        [[{a: "hashed"}], false],
+        [[{"$**": 1}], false],
+    ]) {
+        const baseColl = conn.getDB(db1)[jsTestName() + "_hw_left"];
+        baseColl.drop();
+        assert.commandWorked(
+            baseColl.insertMany(Array.from({length: 10}, (_, i) => ({_id: i, a: 0}))),
+        );
+        assert.commandWorked(baseColl.createIndex(...baseIndexArgs));
+        // This supplies arrayness data for `a` without competing for the base access path.
+        assert.commandWorked(baseColl.createIndex({b: 1, a: 1}));
+
+        const runner = eligible ? runTestCaseEligiblePipeline : runTestCaseIneligiblePipeline;
+        const reason = eligible ? null : "failedToGetSingleTableAccessViaCBR";
+
+        runner({
+            coll: baseColl,
+            pipeline: [
+                // The $match being selective keeps a collscan from being used.
+                {$match: {a: 42}},
+                {
+                    $lookup: {
+                        from: collRight.getName(),
+                        localField: "a",
+                        foreignField: "rk",
+                        as: "test",
+                    },
+                },
+                {$unwind: "$test"},
+            ],
+            expectedCount: 0,
+            expectedFallbackReason: reason,
+        });
+    }
+}
+
 // SBE cannot produce document metadata, such as the sort key that $rank needs, so a join node that
 // depends on it must fall back.
 {

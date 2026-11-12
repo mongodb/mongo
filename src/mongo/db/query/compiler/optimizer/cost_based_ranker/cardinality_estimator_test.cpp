@@ -20,8 +20,11 @@
 namespace mongo::cost_based_ranker {
 namespace {
 
+static IncrementalFeatureRolloutContext& testIFRContext() {
+    static IncrementalFeatureRolloutContext ctx;
+    return ctx;
+}
 const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
-
 
 // Subclass of CardinalityEstimator that exposes protected methods for unit tests.
 class CardinalityEstimatorForTest : public CardinalityEstimator {
@@ -35,9 +38,19 @@ CEResult estimateIndexSeeks(ce::SamplingEstimator& samplingEstimator,
                             bool multiKey) {
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, 1000.0));
     EstimateMap qsnEstimates;
-    CardinalityEstimatorForTest estimator{
-        collInfo, &samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
-    return estimator.estimateIndexSeeks(bounds, multiKey);
+    CardinalityEstimatorForTest estimator{collInfo,
+                                          &samplingEstimator,
+                                          qsnEstimates,
+                                          QueryCBRCEModeEnum::kSamplingCE,
+                                          testIFRContext()};
+
+    std::vector<std::string> fields;
+    for (auto& oil : bounds.fields) {
+        fields.push_back(oil.name);
+    }
+    IndexEntry fakeIndex =
+        multiKey ? buildMultikeyIndexEntry(fields, "fake") : buildSimpleIndexEntry(fields);
+    return estimator.estimateIndexSeeks(bounds, fakeIndex);
 }
 
 TEST(CardinalityEstimator, PointInterval) {
@@ -776,6 +789,42 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanWithFetchNoFil
               getPlanSamplingCE(*collPlan, collCard, &samplingEstimator));
 }
 
+TEST(CardinalityEstimator, CompareCardinalityEstimatesForFilteredFetchOverFilteredIndexScan) {
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+
+    std::vector<BSONObj> docs = {
+        BSON("_id" << 0 << "a" << 0 << "b" << 0 << "c" << 0),
+        BSON("_id" << 1 << "a" << 1 << "b" << 0 << "c" << 0),
+        BSON("_id" << 2 << "a" << 0 << "b" << 1 << "c" << 0),
+        BSON("_id" << 3 << "a" << 0 << "b" << 0 << "c" << 1),
+    };
+    size_t collCard = docs.size();
+    ce::SamplingEstimatorTest samplingEstimatorTest;
+    samplingEstimatorTest.setUp();
+    // Sample the full collection so that the plan estimate is exact.
+    auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(
+        /*collCard=*/collCard, /*sampleSize=*/collCard, ce::NoProjection{}, std::move(docs));
+
+    std::vector<std::string> indexFields = {"a"};
+    BSONObj indexFilterBson = fromjson("{b: 0}");
+    BSONObj fetchBson = fromjson("{c: 0}");
+    auto indexFilter = parse(indexFilterBson);
+    auto fetchExpr = parse(fetchBson);
+    auto indexedPlan = makeIndexScanFetchPlan(testNss,
+                                              // {a: 0}
+                                              makePointIntervalBounds(0.0, indexFields[0]),
+                                              indexFields,
+                                              std::move(indexFilter),
+                                              std::move(fetchExpr));
+
+    BSONObj queryBson = fromjson("{a: 0, b: 0, c: 0}");
+    auto collPlan = makeCollScanPlan(parse(queryBson));
+
+    ASSERT_EQ(getPlanSamplingCE(*indexedPlan, collCard, &samplingEstimator),
+              getPlanSamplingCE(*collPlan, collCard, &samplingEstimator));
+    ASSERT_EQ(getPlanSamplingCE(*indexedPlan, collCard, &samplingEstimator), makeCard(1.0));
+}
+
 TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
 
     // Constant settings
@@ -883,8 +932,11 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         EstimateMap qsnEstimates;
         const CollectionInfo collInfo =
             buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
-        CardinalityEstimator ceEstimator{
-            collInfo, &samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
+        CardinalityEstimator ceEstimator{collInfo,
+                                         &samplingEstimator,
+                                         qsnEstimates,
+                                         QueryCBRCEModeEnum::kSamplingCE,
+                                         testIFRContext()};
         auto _ = ceEstimator.estimatePlan(*indexPlan);
     }
 
@@ -909,8 +961,11 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         EstimateMap qsnEstimates;
         const CollectionInfo collInfo =
             buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
-        CardinalityEstimator ceEstimator{
-            collInfo, &samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
+        CardinalityEstimator ceEstimator{collInfo,
+                                         &samplingEstimator,
+                                         qsnEstimates,
+                                         QueryCBRCEModeEnum::kSamplingCE,
+                                         testIFRContext()};
         auto _ = ceEstimator.estimatePlan(*indexPlan);
     }
 
@@ -932,8 +987,11 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         EstimateMap qsnEstimates;
         const CollectionInfo collInfo =
             buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
-        CardinalityEstimator ceEstimator{
-            collInfo, &samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
+        CardinalityEstimator ceEstimator{collInfo,
+                                         &samplingEstimator,
+                                         qsnEstimates,
+                                         QueryCBRCEModeEnum::kSamplingCE,
+                                         testIFRContext()};
         auto _ = ceEstimator.estimatePlan(*indexPlan);
     }
 
@@ -967,8 +1025,11 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         EstimateMap qsnEstimates;
         const CollectionInfo collInfo =
             buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
-        CardinalityEstimator ceEstimator{
-            collInfo, &samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
+        CardinalityEstimator ceEstimator{collInfo,
+                                         &samplingEstimator,
+                                         qsnEstimates,
+                                         QueryCBRCEModeEnum::kSamplingCE,
+                                         testIFRContext()};
         auto _ = ceEstimator.estimatePlan(*indexPlan);
     }
 }
@@ -1048,7 +1109,8 @@ TEST(CardinalityEstimator, SamplingCECompareIndexWithSample) {
 
         // For point queries, the estimates should be identical.
         // (estimateKeysScanned: 6800 == estimateCardinality: 6800)
-        ASSERT_EQ(samplingEstimator.estimateKeysScanned(*idxBounds).toDouble(),
+        ASSERT_EQ(samplingEstimator.estimateKeysScanned(*idxBounds, buildSimpleIndexEntry({"a"}))
+                      .toDouble(),
                   samplingEstimator.estimateCardinality(matchExpr.get()).toDouble());
     }
 
@@ -1078,7 +1140,8 @@ TEST(CardinalityEstimator, SamplingCECompareIndexWithSample) {
 
         // For range queries, the estimates should be different.
         // (estimateKeysScanned: 10000 != estimateCardinality: 3200)
-        ASSERT_NE(samplingEstimator.estimateKeysScanned(*idxBounds).toDouble(),
+        ASSERT_NE(samplingEstimator.estimateKeysScanned(*idxBounds, buildSimpleIndexEntry({"a"}))
+                      .toDouble(),
                   samplingEstimator.estimateCardinality(matchExpr.get()).toDouble());
     }
 }
@@ -1091,31 +1154,28 @@ public:
     CardinalityEstimate estimateCardinality(const MatchExpression*) const override {
         return makeCard(10.0);
     }
-    CardinalityEstimate estimateKeysScanned(const IndexBounds&) const override {
+    CardinalityEstimate estimateKeysScanned(const IndexBounds&, const IndexEntry&) const override {
         return makeCard(10.0);
     }
-    std::vector<CardinalityEstimate> estimateKeysScanned(
-        const std::vector<const IndexBounds*>&) const override {
+    std::vector<CardinalityEstimate> estimateKeysScanned(const std::vector<const IndexBounds*>&,
+                                                         const IndexEntry&) const override {
         return {};
     }
-    CardinalityEstimate estimateRIDs(const IndexBounds&, const MatchExpression*) const override {
+    CardinalityEstimate estimateRIDs(const IndexBounds&,
+                                     const MatchExpression*,
+                                     const IndexEntry&) const override {
         ++estimateRIDsCallCount;
         return makeCard(10.0);
     }
-    std::vector<CardinalityEstimate> estimateRIDs(
-        const std::vector<const IndexBounds*>&,
-        const std::vector<const MatchExpression*>&) const override {
+    std::vector<CardinalityEstimate> estimateRIDs(const std::vector<const IndexBounds*>&,
+                                                  const std::vector<const MatchExpression*>&,
+                                                  const IndexEntry&) const override {
         return {};
     }
     void generateSample(ce::ProjectionParams) override {}
-    CardinalityEstimate estimateNDV(
-        const std::vector<ce::FieldPathAndEqSemantics>&,
-        boost::optional<std::span<const OrderedIntervalList>>) const override {
-        return makeCard(10.0);
-    }
-    CardinalityEstimate estimateNDVMultiKey(
-        const std::vector<ce::FieldPathAndEqSemantics>&,
-        boost::optional<std::span<const OrderedIntervalList>>) const override {
+    CardinalityEstimate estimateNDV(const std::vector<ce::FieldPathAndEqSemantics>&,
+                                    boost::optional<std::span<const OrderedIntervalList>>,
+                                    const IndexEntry* = nullptr) const override {
         return makeCard(10.0);
     }
     CardinalityEstimate getCollCard() const override {
@@ -1163,7 +1223,7 @@ TEST(CardinalityEstimator, CachesEstimateWhenTotalIntervalsAtOrBelowLimit) {
     const CollectionInfo collInfo = buildCollectionInfo({}, makeCollStats(100.0));
     EstimateMap qsnEstimates;
     CardinalityEstimator estimator{
-        collInfo, &mockEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
+        collInfo, &mockEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE, testIFRContext()};
 
     ASSERT(estimator.estimatePlan(*plan1).isOK());
     ASSERT(estimator.estimatePlan(*plan2).isOK());
@@ -1186,7 +1246,7 @@ TEST(CardinalityEstimator, DoesNotCacheEstimateWhenTotalIntervalsAboveLimit) {
     const CollectionInfo collInfo = buildCollectionInfo({}, makeCollStats(100.0));
     EstimateMap qsnEstimates;
     CardinalityEstimator estimator{
-        collInfo, &mockEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
+        collInfo, &mockEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE, testIFRContext()};
 
     ASSERT(estimator.estimatePlan(*plan1).isOK());
     ASSERT(estimator.estimatePlan(*plan2).isOK());
@@ -1295,8 +1355,11 @@ private:
         auto plan = makeEqualityPrefixPlan(std::move(bounds));
         EstimateMap qsnEstimates;
         auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, 100.0));
-        CardinalityEstimator estimator{
-            collInfo, &*_samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
+        CardinalityEstimator estimator{collInfo,
+                                       &*_samplingEstimator,
+                                       qsnEstimates,
+                                       QueryCBRCEModeEnum::kSamplingCE,
+                                       testIFRContext()};
         return estimator.estimatePlan(*plan);
     }
 
@@ -1519,8 +1582,8 @@ TYPED_TEST(EqualityPrefixTypedTest, NonFullyOpen_FullyOpen_FullyOpen_MultiInterv
 //     skipped.
 //  4. An empty OIL anywhere yields zeroCE (no seeks, no docs).
 
-// A minimal SamplingEstimator mock. Only estimateNDV and estimateNDVMultiKey are implemented;
-// all other methods are unimplemented and will throw if called.
+// A minimal SamplingEstimator mock. Only estimateNDV is implemented; all other methods are
+// unimplemented and will throw if called.
 class MockSamplingEstimator : public ce::SamplingEstimator {
 public:
     explicit MockSamplingEstimator(double ndv,
@@ -1535,35 +1598,37 @@ public:
     CardinalityEstimate estimateCardinality(const MatchExpression*) const override {
         MONGO_UNIMPLEMENTED;
     }
-    CardinalityEstimate estimateKeysScanned(const IndexBounds&) const override {
+    CardinalityEstimate estimateKeysScanned(const IndexBounds&, const IndexEntry&) const override {
         MONGO_UNIMPLEMENTED;
     }
-    std::vector<CardinalityEstimate> estimateKeysScanned(
-        const std::vector<const IndexBounds*>&) const override {
+    std::vector<CardinalityEstimate> estimateKeysScanned(const std::vector<const IndexBounds*>&,
+                                                         const IndexEntry&) const override {
         MONGO_UNIMPLEMENTED;
     }
-    CardinalityEstimate estimateRIDs(const IndexBounds&, const MatchExpression*) const override {
+    CardinalityEstimate estimateRIDs(const IndexBounds&,
+                                     const MatchExpression*,
+                                     const IndexEntry&) const override {
         MONGO_UNIMPLEMENTED;
     }
-    std::vector<CardinalityEstimate> estimateRIDs(
-        const std::vector<const IndexBounds*>&,
-        const std::vector<const MatchExpression*>&) const override {
+    std::vector<CardinalityEstimate> estimateRIDs(const std::vector<const IndexBounds*>&,
+                                                  const std::vector<const MatchExpression*>&,
+                                                  const IndexEntry&) const override {
         MONGO_UNIMPLEMENTED;
     }
     void generateSample(ce::ProjectionParams) override {
         MONGO_UNIMPLEMENTED;
     }
-    CardinalityEstimate estimateNDV(
-        const std::vector<ce::FieldPathAndEqSemantics>& fields,
-        boost::optional<std::span<const OrderedIntervalList>> bounds) const override {
+    CardinalityEstimate estimateNDV(const std::vector<ce::FieldPathAndEqSemantics>& fields,
+                                    boost::optional<std::span<const OrderedIntervalList>> bounds,
+                                    const IndexEntry* indexEntry) const override {
         recordNDVArgs(fields, bounds);
-        return makeCard(bounds ? _ndvBounded : _ndv);
-    }
-    CardinalityEstimate estimateNDVMultiKey(
-        const std::vector<ce::FieldPathAndEqSemantics>& fields,
-        boost::optional<std::span<const OrderedIntervalList>> bounds) const override {
-        recordNDVArgs(fields, bounds);
-        return makeCard(bounds ? _ndvMultiKeyBounded : _ndvMultiKey);
+        // This mirrors the dispatch logic from the real estimateNDV.
+        const bool multiKey =
+            indexEntry && (indexEntry->multikey || indexEntry->type == IndexType::INDEX_WILDCARD);
+        if (bounds) {
+            return makeCard(multiKey ? _ndvMultiKeyBounded : _ndvBounded);
+        }
+        return makeCard(multiKey ? _ndvMultiKey : _ndv);
     }
     CardinalityEstimate getCollCard() const override {
         return makeCard(1000.0);
@@ -1588,7 +1653,7 @@ private:
         lastNDVFields.clear();
         lastNDVBoundNames.clear();
         for (const auto& field : fields) {
-            lastNDVFields.push_back(field.path.fullPath());
+            lastNDVFields.push_back(field.path);
         }
         if (bounds) {
             for (const auto& oil : *bounds) {
@@ -1821,9 +1886,10 @@ TEST(CardinalityEstimator, IndexSeeks_AllPointPrefixSkipsNDV) {
     ASSERT_TRUE(mock.lastNDVBoundNames.empty());
 }
 
-// Multikey index uses estimateNDVMultiKey rather than estimateNDV, producing a different estimate.
-TEST(CardinalityEstimator, IndexSeeks_MultikeyUsesNDVMultiKey) {
-    // Non-multikey mock returns NDV=3, multikey mock returns NDVMultiKey=7.
+// A multikey index produces a different NDV than a non-multikey one: the estimator's multikey
+// path is selected by the index entry.
+TEST(CardinalityEstimator, IndexSeeks_MultikeyUsesMultikeyNDV) {
+    // Non-multikey mock returns NDV=3, multikey mock returns the multikey NDV=7.
     MockSamplingEstimator mock{/*ndv=*/3.0, /*ndvMultiKey=*/7.0};
     // a: range; b: single range interval
     IndexBounds bounds;
@@ -1859,9 +1925,9 @@ TEST(CardinalityEstimator, IndexSeeks_IntervalsPassedToNDV) {
     ASSERT_EQ(result.getValue(), makeCard(3.0));
 }
 
-// Same check for the multikey path: estimateNDVMultiKey must receive the OIL.
+// Same check for the multikey path: the multikey NDV request must receive the OIL.
 TEST(CardinalityEstimator, IndexSeeks_IntervalsPassedToNDVMultiKey) {
-    // ndvMultiKeyBounded=4.0 is returned when bounds are supplied to estimateNDVMultiKey;
+    // ndvMultiKeyBounded=4.0 is returned when bounds are supplied for the multikey request;
     // ndvMultiKey=10.0 would be returned for boost::none.
     MockSamplingEstimator mock{/*ndv=*/10.0,
                                /*ndvMultiKey=*/10.0,
@@ -1940,8 +2006,11 @@ TEST(CardinalityEstimator, ZeroCEEstimateFromHistogramIsClamped) {
     // The histogram fixture's bucket frequencies total 1000, so collCard must match.
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({"a"}, 1000.0));
     EstimateMap estimates;
-    CardinalityEstimator estimator{
-        collInfo, nullptr /*samplingEstimator*/, estimates, QueryCBRCEModeEnum::kHistogramCE};
+    CardinalityEstimator estimator{collInfo,
+                                   nullptr /*samplingEstimator*/,
+                                   estimates,
+                                   QueryCBRCEModeEnum::kHistogramCE,
+                                   testIFRContext()};
 
     // The histogram over 'a' covers values 0..6, so a point query on 100 estimates to zero.
     std::vector<std::string> indexFields = {"a"};
@@ -1957,8 +2026,11 @@ TEST(CardinalityEstimator, NonZeroEstimatePlanDoesNotFail) {
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({"a"}, 1000.0));
     EstimateMap estimates;
-    CardinalityEstimator estimator{
-        collInfo, nullptr /*samplingEstimator*/, estimates, QueryCBRCEModeEnum::kHistogramCE};
+    CardinalityEstimator estimator{collInfo,
+                                   nullptr /*samplingEstimator*/,
+                                   estimates,
+                                   QueryCBRCEModeEnum::kHistogramCE,
+                                   testIFRContext()};
 
     // Value 5 is inside the histogram over 'a' and has non-zero frequency.
     std::vector<std::string> indexFields = {"a"};
@@ -1976,6 +2048,8 @@ TEST(CardinalityEstimator, ZeroCEEstimateIsClampedIfConsideredEstimableByFlag) {
     size_t sampleSize = 200;
     ce::SamplingEstimatorTest samplingEstimatorTest;
     samplingEstimatorTest.setUp();
+    auto ifrCtx =
+        IncrementalFeatureRolloutContext::get(samplingEstimatorTest.getOperationContext());
     auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(
         collCard, sampleSize, ce::NoProjection{});
 
@@ -1985,6 +2059,7 @@ TEST(CardinalityEstimator, ZeroCEEstimateIsClampedIfConsideredEstimableByFlag) {
                                    &samplingEstimator,
                                    estimates,
                                    QueryCBRCEModeEnum::kSamplingCE,
+                                   *ifrCtx,
                                    false /* considerZeroCESampledIXScanNonEstimable */};
 
     // The sampled documents have 'a' in [0, 99], so a point query on 100 estimates to zero.
@@ -2005,13 +2080,15 @@ TEST(CardinalityEstimator, ZeroOutputIndexScanWithNonZeroInputIsEstimable) {
     size_t collCard = 1000;
     ce::SamplingEstimatorTest samplingEstimatorTest;
     samplingEstimatorTest.setUp();
+    auto ifrCtx =
+        IncrementalFeatureRolloutContext::get(samplingEstimatorTest.getOperationContext());
     // Sample the full collection so that the estimates are exact.
     auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(
         collCard, collCard, ce::NoProjection{});
     EstimateMap estimates;
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
     CardinalityEstimator estimator{
-        collInfo, &samplingEstimator, estimates, QueryCBRCEModeEnum::kSamplingCE};
+        collInfo, &samplingEstimator, estimates, QueryCBRCEModeEnum::kSamplingCE, *ifrCtx};
 
     // 'a' is 50 in 10 of the documents, none of which has 'b' equal to 999.
     std::vector<std::string> indexFields = {"a", "b"};
@@ -2032,12 +2109,14 @@ TEST(CardinalityEstimator, ZeroInputSampledIndexScanFailsEstimation) {
     size_t collCard = 1000;
     ce::SamplingEstimatorTest samplingEstimatorTest;
     samplingEstimatorTest.setUp();
+    auto ifrCtx =
+        IncrementalFeatureRolloutContext::get(samplingEstimatorTest.getOperationContext());
     auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(
         collCard, collCard, ce::NoProjection{});
     EstimateMap estimates;
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
     CardinalityEstimator estimator{
-        collInfo, &samplingEstimator, estimates, QueryCBRCEModeEnum::kSamplingCE};
+        collInfo, &samplingEstimator, estimates, QueryCBRCEModeEnum::kSamplingCE, *ifrCtx};
 
     // No document has 'a' equal to 5000.
     std::vector<std::string> indexFields = {"a"};
@@ -2052,12 +2131,14 @@ TEST(CardinalityEstimator, ZeroEstimateOnNonIndexScanNodeIsEstimable) {
     size_t collCard = 1000;
     ce::SamplingEstimatorTest samplingEstimatorTest;
     samplingEstimatorTest.setUp();
+    auto ifrCtx =
+        IncrementalFeatureRolloutContext::get(samplingEstimatorTest.getOperationContext());
     auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(
         collCard, collCard, ce::NoProjection{});
     EstimateMap estimates;
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
     CardinalityEstimator estimator{
-        collInfo, &samplingEstimator, estimates, QueryCBRCEModeEnum::kSamplingCE};
+        collInfo, &samplingEstimator, estimates, QueryCBRCEModeEnum::kSamplingCE, *ifrCtx};
 
     // The index scan reads the 10 keys where 'a' is 50, and the fetch filter matches none of the
     // documents.
@@ -2088,8 +2169,11 @@ protected:
         _samplingEstimator.emplace(
             createSamplingEstimatorForTesting(kCollCard, kCollCard, ce::NoProjection{}));
         _collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, kCollCard));
-        _estimator.emplace(
-            *_collInfo, &*_samplingEstimator, _estimates, QueryCBRCEModeEnum::kSamplingCE);
+        _estimator.emplace(*_collInfo,
+                           &*_samplingEstimator,
+                           _estimates,
+                           QueryCBRCEModeEnum::kSamplingCE,
+                           *IncrementalFeatureRolloutContext::get(operationContext()));
     }
 
     // No document has 'a' equal to 5000.

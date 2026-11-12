@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
 
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/compiler/ce/sampling/ce_index_keystring_support.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cardinality_estimator.h"
 #include "mongo/db/query/query_planner.h"
@@ -11,6 +12,8 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#include <algorithm>
 
 #include <fmt/format.h>
 
@@ -102,12 +105,12 @@ StatusWith<cost_based_ranker::CardinalityEstimate> cardinalityEstimateOnOriginal
     });
 
     cost_based_ranker::EstimateMap ceEstimates;
-    cost_based_ranker::CardinalityEstimator ce{
-        ceParams.mainCollectionInfo,
-        samplingEstimator,
-        ceEstimates,
-        QueryCBRCEModeEnum::kSamplingCE,
-    };
+    auto ifrContext = IncrementalFeatureRolloutContext::get(opCtx);
+    cost_based_ranker::CardinalityEstimator ce{ceParams.mainCollectionInfo,
+                                               samplingEstimator,
+                                               ceEstimates,
+                                               QueryCBRCEModeEnum::kSamplingCE,
+                                               *ifrContext};
 
     const MatchExpression* filter = node.originalFilter->getPrimaryMatchExpression();
     return ce.estimateFilter(filter);
@@ -123,6 +126,24 @@ struct SingleTablePlanResult {
 
 // Plans and cost-based-ranks the access path with derived predicates, returning the
 // single winning solution together with its cost and estimates.
+namespace {
+
+// Returns true if the QSN tree contains an index scan over an index whose keys cannot be
+// reproduced by projecting fields from the sample documents (hashed, wildcard, collated). The
+// join cost model's IO assumptions (Mackert-Lohman, key-group clustering) hold for b-tree keys
+// only, so a plan containing such a scan makes the join's cost estimates unreliable.
+bool containsKeystringEstimatedIndexScan(const QuerySolutionNode& qsn) {
+    if (qsn.getType() == STAGE_IXSCAN &&
+        ce::requiresKeystringEstimation(&static_cast<const IndexScanNode&>(qsn).index)) {
+        return true;
+    }
+    return std::any_of(qsn.children.begin(), qsn.children.end(), [](const auto& child) {
+        return containsKeystringEstimatedIndexScan(*child);
+    });
+}
+
+}  // namespace
+
 StatusWith<SingleTablePlanResult> accessPlanForFilterWithDerivedPredicates(
     OperationContext* opCtx,
     const JoinNode& node,
@@ -165,6 +186,14 @@ StatusWith<SingleTablePlanResult> accessPlanForFilterWithDerivedPredicates(
 
     auto& winningSolution = cbrResult.solutions.front();
     const auto* rootQsn = winningSolution->root();
+
+    if (containsKeystringEstimatedIndexScan(*rootQsn)) {
+        // CBR can cost plans using hashed/wildcard/collated indexes (keystring estimation), but
+        // the join cost model assumes b-tree key semantics. Bail out of join optimization rather
+        // than hand the join a plan its cost model cannot model faithfully.
+        return Status(ErrorCodes::NoQueryExecutionPlans,
+                      "winning single-table plan uses a hashed, wildcard or collated index");
+    }
 
     // CBR also accepts a plan it cannot estimate, leaving it to the multi-planner. As the sole
     // candidate, such a plan looks like a winner but has no cost.

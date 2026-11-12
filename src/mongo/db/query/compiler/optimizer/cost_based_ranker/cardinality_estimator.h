@@ -53,6 +53,7 @@ public:
                          const ce::SamplingEstimator* samplingEstimator,
                          EstimateMap& qsnEstimates,
                          QueryCBRCEModeEnum rankerMode,
+                         IncrementalFeatureRolloutContext& ifrContext,
                          bool considerZeroCESampledIXScanNonEstimable = true);
 
     // Delete the copy and move constructors and assignment operator
@@ -101,7 +102,7 @@ protected:
     CEResult estimate(const InternalSchemaAllowedPropertiesMatchExpression* node);
 
     // Intervals
-    CEResult estimate(const IndexBounds* node);
+    CEResult estimate(const IndexBounds* node, const IndexEntry& indexEntry);
     CEResult estimate(const OrderedIntervalList* node, bool forceHistogram = false);
 
     /**
@@ -137,7 +138,9 @@ protected:
      */
     CardinalityEstimate clampZeroEstimate(CardinalityEstimate ce);
 
-    CEResult estimateIndexSeeks(const IndexBounds& bounds, bool multiKey);
+    CEResult estimateIndexSeeks(const IndexBounds& bounds, const IndexEntry& indexEntry);
+
+    CEResult estimateIXScanNode(const IndexScanNode* node);
 
     // Internal helper functions
 
@@ -258,6 +261,10 @@ protected:
     // non-estimable, reported with ErrorCodes::ZeroCEEstimate. Set by the constructor; cleared
     // while estimating the subtree of a node for which disablesZeroCEFallback() is true.
     bool _considerZeroCESampledIXScanNonEstimable;
+
+    // The incremental feature rollout context of the enclosing operation; used to consult
+    // feature flags consistently within one planning pass.
+    IncrementalFeatureRolloutContext& _ifrContext;
 
     // Set with the paths we know are multikey which is deduced from the catalog. Note that a field
     // may be multikey but not reflected in this set because there may not be an index over the

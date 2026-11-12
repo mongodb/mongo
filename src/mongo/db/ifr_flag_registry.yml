@@ -42,6 +42,7 @@ release:
   featureFlagExtractFieldPathsSbeStage: {}
   featureFlagImprovedDepsAnalysis: {}
   featureFlagMultiPlanLimiter: {}
+  featureFlagSamplingCEKeystringEstimation: {}
   featureFlagSbeAccumulators: {}
   featureFlagSbeNonLeadingMatch: {}
   featureFlagSbeTransformStages: {}

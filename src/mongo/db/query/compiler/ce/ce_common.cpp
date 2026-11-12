@@ -20,23 +20,20 @@
 
 namespace mongo::ce {
 
-namespace {
-class SameSizeVectorBSONElementCmp {
-public:
-    bool operator()(const std::vector<BSONElement>& l, const std::vector<BSONElement>& r) const {
-        // From below, we know these vector are all the same size.
-        tassert(11214702, "Vectors must be the same size", l.size() == r.size());
+bool SameSizeVectorBSONElementCmp::operator()(const std::vector<BSONElement>& l,
+                                              const std::vector<BSONElement>& r) const {
+    tassert(11214702, "Vectors must be the same size", l.size() == r.size());
 
-        for (size_t i = 0; i < l.size(); i++) {
-            auto cmp = l[i].woCompare(r[i], false, /*comparator=*/nullptr);
-            if (cmp != 0) {
-                return cmp < 0;
-            }
+    for (size_t i = 0; i < l.size(); i++) {
+        auto cmp = l[i].woCompare(r[i], false, /*comparator=*/nullptr);
+        if (cmp != 0) {
+            return cmp < 0;
         }
-        return false;
     }
-};
+    return false;
+}
 
+namespace {
 // Comparator that ignores field names, matching the semantics of BSONElementSet
 // (BSONElementCmpWithoutField) that countUniqueDocuments() relied on. The comparator must
 // outlive any set it backs. It has no dependencies on other objects with static storage
@@ -46,7 +43,7 @@ const BSONElementComparator kIgnoreFieldNameComparator{
 }  // namespace
 
 BSONObj FieldPathAndEqSemantics::toBSON() const {
-    return BSON("path" << path.fullPath() << "isExprEq" << isExprEq);
+    return BSON("path" << path << "isExprEq" << isExprEq);
 }
 
 
@@ -78,7 +75,7 @@ public:
         projectedFieldValues.clear();
         for (const auto& field : fields) {
             // These "array behavior" settings ensure we stop and return any arrays we encounter.
-            const ElementPath eltPath(field.path.fullPath(),
+            const ElementPath eltPath(field.path,
                                       ElementPath::LeafArrayBehavior::kNoTraversal,
                                       ElementPath::NonLeafArrayBehavior::kMatchSubpath);
             BSONElementIterator it(&eltPath, doc);
@@ -97,7 +94,7 @@ public:
                     str::stream()
                         << "query plan killed :: non-array path became multikey while the query "
                            "was suspended: path="
-                        << field.path.fullPath());
+                        << field.path);
             }
             if (elt.element().eoo() && !field.isExprEq) {
                 // Use $eq equality semantics, which consider null & missing to be equal.
@@ -158,7 +155,7 @@ public:
         // Seed the recursion with the full, still-unresolved paths and an all-null value tuple.
         std::vector<std::string_view> paths(_fields.size());
         for (size_t i = 0; i < _fields.size(); ++i) {
-            paths[i] = _fields[i].path.fullPath();
+            paths[i] = _fields[i].path;
         }
         _processObj(
             doc, std::move(paths), std::vector<BSONElement>(_fields.size(), kNullElt), callback);

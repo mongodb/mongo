@@ -192,8 +192,6 @@ public:
         boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
         SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
-    ~SamplingEstimatorImpl() override;
-
     /**
      * Estimates the Cardinality of a filter/MatchExpression by running the given ME against the
      * sample.
@@ -205,10 +203,11 @@ public:
      * index keys of a document in '_sample' and calculates the number of index keys scanned by
      * evaluating the index keys against the given IndexBounds.
      */
-    CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const override;
+    CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds,
+                                            const IndexEntry& indexEntry) const override;
 
     std::vector<CardinalityEstimate> estimateKeysScanned(
-        const std::vector<const IndexBounds*>& bounds) const override;
+        const std::vector<const IndexBounds*>& bounds, const IndexEntry& indexEntry) const override;
 
     /**
      * Estimate the number of RIDs which 'bounds' will return. Similar to 'estimateKeysScanned(..)',
@@ -218,24 +217,24 @@ public:
      * estimate a IndexScanNode with a residual filter.
      */
     CardinalityEstimate estimateRIDs(const IndexBounds& bounds,
-                                     const MatchExpression* expr) const override;
+                                     const MatchExpression* expr,
+                                     const IndexEntry& indexEntry) const override;
 
     std::vector<CardinalityEstimate> estimateRIDs(
         const std::vector<const IndexBounds*>& bounds,
-        const std::vector<const MatchExpression*>& expressions) const override;
+        const std::vector<const MatchExpression*>& expressions,
+        const IndexEntry& indexEntry) const override;
 
     /**
-     * Estimates the number of distinct values of tuples of the given field names in the collection,
-     * according to the equality semantics specified by each field in 'fields'.
+     * Dispatcher for the NDV estimators: picks the multikey estimation (over the unwound index
+     * keys, scaled to the estimated index size) when 'indexEntry' is essentially multikey, and
+     * the single-key estimation (scaled to the collection size) otherwise.
      *
-     * If 'bounds' is provided, only documents matching those bounds contribute to the estimate.
-     * There must be one OrderedIntervalList per field, in the same order as 'fields'.
-     *
-     * Note: Does not support estimating NDV over array-valued fields.
+     * See estimateNDVSingleKey and estimateNDVMultiKey below.
      */
-    CardinalityEstimate estimateNDV(
-        const std::vector<FieldPathAndEqSemantics>& fields,
-        boost::optional<std::span<const OrderedIntervalList>> bounds) const override;
+    CardinalityEstimate estimateNDV(const std::vector<FieldPathAndEqSemantics>& fields,
+                                    boost::optional<std::span<const OrderedIntervalList>> bounds,
+                                    const IndexEntry* indexEntry) const override;
     using SamplingEstimator::estimateNDV;
 
     /**
@@ -247,20 +246,6 @@ public:
      */
     boost::optional<CardinalityEstimate> tryEstimateNDVFromPersistentStats(
         const std::vector<FieldPathAndEqSemantics>& fields) const override;
-
-    /**
-     * Estimates the number of distinct values of tuples of the given field names
-     * a multikey index over the provided fields would contain, from the values
-     * present in the sample.
-     *
-     * The sample documents are drawn from the collection; this is not exactly equivalent
-     * to sampling from a multikey index, as each index key is not equally weighted or
-     * drawn independently of "sibling" values in the same document.
-     */
-    CardinalityEstimate estimateNDVMultiKey(
-        const std::vector<FieldPathAndEqSemantics>& fields,
-        boost::optional<std::span<const OrderedIntervalList>> bounds) const override;
-    using SamplingEstimator::estimateNDVMultiKey;
 
     /*
      * Generates a sample of documents from the collection using random, chunk-based, sequential
@@ -428,6 +413,14 @@ protected:
 
 private:
     /**
+     * Runs keystring sampling unless extraction previously failed for this index. Failures are
+     * remembered by catalog name rather than by IndexEntry::Identifier, whose disambiguator differs
+     * between wildcard expansions.
+     */
+    template <typename T>
+    auto withKeystringSampler(const IndexEntry& indexEntry, const T& callback) const;
+
+    /**
      * Whether persisted NDV statistics may be served, i.e. featureFlagPersistentStats and the
      * internalQueryEnablePersistentNDVStats knob are both enabled. Computed once per instance.
      */
@@ -450,6 +443,35 @@ private:
     boost::optional<PersistedNDVEntry> loadPersistedNDVStats(const SortedFieldPaths& sortedPaths,
                                                              size_t numFields) const;
 
+    /**
+     * The multikey/wildcard counterpart to estimateNDVSingleKey.
+     *
+     * The sample documents are drawn from the collection; this is not exactly equivalent
+     * to sampling from a multikey index, as each index key is not equally weighted or
+     * drawn independently of "sibling" values in the same document.
+     *
+     * indexEntry must be a multikey/wildcard index.
+     */
+    CardinalityEstimate estimateNDVMultiKey(
+        const std::vector<FieldPathAndEqSemantics>& fields,
+        boost::optional<std::span<const OrderedIntervalList>> bounds,
+        const IndexEntry& indexEntry) const;
+
+    /**
+     * Estimates the number of distinct values of tuples of the given field names in the collection,
+     * according to the equality semantics specified by each field in 'fields', after the documents
+     * are translated to the keystring space of the given indexEntry (if provided).
+     *
+     * If 'bounds' is provided, only documents matching those bounds contribute to the estimate.
+     * There must be one OrderedIntervalList per field, in the same order as 'fields'.
+     *
+     * If specified, indexEntry must be a non-multikey/wildcard index.
+     */
+    CardinalityEstimate estimateNDVSingleKey(
+        const std::vector<FieldPathAndEqSemantics>& fields,
+        boost::optional<std::span<const OrderedIntervalList>> bounds,
+        const IndexEntry* indexEntry) const;
+
     OperationContext* _opCtx;
     // The collection the sampling plan runs against and is the one accessed by the query being
     // optimized.
@@ -457,6 +479,9 @@ private:
     boost::intrusive_ptr<const ExpressionContext> _customerQueryExpCtx;
     NamespaceString _nss;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
+    // Catalog names of indices for which keystring extraction has
+    // failed before.
+    mutable StringSet _indexesWithFailedKeystringExtraction;
 };
 
 }  // namespace mongo::ce

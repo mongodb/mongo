@@ -58,10 +58,10 @@ inline bool reversedInterval(sbe::value::TypeTags tagLow,
 }
 
 /**
- * Helper struct to indicate semantics of an equality predicate on the given FieldPath.
+ * Helper struct to indicate semantics of an equality predicate on the given field path.
  */
 struct FieldPathAndEqSemantics {
-    FieldPath path;
+    std::string path;
     // Indicates the type of equality:
     //  - true => $expr eq, strict equality, null != missing.
     //  - false => regular eq, null == missing.
@@ -104,6 +104,16 @@ struct KeyCountResult {
     size_t uniqueMatchingKeys;
     // Number of distinct key tuples among all projected keys (regardless of filter).
     size_t sampleUniqueKeys;
+};
+
+
+/**
+ * Less-than operator for BSONElement vectors of equal size.
+ * Compares components lexicographically using woCompare.
+ */
+class SameSizeVectorBSONElementCmp {
+public:
+    bool operator()(const std::vector<BSONElement>& l, const std::vector<BSONElement>& r) const;
 };
 
 /**

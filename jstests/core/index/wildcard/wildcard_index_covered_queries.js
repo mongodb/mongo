@@ -13,8 +13,8 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
+    getAllPlans,
     getPlanStages,
     getWinningPlanFromExplain,
     isIndexOnly,
@@ -40,12 +40,20 @@ function assertWildcardProvidesCoveredSolution(query, proj, shouldFailToCover = 
     assert.gt(ixScans.length, 0, tojson(explainOut));
     ixScans.forEach((ixScan) => assert(ixScan.keyPattern.hasOwnProperty("$_path")));
 
-    // Verify that the solution is covered, and that no documents were examined. If the argument
-    // 'shouldFailToCover' is true, invert the validation to confirm that it is NOT covered.
-    assert.eq(!!explainOut.executionStats.totalDocsExamined, shouldFailToCover, explainOut);
-    assert.eq(isIndexOnly(coll.getDB(), winningPlan), !shouldFailToCover);
+    // If the query cannot be covered, it must examine documents.
+    // If it can, the plan ranker may still choose a non-covering plan.
+    // But if it chooses a covering plan, it must not examine any documents.
+    if (shouldFailToCover) {
+        assert(getAllPlans(explainOut).every((plan) => !isIndexOnly(db, plan)));
+        assert.gt(explainOut.executionStats.totalDocsExamined, 0, explainOut);
+    } else {
+        assert(getAllPlans(explainOut).some((plan) => isIndexOnly(db, plan)));
+        if (isIndexOnly(db, winningPlan)) {
+            assert.eq(explainOut.executionStats.totalDocsExamined, 0, explainOut);
+        }
+    }
 
-    // Verify that the query covered by the $** index produces the same results as a COLLSCAN.
+    // Verify that the query produces the same results as a COLLSCAN.
     assertArrayEq(
         coll.find(query, proj).toArray(),
         coll.find(query, proj).hint({$natural: 1}).toArray(),

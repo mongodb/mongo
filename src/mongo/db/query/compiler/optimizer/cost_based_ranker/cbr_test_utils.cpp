@@ -230,7 +230,9 @@ CEResult getPlanCE(const QuerySolution& plan,
                    const CollectionInfo& collInfo,
                    QueryCBRCEModeEnum ceMode) {
     EstimateMap qsnEstimates;
-    CardinalityEstimator estimator{collInfo, nullptr /*samplingEstimator*/, qsnEstimates, ceMode};
+    IncrementalFeatureRolloutContext ifrContext;
+    CardinalityEstimator estimator{
+        collInfo, nullptr /*samplingEstimator*/, qsnEstimates, ceMode, ifrContext};
     return estimator.estimatePlan(plan);
 }
 
@@ -256,8 +258,9 @@ CardinalityEstimate getPlanSamplingCE(const QuerySolution& plan,
                                       ce::SamplingEstimator* samplingEstimator) {
     EstimateMap qsnEstimates;
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
+    IncrementalFeatureRolloutContext ifrContext;
     CardinalityEstimator estimator{
-        collInfo, samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE};
+        collInfo, samplingEstimator, qsnEstimates, QueryCBRCEModeEnum::kSamplingCE, ifrContext};
     const auto ceRes = estimator.estimatePlan(plan);
     ASSERT(ceRes.isOK());
     return ceRes.getValue();

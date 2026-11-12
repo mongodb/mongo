@@ -113,15 +113,17 @@ class SamplingEstimatorAssertingKeysScanned : public SamplingEstimatorForTesting
 public:
     using SamplingEstimatorForTesting::SamplingEstimatorForTesting;
 
-    CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const override {
+    CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds,
+                                            const IndexEntry& indexEntry) const override {
         tassert(11068100, "This query should not invoke estimateKeysScanned", false);
-        return SamplingEstimatorForTesting::estimateKeysScanned(bounds);
+        return SamplingEstimatorForTesting::estimateKeysScanned(bounds, indexEntry);
     }
 
     std::vector<CardinalityEstimate> estimateKeysScanned(
-        const std::vector<const IndexBounds*>& bounds) const override {
+        const std::vector<const IndexBounds*>& bounds,
+        const IndexEntry& indexEntry) const override {
         tassert(11068101, "This query should not invoke estimateKeysScanned", false);
-        return SamplingEstimatorForTesting::estimateKeysScanned(bounds);
+        return SamplingEstimatorForTesting::estimateKeysScanned(bounds, indexEntry);
     }
 };
 
@@ -187,10 +189,21 @@ public:
     }
 
     /**
-     * Helper to create sampling estimator for unit tests.
+     * Helper to create sampling estimator for unit tests. Inserts the default generated documents
+     * into the default collection.
      */
     SamplingEstimatorForTesting createSamplingEstimatorForTesting(
         size_t collCard, size_t sampleSize, ce::ProjectionParams projectionParams);
+
+    /**
+     * Helper to create sampling estimator for unit tests. Inserts the caller-provided documents
+     * into the default collection.
+     */
+    SamplingEstimatorForTesting createSamplingEstimatorForTesting(
+        size_t collCard,
+        size_t sampleSize,
+        ce::ProjectionParams projectionParams,
+        std::vector<BSONObj> docs);
 
     NamespaceString _kTestNss;
 };
@@ -220,6 +233,15 @@ size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef);
 
 std::pair<SamplingCEMethodEnum, boost::optional<int>> iniitalizeSamplingAlgoBasedOnChunks(
     int numOfChunks);
+
+/**
+ * Builds a planner-shaped IndexEntry for 'indexName' from the collection's index catalog via
+ * indexEntryFromIndexCatalogEntry(), pinning the catalog entry (as the planner does) via
+ * 'indexCatalogEntryStorage'.
+ */
+IndexEntry makeIndexEntry(OperationContext* opCtx,
+                          const CollectionPtr& coll,
+                          std::string indexName);
 
 /**
  * Sampling accuracy test extension used as a vessel to generate samples over collections and

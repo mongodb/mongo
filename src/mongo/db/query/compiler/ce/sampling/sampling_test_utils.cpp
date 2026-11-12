@@ -7,9 +7,11 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
@@ -172,6 +174,28 @@ std::pair<SamplingCEMethodEnum, boost::optional<int>> iniitalizeSamplingAlgoBase
     } else {
         return {SamplingCEMethodEnum::kChunk, numOfChunks};
     }
+}
+
+IndexEntry makeIndexEntry(OperationContext* opCtx,
+                          const CollectionPtr& coll,
+                          std::string indexName) {
+    const auto* entry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    invariant(entry);
+
+    if (entry->descriptor()->getIndexType() == IndexType::INDEX_WILDCARD) {
+        uassert(ErrorCodes::IllegalOperation,
+                "makeIndexEntry() cannot represent multikey wildcard indexes: their multikey "
+                "path set is query-dependent",
+                !entry->isMultikey(opCtx, coll));
+    }
+
+    // Such a minimal query is fine for non-multikey indices.
+    auto findCommand = std::make_unique<FindCommandRequest>(coll->ns());
+    auto cq = uassertStatusOK(CanonicalQuery::make(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)},
+    }));
+    return indexEntryFromIndexCatalogEntry(opCtx, coll, entry->shared_from_this(), *cq);
 }
 
 void createCollAndInsertDocuments(OperationContext* opCtx,
@@ -533,7 +557,16 @@ void SamplingAccuracyTest::runNDVSamplingEstimatorTestConfiguration(
 
 SamplingEstimatorForTesting SamplingEstimatorTest::createSamplingEstimatorForTesting(
     size_t collCard, size_t sampleSize, ce::ProjectionParams projectionParams) {
-    insertDocuments(_kTestNss, createDocuments(collCard));
+    return createSamplingEstimatorForTesting(
+        collCard, sampleSize, projectionParams, createDocuments(collCard));
+}
+
+SamplingEstimatorForTesting SamplingEstimatorTest::createSamplingEstimatorForTesting(
+    size_t collCard,
+    size_t sampleSize,
+    ce::ProjectionParams projectionParams,
+    std::vector<BSONObj> docs) {
+    insertDocuments(_kTestNss, std::move(docs));
 
     auto collection =
         acquireCollectionOrView(operationContext(),

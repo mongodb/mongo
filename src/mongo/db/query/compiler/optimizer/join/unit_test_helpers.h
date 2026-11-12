@@ -153,20 +153,23 @@ public:
     CardinalityEstimate estimateCardinality(const MatchExpression* expr) const override {
         MONGO_UNREACHABLE;
     }
-    CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const override {
+    CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds,
+                                            const IndexEntry&) const override {
         MONGO_UNREACHABLE;
     }
     std::vector<CardinalityEstimate> estimateKeysScanned(
-        const std::vector<const IndexBounds*>& bounds) const override {
+        const std::vector<const IndexBounds*>& bounds, const IndexEntry&) const override {
         MONGO_UNREACHABLE;
     }
     CardinalityEstimate estimateRIDs(const IndexBounds& bounds,
-                                     const MatchExpression* expr) const override {
+                                     const MatchExpression* expr,
+                                     const IndexEntry&) const override {
         MONGO_UNREACHABLE;
     }
     std::vector<CardinalityEstimate> estimateRIDs(
         const std::vector<const IndexBounds*>& bounds,
-        const std::vector<const MatchExpression*>& expressions) const override {
+        const std::vector<const MatchExpression*>& expressions,
+        const IndexEntry&) const override {
         MONGO_UNREACHABLE;
     }
     void generateSample(ce::ProjectionParams projectionParams) override {
@@ -185,9 +188,13 @@ public:
      * then uses those from 'addFakeNDVEstimate()'. If neither is set for a particular 'fieldNames',
      * this function will throw an exception.
      */
-    CardinalityEstimate estimateNDV(
-        const std::vector<ce::FieldPathAndEqSemantics>& fields,
-        boost::optional<std::span<const OrderedIntervalList>> bounds) const override {
+    CardinalityEstimate estimateNDV(const std::vector<ce::FieldPathAndEqSemantics>& fields,
+                                    boost::optional<std::span<const OrderedIntervalList>> bounds,
+                                    const IndexEntry* indexEntry) const override {
+        // Multikey estimation is not yet required in these tests.
+        if (indexEntry && (indexEntry->multikey || indexEntry->type == IndexType::INDEX_WILDCARD)) {
+            MONGO_UNIMPLEMENTED;
+        }
         ASSERT_FALSE(bounds.has_value()) << "FakeNdvEstimator doesn't handle bounds";
         if (auto persisted = tryEstimateNDVFromPersistentStats(fields)) {
             return *persisted;
@@ -197,13 +204,6 @@ public:
             fieldPaths.push_back(field.path);
         }
         return _fakeEstimates.at(fieldPaths);
-    }
-
-    CardinalityEstimate estimateNDVMultiKey(
-        const std::vector<ce::FieldPathAndEqSemantics>& fields,
-        boost::optional<std::span<const OrderedIntervalList>> bounds) const override {
-        // Not yet required in these tests.
-        MONGO_UNIMPLEMENTED;
     }
 
     /*

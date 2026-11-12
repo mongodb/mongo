@@ -66,7 +66,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costIndexScanFragment(NodeId nodeId,
         if (!ixNode->index.multikey) {
             std::vector<ce::FieldPathAndEqSemantics> fields;
             for (auto&& elt : ixNode->index.keyPattern) {
-                fields.push_back({.path = FieldPath(elt.fieldName())});
+                fields.push_back({.path = std::string(elt.fieldName())});
             }
             const auto& samplingEstimator = _jCtx.samplingEstimators->at(nss);
             auto ndv = samplingEstimator->estimateNDV(fields);

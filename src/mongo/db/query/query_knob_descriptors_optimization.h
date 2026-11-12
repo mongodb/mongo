@@ -194,6 +194,10 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQueryNumChunksForChunkBasedSamplingName,                                \
          internalQueryNumChunksForChunkBasedSampling,                                     \
          getNumChunksForChunkBasedSampling)                                               \
+    KNOB(kSamplingCEMaxKeystringsPerDocument,                                             \
+         kInternalQuerySamplingCEMaxKeystringsPerDocumentName,                            \
+         internalQuerySamplingCEMaxKeystringsPerDocument,                                 \
+         getSamplingCEMaxKeystringsPerDocument)                                           \
     KNOB(kEnablePersistentNDVStats,                                                       \
          kInternalQueryEnablePersistentNDVStatsName,                                      \
          internalQueryEnablePersistentNDVStats,                                           \

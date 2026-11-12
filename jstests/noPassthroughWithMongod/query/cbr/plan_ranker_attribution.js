@@ -41,7 +41,7 @@ describe("planRanker attribution", function () {
         const docs = [];
         for (let i = 0; i < 1000; i++) {
             // 'h1' and 'h2' are left unindexed here; the mixed-ranker case below gives them the
-            // hashed indexes it needs.
+            // sparse indexes it needs.
             docs.push({a: i % 5, b: i, h1: i % 13, h2: i % 17});
         }
         assert.commandWorked(coll.insert(docs));
@@ -315,11 +315,12 @@ describe("planRanker attribution", function () {
     });
 
     it("a rooted $or ranked by both CBR and the multi-planner reports the multi-planner", function () {
-        // CBR can only estimate plain btree index scans, so a branch whose candidates are all
-        // hashed index scans falls through to the multi-planner while the other branch is
-        // cost-based ranked. Two hashed indexes give that branch competing candidates, which is
+        // CBR cannot estimate sparse index scans, so a branch whose candidates are all
+        // sparse index scans falls through to the multi-planner while the other branch is
+        // cost-based ranked. Two sparse indexes give that branch competing candidates, which is
         // what makes the multi-planner rank it rather than it being a lone plan.
-        assert.commandWorked(coll.createIndexes([{h1: "hashed"}, {h2: "hashed"}]));
+        assert.commandWorked(coll.createIndex({h1: 1}, {sparse: true, name: "h1_sparse"}));
+        assert.commandWorked(coll.createIndex({h2: 1}, {sparse: true, name: "h2_sparse"}));
         try {
             setPlanRankerConfig(db, {
                 internalQueryPlanRanker: "costBased",
@@ -349,8 +350,8 @@ describe("planRanker attribution", function () {
             );
         } finally {
             setPlanRankerConfig(db, {featureFlagCostBasedRanker: false});
-            assert.commandWorked(coll.dropIndex({h1: "hashed"}));
-            assert.commandWorked(coll.dropIndex({h2: "hashed"}));
+            assert.commandWorked(coll.dropIndex({h1: 1}));
+            assert.commandWorked(coll.dropIndex({h2: 1}));
             coll.getPlanCache().clear();
         }
     });

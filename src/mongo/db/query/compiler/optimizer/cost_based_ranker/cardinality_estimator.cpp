@@ -5,11 +5,13 @@
 
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/query/compiler/ce/histogram/histogram_estimator.h"
+#include "mongo/db/query/compiler/ce/sampling/ce_index_keystring_support.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_rewrites.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/heuristic_estimator.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
@@ -68,6 +70,7 @@ CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
                                            const ce::SamplingEstimator* samplingEstimator,
                                            EstimateMap& qsnEstimates,
                                            QueryCBRCEModeEnum rankerMode,
+                                           IncrementalFeatureRolloutContext& ifrContext,
                                            bool considerZeroCESampledIXScanNonEstimable)
     : _collCard{CardinalityEstimate{CardinalityType{collInfo.collStats->getCardinality()},
                                     EstimationSource::Metadata}},
@@ -76,7 +79,8 @@ CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
       _samplingEstimator(samplingEstimator),
       _qsnEstimates{qsnEstimates},
       _ceMode(rankerMode),
-      _considerZeroCESampledIXScanNonEstimable(considerZeroCESampledIXScanNonEstimable) {
+      _considerZeroCESampledIXScanNonEstimable(considerZeroCESampledIXScanNonEstimable),
+      _ifrContext(ifrContext) {
     if (_ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         tassert(9746501,
                 "samplingEstimator cannot be null when CBRCEMode is samplingCE",
@@ -482,13 +486,32 @@ CEResult CardinalityEstimator::scanCard(const QuerySolutionNode* node,
     return outCE;
 }
 
-bool isIndexScanSupported(const IndexScanNode& node) {
+bool isIndexScanSupported(const IndexScanNode& node,
+                          QueryCBRCEModeEnum ceMode,
+                          IncrementalFeatureRolloutContext& ifrContext) {
     const auto& indexEntry = node.index;
-    return indexEntry.filterExpr == nullptr &&  // prevent partial index
-        indexEntry.type == INDEX_BTREE &&       // prevent hashed, text, wildcard and geo
-        !indexEntry.sparse &&                   // prevent sparse indexes
-        indexEntry.collator == nullptr &&       // collation unsupported
-        indexEntry.version == IndexDescriptor::IndexVersion::kV2;  // prevent old index formats
+    const bool isSparse = indexEntry.sparse && indexEntry.type != IndexType::INDEX_WILDCARD;
+    // Sparse and partial indices as well as older index versions are not supported.
+    if (isSparse || indexEntry.filterExpr != nullptr ||
+        indexEntry.version != IndexDescriptor::IndexVersion::kV2) {
+        return false;
+    }
+
+    const bool isKeystringEstimated = ce::requiresKeystringEstimation(&indexEntry);
+    if (!isKeystringEstimated) {
+        return indexEntry.type == IndexType::INDEX_BTREE;
+    }
+
+    const bool isBtreeFamily = indexEntry.type == IndexType::INDEX_BTREE ||
+        indexEntry.type == IndexType::INDEX_HASHED || indexEntry.type == IndexType::INDEX_WILDCARD;
+    if (!isBtreeFamily) {
+        return false;
+    }
+
+    const bool keystringEstimationEnabled =
+        ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagSamplingCEKeystringEstimation);
+    // Only samplingCE supports indices that require keystring estimation.
+    return keystringEstimationEnabled && ceMode == QueryCBRCEModeEnum::kSamplingCE;
 }
 
 bool hasOnlyPointPredicates(const IndexBounds* node) {
@@ -540,7 +563,8 @@ EqualityPrefix equalityPrefix(const IndexBounds* node) {
     return EqualityPrefix{std::move(eqPrefix), isEqPrefix};
 }
 
-CEResult CardinalityEstimator::estimateIndexSeeks(const IndexBounds& bounds, bool multiKey) {
+CEResult CardinalityEstimator::estimateIndexSeeks(const IndexBounds& bounds,
+                                                  const IndexEntry& indexEntry) {
     auto oils = bounds.fields;
 
     double seekEstimate = 1;
@@ -669,9 +693,8 @@ CEResult CardinalityEstimator::estimateIndexSeeks(const IndexBounds& bounds, boo
         fieldAndEqs.emplace_back(oil.name);
     }
     auto oilSpan = std::span<const OrderedIntervalList>(oils);
-    CardinalityEstimate ndv = multiKey
-        ? _samplingEstimator->estimateNDVMultiKey(fieldAndEqs, oilSpan)
-        : _samplingEstimator->estimateNDV(fieldAndEqs, oilSpan);
+
+    CardinalityEstimate ndv = _samplingEstimator->estimateNDV(fieldAndEqs, oilSpan, &indexEntry);
 
     ndv = exactMax(oneCE, ndv);
     seekEstimate *= ndv.toDouble();
@@ -683,19 +706,28 @@ CEResult CardinalityEstimator::estimateIndexSeeks(const IndexBounds& bounds, boo
 }
 
 CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
-    if (!isIndexScanSupported(*node)) {
+    if (!isIndexScanSupported(*node, _ceMode, _ifrContext)) {
         // Fallback to multiplanning
         return Status(ErrorCodes::UnsupportedCbrNode,
                       str::stream{} << "encountered unsupported index scan: "
                                     << node->index.toString());
     }
 
+    try {
+        return estimateIXScanNode(node);
+    } catch (const ce::KeystringExtractionException& ex) {
+        return Status(ErrorCodes::UnsupportedCbrNode,
+                      str::stream{} << "key extraction failed: " << ex.toStatus().reason());
+    }
+}
+
+CEResult CardinalityEstimator::estimateIXScanNode(const IndexScanNode* node) {
     QSNEstimate est;
 
     if (_inputCard == zeroCE ||
         // TODO SERVER-96816: Implement support for estimation of simple ranges
         (!node->index.multikey && !node->filter && !node->bounds.isSimpleRange &&
-         node->bounds.isUnbounded())) {
+         node->bounds.isUnbounded() && node->index.type != IndexType::INDEX_WILDCARD)) {
         est.inCE = _inputCard;
         est.outCE = _inputCard;
         _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
@@ -716,19 +748,21 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
             auto matchExpr = getMatchExpressionFromBounds(bounds, filter.get());
             if (matchExpr) {
                 return _ceCache.getOrCompute(std::move(matchExpr), [&] {
-                    return _samplingEstimator->estimateRIDs(bounds, filter.get());
+                    return _samplingEstimator->estimateRIDs(bounds, filter.get(), node->index);
                 });
             }
         }
         // Rare case, CE not cached.
-        return _samplingEstimator->estimateRIDs(bounds, filter.get());
+        return _samplingEstimator->estimateRIDs(bounds, filter.get(), node->index);
     };
 
     // Estimate the number of keys in the index scan interval.
-    // We can avoid computing input selectivity for sampling CE on point queries over non-multikey
-    // fields without residual filter, as input cardinality is equal to output cardinality.
-    if (_ceMode != QueryCBRCEModeEnum::kSamplingCE || node->index.multikey || node->filter) {
-        auto ceRes1 = estimate(&node->bounds);
+    // We can avoid computing input selectivity for sampling CE on point queries over
+    // non-multikey/wildcard indices without a residual filter,
+    // as then the input cardinality is equal to the output cardinality.
+    if (_ceMode != QueryCBRCEModeEnum::kSamplingCE || node->index.multikey ||
+        node->index.type == IndexType::INDEX_WILDCARD || node->filter) {
+        auto ceRes1 = estimate(&node->bounds, node->index);
         if (!ceRes1.isOK()) {
             return ceRes1;
         }
@@ -758,7 +792,7 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
             }
         }
 
-        auto seekCE = estimateIndexSeeks(node->bounds, node->index.multikey);
+        auto seekCE = estimateIndexSeeks(node->bounds, node->index);
         if (seekCE.isOK()) {
             est.indexSeekCE = seekCE.getValue();
         }
@@ -834,26 +868,34 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
             return ceRes1.getValue();
         }
 
-        // If the child IndexScan stage does not have a filter, then we can estimate the cardinality
-        // of the MatchExpression using the bounds of the IndexScan stage and the filter of the
-        // FetchNode.
-        if (static_cast<const IndexScanNode*>(node->children[0].get())->filter ==
-            nullptr  // TODO SERVER-98577: Remove this restriction
-        ) {
-            auto& bounds = static_cast<const IndexScanNode*>(node->children[0].get())->bounds;
+        // Merge the filters of the fetch and the ixscan if both exist.
+        auto ixscan = static_cast<const IndexScanNode*>(node->children[0].get());
+        std::vector<std::unique_ptr<MatchExpression>> filters;
+        if (ixscan->filter) {
+            filters.push_back(ixscan->filter->clone());
+        }
+        filters.push_back(node->filter->clone());
+        auto combinedFilter = filters.size() == 1
+            ? std::move(filters[0])
+            : std::make_unique<AndMatchExpression>(std::move(filters));
+
+        const auto& bounds = ixscan->bounds;
+        const auto& index = ixscan->index;
+        try {
             auto ce = [&]() -> CardinalityEstimate {
                 if (totalIntervalCount(bounds) <= kMaxNumIntervalsCached) {
                     // TODO(SERVER-105939): This is wrong for some index bounds.
-                    auto matchExpr = getMatchExpressionFromBounds(bounds, node->filter.get());
+                    auto matchExpr = getMatchExpressionFromBounds(bounds, combinedFilter.get());
                     if (matchExpr) {
                         return _ceCache.getOrCompute(std::move(matchExpr), [&] {
-                            return _samplingEstimator->estimateRIDs(bounds, node->filter.get());
+                            return _samplingEstimator->estimateRIDs(
+                                bounds, combinedFilter.get(), index);
                         });
                     }
                 }
 
                 // Rare case, CE not cached.
-                return _samplingEstimator->estimateRIDs(bounds, node->filter.get());
+                return _samplingEstimator->estimateRIDs(bounds, combinedFilter.get(), index);
             }();
 
             popSelectivities();
@@ -861,6 +903,9 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
             est.outCE = ce;
             _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
             return ce;
+        } catch (const ce::KeystringExtractionException& ex) {
+            return Status(ErrorCodes::UnsupportedCbrNode,
+                          str::stream{} << "key extraction failed: " << ex.toStatus().reason());
         }
     }
 
@@ -1433,7 +1478,7 @@ CEResult CardinalityEstimator::estimate(
  * Intervals
  */
 
-CEResult CardinalityEstimator::estimate(const IndexBounds* bounds) {
+CEResult CardinalityEstimator::estimate(const IndexBounds* bounds, const IndexEntry& indexEntry) {
     if (bounds->isSimpleRange) {
         // TODO SERVER-96816: Implement support for estimation of simple ranges
         return Status(ErrorCodes::UnsupportedCbrNode, "simple ranges unsupported");
@@ -1441,7 +1486,7 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* bounds) {
 
     if (_ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         return _ceCache.getOrCompute(
-            bounds, [&] { return _samplingEstimator->estimateKeysScanned(*bounds); });
+            bounds, [&] { return _samplingEstimator->estimateKeysScanned(*bounds, indexEntry); });
     }
 
     // Iterate over all intervals over individual index fields (OILs). These intervals are

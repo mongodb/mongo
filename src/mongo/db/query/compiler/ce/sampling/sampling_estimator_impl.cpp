@@ -15,6 +15,7 @@
 #include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/field_stats/field_stats.h"
 #include "mongo/db/query/compiler/ce/field_stats/field_stats_loader.h"
+#include "mongo/db/query/compiler/ce/sampling/ce_index_keystring_support.h"
 #include "mongo/db/query/compiler/ce/sampling/math.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_manager.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
@@ -91,6 +92,10 @@ void checkSampleContainsMatchExpressionFields(const StringSet& topLevelSampleFie
 void checkSampleContainsIndexBoundsFields(const StringSet& topLevelSampleFieldNames,
                                           const IndexBounds& bounds) {
     for (auto& oil : bounds.fields) {
+        if (oil.name == "$_path") {
+            // Synthetic wildcard path selector: not a field of the sampled documents.
+            continue;
+        }
         tassert(10770101,
                 "Field in index bounds should be included in the set of sampled fields.",
                 topLevelSampleFieldNames.contains(stage_builder::getTopLevelField(oil.name)));
@@ -413,7 +418,27 @@ CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpres
 }
 
 
-CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds& bounds) const {
+template <typename T>
+auto SamplingEstimatorImpl::withKeystringSampler(const IndexEntry& indexEntry,
+                                                 const T& callback) const {
+    // Use only the name of the index to block wildcard indices producing
+    // too many keys no matter their keyPattern.
+    const auto& indexName = indexEntry.identifier.catalogName;
+    if (_indexesWithFailedKeystringExtraction.contains(indexName)) {
+        throw KeystringExtractionException(
+            str::stream{} << "Index key extraction previously failed for index: " << indexName);
+    }
+    try {
+        IndexKeystringSampler sampler(_opCtx, _collections.lookupCollection(_nss), indexEntry);
+        return callback(sampler);
+    } catch (const KeystringExtractionException&) {
+        _indexesWithFailedKeystringExtraction.insert(indexName);
+        throw;
+    }
+}
+
+CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds& bounds,
+                                                               const IndexEntry& indexEntry) const {
     tassert(10981502,
             "Sample must be generated before calling estimateKeysScanned()",
             _sample.has_value());
@@ -431,11 +456,17 @@ CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds
 
     size_t count = 0;
 
-    forNumberKeysMatch(bounds, _sample->docs(), [&](size_t matchCnt) { count += matchCnt; });
+    if (requiresKeystringEstimation(&indexEntry)) {
+        withKeystringSampler(indexEntry, [&](IndexKeystringSampler& sampler) {
+            sampler.forNumberKeysMatch(
+                bounds, _sample->docs(), [&](size_t matchCnt) { count += matchCnt; });
+        });
+    } else {
+        forNumberKeysMatch(bounds, _sample->docs(), [&](size_t matchCnt) { count += matchCnt; });
+    }
 
-    CardinalityEstimate estimate{
-        CardinalityType{(count * getCollCard().toDouble()) / _sample->size()},
-        EstimationSource::Sampling};
+    auto estimate = makeScaledEstimate(
+        count, /*errorCount=*/0, _sample->size(), getCollCard(), _sample->isPersisted());
     LOGV2_DEBUG(9756605,
                 5,
                 "SamplingCE cardinality (# keys) for index bounds",
@@ -445,21 +476,22 @@ CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds
 }
 
 std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateKeysScanned(
-    const std::vector<const IndexBounds*>& bounds) const {
+    const std::vector<const IndexBounds*>& bounds, const IndexEntry& indexEntry) const {
     tassert(10981503,
             "Sample must be generated before calling estimateKeysScanned()",
             _sample.has_value());
     std::vector<CardinalityEstimate> estimates;
     estimates.reserve(bounds.size());
     for (size_t i = 0; i < bounds.size(); i++) {
-        estimates.push_back(estimateKeysScanned(*bounds[i]));
+        estimates.push_back(estimateKeysScanned(*bounds[i], indexEntry));
     }
     return estimates;
 }
 
 std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateRIDs(
     const std::vector<const IndexBounds*>& bounds,
-    const std::vector<const MatchExpression*>& expressions) const {
+    const std::vector<const MatchExpression*>& expressions,
+    const IndexEntry& indexEntry) const {
     tassert(
         10981504, "Sample must be generated before calling estimateRIDs()", _sample.has_value());
 
@@ -469,13 +501,14 @@ std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateRIDs(
             expressions.size() == bounds.size());
     estimates.reserve(bounds.size());
     for (size_t i = 0; i < bounds.size(); i++) {
-        estimates.push_back(estimateRIDs(*bounds[i], expressions[i]));
+        estimates.push_back(estimateRIDs(*bounds[i], expressions[i], indexEntry));
     }
     return estimates;
 }
 
 CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bounds,
-                                                        const MatchExpression* expr) const {
+                                                        const MatchExpression* expr,
+                                                        const IndexEntry& indexEntry) const {
     tassert(
         10981505, "Sample must be generated before calling estimateRIDs()", _sample.has_value());
     if (!_spec.topLevelSampleFieldNames.empty()) {
@@ -496,28 +529,33 @@ CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bound
 
     size_t count = 0;
     size_t errorCount = 0;
-    forDocumentsMatchingBounds(bounds, _sample->docs(), [&](const BSONObj& document) {
+    auto estimateDocument = [&](const BSONObj& document) {
         // If 'expr' is null, we are simply estimating the cardinality by IndexBounds.
         if (expr == nullptr) {
             count++;
-            return true;
         } else if (allEqInfo) {
             if (documentMatchesAllEqualities(document, allEqInfo->first, sortedRequiredValues)) {
                 count++;
             }
-            return true;
         } else {
             auto result = tryMatchesBSON(expr, document);
             if (!result) {
                 errorCount++;
-                return true;
-            }
-            if (*result) {
+            } else if (*result) {
                 count++;
             }
-            return true;
         }
-    });
+
+        return true;
+    };
+
+    if (requiresKeystringEstimation(&indexEntry)) {
+        withKeystringSampler(indexEntry, [&](IndexKeystringSampler& sampler) {
+            sampler.forDocumentsMatchingBounds(bounds, _sample->docs(), estimateDocument);
+        });
+    } else {
+        forDocumentsMatchingBounds(bounds, _sample->docs(), estimateDocument);
+    }
     CardinalityEstimate estimate = makeScaledEstimate(
         count, errorCount, _sample->size(), getCollCard(), _sample->isPersisted());
     LOGV2_DEBUG(9756606,
@@ -580,7 +618,6 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
                             std::move(customerQueryExpCtx),
                             samplingSource) {}
 
-SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 
 namespace {
 // Hit = served an NDV from persisted field statistics. Miss = fell back to the sample-based
@@ -773,7 +810,7 @@ boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPe
     std::vector<std::pair<std::string, bool>> sortedFields;
     sortedFields.reserve(fields.size());
     for (const auto& field : fields) {
-        sortedFields.emplace_back(field.path.fullPath(), field.isExprEq);
+        sortedFields.emplace_back(field.path, field.isExprEq);
     }
     std::sort(sortedFields.begin(), sortedFields.end());
 
@@ -849,12 +886,32 @@ boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPe
 
 CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
     const std::vector<FieldPathAndEqSemantics>& fields,
-    boost::optional<std::span<const OrderedIntervalList>> bounds) const {
+    boost::optional<std::span<const OrderedIntervalList>> bounds,
+    const IndexEntry* indexEntry) const {
     tassert(11158504, "Sample must be generated before calling estimateNDV()", _sample.has_value());
 
+    // Wildcard indexes are essentially multikey even when not flagged as such: their keys are
+    // (path, value) pairs over every indexed leaf path of the document.
+    if (indexEntry && (indexEntry->multikey || indexEntry->type == IndexType::INDEX_WILDCARD)) {
+        return estimateNDVMultiKey(fields, bounds, *indexEntry);
+    }
+    return estimateNDVSingleKey(fields, bounds, indexEntry);
+}
+
+CardinalityEstimate SamplingEstimatorImpl::estimateNDVSingleKey(
+    const std::vector<FieldPathAndEqSemantics>& fields,
+    boost::optional<std::span<const OrderedIntervalList>> bounds,
+    const IndexEntry* indexEntry) const {
+    const bool useKeystrings = requiresKeystringEstimation(indexEntry);
+
+    // Persisted NDV statistics describe field values under binary equality semantics; they
+    // cannot serve collated / non-btree indexes, as these transform the indexed fields.
+    // TODO(SERVER-139093): Serve collated/non-btree-index NDV from persisted statistics.
     // Bounded NDV stays sample-only by design: a whole-domain sketch cannot answer how many
     // distinct values fall within a range.
-    if (!bounds) {
+    if (!bounds &&
+        (!indexEntry ||
+         (indexEntry->collator == nullptr && indexEntry->type == IndexType::INDEX_BTREE))) {
         if (auto persisted = tryEstimateNDVFromPersistentStats(fields)) {
             return *persisted;
         }
@@ -866,7 +923,8 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
         for (const auto& field : fields) {
             tassert(11158505,
                     "Sample must include the NDV fieldName as a top-level field.",
-                    _spec.topLevelSampleFieldNames.contains(field.path.front()));
+                    _spec.topLevelSampleFieldNames.contains(
+                        stage_builder::getTopLevelField(field.path)));
         }
     }
 
@@ -876,7 +934,14 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
     // of sampleSize because we sample with replacement. This can produce duplicate documents, which
     // may result in us oscillating in and out of NR for defacto unique fields. The unique doc count
     // is lazily computed and cached.
-    size_t sampleNDV = countNDV(fields, _sample->docs(), bounds);
+    size_t sampleNDV = 0;
+    if (useKeystrings) {
+        sampleNDV = withKeystringSampler(*indexEntry, [&](IndexKeystringSampler& sampler) {
+            return sampler.countNDV(fields, _sample->docs(), bounds).sampleUniqueKeys;
+        });
+    } else {
+        sampleNDV = countNDV(fields, _sample->docs(), bounds);
+    }
     if (!_uniqueDocCount) {
         _uniqueDocCount = countUniqueDocuments(_sample->docs());
     }
@@ -926,31 +991,45 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
 
 CardinalityEstimate SamplingEstimatorImpl::estimateNDVMultiKey(
     const std::vector<FieldPathAndEqSemantics>& fields,
-    boost::optional<std::span<const OrderedIntervalList>> bounds) const {
+    boost::optional<std::span<const OrderedIntervalList>> bounds,
+    const IndexEntry& indexEntry) const {
     tassert(10061103, "Sample must be generated before calling estimateNDV()", _sample.has_value());
+    const bool useKeystrings = requiresKeystringEstimation(&indexEntry);
 
     if (!_spec.topLevelSampleFieldNames.empty()) {
         for (const auto& field : fields) {
+            if (useKeystrings && field.path == "$_path") {
+                // Synthetic wildcard path selector: not a field of the sampled documents.
+                continue;
+            }
             tassert(10061104,
                     "Sample must include the NDV fieldName as a top-level field.",
-                    _spec.topLevelSampleFieldNames.contains(field.path.front()));
+                    _spec.topLevelSampleFieldNames.contains(
+                        stage_builder::getTopLevelField(field.path)));
         }
     }
 
     // Obtain the NDV for the sample. If this is equal to the sample size, don't bother with NR
     // iteration, since it is likely to diverge. The best guess is that each element in the
     // collection is unique.
-    const auto [totalSampleKeys, totalMatchingKeys, totalUniqueKeys] =
-        countNDVMultiKey(fields, _sample->docs(), bounds);
+    const auto [totalSampleKeys,
+                /*uniqueMatchingKeys=*/totalMatchingKeys,
+                /*sampleUniqueKeys=*/totalUniqueKeys] = [&]() {
+        if (useKeystrings) {
+            return withKeystringSampler(indexEntry, [&](IndexKeystringSampler& sampler) {
+                return sampler.countNDV(fields, _sample->docs(), bounds);
+            });
+        }
+        return countNDVMultiKey(fields, _sample->docs(), bounds);
+    }();
 
     if (bounds.has_value() && !totalMatchingKeys) {
         return cost_based_ranker::zeroCE;
     }
 
     // NDV over an empty sample is undefined (there is no sensible default), and dividing by
-    // a sample size of 0 below would yield NaN. This is a precondition violation: callers
-    // must not request NDV when the sample is empty. (estimateNDV() enforces the analogous
-    // invariant)
+    // '_sample.size()' of 0 below would yield NaN. This is a precondition violation: callers must
+    // not request NDV when the sample is empty. (estimateNDV() enforces the analogous invariant)
     tassert(
         12552502, "Multikey NDV estimation requires a non-empty sample", !_sample->docs().empty());
     const auto avgKeysPerDoc = (double(totalSampleKeys) / _sample->size());

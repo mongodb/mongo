@@ -8,6 +8,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/ce/field_stats/field_stats.h"
 #include "mongo/db/query/compiler/ce/field_stats/field_stats_gen.h"
@@ -293,6 +294,46 @@ TEST_F(PersistentNDVTest, FallsBackWhenDisabled) {
     }
 }
 
+TEST_F(PersistentNDVTest, DoesNotServePersistedNDVForHashedCollatedIndex) {
+    persistNDV(kPersistedNDV);
+
+    ASSERT_OK(createIndexFromSpec(operationContext(),
+                                  _kTestNss.ns_forTest(),
+                                  BSON("name" << "a_1" << "key" << BSON("a" << 1) << "v" << 2)));
+    ASSERT_OK(createIndexFromSpec(
+        operationContext(),
+        _kTestNss.ns_forTest(),
+        BSON("name" << "a_hashed" << "key" << BSON("a" << "hashed") << "v" << 2)));
+    ASSERT_OK(
+        createIndexFromSpec(operationContext(),
+                            _kTestNss.ns_forTest(),
+                            BSON("name" << "a_1_coll" << "key" << BSON("a" << 1) << "collation"
+                                        << BSON("locale" << "en" << "strength" << 2) << "v" << 2)));
+
+    auto coll = acquireTestCollection();
+
+    auto regularIndex = makeIndexEntry(operationContext(), coll.getCollectionPtr(), "a_1");
+    auto collIndex = makeIndexEntry(operationContext(), coll.getCollectionPtr(), "a_1_coll");
+    auto hashedIndex = makeIndexEntry(operationContext(), coll.getCollectionPtr(), "a_hashed");
+
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        // Control: uncollated index serves the persisted statistics.
+        ASSERT_EQ(estimator.estimateNDV({{.path = "a"}}, boost::none, &regularIndex).toDouble(),
+                  kPersistedNDV);
+
+        // Collated index does not use the persisted stats.
+        ASSERT_NE(estimator.estimateNDV({{.path = "a"}}, boost::none, &collIndex).toDouble(),
+                  kPersistedNDV);
+
+        // Hashed index does not use the persisted stats.
+        ASSERT_NE(estimator.estimateNDV({{.path = "a"}}, boost::none, &hashedIndex).toDouble(),
+                  kPersistedNDV);
+
+        // Only the control consumed the persisted statistics.
+        ASSERT_EQ(estimator.getNumPersistedNDVStatsUsed(), 1u);
+    });
+}
+
 TEST_F(PersistentNDVTest, ServesBothEqualitySemanticsIdentically) {
     // The persisted sketch counts null and missing as distinct values ($expr semantics). Regular
     // equality (null == missing) gets the same number, off by at most one, which the design
@@ -321,7 +362,8 @@ TEST_F(PersistentNDVTest, FallsBackWithBounds) {
         OrderedIntervalList oil("a");
         oil.intervals.push_back(Interval(BSON("" << 0 << "" << 3), true, true));
         const std::vector<OrderedIntervalList> bounds{oil};
-        ASSERT_NE(estimator.estimateNDV({{.path = "a"}}, std::span(bounds)).toDouble(),
+        ASSERT_NE(estimator.estimateNDV({{.path = "a"}}, std::span(bounds), /*indexEntry=*/nullptr)
+                      .toDouble(),
                   kPersistedNDV);
     });
 }

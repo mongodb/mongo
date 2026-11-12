@@ -11,6 +11,7 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/query/compiler/ce/sampling/ce_index_keystring_support.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
@@ -35,7 +36,6 @@ namespace mongo::ce {
 using namespace std::literals::string_view_literals;
 
 namespace {
-
 /**
  * Returns true if 'doc' has an '_id' field and shardHash(_id) % modulus == 0.
  * Mirrors the hash-mod filter used by stride sampling in SamplingEstimatorImpl.
@@ -963,7 +963,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
         BSON("" << 10 << "" << 20), BoundInclusion::kIncludeEndKeyOnly));
     IndexBounds boundsA;
     boundsA.fields.push_back(list);
-    auto ce = samplingEstimator.estimateRIDs(boundsA, nullptr);
+    auto ce = samplingEstimator.estimateRIDs(boundsA, nullptr, buildSimpleIndexEntry({"a"}));
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 0.2 * card);
 
     // Test IndexBounds with multiple fields.
@@ -979,7 +979,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
     IndexBounds boundsAB;
     boundsAB.fields.push_back(listA);
     boundsAB.fields.push_back(listB);
-    ce = samplingEstimator.estimateRIDs(boundsAB, nullptr);
+    ce = samplingEstimator.estimateRIDs(boundsAB, nullptr, buildSimpleIndexEntry({"a"}));
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 0.5 * 0.2 * card);
 
     // Test "allValues" IndexBounds.
@@ -987,7 +987,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
     listNil.intervals.push_back(IndexBoundsBuilder::allValues());
     IndexBounds allValuesBounds;
     allValuesBounds.fields.push_back(listNil);
-    ce = samplingEstimator.estimateRIDs(allValuesBounds, nullptr);
+    ce = samplingEstimator.estimateRIDs(allValuesBounds, nullptr, buildSimpleIndexEntry({"a"}));
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 1.0 * card);
 
     // Test null value.
@@ -995,19 +995,19 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
     listNil.intervals.push_back(IndexBoundsBuilder::kNullPointInterval);
     IndexBounds nullPointBounds;
     nullPointBounds.fields.push_back(listNil);
-    ce = samplingEstimator.estimateRIDs(nullPointBounds, nullptr);
+    ce = samplingEstimator.estimateRIDs(nullPointBounds, nullptr, buildSimpleIndexEntry({"a"}));
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 1.0 * card);
 
     // Test missing dotted path field.
     nullPointBounds.fields[0].name = "obj.missing";
-    ce = samplingEstimator.estimateRIDs(nullPointBounds, nullptr);
+    ce = samplingEstimator.estimateRIDs(nullPointBounds, nullptr, buildSimpleIndexEntry({"a"}));
     // In terms of a non-sparse index, documents that have missing field are still indexed by a null
     // key.
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 1.0 * card);
 
     // Test dotted path field with null value.
     nullPointBounds.fields[0].name = "obj.nil";
-    ce = samplingEstimator.estimateRIDs(nullPointBounds, nullptr);
+    ce = samplingEstimator.estimateRIDs(nullPointBounds, nullptr, buildSimpleIndexEntry({"a"}));
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 1.0 * card);
 
     // Test batch process of multiple IndexBounds.
@@ -1016,7 +1016,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
     boundslist.push_back(&boundsAB);
     boundslist.push_back(&nullPointBounds);
     std::vector<const MatchExpression*> expressions(3, nullptr);
-    auto estimates = samplingEstimator.estimateRIDs(boundslist, expressions);
+    auto estimates =
+        samplingEstimator.estimateRIDs(boundslist, expressions, buildSimpleIndexEntry({"a"}));
     ASSERT_EQUALS(estimates.size(), 3);
     samplingEstimator.assertEstimateInConfidenceInterval(estimates[0], 0.2 * card);
     samplingEstimator.assertEstimateInConfidenceInterval(estimates[1], 0.5 * 0.2 * card);
@@ -1049,7 +1050,7 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
         BSON("" << 0 << "" << 30), BoundInclusion::kIncludeBothStartAndEndKeys));
     IndexBounds boundsA;
     boundsA.fields.push_back(list);
-    auto ce = samplingEstimator.estimateKeysScanned(boundsA);
+    auto ce = samplingEstimator.estimateKeysScanned(boundsA, buildSimpleIndexEntry({"a"}));
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 3 * card);
 
     // Test IndexBounds with multiple fields.
@@ -1065,14 +1066,15 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
     IndexBounds boundsAArr;
     boundsAArr.fields.push_back(listA);
     boundsAArr.fields.push_back(listArr);
-    ce = samplingEstimator.estimateKeysScanned(boundsAArr);
+    ce = samplingEstimator.estimateKeysScanned(boundsAArr, buildSimpleIndexEntry({"a"}));
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 3 * 0.2 * card);
 
     // Test batch process of index keys scanned estimate.
     std::vector<const IndexBounds*> boundslist;
     boundslist.push_back(&boundsA);
     boundslist.push_back(&boundsAArr);
-    auto estimates = samplingEstimator.estimateKeysScanned(boundslist);
+    auto estimates =
+        samplingEstimator.estimateKeysScanned(boundslist, buildSimpleIndexEntry({"a"}));
     ASSERT_EQUALS(estimates.size(), 2);
     samplingEstimator.assertEstimateInConfidenceInterval(estimates[0], 3 * card);
     samplingEstimator.assertEstimateInConfidenceInterval(estimates[1], 3 * 0.2 * card);
@@ -1179,7 +1181,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
     IndexBounds boundsB;
     boundsB.fields.push_back(list);
 
-    auto ce = samplingEstimator.estimateRIDs(boundsB, &lt);
+    auto ce = samplingEstimator.estimateRIDs(boundsB, &lt, buildSimpleIndexEntry({"a"}));
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 0.5 * 0.2 * card);
 
     // Test batch process of multiple IndexBounds and optional MatchExpression.
@@ -1196,7 +1198,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
     std::vector<const MatchExpression*> expressions;
     expressions.push_back(&lt);
     expressions.push_back(nullptr);
-    auto estimates = samplingEstimator.estimateRIDs(boundslist, expressions);
+    auto estimates =
+        samplingEstimator.estimateRIDs(boundslist, expressions, buildSimpleIndexEntry({"a"}));
     ASSERT_EQUALS(estimates.size(), 2);
     samplingEstimator.assertEstimateInConfidenceInterval(estimates[0], 0.2 * card);
     samplingEstimator.assertEstimateInConfidenceInterval(estimates[1], 0.5 * 0.2 * card);
@@ -1399,7 +1402,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     boundslist.push_back(&boundsA);
     boundslist.push_back(&boundsA);
     std::vector<const MatchExpression*> expressions(1, nullptr);
-    auto estimates = samplingEstimator.estimateRIDs(boundslist, expressions);
+    auto estimates =
+        samplingEstimator.estimateRIDs(boundslist, expressions, buildSimpleIndexEntry({"a"}));
 }
 
 DEATH_TEST_F(SamplingEstimatorTestDeathTest,
@@ -1495,7 +1499,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
         BSON("" << 10 << "" << 20), BoundInclusion::kIncludeEndKeyOnly));
     IndexBounds bounds;
     bounds.fields.push_back(list);
-    samplingEstimator.estimateRIDs(bounds, &eq);
+    samplingEstimator.estimateRIDs(bounds, &eq, buildSimpleIndexEntry({"a"}));
 }
 
 DEATH_TEST_F(SamplingEstimatorTestDeathTest,
@@ -1533,7 +1537,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
         BSON("" << MINKEY << "" << MAXKEY), BoundInclusion::kIncludeBothStartAndEndKeys));
     IndexBounds bounds;
     bounds.fields = {listA, listB, listC};
-    samplingEstimator.estimateRIDs(bounds, expr.get());
+    samplingEstimator.estimateRIDs(bounds, expr.get(), buildSimpleIndexEntry({"a"}));
 }
 
 DEATH_TEST_F(SamplingEstimatorTestDeathTest,
@@ -1571,7 +1575,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
         BSON("" << MINKEY << "" << MAXKEY), BoundInclusion::kIncludeBothStartAndEndKeys));
     IndexBounds bounds;
     bounds.fields = {listA, listB, listC};
-    samplingEstimator.estimateKeysScanned(bounds);
+    samplingEstimator.estimateKeysScanned(bounds, buildSimpleIndexEntry({"a"}));
 }
 
 DEATH_TEST_F(SamplingEstimatorTestDeathTest,
@@ -1600,7 +1604,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
         BSON("" << 1 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys));
     IndexBounds bounds;
     bounds.fields = {listA};
-    samplingEstimator.estimateKeysScanned(bounds);
+    samplingEstimator.estimateKeysScanned(bounds, buildSimpleIndexEntry({"a"}));
 }
 
 DEATH_TEST_F(SamplingEstimatorTestDeathTest,
@@ -1629,7 +1633,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
         BSON("" << 1 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys));
     IndexBounds bounds;
     bounds.fields = {listA};
-    samplingEstimator.estimateRIDs(bounds, expr.get());
+    samplingEstimator.estimateRIDs(bounds, expr.get(), buildSimpleIndexEntry({"a"}));
 }
 
 DEATH_TEST_F(SamplingEstimatorTestDeathTest,
@@ -1792,8 +1796,9 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTenPercent) {
     makeNDVAssertions(estimator, sampleSize);
 }
 
-// Parameterized test: validate that estimateNDVMultiKey and estimateNDV are consistent when the
-// array-valued field has elements drawn from a fixed set of unique values.
+// Parameterized test: validate that estimateNDV() over a multikey index is consistent with the
+// single-key estimate when the array-valued field has elements drawn from a fixed set of unique
+// values.
 //
 // For {a: [v]}: each document produces exactly one index key, so countNDVMultiKey sees
 // (totalSampleKeys=sampleSize, uniqueKeys=uniqueValueCount) - identical to countNDV on the scalar
@@ -1857,7 +1862,7 @@ TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
     auto multiElemColls = MultipleCollectionAccessor(
         multiElemColl, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
-    // Baseline: scalar field {a: i%n} -> estimateNDV and estimateNDVMultiKey must agree.
+    // Baseline: scalar field {a: i%n} -> the single-key and multikey estimates must agree.
     SamplingEstimatorForTesting scalarEstimator(operationContext(),
                                                 scalarColls,
                                                 _kTestNss,
@@ -1868,8 +1873,10 @@ TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
                                                 makeCardinalityEstimate(card),
                                                 /*customerQueryExpCtx=*/nullptr);
     scalarEstimator.generateSample(ce::NoProjection{});
+    auto fakeMultikeyEntry = buildMultikeyIndexEntry({"a"}, "a");
     auto ndvScalar = scalarEstimator.estimateNDV({{.path = "a"}});
-    auto ndvScalarMK = scalarEstimator.estimateNDVMultiKey({{.path = "a"}});
+    auto ndvScalarMK =
+        scalarEstimator.estimateNDV({{.path = "a"}}, boost::none, &fakeMultikeyEntry);
     ASSERT_EQUALS(ndvScalar, ndvScalarMK);
     const double n = static_cast<double>(uniqueValueCount);
     assertBetween(ndvScalar, n * 0.5, n * 2.0 + 1.0);
@@ -1886,7 +1893,8 @@ TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
                                                     makeCardinalityEstimate(card),
                                                     /*customerQueryExpCtx=*/nullptr);
     singleElemEstimator.generateSample(ce::NoProjection{});
-    auto ndvSingleElem = singleElemEstimator.estimateNDVMultiKey({{.path = "a"}});
+    auto ndvSingleElem =
+        singleElemEstimator.estimateNDV({{.path = "a"}}, boost::none, &fakeMultikeyEntry);
     ASSERT_EQ(ndvScalar, ndvSingleElem);
 
     // Multi-element same-value array {a: [v, v, v, v]}: totalSampleKeys grows to 4*sampleSize but
@@ -1902,7 +1910,8 @@ TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
                                                    makeCardinalityEstimate(card),
                                                    /*customerQueryExpCtx=*/nullptr);
     multiElemEstimator.generateSample(ce::NoProjection{});
-    auto ndvMultiElem = multiElemEstimator.estimateNDVMultiKey({{.path = "a"}});
+    auto ndvMultiElem =
+        multiElemEstimator.estimateNDV({{.path = "a"}}, boost::none, &fakeMultikeyEntry);
     assertBetween(ndvMultiElem, n * 0.5, n * 2.0 + 1.0);
 }
 
@@ -2049,7 +2058,7 @@ TEST_F(SamplingEstimatorTest, EstimateRIDsWithAllFastPath) {
         IndexBounds bounds;
         bounds.fields.push_back(oil);
 
-        auto ce = samplingEstimator.estimateRIDs(bounds, &andExpr);
+        auto ce = samplingEstimator.estimateRIDs(bounds, &andExpr, buildSimpleIndexEntry({"a"}));
         samplingEstimator.assertEstimateInConfidenceInterval(ce, 1.0 * card);
     }
 
@@ -2070,7 +2079,7 @@ TEST_F(SamplingEstimatorTest, EstimateRIDsWithAllFastPath) {
         IndexBounds bounds;
         bounds.fields.push_back(oil);
 
-        auto ce = samplingEstimator.estimateRIDs(bounds, &andExpr);
+        auto ce = samplingEstimator.estimateRIDs(bounds, &andExpr, buildSimpleIndexEntry({"a"}));
         ASSERT_EQ(ce.toDouble(), 0.0);
     }
 }
@@ -2271,7 +2280,7 @@ TEST_F(SamplingEstimatorTest, EstimateKeysScannedEmptySampleReturnsZero) {
     IndexBounds bounds;
     bounds.fields.push_back(list);
 
-    ASSERT_EQ(estimator.estimateKeysScanned(bounds).toDouble(), 0.0);
+    ASSERT_EQ(estimator.estimateKeysScanned(bounds, buildSimpleIndexEntry({"a"})).toDouble(), 0.0);
 }
 
 DEATH_TEST_F(SamplingEstimatorTestDeathTest, EstimateNDVMultiKeyEmptySampleTasserts, "12552502") {
@@ -2292,7 +2301,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest, EstimateNDVMultiKeyEmptySampleTasse
                                           /*customerQueryExpCtx=*/nullptr);
     estimator.setSampleForTesting({});  // empty sample
 
-    estimator.estimateNDVMultiKey({{.path = "a"}}, boost::none /* non-bounded */);
+    auto fakeMultikeyEntry = buildMultikeyIndexEntry({"a"}, "a");
+    estimator.estimateNDV({{.path = "a"}}, boost::none /* non-bounded */, &fakeMultikeyEntry);
 }
 
 TEST_F(SamplingEstimatorTest, SamplingEstimatorLoadsMultiPageSample) {
@@ -2925,6 +2935,91 @@ TEST_F(SamplingEstimatorTest, PersistentFullSampleIsNotAuthoritative) {
     const auto matchExpr = parse(filter);
     CardinalityEstimate est = estimator.estimateCardinality(matchExpr.get());
     ASSERT_EQUALS(est.source(), cost_based_ranker::EstimationSource::Sampling);
+}
+
+TEST_F(SamplingEstimatorTest, KeystringFailuresSkipSubsequentExtraction) {
+    // Set an artificially low max keystring to easily force a failure.
+    QueryKnobGuardForTest guard{
+        operationContext(), "internalQuerySamplingCEMaxKeystringsPerDocument", 2};
+    createIndex(BSON("name" << "wildcard" << "key" << BSON("$**" << 1) << "v" << 2));
+    createIndex(BSON("name" << "otherWildcard" << "key" << BSON("a.$**" << 1) << "v" << 2));
+    createIndex(BSON("name" << "hashed" << "key" << BSON("a" << "hashed") << "v" << 2));
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+
+    auto indexA = makeIndexEntry(operationContext(), coll.getCollectionPtr(), "wildcard");
+    indexA.keyPattern = BSON("$_path" << 1 << "a" << 1);
+    indexA.identifier.disambiguator = "a";
+    auto indexB = indexA;
+    indexB.keyPattern = BSON("$_path" << 1 << "b" << 1);
+    indexB.identifier.disambiguator = "b";
+    auto otherIndex = makeIndexEntry(operationContext(), coll.getCollectionPtr(), "otherWildcard");
+    otherIndex.keyPattern = BSON("$_path" << 1 << "a" << 1);
+    otherIndex.identifier.disambiguator = "a";
+    const auto bounds = makePointIntervalBounds("a", "$_path");
+    auto hashedIndex = makeIndexEntry(operationContext(), coll.getCollectionPtr(), "hashed");
+
+    const auto makeEstimator = [&]() {
+        return SamplingEstimatorForTesting(operationContext(),
+                                           colls,
+                                           kTestNss,
+                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                           1,
+                                           SamplingCEMethodEnum::kRandom,
+                                           boost::none,
+                                           makeCardinalityEstimate(100),
+                                           /*customerQueryExpCtx=*/nullptr);
+    };
+
+    // Each entry point into keystring sampling must remember extraction failures. Use a fresh
+    // estimator each time to also check that the failed-index set is scoped to one query.
+    for (int method = 0; method < 3; ++method) {
+        SamplingEstimatorForTesting estimator = makeEstimator();
+        const auto estimate = [&](const IndexEntry& index) {
+            switch (method) {
+                case 0:
+                    return estimator.estimateKeysScanned(bounds, index);
+                case 1:
+                    return estimator.estimateRIDs(bounds, nullptr, index);
+                case 2:
+                    return estimator.estimateNDV({{"$_path"}}, boost::none, &index);
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        };
+        // This passes because each doc individually is within the two keystrings limit.
+        estimator.setSampleForTesting({BSON("a" << 1 << "b" << 2), BSON("a" << 1 << "b" << 2)});
+        ASSERT_GT(estimate(indexA).toDouble(), 0);
+        // This fails because a single doc produces too many keystrings.
+        estimator.setSampleForTesting({BSON("a" << 1 << "b" << 2 << "c" << 3)});
+        ASSERT_THROWS(estimate(indexA), KeystringExtractionException);
+
+        // Extraction would now succeed, so an exception proves that the remembered failure
+        // prevents another attempt, including for a different expansion of the same index.
+        estimator.setSampleForTesting({BSON("a" << 1 << "b" << 2)});
+        ASSERT_THROWS(estimate(indexA), KeystringExtractionException);
+        ASSERT_THROWS(estimate(indexB), KeystringExtractionException);
+        // Remembered failure is scoped to a single index.
+        ASSERT_GT(estimate(otherIndex).toDouble(), 0);
+    }
+
+    // Test single-key NDV as well.
+    SamplingEstimatorForTesting estimator = makeEstimator();
+
+    // Negative control
+    estimator.setSampleForTesting({BSON("_id" << 0 << "a" << 1)});
+    ASSERT_GT(estimator.estimateNDV({{"a"}}, boost::none, &hashedIndex).toDouble(), 0);
+
+    // A persisted sample can predate the hashed index, which cannot index arrays.
+    estimator.setSampleForTesting({BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2))},
+                                  /*wasPersisted=*/true);
+    ASSERT_THROWS(estimator.estimateNDV({{"a"}}, boost::none, &hashedIndex),
+                  KeystringExtractionException);
+
+    // Another attempt at NDV key extraction must still fail (without regenerating any keys).
+    estimator.setSampleForTesting({BSON("_id" << 0 << "a" << 1)});
+    ASSERT_THROWS(estimator.estimateNDV({{"a"}}, boost::none, &hashedIndex),
+                  KeystringExtractionException);
 }
 
 }  // namespace mongo::ce

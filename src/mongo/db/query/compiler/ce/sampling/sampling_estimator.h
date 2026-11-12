@@ -5,6 +5,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/util/modules.h"
@@ -52,22 +53,34 @@ public:
 
     /**
      * Estimates the number of keys scanned for the given IndexBounds.
+     *
+     * 'indexEntry' describes the index the bounds belong to.
+     *
+     * Throws KeystringExtractionException if the index's key generation fails over a sampled
+     * document (e.g. a stale persisted sample holding a document the index cannot index), or
+     * generates more than the configured maximum number of keystrings. Subsequent requests that
+     * need keystring extraction for such indexes also throw.
      */
-    virtual CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const = 0;
+    virtual CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds,
+                                                    const IndexEntry& indexEntry) const = 0;
 
     /**
      * Batch estimates the number of keys scanned for the given vector of IndexBounds.
      */
     virtual std::vector<CardinalityEstimate> estimateKeysScanned(
-        const std::vector<const IndexBounds*>& bounds) const = 0;
+        const std::vector<const IndexBounds*>& bounds, const IndexEntry& indexEntry) const = 0;
 
     /**
      * Estimates the number of RIDs matched the given IndexBounds and an optional MatchExpression.
      * 'expr' can be nullptr to indicate only estimate the index bounds. When 'expr' is provided
      * the 'expr' will be evaluated against the documents that fall into the 'bounds'.
+     *
+     * See estimateKeysScanned() for the meaning of 'indexEntry' and the
+     * KeystringExtractionException it can throw.
      */
     virtual CardinalityEstimate estimateRIDs(const IndexBounds& bounds,
-                                             const MatchExpression* expr) const = 0;
+                                             const MatchExpression* expr,
+                                             const IndexEntry& indexEntry) const = 0;
 
     /**
      * Batch estimates the number of RIDs matched the given IndexBounds. 'expressions' can be
@@ -76,28 +89,38 @@ public:
      */
     virtual std::vector<CardinalityEstimate> estimateRIDs(
         const std::vector<const IndexBounds*>& bounds,
-        const std::vector<const MatchExpression*>& expressions) const = 0;
+        const std::vector<const MatchExpression*>& expressions,
+        const IndexEntry& indexEntry) const = 0;
 
     virtual void generateSample(ce::ProjectionParams projectionParams) = 0;
 
     /**
-     * Estimates the number of distinct values of tuples of the given field names in the collection.
-     * Does not support estimating NDV over array-valued fields.
+     * Estimates the number of distinct values of tuples of the given field names in the
+     * collection. If 'indexEntry' is provided and the index is multikey (or a wildcard index,
+     * which is essentially multikey), the estimate is over the unwound index keys a multikey
+     * index over the provided fields would contain, scaled to the estimated index size rather
+     * than the collection size. The sample documents are drawn from the collection; this is not
+     * exactly equivalent to sampling from a multikey index, as each index key is not equally
+     * weighted or drawn independently of "sibling" values in the same document.
+     *
      * 'fields' specifies which fields should follow strict, $expr-style equality (null !=
      * missing) vs. regular equality semantics (null == missing).
      *
-     * Note: when the estimate is served from persisted NDV statistics (no bounds, at most
-     * kMaxFieldStatsFields fields), the semantics select the persisted folding variant. A
-     * single-field statistic carries only the strict ($expr) sketch and serves both semantics, off
-     * by at most one; a composite statistic carries one variant per folded field plus all-match,
-     * and requests folding several but not all fields fall back to the sample.
+     * Note: when the estimate is served from persisted NDV statistics, the semantics select the
+     * persisted folding variant. A single-field statistic carries only the strict ($expr) sketch
+     * and serves both semantics, off by at most one; a composite statistic carries one variant per
+     * folded field plus all-match, and requests folding several but not all fields fall back
+     * to the sample.
+     *
+     * See estimateKeysScanned() for the meaning of 'indexEntry'.
      */
     virtual CardinalityEstimate estimateNDV(
         const std::vector<FieldPathAndEqSemantics>& fields,
-        boost::optional<std::span<const OrderedIntervalList>> bounds) const = 0;
+        boost::optional<std::span<const OrderedIntervalList>> bounds,
+        const IndexEntry* indexEntry) const = 0;
 
     CardinalityEstimate estimateNDV(const std::vector<FieldPathAndEqSemantics>& fields) const {
-        return estimateNDV(fields, boost::none);
+        return estimateNDV(fields, /*bounds=*/boost::none, /*indexEntry=*/nullptr);
     }
 
     /**
@@ -108,24 +131,6 @@ public:
     virtual boost::optional<CardinalityEstimate> tryEstimateNDVFromPersistentStats(
         const std::vector<FieldPathAndEqSemantics>& fields) const {
         return boost::none;
-    }
-
-    /**
-     * Estimates the number of distinct values of tuples of the given field names
-     * a multikey index over the provided fields would contain, from the values
-     * present in the sample.
-     *
-     * The sample documents are drawn from the collection; this is not exactly equivalent
-     * to sampling from a multikey index, as each index key is not equally weighted or
-     * drawn independently of "sibling" values in the same document.
-     */
-    virtual CardinalityEstimate estimateNDVMultiKey(
-        const std::vector<FieldPathAndEqSemantics>& fields,
-        boost::optional<std::span<const OrderedIntervalList>> bounds) const = 0;
-
-    CardinalityEstimate estimateNDVMultiKey(
-        const std::vector<FieldPathAndEqSemantics>& fields) const {
-        return estimateNDVMultiKey(fields, boost::none);
     }
 
     virtual CardinalityEstimate getCollCard() const = 0;

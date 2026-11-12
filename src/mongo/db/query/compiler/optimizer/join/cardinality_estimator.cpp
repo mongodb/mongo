@@ -38,7 +38,7 @@ std::vector<ce::FieldPathAndEqSemantics> joinKeyFields(const JoinReorderingConte
                 "join predicate selectivity estimation only supported for equality",
                 joinPred.isEquality());
         auto pathId = nodeId == edge.left ? joinPred.left : joinPred.right;
-        fields.push_back({.path = ctx.resolvedPaths[pathId].underlyingFieldPath,
+        fields.push_back({.path = ctx.resolvedPaths[pathId].underlyingFieldPath.fullPath(),
                           .isExprEq = joinPred.op == JoinPredicate::Operator::ExprEq});
     }
     return fields;

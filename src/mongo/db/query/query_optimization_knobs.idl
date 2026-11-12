@@ -1090,6 +1090,37 @@ server_parameters:
             query_knob:
                 wire_name: samplingBySequentialScan
 
+    internalQuerySamplingCEMaxKeystringsPerDocument:
+        description: >-
+            Maximum number of keystrings a sampled document may generate during keystring-based
+            cardinality estimation. Exceeding this limit prevents further keystring extraction for
+            that index during the query; plans that require extraction fall back to multi-planning.
+            The default leaves headroom for synthetic benchmark workloads while bounding extraction
+            work for wide documents.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySamplingCEMaxKeystringsPerDocument"
+        cpp_vartype: Atomic<int>
+        default: 50
+        validator:
+            gt: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: samplingCEMaxKeystringsPerDocument
+
+    internalQuerySamplingCEForceKeystringEstimation:
+        mod_visibility: needs_replacement
+        description:
+            Test-only knob that forces samplingCE to estimate all index types via the
+            keystring-based path (generating actual index keys from the sampled documents)
+            instead of the projection-based path. Used by benchmarks to compare the two
+            estimation paths on identical indexes.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySamplingCEForceKeystringEstimation"
+        cpp_vartype: Atomic<bool>
+        default: false
+        redact: false
+
     internalQuerySamplingByStrides:
         mod_visibility: needs_replacement
         description:
