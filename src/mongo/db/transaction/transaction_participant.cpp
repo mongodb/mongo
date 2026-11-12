@@ -146,6 +146,7 @@ const auto retryableWriteTransactionParticipantCatalogDecoration =
  */
 RetryableWriteTransactionParticipantCatalog& getRetryableWriteTransactionParticipantCatalog(
     Session* session) {
+    invariant(session);
     if (const auto parentSession = session->getParentSession()) {
         return retryableWriteTransactionParticipantCatalogDecoration(parentSession);
     }

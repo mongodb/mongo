@@ -669,6 +669,17 @@ TEST_F(TxnParticipantTest, AutocommitRequiredOnEveryTxnOp) {
 }
 
 using TxnParticipantTestDeathTest = TxnParticipantTest;
+DEATH_TEST_F(TxnParticipantTestDeathTest,
+             RetryableWriteParticipantCatalogRequiresCheckedOutSession,
+             "Invariant failure") {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    sessionCheckout->checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
+    ASSERT_FALSE(OperationContextSession::get(opCtx()));
+
+    static_cast<void>(txnParticipant.onConflictingInternalTransactionCompletion(opCtx()));
+}
+
 DEATH_TEST_F(TxnParticipantTestDeathTest, AutocommitCannotBeTrue3, "invariant") {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
