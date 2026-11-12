@@ -957,6 +957,12 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
         }
     }();
 
+    if (timestamp.has_value() && repairMode != RepairMode::kNone) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "Running the validate command with { atClusterTime: ... } and a repair option is "
+                  "not supported");
+    }
+
     if (repair) {
         shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
             PrepareConflictBehavior::ignoreAndAllowWrites);
