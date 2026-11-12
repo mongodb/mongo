@@ -38,15 +38,14 @@ bool annotateNonArrayIdFields(PipelineRewriteContext& ctx) {
 
 }  // namespace
 
-// Runs only to count plans eligible for streaming group; no streaming group stage uses it yet.
-REGISTER_RULES_WITH_FEATURE_FLAG(DocumentSourceGroup,
-                                 &feature_flags::gFeatureFlagStreamingGroupEligibilityCounter,
-                                 {
-                                     .name = "ANNOTATE_GROUP_NON_ARRAY_ID_FIELDS",
-                                     .precondition = mayRunInSbe,
-                                     .transform = annotateNonArrayIdFields,
-                                     .priority = kDefaultOptimizeInPlacePriority,
-                                     .tags = PipelineRewriteContext::Tags::Annotation,
-                                 });
+// Annotates each $group with the _id fields that cannot be arrays
+REGISTER_RULES(DocumentSourceGroup,
+               {
+                   .name = "ANNOTATE_GROUP_NON_ARRAY_ID_FIELDS",
+                   .precondition = mayRunInSbe,
+                   .transform = annotateNonArrayIdFields,
+                   .priority = kDefaultOptimizeInPlacePriority,
+                   .tags = PipelineRewriteContext::Tags::Annotation,
+               });
 
 }  // namespace mongo::rule_based_rewrites::pipeline

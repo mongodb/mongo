@@ -414,19 +414,6 @@ function runStandaloneCases(db) {
         assert.commandWorked(coll.deleteOne({_id: "multikeyB"}));
     }
 
-    // The flag is a kill switch: with it off the $group is still counted, but never as eligible.
-    {
-        setIndexes([[{a: 1}]]);
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, featureFlagStreamingGroupEligibilityCounter: false}),
-        );
-        assertCounts(nodeCounters(eligiblePipeline), {group: 1, eligible: 0}, "flag off");
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, featureFlagStreamingGroupEligibilityCounter: true}),
-        );
-        assertCounts(nodeCounters(eligiblePipeline), {group: 1, eligible: 1}, "flag back on");
-    }
-
     // A $group that runs in the classic engine has no GROUP node, so neither counter is set.
     {
         setIndexes([[{a: 1}]]);

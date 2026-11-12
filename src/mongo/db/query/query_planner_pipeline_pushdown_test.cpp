@@ -586,11 +586,7 @@ protected:
     }
 };
 
-class StreamingGroupEligibilityTest : public StreamingGroupPlanningTest {
-protected:
-    unittest::ServerParameterGuard eligibilityCounterEnabled{
-        "featureFlagStreamingGroupEligibilityCounter", true};
-};
+using StreamingGroupEligibilityTest = StreamingGroupPlanningTest;
 
 TEST_F(StreamingGroupEligibilityTest, EligibleForCoveredIndexSort) {
     addIndex(fromjson("{a: 1}"));
@@ -600,18 +596,6 @@ TEST_F(StreamingGroupEligibilityTest, EligibleForCoveredIndexSort) {
                                   nonArray(fromjson("{a: 1}")));
     assertGroupRoot(*solution, true);
     ASSERT_EQ(rootNonArrayIdFields(*solution), OrderedPathSet({"_id"}));
-}
-
-TEST_F(StreamingGroupPlanningTest, IneligibleWithoutFeatureFlag) {
-    unittest::ServerParameterGuard eligibilityCounterDisabled{
-        "featureFlagStreamingGroupEligibilityCounter", false};
-    addIndex(fromjson("{a: 1}"));
-
-    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
-                                   fromjson("{$group: {_id: '$a', total: {$sum: '$a'}}}")},
-                                  nonArray(fromjson("{a: 1}")));
-    assertGroupRoot(*solution, false);
-    ASSERT_EQ(rootNonArrayIdFields(*solution), OrderedPathSet{});
 }
 
 class StreamingGroupNodeTest : public StreamingGroupPlanningTest {

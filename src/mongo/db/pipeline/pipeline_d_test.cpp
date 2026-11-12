@@ -20,7 +20,6 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_role.h"
-#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -138,10 +137,6 @@ protected:
     }
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
-
-private:
-    unittest::ServerParameterGuard _featureFlag{"featureFlagStreamingGroupEligibilityCounter",
-                                                true};
 };
 
 TEST_F(PipelineDGroupAnnotationTest, GenericPathRecomputesAnnotationOfClonedGroup) {

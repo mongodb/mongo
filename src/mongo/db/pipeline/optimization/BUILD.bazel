@@ -47,7 +47,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query/compiler/metadata:path_arrayness",
         "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
-        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 

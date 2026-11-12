@@ -2089,10 +2089,7 @@ namespace {
 bool eligibleForStreamingGroup(const CanonicalQuery& query,
                                QuerySolutionNode& input,
                                const DocumentSourceGroup& group) {
-    auto ifr = query.getExpCtx()->getIfrContext();
-    if (!(ifr->getSavedFlagValue(feature_flags::gFeatureFlagStreamingGroupEligibilityCounter) ||
-          ifr->getSavedFlagValue(feature_flags::gFeatureFlagSbeStreamingGroup)) ||
-        group.doingMerge() || group.willBeMerged() || query.getCollator()) {
+    if (group.doingMerge() || group.willBeMerged() || query.getCollator()) {
         return false;
     }
     StringSet paths;

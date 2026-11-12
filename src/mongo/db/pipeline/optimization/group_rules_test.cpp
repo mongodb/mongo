@@ -11,7 +11,6 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
-#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -61,8 +60,6 @@ protected:
 
 private:
     std::shared_ptr<PathArrayness> _pathArrayness = std::make_shared<PathArrayness>();
-    unittest::ServerParameterGuard _featureFlag{"featureFlagStreamingGroupEligibilityCounter",
-                                                true};
 };
 
 TEST_F(GroupRulesTest, TopLevelKey) {
@@ -110,14 +107,6 @@ TEST_F(GroupRulesTest, RecordsPathsForYieldRecheck) {
     addIndexedPath("a");
     optimizeAndGetNonArrayIdFields({"{$group: {_id: '$a'}}"});
     ASSERT_EQ(recordedNonArrayPaths(), std::vector<std::string>{"a"});
-}
-
-TEST_F(GroupRulesTest, FeatureFlagOff) {
-    unittest::ServerParameterGuard featureFlag("featureFlagStreamingGroupEligibilityCounter",
-                                               false);
-    addIndexedPath("a");
-    ASSERT_EQ(optimizeAndGetNonArrayIdFields({"{$group: {_id: '$a'}}"}), OrderedPathSet{});
-    ASSERT_EQ(recordedNonArrayPaths(), std::vector<std::string>{});
 }
 
 TEST_F(GroupRulesTest, ForceClassicEngine) {
