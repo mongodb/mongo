@@ -1,6 +1,7 @@
 /**
  * Tests that rolling back the insertion of the shardIdentity document on a shard causes the node
- * rolling it back to shut down.
+ * rolling it back to shut down. For DSC, verifies that fencing terminates a primary with an
+ * unshipped shard identity and that recovery does not retain its initialized sharding state.
  * @tags: [multiversion_incompatible, requires_persistence]
  */
 
@@ -8,12 +9,16 @@
 TestData.skipEnforceFastCountOnValidate = true;
 
 import {stopServerReplication, restartServerReplication} from "jstests/libs/write_concern_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 1});
 
-let replTest = new ReplSetTest({nodes: 3});
+let replTest = new ReplSetTest({
+    nodes: [{rsConfig: {priority: 1}}, {rsConfig: {priority: 1}}, {rsConfig: {priority: 1}}],
+});
 replTest.startSet({shardsvr: ""});
 replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
@@ -27,6 +32,7 @@ assert.commandWorked(
 );
 
 let priConn = replTest.getPrimary();
+const disagg = isDisagg(priConn);
 let secondaries = replTest.getSecondaries();
 let configConnStr = st.configRS.getURL();
 
@@ -37,7 +43,15 @@ replTest.awaitSecondaryNodes();
 
 replTest.awaitReplication();
 
-stopServerReplication(secondaries);
+if (disagg) {
+    // Checkpoint the existing state, then wait for SLS shipping to pause so the subsequent
+    // shardIdentity insert remains local to this primary and is lost on failover.
+    assert.commandWorked(priConn.adminCommand({fsync: 1}));
+    const shippingPause = configureFailPoint(priConn, "hangInPrimaryMainLoopInner");
+    shippingPause.wait();
+} else {
+    stopServerReplication(secondaries);
+}
 
 jsTest.log("inserting shardIdentity document to primary that shouldn't replicate");
 
@@ -82,47 +96,69 @@ assert.writeErrorWithCode(
     40070,
 );
 
-jsTest.log("shutting down primary");
-// Shut down the primary so a secondary gets elected that definitely won't have replicated the
-// shardIdentity insert, which should trigger a rollback on the original primary when it comes
-// back online.
-replTest.stop(priConn);
+if (disagg) {
+    // Promote a standby while SLS shipping remains paused. Its higher-term heartbeat causes
+    // the old primary to exit, preventing it from retaining an active, unshipped shard identity.
+    jsTest.log("Fencing the primary while its shard identity has not reached SLS");
+    assert.soon(() => secondaries[0].adminCommand({replSetStepUp: 1}).ok);
+    checkLog.containsJson(secondaries[0], 10985456);
+    // Verify that fencing, rather than an explicit stop request, caused the abrupt exit.
+    let termination;
+    assert.soon(() => {
+        termination = checkProgram(priConn.pid);
+        return !termination.alive;
+    });
+    assert.eq(MongoRunner.EXIT_ABRUPT, termination.exitCode, tojson(termination));
+} else {
+    jsTest.log("shutting down primary");
+    // Shut down the primary so a secondary gets elected that definitely won't have replicated the
+    // shardIdentity insert, which should trigger a rollback on the original primary when it comes
+    // back online.
+    replTest.stop(priConn);
 
-// Disable the fail point so that the elected node can exit drain mode and finish becoming
-// primary.
-restartServerReplication(secondaries);
+    // Disable the fail point so that the elected node can exit drain mode and finish becoming
+    // primary.
+    restartServerReplication(secondaries);
+}
 
 // Wait for a new healthy primary
 let newPriConn = replTest.getPrimary();
 assert.neq(priConn, newPriConn);
 assert.commandWorked(newPriConn.getDB("test").foo.insert({a: 1}, {writeConcern: {w: "majority"}}));
 
-// Restart the original primary so it triggers a rollback of the shardIdentity insert. Pass
-// {waitForConnect : false} to avoid a race condition between the node crashing (which we expect)
-// and waiting to be able to connect to the node.
-jsTest.log("Restarting original primary");
-priConn = replTest.start(priConn, {waitForConnect: false}, true);
+if (disagg) {
+    // The identity never reached SLS, so the new primary must have neither the document nor
+    // initialized sharding state.
+    assert.eq(null, newPriConn.getDB("admin").system.version.findOne({_id: "shardIdentity"}));
+    assert(!assert.commandWorked(newPriConn.adminCommand({shardingState: 1})).enabled);
+} else {
+    // Restart the original primary so it triggers a rollback of the shardIdentity insert. Pass
+    // {waitForConnect : false} to avoid a race condition between the node crashing (which we expect)
+    // and waiting to be able to connect to the node.
+    jsTest.log("Restarting original primary");
+    priConn = replTest.start(priConn, {waitForConnect: false}, true);
 
-// Wait until we cannot create a connection to the former primary, which indicates that it must
-// have shut itself down during the rollback.
-jsTest.log("Waiting for original primary to rollback and shut down");
-// Wait until the node shuts itself down during the rollback. We will hit the first assertion if
-// we rollback using 'recoverToStableTimestamp'.
-assert.soon(() => {
-    return rawMongoProgramOutput("Fatal assertion").search(/(40498|50712)/) !== -1;
-});
+    // Wait until we cannot create a connection to the former primary, which indicates that it must
+    // have shut itself down during the rollback.
+    jsTest.log("Waiting for original primary to rollback and shut down");
+    // Wait until the node shuts itself down during the rollback. We will hit the first assertion if
+    // we rollback using 'recoverToStableTimestamp'.
+    assert.soon(() => {
+        return rawMongoProgramOutput("Fatal assertion").search(/(40498|50712)/) !== -1;
+    });
 
-// Restart the original primary again.  This time, the shardIdentity document should already be
-// rolled back, so there shouldn't be any rollback and the node should stay online.
-jsTest.log(
-    "Restarting original primary a second time and waiting for it to successfully become " +
-        "secondary",
-);
-try {
-    // Join() with the crashed mongod and ignore its bad exit status.
-    MongoRunner.stopMongod(priConn);
-} catch (e) {
-    // expected
+    // Restart the original primary again.  This time, the shardIdentity document should already be
+    // rolled back, so there shouldn't be any rollback and the node should stay online.
+    jsTest.log(
+        "Restarting original primary a second time and waiting for it to successfully become " +
+            "secondary",
+    );
+    try {
+        // Join() with the crashed mongod and ignore its bad exit status.
+        MongoRunner.stopMongod(priConn);
+    } catch (e) {
+        // expected
+    }
 }
 // Since we pass "restart: true" here, the node will start with the same options as above unless
 // specified. We do want to wait to be able to connect to the node here however, so we need to pass
