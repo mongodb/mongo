@@ -5,6 +5,8 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/resharding/local_resharding_operations_registry.h"
@@ -19,6 +21,7 @@
 #include "mongo/util/version/releases.h"
 
 #include <array>
+#include <string>
 
 #include <gtest/gtest.h>
 
@@ -403,6 +406,93 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 
     ASSERT_EQ(computeVerificationDeadline(coordinatorDoc, reachedStrictConsistencyTime),
               reachedStrictConsistencyTime);
+}
+
+TEST_F(ReshardingCoordinatorServiceUtilTest, ExtendAndValidateZoneRange) {
+    struct TestCase {
+        std::string name;
+        BSONObj shardKey;
+        BSONObj min;
+        BSONObj max;
+        boost::optional<ErrorCodes::Error> expectedError;
+        BSONObj expectedMin;
+        BSONObj expectedMax;
+    };
+
+    const std::vector<TestCase> testCases = {
+        // Compound range key: prefix bounds extend to the full key.
+        {"compoundRange",
+         BSON("a" << 1 << "b" << 1),
+         BSON("a" << MINKEY),
+         BSON("a" << MAXKEY),
+         boost::none,
+         BSON("a" << MINKEY << "b" << MINKEY),
+         BSON("a" << MAXKEY << "b" << MAXKEY)},
+        // Hashed prefix: the hashed bound must be NumberLong, MinKey or MaxKey.
+        {"hashedPrefix",
+         BSON("a" << "hashed" << "b" << 1),
+         BSON("a" << MINKEY),
+         BSON("a" << 0LL),
+         boost::none,
+         BSON("a" << MINKEY << "b" << MINKEY),
+         BSON("a" << 0LL << "b" << MINKEY)},
+        {"hashedPrefixGlobalMax",
+         BSON("a" << "hashed" << "b" << 1),
+         BSON("a" << 0LL),
+         BSON("a" << MAXKEY),
+         boost::none,
+         BSON("a" << 0LL << "b" << MINKEY),
+         BSON("a" << MAXKEY << "b" << MAXKEY)},
+        // Hashed suffix: the range prefix is padded with MinKey.
+        {"hashedSuffix",
+         BSON("a" << 1 << "b" << "hashed"),
+         BSON("a" << 0),
+         BSON("a" << 5),
+         boost::none,
+         BSON("a" << 0 << "b" << MINKEY),
+         BSON("a" << 5 << "b" << MINKEY)},
+        // Non-hashed fields may hold any type.
+        {"nonHashedFieldWithStringValue",
+         BSON("a" << 1),
+         BSON("a" << "aaa"),
+         BSON("a" << "bbb"),
+         boost::none,
+         BSON("a" << "aaa"),
+         BSON("a" << "bbb")},
+        {"invalidHashedValue",
+         BSON("h" << "hashed"),
+         BSON("h" << "aaa"),
+         BSON("h" << "bbb"),
+         ErrorCodes::InvalidOptions,
+         BSONObj(),
+         BSONObj()},
+        {"nonPrefixBound",
+         BSON("a" << 1 << "b" << 1),
+         BSON("b" << 0),
+         BSON("b" << 5),
+         ErrorCodes::ShardKeyNotFound,
+         BSONObj(),
+         BSONObj()},
+    };
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("db.coll");
+    for (const auto& testCase : testCases) {
+        SCOPED_TRACE(testCase.name);
+        const ShardKeyPattern shardKey(testCase.shardKey);
+
+        if (testCase.expectedError) {
+            ASSERT_THROWS_CODE(extendAndValidateZoneRange(
+                                   nss, shardKey.getKeyPattern(), testCase.min, testCase.max),
+                               DBException,
+                               *testCase.expectedError);
+            continue;
+        }
+
+        const auto range =
+            extendAndValidateZoneRange(nss, shardKey.getKeyPattern(), testCase.min, testCase.max);
+        ASSERT_BSONOBJ_EQ(range.getMin(), testCase.expectedMin);
+        ASSERT_BSONOBJ_EQ(range.getMax(), testCase.expectedMax);
+    }
 }
 
 }  // namespace resharding

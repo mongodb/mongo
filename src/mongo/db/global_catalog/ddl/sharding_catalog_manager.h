@@ -64,6 +64,18 @@
 
 namespace mongo {
 /**
+ * Extends the zone bounds 'min' and 'max' to the full shard key 'keyPattern' and validates that
+ * every hashed shard key field in the resulting range is bounded by a NumberLong, MinKey, or
+ * MaxKey. 'nss' is only used in error messages.
+ *
+ * Both bounds must be a field-name prefix of 'keyPattern'.
+ */
+[[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkRange extendAndValidateZoneRange(const NamespaceString& nss,
+                                                                      const KeyPattern& keyPattern,
+                                                                      const BSONObj& min,
+                                                                      const BSONObj& max);
+
+/**
  * Implements modifications to the sharding catalog metadata.
  *
  * TODO (SERVER-123626): Currently the code responsible for writing the sharding catalog metadata is

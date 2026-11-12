@@ -113,6 +113,32 @@ Status checkForOverlappingZonedKeyRange(OperationContext* opCtx,
 }
 
 /**
+ * Extends the given zone bounds to the full shard key.
+ *
+ * A bound that is not a field-name prefix of the shard key is a user error. Checking it here keeps
+ * extendRangeBound() and isGlobalMax() from firing their internal masserts.
+ */
+ChunkRange extendZoneRangeBounds(const NamespaceString& nss,
+                                 const KeyPattern& keyPattern,
+                                 const BSONObj& min,
+                                 const BSONObj& max) {
+    const auto keyBSON = keyPattern.toBSON();
+
+    uassert(ErrorCodes::ShardKeyNotFound,
+            str::stream() << "min: " << min << " is not a prefix of the shard key " << keyBSON
+                          << " of ns: " << nss.toStringForErrorMsg(),
+            min.isFieldNamePrefixOf(keyBSON));
+    uassert(ErrorCodes::ShardKeyNotFound,
+            str::stream() << "max: " << max << " is not a prefix of the shard key " << keyBSON
+                          << " of ns: " << nss.toStringForErrorMsg(),
+            max.isFieldNamePrefixOf(keyBSON));
+
+    // Use makeUpperInclusive=true when the max bound is all-MaxKey.
+    return ChunkRange(keyPattern.extendRangeBound(min, false),
+                      keyPattern.extendRangeBound(max, keyPattern.isGlobalMax(max)));
+}
+
+/**
  * Returns a new range based on the given range with the full shard key.
  * Returns:
  * - ErrorCodes::NamespaceNotSharded if nss is not sharded.
@@ -143,22 +169,9 @@ ChunkRange includeFullShardKey(OperationContext* opCtx,
 
     CollectionType coll(findCollResult.front());
     const auto& shardKeyPattern = coll.getKeyPattern();
-    const auto& shardKeyBSON = shardKeyPattern.toBSON();
     *shardKeyPatternOut = shardKeyPattern;
 
-    uassert(ErrorCodes::ShardKeyNotFound,
-            str::stream() << "min: " << range.getMin() << " is not a prefix of the shard key "
-                          << shardKeyBSON << " of ns: " << nss.toStringForErrorMsg(),
-            range.getMin().isFieldNamePrefixOf(shardKeyBSON));
-    uassert(ErrorCodes::ShardKeyNotFound,
-            str::stream() << "max: " << range.getMax() << " is not a prefix of the shard key "
-                          << shardKeyBSON << " of ns: " << nss.toStringForErrorMsg(),
-            range.getMax().isFieldNamePrefixOf(shardKeyBSON));
-
-    // Use makeUpperInclusive=true when range max is all-MaxKey.
-    return ChunkRange(shardKeyPattern.extendRangeBound(range.getMin(), false),
-                      shardKeyPattern.extendRangeBound(
-                          range.getMax(), shardKeyPattern.isGlobalMax(range.getMax())));
+    return extendZoneRangeBounds(nss, shardKeyPattern, range.getMin(), range.getMax());
 }
 
 /**
@@ -225,6 +238,15 @@ BSONObj inferKeyPatternFromChunkRange(const ChunkRange& chunkRange) {
 }
 
 }  // namespace
+
+ChunkRange extendAndValidateZoneRange(const NamespaceString& nss,
+                                      const KeyPattern& keyPattern,
+                                      const BSONObj& min,
+                                      const BSONObj& max) {
+    const auto range = extendZoneRangeBounds(nss, keyPattern, min, max);
+    uassertStatusOK(checkHashedShardKeyRange(range, keyPattern));
+    return range;
+}
 
 Status ShardingCatalogManager::addShardToZone(OperationContext* opCtx,
                                               const std::string& shardName,

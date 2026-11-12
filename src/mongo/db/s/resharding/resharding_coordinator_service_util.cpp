@@ -24,6 +24,7 @@
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_chunk_range.h"
 #include "mongo/db/global_catalog/type_collection_gen.h"
 #include "mongo/db/global_catalog/type_namespace_placement_gen.h"
 #include "mongo/db/global_catalog/type_tags.h"
@@ -275,11 +276,22 @@ void insertChunksForTempNss(OperationContext* opCtx, const std::vector<ChunkType
 
 void setupZonesForTempNss(OperationContext* opCtx,
                           const NamespaceString& nss,
-                          std::vector<ReshardingZoneType> newZones) {
+                          const ShardKeyPattern& shardKey,
+                          const std::vector<ReshardingZoneType>& newZones) {
+    // Validate and extend every zone before writing any. Errors only detectable on the extended
+    // ranges (e.g. overlap, ZoneNotFound) are caught by the config server command and may leave a
+    // partial set of tags, which abort cleanup removes.
+    std::vector<ChunkRange> ranges;
+    ranges.reserve(newZones.size());
     for (const auto& zone : newZones) {
+        ranges.emplace_back(extendAndValidateZoneRange(
+            nss, shardKey.getKeyPattern(), zone.getMin(), zone.getMax()));
+    }
+
+    for (size_t i = 0; i < newZones.size(); ++i) {
         BSONObjBuilder cmdBuilder;
         ConfigsvrUpdateZoneKeyRange cmd(
-            nss, zone.getMin(), zone.getMax(), std::string{zone.getZone()});
+            nss, ranges[i].getMin(), ranges[i].getMax(), std::string{newZones[i].getZone()});
         cmd.serialize(&cmdBuilder);
         cmdBuilder.append("writeConcern", resharding::kMajorityWriteConcern.toBSON());
 
@@ -629,6 +641,12 @@ void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
     removeChunkAndTagsDocs(opCtx, tagsQuery, coordinatorDoc.getReshardingUUID());
     insertChunksForTempNss(opCtx, initialChunks);
 
+    // Zones need to be setup before the coordinator document is updated for idempotency.
+    setupZonesForTempNss(opCtx,
+                         coordinatorDoc.getTempReshardingNss(),
+                         ShardKeyPattern(coordinatorDoc.getReshardingKey()),
+                         zones);
+
     runCoordinatorCatalogTxn(opCtx,
                              coordinatorDoc.getAuthoritativeMetadataAccessLevel(),
                              {coordinatorDoc.getSourceNss()},
@@ -649,8 +667,6 @@ void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
                                                                     isUnsplittable,
                                                                     txnNumber);
                              });
-
-    setupZonesForTempNss(opCtx, coordinatorDoc.getTempReshardingNss(), zones);
 }
 
 void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(

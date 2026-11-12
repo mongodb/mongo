@@ -167,8 +167,16 @@ protected:
         CoordinatorStateEnum state,
         bool useUserUUID = false,
         boost::optional<Timestamp> fetchTimestamp = boost::none) {
+        return makeCoordinatorDocWithShardKey(state, _newShardKey, useUserUUID, fetchTimestamp);
+    }
+
+    ReshardingCoordinatorDocument makeCoordinatorDocWithShardKey(
+        CoordinatorStateEnum state,
+        const ShardKeyPattern& shardKey,
+        bool useUserUUID = false,
+        boost::optional<Timestamp> fetchTimestamp = boost::none) {
         CommonReshardingMetadata meta(
-            _reshardingUUID, _originalNss, UUID::gen(), _tempNss, _newShardKey.toBSON());
+            _reshardingUUID, _originalNss, UUID::gen(), _tempNss, shardKey.toBSON());
 
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         meta.setStartingFCV(fcvSnapshot.getVersion());
@@ -186,6 +194,30 @@ protected:
         doc.setCommonReshardingMetadata(meta);
         emplaceCloneTimestampIfExists(doc, std::move(fetchTimestamp));
         return doc;
+    }
+
+    struct ZoneTestSetup {
+        ReshardingCoordinatorDocument coordinatorDoc;
+        std::vector<ChunkType> initialChunks;
+    };
+
+    // Sets up an initializing coordinator doc with the given shard key and zones.
+    ZoneTestSetup setUpZoneTest(const ShardKeyPattern& shardKey,
+                                std::vector<ReshardingZoneType> zones) {
+        auto coordinatorDoc =
+            makeCoordinatorDocWithShardKey(CoordinatorStateEnum::kInitializing, shardKey);
+        makeAndInsertChunksForDonorShard(
+            _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+        coordinatorDoc.setZones(std::move(zones));
+        setupSourceCollection(operationContext(), coordinatorDoc);
+        insertCoordDocAndChangeOrigCollEntry(operationContext(), _metrics.get(), coordinatorDoc);
+
+        return {std::move(coordinatorDoc),
+                {ChunkType(_reshardingUUID,
+                           ChunkRange(shardKey.getKeyPattern().globalMin(),
+                                      shardKey.getKeyPattern().globalMax()),
+                           ChunkVersion({_tempEpoch, Timestamp(1, 2)}, {1, 0}),
+                           ShardId("shard0001"))}};
     }
 
     CollectionType makeOriginalCollectionCatalogEntry(
@@ -796,6 +828,197 @@ TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoSucceeds) {
         assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
     ASSERT_EQ(std::partial_ordering::less,
               collectionPlacementVersion <=> postTransitionCollectionPlacementVersion);
+}
+
+TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoWritesZonesBeforeStateTransition) {
+    auto coordinatorDoc = makeCoordinatorDoc(CoordinatorStateEnum::kInitializing);
+
+    // Ensure the chunks for the original namespace exist since they will be bumped as a product of
+    // the state transition to kPreparingToDonate.
+    makeAndInsertChunksForDonorShard(
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+
+    auto initialChunks =
+        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+
+    auto newZones = makeZones(_tempNss, _newShardKey);
+    std::vector<ReshardingZoneType> reshardingZoneTypes;
+    for (const auto& zone : newZones) {
+        reshardingZoneTypes.emplace_back(zone.getTag(), zone.getMinKey(), zone.getMaxKey());
+    }
+    coordinatorDoc.setZones(std::move(reshardingZoneTypes));
+
+    setupSourceCollection(operationContext(), coordinatorDoc);
+    insertCoordDocAndChangeOrigCollEntry(operationContext(), _metrics.get(), coordinatorDoc);
+
+    // Simulate the coordinator stepping down while committing the state transition.
+    PhaseTransitionFn failingTransitionFn = [](OperationContext*, TxnNumber) {
+        uasserted(ErrorCodes::Interrupted, "simulated stepdown");
+        return ReshardingCoordinatorDocument{};
+    };
+
+    ASSERT_THROWS_CODE(writeParticipantShardsAndTempCollInfo(operationContext(),
+                                                             _metrics.get(),
+                                                             coordinatorDoc,
+                                                             std::move(failingTransitionFn),
+                                                             initialChunks,
+                                                             *coordinatorDoc.getZones(),
+                                                             boost::none),
+                       DBException,
+                       ErrorCodes::Interrupted);
+
+    // The transition failed, so the tags must already have been written before it was attempted.
+    readTagCatalogEntriesAndAssertMatchExpected(operationContext(), newZones);
+
+    // Aborting from kInitializing must remove the temp namespace's chunks and tags.
+    removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+        operationContext(),
+        _metrics.get(),
+        coordinatorDoc,
+        Status(ErrorCodes::ReshardCollectionAborted, "test abort"));
+
+    DBDirectClient client(operationContext());
+    ASSERT_EQ(client.count(TagsType::ConfigNS, BSON("ns" << _tempNss.ns_forTest())), 0);
+    ASSERT_EQ(client.count(NamespaceString::kConfigsvrChunksNamespace,
+                           BSON(ChunkType::collectionUUID() << _reshardingUUID)),
+              0);
+}
+
+TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoRetriesStateTransitionAfterStepdown) {
+    auto coordinatorDoc = makeCoordinatorDoc(CoordinatorStateEnum::kInitializing);
+
+    // Ensure the chunks for the original namespace exist since they will be bumped as a product of
+    // the state transition to kPreparingToDonate.
+    makeAndInsertChunksForDonorShard(
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+
+    auto initialChunks =
+        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+
+    auto newZones = makeZones(_tempNss, _newShardKey);
+    std::vector<ReshardingZoneType> reshardingZoneTypes;
+    for (const auto& zone : newZones) {
+        reshardingZoneTypes.emplace_back(zone.getTag(), zone.getMinKey(), zone.getMaxKey());
+    }
+    coordinatorDoc.setZones(std::move(reshardingZoneTypes));
+
+    setupSourceCollection(operationContext(), coordinatorDoc);
+    insertCoordDocAndChangeOrigCollEntry(operationContext(), _metrics.get(), coordinatorDoc);
+
+    // Simulate the coordinator stepping down while committing the state transition.
+    PhaseTransitionFn failingTransitionFn = [](OperationContext*, TxnNumber) {
+        uasserted(ErrorCodes::Interrupted, "simulated stepdown");
+        return ReshardingCoordinatorDocument{};
+    };
+
+    ASSERT_THROWS_CODE(writeParticipantShardsAndTempCollInfo(operationContext(),
+                                                             _metrics.get(),
+                                                             coordinatorDoc,
+                                                             std::move(failingTransitionFn),
+                                                             initialChunks,
+                                                             *coordinatorDoc.getZones(),
+                                                             boost::none),
+                       DBException,
+                       ErrorCodes::Interrupted);
+
+    // The transition failed, so the tags must already have been written before it was attempted.
+    readTagCatalogEntriesAndAssertMatchExpected(operationContext(), newZones);
+
+    // A new primary re-runs initialization from kInitializing and retries the state transition.
+    auto expectedCoordinatorDoc = coordinatorDoc;
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
+    expectedCoordinatorDoc.setZones(boost::none);
+    expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
+
+    writeParticipantShardsAndTempCollInfo(operationContext(),
+                                          _metrics.get(),
+                                          expectedCoordinatorDoc,
+                                          createPreparingToDonateDaoUpdate(expectedCoordinatorDoc),
+                                          initialChunks,
+                                          *coordinatorDoc.getZones(),
+                                          boost::none);
+
+    assertStateAndCatalogEntriesMatchExpected(operationContext(), expectedCoordinatorDoc);
+    readChunkCatalogEntriesAndAssertMatchExpected(
+        operationContext(), _reshardingUUID, initialChunks, _originalEpoch, _originalTimestamp);
+    readTagCatalogEntriesAndAssertMatchExpected(operationContext(), newZones);
+}
+
+TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoExtendsZoneRangesForTempNss) {
+    // Prefix bounds must be extended to the full shard key for the temp namespace.
+    const ShardKeyPattern compoundShardKey(BSON("a" << 1 << "b" << 1));
+    std::vector<ReshardingZoneType> zones{
+        ReshardingZoneType(kZone1, BSON("a" << MINKEY), BSON("a" << 0)),
+        ReshardingZoneType(kZone2, BSON("a" << 0), BSON("a" << MAXKEY))};
+    auto setup = setUpZoneTest(compoundShardKey, zones);
+
+    auto expectedCoordinatorDoc = setup.coordinatorDoc;
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
+    expectedCoordinatorDoc.setZones(boost::none);
+
+    writeParticipantShardsAndTempCollInfo(operationContext(),
+                                          _metrics.get(),
+                                          expectedCoordinatorDoc,
+                                          createPreparingToDonateDaoUpdate(expectedCoordinatorDoc),
+                                          std::move(setup.initialChunks),
+                                          zones,
+                                          boost::none);
+
+    std::vector<TagsType> expectedZones{
+        TagsType(_tempNss,
+                 kZone1,
+                 ChunkRange(BSON("a" << MINKEY << "b" << MINKEY), BSON("a" << 0 << "b" << MINKEY))),
+        TagsType(
+            _tempNss,
+            kZone2,
+            ChunkRange(BSON("a" << 0 << "b" << MINKEY), BSON("a" << MAXKEY << "b" << MAXKEY)))};
+    readTagCatalogEntriesAndAssertMatchExpected(operationContext(), expectedZones);
+}
+
+TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoRejectsZoneBoundNotPrefixOfShardKey) {
+    // 'b' is the second field of the shard key, so a bound on 'b' alone is not a prefix.
+    const ShardKeyPattern compoundShardKey(BSON("a" << 1 << "b" << 1));
+    std::vector<ReshardingZoneType> zones{
+        ReshardingZoneType(kZone1, BSON("b" << 0), BSON("b" << 5))};
+    auto setup = setUpZoneTest(compoundShardKey, zones);
+
+    auto expectedCoordinatorDoc = setup.coordinatorDoc;
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
+    expectedCoordinatorDoc.setZones(boost::none);
+
+    ASSERT_THROWS_CODE(writeParticipantShardsAndTempCollInfo(
+                           operationContext(),
+                           _metrics.get(),
+                           expectedCoordinatorDoc,
+                           createPreparingToDonateDaoUpdate(expectedCoordinatorDoc),
+                           std::move(setup.initialChunks),
+                           zones,
+                           boost::none),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
+}
+
+TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoRejectsInvalidHashedZoneRange) {
+    // A hashed field must be bounded by a NumberLong, MinKey, or MaxKey.
+    const ShardKeyPattern hashedShardKey(BSON("h" << "hashed"));
+    std::vector<ReshardingZoneType> zones{
+        ReshardingZoneType(kZone1, BSON("h" << "aaa"), BSON("h" << "bbb"))};
+    auto setup = setUpZoneTest(hashedShardKey, zones);
+
+    auto expectedCoordinatorDoc = setup.coordinatorDoc;
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
+    expectedCoordinatorDoc.setZones(boost::none);
+
+    ASSERT_THROWS_CODE(writeParticipantShardsAndTempCollInfo(
+                           operationContext(),
+                           _metrics.get(),
+                           expectedCoordinatorDoc,
+                           createPreparingToDonateDaoUpdate(expectedCoordinatorDoc),
+                           std::move(setup.initialChunks),
+                           zones,
+                           boost::none),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, ThrowsWhenZoneSpecifiedDoesNotExist) {

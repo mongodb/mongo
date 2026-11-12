@@ -994,8 +994,8 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorOnly(
             // Notify metrics as the operation is now complete for external observers.
             markCompleted(status, _metrics.get());
 
-            // The temporary collection and its corresponding entries were never created. Only
-            // the coordinator document and reshardingFields require cleanup.
+            // The temp collection's config.collections entry was never created, but chunks and
+            // zones for the temp namespace may already have been written. Cleanup removes them.
             return _cleanupCoordinator(executor, status);
         })
         // Return back original status.
