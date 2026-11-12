@@ -16,6 +16,7 @@ import {
 } from "jstests/libs/block_replica_set_writes_utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     restartReplicationOnSecondaries,
@@ -35,7 +36,13 @@ function isBlockReplicaSetWritesRunning(adminDB) {
 
 describe("Test that blockReplicaSetWrites waits for majority write concern", function () {
     before(function () {
-        this.rst = new ReplSetTest({nodes: 3});
+        this.rst = new ReplSetTest({
+            nodes: [
+                {rsConfig: {priority: 1}},
+                {rsConfig: {priority: 1}},
+                {rsConfig: {priority: 1}},
+            ],
+        });
         this.rst.startSet();
         this.rst.initiate();
     });
@@ -114,6 +121,15 @@ describe("Test that blockReplicaSetWrites waits for majority write concern", fun
             primaryAdminDB.getSiblingDB("testDB").testColl.insert({x: 1}),
             ErrorCodes.ReplicaSetWritesBlocked,
         );
+
+        // Catch up all candidates so the write-block state is applied before handoff.
+        this.rst.awaitReplication();
+        if (isDisagg(primary)) {
+            // We must additionally make sure that the primary is aware that the secondaries are
+            // caught up to its lastApplied, since DSC uses heartbeat-reported progress for handoff.
+            // Wait until the primary's view of their applied optimes matches its own.
+            this.rst.awaitNodesAgreeOnAppliedOpTime(undefined, [primary]);
+        }
 
         // Step down and wait for a new primary to be elected.
         let stepDownRes;
