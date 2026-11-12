@@ -202,7 +202,8 @@ protected:
                 {},
                 {},
                 multikeyMetadata,
-                0);
+                0,
+                nullptr);
             pool.enqueue(0, std::move(item));
         }
         pool.shutdownAndJoin();
@@ -503,12 +504,12 @@ TEST_F(PipelinedWorkItemTest, KeepsMultikeyResultsWithTheirBatchWhenALaterBatchF
     PipelinedApplierBatchTracker tracker;
     auto metadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(4);
     std::weak_ptr<std::vector<WorkerMultikeyPathInfo>> weakMetadata = metadata;
-    auto counter =
-        tracker.addBatch({second.getOpTime(), second.getWallClockTime()}, 2, {}, {}, metadata, 0);
+    auto counter = tracker.addBatch(
+        {second.getOpTime(), second.getWallClockTime()}, 2, {}, {}, metadata, 0, nullptr);
     auto laterMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(4);
     std::weak_ptr<std::vector<WorkerMultikeyPathInfo>> weakLaterMetadata = laterMetadata;
     auto laterCounter = tracker.addBatch(
-        {later.getOpTime(), later.getWallClockTime()}, 1, {}, {}, laterMetadata, 0);
+        {later.getOpTime(), later.getWallClockTime()}, 1, {}, {}, laterMetadata, 0, nullptr);
     auto firstOwned = makeItem({first});
     firstOwned.item.batchRemainingWorkers = counter;
     firstOwned.item.multikeyPathInfo = &(*metadata)[0];
@@ -744,7 +745,7 @@ TEST_F(PipelinedWorkItemTest, BatchStaysIncompleteUntilTheWholeSliceIsApplied) {
                                        owned.item.ops.back()->getWallClockTime()};
     auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(1);
     owned.item.multikeyPathInfo = &(*multikeyMetadata)[0];
-    auto counter = tracker.addBatch(lastOpTime, 1, {}, {}, multikeyMetadata, 0);
+    auto counter = tracker.addBatch(lastOpTime, 1, {}, {}, multikeyMetadata, 0, nullptr);
     owned.item.batchRemainingWorkers = counter;
     Notification<void> reached;
     Notification<void> release;
@@ -795,7 +796,7 @@ TEST_F(PipelinedWorkItemTest, RecordsMultikeyAfterTheWholeSliceIsApplied) {
                                        owned.item.ops.back()->getWallClockTime()};
     auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(1);
     owned.item.multikeyPathInfo = &(*multikeyMetadata)[0];
-    auto counter = tracker.addBatch(lastOpTime, 1, {}, {}, multikeyMetadata, 0);
+    auto counter = tracker.addBatch(lastOpTime, 1, {}, {}, multikeyMetadata, 0, nullptr);
     owned.item.batchRemainingWorkers = counter;
     Notification<void> reached;
     Notification<void> release;
@@ -857,7 +858,8 @@ TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotCompleteItsBatch) {
         {},
         {},
         firstMetadata,
-        0);
+        0,
+        nullptr);
     owned.item.batchRemainingWorkers = counter;
     owned.item.multikeyPathInfo = &(*firstMetadata)[0];
     peer.item.batchRemainingWorkers = counter;
@@ -870,7 +872,8 @@ TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotCompleteItsBatch) {
         {},
         {},
         laterMetadata,
-        0);
+        0,
+        nullptr);
     later.item.batchRemainingWorkers = laterCounter;
     later.item.multikeyPathInfo = &(*laterMetadata)[1];
     // Interrupt the insert of _id: 0 with a shutdown error; the other inserts are allowed to
@@ -913,7 +916,8 @@ TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotRecordMultikeyWrites)
         {},
         {},
         firstMetadata,
-        0);
+        0,
+        nullptr);
     owned.item.batchRemainingWorkers = counter;
     owned.item.multikeyPathInfo = &(*firstMetadata)[0];
     peer.item.batchRemainingWorkers = counter;
@@ -926,7 +930,8 @@ TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotRecordMultikeyWrites)
         {},
         {},
         laterMetadata,
-        0);
+        0,
+        nullptr);
     later.item.batchRemainingWorkers = laterCounter;
     later.item.multikeyPathInfo = &(*laterMetadata)[1];
     // Interrupt the insert of _id: 0 with a shutdown error; the other inserts are allowed to

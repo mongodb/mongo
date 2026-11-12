@@ -48,6 +48,34 @@ namespace collection_validation {
  */
 [[MONGO_MOD_PUBLIC]] Lock::ExclusiveLock obtainExclusiveValidationLock(OperationContext* opCtx);
 
+/**
+ * Returns a scoped object, which holds the 'validateLock' in MODE_S for the given scope.
+ * Foreground validation holds this so that it cannot run concurrently with any oplog
+ * application (the classic applier's MODE_X, or the pipelined applier's MODE_IX), while
+ * still allowing multiple foreground validations to run in parallel.
+ */
+[[MONGO_MOD_PUBLIC]] Lock::ResourceLock obtainSharedValidationLock(OperationContext* opCtx,
+                                                                   Date_t deadline = Date_t::max());
+
+/**
+ * Holds the validation lock in MODE_IX for the lifetime of one in-flight pipelined oplog
+ * applier batch. This ensures that validate (which grabs the validation lock in MODE_S)
+ * cannot run while the pipelined oplog applier is running a batch.
+ */
+class [[MONGO_MOD_PUBLIC]] BatchValidationLock {
+public:
+    BatchValidationLock(ServiceContext* serviceContext, OperationContext* opCtx);
+
+    BatchValidationLock(BatchValidationLock&&) = delete;
+    BatchValidationLock& operator=(BatchValidationLock&&) = delete;
+
+    ~BatchValidationLock();
+
+private:
+    std::unique_ptr<Locker> _locker;
+    ResourceId _rid;
+};
+
 enum struct FastCountType {
     // The size storer table created by WiredTiger.
     legacySizeStorer,
@@ -244,9 +272,11 @@ private:
     ValidationOptions _options;
 
     // This lock needs to be obtained before the global lock. Initialise in the validation
-    // constructor. Oplog Batch Applier takes this lock in exclusive mode when applying the batch.
-    // Foreground validation waits on this lock to begin.
-    boost::optional<Lock::SharedLock> _validateLock;
+    // constructor. Oplog application holds this lock while applying batches: the classic
+    // applier in MODE_X per batch, and the pipelined applier in MODE_IX per in-flight batch.
+    // Foreground validation holds it in MODE_S and waits on it to begin; background validation
+    // does not take it.
+    boost::optional<Lock::ResourceLock> _validateLock;
 
     // To avoid racing with shutdown/rollback, this lock must be initialized early.
     Lock::GlobalLock _globalLock;

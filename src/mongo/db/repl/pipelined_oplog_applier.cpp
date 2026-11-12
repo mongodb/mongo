@@ -18,6 +18,7 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/validate/validate_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -290,6 +291,11 @@ void PipelinedOplogApplier::_dispatchBatchToWorkers(OperationContext* opCtx,
     const size_t numWorkers = _workerPool.numWorkers();
     invariant(!ops.empty());
 
+    // Take the validation lock (MODE_IX) for the entire duration of this batch to prevent
+    // validate from running while the batch is in-flight.
+    auto validateLock = std::make_unique<collection_validation::BatchValidationLock>(
+        cc().getServiceContext(), opCtx);
+
     // Capture the last op time to publish lastApplied after all workers finish.
     const OpTimeAndWallTime lastOpTime{ops.back().getOpTime(), ops.back().getWallClockTime()};
 
@@ -338,7 +344,8 @@ void PipelinedOplogApplier::_dispatchBatchToWorkers(OperationContext* opCtx,
                                                    std::move(ops),
                                                    std::move(derivedOps),
                                                    multikeyMetadata,
-                                                   batchBytes);
+                                                   batchBytes,
+                                                   std::move(validateLock));
     if (!remainingWorkers) {
         // Batch tracker shut down while we were waiting for capacity.
         return;

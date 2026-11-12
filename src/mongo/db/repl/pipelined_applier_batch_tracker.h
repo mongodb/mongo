@@ -6,6 +6,7 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/validate/validate_state.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -45,6 +46,15 @@ public:
         uint64_t batchBytes = 0;
         // Worker results are visible after remainingWorkers reaches zero.
         std::shared_ptr<std::vector<WorkerMultikeyPathInfo>> multikeyMetadata;
+        // MODE_IX on the validation lock held for the lifetime of this batch: constructed by the
+        // dispatcher before dispatch, destroyed by the advancer once the published batch is
+        // destroyed, releasing the lock.
+        // Validate grabs this lock in MODE_S when it runs, and therefore oplog application and
+        // validation can't run concurrently: if validate is running, POA will queue behind it and
+        // vice versa to acquire this lock.
+        // Multiple batches of POA can hold the lock at once as the lock can be grabbed by several
+        // callers in MODE_IX at the same time.
+        std::unique_ptr<collection_validation::BatchValidationLock> validateLock;
     };
 
     // Registers a batch before dispatch and returns the counter shared by its worker slices.
@@ -57,7 +67,8 @@ public:
         std::vector<OplogEntry> ops,
         std::vector<std::vector<OplogEntry>> derivedOps,
         std::shared_ptr<std::vector<WorkerMultikeyPathInfo>> multikeyMetadata,
-        uint64_t batchBytes);
+        uint64_t batchBytes,
+        std::unique_ptr<collection_validation::BatchValidationLock> validateLock);
 
     struct BackpressureReason {
         uint64_t batchesOverThreshold;

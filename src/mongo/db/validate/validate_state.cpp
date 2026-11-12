@@ -49,13 +49,19 @@ namespace mongo {
 
 namespace {
 /*
- * Oplog Batch Applier takes this lock in exclusive mode when applying the
- * batch. Foreground validation waits on this lock to begin validation.
- * We must synchronise these operations as foreground validation involves opening a snapshot of the
- * most recent data and during oplog application, CRUD operations on the document are performed in a
- * transaction separate from the fast count updates. This could potentially lead to validation
- * opening a snapshot between these two transactions and result in an incorrectly reported fast
- * count discrepancy.
+ * Oplog application holds this lock while applying batches, and foreground validation holds it in
+ * MODE_S and waits on it to begin. We must synchronise these operations as foreground validation
+ * involves opening a snapshot of the most recent data and during oplog application, CRUD
+ * operations on the document are performed in a transaction separate from the fast count updates.
+ * This could potentially lead to validation opening a snapshot between these two transactions and
+ * result in an incorrectly reported fast count discrepancy.
+ *
+ * Holders:
+ *   - The classic oplog applier takes MODE_X for the duration of each batch.
+ *   - The pipelined oplog applier takes MODE_IX per in-flight batch.
+ *   - Foreground validation takes MODE_S, which conflicts with both MODE_X and MODE_IX while
+ *     still allowing concurrent validations. Therefore validate cannot run if either applier is
+ *     active. Background validation does not take this lock.
  */
 ResourceMutex validateLock("validateLock");
 }  // namespace
@@ -84,13 +90,28 @@ Lock::ExclusiveLock obtainExclusiveValidationLock(OperationContext* opCtx) {
     return Lock::ExclusiveLock(opCtx, validateLock);
 }
 
+Lock::ResourceLock obtainSharedValidationLock(OperationContext* opCtx, Date_t deadline) {
+    return Lock::ResourceLock(opCtx, validateLock.getRid(), MODE_S, deadline);
+}
+
+BatchValidationLock::BatchValidationLock(ServiceContext* serviceContext, OperationContext* opCtx)
+    : _locker(std::make_unique<Locker>(serviceContext)), _rid(validateLock.getRid()) {
+    _locker->lock(opCtx, _rid, MODE_IX);
+}
+
+BatchValidationLock::~BatchValidationLock() {
+    if (_locker) {
+        _locker->unlock(_rid);
+    }
+}
+
 ValidateState::ValidateState(OperationContext* opCtx,
                              const NamespaceString& nss,
                              ValidationOptions options)
     : _options(std::move(options)),
       _validateLock(_options.isBackground()
                         ? boost::none
-                        : boost::optional<Lock::SharedLock>{{opCtx, validateLock}}),
+                        : boost::optional<Lock::ResourceLock>{obtainSharedValidationLock(opCtx)}),
       _globalLock(opCtx,
                   collectionLockMode() == MODE_X ? MODE_IX : MODE_IS,
                   {false,

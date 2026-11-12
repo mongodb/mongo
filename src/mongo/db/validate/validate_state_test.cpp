@@ -3,10 +3,13 @@
 
 #include "mongo/db/validate/validate_state.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/client.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
@@ -14,9 +17,11 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <future>
 #include <string_view>
 
 namespace mongo::collection_validation {
@@ -95,6 +100,133 @@ TEST_F(ValidateStateLockTest, ForegroundWithRepairTakesExclusiveCollectionLock) 
         EXPECT_TRUE(locker->isCollectionLockedForMode(kNss, MODE_X));
         EXPECT_TRUE(locker->isWriteLocked());
     }
+}
+
+TEST_F(ValidateStateLockTest, InflightBatchValidationLockExcludesAndReleasesValidationLock) {
+    // The pipelined oplog applier's per-batch MODE_IX holder acquires on a detached Locker, so
+    // it must exclude foreground validation's MODE_S (taken here through a different locker)
+    // for its lifetime, and release the validation lock when destroyed.
+    auto* serviceContext = operationContext()->getServiceContext();
+    {
+        BatchValidationLock batchValidationLock(serviceContext, operationContext());
+        ASSERT_THROWS_CODE(obtainSharedValidationLock(operationContext(), Date_t::now()),
+                           DBException,
+                           ErrorCodes::LockTimeout);
+    }
+    // Once the batch's lock holder is destroyed, foreground validation can acquire the lock.
+    // No isLocked() check: acquisition with an infinite deadline either succeeds or throws.
+    auto validateLock = obtainSharedValidationLock(operationContext());
+}
+
+// Foreground validation must block rather than run concurrently when POA has a batch in-flight.
+TEST_F(ValidateStateLockTest, ForegroundValidationWaitsForInflightBatchToPublish) {
+    auto* serviceContext = operationContext()->getServiceContext();
+
+    // Stand-in for a batch that has been dispatched but not yet published by the advancer.
+    auto batchLock = std::make_unique<BatchValidationLock>(serviceContext, operationContext());
+
+    std::promise<void> validateAcquired;
+    auto validateAcquiredFuture = validateAcquired.get_future();
+    unittest::JoinThread validateThread([&] {
+        ThreadClient client{serviceContext->getService()};
+        auto opCtx = cc().makeOperationContext();
+        // Real foreground validation has no deadline: it must wait, not time out or proceed.
+        auto validateLock = obtainSharedValidationLock(opCtx.get());
+        validateAcquired.set_value();
+    });
+
+    // The batch is applied but unpublished: validate must not complete while it is in flight.
+    ASSERT_EQ(validateAcquiredFuture.wait_for(Milliseconds(300).toSystemDuration()),
+              std::future_status::timeout);
+
+    // Publishing the batch destroys its lock holder; validate must now complete.
+    batchLock.reset();
+    ASSERT_EQ(validateAcquiredFuture.wait_for(Seconds(10).toSystemDuration()),
+              std::future_status::ready);
+}
+
+// While foreground validation holds the validation lock, a new in-flight batch cannot acquire
+// it and must wait for validation to finish.
+TEST_F(ValidateStateLockTest, NewInflightBatchWaitsForForegroundValidationToFinish) {
+    auto* serviceContext = operationContext()->getServiceContext();
+
+    std::promise<void> validateStarted;
+    std::promise<void> releaseValidation;
+    auto validateStartedFuture = validateStarted.get_future();
+    auto releaseValidationFuture = releaseValidation.get_future();
+
+    unittest::JoinThread validateThread([&] {
+        ThreadClient client{serviceContext->getService()};
+        auto opCtx = cc().makeOperationContext();
+        auto validateLock = obtainSharedValidationLock(opCtx.get());
+        validateStarted.set_value();
+        releaseValidationFuture.wait();
+    });
+    ASSERT_EQ(validateStartedFuture.wait_for(Seconds(10).toSystemDuration()),
+              std::future_status::ready);
+
+    // A new batch tries to start while validation is running.
+    std::promise<void> batchStarted;
+    auto batchStartedFuture = batchStarted.get_future();
+    unittest::JoinThread batchThread([&] {
+        ThreadClient client{serviceContext->getService()};
+        auto opCtx = cc().makeOperationContext();
+        BatchValidationLock batchLock{serviceContext, opCtx.get()};
+        batchStarted.set_value();
+    });
+
+    // Validation is still running: the batch must not start.
+    ASSERT_EQ(batchStartedFuture.wait_for(Milliseconds(300).toSystemDuration()),
+              std::future_status::timeout);
+
+    releaseValidation.set_value();
+    ASSERT_EQ(batchStartedFuture.wait_for(Seconds(10).toSystemDuration()),
+              std::future_status::ready);
+}
+
+// A new in-flight batch must not barge past a *waiting* foreground validation: once validate
+// has queued its MODE_S, no new batch may acquire MODE_IX until validation runs and finishes.
+// Without this queuing order, a steady stream of batches would starve validation forever.
+TEST_F(ValidateStateLockTest, NewInflightBatchDoesNotBargePastWaitingValidation) {
+    auto* serviceContext = operationContext()->getServiceContext();
+
+    // Phase 1: batch 1 in flight, holding MODE_IX.
+    auto batch1Lock = std::make_unique<BatchValidationLock>(serviceContext, operationContext());
+
+    // Phase 2: validate queues its MODE_S behind batch 1. It must not acquire yet.
+    std::promise<void> validateAcquired;
+    auto validateAcquiredFuture = validateAcquired.get_future();
+    unittest::JoinThread validateThread([&] {
+        ThreadClient client{serviceContext->getService()};
+        auto opCtx = cc().makeOperationContext();
+        auto validateLock = obtainSharedValidationLock(opCtx.get());
+        validateAcquired.set_value();
+    });
+    ASSERT_EQ(validateAcquiredFuture.wait_for(Milliseconds(100).toSystemDuration()),
+              std::future_status::timeout);  // validate is queued, not running.
+
+    // Phase 3: batch 2 wants MODE_IX — compatible with batch 1's IX, but it must queue
+    // behind the waiting validate rather than barge past it.
+    std::promise<void> batch2Started;
+    auto batch2StartedFuture = batch2Started.get_future();
+    unittest::JoinThread batch2Thread([&] {
+        ThreadClient client{serviceContext->getService()};
+        auto opCtx = cc().makeOperationContext();
+        BatchValidationLock batch2Lock{serviceContext, opCtx.get()};
+        batch2Started.set_value();
+    });
+    ASSERT_EQ(batch2StartedFuture.wait_for(Milliseconds(300).toSystemDuration()),
+              std::future_status::timeout);  // the key assertion: no barging.
+
+    // Batch 1 publishes: validate acquires and runs to completion first...
+    batch1Lock.reset();
+    ASSERT_EQ(validateAcquiredFuture.wait_for(Seconds(10).toSystemDuration()),
+              std::future_status::ready);
+
+    // ...and only after validation finishes (its lock released at thread scope exit) does
+    // batch 2 acquire.
+    ASSERT_EQ(batch2StartedFuture.wait_for(Seconds(10).toSystemDuration()),
+              std::future_status::ready);
 }
 
 }  // namespace

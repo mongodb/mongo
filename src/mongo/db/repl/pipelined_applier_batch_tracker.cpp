@@ -4,6 +4,7 @@
 #include "mongo/db/repl/pipelined_applier_batch_tracker.h"
 
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/validate/validate_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -27,7 +28,8 @@ std::shared_ptr<std::atomic<uint32_t>> PipelinedApplierBatchTracker::addBatch(
     std::vector<OplogEntry> ops,
     std::vector<std::vector<OplogEntry>> derivedOps,
     std::shared_ptr<std::vector<WorkerMultikeyPathInfo>> multikeyMetadata,
-    uint64_t batchBytes) {
+    uint64_t batchBytes,
+    std::unique_ptr<collection_validation::BatchValidationLock> validateLock) {
     auto remainingWorkers = std::make_shared<std::atomic<uint32_t>>(numWorkers);
     {
         std::unique_lock lk(_mutex);
@@ -87,7 +89,8 @@ std::shared_ptr<std::atomic<uint32_t>> PipelinedApplierBatchTracker::addBatch(
                                     std::move(ops),
                                     std::move(derivedOps),
                                     batchBytes,
-                                    std::move(multikeyMetadata)});
+                                    std::move(multikeyMetadata),
+                                    std::move(validateLock)});
         _inflightBytes += batchBytes;
     }
     // It's possible to enqueue a batch with zero remaining workers, with the intention of advancing
