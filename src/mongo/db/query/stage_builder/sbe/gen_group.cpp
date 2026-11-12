@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
+#include "mongo/db/exec/sbe/stages/streaming_agg.h"
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -1154,7 +1155,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector, SbSlot> buildGroupAggregationBlo
 }  // buildGroupAggregationBlock
 
 /**
- * This function builds a (scalar) HashAggStage for 'groupNode'.
+ * This function builds a scalar group stage for 'groupNode', which will be either HashAggStage or
+ * StreamingAggStage depending on 'isStreaming'.
  *
  * Returns a tuple containing the updated SBE plan tree, a list of slots corresponding to the group
  * by inputs, and a list of accumulator output slots corresponding to the accumulators from
@@ -1168,7 +1170,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationScalar(
     SbStage stage,
     SbExpr::Vector groupByKeyExprs,
     const SbHashAggAccumulatorVector& accumulatorList,
-    const GroupNode* groupNode) {
+    const GroupNode* groupNode,
+    bool isStreaming) {
     const PlanNodeId nodeId = groupNode->nodeId();
     SbBuilder b(state, nodeId);
 
@@ -1189,16 +1192,23 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationScalar(
     }
     individualSlots.insert(individualSlots.end(), groupBySlots.begin(), groupBySlots.end());
 
+    if (isStreaming) {
+        // Builds a streaming group stage with accumulator expressions, group-by slots, and
+        // clustering keys. For now, set the group by slots as the clustering keys.
+        return b.makeStreamingAgg(buildVariableTypes(childOutputs, individualSlots),
+                                  std::move(stage),
+                                  /* gbs */ groupBySlots,
+                                  /* cks */ groupBySlots,
+                                  accumulatorList,
+                                  state.getCollatorSlot());
+    }
+
     // Builds a group stage with accumulator expressions and group-by slot(s).
-    auto [hashAggStage, groupByOutSlots, aggSlots] = [&] {
-        return b.makeHashAgg(buildVariableTypes(childOutputs, individualSlots),
-                             std::move(stage),
-                             groupBySlots,
-                             accumulatorList,
-                             state.getCollatorSlot());
-    }();
-    stage = std::move(hashAggStage);
-    return {std::move(stage), std::move(groupByOutSlots), std::move(aggSlots)};
+    return b.makeHashAgg(buildVariableTypes(childOutputs, individualSlots),
+                         std::move(stage),
+                         groupBySlots,
+                         accumulatorList,
+                         state.getCollatorSlot());
 }  // buildGroupAggregationScalar
 
 /**
@@ -1721,6 +1731,27 @@ SlotBasedStageBuilder::buildGroupImplScalar(SbStage stage,  // moved in
     boost::optional<mongo::stage_builder::SbSlot> slotIdForInitRoot =
         variableAccInit ? boost::make_optional(SbSlot{_state.slotId()}) : boost::none;
 
+    auto idExprObj = dynamic_cast<ExpressionObject*>(groupNode->groupByExpression.get());
+    bool idIsSingleKey = idExprObj == nullptr;
+    bool idIsConstant = idIsSingleKey && !variableAccInit && groupByKeyExprs[0].isConstantExpr();
+
+    bool isStreaming = groupNode->getType() == STAGE_STREAMING_GROUP && !groupNode->doingMerge &&
+        !groupNode->willBeMerged &&
+        groupByKeyExprs.size() <= sbe::StreamingAggStage::kMaxClusteredGroupKeys;
+
+    // TODO(SERVER-138483) support constant group keys in streaming group.
+    // When the group key is constant, all rows are in one group, so streaming group shouldn't
+    // evaluate any grouping or clustering.
+    isStreaming = isStreaming && !idIsConstant;
+
+    // TODO(SERVER-139014) support variable initializers for streaming group.
+    // When variable accumulator initializers are present, generateInitRootSlot adds a project that
+    // rewrites the per-field group-by keys into one object key for the whole _id object. If the
+    // grouping key was an object, the object created by this project is used as the group-by slot.
+    // To support this case for streaming group, the clustering key must also be built as an object,
+    // but with fillEmptyNull applied correctly to each sub-field.
+    isStreaming = isStreaming && (!variableAccInit || idIsSingleKey);
+
     auto accumulatorList =
         generateScalarAccumulators(_state, *groupNode, slotIdForInitRoot, childOutputs);
 
@@ -1729,8 +1760,6 @@ SlotBasedStageBuilder::buildGroupImplScalar(SbStage stage,  // moved in
     // 'childOutputs' when we need to do constant-folding / type analysis and vectorization.
     SbSlotVector individualSlots;
 
-    auto idExprObj = dynamic_cast<ExpressionObject*>(groupNode->groupByExpression.get());
-    bool idIsSingleKey = idExprObj == nullptr;
     if (variableAccInit) {
         idIsSingleKey = true;
         auto [outStage, outExprs] = generateInitRootSlot(std::move(stage),
@@ -1744,17 +1773,15 @@ SlotBasedStageBuilder::buildGroupImplScalar(SbStage stage,  // moved in
         groupByKeyExprs = std::move(outExprs);
     }
 
-    // Expression for the group ID if the key is a single constant and no accs had variable inits.
-    SbExpr idConstantValue;
-
     // If the group by key is a single constant and no acc had a variable initializer, set
     // 'idConstantValue' and clear the 'groupByKeyExprs' vector.
-    if (idIsSingleKey && !variableAccInit && groupByKeyExprs[0].isConstantExpr()) {
+    SbExpr idConstantValue;
+    if (idIsConstant) {
         idConstantValue = std::move(groupByKeyExprs[0]);
         groupByKeyExprs.clear();
     }
 
-    // Build the HashAggStage.
+    // Build the HashAggStage, or the StreamingAggStage for a streaming group.
     auto [outStage, groupByOutSlots, aggOutSlots] =
         buildGroupAggregationScalar(_state,
                                     childOutputs,
@@ -1762,7 +1789,8 @@ SlotBasedStageBuilder::buildGroupImplScalar(SbStage stage,  // moved in
                                     std::move(stage),
                                     std::move(groupByKeyExprs),
                                     accumulatorList,
-                                    groupNode);
+                                    groupNode,
+                                    isStreaming);
     stage = std::move(outStage);
 
     // After the HashAgg/BlockHashAgg stage, the only slots that are "active" are the group-by slots
@@ -1786,10 +1814,4 @@ SlotBasedStageBuilder::buildGroupImplScalar(SbStage stage,  // moved in
                                 std::move(accumulatorList),
                                 *groupNode);
 }  // SlotBasedStageBuilder::buildGroupImplScalar
-
-std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildStreamingGroup(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    tassert(13600700, "buildStreamingGroup() is not implemented yet", false);
-    MONGO_UNREACHABLE;
-}
 }  // namespace mongo::stage_builder

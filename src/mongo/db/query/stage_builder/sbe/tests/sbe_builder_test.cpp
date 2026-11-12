@@ -13,6 +13,8 @@
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
@@ -46,7 +48,138 @@ protected:
         return std::make_unique<ShardFiltererFactoryMock>(
             std::make_unique<ConstantFilterMock>(true, BSONObj{BSON("a" << 1)}));
     }
+
+    /**
+     * Builds a STREAMING_GROUP node with 'groupSpec' (an $group spec) over a virtual collection
+     * scan that produces 'docs' in order, runs it, and checks that it produces 'expected'. The
+     * caller must provide 'docs' clustered by the group key.
+     */
+    void assertStreamingGroupResults(const std::vector<BSONObj>& docs,
+                                     const BSONObj& groupSpec,
+                                     const std::vector<BSONObj>& expected) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>(operationContext(), _nss);
+        VariablesParseState vps = expCtx->variablesParseState;
+
+        std::vector<BSONArray> scanDocs;
+        for (const auto& doc : docs) {
+            scanDocs.push_back(BSON_ARRAY(doc));
+        }
+        auto scan = std::make_unique<VirtualScanNode>(
+            std::move(scanDocs), VirtualScanNode::ScanType::kCollScan, false);
+
+        auto idExpr = Expression::parseOperand(expCtx.get(), groupSpec["_id"], vps);
+        std::vector<AccumulationStatement> accStmts;
+        for (auto&& elem : groupSpec) {
+            if (elem.fieldNameStringData() != "_id") {
+                accStmts.push_back(
+                    AccumulationStatement::parseAccumulationStatement(expCtx.get(), elem, vps));
+            }
+        }
+        auto groupNode =
+            std::make_unique<StreamingGroupNode>(std::move(scan),
+                                                 idExpr,
+                                                 std::move(accStmts),
+                                                 /*shouldProduceBson=*/true,
+                                                 /*nonArrayIdFields=*/OrderedPathSet{});
+        auto querySolution = makeQuerySolution(std::move(groupNode));
+
+        auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
+        auto [resultSlots, stage, data, _] =
+            buildPlanStage(std::move(querySolution), false, std::move(shardFiltererInterface));
+        auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
+        ASSERT_EQ(resultAccessors.size(), 1u);
+
+        std::vector<BSONObj> actual;
+        for (auto st = stage->getNext(); st == sbe::PlanState::ADVANCED; st = stage->getNext()) {
+            auto [tag, val] = resultAccessors[0]->getViewOfValue();
+            ASSERT_TRUE(tag == sbe::value::TypeTags::bsonObject);
+            actual.push_back(BSONObj(sbe::value::bitcastTo<const char*>(val)).getOwned());
+        }
+
+        ASSERT_EQ(actual.size(), expected.size());
+        for (size_t i = 0; i < expected.size(); ++i) {
+            ASSERT_BSONOBJ_EQ(actual[i], expected[i]);
+        }
+    }
 };
+
+TEST_F(SbeStageBuilderTest, StreamingGroupSingleKey) {
+    assertStreamingGroupResults({fromjson("{a: 1, b: 1}"),
+                                 fromjson("{a: 1, b: 2}"),
+                                 fromjson("{a: 2, b: 5}"),
+                                 fromjson("{a: 3, b: 1}"),
+                                 fromjson("{a: 3, b: 1}"),
+                                 fromjson("{a: 3, b: 1}")},
+                                fromjson("{_id: '$a', total: {$sum: '$b'}, n: {$sum: 1}}"),
+                                {fromjson("{_id: 1, total: 3, n: 2}"),
+                                 fromjson("{_id: 2, total: 5, n: 1}"),
+                                 fromjson("{_id: 3, total: 3, n: 3}")});
+}
+
+// The input of this test is deliberately not clustered by the group key. Streaming group emits a
+// group whenever the key changes, so it produces three groups, where a hash group would produce
+// two. This checks that a STREAMING_GROUP node really builds a streaming stage.
+TEST_F(SbeStageBuilderTest, StreamingGroupEmitsGroupOnKeyChange) {
+    assertStreamingGroupResults(
+        {fromjson("{a: 1}"), fromjson("{a: 2}"), fromjson("{a: 1}")},
+        fromjson("{_id: '$a', n: {$sum: 1}}"),
+        {fromjson("{_id: 1, n: 1}"), fromjson("{_id: 2, n: 1}"), fromjson("{_id: 1, n: 1}")});
+}
+
+// Accumulators that lower to more than one aggregate ($avg) and ones that don't, none of which have
+// merging expressions.
+TEST_F(SbeStageBuilderTest, StreamingGroupMultipleAccumulators) {
+    assertStreamingGroupResults(
+        {fromjson("{a: 1, b: 1}"), fromjson("{a: 1, b: 3}"), fromjson("{a: 2, b: 4}")},
+        fromjson("{_id: '$a', avg: {$avg: '$b'}, mx: {$max: '$b'}}"),
+        {fromjson("{_id: 1, avg: 2.0, mx: 3}"), fromjson("{_id: 2, avg: 4.0, mx: 4}")});
+}
+
+TEST_F(SbeStageBuilderTest, StreamingGroupCompoundKey) {
+    assertStreamingGroupResults({fromjson("{a: 1, b: 1}"),
+                                 fromjson("{a: 1, b: 1}"),
+                                 fromjson("{a: 1, b: 2}"),
+                                 fromjson("{a: 2, b: 1}")},
+                                fromjson("{_id: {x: '$a', y: '$b'}, n: {$sum: 1}}"),
+                                {fromjson("{_id: {x: 1, y: 1}, n: 2}"),
+                                 fromjson("{_id: {x: 1, y: 2}, n: 1}"),
+                                 fromjson("{_id: {x: 2, y: 1}, n: 1}")});
+}
+
+// Both key components read the same field, so they share a slot, which must only be passed to the
+// stage once.
+TEST_F(SbeStageBuilderTest, StreamingGroupDuplicateKeyPaths) {
+    assertStreamingGroupResults(
+        {fromjson("{a: 1}"), fromjson("{a: 1}"), fromjson("{a: 2}")},
+        fromjson("{_id: {x: '$a', y: '$a'}, n: {$sum: 1}}"),
+        {fromjson("{_id: {x: 1, y: 1}, n: 2}"), fromjson("{_id: {x: 2, y: 2}, n: 1}")});
+}
+
+// The initializer of $maxN's 'n' is evaluated against the _id, which is an object here, so it
+// differs per group. A scalar _id keeps its group-by slot, so streaming group supports this.
+TEST_F(SbeStageBuilderTest, StreamingGroupVariableInitializerWithScalarId) {
+    assertStreamingGroupResults(
+        {fromjson("{a: {k: 1}, b: 1}"),
+         fromjson("{a: {k: 1}, b: 3}"),
+         fromjson("{a: {k: 1}, b: 2}"),
+         fromjson("{a: {k: 0}, b: 5}"),
+         fromjson("{a: {k: 0}, b: 6}")},
+        fromjson("{_id: '$a', top: {$maxN: {input: '$b', n: {$add: ['$k', 1]}}}}"),
+        {fromjson("{_id: {k: 1}, top: [3, 2]}"), fromjson("{_id: {k: 0}, top: [6]}")});
+}
+
+// An object _id with more keys than StreamingAggStage::kMaxClusteredGroupKeys falls back to hash
+// $group instead of failing. A single group is used since hash group output order is unspecified.
+TEST_F(SbeStageBuilderTest, StreamingGroupFallsBackWithTooManyGroupByKeys) {
+    assertStreamingGroupResults(
+        {fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}"), fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}")},
+        fromjson("{_id: {a: '$a', b: '$b', c: '$c', d: '$d', e: '$e'}, n: {$sum: 1}}"),
+        {fromjson("{_id: {a: 1, b: 1, c: 1, d: 1, e: 1}, n: 2}")});
+}
+
+TEST_F(SbeStageBuilderTest, StreamingGroupEmptyInput) {
+    assertStreamingGroupResults({}, fromjson("{_id: '$a', n: {$sum: 1}}"), {});
+}
 
 TEST_F(SbeStageBuilderTest, TestVirtualScan) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(int64_t{0} << BSON("a" << 1 << "b" << 2)),

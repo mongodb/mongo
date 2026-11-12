@@ -1,13 +1,14 @@
 /**
- * Asserts that the 'eligibleForStreamingGroup' plan shape counter in query stats counts exactly
- * the plans whose pushed-down $group could have run as a streaming $group, on a standalone and on
- * a sharded cluster.
+ * Asserts that for plans whose pushed-down $group could run as a streaming $group, the
+ * 'eligibleForStreamingGroup' plan shape counter in query stats is counted correctly, and the
+ * resulting plan contains a streaming group stage when the streaming group feature flag is enabled.
  *
  * @tags: [
  *   requires_fcv_91,
  *   requires_sharding,
  * ]
  */
+import {getNestedProperties, getQueryPlanners} from "jstests/libs/query/analyze_plan.js";
 import {
     getQueryStats,
     getQueryStatsServerParameters,
@@ -25,9 +26,17 @@ const docs = Array.from({length: 20}, (_, i) => ({
     x: {y: i % 2},
 }));
 
-function makeHelpers(db, collName) {
+function makeHelpers(db, collName, flagConns, streamingEnabled) {
     const conn = db.getMongo();
     const coll = db[collName];
+    for (const flagConn of flagConns) {
+        assert.commandWorked(
+            flagConn.getDB("admin").runCommand({
+                setParameter: 1,
+                featureFlagSbeStreamingGroup: streamingEnabled,
+            }),
+        );
+    }
 
     function nodeCounters(pipeline, options = {}, runs = 1) {
         resetQueryStatsStore(conn, "1MB");
@@ -44,8 +53,32 @@ function makeHelpers(db, collName) {
     }
 
     function assertCounts(nodes, {group, eligible}, context) {
-        assert.eq(group, Number(nodes.group ?? 0), {context, nodes});
-        assert.eq(eligible, Number(nodes.eligibleForStreamingGroup ?? 0), {context, nodes});
+        const assertMsg = {context, streamingEnabled, nodes};
+        assert.eq(group, Number(nodes.group ?? 0) + Number(nodes.streamingGroup ?? 0), assertMsg);
+        assert.eq(eligible, Number(nodes.eligibleForStreamingGroup ?? 0), assertMsg);
+        assert.eq(streamingEnabled ? eligible : 0, Number(nodes.streamingGroup ?? 0), assertMsg);
+    }
+
+    // Counts the streaming and hash $group stages in the lowered SBE plans of the explain, which
+    // are the stages that actually run. The block hash group stage is not counted.
+    function groupStageCounts(pipeline, options = {}) {
+        const explain = coll.explain().aggregate(pipeline, options);
+        const sbeStages = getQueryPlanners(explain)
+            .flatMap((queryPlanner) => getNestedProperties(queryPlanner, "slotBasedPlan"))
+            .map((plan) => plan.stages)
+            .join("\n");
+        return {
+            streaming: (sbeStages.match(/(?<!\w)streaming_group\s*\[/g) ?? []).length,
+            hash: (sbeStages.match(/(?<!\w)group\s*\[/g) ?? []).length,
+        };
+    }
+
+    function assertStreamingStages(pipeline, streamingIfEnabled, context, options = {}) {
+        assert.eq(
+            streamingEnabled ? streamingIfEnabled : 0,
+            groupStageCounts(pipeline, options).streaming,
+            {context, streamingEnabled, pipeline},
+        );
     }
 
     function setIndexes(indexes) {
@@ -59,19 +92,54 @@ function makeHelpers(db, collName) {
         const mismatches = [];
         for (const {name, indexes, pipeline, options, group, eligible} of cases) {
             setIndexes(indexes);
+            const expectedStreaming = streamingEnabled ? eligible : 0;
             const nodes = nodeCounters(pipeline, options);
             const actual = {
-                group: Number(nodes.group ?? 0),
+                group: Number(nodes.group ?? 0) + Number(nodes.streamingGroup ?? 0),
                 eligible: Number(nodes.eligibleForStreamingGroup ?? 0),
+                streaming: Number(nodes.streamingGroup ?? 0),
             };
-            if (actual.group !== group || actual.eligible !== eligible) {
-                mismatches.push({name, expected: {group, eligible}, actual, nodes});
+            if (
+                actual.group !== group ||
+                actual.eligible !== eligible ||
+                actual.streaming !== expectedStreaming
+            ) {
+                mismatches.push({
+                    name,
+                    streamingEnabled,
+                    expected: {group, eligible, streaming: expectedStreaming},
+                    actual,
+                    nodes,
+                });
+            }
+
+            const stages = groupStageCounts(pipeline, options);
+            if (
+                stages.streaming !== expectedStreaming ||
+                stages.hash !== group - expectedStreaming
+            ) {
+                mismatches.push({
+                    name,
+                    streamingEnabled,
+                    expectedStages: {
+                        streaming: expectedStreaming,
+                        hash: group - expectedStreaming,
+                    },
+                    actualStages: stages,
+                });
             }
         }
         assert.eq([], mismatches);
     }
 
-    return {coll, nodeCounters, assertCounts, setIndexes, runCases};
+    return {
+        coll,
+        nodeCounters,
+        assertCounts,
+        assertStreamingStages,
+        setIndexes,
+        runCases,
+    };
 }
 
 function eligibleCase(name, indexes, pipeline, options) {
@@ -346,9 +414,10 @@ const standaloneCases = [
     ),
 ];
 
-function runStandaloneCases(db) {
+function runStandaloneCases(db, streamingEnabled) {
     const collName = jsTestName();
-    const {coll, nodeCounters, assertCounts, setIndexes, runCases} = makeHelpers(db, collName);
+    const {coll, nodeCounters, assertCounts, assertStreamingStages, setIndexes, runCases} =
+        makeHelpers(db, collName, [db.getMongo()], streamingEnabled);
     coll.drop();
     assert.commandWorked(coll.insert(docs));
     assert.commandWorked(db.foreign.insert([{a: 1}, {a: 2}]));
@@ -388,10 +457,12 @@ function runStandaloneCases(db) {
             {group: 3, eligible: 3},
             "before multikey",
         );
+        assertStreamingStages(eligiblePipeline, 1, "before multikey");
         assert.commandWorked(
             coll.insert({_id: "multikey", a: [1, 2], b: 0, c: 0, s: "", x: {y: 0}}),
         );
         assertCounts(nodeCounters(eligiblePipeline), {group: 1, eligible: 0}, "after multikey");
+        assertStreamingStages(eligiblePipeline, 0, "after multikey");
         assert.commandWorked(coll.deleteOne({_id: "multikey"}));
     }
 
@@ -406,11 +477,13 @@ function runStandaloneCases(db) {
             {group: 1, eligible: 1},
             "other field multikey",
         );
+        assertStreamingStages(eligiblePipeline, 1, "other field multikey");
         assertCounts(
             nodeCounters([{$match: {a: 1}}, {$group: {_id: "$b"}}]),
             {group: 1, eligible: 0},
             "key is multikey",
         );
+        assertStreamingStages([{$match: {a: 1}}, {$group: {_id: "$b"}}], 0, "key is multikey");
         assert.commandWorked(coll.deleteOne({_id: "multikeyB"}));
     }
 
@@ -427,44 +500,55 @@ function runStandaloneCases(db) {
     }
 }
 
-function runShardedCases(st) {
+function runShardedCases(st, streamingEnabled) {
     const db = st.s.getDB("test");
+    // The shards plan the $group, so they are the ones that need the streaming group flag.
+    const flagConns = [st.rs0.getPrimary(), st.rs1.getPrimary()];
     assert.commandWorked(db.foreign.insert([{a: 1}, {a: 2}]));
 
     // An unsharded collection runs the whole pipeline on its primary shard.
     {
-        const {coll, nodeCounters, assertCounts, setIndexes} = makeHelpers(db, "unsharded");
+        const {coll, nodeCounters, assertCounts, assertStreamingStages, setIndexes} = makeHelpers(
+            db,
+            "unsharded",
+            flagConns,
+            streamingEnabled,
+        );
         assert.commandWorked(coll.insert(docs));
         setIndexes([[{a: 1}]]);
-        assertCounts(
-            nodeCounters([{$match: {a: {$gte: 0}}}, {$group: {_id: "$a", ...kSum}}]),
-            {group: 1, eligible: 1},
-            "unsharded collection",
-        );
+        const pipeline = [{$match: {a: {$gte: 0}}}, {$group: {_id: "$a", ...kSum}}];
+        {
+            assertCounts(nodeCounters(pipeline), {group: 1, eligible: 1}, "unsharded collection");
+            assertStreamingStages(pipeline, 1, "unsharded collection");
+        }
     }
 
     // On a sharded collection, a $group that is split between the shards and the router is
     // marked willBeMerged on the shards, so it is not eligible.
+    const {coll, nodeCounters, assertCounts, assertStreamingStages, setIndexes} = makeHelpers(
+        db,
+        "sharded",
+        flagConns,
+        streamingEnabled,
+    );
+    st.shardColl(coll, {c: 1}, {c: 10});
+    assert.commandWorked(coll.insert(docs));
+    setIndexes([[{a: 1}]]);
     {
-        const {coll, nodeCounters, assertCounts, setIndexes} = makeHelpers(db, "sharded");
-        st.shardColl(coll, {c: 1}, {c: 10});
-        assert.commandWorked(coll.insert(docs));
-        setIndexes([[{a: 1}]]);
-        assertCounts(
-            nodeCounters([{$match: {a: {$gte: 0}}}, {$group: {_id: "$a", ...kSum}}]),
-            {group: 2, eligible: 0},
-            "split group",
-        );
+        const pipeline = [{$match: {a: {$gte: 0}}}, {$group: {_id: "$a", ...kSum}}];
+        {
+            assertCounts(nodeCounters(pipeline), {group: 2, eligible: 0}, "split group");
+            assertStreamingStages(pipeline, 0, "split group");
+        }
     }
 
     // A $group on the shard key runs entirely on the shards, with no merge on the router.
     {
-        const {coll, nodeCounters, assertCounts} = makeHelpers(db, "sharded");
-        assertCounts(
-            nodeCounters([{$match: {c: {$gte: 0}}}, {$group: {_id: "$c", ...kSum}}]),
-            {group: 2, eligible: 2},
-            "group on the shard key",
-        );
+        const pipeline = [{$match: {c: {$gte: 0}}}, {$group: {_id: "$c", ...kSum}}];
+        {
+            assertCounts(nodeCounters(pipeline), {group: 2, eligible: 2}, "group on the shard key");
+            assertStreamingStages(pipeline, 2, "group on the shard key");
+        }
     }
 }
 
@@ -472,21 +556,22 @@ function runShardedCases(st) {
     const conn = MongoRunner.runMongod(getQueryStatsServerParameters());
     const db = conn.getDB("test");
     if (checkSbeStatus(db) === kSbeRestricted) {
-        runStandaloneCases(db);
+        runStandaloneCases(db, /*streamingEnabled=*/ false);
+        runStandaloneCases(db, /*streamingEnabled=*/ true);
     } else {
         jsTest.log.info("Skipping the standalone cases: they need $group pushed down to SBE");
     }
     MongoRunner.stopMongod(conn);
 }
 
-{
+for (const streamingEnabled of [false, true]) {
     const st = new ShardingTest({
         shards: 2,
         mongosOptions: getQueryStatsServerParameters(),
         rsOptions: getQueryStatsServerParameters(),
     });
     if (checkSbeStatus(st.s.getDB("test")) === kSbeRestricted) {
-        runShardedCases(st);
+        runShardedCases(st, streamingEnabled);
     } else {
         jsTest.log.info("Skipping the sharded cases: they need $group pushed down to SBE");
     }

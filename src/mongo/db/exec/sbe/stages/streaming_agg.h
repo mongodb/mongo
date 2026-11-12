@@ -55,6 +55,9 @@ namespace mongo::sbe {
  */
 class StreamingAggStage final : public PlanStage {
 public:
+    // The maximum number of group keys with a cluster key slot different from the group-by slot.
+    static constexpr size_t kMaxClusteredGroupKeys = 4;
+
     StreamingAggStage(std::unique_ptr<PlanStage> input,
                       value::SlotVector keySlots,
                       value::SlotVector keyOutSlots,
@@ -77,13 +80,13 @@ public:
                       DebugPrintInfo& debugPrintInfo) const final;
     size_t estimateCompileTimeSize() const final;
 
+
 protected:
     bool shouldOptimizeSaveState(size_t) const final {
         return true;
     }
 
 private:
-    static constexpr size_t kMaxClusteredGroupKeys = 4;
     // Limit on the number of parallel groups we expect to see at a single time. At most 2 values
     // per clustered field, plus the first row of the next cluster.
     static constexpr size_t kMaxParallelGroups = (1 << kMaxClusteredGroupKeys) + 1;
