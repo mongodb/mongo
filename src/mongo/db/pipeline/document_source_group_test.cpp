@@ -1266,7 +1266,7 @@ public:
     }
 };
 
-TEST_F(DocumentSourceGroupDelinquencyTest, GroupTeardownIsExcludedFromInterruptDelinquency) {
+TEST_F(DocumentSourceGroupDelinquencyTest, GroupResetDoesNotCheckForInterrupt) {
     auto expCtx = getExpCtx();
     auto opCtx = expCtx->getOperationContext();
     unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
@@ -1292,17 +1292,15 @@ TEST_F(DocumentSourceGroupDelinquencyTest, GroupTeardownIsExcludedFromInterruptD
     opCtx->trackOverdueInterruptChecks(ticks->getTicks());
     const auto* stats = opCtx->overdueInterruptCheckStats();
     ticks->advance(Milliseconds{20});
-    const auto before = ticks->getTicks();
-    // Advance time after the pre-teardown check to distinguish it from the exit-window reset.
+    const auto checksBefore = opCtx->numInterruptChecks();
     ticks->setAdvanceOnRead(Milliseconds{5});
     processor.reset();
     ticks->setAdvanceOnRead(Milliseconds{0});
-    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
-    ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
-    ASSERT_GT(stats->interruptCheckWindowStartTime, before);
-    ASSERT_EQ(stats->interruptCheckWindowStartTime, ticks->getTicks() - 5);
+    ASSERT_EQ(opCtx->numInterruptChecks(), checksBefore);
+    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
     std::ignore = opCtx->checkForInterruptNoAssert();
     ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
+    ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
 }
 
 enum class GroupStageType { Default, Streaming };

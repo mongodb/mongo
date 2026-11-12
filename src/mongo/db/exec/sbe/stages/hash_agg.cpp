@@ -518,23 +518,12 @@ void HashAggStage::close() {
 
     trackClose();
 
-    // Destruction cannot usefully check interrupts, so exclude it from delinquency.
-    auto teardownSpillState = [&] {
-        _ht = boost::none;
-
-        if (_recordStore && _opCtx) {
-            _recordStore->resetCursor(_opCtx, _rsCursor);
-        }
-        _rsCursor.reset();
-        _recordStore.reset();
-    };
-    // _opCtx must exist for interrupt checking; if this is a non-executing plan, it may be null.
-    if (_opCtx) {
-        std::ignore = _opCtx->checkForInterruptNoAssert();
-        _opCtx->runWithoutInterruptionExceptAtGlobalShutdown(teardownSpillState);
-    } else {
-        teardownSpillState();
+    _ht = boost::none;
+    if (_recordStore && _opCtx) {
+        _recordStore->resetCursor(_opCtx, _rsCursor);
     }
+    _rsCursor.reset();
+    _recordStore.reset();
     _outKeyRowRecordStore = {0};
     _outAggRowRecordStore = {0};
     _spilledAggRow = {0};

@@ -1063,6 +1063,17 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "plan_executor_sbe_test",
+    srcs = ["plan_executor_sbe_test.cpp"],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
 mongo_cc_library(
     name = "replanning_required_info",
     srcs = [

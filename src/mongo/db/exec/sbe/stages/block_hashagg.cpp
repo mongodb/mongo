@@ -886,9 +886,7 @@ PlanState BlockHashAggStage::getNext() {
 
         if (_htIt == _ht->end()) {
             // All records have been processed.
-            // Destruction cannot usefully check interrupts, so exclude it from delinquency.
-            std::ignore = _opCtx->checkForInterruptNoAssert();
-            _opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] { _ht->clear(); });
+            _ht->clear();
             _htIt = _ht->end();
             _done = true;
             if (numRows == 0) {
@@ -1017,28 +1015,17 @@ void BlockHashAggStage::close() {
     trackClose();
     _children[0]->close();
 
-    // Destruction cannot usefully check interrupts, so exclude it from delinquency.
-    auto teardownSpillState = [&] {
-        _ht = boost::none;
-        if (_recordStore && _opCtx) {
-            _recordStore->resetCursor(_opCtx, _rsCursor);
-        }
-        _rsCursor.reset();
-        _recordStore.reset();
-
-        _currentBlockSize = 0;
-        _bitmapBlock = nullptr;
-        _tokenInfos.clear();
-        _monoBlocks.clear();
-    };
-    if (_opCtx) {
-        // Account for any check-free execution span leading up to teardown (NoAssert: close() is a
-        // cleanup path where throwing is unsafe).
-        std::ignore = _opCtx->checkForInterruptNoAssert();
-        _opCtx->runWithoutInterruptionExceptAtGlobalShutdown(teardownSpillState);
-    } else {
-        teardownSpillState();
+    _ht = boost::none;
+    if (_recordStore && _opCtx) {
+        _recordStore->resetCursor(_opCtx, _rsCursor);
     }
+    _rsCursor.reset();
+    _recordStore.reset();
+
+    _currentBlockSize = 0;
+    _bitmapBlock = nullptr;
+    _tokenInfos.clear();
+    _monoBlocks.clear();
 
     _outKeyRowRecordStore = {0};
     _outAggRowRecordStore = {0};

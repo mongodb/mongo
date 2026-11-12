@@ -152,9 +152,7 @@ void HashAggBaseStage<Derived>::spill() {
                     2,
                     "All in memory data has been consumed. HashAgg stage has nothing to spill. "
                     "Clearing memory.");
-        // Destruction cannot usefully check interrupts, so exclude it from delinquency.
-        std::ignore = _opCtx->checkForInterruptNoAssert();
-        _opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] { ht->clear(); });
+        ht->clear();
         htIt = ht->end();
         _memoryTracker.value().set(0);
         _opCtx->checkForInterrupt();
@@ -174,9 +172,7 @@ void HashAggBaseStage<Derived>::spill() {
 
     auto [spilledBytes, spilledRecords] = derived().spillImpl(_recordStore.get());
 
-    // Destruction cannot usefully check interrupts, so exclude it from delinquency.
-    std::ignore = _opCtx->checkForInterruptNoAssert();
-    _opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] { ht->clear(); });
+    ht->clear();
     htIt = ht->end();
     _memoryTracker.value().set(0);
 

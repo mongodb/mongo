@@ -124,7 +124,7 @@ public:
      * TODO: SERVER-105801 we should consider moving this information up to Interruptible.
      */
     struct OverdueInterruptCheckStats {
-        OverdueInterruptCheckStats(TickSource::Tick startTime)
+        explicit OverdueInterruptCheckStats(TickSource::Tick startTime)
             : interruptCheckWindowStartTime(std::move(startTime)) {}
 
         Atomic<int64_t> overdueInterruptChecks{0};
@@ -132,6 +132,9 @@ public:
         // Sum and max time an operation was overdue in checking for interrupts.
         Atomic<Milliseconds> overdueAccumulator{Milliseconds{0}};
         Atomic<Milliseconds> overdueMaxTime{Milliseconds{0}};
+        // Counts overlapping pauses of overdue interrupt check accounting; the last release
+        // restarts the interval used to detect overdue interrupt checks.
+        unsigned overdueInterruptCheckPauseDepth = 0;
 
         // We only collect interrupt check stats for a small fraction of operations. For this sample
         // we can afford to read the TickSource each checkForInterrupt() call.
@@ -222,6 +225,18 @@ public:
     void updateInterruptCheckCounters();
 
     void resetInterruptCheckWindow();
+
+    /**
+     * Begins a pause in overdue interrupt check accounting, accounting for the preceding interval.
+     * Returns false if this operation is not tracking overdue interrupt checks.
+     */
+    bool beginOverdueInterruptCheckAccountingPause();
+
+    /**
+     * Ends a pause begun by beginOverdueInterruptCheckAccountingPause(). The last outstanding pause
+     * restarts the interrupt check window at the current time.
+     */
+    void endOverdueInterruptCheckAccountingPause();
 
     /**
      * Returns the service context under which this operation context runs.
@@ -1172,6 +1187,30 @@ private:
 
     // The query sampling options for operations on this opCtx.
     boost::optional<QuerySamplingOptions> _querySamplingOpts;
+};
+
+/**
+ * An interrupt check is overdue when the time since the preceding interrupt check exceeds the
+ * configured interval. This handle pauses overdue interrupt check accounting without suppressing
+ * checks or deadlines. Entry accounts for the preceding interval; the last release restarts it.
+ * Pauses may nest. Use the handle and opCtx on the operation's executing thread.
+ */
+class OverdueInterruptCheckAccountingPause {
+public:
+    explicit OverdueInterruptCheckAccountingPause(OperationContext* opCtx);
+    ~OverdueInterruptCheckAccountingPause();
+    OverdueInterruptCheckAccountingPause(const OverdueInterruptCheckAccountingPause&) = delete;
+    OverdueInterruptCheckAccountingPause& operator=(const OverdueInterruptCheckAccountingPause&) =
+        delete;
+    OverdueInterruptCheckAccountingPause(OverdueInterruptCheckAccountingPause&& other) noexcept;
+    OverdueInterruptCheckAccountingPause& operator=(
+        OverdueInterruptCheckAccountingPause&& other) noexcept;
+
+    /** Ends this handle's pause early. Subsequent calls and destruction have no effect. */
+    void release();
+
+private:
+    OperationContext* _opCtx;
 };
 
 /**

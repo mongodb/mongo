@@ -12,10 +12,8 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/tassert_guard.h"
-#include "mongo/util/tick_source_mock.h"
 
 #include <algorithm>
-#include <functional>
 #include <map>
 #include <tuple>
 #include <vector>
@@ -1250,79 +1248,6 @@ TEST_F(BlockHashAggStageTest, SpilledMergeLoopChecksForInterruptEveryIteration) 
     ASSERT_GTE(spilledRecords, static_cast<int64_t>(kBuckets) - 1);
     ASSERT_GTE(maxCallChecks, spilledRecords - 1);
 
-    stage->close();
-}
-
-class BlockHashAggDelinquencyTest : public BlockHashAggStageTest {
-public:
-    Options makeServiceContextOptions() override {
-        return BlockHashAggStageTest::makeServiceContextOptions().useMockTickSource(true);
-    }
-
-    void assertTeardownExcluded(const std::function<void()>& teardown) {
-        auto* opCtx = operationContext();
-        auto* ticks = static_cast<TickSourceMock<>*>(getServiceContext()->getTickSource());
-        opCtx->trackOverdueInterruptChecks(ticks->getTicks());
-        const auto* stats = opCtx->overdueInterruptCheckStats();
-        ticks->advance(Milliseconds{20});
-        const auto before = ticks->getTicks();
-
-        // Advance time after the pre-teardown check, so an exit-window reset is required.
-        ticks->setAdvanceOnRead(Milliseconds{5});
-        teardown();
-        ticks->setAdvanceOnRead(Milliseconds{0});
-        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
-        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
-        ASSERT_GT(stats->interruptCheckWindowStartTime, before);
-        ASSERT_EQ(stats->interruptCheckWindowStartTime, ticks->getTicks() - 5);
-        std::ignore = opCtx->checkForInterruptNoAssert();
-        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
-    }
-};
-
-TEST_F(BlockHashAggDelinquencyTest, GroupTeardownIsExcludedFromInterruptDelinquency) {
-    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
-
-    constexpr size_t kBuckets = 8;
-    std::vector<Bucket> buckets;
-    for (size_t i = 0; i < kBuckets; ++i) {
-        buckets.push_back(Bucket{
-            .ids = {makeInt32sBlock({0})}, .bitset = {true}, .dataBlocks = {makeInt32sBlock({1})}});
-    }
-
-    auto setup = prepareBlockAggStageSetup(buckets,
-                                           {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}},
-                                           /*allowDiskUse=*/true,
-                                           /*forceIncreasedSpilling=*/true);
-
-    auto ctx = makeCompileCtx();
-    auto [scanSlots, scanStage] =
-        generateVirtualScanMulti(setup.numScanSlots, setup.inputData.first, setup.inputData.second);
-    auto [outputSlots, stage] = setup.makeFn(scanSlots, std::move(scanStage));
-    std::ignore = prepareTree(ctx.get(), stage.get(), outputSlots);
-
-    while (stage->getNext() == PlanState::ADVANCED) {
-    }
-    auto* blockStats = static_cast<const BlockHashAggStats*>(stage->getSpecificStats());
-    ASSERT_TRUE(blockStats->usedDisk);
-
-    assertTeardownExcluded([&] { stage->close(); });
-}
-
-TEST_F(BlockHashAggDelinquencyTest, EndOfInputTeardownIsExcludedFromInterruptDelinquency) {
-    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
-    std::vector<Bucket> buckets{Bucket{
-        .ids = {makeInt32sBlock({0})}, .bitset = {true}, .dataBlocks = {makeInt32sBlock({1})}}};
-    auto setup = prepareBlockAggStageSetup(
-        buckets, {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}}, false, false);
-    auto ctx = makeCompileCtx();
-    auto [scanSlots, scanStage] =
-        generateVirtualScanMulti(setup.numScanSlots, setup.inputData.first, setup.inputData.second);
-    auto [outputSlots, stage] = setup.makeFn(scanSlots, std::move(scanStage));
-    std::ignore = prepareTree(ctx.get(), stage.get(), outputSlots);
-
-    // The first call emits the only group and clears the exhausted hash table.
-    assertTeardownExcluded([&] { ASSERT_EQ(stage->getNext(), PlanState::ADVANCED); });
     stage->close();
 }
 

@@ -168,11 +168,16 @@ void PlanExecutorSBE::markAsKilled(Status killStatus) {
 
 void PlanExecutorSBE::dispose(OperationContext* opCtx) {
     if (_state != State::kClosed) {
-        _root->close();
-        _state = State::kClosed;
+        closeRoot(opCtx);
     }
 
     _isDisposed = true;
+}
+
+void PlanExecutorSBE::closeRoot(OperationContext* opCtx) {
+    OverdueInterruptCheckAccountingPause overdueInterruptCheckPause(opCtx);
+    _root->close();
+    _state = State::kClosed;
 }
 
 void PlanExecutorSBE::stashResult(const BSONObj& obj) {
@@ -243,8 +248,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
         // If we had stashed elements and consumed them all, but the PlanStage is also
         // already exhausted, we can return EOF straight away. Otherwise, proceed with
         // fetching the next document.
-        _root->close();
-        _state = State::kClosed;
+        closeRoot(_opCtx);
         if (!_resumeRecordIdSlot) {
             return PlanExecutor::ExecState::IS_EOF;
         }
@@ -286,8 +290,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
                                     _mustReturnOwnedBson);
 
         if (result == sbe::PlanState::IS_EOF) {
-            _root->close();
-            _state = State::kClosed;
+            closeRoot(_opCtx);
 
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {

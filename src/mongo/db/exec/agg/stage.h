@@ -190,6 +190,8 @@ public:
      * pointer when calling this method.
      */
     void dispose() {
+        OverdueInterruptCheckAccountingPause overdueInterruptCheckPause(
+            pExpCtx->getOperationContext());
         doDispose();
         if (pSource) {
             pSource->dispose();

@@ -260,6 +260,9 @@ void OperationContext::trackOverdueInterruptChecks(TickSource::Tick startTime) {
 }
 
 void OperationContext::updateInterruptCheckCounters() {
+    if (_overdueInterruptCheckStats->overdueInterruptCheckPauseDepth) {
+        return;
+    }
     const TickSource::Tick now = tickSource().getTicks();
     const TickSource::Tick prevStart =
         std::exchange(_overdueInterruptCheckStats->interruptCheckWindowStartTime, now);
@@ -276,6 +279,49 @@ void OperationContext::updateInterruptCheckCounters() {
         stats.overdueInterruptChecks.fetchAndAddRelaxed(1);
         stats.overdueAccumulator.storeRelaxed(stats.overdueAccumulator.loadRelaxed() + overdue);
         stats.overdueMaxTime.storeRelaxed(std::max(stats.overdueMaxTime.loadRelaxed(), overdue));
+    }
+}
+
+bool OperationContext::beginOverdueInterruptCheckAccountingPause() {
+    if (!_overdueInterruptCheckStats) {
+        return false;
+    }
+    updateInterruptCheckCounters();
+    ++_overdueInterruptCheckStats->overdueInterruptCheckPauseDepth;
+    return true;
+}
+
+void OperationContext::endOverdueInterruptCheckAccountingPause() {
+    auto& stats = *_overdueInterruptCheckStats;
+    invariant(stats.overdueInterruptCheckPauseDepth > 0);
+    if (--stats.overdueInterruptCheckPauseDepth == 0) {
+        stats.interruptCheckWindowStartTime = tickSource().getTicks();
+    }
+}
+
+OverdueInterruptCheckAccountingPause::OverdueInterruptCheckAccountingPause(OperationContext* opCtx)
+    : _opCtx(opCtx && opCtx->beginOverdueInterruptCheckAccountingPause() ? opCtx : nullptr) {}
+
+OverdueInterruptCheckAccountingPause::~OverdueInterruptCheckAccountingPause() {
+    release();
+}
+
+OverdueInterruptCheckAccountingPause::OverdueInterruptCheckAccountingPause(
+    OverdueInterruptCheckAccountingPause&& other) noexcept
+    : _opCtx(std::exchange(other._opCtx, nullptr)) {}
+
+OverdueInterruptCheckAccountingPause& OverdueInterruptCheckAccountingPause::operator=(
+    OverdueInterruptCheckAccountingPause&& other) noexcept {
+    if (this != &other) {
+        release();
+        _opCtx = std::exchange(other._opCtx, nullptr);
+    }
+    return *this;
+}
+
+void OverdueInterruptCheckAccountingPause::release() {
+    if (auto* opCtx = std::exchange(_opCtx, nullptr)) {
+        opCtx->endOverdueInterruptCheckAccountingPause();
     }
 }
 

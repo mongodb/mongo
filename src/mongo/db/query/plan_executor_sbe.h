@@ -164,6 +164,8 @@ public:
     }
 
 private:
+    void closeRoot(OperationContext* opCtx);
+
     template <typename ObjectType>
     ExecState getNextImpl(ObjectType* out, RecordId* dlOut);
 

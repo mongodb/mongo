@@ -32,7 +32,6 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/tick_source_mock.h"
 
 #include <algorithm>
 #include <array>
@@ -1511,50 +1510,4 @@ TEST_F(HashAggStageTest, SpilledMergeLoopChecksForInterruptEveryIteration) {
 
     stage->close();
 }
-
-class HashAggDelinquencyTest : public HashAggStageTest {
-public:
-    Options makeServiceContextOptions() override {
-        return HashAggStageTest::makeServiceContextOptions().useMockTickSource(true);
-    }
-};
-
-TEST_F(HashAggDelinquencyTest, TeardownIsExcludedFromInterruptDelinquency) {
-    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
-    // Small memory threshold so the aggregation spills and close() also tears down a spilling
-    // store.
-    unittest::ServerParameterGuard maxMemoryLimit(
-        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 64);
-
-    auto* opCtx = operationContext();
-    auto ctx = makeCompileCtx();
-    auto [inputTag, inputVal] =
-        stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] =
-        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
-
-    auto [countsSlot, stage] = makeCountHashAgg(std::move(scanStage), scanSlot);
-    std::ignore = prepareTree(ctx.get(), stage.get(), countsSlot);
-    while (stage->getNext() == PlanState::ADVANCED) {
-    }
-    auto* stageStats = static_cast<const HashAggStats*>(stage->getSpecificStats());
-    ASSERT_TRUE(stageStats->usedDisk);
-
-    auto* ticks = static_cast<TickSourceMock<>*>(getServiceContext()->getTickSource());
-    opCtx->trackOverdueInterruptChecks(ticks->getTicks());
-    const auto* stats = opCtx->overdueInterruptCheckStats();
-    ticks->advance(Milliseconds{20});
-    const auto before = ticks->getTicks();
-    // Advance time after the pre-teardown check to distinguish it from the exit-window reset.
-    ticks->setAdvanceOnRead(Milliseconds{5});
-    stage->close();
-    ticks->setAdvanceOnRead(Milliseconds{0});
-    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
-    ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
-    ASSERT_GT(stats->interruptCheckWindowStartTime, before);
-    ASSERT_EQ(stats->interruptCheckWindowStartTime, ticks->getTicks() - 5);
-    std::ignore = opCtx->checkForInterruptNoAssert();
-    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
-}
-
 }  // namespace mongo::sbe

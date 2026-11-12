@@ -1139,6 +1139,161 @@ TEST_F(OperationContextTest, CurrentOpExcludesPendingDestructionOperations) {
     }
 }
 
+class OverdueInterruptCheckTest : public OperationTestWithMockClock {
+public:
+    void setUp() override {
+        OperationTestWithMockClock::setUp();
+        opCtx = client->makeOperationContext();
+        opCtx->trackOverdueInterruptChecks(mockTickSource()->getTicks());
+        stats = opCtx->overdueInterruptCheckStats();
+    }
+
+    ServiceContext::UniqueOperationContext opCtx;
+    const OperationContext::OverdueInterruptCheckStats* stats = nullptr;
+};
+
+TEST_F(OverdueInterruptCheckTest, NestedAccountingPausesResumeAccounting) {
+    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
+    mockTickSource()->advance(Milliseconds{20});
+    {
+        OverdueInterruptCheckAccountingPause outer(opCtx.get());
+        mockTickSource()->advance(Milliseconds{100});
+        {
+            OverdueInterruptCheckAccountingPause inner(opCtx.get());
+            opCtx->checkForInterrupt();
+            mockTickSource()->advance(Milliseconds{100});
+        }
+        mockTickSource()->advance(Milliseconds{100});
+    }
+    ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
+    mockTickSource()->advance(Milliseconds{20});
+    opCtx->updateInterruptCheckCounters();
+    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 2);
+    ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{20});
+}
+
+TEST_F(OverdueInterruptCheckTest, MovingPauseKeepsNestedScopeActive) {
+    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
+    {
+        OverdueInterruptCheckAccountingPause outer(opCtx.get());
+        {
+            OverdueInterruptCheckAccountingPause inner(opCtx.get());
+            OverdueInterruptCheckAccountingPause moved(std::move(inner));
+            ASSERT_EQ(stats->overdueInterruptCheckPauseDepth, 2);
+        }
+        ASSERT_EQ(stats->overdueInterruptCheckPauseDepth, 1);
+        mockTickSource()->advance(Milliseconds{50});
+    }
+    ASSERT_EQ(stats->overdueInterruptCheckPauseDepth, 0);
+    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
+    mockTickSource()->advance(Milliseconds{20});
+    opCtx->updateInterruptCheckCounters();
+    ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
+}
+
+TEST_F(OperationTestWithMockClock, MoveAssigningPauseEndsOldScopeAndTransfersNewOne) {
+    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
+    auto firstClient = getService()->makeClient("FirstClient");
+    auto secondClient = getService()->makeClient("SecondClient");
+    auto first = firstClient->makeOperationContext();
+    auto second = secondClient->makeOperationContext();
+    first->trackOverdueInterruptChecks(mockTickSource()->getTicks());
+    second->trackOverdueInterruptChecks(mockTickSource()->getTicks());
+    auto* firstStats = first->overdueInterruptCheckStats();
+    auto* secondStats = second->overdueInterruptCheckStats();
+    {
+        OverdueInterruptCheckAccountingPause destination(first.get());
+        {
+            OverdueInterruptCheckAccountingPause source(second.get());
+            mockTickSource()->advance(Milliseconds{50});
+            destination = std::move(source);
+            ASSERT_EQ(firstStats->overdueInterruptCheckPauseDepth, 0);
+            ASSERT_EQ(secondStats->overdueInterruptCheckPauseDepth, 1);
+            mockTickSource()->advance(Milliseconds{20});
+            first->updateInterruptCheckCounters();
+            second->updateInterruptCheckCounters();
+            ASSERT_EQ(firstStats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
+            ASSERT_EQ(secondStats->overdueInterruptChecks.loadRelaxed(), 0);
+        }
+        ASSERT_EQ(secondStats->overdueInterruptCheckPauseDepth, 1);
+        auto* self = &destination;
+        destination = std::move(*self);
+        ASSERT_EQ(secondStats->overdueInterruptCheckPauseDepth, 1);
+    }
+    ASSERT_EQ(secondStats->overdueInterruptCheckPauseDepth, 0);
+    mockTickSource()->advance(Milliseconds{20});
+    second->updateInterruptCheckCounters();
+    ASSERT_EQ(secondStats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
+}
+
+TEST_F(OverdueInterruptCheckTest, ReleasingPauseEarlyResumesAccountingOnce) {
+    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
+    {
+        OverdueInterruptCheckAccountingPause pause(opCtx.get());
+        mockTickSource()->advance(Milliseconds{50});
+        pause.release();
+        ASSERT_EQ(stats->overdueInterruptCheckPauseDepth, 0);
+        pause.release();
+        mockTickSource()->advance(Milliseconds{20});
+        opCtx->updateInterruptCheckCounters();
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
+    }
+    ASSERT_EQ(stats->overdueInterruptCheckPauseDepth, 0);
+    mockTickSource()->advance(Milliseconds{20});
+    opCtx->updateInterruptCheckCounters();
+    ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{20});
+}
+
+TEST_F(OverdueInterruptCheckTest, MoveAssigningAfterReleaseTransfersActivePause) {
+    auto otherClient = getService()->makeClient("OtherClient");
+    auto other = otherClient->makeOperationContext();
+    other->trackOverdueInterruptChecks(mockTickSource()->getTicks());
+    auto* otherStats = other->overdueInterruptCheckStats();
+    {
+        OverdueInterruptCheckAccountingPause destination(opCtx.get());
+        destination.release();
+        OverdueInterruptCheckAccountingPause source(other.get());
+        destination = std::move(source);
+        ASSERT_EQ(stats->overdueInterruptCheckPauseDepth, 0);
+        ASSERT_EQ(otherStats->overdueInterruptCheckPauseDepth, 1);
+    }
+    ASSERT_EQ(otherStats->overdueInterruptCheckPauseDepth, 0);
+}
+
+TEST_F(OverdueInterruptCheckTest, ReleasingNestedPauseDoesNotResumeOuterScope) {
+    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
+    OverdueInterruptCheckAccountingPause outer(opCtx.get());
+    OverdueInterruptCheckAccountingPause inner(opCtx.get());
+    inner.release();
+    ASSERT_EQ(stats->overdueInterruptCheckPauseDepth, 1);
+    mockTickSource()->advance(Milliseconds{50});
+    opCtx->updateInterruptCheckCounters();
+    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 0);
+    outer.release();
+    mockTickSource()->advance(Milliseconds{20});
+    opCtx->updateInterruptCheckCounters();
+    ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
+}
+
+TEST_F(OverdueInterruptCheckTest, AccountingPauseDoesNotMaskCancellation) {
+    {
+        OverdueInterruptCheckAccountingPause overdueInterruptCheckPause(opCtx.get());
+        opCtx->markKilled();
+        ASSERT_THROWS_CODE(opCtx->checkForInterrupt(), DBException, ErrorCodes::Interrupted);
+    }
+    ASSERT_THROWS_CODE(opCtx->checkForInterrupt(), DBException, ErrorCodes::Interrupted);
+}
+
+TEST_F(OperationTestWithMockClock, AccountingPauseWithoutInitialSampleDoesNotUnderflow) {
+    auto client = getService()->makeClient("MainClient");
+    auto opCtx = client->makeOperationContext();
+    {
+        OverdueInterruptCheckAccountingPause overdueInterruptCheckPause(opCtx.get());
+        opCtx->trackOverdueInterruptChecks(mockTickSource()->getTicks());
+    }
+    ASSERT_EQ(opCtx->overdueInterruptCheckStats()->overdueInterruptCheckPauseDepth, 0);
+}
+
 TEST_F(OperationTestWithMockClock, InterruptCheckOnTime) {
     unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
                                                             true);
