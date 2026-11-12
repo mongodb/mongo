@@ -13,6 +13,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/config.h"
 #include "mongo/db/admission/egress_response_rate_limiter.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/admission/rate_limiter.h"
@@ -21,12 +22,16 @@
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/error_labels_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/traffic_reader.h"
+#include "mongo/db/traffic_recorder.h"
+#include "mongo/db/traffic_recorder/stashed_request.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_service.h"
@@ -61,6 +66,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -705,6 +711,345 @@ TEST_F(SessionWorkflowTest, CleanupFromGetMore) {
     expect<Event::sepEndSession>();
     joinSessions();
 }
+
+class SessionWorkflowExhaustRequestTest : public SessionWorkflowTest {
+public:
+    static std::string bytesOf(const Message& message) {
+        return std::string(message.buf(), message.size());
+    }
+
+    static void checkSynthetic(const Message& request,
+                               const Message& response,
+                               int32_t previousRequestId,
+                               const BSONObj& body,
+                               bool checksum) {
+        ASSERT_EQ(request.header().getId(), response.header().getId());
+        ASSERT_EQ(request.header().getResponseToMsgId(), previousRequestId);
+        ASSERT_TRUE(OpMsg::isFlagSet(request, OpMsg::kExhaustSupported));
+        ASSERT_FALSE(OpMsg::isFlagSet(request, OpMsg::kMoreToCome));
+        ASSERT_EQ(OpMsg::isFlagSet(request, OpMsg::kChecksumPresent), checksum);
+        ASSERT_BSONOBJ_EQ(OpMsg::parse(request).body, body);
+    }
+
+    void runRecordedRequests(bool checksum, bool compressed, bool nextInvocation = false) {
+        unittest::TempDir directory("exhaust-recording");
+        unittest::ServerParameterGuard recordingDirectory("trafficRecordingDirectory",
+                                                          directory.path());
+        auto* service = getServiceContext();
+        auto& recorder = TrafficRecorder::get(service);
+        StartTrafficRecording options;
+        options.setDestination("recording");
+        recorder.start(options, service);
+        bool stopped = false;
+        ScopeGuard stopRecording = [&] {
+            if (!stopped) {
+                recorder.stop(service);
+            }
+        };
+
+        OpMsgBuilder builder;
+        builder.setBody(BSON("id" << 1 << "comment" << std::string(64 * 1024, 'x')));
+        auto request = setExhaustSupported(builder.finish());
+        request.header().setId(nextMessageId());
+        request.header().setResponseToMsgId(0);
+        const auto requestId = request.header().getId();
+        const auto originalBody = OpMsg::parse(request).body.getOwned();
+        const auto subsequentBody = nextInvocation ? BSON("id" << 2) : originalBody;
+        if (checksum) {
+            OpMsg::appendChecksum(&request);
+        }
+        if (compressed) {
+            _registry.setSupportedCompressors({"snappy"});
+            _registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+            uassertStatusOK(_registry.finalizeSupportedCompressors());
+            onClientConnectCb = [this](Client* client) {
+                MessageCompressorManager::forSession(client->session()) =
+                    MessageCompressorManager(MessageCompressionDirection::kIngress, &_registry);
+            };
+            const auto snappy = static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
+            request = uassertStatusOK(_compression.compressMessage(request, &snappy));
+        }
+        const auto originalBytes = bytesOf(request);
+        std::array<Message, 3> retained;
+        std::array<std::string, 3> snapshots;
+        std::array<Message, 3> responses;
+        std::array<uintptr_t, 3> requestAddresses{};
+
+        startSession();
+        expect<Event::sessionSourceMessage>(std::move(request));
+        for (size_t i = 0; i < retained.size(); ++i) {
+            expect<Event::sepHandleRequest>(
+                [&](OperationContext* opCtx, const Message& message) -> Future<DbResponse> {
+                    auto& stash = StashedRequest::get(opCtx);
+                    auto captured = stash.take();
+                    invariant(captured);
+                    ASSERT_NE(captured->buf(), message.buf());
+                    requestAddresses[i] = reinterpret_cast<uintptr_t>(message.buf());
+                    retained[i] = *captured;
+                    snapshots[i] = bytesOf(*captured);
+                    stash.set(*captured);
+                    auto response = makeResponse(makeOpMsg());
+                    if (i + 1 < retained.size()) {
+                        response.shouldRunAgainForExhaust = true;
+                        if (i == 0 && nextInvocation) {
+                            response.nextInvocation = subsequentBody;
+                        }
+                    }
+                    return response;
+                });
+            expect<Event::sessionSinkMessage>([&](const Message& message) {
+                responses[i] = message;
+                return Status::OK();
+            });
+        }
+        expect<Event::sessionSourceMessage>(kClosedSessionError);
+        expect<Event::sepEndSession>();
+        joinSessions();
+        onClientConnectCb = nullptr;
+        recorder.stop(service);
+        stopped = true;
+
+        ASSERT_EQ(snapshots[0], originalBytes);
+        ASSERT_EQ(requestAddresses[2], requestAddresses[1]);
+        if (!nextInvocation) {
+            ASSERT_EQ(requestAddresses[1], requestAddresses[0]);
+        }
+        for (size_t i = 0; i < retained.size(); ++i) {
+            ASSERT_EQ(bytesOf(retained[i]), snapshots[i]);
+        }
+        auto first = retained[0];
+        if (compressed) {
+            first = uassertStatusOK(_compression.decompressMessage(first));
+            for (auto& response : responses) {
+                ASSERT_EQ(response.operation(), dbCompressed);
+                response = uassertStatusOK(_compression.decompressMessage(response));
+            }
+        }
+        ASSERT_BSONOBJ_EQ(OpMsg::parse(first).body, originalBody);
+        ASSERT_EQ(responses[0].header().getResponseToMsgId(), requestId);
+        checkSynthetic(retained[1], responses[0], requestId, subsequentBody, checksum);
+        checkSynthetic(
+            retained[2], responses[1], retained[1].header().getId(), subsequentBody, checksum);
+        ASSERT_EQ(responses[2].header().getResponseToMsgId(), retained[2].header().getId());
+        for (size_t i = 0; i < responses.size(); ++i) {
+            ASSERT_EQ(OpMsg::isFlagSet(responses[i], OpMsg::kMoreToCome), i + 1 < responses.size());
+            ASSERT_EQ(OpMsg::isFlagSet(responses[i], OpMsg::kChecksumPresent), checksum);
+            ASSERT_DOES_NOT_THROW(OpMsg::parse(responses[i]));
+        }
+
+        const auto packets = trafficRecordingFileToBSONArr(directory.path() + "/recording", false);
+        size_t index = 0;
+        for (const auto& element : packets) {
+            const auto packet = element.Obj();
+            if (packet["event"].Int() != static_cast<int>(EventType::kRequest)) {
+                continue;
+            }
+            ASSERT_LT(index, snapshots.size());
+            int length;
+            const auto raw = packet["rawop"].Obj()["body"].binData(length);
+            ASSERT_EQ(std::string(raw, length), snapshots[index]);
+            ++index;
+        }
+        ASSERT_EQ(index, snapshots.size());
+    }
+
+    void runReusableRequest(bool checksum, bool withCurOp = false) {
+        OpMsgBuilder builder;
+        builder.setBody(BSON("id" << 1 << "comment" << std::string(64 * 1024, 'x')));
+        auto request = setExhaustSupported(builder.finish());
+        request.header().setId(nextMessageId());
+        request.header().setResponseToMsgId(0);
+        const auto requestId = request.header().getId();
+        const auto body = OpMsg::parse(request).body.getOwned();
+        if (checksum) {
+            OpMsg::appendChecksum(&request);
+        }
+        const auto address = reinterpret_cast<uintptr_t>(request.buf());
+        uintptr_t syntheticAddress = 0;
+        Message response;
+        Message synthetic;
+        startSession();
+        expect<Event::sessionSourceMessage>(std::move(request));
+        expect<Event::sepHandleRequest>(
+            [&](OperationContext* opCtx, const Message& message) -> Future<DbResponse> {
+                ASSERT_FALSE(StashedRequest::get(opCtx).take());
+                if (withCurOp) {
+                    auto parsed = OpMsg::parseOwned(message);
+                    std::lock_guard<Client> lk(*opCtx->getClient());
+                    CurOp::get(opCtx)->setOpDescription(lk, parsed.body);
+                }
+                return setExhaust(makeResponse(makeOpMsg()));
+            });
+        expect<Event::sessionSinkMessage>([&](const Message& message) {
+            response = message;
+            return Status::OK();
+        });
+        expect<Event::sepHandleRequest>(
+            [&](OperationContext*, const Message& message) -> Future<DbResponse> {
+                syntheticAddress = reinterpret_cast<uintptr_t>(message.buf());
+                synthetic = message;
+                return makeResponse(makeOpMsg());
+            });
+        expect<Event::sessionSinkMessage>(Status::OK());
+        expect<Event::sessionSourceMessage>(kClosedSessionError);
+        expect<Event::sepEndSession>();
+        joinSessions();
+        ASSERT_EQ(syntheticAddress, address);
+        checkSynthetic(synthetic, response, requestId, body, checksum);
+    }
+
+    enum class RecordingScenario { kNormal, kSensitive, kStoppedDuringExhaust };
+
+    void runRecordingScenario(RecordingScenario scenario) {
+        unittest::TempDir directory("request-recording-snapshot");
+        unittest::ServerParameterGuard recordingDirectory("trafficRecordingDirectory",
+                                                          directory.path());
+        auto* service = getServiceContext();
+        auto& recorder = TrafficRecorder::get(service);
+        StartTrafficRecording options;
+        options.setDestination("recording");
+        recorder.start(options, service);
+        bool stopped = false;
+        ScopeGuard stopRecording = [&] {
+            if (!stopped) {
+                recorder.stop(service);
+            }
+        };
+
+        auto request = makeOpMsg();
+        const bool exhaust = scenario == RecordingScenario::kStoppedDuringExhaust;
+        if (exhaust) {
+            OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
+        }
+        request.header().setId(nextMessageId());
+        request.header().setResponseToMsgId(0);
+        const auto originalBytes = bytesOf(request);
+        Message snapshot;
+        startSession();
+        expect<Event::sessionSourceMessage>(std::move(request));
+        expect<Event::sepHandleRequest>(
+            [&](OperationContext* opCtx, const Message& message) -> Future<DbResponse> {
+                auto& stash = StashedRequest::get(opCtx);
+                auto captured = stash.take();
+                invariant(captured);
+                ASSERT_NE(captured->buf(), message.buf());
+                snapshot = *captured;
+                stash.set(*captured);
+                if (scenario == RecordingScenario::kSensitive) {
+                    stash.clear();
+                }
+                auto response = makeResponse(makeOpMsg());
+                if (exhaust) {
+                    recorder.stop(service);
+                    stopped = true;
+                    response.shouldRunAgainForExhaust = true;
+                }
+                return response;
+            });
+        expect<Event::sessionSinkMessage>(Status::OK());
+        if (exhaust) {
+            expect<Event::sepHandleRequest>(
+                [&](OperationContext* opCtx, const Message&) -> Future<DbResponse> {
+                    ASSERT_FALSE(StashedRequest::get(opCtx).take());
+                    return makeResponse(makeOpMsg());
+                });
+            expect<Event::sessionSinkMessage>(Status::OK());
+        }
+        expect<Event::sessionSourceMessage>(kClosedSessionError);
+        expect<Event::sepEndSession>();
+        joinSessions();
+        if (!stopped) {
+            recorder.stop(service);
+            stopped = true;
+        }
+        ASSERT_EQ(bytesOf(snapshot), originalBytes);
+
+        const auto packets = trafficRecordingFileToBSONArr(directory.path() + "/recording", false);
+        size_t requests = 0;
+        size_t responses = 0;
+        for (const auto& element : packets) {
+            const auto packet = element.Obj();
+            if (packet["event"].Int() == static_cast<int>(EventType::kRequest)) {
+                int length;
+                const auto raw = packet["rawop"].Obj()["body"].binData(length);
+                ASSERT_EQ(std::string(raw, length), originalBytes);
+                ++requests;
+            } else if (packet["event"].Int() == static_cast<int>(EventType::kResponse)) {
+                ++responses;
+            }
+        }
+        const size_t expected = scenario == RecordingScenario::kNormal ? 1 : 0;
+        ASSERT_EQ(requests, expected);
+        ASSERT_EQ(responses, expected);
+    }
+
+private:
+    MessageCompressorRegistry _registry;
+    MessageCompressorManager _compression{MessageCompressionDirection::kEgress, &_registry};
+};
+
+TEST_F(SessionWorkflowExhaustRequestTest, RecordedRequestsWithoutChecksumArePreserved) {
+    runRecordedRequests(false, false);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, CompressedRecordedRequestsArePreserved) {
+    runRecordedRequests(false, true);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, RecordedNextInvocationIsPreserved) {
+    runRecordedRequests(false, false, true);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, CompressedRecordedNextInvocationIsPreserved) {
+    runRecordedRequests(false, true, true);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, ExclusiveRequestReusesBuffer) {
+    runReusableRequest(false);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, CurOpSharedRequestReusesBufferWithoutRecording) {
+    runReusableRequest(false, true);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, NormalRequestHasIndependentRecordingSnapshot) {
+    runRecordingScenario(RecordingScenario::kNormal);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, SensitiveRequestSnapshotIsNotRecorded) {
+    runRecordingScenario(RecordingScenario::kSensitive);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, SnapshotSurvivesRecordingStoppedDuringExhaust) {
+    runRecordingScenario(RecordingScenario::kStoppedDuringExhaust);
+}
+
+#ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
+TEST_F(SessionWorkflowExhaustRequestTest, RecordedRequestsWithChecksumArePreserved) {
+    runRecordedRequests(true, false);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, CompressedRecordedRequestsWithChecksumArePreserved) {
+    runRecordedRequests(true, true);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, RecordedNextInvocationWithChecksumIsPreserved) {
+    runRecordedRequests(true, false, true);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, CompressedRecordedNextInvocationWithChecksumIsPreserved) {
+    runRecordedRequests(true, true, true);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest, ExclusiveRequestWithChecksumReusesBuffer) {
+    runReusableRequest(true);
+}
+
+TEST_F(SessionWorkflowExhaustRequestTest,
+       CurOpSharedRequestWithChecksumReusesBufferWithoutRecording) {
+    runReusableRequest(true, true);
+}
+#endif
 
 class ConnectionEstablishmentQueueingTest : public SessionWorkflowTest {
 public:
