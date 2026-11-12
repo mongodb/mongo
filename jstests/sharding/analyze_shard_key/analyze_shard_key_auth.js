@@ -1,7 +1,10 @@
 /**
  * Test to validate the privileges required by the analyzeShardKey command.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *   requires_fcv_70,
+ *   multiversion_incompatible,
+ * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
