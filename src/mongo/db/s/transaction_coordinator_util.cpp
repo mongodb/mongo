@@ -254,13 +254,41 @@ void PrepareVoteConsensus::registerVote(const PrepareResponse& vote) {
         // since they are only used to build the accounting metadata. Read-only participants (no
         // affected namespaces) are excluded from the participant sets.
         if (isEndOfTransactionWritePathEnabled() && !vote.affectedNamespaces.empty()) {
-            _namespacesByShard[vote.shardId] = vote.affectedNamespaces;
+            _recordWriteShardNamespaces(vote.shardId, vote.affectedNamespaces);
         }
     } else {
         vote.vote == PrepareVote::kAbort ? ++_numAbortVotes : ++_numNoVotes;
 
         if (!_abortStatus)
             _abortStatus.emplace(*vote.abortReason);
+    }
+}
+
+void PrepareVoteConsensus::_recordWriteShardNamespaces(
+    const ShardId& shardId, const std::vector<NamespaceString>& namespaces) {
+    const auto it = std::find(_writeShards.begin(), _writeShards.end(), shardId);
+    uint32_t index;
+    if (it == _writeShards.end()) {
+        // A new shard: it is appended at the end of '_writeShards'.
+        index = static_cast<uint32_t>(_writeShards.size());
+        _writeShards.push_back(shardId);
+    } else {
+        index = static_cast<uint32_t>(it - _writeShards.begin());
+        // A repeated vote from the same shard replaces its namespaces. Not expected in practice.
+        absl::erase_if(_writeShardsByNamespace, [index](auto& entry) {
+            auto& shards = entry.second;
+            shards.erase(std::remove(shards.begin(), shards.end(), index), shards.end());
+            return shards.empty();
+        });
+    }
+
+    for (const auto& nss : namespaces) {
+        auto& shards = _writeShardsByNamespace[nss];
+        // This shard is the last one appended to every namespace it has written so far, so this
+        // skips a namespace listed twice in one vote.
+        if (shards.empty() || shards.back() != index) {
+            shards.push_back(index);
+        }
     }
 }
 
@@ -290,13 +318,25 @@ constexpr int kMaxEndOfTransactionMetadataBytes =
 // distinct collections, which no real workload does. The check is a safety net against a
 // pathological transaction, not a limit users are expected to hit.
 
-// Serializes a map from key to a set of shard ids into a BSON object with sorted shard-id arrays.
-BSONObj shardSetsToBSON(const std::map<std::string, std::set<ShardId>>& shardSets) {
+// One participant set: the serialized scope name and, for each shard in the set, its rank in
+// shard-id order, which is its index in 'clusterParticipants'.
+struct ShardSet {
+    std::string name;
+    std::vector<uint32_t> shardRanks;
+};
+
+// Serializes 'shardSets' as {<name>: [<index in 'clusterParticipants'>, ...], ...} in name order,
+// with each array in ascending order.
+BSONObj shardSetsToBSON(std::vector<ShardSet> shardSets) {
+    std::sort(shardSets.begin(), shardSets.end(), [](const ShardSet& a, const ShardSet& b) {
+        return a.name < b.name;
+    });
     BSONObjBuilder builder;
-    for (const auto& [key, shards] : shardSets) {
-        BSONArrayBuilder array(builder.subarrayStart(key));
-        for (const auto& shard : shards) {
-            array << shard.toString();
+    for (auto& [name, ranks] : shardSets) {
+        std::sort(ranks.begin(), ranks.end());
+        BSONArrayBuilder array(builder.subarrayStart(name));
+        for (auto rank : ranks) {
+            array.append(static_cast<int>(rank));
         }
     }
     return builder.obj();
@@ -306,24 +346,58 @@ BSONObj shardSetsToBSON(const std::map<std::string, std::set<ShardId>>& shardSet
 EndOfTransactionScopesInfoBase PrepareVoteConsensus::releaseEndOfTransactionMetadata() {
     EndOfTransactionScopesInfoBase metadata;
 
+    // Rank the write shards in shard-id order, which is the order of every list in the metadata.
+    // A transaction typically writes to few shards, so these stay on the stack.
+    const auto numShards = static_cast<uint32_t>(_writeShards.size());
+    absl::InlinedVector<const ShardId*, 8> shardsInOrder;
+    shardsInOrder.reserve(numShards);
+    for (const auto& shardId : _writeShards) {
+        shardsInOrder.push_back(&shardId);
+    }
+    std::sort(shardsInOrder.begin(), shardsInOrder.end(), [](const ShardId* a, const ShardId* b) {
+        return *a < *b;
+    });
+    absl::InlinedVector<uint32_t, 8> rankOf(numShards);
+    for (uint32_t rank = 0; rank < numShards; ++rank) {
+        rankOf[shardsInOrder[rank] - _writeShards.data()] = rank;
+    }
+
     std::vector<ShardId> clusterParticipants;
-    clusterParticipants.reserve(_namespacesByShard.size());
-    std::map<std::string, std::set<ShardId>> collectionParticipants;
-    std::map<std::string, std::set<ShardId>> databaseParticipants;
-    for (const auto& [shardId, namespaces] : _namespacesByShard) {
-        clusterParticipants.push_back(shardId);
-        for (const auto& nss : namespaces) {
-            collectionParticipants[NamespaceStringUtil::serialize(
-                                       nss, SerializationContext::stateDefault())]
-                .insert(shardId);
-            databaseParticipants[DatabaseNameUtil::serialize(nss.dbName(),
-                                                             SerializationContext::stateDefault())]
-                .insert(shardId);
+    clusterParticipants.reserve(numShards);
+    for (const auto* shardId : shardsInOrder) {
+        clusterParticipants.push_back(*shardId);
+    }
+
+    // Each namespace and each database is serialized once. A database's set is the union of the
+    // sets of its namespaces.
+    std::vector<ShardSet> collectionParticipants;
+    collectionParticipants.reserve(_writeShardsByNamespace.size());
+    absl::flat_hash_map<DatabaseName, std::vector<bool>> shardsByDatabase;
+    for (const auto& [nss, shards] : _writeShardsByNamespace) {
+        auto& collection = collectionParticipants.emplace_back();
+        collection.name = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
+        collection.shardRanks.reserve(shards.size());
+        auto& databaseShards = shardsByDatabase[nss.dbName()];
+        databaseShards.resize(numShards);
+        for (auto index : shards) {
+            collection.shardRanks.push_back(rankOf[index]);
+            databaseShards[rankOf[index]] = true;
+        }
+    }
+    std::vector<ShardSet> databaseParticipants;
+    databaseParticipants.reserve(shardsByDatabase.size());
+    for (const auto& [dbName, shards] : shardsByDatabase) {
+        auto& database = databaseParticipants.emplace_back();
+        database.name = DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
+        for (uint32_t rank = 0; rank < numShards; ++rank) {
+            if (shards[rank]) {
+                database.shardRanks.push_back(rank);
+            }
         }
     }
 
-    metadata.setCollectionParticipants(shardSetsToBSON(collectionParticipants));
-    metadata.setDatabaseParticipants(shardSetsToBSON(databaseParticipants));
+    metadata.setCollectionParticipants(shardSetsToBSON(std::move(collectionParticipants)));
+    metadata.setDatabaseParticipants(shardSetsToBSON(std::move(databaseParticipants)));
     metadata.setClusterParticipants(std::move(clusterParticipants));
 
     // Serialize the metadata to measure its size.
@@ -343,25 +417,23 @@ EndOfTransactionScopesInfoBase PrepareVoteConsensus::releaseEndOfTransactionMeta
 bool isEndOfTransactionMetadataConsistentWithParticipants(
     const EndOfTransactionScopesInfoBase& metadata, const std::vector<ShardId>& participants) {
     absl::flat_hash_set<ShardId> participantSet(participants.begin(), participants.end());
-    absl::flat_hash_set<ShardId> clusterParticipantSet;
     for (const auto& shardId : metadata.getClusterParticipants()) {
         if (!participantSet.contains(shardId)) {
             return false;
         }
-        clusterParticipantSet.insert(shardId);
     }
 
     // The collection and database participant maps must be well-formed objects whose arrays contain
-    // only shard ids that are themselves cluster participants.
-    auto isMapConsistent = [&clusterParticipantSet](const BSONObj& map) {
+    // only valid indexes into the cluster participants.
+    const auto numShards = static_cast<int>(metadata.getClusterParticipants().size());
+    auto isMapConsistent = [numShards](const BSONObj& map) {
         for (const auto& [key, value] : map) {
             if (value.type() != BSONType::array) {
                 return false;
             }
-            for (const auto& shardElement : value.Obj()) {
-                if (shardElement.type() != BSONType::string ||
-                    !clusterParticipantSet.contains(
-                        ShardId(std::string(shardElement.valueStringData())))) {
+            for (const auto& index : value.Obj()) {
+                if (index.type() != BSONType::numberInt || index.Int() < 0 ||
+                    index.Int() >= numShards) {
                     return false;
                 }
             }

@@ -86,16 +86,29 @@ std::set<ShardId> parseShardArray(const Value& value) {
     return shards;
 }
 
-// Parses a map from name to an array of shard ids, ignoring any non-object entries.
-std::map<std::string, std::set<ShardId>> parseParticipantMap(const Value& value) {
+// Parses a map from name to an array of indexes into 'clusterParticipants', resolving each index to
+// its shard id. Ignores non-array entries and indexes that are not ints referring to a shard id in
+// 'clusterParticipants' (which holds an empty id for each non-string entry, to keep positions).
+std::map<std::string, std::set<ShardId>> parseParticipantMap(
+    const Value& value, const std::vector<ShardId>& clusterParticipants) {
     std::map<std::string, std::set<ShardId>> participants;
     if (value.getType() != BSONType::object) {
         return participants;
     }
     const Document& document = value.getDocument();
     for (auto it = document.fieldIterator(); it.more();) {
-        const auto [name, shards] = it.next();
-        participants.emplace(std::string{name}, parseShardArray(shards));
+        const auto [name, indexes] = it.next();
+        auto& shards = participants[std::string{name}];
+        if (indexes.getType() != BSONType::array) {
+            continue;
+        }
+        for (const auto& index : indexes.getArray()) {
+            if (index.getType() == BSONType::numberInt && index.getInt() >= 0 &&
+                static_cast<size_t>(index.getInt()) < clusterParticipants.size() &&
+                clusterParticipants[index.getInt()].isValid()) {
+                shards.insert(clusterParticipants[index.getInt()]);
+            }
+        }
     }
     return participants;
 }
@@ -108,8 +121,19 @@ EndOfTransactionAggregator::EndOfTransactionAggregator(
 EndOfTransactionScopes EndOfTransactionScopes::createFromDocument(const Document& scopes) {
     EndOfTransactionScopes result;
     result.shardId = assertFieldType(scopes, kShardIdField, BSONType::string, 13766901).getString();
-    result.collectionParticipants = parseParticipantMap(scopes[kCollectionParticipantsField]);
-    result.databaseParticipants = parseParticipantMap(scopes[kDatabaseParticipantsField]);
+    // The participant maps refer to shards by their position in 'clusterParticipants'.
+    std::vector<ShardId> clusterParticipants;
+    if (const auto cluster = scopes[kClusterParticipantsField];
+        cluster.getType() == BSONType::array) {
+        for (const auto& shard : cluster.getArray()) {
+            clusterParticipants.emplace_back(
+                shard.getType() == BSONType::string ? std::string(shard.getStringData()) : "");
+        }
+    }
+    result.collectionParticipants =
+        parseParticipantMap(scopes[kCollectionParticipantsField], clusterParticipants);
+    result.databaseParticipants =
+        parseParticipantMap(scopes[kDatabaseParticipantsField], clusterParticipants);
     result.clusterParticipants = parseShardArray(scopes[kClusterParticipantsField]);
     return result;
 }

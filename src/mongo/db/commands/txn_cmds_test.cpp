@@ -21,19 +21,17 @@ TEST(EndOfTransactionScopesInfoTest, RoundTripsPopulatedMetadata) {
     EndOfTransactionScopesInfo info;
     info.setShardId(ShardId("shardA"));
     info.setCollectionParticipants(
-        BSON("db.collA" << BSON_ARRAY("shardA" << "shardB") << "db.collB" << BSON_ARRAY("shardB")));
-    info.setDatabaseParticipants(BSON("db" << BSON_ARRAY("shardA" << "shardB")));
+        BSON("db.collA" << BSON_ARRAY(0 << 1) << "db.collB" << BSON_ARRAY(1)));
+    info.setDatabaseParticipants(BSON("db" << BSON_ARRAY(0 << 1)));
     info.setClusterParticipants(std::vector<ShardId>{ShardId("shardA"), ShardId("shardB")});
 
     auto parsed = EndOfTransactionScopesInfo::parse(info.toBSON(),
                                                     IDLParserContext("endOfTransactionScopes"));
 
     ASSERT_EQ(ShardId("shardA"), parsed.getShardId());
-    ASSERT_BSONOBJ_EQ(
-        parsed.getCollectionParticipants(),
-        BSON("db.collA" << BSON_ARRAY("shardA" << "shardB") << "db.collB" << BSON_ARRAY("shardB")));
-    ASSERT_BSONOBJ_EQ(parsed.getDatabaseParticipants(),
-                      BSON("db" << BSON_ARRAY("shardA" << "shardB")));
+    ASSERT_BSONOBJ_EQ(parsed.getCollectionParticipants(),
+                      BSON("db.collA" << BSON_ARRAY(0 << 1) << "db.collB" << BSON_ARRAY(1)));
+    ASSERT_BSONOBJ_EQ(parsed.getDatabaseParticipants(), BSON("db" << BSON_ARRAY(0 << 1)));
     ASSERT_EQ(2U, parsed.getClusterParticipants().size());
     ASSERT_EQ(ShardId("shardA"), parsed.getClusterParticipants().at(0));
     ASSERT_EQ(ShardId("shardB"), parsed.getClusterParticipants().at(1));
@@ -41,10 +39,8 @@ TEST(EndOfTransactionScopesInfoTest, RoundTripsPopulatedMetadata) {
     auto bson = parsed.toBSON();
     ASSERT_BSONOBJ_EQ(bson,
                       BSON("collectionParticipants"
-                           << BSON("db.collA" << BSON_ARRAY("shardA" << "shardB") << "db.collB"
-                                              << BSON_ARRAY("shardB"))
-                           << "databaseParticipants"
-                           << BSON("db" << BSON_ARRAY("shardA" << "shardB"))
+                           << BSON("db.collA" << BSON_ARRAY(0 << 1) << "db.collB" << BSON_ARRAY(1))
+                           << "databaseParticipants" << BSON("db" << BSON_ARRAY(0 << 1))
                            << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB") << "shardId"
                            << "shardA"));
 }
@@ -62,9 +58,9 @@ TEST(CommitTransactionOplogObjectParseTest, ParsesWithoutEndOfTransactionScopesF
 TEST(CommitTransactionOplogObjectParseTest,
      IgnoresArbitrarySubFieldsInEndOfTransactionScopesField) {
     auto scopes = BSON("collectionParticipants"
-                       << BSON("db.collA" << BSON_ARRAY("shardA" << "shardB"))
-                       << "databaseParticipants" << BSON("db" << BSON_ARRAY("shardA"))
-                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB") << "shardId"
+                       << BSON("db.collA" << BSON_ARRAY(0 << 1)) << "databaseParticipants"
+                       << BSON("db" << BSON_ARRAY(0)) << "clusterParticipants"
+                       << BSON_ARRAY("shardA" << "shardB") << "shardId"
                        << "shardA" << "someFutureScope" << "collectionA" << "anotherFutureField"
                        << 42 << "nestedFutureField" << BSON("x" << 1 << "y" << 2));
     auto obj = BSON("commitTransaction" << 1 << "endOfTransactionScopes" << scopes);
@@ -80,18 +76,17 @@ TEST(CommitTransactionOplogObjectParseTest,
 }
 
 TEST(CommitTransactionOplogObjectParseTest, ParsingYieldsIdenticalResults) {
-    auto scopes =
-        BSON("collectionParticipants" << BSON("db.collA" << BSON_ARRAY("shardA" << "shardB"))
-                                      << "databaseParticipants"
-                                      << BSON("db" << BSON_ARRAY("shardA")) << "clusterParticipants"
-                                      << BSON_ARRAY("shardA" << "shardB" << "shardC") << "shardId"
-                                      << "shardC");
+    auto scopes = BSON("collectionParticipants"
+                       << BSON("db.collA" << BSON_ARRAY(0 << 1)) << "databaseParticipants"
+                       << BSON("db" << BSON_ARRAY(0)) << "clusterParticipants"
+                       << BSON_ARRAY("shardA" << "shardB" << "shardC") << "shardId"
+                       << "shardC");
 
     auto validateEndOfTransactionScopes = [](auto&& parsed) {
         ASSERT_EQ(ShardId("shardC"), parsed.getShardId());
         ASSERT_BSONOBJ_EQ(parsed.getCollectionParticipants(),
-                          BSON("db.collA" << BSON_ARRAY("shardA" << "shardB")));
-        ASSERT_BSONOBJ_EQ(parsed.getDatabaseParticipants(), BSON("db" << BSON_ARRAY("shardA")));
+                          BSON("db.collA" << BSON_ARRAY(0 << 1)));
+        ASSERT_BSONOBJ_EQ(parsed.getDatabaseParticipants(), BSON("db" << BSON_ARRAY(0)));
         ASSERT_EQ(3U, parsed.getClusterParticipants().size());
         ASSERT_EQ(ShardId("shardA"), parsed.getClusterParticipants().at(0));
         ASSERT_EQ(ShardId("shardB"), parsed.getClusterParticipants().at(1));

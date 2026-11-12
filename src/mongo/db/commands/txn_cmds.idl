@@ -68,20 +68,21 @@ structs:
         fields:
             collectionParticipants:
                 description: >-
-                    Map from collection namespace to the array of shard ids that wrote that
-                    namespace.
+                    Map from collection namespace to the ascending array of indexes into
+                    'clusterParticipants' of the shards that wrote that namespace.
                 type: object_owned
                 optional: false
                 stability: internal
             databaseParticipants:
                 description: >-
-                    Map from database name to the array of shard ids that wrote at least one
-                    namespace in that database.
+                    Map from database name to the ascending array of indexes into
+                    'clusterParticipants' of the shards that wrote at least one namespace in
+                    that database.
                 type: object_owned
                 optional: false
                 stability: internal
             clusterParticipants:
-                description: "All shards that wrote transaction data."
+                description: "All shards that wrote transaction data, in shard-id order."
                 type: array<shard_id>
                 optional: false
                 stability: internal

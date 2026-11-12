@@ -19,10 +19,8 @@ namespace mongo {
 /**
  * Returns whether end-of-transaction accounting metadata should be written to the oplog. This
  * requires the 'allowEndOfTransaction' server parameter (the operator kill switch) and the
- * 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag (the rollout gate) to be enabled,
- * and the cluster FCV to be at the latest version. The FCV requirement keeps the coordinator from
- * sending the new 'endOfTransactionScopes' field on the strict 'commitTransaction' command to a
- * shard that predates it and would reject the command.
+ * 'featureFlagEndOfTransactionChangeEventSynthesis' feature flag (the rollout gate) to be enabled.
+ * It is not FCV-gated on master; FCV gating will be added when the feature is backported.
  */
 [[MONGO_MOD_PUBLIC]] bool isEndOfTransactionWritePathEnabled();
 

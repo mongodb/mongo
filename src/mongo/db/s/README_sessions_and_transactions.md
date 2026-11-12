@@ -386,6 +386,109 @@ Below are the steps in the two-phase commit protocol.
 The prepare phase is skipped if the coordinator already has the participant list and the commit
 decision persisted. This can be the case if the coordinator was created as part of step-up recovery.
 
+#### End-of-transaction accounting metadata (`endOfTransactionScopes`)
+
+A change stream that opts into `endOfTransaction` events needs to know when it has seen all of a
+cross-shard transaction's events for the scope it is watching. To make that possible the coordinator
+computes commit-time accounting metadata, the `endOfTransactionScopes` field, and delivers it to
+every write participant. Each participant writes it into its `commitTransaction` oplog entry. The
+change stream pipeline reads it from there and uses it to decide when the transaction is complete
+(see `ChangeStreamEndOfTransactionStage`).
+
+**When it is produced.** The metadata is only produced while end-of-transaction accounting is
+enabled, which `isEndOfTransactionWritePathEnabled()` decides. That requires the
+`featureFlagEndOfTransactionChangeEventSynthesis` feature flag and the `allowEndOfTransaction`
+server parameter (the operator kill switch) to both be enabled. Otherwise the field is absent and
+nothing below applies.
+
+**Format.** The metadata is a document with the following fields. It is defined by
+`EndOfTransactionScopesInfoBase` in `txn_cmds.idl`.
+
+- `clusterParticipants`: the array of the shard ids of all _write_ participants, in ascending
+  shard-id order.
+- `collectionParticipants`: a map from collection namespace to the ascending array of indexes into
+  `clusterParticipants` of the shards that wrote that namespace.
+- `databaseParticipants`: a map from database name to the ascending array of indexes into
+  `clusterParticipants` of the shards that wrote at least one namespace.
+
+Shards are referred to by their index in `clusterParticipants` rather than by name, so each shard id
+is stored once however many namespaces the transaction wrote. For example, a transaction that wrote
+`db1.a` on `shardA` and `shardB`, and `db2.b` on `shardB` only, has:
+
+```
+{
+  clusterParticipants: ["shardA", "shardB"],
+  collectionParticipants: {"db1.a": [0, 1], "db2.b": [1]},
+  databaseParticipants: {"db1": [0, 1], "db2": [1]}
+}
+```
+
+The set of shards a change stream waits for depends on what it watches. A collection stream uses its
+namespace's entry in `collectionParticipants`, a database stream uses its database's entry in
+`databaseParticipants`, and a whole-cluster stream uses `clusterParticipants`. If the watched
+collection or database has no entry, the transaction did not write to it and no event is synthesized
+for that stream.
+
+Read-only participants are not listed anywhere in the metadata: they have no changes of their own to
+order, and their `commitTransaction` entries are not augmented.
+
+**Lifecycle.**
+
+1. **Prepare.** Each participant returns the namespaces it wrote in its `prepareTransaction`
+   response. As the votes are collected, `PrepareVoteConsensus` records which write shards wrote
+   which namespaces and builds the metadata when the decision is made
+   (`releaseEndOfTransactionMetadata()`).
+1. **Decision.** The coordinator persists the metadata in the `endOfTransactionScopes` field of the
+   `config.transaction_coordinators` document, in the same write as the commit decision, so that
+   commit retries and coordinator failover reuse exactly the same values. When a coordinator
+   recovers the document it checks that the metadata is consistent with the participant list, and
+   ignores it if not.
+1. **Commit.** The coordinator adds the metadata to the `commitTransaction` command sent to each
+   write participant, together with that participant's own `shardId`. The command is built from the
+   persisted decision and does not re-check the kill switch, so what is sent always matches what was
+   persisted.
+1. **Oplog.** The participant stores the metadata, including its `shardId`, in its
+   `commitTransaction` oplog entry, and marks the entry with `allowEndOfTransaction: true` in `o2`.
+   A change stream turns each such entry into an accounting control event. The router-side stage
+   collects the `shardId`s of the control events it receives for a transaction, and synthesizes the
+   user-visible `endOfTransaction` event once every shard in the watched scope's expected set has
+   reported.
+
+**Size limit.** The metadata grows with the number of distinct namespaces a transaction writes to,
+and it is embedded in both the coordinator document and the `commitTransaction` command, which are
+limited to `BSONObjMaxUserSize`. If it would exceed that limit minus a 1 MB margin for the other
+fields, the coordinator logs a warning and drops it, so the transaction commits normally but change
+streams cannot synthesize an `endOfTransaction` event for it. The limit is a safety net for
+pathological transactions and is not expected to be reached by real workloads.
+
+**Multiversion compatibility.** `commitTransaction` is a strict IDL command, so a participant on a
+binary that predates `endOfTransactionScopes` rejects the command with `IDLUnknownField`. This can
+happen in a mixed-version cluster, for example a 9.1 coordinator and a 9.0 participant. The sending
+of the field is not gated on FCV on master. When the feature is backported, the backport will add
+FCV gating, so that in 9.0 the minimum FCV must be FCV 9. Until then, the coordinator detects the
+rejection and adapts (SERVER-138293):
+
+- When it sends the metadata to a participant, the coordinator also keeps a copy of the command
+  without it. If the participant answers `IDLUnknownField`, the coordinator retries with the copy
+  and marks the shard as ineligible in `EndOfTransactionMetadataShardCache`.
+- `EndOfTransactionMetadataShardCache` is a per-process, in-memory cache keyed by shard id. While a
+  shard is marked ineligible, the coordinator does not attach the metadata to its commits, so the
+  extra round trip happens at most once per ineligible shard per TTL. The TTL is 5 minutes, after
+  which the shard is tried again, so a shard that was upgraded without a restart is picked up. The
+  cache is not persisted or replicated, so a restart clears it.
+- A shard that is ineligible still commits; only the metadata is left out of its `commitTransaction`
+  command.
+
+Both the retry and the cache are to be removed once the oldest version that can be part of the
+cluster understands the field (SERVER-138031).
+
+#### Code references
+
+- [**EndOfTransactionScopesInfoBase**](../commands/txn_cmds.idl)
+- [**PrepareVoteConsensus::releaseEndOfTransactionMetadata**](transaction_coordinator_util.cpp)
+- [**EndOfTransactionMetadataShardCache**](end_of_transaction_metadata_shard_cache.h)
+- [**ChangeStreamEndOfTransactionStage**](../exec/agg/change_stream_end_of_transaction_stage.h)
+
 ### Aborting a Transaction
 
 Mongos will implicitly abort a transaction on any error except the view resolution error from a

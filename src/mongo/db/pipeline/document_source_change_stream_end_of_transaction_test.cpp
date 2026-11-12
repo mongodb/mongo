@@ -77,11 +77,11 @@ Document makeAccountingControlEvent(const BSONObj& lsid,
                                     Timestamp ts,
                                     long long txnNumber = 7,
                                     boost::optional<Timestamp> commitTimestamp = boost::none) {
-    const BSONObj scopes = BSON(
-        "shardId" << shardId << "collectionParticipants"
-                  << BSON("unittests.change_stream" << BSON_ARRAY("shardA" << "shardB"))
-                  << "databaseParticipants" << BSON("unittests" << BSON_ARRAY("shardA" << "shardB"))
-                  << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
+    const BSONObj scopes =
+        BSON("shardId" << shardId << "collectionParticipants"
+                       << BSON("unittests.change_stream" << BSON_ARRAY(0 << 1))
+                       << "databaseParticipants" << BSON("unittests" << BSON_ARRAY(0 << 1))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     BSONObjBuilder event;
     event.append("_id", BSON("_data" << "resume-token"));
     event.append("operationType", DocumentSourceChangeStream::kEndOfTransactionOpType);
@@ -106,7 +106,8 @@ Document makeAccountingControlEventForUnwatchedScope(const BSONObj& lsid,
                                                      long long txnNumber = 7) {
     const BSONObj scopes =
         BSON("shardId" << shardId << "collectionParticipants"
-                       << BSON("someotherdb.someothercoll" << BSON_ARRAY("shardA" << "shardB")));
+                       << BSON("someotherdb.someothercoll" << BSON_ARRAY(0 << 1))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     const BSONObj event =
         BSON("_id" << BSON("_data" << "resume-token") << "operationType"
                    << DocumentSourceChangeStream::kEndOfTransactionOpType << "clusterTime" << ts
@@ -125,11 +126,11 @@ Document makeAccountingControlEventWatchedScopeOnShardA(const BSONObj& lsid,
                                                         std::string_view shardId,
                                                         Timestamp ts,
                                                         long long txnNumber = 7) {
-    const BSONObj scopes = BSON(
-        "shardId" << shardId << "collectionParticipants"
-                  << BSON("unittests.change_stream" << BSON_ARRAY("shardA") << "otherdb.othercoll"
-                                                    << BSON_ARRAY("shardB"))
-                  << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
+    const BSONObj scopes =
+        BSON("shardId" << shardId << "collectionParticipants"
+                       << BSON("unittests.change_stream" << BSON_ARRAY(0) << "otherdb.othercoll"
+                                                         << BSON_ARRAY(1))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     const BSONObj event =
         BSON("_id" << BSON("_data" << "resume-token") << "operationType"
                    << DocumentSourceChangeStream::kEndOfTransactionOpType << "clusterTime" << ts
@@ -283,17 +284,18 @@ Document makeEndOfTransactionControlEvent(ChangeStreamType scope,
                                           Timestamp ts) {
     BSONObjBuilder scopes;
     scopes.append("shardId", shardId);
+    // The collection and database participants refer to shards by their index here.
+    scopes.append("clusterParticipants", BSON_ARRAY("shardA" << "shardB"));
     switch (scope) {
         case ChangeStreamType::kCollection:
             scopes.append("collectionParticipants",
-                          BSON(kEventNss.ns_forTest() << BSON_ARRAY("shardA" << "shardB")));
+                          BSON(kEventNss.ns_forTest() << BSON_ARRAY(0 << 1)));
             break;
         case ChangeStreamType::kDatabase:
             scopes.append("databaseParticipants",
-                          BSON(kEventNss.db_forTest() << BSON_ARRAY("shardA" << "shardB")));
+                          BSON(kEventNss.db_forTest() << BSON_ARRAY(0 << 1)));
             break;
         case ChangeStreamType::kAllDatabases:
-            scopes.append("clusterParticipants", BSON_ARRAY("shardA" << "shardB"));
             break;
     }
 
@@ -434,11 +436,11 @@ namespace {
 // Builds an end-of-transaction accounting control event with every field populated. The
 // participants cover the collection, database and cluster scopes of 'kEventNss'.
 Document makeFullControlEvent(const LogicalSessionFromClient& lsid, Timestamp clusterTime) {
-    const BSONObj scopes = BSON(
-        "shardId" << "shardA" << "collectionParticipants"
-                  << BSON(kEventNss.ns_forTest() << BSON_ARRAY("shardA" << "shardB"))
-                  << "databaseParticipants" << BSON(kEventNss.db_forTest() << BSON_ARRAY("shardA"))
-                  << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB" << "shardC"));
+    const BSONObj scopes =
+        BSON("shardId" << "shardA" << "collectionParticipants"
+                       << BSON(kEventNss.ns_forTest() << BSON_ARRAY(0 << 1))
+                       << "databaseParticipants" << BSON(kEventNss.db_forTest() << BSON_ARRAY(0))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB" << "shardC"));
     return Document(BSON("_id" << BSON("_data" << "resume-token") << "operationType"
                                << DocumentSourceChangeStream::kEndOfTransactionOpType
                                << "clusterTime" << clusterTime << "wallTime"
@@ -470,6 +472,25 @@ TEST_F(ChangeStreamStageTest, EndOfTransactionControlEventParsesEveryField) {
     ASSERT_EQ(parsed.scopes.databaseParticipants,
               (std::map<std::string, std::set<ShardId>>{
                   {std::string{kEventNss.db_forTest()}, {ShardId("shardA")}}}));
+}
+
+TEST_F(ChangeStreamStageTest, EndOfTransactionScopesIgnoreInvalidShardIndexes) {
+    // Indexes that are not ints, are out of range, or refer to a non-string cluster participant
+    // are ignored; a non-string cluster participant still takes up its position.
+    const BSONObj scopes =
+        BSON("shardId" << "shardA" << "collectionParticipants"
+                       << BSON("db.a" << BSON_ARRAY(0 << 1 << 2 << 3 << -1 << "shardA" << 1.0)
+                                      << "db.b" << "notAnArray")
+                       << "databaseParticipants" << BSON("db" << BSON_ARRAY(2))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << 5 << "shardC"));
+    const auto parsed = EndOfTransactionScopes::createFromDocument(Document(scopes));
+    ASSERT_EQ(parsed.clusterParticipants,
+              (std::set<ShardId>{ShardId("shardA"), ShardId("shardC")}));
+    ASSERT_EQ(parsed.collectionParticipants,
+              (std::map<std::string, std::set<ShardId>>{
+                  {"db.a", {ShardId("shardA"), ShardId("shardC")}}, {"db.b", {}}}));
+    ASSERT_EQ(parsed.databaseParticipants,
+              (std::map<std::string, std::set<ShardId>>{{"db", {ShardId("shardC")}}}));
 }
 
 TEST_F(ChangeStreamStageTest, EndOfTransactionControlEventWithoutAccountingMetadataTasserts) {

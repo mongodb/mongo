@@ -28,7 +28,9 @@
 #include <utility>
 #include <vector>
 
+#include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
+#include <absl/container/inlined_vector.h>
 #include <absl/hash/hash.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -102,8 +104,16 @@ private:
     Timestamp _maxPrepareTimestamp;
     absl::flat_hash_set<NamespaceString> _affectedNamespaces;
 
-    // Namespaces written by each write-participant shard, used to derive the participant sets.
-    std::map<ShardId, std::vector<NamespaceString>> _namespacesByShard;
+    // Records that 'shardId' wrote 'namespaces', replacing anything recorded for it before.
+    void _recordWriteShardNamespaces(const ShardId& shardId,
+                                     const std::vector<NamespaceString>& namespaces);
+
+    // The write-participant shards in the order their votes arrived, and for each namespace the
+    // indexes into '_writeShards' of the shards that wrote it. Used to derive the participant
+    // sets; each shard id and namespace is stored once, however many (shard, namespace) pairs the
+    // transaction has.
+    std::vector<ShardId> _writeShards;
+    absl::flat_hash_map<NamespaceString, absl::InlinedVector<uint32_t, 4>> _writeShardsByNamespace;
 
     boost::optional<Status> _abortStatus;
 };

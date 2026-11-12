@@ -89,6 +89,45 @@ using CoordinatorCommitDecision = txn::CoordinatorCommitDecision;
 using PrepareResponse = txn::PrepareResponse;
 using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
 
+// Returns 'map', a participant map written the readable way, {<name>: [<shardId>, ...]}, in the
+// stored form, {<name>: [<index in the metadata's 'clusterParticipants'>, ...]}, with each array in
+// ascending order. The inverse of toShardIdsForTest.
+BSONObj toShardIndexesForTest(const EndOfTransactionScopesInfoBase& metadata, const BSONObj& map) {
+    const auto& cluster = metadata.getClusterParticipants();
+    BSONObjBuilder builder;
+    for (const auto& elem : map) {
+        std::vector<int> indexes;
+        for (const auto& shard : elem.Obj()) {
+            const auto it = std::find(cluster.begin(), cluster.end(), ShardId(shard.String()));
+            ASSERT(it != cluster.end());
+            indexes.push_back(static_cast<int>(it - cluster.begin()));
+        }
+        std::sort(indexes.begin(), indexes.end());
+        BSONArrayBuilder array(builder.subarrayStart(elem.fieldNameStringData()));
+        for (auto index : indexes) {
+            array.append(index);
+        }
+    }
+    return builder.obj();
+}
+
+// Returns 'map' (the metadata's collection or database participants) as {<name>: [<shardId>,
+// ...]}. Also checks that each array of indexes is strictly ascending. The inverse of
+// toShardIndexesForTest.
+BSONObj toShardIdsForTest(const EndOfTransactionScopesInfoBase& metadata, const BSONObj& map) {
+    BSONObjBuilder builder;
+    for (const auto& elem : map) {
+        BSONArrayBuilder array(builder.subarrayStart(elem.fieldNameStringData()));
+        int previous = -1;
+        for (const auto& index : elem.Obj()) {
+            ASSERT_GT(index.Int(), previous);
+            previous = index.Int();
+            array << metadata.getClusterParticipants().at(index.Int()).toString();
+        }
+    }
+    return builder.obj();
+}
+
 const Hours kLongFutureTimeout(8);
 
 const StatusWith<BSONObj> kNoSuchTransaction =
@@ -741,10 +780,11 @@ TEST_F(TransactionCoordinatorDriverTest,
     txn::AsyncWorkScheduler aws(getServiceContext());
 
     EndOfTransactionScopesInfoBase metadata;
-    metadata.setCollectionParticipants(
-        BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2")));
-    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1" << "s2")));
     metadata.setClusterParticipants({ShardId("s1"), ShardId("s2")});
+    metadata.setCollectionParticipants(toShardIndexesForTest(
+        metadata, BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2"))));
+    metadata.setDatabaseParticipants(
+        toShardIndexesForTest(metadata, BSON("db" << BSON_ARRAY("s1" << "s2"))));
 
     auto commitFuture = txn::sendCommit(getServiceContext(),
                                         aws,
@@ -790,10 +830,11 @@ TEST_F(TransactionCoordinatorDriverTest,
     txn::AsyncWorkScheduler aws(getServiceContext());
 
     EndOfTransactionScopesInfoBase metadata;
-    metadata.setCollectionParticipants(
-        BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2")));
-    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1" << "s2")));
     metadata.setClusterParticipants({ShardId("s1"), ShardId("s2")});
+    metadata.setCollectionParticipants(toShardIndexesForTest(
+        metadata, BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2"))));
+    metadata.setDatabaseParticipants(
+        toShardIndexesForTest(metadata, BSON("db" << BSON_ARRAY("s1" << "s2"))));
 
     auto commitFuture = txn::sendCommit(getServiceContext(),
                                         aws,
@@ -855,10 +896,11 @@ TEST_F(TransactionCoordinatorDriverTest,
 
     EndOfTransactionScopesInfoBase metadata;
     // 's2' and 's3' wrote transaction data; 's1' is a read-only participant.
-    metadata.setCollectionParticipants(
-        BSON("db.coll2" << BSON_ARRAY("s2") << "db.coll3" << BSON_ARRAY("s3")));
-    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s2" << "s3")));
     metadata.setClusterParticipants({ShardId("s2"), ShardId("s3")});
+    metadata.setCollectionParticipants(toShardIndexesForTest(
+        metadata, BSON("db.coll2" << BSON_ARRAY("s2") << "db.coll3" << BSON_ARRAY("s3"))));
+    metadata.setDatabaseParticipants(
+        toShardIndexesForTest(metadata, BSON("db" << BSON_ARRAY("s2" << "s3"))));
 
     auto commitFuture = txn::sendCommit(getServiceContext(),
                                         aws,
@@ -902,9 +944,11 @@ TEST_F(TransactionCoordinatorDriverTest,
     txn::AsyncWorkScheduler aws(getServiceContext());
 
     EndOfTransactionScopesInfoBase metadata;
-    metadata.setCollectionParticipants(BSON("db.coll1" << BSON_ARRAY("s1")));
-    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1")));
     metadata.setClusterParticipants({ShardId("s1")});
+    metadata.setCollectionParticipants(
+        toShardIndexesForTest(metadata, BSON("db.coll1" << BSON_ARRAY("s1"))));
+    metadata.setDatabaseParticipants(
+        toShardIndexesForTest(metadata, BSON("db" << BSON_ARRAY("s1"))));
 
     auto commitFuture = txn::sendCommit(getServiceContext(),
                                         aws,
@@ -962,9 +1006,11 @@ TEST_F(TransactionCoordinatorDriverTest, SendCommitRetriesWithoutMetadataWhenSha
     txn::AsyncWorkScheduler aws(getServiceContext());
 
     EndOfTransactionScopesInfoBase metadata;
-    metadata.setCollectionParticipants(BSON("db.coll1" << BSON_ARRAY("s1")));
-    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1")));
     metadata.setClusterParticipants({ShardId("s1")});
+    metadata.setCollectionParticipants(
+        toShardIndexesForTest(metadata, BSON("db.coll1" << BSON_ARRAY("s1"))));
+    metadata.setDatabaseParticipants(
+        toShardIndexesForTest(metadata, BSON("db" << BSON_ARRAY("s1"))));
 
     auto& shardCache = EndOfTransactionMetadataShardCache::get(getServiceContext());
     ASSERT_TRUE(shardCache.isShardDefinitelyEligible(ShardId("s1")));
@@ -1051,9 +1097,11 @@ TEST_F(TransactionCoordinatorDriverTest, MetadataRejectionLogIsSuppressedWithinT
 
     auto commitToShardThatRejectsMetadata = [&](const ShardId& shardId) {
         EndOfTransactionScopesInfoBase metadata;
-        metadata.setCollectionParticipants(BSON("db.coll" << BSON_ARRAY(shardId.toString())));
-        metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY(shardId.toString())));
         metadata.setClusterParticipants({shardId});
+        metadata.setCollectionParticipants(
+            toShardIndexesForTest(metadata, BSON("db.coll" << BSON_ARRAY(shardId.toString()))));
+        metadata.setDatabaseParticipants(
+            toShardIndexesForTest(metadata, BSON("db" << BSON_ARRAY(shardId.toString()))));
 
         auto commitFuture = txn::sendCommit(getServiceContext(),
                                             aws,
@@ -1171,9 +1219,9 @@ TEST_F(TransactionCoordinatorDriverTest, SendPrepareCollectsEndOfTransactionMeta
 
     ASSERT_BSONOBJ_EQ(BSON("db1.coll1" << BSON_ARRAY("s1" << "s2") << "db1.coll2"
                                        << BSON_ARRAY("s2") << "db2.coll1" << BSON_ARRAY("s1")),
-                      metadata.getCollectionParticipants());
+                      toShardIdsForTest(metadata, metadata.getCollectionParticipants()));
     ASSERT_BSONOBJ_EQ(BSON("db1" << BSON_ARRAY("s1" << "s2") << "db2" << BSON_ARRAY("s1")),
-                      metadata.getDatabaseParticipants());
+                      toShardIdsForTest(metadata, metadata.getDatabaseParticipants()));
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -1213,8 +1261,10 @@ TEST_F(TransactionCoordinatorDriverTest,
     // Only 's1' wrote transaction data, so only 's1' is recorded.
     ASSERT_EQUALS(1U, metadata.getClusterParticipants().size());
     ASSERT_EQUALS(ShardId("s1"), metadata.getClusterParticipants()[0]);
-    ASSERT_BSONOBJ_EQ(BSON("db.coll" << BSON_ARRAY("s1")), metadata.getCollectionParticipants());
-    ASSERT_BSONOBJ_EQ(BSON("db" << BSON_ARRAY("s1")), metadata.getDatabaseParticipants());
+    ASSERT_BSONOBJ_EQ(BSON("db.coll" << BSON_ARRAY("s1")),
+                      toShardIdsForTest(metadata, metadata.getCollectionParticipants()));
+    ASSERT_BSONOBJ_EQ(BSON("db" << BSON_ARRAY("s1")),
+                      toShardIdsForTest(metadata, metadata.getDatabaseParticipants()));
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -1282,6 +1332,192 @@ TEST_F(TransactionCoordinatorDriverTest, DropsOversizedEndOfTransactionMetadata)
 
     // A warning is emitted so that the dropped metadata is observable.
     ASSERT_GT(logs.countBSONContainingSubset(BSON("id" << 13790400)), 0);
+}
+
+// Reference model of the end-of-transaction metadata, in readable form: the participant sets keyed
+// by serialized name, in sorted key order, each listing its shards in sorted shard-id order.
+BSONObj referenceEndOfTransactionMetadata(const std::vector<txn::PrepareResponse>& votes) {
+    std::map<ShardId, std::vector<NamespaceString>> namespacesByShard;
+    for (const auto& vote : votes) {
+        if (!vote.affectedNamespaces.empty()) {
+            namespacesByShard[vote.shardId] = vote.affectedNamespaces;
+        }
+    }
+    std::map<std::string, std::set<ShardId>> collections;
+    std::map<std::string, std::set<ShardId>> databases;
+    std::vector<ShardId> clusterParticipants;
+    for (const auto& [shardId, namespaces] : namespacesByShard) {
+        clusterParticipants.push_back(shardId);
+        for (const auto& nss : namespaces) {
+            collections[NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())]
+                .insert(shardId);
+            databases[DatabaseNameUtil::serialize(nss.dbName(),
+                                                  SerializationContext::stateDefault())]
+                .insert(shardId);
+        }
+    }
+    auto toBSON = [](const std::map<std::string, std::set<ShardId>>& sets) {
+        BSONObjBuilder builder;
+        for (const auto& [key, shards] : sets) {
+            BSONArrayBuilder array(builder.subarrayStart(key));
+            for (const auto& shard : shards) {
+                array << shard.toString();
+            }
+        }
+        return builder.obj();
+    };
+    BSONArrayBuilder cluster;
+    for (const auto& shardId : clusterParticipants) {
+        cluster << shardId.toString();
+    }
+    // clang-format off
+    return BSON(
+        "collectionParticipants" << toBSON(collections)
+        << "databaseParticipants" << toBSON(databases)
+        << "clusterParticipants" << cluster.arr());
+    // clang-format on
+}
+
+// 'metadata' in the readable form of referenceEndOfTransactionMetadata.
+BSONObj toReadableEndOfTransactionMetadataForTest(const EndOfTransactionScopesInfoBase& metadata) {
+    BSONArrayBuilder cluster;
+    for (const auto& shardId : metadata.getClusterParticipants()) {
+        cluster << shardId.toString();
+    }
+    const auto collections = toShardIdsForTest(metadata, metadata.getCollectionParticipants());
+    const auto databases = toShardIdsForTest(metadata, metadata.getDatabaseParticipants());
+    // clang-format off
+    return BSON(
+        "collectionParticipants" << collections
+        << "databaseParticipants" << databases
+        << "clusterParticipants" << cluster.arr());
+    // clang-format on
+}
+
+TEST_F(TransactionCoordinatorDriverTest, EndOfTransactionMetadataMatchesReferenceModel) {
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    // Shard ids whose lexicographic order differs from their numeric order, collections spread over
+    // several databases with overlapping shard sets, read-only shards, and more than 64 shards.
+    for (int numShards : {1, 3, 12, 70}) {
+        std::vector<txn::PrepareResponse> votes;
+        for (int s = 0; s < numShards; ++s) {
+            txn::PrepareResponse vote;
+            vote.shardId = ShardId(fmt::format("shard{}", s));
+            vote.vote = txn::PrepareVote::kCommit;
+            vote.prepareTimestamp = Timestamp(1, s + 1);
+            if (s % 5 != 4) {  // Every fifth shard is read-only.
+                for (int c = 0; c < 23; ++c) {
+                    if ((c + s) % 3 != 0) {
+                        vote.affectedNamespaces.push_back(
+                            NamespaceString::createNamespaceString_forTest(
+                                fmt::format("db{}", c % 4), fmt::format("coll{}", c)));
+                    }
+                }
+            }
+            votes.push_back(std::move(vote));
+        }
+        const auto expected = referenceEndOfTransactionMetadata(votes);
+
+        // The result must not depend on the order in which the votes arrive.
+        for (int order = 0; order < 3; ++order) {
+            auto ordered = votes;
+            if (order == 1) {
+                std::reverse(ordered.begin(), ordered.end());
+            } else if (order == 2) {
+                std::rotate(ordered.begin(), ordered.begin() + ordered.size() / 2, ordered.end());
+            }
+            txn::PrepareVoteConsensus consensus(numShards);
+            for (const auto& vote : ordered) {
+                consensus.registerVote(vote);
+            }
+            const auto metadata = consensus.releaseEndOfTransactionMetadata();
+            const auto actual = toReadableEndOfTransactionMetadataForTest(metadata);
+            ASSERT(expected.binaryEqual(actual)) << "numShards " << numShards << " order " << order
+                                                 << ": expected " << expected << ", got " << actual;
+            // Releasing again returns the same metadata, byte for byte.
+            ASSERT(metadata.toBSON().binaryEqual(
+                consensus.releaseEndOfTransactionMetadata().toBSON()));
+        }
+    }
+}
+
+TEST_F(TransactionCoordinatorDriverTest, RepeatedVoteReplacesShardNamespacesInMetadata) {
+    unittest::ServerParameterGuard featureFlag("featureFlagEndOfTransactionChangeEventSynthesis",
+                                               true);
+    unittest::ServerParameterGuard parameter("allowEndOfTransaction", true);
+
+    auto makeVote = [](const std::string& shard,
+                       std::vector<std::pair<std::string, std::string>> nss) {
+        txn::PrepareResponse vote;
+        vote.shardId = ShardId(shard);
+        vote.vote = txn::PrepareVote::kCommit;
+        vote.prepareTimestamp = Timestamp(1, 1);
+        for (const auto& [db, coll] : nss) {
+            vote.affectedNamespaces.push_back(
+                NamespaceString::createNamespaceString_forTest(db, coll));
+        }
+        return vote;
+    };
+
+    // shard0 votes again with a different set of namespaces: 'db1.a' loses its only writer,
+    // 'db1.b' keeps shard1 only, and 'db2.c' is written by shard0 (after shard1 in vote order).
+    const std::vector<txn::PrepareResponse> votes{
+        makeVote("shard0", {{"db1", "a"}, {"db1", "b"}}),
+        makeVote("shard1", {{"db1", "b"}, {"db2", "c"}}),
+        makeVote("shard0", {{"db2", "c"}, {"db2", "c"}}),
+    };
+
+    txn::PrepareVoteConsensus consensus(votes.size());
+    for (const auto& vote : votes) {
+        consensus.registerVote(vote);
+    }
+    const auto actual =
+        toReadableEndOfTransactionMetadataForTest(consensus.releaseEndOfTransactionMetadata());
+    const auto expected = referenceEndOfTransactionMetadata(votes);
+    ASSERT_BSONOBJ_EQ(expected, actual);
+    ASSERT_BSONOBJ_EQ(
+        expected,
+        BSON("collectionParticipants"
+             << BSON("db1.b" << BSON_ARRAY("shard1") << "db2.c" << BSON_ARRAY("shard0" << "shard1"))
+             << "databaseParticipants"
+             << BSON("db1" << BSON_ARRAY("shard1") << "db2" << BSON_ARRAY("shard0" << "shard1"))
+             << "clusterParticipants" << BSON_ARRAY("shard0" << "shard1")));
+}
+
+TEST(EndOfTransactionMetadataConsistencyTest, ChecksShardIndexes) {
+    const std::vector<ShardId> participants{ShardId("s1"), ShardId("s2")};
+    auto makeMetadata = [](BSONObj collections, BSONObj databases) {
+        EndOfTransactionScopesInfoBase metadata;
+        metadata.setClusterParticipants({ShardId("s1"), ShardId("s2")});
+        metadata.setCollectionParticipants(std::move(collections));
+        metadata.setDatabaseParticipants(std::move(databases));
+        return metadata;
+    };
+    auto isConsistent = [&](const EndOfTransactionScopesInfoBase& metadata) {
+        return txn::isEndOfTransactionMetadataConsistentWithParticipants(metadata, participants);
+    };
+
+    ASSERT_TRUE(isConsistent(makeMetadata(BSON("db.a" << BSON_ARRAY(0) << "db.b" << BSON_ARRAY(1)),
+                                          BSON("db" << BSON_ARRAY(0 << 1)))));
+    // The metadata dropped for being oversized is consistent with any participants.
+    ASSERT_TRUE(isConsistent(EndOfTransactionScopesInfoBase{}));
+
+    // Indexes must be ints within the cluster participants.
+    ASSERT_FALSE(isConsistent(makeMetadata(BSON("db.a" << BSON_ARRAY(2)), BSONObj())));
+    ASSERT_FALSE(isConsistent(makeMetadata(BSONObj(), BSON("db" << BSON_ARRAY(-1)))));
+    ASSERT_FALSE(isConsistent(makeMetadata(BSON("db.a" << BSON_ARRAY(0.0)), BSONObj())));
+    // Shard ids instead of indexes.
+    ASSERT_FALSE(isConsistent(makeMetadata(BSON("db.a" << BSON_ARRAY("s1")), BSONObj())));
+    // Each value must be an array.
+    ASSERT_FALSE(isConsistent(makeMetadata(BSON("db.a" << 0), BSONObj())));
+
+    // Every cluster participant must be a participant of the transaction.
+    auto metadata = makeMetadata(BSON("db.a" << BSON_ARRAY(0)), BSON("db" << BSON_ARRAY(0)));
+    metadata.setClusterParticipants({ShardId("s3")});
+    ASSERT_FALSE(isConsistent(metadata));
 }
 
 class TransactionCoordinatorDriverPersistenceTest : public TransactionCoordinatorDriverTest {
@@ -1374,9 +1610,11 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
         operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
 
     EndOfTransactionScopesInfoBase metadata;
-    metadata.setCollectionParticipants(BSON("db.coll1" << BSON_ARRAY("shard0001")));
-    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("shard0001")));
     metadata.setClusterParticipants({ShardId("shard0001")});
+    metadata.setCollectionParticipants(
+        toShardIndexesForTest(metadata, BSON("db.coll1" << BSON_ARRAY("shard0001"))));
+    metadata.setDatabaseParticipants(
+        toShardIndexesForTest(metadata, BSON("db" << BSON_ARRAY("shard0001"))));
 
     txn::persistDecision(
         *_aws,
@@ -1401,8 +1639,9 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
     // duplicated in the metadata.
     ASSERT_EQUALS(_commitTimestamp, *doc.getDecision()->getCommitTimestamp());
     ASSERT_BSONOBJ_EQ(BSON("db.coll1" << BSON_ARRAY("shard0001")),
-                      scopes.getCollectionParticipants());
-    ASSERT_BSONOBJ_EQ(BSON("db" << BSON_ARRAY("shard0001")), scopes.getDatabaseParticipants());
+                      toShardIdsForTest(scopes, scopes.getCollectionParticipants()));
+    ASSERT_BSONOBJ_EQ(BSON("db" << BSON_ARRAY("shard0001")),
+                      toShardIdsForTest(scopes, scopes.getDatabaseParticipants()));
     ASSERT_EQUALS(1U, scopes.getClusterParticipants().size());
     ASSERT_EQUALS(ShardId("shard0001"), scopes.getClusterParticipants().at(0));
 }
@@ -1420,9 +1659,11 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
         operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
 
     EndOfTransactionScopesInfoBase metadata;
-    metadata.setCollectionParticipants(BSON("db.coll1" << BSON_ARRAY("shard0001")));
-    metadata.setDatabaseParticipants(BSON("db" << BSON_ARRAY("shard0001")));
     metadata.setClusterParticipants({ShardId("shard0001")});
+    metadata.setCollectionParticipants(
+        toShardIndexesForTest(metadata, BSON("db.coll1" << BSON_ARRAY("shard0001"))));
+    metadata.setDatabaseParticipants(
+        toShardIndexesForTest(metadata, BSON("db" << BSON_ARRAY("shard0001"))));
 
     txn::persistDecision(
         *_aws,
@@ -2179,10 +2420,11 @@ TEST_F(TransactionCoordinatorTest, ContinueCommitAttachesPersistedEndOfTransacti
 
     const Timestamp commitTimestamp(100, 5);
     EndOfTransactionScopesInfoBase persistedScopes;
-    persistedScopes.setCollectionParticipants(
-        BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2")));
-    persistedScopes.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1" << "s2")));
     persistedScopes.setClusterParticipants({ShardId("s1"), ShardId("s2")});
+    persistedScopes.setCollectionParticipants(toShardIndexesForTest(
+        persistedScopes, BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2"))));
+    persistedScopes.setDatabaseParticipants(
+        toShardIndexesForTest(persistedScopes, BSON("db" << BSON_ARRAY("s1" << "s2"))));
 
     TransactionCoordinatorDocument coordinatorDoc;
     coordinatorDoc.setParticipants(kTwoShardIdList);
@@ -2239,10 +2481,11 @@ TEST_F(TransactionCoordinatorTest, ContinueCommitAttachesPersistedScopesWhenFeat
 
     const Timestamp commitTimestamp(100, 5);
     EndOfTransactionScopesInfoBase persistedScopes;
-    persistedScopes.setCollectionParticipants(
-        BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2")));
-    persistedScopes.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s1" << "s2")));
     persistedScopes.setClusterParticipants({ShardId("s1"), ShardId("s2")});
+    persistedScopes.setCollectionParticipants(toShardIndexesForTest(
+        persistedScopes, BSON("db.coll1" << BSON_ARRAY("s1") << "db.coll2" << BSON_ARRAY("s2"))));
+    persistedScopes.setDatabaseParticipants(
+        toShardIndexesForTest(persistedScopes, BSON("db" << BSON_ARRAY("s1" << "s2"))));
 
     TransactionCoordinatorDocument coordinatorDoc;
     coordinatorDoc.setParticipants(kTwoShardIdList);
@@ -2330,9 +2573,11 @@ TEST_F(TransactionCoordinatorTest, ContinueCommitIgnoresInconsistentEndOfTransac
     // is inconsistent and must not be forwarded to the participants.
     const Timestamp commitTimestamp(100, 5);
     EndOfTransactionScopesInfoBase persistedScopes;
-    persistedScopes.setCollectionParticipants(BSON("db.coll1" << BSON_ARRAY("s3")));
-    persistedScopes.setDatabaseParticipants(BSON("db" << BSON_ARRAY("s3")));
     persistedScopes.setClusterParticipants({ShardId("s3")});
+    persistedScopes.setCollectionParticipants(
+        toShardIndexesForTest(persistedScopes, BSON("db.coll1" << BSON_ARRAY("s3"))));
+    persistedScopes.setDatabaseParticipants(
+        toShardIndexesForTest(persistedScopes, BSON("db" << BSON_ARRAY("s3"))));
 
     TransactionCoordinatorDocument coordinatorDoc;
     coordinatorDoc.setParticipants(kTwoShardIdList);

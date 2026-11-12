@@ -168,7 +168,8 @@ describe("endOfTransactionScopes in commitTransaction oplog entries", function (
     }
 
     // Asserts that the participant map 'actual' (keyed by namespace or database name) maps each key
-    // to exactly the expected shard set.
+    // to exactly the expected shard set. 'actual' refers to shards by their index in
+    // 'scopes.clusterParticipants', in ascending order; 'expected' lists shard names.
     function assertParticipantMap(actual, expected, kind, scopes) {
         assert.sameMembers(
             Object.keys(actual),
@@ -178,8 +179,20 @@ describe("endOfTransactionScopes in commitTransaction oplog entries", function (
             {scopes},
         );
         for (const key of Object.keys(expected)) {
+            const indexes = actual[key];
+            assert(
+                indexes.every(
+                    (index, i) =>
+                        Number.isInteger(index) &&
+                        index >= 0 &&
+                        index < scopes.clusterParticipants.length &&
+                        (i === 0 || indexes[i - 1] < index),
+                ),
+                `${kind} participants must be ascending indexes into the cluster participants`,
+                {key, scopes},
+            );
             assert.sameMembers(
-                actual[key],
+                indexes.map((index) => scopes.clusterParticipants[index]),
                 expected[key],
                 `unexpected ${kind} participants`,
                 undefined,
@@ -211,6 +224,12 @@ describe("endOfTransactionScopes in commitTransaction oplog entries", function (
             expected.databaseParticipants,
             "database",
             scopes,
+        );
+        assert.eq(
+            [...scopes.clusterParticipants].sort(),
+            scopes.clusterParticipants,
+            "cluster participants must be in shard-id order",
+            {scopes},
         );
         assert.sameMembers(
             scopes.clusterParticipants,

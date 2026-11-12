@@ -111,6 +111,12 @@ describe("endOfTransactionScopes replicated to shard secondaries", function () {
         return entries[0];
     }
 
+    // The participant maps refer to shards by their index in 'scopes.clusterParticipants'. Returns
+    // the shard names the given array of indexes refers to.
+    function participantNames(scopes, indexes) {
+        return indexes.map((index) => scopes.clusterParticipants[index]);
+    }
+
     it("replicates the metadata to the secondary of every write participant", function () {
         const {lsid, txnNumber} = runTransaction(1);
 
@@ -134,28 +140,28 @@ describe("endOfTransactionScopes replicated to shard secondaries", function () {
             );
             assert.sameMembers(
                 [shard0Name],
-                scopes.collectionParticipants[nsA],
+                participantNames(scopes, scopes.collectionParticipants[nsA]),
                 "unexpected nsA participants",
                 undefined,
                 {scopes},
             );
             assert.sameMembers(
                 [shard1Name],
-                scopes.collectionParticipants[nsB],
+                participantNames(scopes, scopes.collectionParticipants[nsB]),
                 "unexpected nsB participants",
                 undefined,
                 {scopes},
             );
             assert.sameMembers(
                 [shard0Name],
-                scopes.databaseParticipants[dbA],
+                participantNames(scopes, scopes.databaseParticipants[dbA]),
                 "unexpected dbA participants",
                 undefined,
                 {scopes},
             );
             assert.sameMembers(
                 [shard1Name],
-                scopes.databaseParticipants[dbB],
+                participantNames(scopes, scopes.databaseParticipants[dbB]),
                 "unexpected dbB participants",
                 undefined,
                 {scopes},

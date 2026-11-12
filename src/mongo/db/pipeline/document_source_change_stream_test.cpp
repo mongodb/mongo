@@ -3786,8 +3786,8 @@ TEST_F(ChangeStreamStageTest, CoordinatedCommitEmitsAccountingControlEvent) {
     auto preparedTransaction = makePreparedApplyOpsEntry(nss, applyOpsOpTime);
     const BSONObj scopes =
         BSON("shardId" << "shardA"
-                       << "collectionParticipants"
-                       << BSON(nss.ns_forTest() << BSON_ARRAY("shardA" << "shardB")));
+                       << "collectionParticipants" << BSON(nss.ns_forTest() << BSON_ARRAY(0 << 1))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     auto commitEntry = makeCoordinatedCommitEntry(scopes, applyOpsOpTime);
 
     std::vector<GetNextResult> results =
@@ -3840,8 +3840,8 @@ TEST_F(ChangeStreamStageTest, CoordinatedCommitRequiredStreamEmitsAccountingCont
     auto preparedTransaction = makePreparedApplyOpsEntry(nss, applyOpsOpTime);
     const BSONObj scopes =
         BSON("shardId" << "shardA"
-                       << "collectionParticipants"
-                       << BSON(nss.ns_forTest() << BSON_ARRAY("shardA" << "shardB")));
+                       << "collectionParticipants" << BSON(nss.ns_forTest() << BSON_ARRAY(0 << 1))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     auto commitEntry = makeCoordinatedCommitEntry(scopes, applyOpsOpTime);
 
     std::vector<GetNextResult> results =
@@ -3870,8 +3870,8 @@ TEST_F(ChangeStreamStageTest, CoordinatedCommitWithoutOptInEmitsNoAccountingCont
     auto preparedTransaction = makePreparedApplyOpsEntry(nss, applyOpsOpTime);
     const BSONObj scopes =
         BSON("shardId" << "shardA"
-                       << "collectionParticipants"
-                       << BSON(nss.ns_forTest() << BSON_ARRAY("shardA" << "shardB")));
+                       << "collectionParticipants" << BSON(nss.ns_forTest() << BSON_ARRAY(0 << 1))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     auto commitEntry = makeCoordinatedCommitEntry(scopes, applyOpsOpTime);
 
     std::vector<GetNextResult> results = runShardPipeline(
@@ -3901,10 +3901,10 @@ TEST_F(ChangeStreamStageTest, CoordinatedCommitForUnwatchedScopeEmitsNoAccountin
 
     repl::OpTime applyOpsOpTime(Timestamp(99, 1), 1);
     auto preparedTransaction = makePreparedApplyOpsEntry(nss, applyOpsOpTime);
-    const BSONObj scopes =
-        BSON("shardId" << "shardA"
-                       << "collectionParticipants"
-                       << BSON("someotherdb.collname" << BSON_ARRAY("shardA" << "shardB")));
+    const BSONObj scopes = BSON(
+        "shardId" << "shardA"
+                  << "collectionParticipants" << BSON("someotherdb.collname" << BSON_ARRAY(0 << 1))
+                  << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     auto commitEntry = makeCoordinatedCommitEntry(scopes, applyOpsOpTime);
 
     std::vector<GetNextResult> results =
@@ -3936,11 +3936,11 @@ TEST_F(ChangeStreamStageTest,
 
     repl::OpTime applyOpsOpTime(Timestamp(99, 1), 1);
     auto preparedTransaction = makePreparedApplyOpsEntry(nss, applyOpsOpTime);
-    const BSONObj scopes =
-        BSON("shardId" << "shardB"
-                       << "collectionParticipants"
-                       << BSON(nss.ns_forTest() << BSON_ARRAY("shardA") << "otherdb.othercoll"
-                                                << BSON_ARRAY("shardB")));
+    const BSONObj scopes = BSON(
+        "shardId" << "shardB"
+                  << "collectionParticipants"
+                  << BSON(nss.ns_forTest() << BSON_ARRAY(0) << "otherdb.othercoll" << BSON_ARRAY(1))
+                  << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     auto commitEntry = makeCoordinatedCommitEntry(scopes, applyOpsOpTime);
 
     std::vector<GetNextResult> results =
@@ -3975,8 +3975,8 @@ TEST_F(ChangeStreamStageTest, CoordinatedCommitForPassthroughEmitsUserVisibleEve
     auto preparedTransaction = makePreparedApplyOpsEntry(nss, applyOpsOpTime);
     const BSONObj scopes =
         BSON("shardId" << "shardA"
-                       << "collectionParticipants"
-                       << BSON(nss.ns_forTest() << BSON_ARRAY("shardA" << "shardB")));
+                       << "collectionParticipants" << BSON(nss.ns_forTest() << BSON_ARRAY(0 << 1))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     auto commitEntry = makeCoordinatedCommitEntry(scopes, applyOpsOpTime);
 
     std::vector<GetNextResult> results =
@@ -4026,8 +4026,8 @@ TEST_F(ChangeStreamStageTest, CoordinatedCommitForPassthroughHonorsShowCommitTim
     auto preparedTransaction = makePreparedApplyOpsEntry(nss, applyOpsOpTime);
     const BSONObj scopes =
         BSON("shardId" << "shardA"
-                       << "collectionParticipants"
-                       << BSON(nss.ns_forTest() << BSON_ARRAY("shardA" << "shardB")));
+                       << "collectionParticipants" << BSON(nss.ns_forTest() << BSON_ARRAY(0 << 1))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     auto commitEntry = makeCoordinatedCommitEntry(scopes, applyOpsOpTime);
 
     std::vector<GetNextResult> results =
@@ -4063,8 +4063,8 @@ TEST_F(ChangeStreamStageTest, CoordinatedCommitForPassthroughForUnwatchedScopeEm
         NamespaceString::createNamespaceString_forTest("someotherdb.collname"), applyOpsOpTime);
     const BSONObj scopes =
         BSON("shardId" << "shardA"
-                       << "collectionParticipants"
-                       << BSON(nss.ns_forTest() << BSON_ARRAY("shardA" << "shardB")));
+                       << "collectionParticipants" << BSON(nss.ns_forTest() << BSON_ARRAY(0 << 1))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     auto commitEntry = makeCoordinatedCommitEntry(scopes, applyOpsOpTime);
 
     std::vector<GetNextResult> results =
@@ -4100,10 +4100,10 @@ TEST_F(ChangeStreamStageTest, CoordinatedCommitPassthroughKillSwitchOffEmitsNoEv
     repl::OpTime applyOpsOpTime(Timestamp(99, 1), 1);
     auto preparedTransaction = makePreparedApplyOpsEntry(
         NamespaceString::createNamespaceString_forTest("someotherdb.collname"), applyOpsOpTime);
-    const BSONObj scopes =
-        BSON("shardId" << "shardA"
-                       << "collectionParticipants"
-                       << BSON("someotherdb.collname" << BSON_ARRAY("shardA" << "shardB")));
+    const BSONObj scopes = BSON(
+        "shardId" << "shardA"
+                  << "collectionParticipants" << BSON("someotherdb.collname" << BSON_ARRAY(0 << 1))
+                  << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     auto commitEntry = makeCoordinatedCommitEntry(scopes, applyOpsOpTime);
 
     std::vector<GetNextResult> results =
@@ -4135,8 +4135,8 @@ TEST_F(ChangeStreamStageTest, CoordinatedCommitRouterKillSwitchOffEmitsNoControl
     auto preparedTransaction = makePreparedApplyOpsEntry(nss, applyOpsOpTime);
     const BSONObj scopes =
         BSON("shardId" << "shardA"
-                       << "collectionParticipants"
-                       << BSON(nss.ns_forTest() << BSON_ARRAY("shardA" << "shardB")));
+                       << "collectionParticipants" << BSON(nss.ns_forTest() << BSON_ARRAY(0 << 1))
+                       << "clusterParticipants" << BSON_ARRAY("shardA" << "shardB"));
     auto commitEntry = makeCoordinatedCommitEntry(scopes, applyOpsOpTime);
 
     std::vector<GetNextResult> results =

@@ -82,24 +82,41 @@ using namespace std::literals::string_view_literals;
 // entry.
 constexpr std::string_view kEndOfTransactionScopesField = "endOfTransactionScopes"sv;
 
-// Returns true if the sub-document valued 'participants' maps 'fieldName' to an array of shard ids
-// that contains 'shardId'.
+// Returns true if the sub-document valued 'participants' maps 'fieldName' to an array of indexes
+// into 'clusterParticipants' that contains the position of 'shardId'.
 bool participantMapContainsShard(const Value& participants,
+                                 const Value& clusterParticipants,
                                  std::string_view fieldName,
                                  std::string_view shardId) {
-    if (participants.getType() != BSONType::object) {
+    if (participants.getType() != BSONType::object ||
+        clusterParticipants.getType() != BSONType::array) {
         return false;
     }
+
+    // The participant maps refer to shards by their position in 'clusterParticipants'.
+    boost::optional<int> shardIndex;
+    int position = 0;
+    for (const auto& shard : clusterParticipants.getArray()) {
+        if (shard.getType() == BSONType::string && shard.getStringData() == shardId) {
+            shardIndex = position;
+            break;
+        }
+        ++position;
+    }
+    if (!shardIndex) {
+        return false;
+    }
+
     for (auto it = participants.getDocument().fieldIterator(); it.more();) {
-        const auto [name, shards] = it.next();
+        const auto [name, indexes] = it.next();
         if (name != fieldName) {
             continue;
         }
-        if (shards.getType() != BSONType::array) {
+        if (indexes.getType() != BSONType::array) {
             return false;
         }
-        for (const auto& shard : shards.getArray()) {
-            if (shard.getType() == BSONType::string && shard.getStringData() == shardId) {
+        for (const auto& index : indexes.getArray()) {
+            if (index.getType() == BSONType::numberInt && index.getInt() == *shardIndex) {
                 return true;
             }
         }
@@ -176,13 +193,17 @@ bool ChangeStreamUnwindTransactionStage::_endOfTransactionScopesCoverWatchedScop
         case ChangeStreamType::kCollection: {
             const std::string key = str::stream()
                 << watchedNamespace->dbName().db(omitTenant) << "." << watchedNamespace->coll();
-            return participantMapContainsShard(
-                scopes["collectionParticipants"sv], key, reportingShard);
+            return participantMapContainsShard(scopes["collectionParticipants"sv],
+                                               scopes["clusterParticipants"sv],
+                                               key,
+                                               reportingShard);
         }
         case ChangeStreamType::kDatabase: {
             const std::string key{watchedNamespace->dbName().db(omitTenant)};
-            return participantMapContainsShard(
-                scopes["databaseParticipants"sv], key, reportingShard);
+            return participantMapContainsShard(scopes["databaseParticipants"sv],
+                                               scopes["clusterParticipants"sv],
+                                               key,
+                                               reportingShard);
         }
         case ChangeStreamType::kAllDatabases:
             // Every write participant is a cluster participant, so the reporting shard always

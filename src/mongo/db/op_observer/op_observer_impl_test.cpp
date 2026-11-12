@@ -2967,8 +2967,8 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitWritesEndOfTransact
     // command on the participant. The floor for the commit entry is its commit timestamp, set on
     // the oplog entry below rather than stored in the metadata.
     EndOfTransactionScopesInfo scopes;
-    scopes.setCollectionParticipants(BSON("test.coll" << BSON_ARRAY("shard0" << "shard1")));
-    scopes.setDatabaseParticipants(BSON("test" << BSON_ARRAY("shard0" << "shard1")));
+    scopes.setCollectionParticipants(BSON("test.coll" << BSON_ARRAY(0 << 1)));
+    scopes.setDatabaseParticipants(BSON("test" << BSON_ARRAY(0 << 1)));
     scopes.setClusterParticipants(std::vector<ShardId>{ShardId("shard0"), ShardId("shard1")});
     scopes.setShardId(ShardId("shard0"));
     txnParticipant.setEndOfTransactionScopes(scopes);
