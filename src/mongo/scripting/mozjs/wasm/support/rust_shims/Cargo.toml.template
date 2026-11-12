@@ -9,3 +9,17 @@ crate-type = ["staticlib"]
 [dependencies]
 encoding_c = { path = "{{SPIDERMONKEY_ROOT}}/third_party/rust/encoding_c" }
 encoding_c_mem = { path = "{{SPIDERMONKEY_ROOT}}/third_party/rust/encoding_c_mem" }
+normalizer_glue = { path = "{{SPIDERMONKEY_ROOT}}/js/src/builtin/normalizer_glue" }
+
+# SpiderMonkey has forks of these crates containing custom Mozilla patches, but their 
+# .cargo-checksum.json manifests were never updated. [patch.crates-io] tells cargo to 
+# consume these crates as path sources and skip checksum verification. SpiderMonkey's
+# own build does the same.
+[patch.crates-io]
+icu_collections = { path = "{{SPIDERMONKEY_ROOT}}/third_party/rust/icu_collections" }
+icu_normalizer = { path = "{{SPIDERMONKEY_ROOT}}/third_party/rust/icu_normalizer" }
+icu_normalizer_data = { path = "{{SPIDERMONKEY_ROOT}}/third_party/rust/icu_normalizer_data" }
+icu_properties = { path = "{{SPIDERMONKEY_ROOT}}/third_party/rust/icu_properties" }
+icu_properties_data = { path = "{{SPIDERMONKEY_ROOT}}/third_party/rust/icu_properties_data" }
+utf16_iter = { path = "{{SPIDERMONKEY_ROOT}}/third_party/rust/utf16_iter" }
+utf8_iter = { path = "{{SPIDERMONKEY_ROOT}}/third_party/rust/utf8_iter" }

@@ -46,9 +46,9 @@ spidermonkey_wasi_repo = use_repo_rule(
 
 spidermonkey_wasi_repo(
     name = "spidermonkey_wasi",
-    sha256 = "c4dac530b125bf9d09664a8d611db7e1775ab3b9f1b939b62a65c32a0362b289",
+    sha256 = "3e19f6b6e53d9848a7e50aae8a47ce8be059ce0ee797205c29474491d4ed38db",
     urls = [
-        "https://mdb-build-public.s3.amazonaws.com/spidermonkey-wasm/FIREFOX_140_12_0esr_RELEASE/spidermonkey-wasip2-release.tar.gz",
+        "https://mdb-build-public.s3.amazonaws.com/spidermonkey-wasm/FIREFOX_153_3_0esr_RELEASE/spidermonkey-wasip2-release.tar.gz",
     ] * 5,
 )
 

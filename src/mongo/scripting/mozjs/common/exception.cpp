@@ -133,9 +133,18 @@ Status jsExceptionToStatus(JSContext* cx,
 
     JS::RootedObject obj(cx, excn.toObjectOrNull());
 
+    // JS_ErrorFromException has a different signature in the WASI build since it compiles against
+    // a different SpiderMonkey version.
+#ifdef MONGO_MOZJS_WASI_BUILD
+    JS::BorrowedErrorReport borrowed(cx);
+    if (!JS_ErrorFromException(cx, obj, borrowed))
+        return Status(altCode, altReason);
+    JSErrorReport* report = borrowed.get();
+#else
     JSErrorReport* report = JS_ErrorFromException(cx, obj);
     if (!report)
         return Status(altCode, altReason);
+#endif
 
     return JSErrorReportToStatus(cx, report, altCode, altReason);
 }

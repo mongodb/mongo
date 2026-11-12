@@ -1,0 +1,10 @@
+# Cargo source configuration for the WASI rust shims build.
+#
+# Resolve all crates.io dependencies from the SpiderMonkey tree's vendored
+# third_party/rust directory, exactly like a regular `mach build` does via
+# .cargo/config.toml. This is required for normalizer glue.
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "{{SPIDERMONKEY_ROOT}}/third_party/rust"

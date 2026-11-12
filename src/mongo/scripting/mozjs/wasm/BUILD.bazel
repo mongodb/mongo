@@ -32,6 +32,7 @@ genrule(
         "@spidermonkey//:srcs",
         "support/rust_shims/src/lib.rs",
         "support/rust_shims/Cargo.toml.template",
+        "support/rust_shims/cargo-config.toml.template",
         "scripts/build_spidermonkey_wasip2.sh",
     ],
     outs = ["spidermonkey-wasip2-release.tar.gz"],
@@ -40,6 +41,7 @@ genrule(
       export SPIDER_MACH_PATH="$(location @spidermonkey//:mach)"
       export RUST_SHIMS_LIB_RS="$(location support/rust_shims/src/lib.rs)"
       export CARGO_TEMPLATE_PATH="$(location support/rust_shims/Cargo.toml.template)"
+      export CARGO_CONFIG_TEMPLATE_PATH="$(location support/rust_shims/cargo-config.toml.template)"
       export HOST_CC="$(CC)"
       export OUTPUT="$@"
       bash $(location scripts/build_spidermonkey_wasip2.sh)

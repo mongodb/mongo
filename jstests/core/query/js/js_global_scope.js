@@ -163,6 +163,10 @@ const globalVarsWasm = [
     "_processMsg",
     "assertThrowsHelper",
     "friendlyEqual",
+    // Explicit resource management globals
+    "AsyncDisposableStack",
+    "DisposableStack",
+    "SuppressedError",
 ];
 
 if (isMozjsWasm()) {

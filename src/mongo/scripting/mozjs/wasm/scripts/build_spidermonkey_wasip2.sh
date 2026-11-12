@@ -7,10 +7,11 @@
 #   - obj-extra/       (support objects outside libjs_static.a)
 #
 # Required environment variables:
-#   OUTPUT               - Output tarball path (.tar.gz)
-#   SPIDER_MACH_PATH     - Path to SpiderMonkey's mach file
-#   RUST_SHIMS_LIB_RS    - Path to support/rust_shims/src/lib.rs
-#   CARGO_TEMPLATE_PATH  - Path to support/rust_shims/Cargo.toml.template
+#   OUTPUT                      - Output tarball path (.tar.gz)
+#   SPIDER_MACH_PATH            - Path to SpiderMonkey's mach file
+#   RUST_SHIMS_LIB_RS           - Path to support/rust_shims/src/lib.rs
+#   CARGO_TEMPLATE_PATH         - Path to support/rust_shims/Cargo.toml.template
+#   CARGO_CONFIG_TEMPLATE_PATH  - Path to support/rust_shims/cargo-config.toml.template
 #
 # Compiler discovery (set one of):
 #   WASI_SDK_BIN_FILES   - Space-separated wasi_sdk bin files (auto-discovers clang)
@@ -20,6 +21,7 @@
 #   SPIDER_MACH_PATH=/path/to/gecko-dev/mach \
 #   RUST_SHIMS_LIB_RS=support/rust_shims/src/lib.rs \
 #   CARGO_TEMPLATE_PATH=support/rust_shims/Cargo.toml.template \
+#   CARGO_CONFIG_TEMPLATE_PATH=support/rust_shims/cargo-config.toml.template \
 #   WASI_SDK_PATH=/opt/wasi-sdk \
 #   OUTPUT=spidermonkey-wasip2-release.tar.gz \
 #   bash scripts/build_spidermonkey_wasip2.sh
@@ -189,13 +191,17 @@ if ! command -v cbindgen >/dev/null 2>&1; then
 fi
 
 cd "$SRC_ROOT_REAL"
-python3 "./mach" -v --no-interactive build
-
-# Build Rust support library if present/required (best-effort).
-python3 "./mach" -v --no-interactive build js/src/rust || true
+if ! python3 "./mach" -v --no-interactive build; then
+    echo "ERROR: 'mach build' failed" >&2
+    exit 1
+fi
+echo "mach build completed; packaging tarball..." >&2
 
 LIBJS_A="$OBJDIR_REAL/js/src/build/libjs_static.a"
-test -s "$LIBJS_A"
+if [ ! -s "$LIBJS_A" ]; then
+    echo "ERROR: libjs_static.a missing or empty at $LIBJS_A" >&2
+    exit 1
+fi
 cp "$LIBJS_A" "$PKG_DIR/lib/libjs_static.a"
 
 # Headers for embedders (needed to compile our wrapper).
@@ -260,18 +266,30 @@ RUST_SHIMS_DIR="$WORK_DIR/rust-shims"
 rm -rf "$RUST_SHIMS_DIR"
 mkdir -p "$RUST_SHIMS_DIR/src"
 
+# Resolve a Bazel $(location ...) input path, which may be EXECROOT-relative or absolute.
+input_path() {
+    case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    *) printf '%s\n' "$EXECROOT/$1" ;;
+    esac
+}
+
 # Copy lib.rs from support files.
-# Path may be relative to EXECROOT or absolute.
-case "$RUST_SHIMS_LIB_RS" in
-/*) cp "$RUST_SHIMS_LIB_RS" "$RUST_SHIMS_DIR/src/lib.rs" ;;
-*) cp "$EXECROOT/$RUST_SHIMS_LIB_RS" "$RUST_SHIMS_DIR/src/lib.rs" ;;
-esac
+cp "$(input_path "$RUST_SHIMS_LIB_RS")" "$RUST_SHIMS_DIR/src/lib.rs"
+
+# Render a support template into the rust-shims crate, substituting the SpiderMonkey source
+# root.
+render_template() {
+    sed "s|{{SPIDERMONKEY_ROOT}}|$SRC_ROOT_REAL|g" "$(input_path "$1")" >"$2"
+}
 
 # Generate Cargo.toml from template with SpiderMonkey root path.
-case "$CARGO_TEMPLATE_PATH" in
-/*) sed "s|{{SPIDERMONKEY_ROOT}}|$SRC_ROOT_REAL|g" "$CARGO_TEMPLATE_PATH" >"$RUST_SHIMS_DIR/Cargo.toml" ;;
-*) sed "s|{{SPIDERMONKEY_ROOT}}|$SRC_ROOT_REAL|g" "$EXECROOT/$CARGO_TEMPLATE_PATH" >"$RUST_SHIMS_DIR/Cargo.toml" ;;
-esac
+render_template "$CARGO_TEMPLATE_PATH" "$RUST_SHIMS_DIR/Cargo.toml"
+
+# Generate .cargo/config.toml so dependencies resolve from the SpiderMonkey tree's vendored
+# third_party/rust directory instead of crates.io.
+mkdir -p "$RUST_SHIMS_DIR/.cargo"
+render_template "$CARGO_CONFIG_TEMPLATE_PATH" "$RUST_SHIMS_DIR/.cargo/config.toml"
 
 export CARGO_TARGET_DIR="$OBJDIR_REAL/cargo-target"
 (cd "$RUST_SHIMS_DIR" && "$CARGO" build --release --target wasm32-wasip2)
@@ -293,7 +311,6 @@ EXTRA_ROOT="$PKG_DIR/obj-extra"
 for rel in \
     memory/build/Unified_cpp_memory_build0.o \
     memory/mozalloc/Unified_cpp_memory_mozalloc0.o \
-    mozglue/misc/AutoProfilerLabel.o \
     mozglue/misc/ConditionVariable_noop.o \
     mozglue/misc/MmapFaultHandler.o \
     mozglue/misc/Mutex_noop.o \

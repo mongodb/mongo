@@ -1,9 +1,11 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 // Rust shims for WASI linkage.
-// Force-link the encoding shim crates so their exported C symbols are present.
+// Force-link the encoding and normalizer_glue shim crates so their exported C
+// symbols are present.
 extern crate encoding_c;
 extern crate encoding_c_mem;
+extern crate normalizer_glue;
 
 #[no_mangle]
 pub extern "C" fn mongo_wasip2_rust_shims_keepalive() {
@@ -14,5 +16,6 @@ pub extern "C" fn mongo_wasip2_rust_shims_keepalive() {
         let q = core::ptr::null::<u16>();
         let _ = encoding_c_mem::encoding_mem_is_utf8_latin1(p, 0);
         let _ = q;
+        let _ = normalizer_glue::js_normalize;
     }
 }
