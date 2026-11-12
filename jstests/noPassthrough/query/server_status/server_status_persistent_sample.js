@@ -28,9 +28,12 @@ describe("persistent sample serverStatus metrics", function () {
     let coll;
 
     const collName = jsTestName();
-    const kSourceSize = 1000;
+    const kSourceSize = 2000;
     const kSourceDocs = Array.from({length: kSourceSize}, (_, i) => ({_id: i, a: i}));
-    let kSampleSize;
+    // The sample size CBR uses.
+    let kCBRSampleSize;
+    // The sample size analyze persists.
+    let kPersistedSampleSize;
 
     // Both commands.analyze.histograms.micros and query.sampling.persistentSample.histograms.
     // loadMicros use HistogramServerStatusMetric::computeBounds<uint64_t>(11, 256, 4).
@@ -63,11 +66,12 @@ describe("persistent sample serverStatus metrics", function () {
             }),
         );
 
-        kSampleSize = PersistentSamplesUtils.defaultSampleSize(db);
+        kCBRSampleSize = PersistentSamplesUtils.defaultSampleSize(db);
+        kPersistedSampleSize = PersistentSamplesUtils.expectedPersistedSampleSize(db);
         assert.lt(
-            kSampleSize,
+            kPersistedSampleSize,
             kSourceSize,
-            "default sample size must be smaller than the source collection",
+            "default persisted sample size must be smaller than the source collection",
         );
 
         assert.commandWorked(coll.insertMany(kSourceDocs));
@@ -76,12 +80,6 @@ describe("persistent sample serverStatus metrics", function () {
     beforeEach(function () {
         PersistentSamplesUtils.dropSamplesColl(db);
     });
-
-    function runAnalyzeWithSampleSize(targetCollName, sampleSize) {
-        return runWithKnobs(db, () => db.runCommand({analyze: targetCollName, mode: "sample"}), {
-            internalSamplingSizeOverride: sampleSize,
-        });
-    }
 
     after(function () {
         MongoRunner.stopMongod(conn);
@@ -103,7 +101,7 @@ describe("persistent sample serverStatus metrics", function () {
 
         assert.eq(
             after.docsPersisted,
-            before.docsPersisted + kSampleSize,
+            before.docsPersisted + kPersistedSampleSize,
             "docsPersisted should increase by the actual persisted doc count",
             {before, after},
         );
@@ -151,7 +149,7 @@ describe("persistent sample serverStatus metrics", function () {
         const afterSecond = getAnalyzeMetrics(db);
         assert.eq(
             afterSecond.docsPersisted,
-            after.docsPersisted + kSampleSize,
+            after.docsPersisted + kPersistedSampleSize,
             "docsPersisted should accumulate across runs",
             {after, afterSecond},
         );
@@ -222,7 +220,9 @@ describe("persistent sample serverStatus metrics", function () {
         const before = getAnalyzeMetrics(db);
 
         // A sample size >= the collection size forces a full collection scan.
-        assert.commandWorked(runAnalyzeWithSampleSize(collName, kSourceSize));
+        assert.commandWorked(
+            PersistentSamplesUtils.analyzeWithSampleSize(db, collName, kSourceSize),
+        );
 
         const after = getAnalyzeMetrics(db);
 
@@ -267,7 +267,9 @@ describe("persistent sample serverStatus metrics", function () {
         const before = getAnalyzeMetrics(db);
 
         // The sample size equals numRecords so all docs will be in the sample.
-        assert.commandWorked(runAnalyzeWithSampleSize(discardCollName, kNumDocs));
+        assert.commandWorked(
+            PersistentSamplesUtils.analyzeWithSampleSize(db, discardCollName, kNumDocs),
+        );
 
         const after = getAnalyzeMetrics(db);
 
@@ -314,7 +316,7 @@ describe("persistent sample serverStatus metrics", function () {
         });
         assert.eq(
             after.docsLoaded,
-            before.docsLoaded + kSampleSize,
+            before.docsLoaded + kCBRSampleSize,
             "docsLoaded should increase by the loaded sample size",
             {before, after},
         );
@@ -425,8 +427,8 @@ describe("persistent sample serverStatus metrics", function () {
         const pages = PersistentSamplesUtils.validatePersistentSample(db, {
             sampledCollName: collName,
             samplingMethod: "random",
-            requestedSampleSize: kSampleSize,
-            actualSampleSize: kSampleSize,
+            requestedSampleSize: kPersistedSampleSize,
+            actualSampleSize: kPersistedSampleSize,
             expectedFields: ["a"],
             expectedNumPages: 1,
         });
@@ -523,8 +525,8 @@ describe("persistent sample serverStatus metrics", function () {
             // Persisted sample >16 mb is forced to span more than one page.
             const docBytes = 50 * 1024;
             const docs = PersistentSamplesUtils.makeDocsOfTotalSize(
-                kSampleSize,
-                docBytes * kSampleSize,
+                kCBRSampleSize,
+                docBytes * kCBRSampleSize,
             );
             assert.commandWorked(largeColl.insertMany(docs));
         });

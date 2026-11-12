@@ -12,7 +12,6 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 import {getAnalyzeMetrics} from "jstests/libs/query/planning_metrics_utils.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
 
@@ -34,6 +33,7 @@ const samplesColl = PersistentSamplesUtils.getSamplesColl(db);
 
 const defaultSampleSize = PersistentSamplesUtils.defaultSampleSize(db);
 const defaultNumChunks = PersistentSamplesUtils.defaultNumChunks(db);
+const defaultPersistedSampleSize = PersistentSamplesUtils.expectedPersistedSampleSize(db);
 
 function cleanup() {
     coll.drop();
@@ -48,13 +48,6 @@ function insertDocs(n) {
     assert.commandWorked(coll.insertMany(docs));
 }
 
-// Runs an analyze command expected to succeed and asserts the persistent samples collection
-// created remains clustered on _id.
-function runAnalyze(analyzeCmd) {
-    assert.commandWorked(db.runCommand(analyzeCmd));
-    PersistentSamplesUtils.assertSamplesCollClustered(db);
-}
-
 // Returns how many persisted samples hit no write conflict and how many hit at least one.
 function getWriteConflictCounts() {
     const [noConflicts, ...someConflicts] = getAnalyzeMetrics(db).histograms.writeConflicts;
@@ -62,20 +55,6 @@ function getWriteConflictCounts() {
         none: Number(noConflicts.count),
         some: someConflicts.reduce((sum, bucket) => sum + Number(bucket.count), 0),
     };
-}
-
-function runAnalyzeWith({sampleSize, samplingMethod, numChunks}) {
-    const knobs = {};
-    if (sampleSize !== undefined) {
-        knobs.internalSamplingSizeOverride = sampleSize;
-    }
-    if (samplingMethod !== undefined) {
-        knobs.internalQuerySamplingCEMethodForPersistentSamples = samplingMethod;
-    }
-    if (numChunks !== undefined) {
-        knobs.internalQueryNumChunksForChunkBasedSampling = numChunks;
-    }
-    runWithKnobs(db, () => runAnalyze({analyze: collName, mode: "sample"}), knobs);
 }
 
 const sourceDocFields = ["a", "b"];
@@ -88,7 +67,12 @@ const sourceDocFields = ["a", "b"];
 cleanup();
 insertDocs(20);
 {
-    runAnalyzeWith({sampleSize: 10, samplingMethod: "random"});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: 10,
+            samplingMethod: "random",
+        }),
+    );
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
@@ -103,7 +87,12 @@ insertDocs(20);
 cleanup();
 insertDocs(20);
 {
-    runAnalyzeWith({sampleSize: 100, samplingMethod: "random"});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: 100,
+            samplingMethod: "random",
+        }),
+    );
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
@@ -119,7 +108,12 @@ insertDocs(20);
 cleanup();
 insertDocs(20);
 {
-    runAnalyzeWith({sampleSize: 10, samplingMethod: "random"});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: 10,
+            samplingMethod: "random",
+        }),
+    );
     const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
     const expectedId = PersistentSamplesUtils.getExpectedId(uuid, expectedSchemaVersion);
     const firstCreatedAt = PersistentSamplesUtils.getSampleDoc(samplesColl, expectedId)[
@@ -127,7 +121,12 @@ insertDocs(20);
     ];
 
     // Re-running analyze against an already-clustered samples collection must replace the existing sample document.
-    runAnalyzeWith({sampleSize: 10, samplingMethod: "random"});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: 10,
+            samplingMethod: "random",
+        }),
+    );
     const secondPages = PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
@@ -153,14 +152,14 @@ insertDocs(20);
     const expectedSample = {
         sampledCollName: collName,
         samplingMethod: "random",
-        requestedSampleSize: defaultSampleSize,
+        requestedSampleSize: defaultPersistedSampleSize,
         actualSampleSize: 20,
         expectedSchemaVersion: expectedSchemaVersion,
         expectedFields: sourceDocFields,
         expectedGenId: PersistentSamplesUtils.kFirstPersistentSampleGenId,
     };
     const writeConflictsBefore = getWriteConflictCounts();
-    runAnalyze(analyzeCmd);
+    assert.commandWorked(PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName));
     assert.docEq(
         {none: writeConflictsBefore.none + 1, some: writeConflictsBefore.some},
         getWriteConflictCounts(),
@@ -246,7 +245,7 @@ insertDocs(20);
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
-        requestedSampleSize: defaultSampleSize,
+        requestedSampleSize: defaultPersistedSampleSize,
         actualSampleSize: 20,
         expectedSchemaVersion: expectedSchemaVersion,
         expectedFields: sourceDocFields,
@@ -263,7 +262,12 @@ insertDocs(20);
 cleanup();
 assert.commandWorked(db.createCollection(collName));
 {
-    runAnalyzeWith({sampleSize: 10, samplingMethod: "random"});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: 10,
+            samplingMethod: "random",
+        }),
+    );
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
@@ -287,14 +291,19 @@ assert.commandFailedWithCode(
 
 // Large collection (> default): sample size equals the calculated default, not clamped.
 cleanup();
-insertDocs(500);
+insertDocs(2000);
 {
-    runAnalyze({analyze: collName, mode: "sample"});
+    assert.lt(
+        defaultPersistedSampleSize,
+        2000,
+        "the collection size must exceed the default sample size",
+    );
+    assert.commandWorked(PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName));
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
-        requestedSampleSize: defaultSampleSize,
-        actualSampleSize: defaultSampleSize,
+        requestedSampleSize: defaultPersistedSampleSize,
+        actualSampleSize: defaultPersistedSampleSize,
         expectedSchemaVersion: expectedSchemaVersion,
         expectedFields: sourceDocFields,
     });
@@ -305,11 +314,11 @@ insertDocs(500);
 cleanup();
 insertDocs(50);
 {
-    runAnalyze({analyze: collName, mode: "sample"});
+    assert.commandWorked(PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName));
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
-        requestedSampleSize: defaultSampleSize,
+        requestedSampleSize: defaultPersistedSampleSize,
         actualSampleSize: 50,
         expectedSchemaVersion: expectedSchemaVersion,
         expectedFields: sourceDocFields,
@@ -331,7 +340,12 @@ insertDocs(500);
         defaultSampleSize,
         "override size must differ from the derived default for this test to be meaningful",
     );
-    runAnalyzeWith({sampleSize: overrideSize, samplingMethod: "random"});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: overrideSize,
+            samplingMethod: "random",
+        }),
+    );
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "random",
@@ -340,6 +354,40 @@ insertDocs(500);
         expectedSchemaVersion: expectedSchemaVersion,
         expectedFields: sourceDocFields,
     });
+}
+
+// =============================================================================
+// internalJoinPlanSamplingSize knob
+// =============================================================================
+
+// The persisted sample is sized to the larger of the CBR and join sample sizes, regardless of
+// whether join optimization is enabled.
+cleanup();
+insertDocs(500);
+let expectedGenId = PersistentSamplesUtils.kFirstPersistentSampleGenId;
+for (const enableJoinOptimization of [true, false]) {
+    for (const {cbrSampleSize, joinSampleSize, expectedSampleSize} of [
+        {cbrSampleSize: 10, joinSampleSize: 25, expectedSampleSize: 25},
+        {cbrSampleSize: 25, joinSampleSize: 10, expectedSampleSize: 25},
+    ]) {
+        assert.commandWorked(
+            PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+                sampleSize: cbrSampleSize,
+                joinSampleSize,
+                enableJoinOptimization,
+                samplingMethod: "random",
+            }),
+        );
+        PersistentSamplesUtils.validatePersistentSample(db, {
+            sampledCollName: collName,
+            samplingMethod: "random",
+            requestedSampleSize: expectedSampleSize,
+            actualSampleSize: expectedSampleSize,
+            expectedSchemaVersion: expectedSchemaVersion,
+            expectedFields: sourceDocFields,
+            expectedGenId: expectedGenId++,
+        });
+    }
 }
 
 // =============================================================================
@@ -359,7 +407,13 @@ insertDocs(20);
         defaultNumChunks,
         "numChunks must differ from the default for this test to be meaningful",
     );
-    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "chunk", numChunks: numChunks});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: sampleSize,
+            samplingMethod: "chunk",
+            numChunks: numChunks,
+        }),
+    );
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "chunk",
@@ -420,7 +474,12 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "chunk"});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: sampleSize,
+            samplingMethod: "chunk",
+        }),
+    );
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "seqScan",
@@ -436,7 +495,12 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "random"});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: sampleSize,
+            samplingMethod: "random",
+        }),
+    );
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "seqScan",
@@ -455,7 +519,12 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "random"});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: sampleSize,
+            samplingMethod: "random",
+        }),
+    );
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "seqScan",
@@ -476,7 +545,12 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "chunk"});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: sampleSize,
+            samplingMethod: "chunk",
+        }),
+    );
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "strides",
@@ -492,7 +566,12 @@ cleanup();
 insertDocs(20);
 {
     const sampleSize = 10;
-    runAnalyzeWith({sampleSize: sampleSize, samplingMethod: "random"});
+    assert.commandWorked(
+        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
+            sampleSize: sampleSize,
+            samplingMethod: "random",
+        }),
+    );
     PersistentSamplesUtils.validatePersistentSample(db, {
         sampledCollName: collName,
         samplingMethod: "strides",

@@ -2,6 +2,7 @@
  * Utils for writing tests for the persistent samples collection/analyze command in sample mode
  */
 
+import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 export const samplesCollName = "system.stats.samples";
@@ -95,6 +96,57 @@ export function defaultSampleSize(db) {
         knobValues.kSamplingConfidenceInterval,
         knobValues.kSamplingMarginOfError,
     );
+}
+
+// Get the expected size of the sample the analyze command will attempt to persist
+export function expectedPersistedSampleSize(db) {
+    const {internalJoinPlanSamplingSize} = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalJoinPlanSamplingSize: 1}),
+    );
+    return Math.max(defaultSampleSize(db), internalJoinPlanSamplingSize);
+}
+
+// Runs the analyze command in sample mode on 'collName' with the given knobs set for the duration of
+// the command, and returns the command response. On success, also asserts that the persistent
+// samples collection remains clustered on _id. analyze persists the larger of the CBR and join
+// sample sizes, so 'sampleSize' sets both unless 'joinSampleSize' is given.
+export function runAnalyzeSampleWithKnobs(
+    db,
+    collName,
+    {
+        sampleSize,
+        joinSampleSize = sampleSize,
+        enableJoinOptimization,
+        samplingMethod,
+        numChunks,
+    } = {},
+) {
+    const knobs = {};
+    if (sampleSize !== undefined) {
+        knobs.internalSamplingSizeOverride = sampleSize;
+    }
+    if (joinSampleSize !== undefined) {
+        knobs.internalJoinPlanSamplingSize = joinSampleSize;
+    }
+    if (enableJoinOptimization !== undefined) {
+        knobs.internalEnableJoinOptimization = enableJoinOptimization;
+    }
+    if (samplingMethod !== undefined) {
+        knobs.internalQuerySamplingCEMethodForPersistentSamples = samplingMethod;
+    }
+    if (numChunks !== undefined) {
+        knobs.internalQueryNumChunksForChunkBasedSampling = numChunks;
+    }
+    const res = runWithKnobs(db, () => db.runCommand({analyze: collName, mode: "sample"}), knobs);
+    if (res.ok) {
+        assertSamplesCollClustered(db);
+    }
+    return res;
+}
+
+// Runs the analyze command with sample size forced to the given value
+export function analyzeWithSampleSize(db, collName, sampleSize) {
+    return runAnalyzeSampleWithKnobs(db, collName, {sampleSize});
 }
 
 // Get the default num chunks based on query knobs so the test stays correct if knob values change

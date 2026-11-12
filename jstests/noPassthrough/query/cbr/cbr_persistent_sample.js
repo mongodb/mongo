@@ -28,7 +28,7 @@ const db = conn.getDB("test");
 
 const collName = jsTestName();
 const coll = db[collName];
-const kSourceSize = 1000;
+const kSourceSize = 2000;
 const kSourceDocs = Array.from({length: kSourceSize}, (_, i) => ({
     _id: i,
     a: i,
@@ -36,6 +36,11 @@ const kSourceDocs = Array.from({length: kSourceSize}, (_, i) => ({
 }));
 const kSampleSize = PersistentSamplesUtils.defaultSampleSize(db);
 const kNumChunks = PersistentSamplesUtils.defaultNumChunks(db);
+assert.gt(
+    kSourceSize,
+    PersistentSamplesUtils.expectedPersistedSampleSize(db),
+    "the source collection must exceed the persisted sample size, or analyze falls back to a full collection scan",
+);
 
 function resetCollections() {
     coll.drop();
@@ -179,8 +184,8 @@ try {
         assert.eq(meta.sampleNumChunks, kNumChunks, "expected numChunks to match", {meta});
         assert.eq(
             meta.sampleDocCount,
-            storedDocCount,
-            "expected docCount to match persisted sample size",
+            Math.min(storedDocCount, kSampleSize),
+            "expected docCount to match number of docs loaded from the persisted sample",
             {meta},
         );
         assert.eq(
@@ -653,8 +658,8 @@ try {
         PersistentSamplesUtils.validatePersistentSample(db, {
             sampledCollName: collName,
             samplingMethod: "random",
-            requestedSampleSize: kSampleSize,
-            actualSampleSize: kSampleSize,
+            requestedSampleSize: PersistentSamplesUtils.expectedPersistedSampleSize(db),
+            actualSampleSize: numDocs,
             expectedNumPages: 2,
         });
 

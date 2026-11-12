@@ -271,13 +271,12 @@ void runSampleMode(OperationContext* opCtx, const NamespaceString& nss) {
 
     QueryKnobConfiguration qkc(query_settings::QuerySettings{});
 
+    // Persist the maximum needed sample size between CBR and JOO.
+    size_t requestedSampleSize = std::max(
+        ce::calculateSampleSize(qkc), static_cast<size_t>(qkc.getInternalJoinPlanSamplingSize()));
+
     // Use kOnTheFlySample to force collection of a new sample rather than attempting to
     // read an existing one.
-    size_t requestedSampleSize = ce::calculateSampleSize(qkc);
-    if (qkc.isJoinOrderingEnabled()) {
-        requestedSampleSize = std::max(requestedSampleSize,
-                                       static_cast<size_t>(qkc.getInternalJoinPlanSamplingSize()));
-    }
     const ce::SampleSpec spec{
         .nss = nss,
         .requestedSampleSize = requestedSampleSize,

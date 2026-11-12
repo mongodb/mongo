@@ -9,7 +9,6 @@
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
 
 describe("analyze sample paging", function () {
@@ -34,12 +33,6 @@ describe("analyze sample paging", function () {
         MongoRunner.stopMongod(conn);
     });
 
-    function analyzeWithSampleSize(collName, sampleSize) {
-        return runWithKnobs(db, () => db.runCommand({analyze: collName, mode: "sample"}), {
-            internalSamplingSizeOverride: sampleSize,
-        });
-    }
-
     // Inserts `numDocs` documents totaling `totalSizeBytes`, samples all of them, and asserts the resulting sample is split into exactly `expectedNumPages` pages.
     function runPagingBoundaryTest({numDocs, totalSizeBytes, expectedNumPages}) {
         const collName = jsTestName();
@@ -50,7 +43,9 @@ describe("analyze sample paging", function () {
         assert.commandWorked(coll.insertMany(docs));
 
         // sampleSize == numRecords so all docs will be present in the sample.
-        assert.commandWorked(analyzeWithSampleSize(collName, docs.length));
+        assert.commandWorked(
+            PersistentSamplesUtils.analyzeWithSampleSize(db, collName, docs.length),
+        );
 
         PersistentSamplesUtils.validatePersistentSample(db, {
             sampledCollName: collName,
@@ -101,7 +96,7 @@ describe("analyze sample paging", function () {
             assert.commandWorked(coll.insert(Object.assign({}, doc, {_id: i})));
         });
 
-        return analyzeWithSampleSize(collName, docs.length);
+        return PersistentSamplesUtils.analyzeWithSampleSize(db, collName, docs.length);
     }
 
     // Returns the _ids of the docs in `docs` that are small enough to be persisted.
