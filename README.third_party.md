@@ -64,16 +64,16 @@ a notice will be included in
 | [S2 Geometry Library]                                | Apache-2.0                                     | a25c502bda9d7e0274b9e2b7825fbddf13cc0306 | ✗                    | ✗                               |
 | [s2n-tls TLS library]                                | Apache-2.0                                     | 1.7.3                                    |                      | ✗                               |
 | [SafeInt]                                            | MIT                                            | 3.0.28a                                  |                      | ✗                               |
-| [siphash]                                            | MIT                                            | 32d067603b93b47828700880649198e0bfbbcffa |                      | ✗                               |
+| [siphash]                                            | MIT                                            | eee7d0d84dc7731df2359b243aa5e75d85f6eaef |                      | ✗                               |
 | [snappy]                                             | BSD-3-Clause                                   | 1.1.10                                   | ✗                    | ✗                               |
-| [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                                   | 1.0.0                                    | ✗                    | ✗                               |
+| [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                                   | 1a76afa5b90c94034630951a84f79d5ccbf3c881 | ✗                    | ✗                               |
 | [tcmalloc]                                           | Apache-2.0                                     | f3b20f9a07e175c5d897df7b49d9830d4efa6110 |                      | ✗                               |
 | [timelib]                                            | MIT                                            | 2026.02                                  |                      | ✗                               |
 | [Unicode Character Database]                         | Unicode-DFS-2016                               | 8.0.0                                    | ✗                    | ✗                               |
 | [valgrind.h]                                         | BSD-4-Clause                                   | 3.17.0                                   |                      | ✗                               |
 | [xxHash]                                             | BSD-2-Clause                                   | 0.8.3                                    | ✗                    | ✗                               |
 | [yaml-cpp]                                           | MIT                                            | 0.6.3                                    |                      | ✗                               |
-| [zlib]                                               | Zlib                                           | 1.3.2                                    | ✗                    | ✗                               |
+| [zlib]                                               | Zlib                                           | 1.4                                      | ✗                    | ✗                               |
 | [Zstandard (zstd)]                                   | BSD-3-Clause [2]                               | 1.5.5                                    | ✗                    | ✗                               |
 
 
