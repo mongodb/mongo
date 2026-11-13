@@ -40,6 +40,17 @@ __session_dhandle_readlock(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __session_dhandle_try_readlock --
+ *     Try to acquire read lock for the session's current dhandle.
+ */
+static int
+__session_dhandle_try_readlock(WT_SESSION_IMPL *session)
+{
+    WT_ASSERT(session, session->dhandle != NULL);
+    return (__wt_try_readlock(session, &session->dhandle->rwlock));
+}
+
+/*
  * __session_dhandle_readunlock --
  *     Release read lock for the session's current dhandle.
  */
@@ -172,7 +183,8 @@ retry:
  * __wt_session_lock_dhandle --
  *     Return when the current data handle is either (a) open with the requested lock mode; or (b)
  *     closed and write locked. If exclusive access is requested and cannot be granted immediately
- *     because the handle is in use, fail with EBUSY. Here is a brief summary of how different
+ *     because the handle is in use, fail with EBUSY. If the session is flagged not to wait for
+ *     handle locks, fail with EBUSY instead of waiting. Here is a brief summary of how different
  *     operations synchronize using either the schema lock, handle locks or handle flags: open --
  *     one thread gets the handle exclusive, reverts to a shared handle lock once the handle is
  *     open; bulk load --
@@ -190,13 +202,14 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
     WT_BTREE *btree;
     WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
-    bool is_open, lock_busy, want_exclusive;
+    bool is_open, lock_busy, no_wait, want_exclusive;
 
     *is_deadp = false;
 
     dhandle = session->dhandle;
     btree = dhandle->handle;
     lock_busy = false;
+    no_wait = FLD_ISSET(session->lock_flags, WT_SESSION_NO_DHANDLE_WAIT);
     want_exclusive = LF_ISSET(WT_DHANDLE_EXCLUSIVE);
 
     /*
@@ -260,7 +273,11 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
          * thread has it locked for real.
          */
         if (F_ISSET(dhandle, WT_DHANDLE_OPEN) && (!want_exclusive || lock_busy)) {
-            WT_WITH_DHANDLE(session, dhandle, __session_dhandle_readlock(session));
+            if (no_wait) {
+                WT_WITH_DHANDLE(session, dhandle, ret = __session_dhandle_try_readlock(session));
+                WT_RET(ret);
+            } else
+                WT_WITH_DHANDLE(session, dhandle, __session_dhandle_readlock(session));
             if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
                 *is_deadp = true;
                 WT_WITH_DHANDLE(session, dhandle, __session_dhandle_readunlock(session));
@@ -304,7 +321,9 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
             WT_ASSERT(session, !F_ISSET(dhandle, WT_DHANDLE_DEAD));
             return (0);
         }
-        if (ret != EBUSY || (is_open && want_exclusive) || LF_ISSET(WT_DHANDLE_LOCK_ONLY))
+        /* Only retry a busy handle if the caller is allowed to wait for it. */
+        if (ret != EBUSY || (is_open && want_exclusive) || LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
+          no_wait)
             return (ret);
         lock_busy = true;
 

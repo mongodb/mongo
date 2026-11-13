@@ -228,7 +228,8 @@ __verify_dsk_addr_validity(WT_CELL_UNPACK_ADDR *unpack, WT_VERIFY_INFO *vi)
         ta = &effective_ta;
     }
 
-    if ((ret = __wt_time_aggregate_validate(vi->session, ta, addr != NULL ? &addr->ta : NULL,
+    if ((ret = __wt_time_aggregate_validate(vi->session, ta, addr != NULL ? &addr->ta : NULL, true,
+           FLD_ISSET(vi->flags, WT_VRFY_DISK_FROM_DELTA),
            F_ISSET(vi->session, WT_SESSION_QUIET_CORRUPT_FILE))) == 0)
         return (0);
 
@@ -249,7 +250,7 @@ __verify_dsk_value_validity(WT_CELL_UNPACK_KV *unpack, WT_VERIFY_INFO *vi)
     addr = vi->page_addr;
 
     if ((ret = __wt_time_value_validate(vi->session, &unpack->tw, addr != NULL ? &addr->ta : NULL,
-           FLD_ISSET(vi->flags, WT_VRFY_DISK_FROM_DELTA),
+           true, FLD_ISSET(vi->flags, WT_VRFY_DISK_FROM_DELTA),
            F_ISSET(vi->session, WT_SESSION_QUIET_CORRUPT_FILE))) == 0)
         return (0);
 

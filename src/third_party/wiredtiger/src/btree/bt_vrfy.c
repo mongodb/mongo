@@ -849,11 +849,13 @@ err:
  *     Check an address block's timestamps.
  */
 static int
-__verify_addr_ts(WT_SESSION_IMPL *session, WT_REF *ref, WT_CELL_UNPACK_ADDR *unpack, WT_VSTUFF *vs)
+__verify_addr_ts(WT_SESSION_IMPL *session, WT_REF *ref, WT_CELL_UNPACK_ADDR *unpack,
+  bool from_delta, WT_VSTUFF *vs)
 {
     WT_DECL_RET;
 
-    if ((ret = __wt_time_aggregate_validate(session, &unpack->ta, NULL, false)) == 0)
+    if ((ret = __wt_time_aggregate_validate(session, &unpack->ta, NULL, true, from_delta, false)) ==
+      0)
         return (0);
 
     WT_RET_MSG(session, ret, "internal page reference at %s failed timestamp validation",
@@ -957,12 +959,14 @@ __verify_tree(
     WT_REF *child_ref;
     size_t my_stack_level, next_stack_level;
     uint32_t entry;
+    bool from_delta;
 
     btree = S2BT(session);
     bm = btree->bm;
     unpack = &_unpack;
     home = (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home);
     page = ref->page;
+    from_delta = page->disagg_info != NULL && page->disagg_info->block_meta.delta_count > 0;
 
     /*
      * The verify operation does not go through the same tree walk flow as other operations
@@ -1199,7 +1203,7 @@ celltype_err:
             __wt_cell_unpack_addr(session,
               ((WT_PAGE *)__wt_atomic_load_ptr_relaxed(&child_ref->home))->dsk, child_ref->addr,
               unpack);
-            WT_RET(__verify_addr_ts(session, child_ref, unpack, vs));
+            WT_RET(__verify_addr_ts(session, child_ref, unpack, from_delta, vs));
 
             /*
              * Accumulate the block size from the disagg cookie. This is used to validate the
@@ -1269,7 +1273,7 @@ celltype_err:
             __wt_cell_unpack_addr(session,
               ((WT_PAGE *)__wt_atomic_load_ptr_relaxed(&child_ref->home))->dsk, child_ref->addr,
               unpack);
-            WT_RET(__verify_addr_ts(session, child_ref, unpack, vs));
+            WT_RET(__verify_addr_ts(session, child_ref, unpack, from_delta, vs));
 
             /*
              * Accumulate the block size from the disagg cookie. This is used to validate the
@@ -1501,9 +1505,11 @@ __verify_page_content_int(
     const WT_PAGE_HEADER *dsk;
     WT_TIME_AGGREGATE effective_ta, *ta;
     uint32_t cell_num;
+    bool from_delta;
 
     page = ref->page;
     dsk = page->dsk;
+    from_delta = page->disagg_info != NULL && page->disagg_info->block_meta.delta_count > 0;
 
     /* Walk the page, verifying overflow pages and validating timestamps. */
     cell_num = 0;
@@ -1548,7 +1554,8 @@ __verify_page_content_int(
         case WT_CELL_ADDR_INT:
         case WT_CELL_ADDR_LEAF:
         case WT_CELL_ADDR_LEAF_NO:
-            if ((ret = __wt_time_aggregate_validate(session, ta, &parent->ta, false)) != 0)
+            if ((ret = __wt_time_aggregate_validate(
+                   session, ta, &parent->ta, true, from_delta, false)) != 0)
                 WT_RET_MSG(session, ret,
                   "cell %" PRIu32 " on page at %s failed timestamp validation", cell_num - 1,
                   __verify_addr_string(session, ref, vs->tmp1));
@@ -1633,7 +1640,8 @@ __verify_page_content_leaf(
             __wt_verbose_debug3(session, WT_VERB_VERIFY, "cell num: %" PRIu32 ", time window: %s",
               cell_num - 1, __wt_time_window_to_string(tw, tw_string));
 
-            if ((ret = __wt_time_value_validate(session, tw, &parent->ta, from_delta, false)) != 0)
+            if ((ret = __wt_time_value_validate(
+                   session, tw, &parent->ta, true, from_delta, false)) != 0)
                 WT_RET_MSG(session, ret,
                   "cell %" PRIu32 " on page at %s failed timestamp validation", cell_num - 1,
                   __verify_addr_string(session, ref, vs->tmp1));

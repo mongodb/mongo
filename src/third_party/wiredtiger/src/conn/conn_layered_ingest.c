@@ -10,6 +10,8 @@
 
 static int __layered_drop_prepared_transaction_ops(WT_SESSION_IMPL *session, WT_ITEM *key,
   WT_BTREE *stable_btree, uint64_t txnid, uint64_t prepared_id);
+static int __layered_fix_prepared_transaction(WT_SESSION_IMPL *session, WT_ITEM *key,
+  WT_BTREE *ingest_btree, WT_BTREE *stable_btree, uint64_t txnid, uint64_t prepared_id);
 static int __layered_last_checkpoint_order(
   WT_SESSION_IMPL *session, const char *shared_uri, int64_t *ckpt_order);
 
@@ -67,16 +69,17 @@ __layered_stable_has_value(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 /*
  * __layered_move_updates --
- *     Move the updates of a key to the stable table, dropping removes with nothing to delete. Any
- *     unresolved prepared update on the stable table should now have been resolved. On success the
- *     update list is consumed; on error it holds what remains to free.
+ *     Move the updates of a key to the stable table, redirecting an in-flight prepared transaction
+ *     there and dropping removes with nothing to delete. Any unresolved prepared update on the
+ *     stable table should now have been resolved. On success the update list is consumed; on error
+ *     it holds what remains to free.
  */
 static int
-__layered_move_updates(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key,
-  WT_UPDATE **updates_ptr, wt_timestamp_t from_ts, uint64_t *orphan_countp)
+__layered_move_updates(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_BTREE *ingest_btree,
+  WT_ITEM *key, WT_UPDATE **updates_ptr, wt_timestamp_t from_ts, uint64_t *orphan_countp)
 {
     WT_DECL_RET;
-    WT_UPDATE *last_upd;
+    WT_UPDATE *last_upd, *newest;
 
     /*
      * Disable bulk load if the btree is empty. Otherwise, checkpoint may skip this btree if it has
@@ -87,6 +90,17 @@ __layered_move_updates(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *
     /* Search the page. */
     WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(cbt, key, true, NULL, false, NULL));
     WT_ERR(ret);
+
+    /*
+     * An in-flight prepared transaction holds the key, so the key's updates are the newest updates
+     * in the list. Redirect it here when the drain list holds all of the key's updates, as
+     * redirecting marks its updates aborted on the ingest btree, which would hide the older ones
+     * from the drain.
+     */
+    newest = *updates_ptr;
+    if (newest->txnid != WT_TXN_ABORTED && newest->prepare_state == WT_PREPARE_INPROGRESS)
+        WT_ERR(__layered_fix_prepared_transaction(
+          session, key, ingest_btree, CUR2BT(cbt), newest->txnid, newest->prepared_id));
 
     /*
      * With no stable value, starting from the oldest update that was not rolled back:
@@ -715,7 +729,8 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, const char *ingest_uri,
         if (ret == WT_NOTFOUND) {
             if (key->size > 0 && upds != NULL) {
                 WT_WITH_DHANDLE(session, cbt->dhandle,
-                  ret = __layered_move_updates(session, cbt, key, &upds, from_ts, orphan_countp));
+                  ret = __layered_move_updates(
+                    session, cbt, ingest_btree, key, &upds, from_ts, orphan_countp));
                 WT_ERR(ret);
             } else
                 ret = 0;
@@ -733,7 +748,8 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, const char *ingest_uri,
 
             if (upds != NULL) {
                 WT_WITH_DHANDLE(session, cbt->dhandle,
-                  ret = __layered_move_updates(session, cbt, key, &upds, from_ts, orphan_countp));
+                  ret = __layered_move_updates(
+                    session, cbt, ingest_btree, key, &upds, from_ts, orphan_countp));
                 WT_ERR(ret);
             }
 
@@ -887,12 +903,9 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, const char *ingest_uri,
                 /* This is for debugging purpose and it is not checked in the code. */
                 F_SET(upd, WT_UPDATE_RESTORED_FROM_INGEST);
 
-                if (prepare && !prepare_txn_fixed) {
-                    WT_ASSERT(session, upds == NULL);
-                    WT_ERR(__layered_fix_prepared_transaction(
-                      session, key, ingest_btree, stable_btree, start_txn, start_prepared_id));
-                    prepare_txn_fixed = true;
-                }
+                WT_ASSERT(session,
+                  !prepare || upds == NULL ||
+                    (upds->txnid == start_txn && upds->prepared_id == start_prepared_id));
             }
         }
 

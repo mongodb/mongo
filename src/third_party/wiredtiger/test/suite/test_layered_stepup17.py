@@ -343,7 +343,7 @@ class test_layered_stepup17_rollback(wttest.WiredTigerTestCase):
             writer.commit_transaction('commit_timestamp=' + self.timestamp_str(22))
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(self.checkpoint_ts))
-        orphans = 0 if self.final is None or self.insert_in_txn else 1
+        orphans = 0 if self.final is None else 1
         warnings = [f'{self.uri}: step-up drain skipped orphan removes for 1 key(s) with no value '
             'in the stable table'] if orphans else []
         before = self.get_stat(wiredtiger.stat.conn.disagg_step_up_ingest_drain_orphan_remove)
@@ -580,10 +580,8 @@ class test_layered_stepup17_same_txn(wttest.WiredTigerTestCase):
             self.resolve(writer)
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(22))
 
-        # FIXME-WT-19038: a transaction still prepared at step-up should count by its first write.
-        counted = self.writes[0] if self.resolve_before else self.writes[-1]
         # Removes rolled back before step-up are not counted.
-        orphans = 1 if self.stable_state == 'absent' and counted == 'remove' and not (
+        orphans = 1 if self.stable_state == 'absent' and self.writes[0] == 'remove' and not (
             self.resolve_before and not self.commit) else 0
         warnings = [f'{self.uri}: step-up drain skipped orphan removes for 1 key(s) with no value '
             'in the stable table'] if orphans else []

@@ -1113,8 +1113,9 @@ functions:
         # /proc/meminfo here.
         memory_max=$(cat /proc/meminfo | grep "MemTotal: " | grep -o "[[:digit:]]*")
         memory_max=$(( ($memory_max * 8) / (${num_jobs} * 1024 * 10) ))
+        # Evergreen reports only the first failure, so stop scheduling jobs after it.
         for i in $(seq ${times|1}); do
-          ./format.sh -j ${num_jobs} ${format_test_script_args|} cache.maximum=$memory_max ${format_variant_args|} 2>&1
+          ./format.sh -F -j ${num_jobs} ${format_test_script_args|} cache.maximum=$memory_max ${format_variant_args|} 2>&1
         done
   "format test disagg":
     command: shell.exec

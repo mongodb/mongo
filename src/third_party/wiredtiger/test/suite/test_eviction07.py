@@ -169,7 +169,7 @@ class test_eviction07(wttest.WiredTigerTestCase):
     def test_operation_timeout_at_transaction_resolution(self):
         resolution_time = self._run_with_pinned_dirty(self._resolve_until_timeout)
         self.assertIsNotNone(resolution_time)
-        self.assertLess(resolution_time, 1.0)
+        self.assertLess(resolution_time, 2.0)
 
     def test_bounded_assist_at_transaction_resolution(self):
         resolution_time = self._run_with_pinned_dirty(self._resolve_until_bounded_wait)

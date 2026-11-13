@@ -125,11 +125,55 @@ __wt_verbose_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t ts, const char *
       session, WT_VERB_TIMESTAMP, "Timestamp %s: %s", __wt_timestamp_to_string(ts, ts_string), msg);
 }
 
-#define WT_TIME_VALIDATE_RET(session, ...)        \
-    do {                                          \
-        if (silent)                               \
-            return (EINVAL);                      \
-        WT_RET_MSG(session, EINVAL, __VA_ARGS__); \
+/*
+ * __time_validate_error --
+ *     Report a validation error with live diagnostic timestamps. Whether the page was built from a
+ *     delta is reported only when the caller knows it.
+ */
+static int
+__time_validate_error(
+  WT_SESSION_IMPL *session, bool from_delta_known, bool from_delta, const char *fmt, ...)
+{
+    WT_BTREE *btree;
+    WT_DECL_ITEM(message);
+    WT_DECL_RET;
+    wt_timestamp_t checkpoint_oldest_ts, checkpoint_stable_ts;
+    char checkpoint_oldest[WT_TS_INT_STRING_SIZE], checkpoint_stable[WT_TS_INT_STRING_SIZE];
+    char connection_oldest[WT_TS_INT_STRING_SIZE], connection_stable[WT_TS_INT_STRING_SIZE];
+
+    WT_RET(__wt_scr_alloc(session, 0, &message));
+
+    WT_VA_ARGS_BUF_FORMAT(session, message, fmt, false);
+
+    /* Checkpoint metadata validation does not require an active B-tree. */
+    btree = S2BT_SAFE(session);
+    checkpoint_stable_ts = btree == NULL ? WT_TS_NONE : btree->checkpoint_timestamp;
+    checkpoint_oldest_ts = __wt_atomic_load_uint64_acquire(
+      &S2C(session)->disaggregated_storage.last_checkpoint_oldest_timestamp);
+
+    WT_ERR(__wt_buf_catfmt(session, message,
+      "; connection stable timestamp %s, connection oldest timestamp %s, "
+      "checkpoint stable timestamp %s, checkpoint oldest timestamp %s",
+      __wt_timestamp_to_string(__wt_get_stable_timestamp(session), connection_stable),
+      __wt_timestamp_to_string(__wt_get_oldest_timestamp(session), connection_oldest),
+      __wt_timestamp_to_string(checkpoint_stable_ts, checkpoint_stable),
+      __wt_timestamp_to_string(checkpoint_oldest_ts, checkpoint_oldest)));
+    if (from_delta_known)
+        WT_ERR(__wt_buf_catfmt(
+          session, message, ", page built from delta: %s", from_delta ? "true" : "false"));
+
+    WT_ERR_MSG(session, EINVAL, "%s", (const char *)message->data);
+
+err:
+    __wt_scr_free(session, &message);
+    return (ret);
+}
+
+#define WT_TIME_VALIDATE_RET(session, ...)                                                  \
+    do {                                                                                    \
+        if (silent)                                                                         \
+            return (EINVAL);                                                                \
+        return (__time_validate_error(session, from_delta_known, from_delta, __VA_ARGS__)); \
     } while (0)
 
 #undef WT_TIME_ERROR
@@ -137,19 +181,19 @@ __wt_verbose_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t ts, const char *
     WT_TIME_VALIDATE_RET(session,                                      \
       "aggregate time window has " tag                                 \
       " the stable point with an empty parent aggregate time window; " \
-      "stable time %s, time window %s",                                \
-      __wt_timestamp_to_string(stable, ts_string), __wt_time_aggregate_to_string(ta, time_string))
+      "time window %s",                                                \
+      __wt_time_aggregate_to_string(ta, time_string))
 
 /*
  * __time_aggregate_validate_parent_stable --
  *     Aggregated time window validation against a stable point.
  */
 static int
-__time_aggregate_validate_parent_stable(
-  WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta, bool silent)
+__time_aggregate_validate_parent_stable(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta,
+  bool from_delta_known, bool from_delta, bool silent)
 {
     wt_timestamp_t stable;
-    char time_string[WT_TIME_STRING_SIZE], ts_string[WT_TS_INT_STRING_SIZE];
+    char time_string[WT_TIME_STRING_SIZE];
 
     stable = __wt_get_stable_timestamp(session);
 
@@ -170,8 +214,8 @@ __time_aggregate_validate_parent_stable(
  *     Aggregated time window validation against a parent.
  */
 static int
-__time_aggregate_validate_parent(
-  WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta, WT_TIME_AGGREGATE *parent, bool silent)
+__time_aggregate_validate_parent(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta,
+  WT_TIME_AGGREGATE *parent, bool from_delta_known, bool from_delta, bool silent)
 {
     wt_timestamp_t parent_newest_durable_ts;
     char time_string[2][WT_TIME_STRING_SIZE];
@@ -233,11 +277,12 @@ __time_aggregate_validate_parent(
 
 /*
  * __wt_time_aggregate_validate --
- *     Aggregated time window validation.
+ *     Aggregated time window validation. Whether the page was built from a delta only affects the
+ *     error message, and is reported only if known.
  */
 int
-__wt_time_aggregate_validate(
-  WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta, WT_TIME_AGGREGATE *parent, bool silent)
+__wt_time_aggregate_validate(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta,
+  WT_TIME_AGGREGATE *parent, bool from_delta_known, bool from_delta, bool silent)
 {
     char time_string[2][WT_TIME_STRING_SIZE];
 
@@ -359,8 +404,9 @@ __wt_time_aggregate_validate(
     if (parent == NULL || WT_IS_METADATA(session->dhandle))
         return (0);
     return (WT_TIME_AGGREGATE_IS_EMPTY(parent) ?
-        __time_aggregate_validate_parent_stable(session, ta, silent) :
-        __time_aggregate_validate_parent(session, ta, parent, silent));
+        __time_aggregate_validate_parent_stable(session, ta, from_delta_known, from_delta, silent) :
+        __time_aggregate_validate_parent(
+          session, ta, parent, from_delta_known, from_delta, silent));
 }
 
 #undef WT_TIME_ERROR
@@ -368,8 +414,8 @@ __wt_time_aggregate_validate(
     WT_TIME_VALIDATE_RET(session,                                      \
       "time window has " tag                                           \
       " the stable point with an empty parent aggregate time window; " \
-      "stable time %s, time window %s",                                \
-      __wt_timestamp_to_string(stable, ts_string), __wt_time_window_to_string(tw, time_string))
+      "time window %s",                                                \
+      __wt_time_window_to_string(tw, time_string))
 
 /*
  * __time_value_validate_parent_stable --
@@ -377,10 +423,10 @@ __wt_time_aggregate_validate(
  */
 static int
 __time_value_validate_parent_stable(
-  WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, bool from_delta, bool silent)
+  WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, bool from_delta_known, bool from_delta, bool silent)
 {
     wt_timestamp_t stable;
-    char time_string[WT_TIME_STRING_SIZE], ts_string[WT_TS_INT_STRING_SIZE];
+    char time_string[WT_TIME_STRING_SIZE];
 
     /*
      * A page rebuilt from a base image and deltas can hold cells with timestamps under an empty
@@ -421,10 +467,8 @@ __time_value_validate_parent_stable(
  *     but confirm that once the other fix lands rather than assuming it here.
  */
 static WT_INLINE bool
-__time_value_obsolete_at_checkpoint(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
+__time_value_obsolete_at_checkpoint(WT_TIME_WINDOW *tw, wt_timestamp_t checkpoint_oldest_ts)
 {
-    wt_timestamp_t checkpoint_oldest_ts = __wt_atomic_load_uint64_acquire(
-      &S2C(session)->disaggregated_storage.last_checkpoint_oldest_timestamp);
     return (checkpoint_oldest_ts != WT_TS_NONE && WT_TIME_WINDOW_HAS_STOP(tw) &&
       tw->stop_ts <= checkpoint_oldest_ts);
 }
@@ -435,8 +479,9 @@ __time_value_obsolete_at_checkpoint(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw
  */
 static int
 __time_value_validate_parent(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw,
-  WT_TIME_AGGREGATE *parent, bool from_delta, bool silent)
+  WT_TIME_AGGREGATE *parent, bool from_delta_known, bool from_delta, bool silent)
 {
+    wt_timestamp_t checkpoint_oldest_ts;
     char time_string[2][WT_TIME_STRING_SIZE];
     bool start_obsolete_at_checkpoint;
 
@@ -445,7 +490,13 @@ __time_value_validate_parent(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw,
      * treated as obsolete when it built this aggregate; a full image has no such rebuild step, so a
      * mismatch there stays a real failure.
      */
-    start_obsolete_at_checkpoint = from_delta && __time_value_obsolete_at_checkpoint(session, tw);
+    start_obsolete_at_checkpoint = false;
+    if (from_delta) {
+        checkpoint_oldest_ts = __wt_atomic_load_uint64_acquire(
+          &S2C(session)->disaggregated_storage.last_checkpoint_oldest_timestamp);
+        start_obsolete_at_checkpoint =
+          __time_value_obsolete_at_checkpoint(tw, checkpoint_oldest_ts);
+    }
 
     if (parent->newest_start_durable_ts != WT_TS_NONE &&
       tw->durable_start_ts > parent->newest_start_durable_ts)
@@ -520,11 +571,12 @@ __time_value_validate_parent(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw,
 
 /*
  * __wt_time_value_validate --
- *     Value time window validation.
+ *     Value time window validation. A page built from a delta relaxes some checks against the
+ *     parent; whether it was is reported in the error message only if known.
  */
 int
 __wt_time_value_validate(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, WT_TIME_AGGREGATE *parent,
-  bool from_delta, bool silent)
+  bool from_delta_known, bool from_delta, bool silent)
 {
     char time_string[2][WT_TIME_STRING_SIZE];
 
@@ -627,6 +679,6 @@ __wt_time_value_validate(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, WT_TIME_A
     if (parent == NULL || WT_IS_METADATA(session->dhandle))
         return (0);
     return (WT_TIME_AGGREGATE_IS_EMPTY(parent) ?
-        __time_value_validate_parent_stable(session, tw, from_delta, silent) :
-        __time_value_validate_parent(session, tw, parent, from_delta, silent));
+        __time_value_validate_parent_stable(session, tw, from_delta_known, from_delta, silent) :
+        __time_value_validate_parent(session, tw, parent, from_delta_known, from_delta, silent));
 }

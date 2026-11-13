@@ -1081,7 +1081,8 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
 
     for (upd = first_upd; upd != NULL; upd = upd->next) {
         if (upd->txnid == WT_TXN_ABORTED) {
-            if (!F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
+            if (!F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) ||
+              !F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
                 continue;
 
             if (upd->prepare_state != WT_PREPARE_INPROGRESS)

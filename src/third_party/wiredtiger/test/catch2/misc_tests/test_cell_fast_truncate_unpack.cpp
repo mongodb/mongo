@@ -277,7 +277,8 @@ TEST_CASE("Cell Fast Truncate: effective aggregate is contained by an old wide p
 
     CHECK(effective_ta.newest_stop_ts == 20);
     CHECK(old_parent.newest_stop_ts == WT_TS_MAX);
-    CHECK(__wt_time_aggregate_validate(session, &effective_ta, &old_parent, true) == 0);
+    CHECK(
+      __wt_time_aggregate_validate(session, &effective_ta, &old_parent, false, false, true) == 0);
 }
 
 TEST_CASE("Cell Fast Truncate: effective aggregate is required by a tightened parent",
@@ -303,8 +304,10 @@ TEST_CASE("Cell Fast Truncate: effective aggregate is required by a tightened pa
     CHECK(unpack.ta.newest_stop_ts == WT_TS_MAX);
     CHECK(effective_ta.newest_stop_ts == 20);
     CHECK(tightened_parent.newest_stop_ts == 20);
-    CHECK(__wt_time_aggregate_validate(session, &unpack.ta, &tightened_parent, true) == EINVAL);
-    CHECK(__wt_time_aggregate_validate(session, &effective_ta, &tightened_parent, true) == 0);
+    CHECK(__wt_time_aggregate_validate(
+            session, &unpack.ta, &tightened_parent, false, false, true) == EINVAL);
+    CHECK(__wt_time_aggregate_validate(
+            session, &effective_ta, &tightened_parent, false, false, true) == 0);
 }
 
 TEST_CASE("Time aggregate: mixed child stop durable time is within parent overall bound",
@@ -318,7 +321,7 @@ TEST_CASE("Time aggregate: mixed child stop durable time is within parent overal
     parent = make_time_aggregate(200, 100, 40, 20, WT_TS_MAX, WT_TXN_MAX);
 
     CHECK_FALSE(WT_TIME_AGGREGATE_ALL_DELETED(&child));
-    CHECK(__wt_time_aggregate_validate(session, &child, &parent, true) == 0);
+    CHECK(__wt_time_aggregate_validate(session, &child, &parent, false, false, true) == 0);
 }
 
 TEST_CASE("Time aggregate: fully deleted child remains bounded by parent stop durable time",
@@ -332,7 +335,7 @@ TEST_CASE("Time aggregate: fully deleted child remains bounded by parent stop du
     parent = make_time_aggregate(200, 100, 40, 20, WT_TS_MAX, WT_TXN_MAX);
 
     CHECK(WT_TIME_AGGREGATE_ALL_DELETED(&child));
-    CHECK(__wt_time_aggregate_validate(session, &child, &parent, true) == EINVAL);
+    CHECK(__wt_time_aggregate_validate(session, &child, &parent, false, false, true) == EINVAL);
 }
 
 TEST_CASE(
@@ -350,6 +353,7 @@ TEST_CASE(
     CHECK(fully_deleted_child.newest_stop_durable_ts < mixed_child.newest_stop_durable_ts);
     CHECK(parent.newest_stop_durable_ts == fully_deleted_child.newest_stop_durable_ts);
     CHECK(parent.newest_start_durable_ts == mixed_child.newest_start_durable_ts);
-    CHECK(__wt_time_aggregate_validate(session, &fully_deleted_child, &parent, true) == 0);
-    CHECK(__wt_time_aggregate_validate(session, &mixed_child, &parent, true) == 0);
+    CHECK(__wt_time_aggregate_validate(
+            session, &fully_deleted_child, &parent, false, false, true) == 0);
+    CHECK(__wt_time_aggregate_validate(session, &mixed_child, &parent, false, false, true) == 0);
 }

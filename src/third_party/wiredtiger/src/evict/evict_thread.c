@@ -490,7 +490,8 @@ __evict_update_work(WT_SESSION_IMPL *session, bool *eviction_needed)
              * dhandle cache, we bail out. We must not proceed to acquire a connection dhandle read
              * lock or a schema lock to acquire the HS dhandle while holding the pass lock, as this
              * could lead to a deadlock. There are several places in the code where a pass lock is
-             * taken after a schema lock, which makes this sequence unsafe.
+             * taken after a schema lock, which makes this sequence unsafe. The cached cursor's
+             * reopen likewise doesn't wait for the HS dhandle lock.
              */
             WT_RET_NOTFOUND_OK(ret = __wt_curhs_get_cached(session, hs_id, &hs_tree));
             if (ret == 0) {

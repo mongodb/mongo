@@ -17,7 +17,8 @@ __cell_check_value_validity(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, bool e
 #ifdef HAVE_DIAGNOSTIC
     WT_DECL_RET;
 
-    if ((ret = __wt_time_value_validate(session, tw, NULL, false, false)) != 0)
+    /* Callers have no page context, so whether the page came from a delta is unknown. */
+    if ((ret = __wt_time_value_validate(session, tw, NULL, false, false, false)) != 0)
         return (expected_error ?
             WT_ERROR :
             __wt_panic(session, ret, "value timestamp window failed validation"));
@@ -179,7 +180,8 @@ __wt_check_addr_validity(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta, bool e
 #ifdef HAVE_DIAGNOSTIC
     WT_DECL_RET;
 
-    if ((ret = __wt_time_aggregate_validate(session, ta, NULL, false)) != 0)
+    /* Callers have no page context, so whether the page came from a delta is unknown. */
+    if ((ret = __wt_time_aggregate_validate(session, ta, NULL, false, false, false)) != 0)
         return (expected_error ?
             WT_ERROR :
             __wt_panic(session, ret, "address timestamp window failed validation"));
