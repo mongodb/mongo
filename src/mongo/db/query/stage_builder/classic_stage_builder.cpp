@@ -150,6 +150,9 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             case STAGE_IXSCAN: {
                 const IndexScanNode* ixn = static_cast<const IndexScanNode*>(root);
 
+                // Ignore allowBatching until batched classic execution is implemented so rewritten
+                // solutions can still execute and multiplan.
+                // TODO SERVER-136310: Consume allowBatching flag to build batched ixscan
                 invariant(collectionPtr);
                 const auto* entry = collectionPtr->getIndexCatalog()->findIndexByIdent(
                     _opCtx, ixn->index.indexCatalogEntryStorage->getIdent());
@@ -176,7 +179,11 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 return std::make_unique<IndexScan>(
                     expCtx, _collection, std::move(params), _ws, ixn->filter.get());
             }
+            case STAGE_BATCHED_FETCH:
             case STAGE_FETCH: {
+                // BatchedFetchNode derives from FetchNode. Lower both to a scalar FetchStage
+                // until batched classic execution is implemented.
+                // TODO SERVER-136310: Build BatchedFetchStage
                 const FetchNode* fn = static_cast<const FetchNode*>(root);
                 auto childStage = build(fn->children[0].get());
                 return std::make_unique<FetchStage>(
@@ -543,7 +550,6 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 return mockStage;
             }
             case STAGE_BATCHED_DELETE:
-            case STAGE_BATCHED_FETCH:
             case STAGE_CACHED_PLAN:
             case STAGE_COLLSCAN_MULTI_RANGE:
             case STAGE_COUNT:

@@ -246,6 +246,36 @@ TEST_F(ClassicStageBuilderTest, IndexFetchTranslationPopulatesMap) {
     ASSERT_EQ(expectedResults, planStageQsnMap());
 }
 
+TEST_F(ClassicStageBuilderTest, BatchingEnabledIndexScanLowersToScalarIndexScan) {
+    auto idxScan = std::make_unique<IndexScanNode>(kNss, buildSimpleIndexEntry(BSON("a" << 1)));
+    idxScan->allowBatching = true;
+
+    auto stage = buildPlanStage(makeQuerySolution(std::move(idxScan)));
+    ASSERT_EQ(stage->stageType(), STAGE_IXSCAN);
+}
+
+TEST_F(ClassicStageBuilderTest, BatchedIndexScanFetchLowersToScalarStagesAndPopulatesMap) {
+    auto idxScan = std::make_unique<IndexScanNode>(kNss, buildSimpleIndexEntry(BSON("a" << 1)));
+    idxScan->allowBatching = true;
+    auto* idxScanPtr = idxScan.get();
+    auto fetch = std::make_unique<BatchedFetchNode>(std::move(idxScan), kNss);
+    auto* fetchPtr = fetch.get();
+    auto querySolution = makeQuerySolution(std::move(fetch));
+
+    // buildPlanStage destroys the solution, so capture node ids before calling it.
+    const auto fetchNodeId = fetchPtr->nodeId();
+    const auto idxScanNodeId = idxScanPtr->nodeId();
+
+    auto stage = buildPlanStage(std::move(querySolution));
+    ASSERT_EQ(stage->stageType(), STAGE_FETCH);
+    ASSERT_EQ(stage->child()->stageType(), STAGE_IXSCAN);
+
+    stage_builder::PlanStageToQsnMap expectedResults = {
+        {stage.get(), {fetchPtr, fetchNodeId}},
+        {stage->child().get(), {idxScanPtr, idxScanNodeId}}};
+    ASSERT_EQ(expectedResults, planStageQsnMap());
+}
+
 // The stage builder looks up the index by ident when building the plan. If the ident is gone
 // from the catalog (index was dropped after planning), it throws QueryPlanKilled.
 TEST_F(ClassicStageBuilderTest, DroppedIndexThrowsQueryPlanKilled) {
