@@ -1292,6 +1292,7 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/repl/initial_sync:initial_syncer",
         "//src/mongo/db/replicated_fast_count:repair_replicated_metadata_idl",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_delta_utils",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
         "//src/mongo/db/replicated_fast_count:size_count_checkpoint_validator",
         "//src/mongo/db/session:session_catalog_mongod",

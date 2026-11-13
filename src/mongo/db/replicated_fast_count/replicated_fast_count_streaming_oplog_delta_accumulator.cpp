@@ -8,6 +8,7 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/replicated_fast_count/durable_size_metadata_gen.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/logv2/log.h"
@@ -160,17 +161,6 @@ enum class FastDecision {
     kNoopRepair,
     kNeedsParse,
 };
-
-// The `type` discriminator value carried in the o2 of a no-op oplog entry that repairs a
-// collection's replicated metadata with explicit size/count/hash diffs or an absolute hash.
-constexpr std::string_view kRepairReplicatedMetadataType = "repairReplicatedMetadata"sv;
-
-// True if `o2` is the o2 object of a repairReplicatedMetadata no-op entry.
-bool isRepairReplicatedMetadataO2(const BSONObj& o2) {
-    const auto typeElem = o2.getField("type"sv);
-    return typeElem.type() == BSONType::string &&
-        typeElem.valueStringData() == kRepairReplicatedMetadataType;
-}
 
 FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
     // A malformed or missing `ts` must never be counted as "processed" by a fast lane: only

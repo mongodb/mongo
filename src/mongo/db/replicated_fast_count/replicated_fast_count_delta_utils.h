@@ -9,6 +9,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
@@ -16,6 +17,17 @@
 
 namespace mongo {
 namespace replicated_fast_count {
+
+// The `type` discriminator value carried in the o2 of a no-op oplog entry that repairs a
+// collection's replicated metadata with explicit size/count/hash diffs or an absolute hash.
+inline constexpr std::string_view kRepairReplicatedMetadataType = "repairReplicatedMetadata"sv;
+
+// True if `o2` is the o2 object of a repairReplicatedMetadata no-op entry.
+[[MONGO_MOD_PUBLIC]] inline bool isRepairReplicatedMetadataO2(const BSONObj& o2) {
+    const auto typeElem = o2.getField("type");
+    return typeElem.type() == BSONType::string &&
+        typeElem.valueStringData() == kRepairReplicatedMetadataType;
+}
 
 /**
  * Returns the size, count and validation hash delta extracted from the oplog entry's size metadata

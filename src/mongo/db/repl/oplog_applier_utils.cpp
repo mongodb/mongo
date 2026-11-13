@@ -24,6 +24,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/split_prepare_session_manager.h"
 #include "mongo/db/replicated_fast_count/repair_replicated_metadata_gen.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -634,13 +635,6 @@ NamespaceStringOrUUID OplogApplierUtils::getNsOrUUID(const NamespaceString& nss,
 
 namespace {
 
-// True if `o2` is the o2 object of a repairReplicatedMetadata no-op entry.
-bool isRepairReplicatedMetadataO2(const BSONObj& o2) {
-    const auto typeElem = o2.getField("type");
-    return typeElem.type() == BSONType::string &&
-        typeElem.valueStringData() == "repairReplicatedMetadata";
-}
-
 void applyRepairReplicatedMetadataNoop(OperationContext* opCtx, const BSONObj& o2) {
     // Replication does not otherwise validate a no-op's o2, so a malformed repair entry is
     // ignored rather than surfaced as an error, mirroring the fast-count oplog scan.
@@ -714,7 +708,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
 
     if (opType == OpTypeEnum::kNoop) {
         const auto& o2 = op->getObject2();
-        if (o2 && isRepairReplicatedMetadataO2(*o2)) {
+        if (o2 && replicated_fast_count::isRepairReplicatedMetadataO2(*o2)) {
             applyRepairReplicatedMetadataNoop(opCtx, *o2);
         }
         incrementOpsAppliedStats(1);
