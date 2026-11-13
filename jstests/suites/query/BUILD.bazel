@@ -121,6 +121,7 @@ resmoke_suite_test(
         "ci-default",
         "config_fuzzer",
         "incompatible_inmemory",
+        "non_deterministic",
         "suggested_excluding_required__for_devprod_mitigation_only",
     ],
     target_compatible_with = select({
@@ -148,6 +149,7 @@ resmoke_suite_test(
         "config_fuzzer",
         "incompatible_debug_mode",
         "incompatible_inmemory",
+        "non_deterministic",
         "suggested_excluding_required__for_devprod_mitigation_only",
     ],
     target_compatible_with = select({

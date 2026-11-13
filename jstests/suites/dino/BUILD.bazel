@@ -21,6 +21,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -36,6 +37,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -51,6 +53,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -66,6 +69,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -81,6 +85,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -95,6 +100,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -109,6 +115,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -124,6 +131,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -139,6 +147,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -154,6 +163,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -169,6 +179,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
     ],
     deps = [
@@ -184,6 +195,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -199,6 +211,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -214,6 +227,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -229,6 +243,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -244,6 +259,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -259,6 +275,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "infinite_release_critical",
         "sharding",
     ],
     deps = [
@@ -275,6 +292,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "infinite_release_critical",
         "sharding",
     ],
     deps = [
@@ -291,6 +309,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "infinite_release_critical",
         "sharding",
     ],
     deps = [
@@ -307,6 +326,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "sharding",
     ],
     deps = [
@@ -323,6 +343,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "secondary_reads",
     ],
     deps = [
@@ -339,6 +360,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "secondary_reads",
     ],
     deps = [
@@ -356,6 +378,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -374,6 +397,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -392,6 +416,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -410,6 +435,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -428,6 +454,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -446,6 +473,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -464,6 +492,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -482,6 +511,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -500,6 +530,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -518,6 +549,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -536,6 +568,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -554,6 +587,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -572,6 +606,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -590,6 +625,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -608,6 +644,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -626,6 +663,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -644,6 +682,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -662,6 +701,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -681,6 +721,7 @@ resmoke_suite_test(
         "change_streams",
         "ci-default",
         "multiversion_incompatible",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -700,6 +741,7 @@ resmoke_suite_test(
         "change_streams",
         "ci-default",
         "multiversion_incompatible",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -718,6 +760,7 @@ resmoke_suite_test(
         "change_streams",
         "ci-default",
         "multiversion_incompatible",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -736,6 +779,7 @@ resmoke_suite_test(
         "change_streams",
         "ci-default",
         "multiversion_incompatible",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -754,6 +798,7 @@ resmoke_suite_test(
         "change_streams",
         "ci-default",
         "multiversion_incompatible",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -772,6 +817,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -790,6 +836,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -807,6 +854,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "secondary_reads",
     ],
     deps = [
@@ -823,6 +871,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "secondary_reads",
     ],
     deps = [
@@ -839,6 +888,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "secondary_reads",
     ],
     deps = [
@@ -855,6 +905,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -870,6 +921,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "secondary_reads",
     ],
     deps = [
@@ -886,6 +938,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "secondary_reads",
     ],
     deps = [
@@ -902,6 +955,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -917,6 +971,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -932,6 +987,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -947,6 +1003,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -962,6 +1019,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -977,6 +1035,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -992,6 +1051,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -1007,6 +1067,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -1022,6 +1083,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -1040,6 +1102,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -1058,6 +1121,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -1077,6 +1141,7 @@ resmoke_suite_test(
         "change_streams",
         "ci-default",
         "multiversion_incompatible",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -1095,6 +1160,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -1112,6 +1178,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "secondary_reads",
     ],
     deps = [
@@ -1128,6 +1195,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -1143,6 +1211,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -1158,6 +1227,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
         "requires_all_feature_flags",
         "sharding",
     ],
@@ -1175,6 +1245,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -1190,6 +1261,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -1205,6 +1277,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -1220,6 +1293,7 @@ resmoke_suite_test(
     tags = [
         "change_streams",
         "ci-default",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
