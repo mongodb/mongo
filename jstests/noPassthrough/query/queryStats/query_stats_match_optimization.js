@@ -39,6 +39,15 @@ function findAllKeyHashes(conn) {
     return aggregateQueryStatsKeyHashes(conn, [{$queryStats: {}}]);
 }
 
+// Returns the sorted keyHashes present in every one of 'conns' stores, so a target taken from here
+// is resolvable on all of them. Query stats also records the server's own commands, and those
+// recordings can differ between nodes, so the raw stores are not identical.
+function commonKeyHashes(conns) {
+    const perConn = conns.map((conn) => new Set(findAllKeyHashes(conn)));
+    const [first, ...rest] = perConn;
+    return [...first].filter((keyHash) => rest.every((hashes) => hashes.has(keyHash))).sort();
+}
+
 // Runs $queryStats with a trailing $match on 'matchPred' and returns the sorted keyHashes it
 // produces, along with the keyHash targets explain reports the pushdown captured (null when the
 // optimization did not fire).
@@ -252,7 +261,11 @@ describe("running $queryStats followed by $match on mongod: unoptimized vs. opti
         MongoRunner.stopMongod(connWithoutPushdown);
     });
 
-    defineKeyHashMatchCases(() => findAllKeyHashes(connWithPushdown), assertOnBothPaths);
+    // Targets are taken from the shapes both connections hold, so both paths can resolve them.
+    defineKeyHashMatchCases(
+        () => commonKeyHashes([connWithPushdown, connWithoutPushdown]),
+        assertOnBothPaths,
+    );
 });
 
 describe("running $queryStats followed by $match on mongos: unoptimized vs. optimized paths", function () {
