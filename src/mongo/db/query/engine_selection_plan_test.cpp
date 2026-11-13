@@ -26,7 +26,8 @@ constexpr uint64_t kSortMaxMemoryUsageBytes = 100 * 1024 * 1024;
 class EngineSelectionPlanFixture : public mongo::unittest::Test {
 public:
     EngineSelectionPlanFixture()
-        : nss(NamespaceString::createNamespaceString_forTest("testdb.coll")) {}
+        : nss(NamespaceString::createNamespaceString_forTest("testdb.coll")),
+          nssForeign(NamespaceString::createNamespaceString_forTest("testdb.collForeign")) {}
 
     std::unique_ptr<QuerySolution> makeDistinctScanPlan(BSONObj indexKeys) {
         return makePlan(std::make_unique<DistinctNode>(nss, buildSimpleIndexEntry(indexKeys)));
@@ -58,6 +59,18 @@ public:
         return orNode;
     }
 
+    // Builds FETCH -> OR -> [IXSCAN, IXSCAN, ...]
+    // Matches the "Ixscan + Or + Fetch" pattern in makeLookupUnwindRule.
+    std::unique_ptr<QuerySolutionNode> makeFetchOrIxScanNode(size_t numBranches) {
+        auto orNode = std::make_unique<OrNode>();
+        orNode->dedup = false;
+        for (size_t i = 0; i < numBranches; ++i) {
+            orNode->children.emplace_back(
+                std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(fromjson("{a: 1}"))));
+        }
+        return std::make_unique<FetchNode>(std::move(orNode), nss);
+    }
+
     // Builds FETCH -> SORT_MERGE -> [IXSCAN, ...] (numBranches IXSCAN children).
     // Matches the "Ixscan + SortedMerge + Fetch" pattern in makeLookupUnwindRule.
     std::unique_ptr<QuerySolutionNode> makeFetchSortMergeIxScanNode(size_t numBranches) {
@@ -71,7 +84,6 @@ public:
     }
 
     // Builds SORT_MERGE -> [FETCH -> IXSCAN, ...] (numBranches FETCH+IXSCAN children).
-    // Matches the "Ixscan + Fetch + SortedMerge" pattern in makeLookupUnwindRule.
     std::unique_ptr<QuerySolutionNode> makeSortMergeFetchIxScanNode(size_t numBranches) {
         auto mergeSortNode = std::make_unique<MergeSortNode>();
         mergeSortNode->sort = fromjson("{a: 1}");
@@ -101,13 +113,11 @@ public:
             makeFetchIxScanNode(indexKeys), nullptr, std::move(projection));
     }
 
-    // Builds a $lookup+$unwind (LU) node with the given outer child and join strategy. For
+    // Builds the children of a $lookup node with the given outer child and join strategy. For
     // strategies that require specific inner-side children (INLJ, DINLJ), appropriate children are
     // created automatically.
-    std::unique_ptr<QuerySolutionNode> makeLuNodeWithStrategy(
+    std::vector<std::unique_ptr<QuerySolutionNode>> makeLookupChildren(
         std::unique_ptr<QuerySolutionNode> outerChild, EqLookupNode::LookupStrategy strategy) {
-        auto nssForeign = NamespaceString::createNamespaceString_forTest("testdb.collForeign");
-
         std::vector<std::unique_ptr<QuerySolutionNode>> children;
         children.emplace_back(std::move(outerChild));
 
@@ -131,15 +141,38 @@ public:
             children.emplace_back(std::make_unique<CollectionScanNode>(nssForeign));
         }
 
-        return std::make_unique<EqLookupNode>(std::move(children),
+        return children;
+    }
+
+    // Builds a $lookup+$unwind (LU) node with the given outer child and join strategy. 'joinField'
+    // is the "as" path and 'indexPath' is the $unwind's 'includeArrayIndex' path, if any.
+    std::unique_ptr<QuerySolutionNode> makeLuNodeWithStrategy(
+        std::unique_ptr<QuerySolutionNode> outerChild,
+        EqLookupNode::LookupStrategy strategy,
+        FieldPath joinField = FieldPath("a"),
+        boost::optional<FieldPath> indexPath = boost::none) {
+        return std::make_unique<EqLookupNode>(makeLookupChildren(std::move(outerChild), strategy),
+                                              nssForeign,
+                                              FieldPath("b"),
+                                              FieldPath("c"),
+                                              joinField,
+                                              strategy,
+                                              false,
+                                              false,
+                                              indexPath);
+    }
+
+    // Builds a plain $lookup node (no absorbed $unwind) with the given outer child and join
+    // strategy.
+    std::unique_ptr<QuerySolutionNode> makeLookupNodeWithStrategy(
+        std::unique_ptr<QuerySolutionNode> outerChild, EqLookupNode::LookupStrategy strategy) {
+        return std::make_unique<EqLookupNode>(makeLookupChildren(std::move(outerChild), strategy),
                                               nssForeign,
                                               FieldPath("b"),
                                               FieldPath("c"),
                                               FieldPath("a"),
                                               strategy,
-                                              false,
-                                              false,
-                                              boost::none);
+                                              false);
     }
 
     // Builds a minimal GROUP node (count) wrapping 'child'.
@@ -158,6 +191,7 @@ public:
 
 protected:
     NamespaceString nss;
+    NamespaceString nssForeign;
     unittest::ServerParameterGuard _hashJoinParamGuard{"featureFlagSbeEqLookupUnwindHashJoin",
                                                        true};
     unittest::ServerParameterGuard _localCollscanParamGuard{
@@ -244,10 +278,10 @@ TEST_F(EngineSelectionPlanFixture, FetchIxScanSelection) {
     ASSERT_EQ(result.planPushdownRoot, nullptr);
 }
 
-// Test selection of IXSCAN + FETCH + OR + LU plans.
-TEST_F(EngineSelectionPlanFixture, LookupUnwindOrFetchIxScanSelection) {
+// Test selection of IXSCAN + OR + FETCH + LU plans.
+TEST_F(EngineSelectionPlanFixture, LookupUnwindFetchOrIxScanSelection) {
     auto runTest = [this](int numBranches, EngineChoice engine) {
-        auto dataAccess = makeOrFetchIxScanNode(numBranches);
+        auto dataAccess = makeFetchOrIxScanNode(numBranches);
         const auto* dataAccessNode = dataAccess.get();
         auto solution = makePlan(
             makeLuNodeWithStrategy(std::move(dataAccess), EqLookupNode::LookupStrategy::kHashJoin));
@@ -263,7 +297,8 @@ TEST_F(EngineSelectionPlanFixture, LookupUnwindOrFetchIxScanSelection) {
     runTest(101, EngineChoice::kClassic);
 }
 
-// Test selection of IXSCAN + SORT + FETCH + LU + PROJECT + MATCH plans.
+// Test selection of IXSCAN + SORT + FETCH + LU + PROJECT + MATCH plans. The LU is the top of the
+// SBE section, so the PROJECT and the MATCH above it are left to classic.
 TEST_F(EngineSelectionPlanFixture, MatchProjectLookupUnwindFetchSortIxScanSelection) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
@@ -273,6 +308,7 @@ TEST_F(EngineSelectionPlanFixture, MatchProjectLookupUnwindFetchSortIxScanSelect
     const auto* dataAccessNode = dataAccess.get();
     auto lookupUnwindNode =
         makeLuNodeWithStrategy(std::move(dataAccess), EqLookupNode::LookupStrategy::kHashJoin);
+    const auto* lookupUnwindNodePtr = lookupUnwindNode.get();
 
     auto projection = projection_ast::parseAndAnalyze(
         expCtx, fromjson("{computedA: '$a'}"), ProjectionPolicies::addFieldsProjectionPolicies());
@@ -288,7 +324,7 @@ TEST_F(EngineSelectionPlanFixture, MatchProjectLookupUnwindFetchSortIxScanSelect
     IncrementalFeatureRolloutContext ctx;
     EngineSelectionResult result = engineSelectionForPlan(solution.get(), dataAccessNode, ctx);
     ASSERT_EQ(result.engine, EngineChoice::kSbe);
-    ASSERT_EQ(result.planPushdownRoot, solution->root());
+    ASSERT_EQ(result.planPushdownRoot, lookupUnwindNodePtr);
 }
 
 TEST_F(EngineSelectionPlanFixture, LookupUnwindFetchSortIxScanWithAbsorbedLimitSelection) {
@@ -452,7 +488,7 @@ TEST_F(EngineSelectionPlanFixture, LuComplexFlagDoesNotAffectNonLuQuery) {
     ASSERT_EQ(result2.planPushdownRoot, groupPtr);
 }
 
-// Verifies all 7 listed access-plan patterns are recognised and a representative set of
+// Verifies all 5 listed access-plan patterns are recognised and a representative set of
 // unlisted patterns are correctly rejected.
 TEST_F(EngineSelectionPlanFixture, LuRuleMatchesListedPatternsAndRejectsOthers) {
     // Runs the data access node through engineSelectionForPlan with an LU wrapper and returns
@@ -489,14 +525,16 @@ TEST_F(EngineSelectionPlanFixture, LuRuleMatchesListedPatternsAndRejectsOthers) 
     }
 
     // 5. OR -> FETCH -> IXSCAN (1 and 3 branches)
-    ASSERT_EQ(runRule(makeOrFetchIxScanNode(1)), EngineChoice::kSbe);
-    ASSERT_EQ(runRule(makeOrFetchIxScanNode(3)), EngineChoice::kSbe);
+    // Not an approved LU pattern.
+    ASSERT_EQ(runRule(makeOrFetchIxScanNode(1)), EngineChoice::kClassic);
+    ASSERT_EQ(runRule(makeOrFetchIxScanNode(3)), EngineChoice::kClassic);
 
     // 6. FETCH -> SORT_MERGE -> IXSCAN
     ASSERT_EQ(runRule(makeFetchSortMergeIxScanNode(2)), EngineChoice::kSbe);
 
     // 7. SORT_MERGE -> FETCH -> IXSCAN
-    ASSERT_EQ(runRule(makeSortMergeFetchIxScanNode(2)), EngineChoice::kSbe);
+    // Not an approved LU pattern
+    ASSERT_EQ(runRule(makeSortMergeFetchIxScanNode(2)), EngineChoice::kClassic);
 
     // Unlisted patterns: all should be rejected (Classic).
 
@@ -506,6 +544,9 @@ TEST_F(EngineSelectionPlanFixture, LuRuleMatchesListedPatternsAndRejectsOthers) 
 
     // OR -> FETCH -> IXSCAN with more than 100 branches
     ASSERT_EQ(runRule(makeOrFetchIxScanNode(101)), EngineChoice::kClassic);
+
+    // FETCH -> OR -> IXSCAN with more than 100 branches
+    ASSERT_EQ(runRule(makeFetchOrIxScanNode(101)), EngineChoice::kClassic);
 
     // Plain IXSCAN without a FETCH wrapper
     ASSERT_EQ(
@@ -698,6 +739,91 @@ TEST_F(EngineSelectionPlanFixture, LuNonExistentForeignCollectionFlagGatedByNlj)
         ASSERT_EQ(result.engine, EngineChoice::kClassic);
         ASSERT_EQ(result.planPushdownRoot, nullptr);
     }
+}
+
+// An LU whose result the SBE plan would have to build itself is left to classic: a dotted "as"
+// path, or an $unwind with 'includeArrayIndex'.
+TEST_F(EngineSelectionPlanFixture, LuWithDottedAsOrArrayIndexStaysClassic) {
+    unittest::ServerParameterGuard inljOn{"featureFlagSbeEqLookupUnwindIndexedLoopJoin", true};
+
+    using Strategy = EqLookupNode::LookupStrategy;
+
+    auto runLu = [&](Strategy strategy, FieldPath joinField, boost::optional<FieldPath> indexPath) {
+        auto dataAccess = std::make_unique<CollectionScanNode>(nss);
+        const auto* dan = dataAccess.get();
+        auto solution =
+            makePlan(makeLuNodeWithStrategy(std::move(dataAccess), strategy, joinField, indexPath));
+        IncrementalFeatureRolloutContext ctx;
+        return engineSelectionForPlan(solution.get(), dan, ctx);
+    };
+
+    for (auto strategy : {Strategy::kHashJoin, Strategy::kIndexedLoopJoin}) {
+        auto strategyStr = EqLookupNode::serializeLookupStrategy(strategy);
+
+        ASSERT_EQ(runLu(strategy, FieldPath("a"), boost::none).engine, EngineChoice::kSbe)
+            << strategyStr;
+
+        auto dottedAs = runLu(strategy, FieldPath("a.b"), boost::none);
+        ASSERT_EQ(dottedAs.engine, EngineChoice::kClassic) << strategyStr;
+        ASSERT_EQ(dottedAs.planPushdownRoot, nullptr);
+
+        auto arrayIndex = runLu(strategy, FieldPath("a"), FieldPath("idx"));
+        ASSERT_EQ(arrayIndex.engine, EngineChoice::kClassic) << strategyStr;
+        ASSERT_EQ(arrayIndex.planPushdownRoot, nullptr);
+    }
+}
+
+// An LU is only pushed down when its local side is the data access plan itself.
+TEST_F(EngineSelectionPlanFixture, LuMustSitOnDataAccessPlan) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    using Strategy = EqLookupNode::LookupStrategy;
+
+    // LU over LU: only the lower one is pushed down.
+    {
+        auto dataAccess = std::make_unique<CollectionScanNode>(nss);
+        const auto* dan = dataAccess.get();
+        auto lowerLu = makeLuNodeWithStrategy(std::move(dataAccess), Strategy::kHashJoin);
+        const auto* lowerLuPtr = lowerLu.get();
+        auto solution = makePlan(makeLuNodeWithStrategy(std::move(lowerLu), Strategy::kHashJoin));
+        IncrementalFeatureRolloutContext ctx;
+        auto result = engineSelectionForPlan(solution.get(), dan, ctx);
+        ASSERT_EQ(result.engine, EngineChoice::kSbe);
+        ASSERT_EQ(result.planPushdownRoot, lowerLuPtr);
+    }
+
+    // LU over a plain $lookup: the $lookup is pushed down and the LU is left to classic.
+    {
+        auto dataAccess = std::make_unique<CollectionScanNode>(nss);
+        const auto* dan = dataAccess.get();
+        auto lookup = makeLookupNodeWithStrategy(std::move(dataAccess), Strategy::kHashJoin);
+        const auto* lookupPtr = lookup.get();
+        auto solution = makePlan(makeLuNodeWithStrategy(std::move(lookup), Strategy::kHashJoin));
+        IncrementalFeatureRolloutContext ctx;
+        auto result = engineSelectionForPlan(solution.get(), dan, ctx);
+        ASSERT_EQ(result.engine, EngineChoice::kSbe);
+        ASSERT_EQ(result.planPushdownRoot, lookupPtr);
+    }
+}
+
+// A pushed down LU is the top of the SBE section: a $group above it is left to classic.
+TEST_F(EngineSelectionPlanFixture, StagesAboveLuAreLeftToClassic) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    auto dataAccess = std::make_unique<CollectionScanNode>(nss);
+    const auto* dataAccessNode = dataAccess.get();
+    auto lu =
+        makeLuNodeWithStrategy(std::move(dataAccess), EqLookupNode::LookupStrategy::kHashJoin);
+    const auto* luPtr = lu.get();
+    auto solution = makePlan(makeSimpleGroupNode(std::move(lu), expCtx));
+    IncrementalFeatureRolloutContext ctx;
+    auto result = engineSelectionForPlan(solution.get(), dataAccessNode, ctx);
+    ASSERT_EQ(result.engine, EngineChoice::kSbe);
+    ASSERT_EQ(result.planPushdownRoot, luPtr);
 }
 
 }  // namespace mongo

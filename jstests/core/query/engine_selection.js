@@ -121,6 +121,7 @@ const lookupUnwind = [lookup, {$unwind: "$array"}];
 const shapesThatTriggerLookupUnwind = lookupUnwindPushesDown
     ? allShapes.filter(
           (p) =>
+              p !== ixScanFetchUnionShape &&
               p !== collScanSortShape &&
               p !== ixScanFetchSortShape &&
               p !== ixScanUnionSortShape &&
@@ -207,89 +208,64 @@ const aggregationTests = [
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
         pushDownPattern: [lookupUnwindPushesDown],
     },
+    // A pushed down $lookup-$unwind is the top of the SBE plan, so the stages after it stay in
+    // classic.
     {
         agg: [lookupUnwind, match],
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
-        pushDownPattern: [lookupUnwindPushesDown, ffSbeNonLeadingMatch],
+        pushDownPattern: [lookupUnwindPushesDown, false],
     },
     {
         agg: [lookupUnwind, neutralProject],
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
-        pushDownPattern: [lookupUnwindPushesDown, ffSbeTransformStages],
+        pushDownPattern: [lookupUnwindPushesDown, false],
     },
     {
         agg: [lookupUnwind, lookup],
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
-        pushDownPattern: [lookupUnwindPushesDown, true],
+        pushDownPattern: [lookupUnwindPushesDown, false],
     },
     {
         agg: [lookupUnwind, group],
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
-        pushDownPattern: [lookupUnwindPushesDown, true],
+        pushDownPattern: [lookupUnwindPushesDown, false],
     },
+    // A $lookup-$unwind over another pushed down stage stays in classic.
     {
         agg: [lookup, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [
-            true,
-            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
-        ],
+        pushDownPattern: [true, false],
     },
     {
         agg: [group, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [
-            true,
-            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
-        ],
+        pushDownPattern: [true, false],
     },
     {
         agg: [lookup, match, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [
-            true,
-            ffSbeNonLeadingMatch,
-            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
-        ],
+        pushDownPattern: [true, ffSbeNonLeadingMatch, false],
     },
     // This test case covers the scenario where the QSN cut has to remove 3 stages from the QSN instead of just one.
     {
         agg: [lookup, match, lookupUnwind, neutralProject, group],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [
-            true,
-            ffSbeNonLeadingMatch,
-            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
-            ffSbeTransformStages,
-            true,
-        ],
+        pushDownPattern: [true, ffSbeNonLeadingMatch, false, ffSbeTransformStages, true],
     },
     {
         agg: [lookup, neutralProject, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [
-            true,
-            ffSbeTransformStages,
-            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
-        ],
+        pushDownPattern: [true, ffSbeTransformStages, false],
     },
     {
         agg: [group, match, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [
-            true,
-            ffSbeNonLeadingMatch,
-            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
-        ],
+        pushDownPattern: [true, ffSbeNonLeadingMatch, false],
     },
     {
         agg: [group, neutralProject, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
-        pushDownPattern: [
-            true,
-            ffSbeTransformStages,
-            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
-        ],
+        pushDownPattern: [true, ffSbeTransformStages, false],
     },
 ];
 

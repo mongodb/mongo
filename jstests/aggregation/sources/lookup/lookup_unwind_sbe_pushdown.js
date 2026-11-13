@@ -177,20 +177,14 @@ describe("$LU pushdown", function () {
         assertSbeLookupUnwind(explain);
     });
 
-    it("Should pushdown when includeArrayIndex is set", function () {
-        if (!canPushdownCollscanNestedLoopJoin()) {
-            jsTest.log.info(
-                "Skipping: lookup-unwind pushdown requires SbeEqLookupUnwindLocalCollscan and SbeEqLookupUnwindNestedLoopJoin to be enabled.",
-            );
-            return;
-        }
+    it("Should not pushdown when includeArrayIndex is set", function () {
         const explain = this.collection
             .explain()
             .aggregate([
                 {$lookup: {from: "foreign", localField: "a", foreignField: "b", as: "c"}},
                 {$unwind: {path: "$c", includeArrayIndex: "idx"}},
             ]);
-        assertSbeLookupUnwind(explain);
+        assertClassicLookupUnwind(explain);
     });
 
     it("Should not pushdown if a project is between lookup and unwind", function () {

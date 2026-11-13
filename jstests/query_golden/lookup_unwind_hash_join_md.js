@@ -85,7 +85,9 @@ assert.commandWorked(db.localDotted.insertMany(dottedLocalDocs));
 assert.commandWorked(db.foreignDotted.insertMany(dottedForeignDocs));
 
 // Pin the strategy flags so the plans depend only on the engine mode, not the build's flags.
+// featureFlagSbeEfficientBoundaryMaterialization changes the SBE plan of a $lookup+$unwind root.
 const strategyFlags = {
+    featureFlagSbeEfficientBoundaryMaterialization: true,
     featureFlagSbeEqLookupUnwindHashJoin: true,
     featureFlagSbeEqLookupUnwindLocalCollscan: true,
     featureFlagSbeEqLookupUnwindNestedLoopJoin: false,

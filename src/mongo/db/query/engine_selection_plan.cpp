@@ -71,26 +71,10 @@ StateMachine makeLookupUnwindRule(IncrementalFeatureRolloutContext& ifrContext) 
                 sm.addMatch(state);
             }
 
-            // Ixscan + Fetch + Or
-            {
-                state = sm.addState(sm.getStartState(), STAGE_OR, 0);
-                state = sm.addState(state, STAGE_FETCH, Range(0, kMaxBranchesInSbe));
-                state = sm.addState(state, STAGE_IXSCAN, 0);
-                sm.addMatch(state);
-            }
-
             // Ixscan + SortedMerge + Fetch
             {
                 state = sm.addState(fetch_state, STAGE_SORT_MERGE, 0);
                 state = sm.addState(state, STAGE_IXSCAN, Range(0, kMaxBranchesInSbe));
-                sm.addMatch(state);
-            }
-
-            // Ixscan + Fetch + SortedMerge
-            {
-                state = sm.addState(sm.getStartState(), STAGE_SORT_MERGE, 0);
-                state = sm.addState(state, STAGE_FETCH, Range(0, kMaxBranchesInSbe));
-                state = sm.addState(state, STAGE_IXSCAN, 0);
                 sm.addMatch(state);
             }
         }
@@ -102,15 +86,17 @@ StateMachine makeLookupUnwindRule(IncrementalFeatureRolloutContext& ifrContext) 
  * This pattern matches when SBE must be used for the input plan. The matched node points to the
  * top of the section that will be pushed down to SBE.
  *
- * For example, when we receive a $LU query with a disabled data access plan for a LU stage, the
- * top of the SBE section will point to the next SBE-eligible stage. Otherwise, if there are no
- * disabled data access plans, we match the entire tree.
- *
+ * An $LU stage is only pushed down if it is the first SBE-eligible stage. When an $LU is pushed
+ * down, no further stages are pushed.
  */
 class PlanPushdownSelector {
 public:
-    PlanPushdownSelector(bool containsLuPattern, IncrementalFeatureRolloutContext& ifrContext)
-        : _containsLuPattern(containsLuPattern), _ifrContext(ifrContext) {}
+    PlanPushdownSelector(bool containsLuPattern,
+                         const QuerySolutionNode* dataAccessNode,
+                         IncrementalFeatureRolloutContext& ifrContext)
+        : _containsLuPattern(containsLuPattern),
+          _dataAccessNode(dataAccessNode),
+          _ifrContext(ifrContext) {}
 
     void preVisit(RuleEngine&, const GroupNode& node, size_t) {
         preVisitBase(node);
@@ -126,17 +112,16 @@ public:
             return;
         }
 
-        // $lookup + $unwind case: both the local-side access plan flag and the strategy flag must
-        // be enabled for this LU node to be pushed into SBE.
-        if (_containsLuPattern && _isStrategyEnabled(node.lookupStrategy)) {
+        // $lookup + $unwind case.
+        if (_canPushDownLu(node)) {
+            // This LU node becomes the top of the SBE section, regardless of what
+            // is above it. We only push down LU on it's own, no further stages.
+            _cutPoint = &node;
             setSbeStatus(SbeStatus::kEnabled, node);
         } else {
-            // Reset the cut point, since this LU node has to be left out from the SBE plan. If we
-            // have a non-LU child, it'll become the next cut point. If it's a LU child, it'll also
-            // be excluded from the SBE plan.
-            //
-            // We also disable SBE for now, since this might be the bottom-most node in the QSN,
-            // which would make us disable SBE for this QSN.
+            // Reset the cut point, since if this LU is not eligible for pushdown
+            // we cannot push this or anything above to SBE. As we keep traversing
+            // down we may find stages to push down.
             setSbeStatus(SbeStatus::kDisabled, node);
             _cutPoint = nullptr;
         }
@@ -170,6 +155,19 @@ private:
         }
     }
 
+    // Allows LU to be pushed down if:
+    //  - The LU is directly above the local access path with no other stages (group/lookup) in
+    //    between.
+    //  - The local access path is an approved plan pattern.
+    //  - The "as" path is a top-level field and the $unwind has no 'includeArrayIndex', so that
+    //    the LU's only change to the local document is setting one top-level field.
+    //  - The flag of the join strategy is on.
+    bool _canPushDownLu(const EqLookupNode& node) const {
+        return _containsLuPattern && node.children[0].get() == _dataAccessNode &&
+            node.joinField.getPathLength() == 1 && !node.unwindSpec->indexPath &&
+            _isStrategyEnabled(node.lookupStrategy);
+    }
+
     // Returns true if the IFR flag for the given LU join strategy is enabled, meaning the strategy
     // is eligible for SBE pushdown.
     bool _isStrategyEnabled(EqLookupNode::LookupStrategy strategy) const {
@@ -198,6 +196,9 @@ private:
 
     // 'true' when the solution tree contains a LookupUnwind access plan pattern, 'false' otherwise.
     bool _containsLuPattern = false;
+
+    // The root of the data access plan, which the pipeline stages were added on top of.
+    const QuerySolutionNode* _dataAccessNode;
 
     // Used to read strategy IFR flags with per-operation snapshot semantics.
     IncrementalFeatureRolloutContext& _ifrContext;
@@ -331,8 +332,8 @@ EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
                 "Engine selection analyzed plan for LU pattern",
                 "containsLuPattern"_attr = containsLuPattern);
 
-    const QuerySolutionNode* planPushdownRoot =
-        treeSearch(solution->root(), PlanPushdownSelector(containsLuPattern, ifrContext));
+    const QuerySolutionNode* planPushdownRoot = treeSearch(
+        solution->root(), PlanPushdownSelector(containsLuPattern, dataAccessNode, ifrContext));
 
     if (planPushdownRoot) {
         LOGV2_DEBUG(13022706,

@@ -67,11 +67,22 @@ assert.commandWorked(collB.insert(collBMatch1));
 
 const anyCollSharded = [baseColl, collA, collB].some((coll) => FixtureHelpers.isSharded(coll));
 
+// A $lookup-$unwind is only pushed down to SBE when it sits directly on the data access plan, and
+// the stages after it stay in classic, so a pipeline containing one is not fully pushed down.
+function containsLookupUnwind(pipeline) {
+    return pipeline.some((stage, i) => stage.$lookup && pipeline[i + 1]?.$unwind);
+}
+
 function assertPipelineResults(pipeline, expected) {
     // Run explain to make sure it passes and assert SBE is used if all
     // necessary flags are on.
     const explain = baseColl.explain().aggregate(pipeline);
-    if (queriesShouldUseSbe && !anyCollSharded && !FixtureHelpers.isMongos(db)) {
+    if (
+        queriesShouldUseSbe &&
+        !containsLookupUnwind(pipeline) &&
+        !anyCollSharded &&
+        !FixtureHelpers.isMongos(db)
+    ) {
         assert.eq(getEngine(explain), "sbe", explain);
         assert(!explain.stages || explain.stages.length === 0, explain);
     }
