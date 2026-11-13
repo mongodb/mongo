@@ -48,10 +48,6 @@ structs:
             requestedSampleSize:
                 type: long
                 validator: {gt: 0}
-            numChunks:
-                type: int
-                optional: true
-                validator: {gt: 0}
             numDocsDiscarded:
                 type: long
                 validator: {gte: 0}

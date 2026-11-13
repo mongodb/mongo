@@ -143,7 +143,6 @@ TEST_F(SamplingEstimatorTest, PersistedFullCollScanSampleReportsFullCollScan) {
                          SamplingTechniqueEnum::kRandom,
                          /*requestedSampleSize=*/2,
                          /*numDocs=*/2,
-                         /*numChunks=*/boost::none,
                          /*overrides=*/
                          BSON(PersistentSampleDoc::kSamplingMethodFieldName
                               << idlSerialize(SamplingTechniqueEnum::kFullCollScan)));
@@ -384,44 +383,6 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshReplacesMatchingSample) {
     }
 }
 
-TEST_F(SamplingEstimatorTest, SampleManagerRefreshPersistsNoNumChunksForFullCollScan) {
-    // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
-    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
-    insertDocuments(_kTestNss,
-                    {BSON("_id" << 1 << "tag" << "live"), BSON("_id" << 2 << "tag" << "live")});
-
-    // Requesting a chunk sample larger than the collection yields a full collection scan, which
-    // was not generated in chunks.
-    SampleManager manager(operationContext(),
-                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                          nullptr /*customerQueryExpCtx*/);
-    const auto summary = manager.refresh(makeSpec(_kTestNss,
-                                                  5,
-                                                  SamplingCEMethodEnum::kChunk,
-                                                  SamplingSourceEnum::kOnTheFlySample,
-                                                  /*numChunks=*/2));
-    ASSERT_OK(summary);
-    ASSERT_TRUE(summary.getValue().samplingMethod == SamplingTechniqueEnum::kFullCollScan);
-
-    DBDirectClient client(operationContext());
-    const BSONObj page = client.findOne(
-        NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName), BSONObj{});
-    ASSERT_EQ(page[PersistentSampleDoc::kRequestedSamplingMethodFieldName].String(),
-              idlSerialize(SamplingTechniqueEnum::kChunk));
-    ASSERT_FALSE(page.hasField(PersistentSampleDoc::kNumChunksFieldName));
-
-    auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
-    MultipleCollectionAccessor colls(std::move(coll));
-    PersistentSampleLoader loader(operationContext(),
-                                  colls,
-                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                  nullptr /*customerQueryExpCtx*/);
-    auto loaded = loader.tryLoad(makeSpec(_kTestNss, 5));
-    ASSERT_OK(loaded.getStatus());
-    ASSERT_TRUE(loaded.getValue().technique() == SamplingTechniqueEnum::kFullCollScan);
-    ASSERT_FALSE(loaded.getValue().numChunks().has_value());
-}
-
 TEST_F(SamplingEstimatorTest, SampleManagerFirstRefreshWritesGenerationTwo) {
     // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
@@ -596,7 +557,6 @@ std::vector<BSONObj> makeRandomSamplePageDocs(const std::vector<BSONObj>& sample
                                         SamplingTechniqueEnum::kRandom,
                                         SamplingTechniqueEnum::kRandom,
                                         requestedSampleSize,
-                                        /*numChunks=*/boost::none,
                                         /*genId=*/1,
                                         sample,
                                         Date_t::now());
@@ -896,7 +856,6 @@ TEST(MakePersistentSamplePageDocs, ProducesParseableRandomSampleDoc) {
                                                     SamplingTechniqueEnum::kRandom,
                                                     SamplingTechniqueEnum::kRandom,
                                                     1000,
-                                                    boost::none,
                                                     /*genId=*/3,
                                                     sample,
                                                     now);
@@ -911,34 +870,6 @@ TEST(MakePersistentSamplePageDocs, ProducesParseableRandomSampleDoc) {
     ASSERT_EQ(parsed.getPageNo(), 0);
     ASSERT_EQ(parsed.getDocs().size(), 2u);
     ASSERT_EQ(parsed.getDocs()[0]["a"].numberInt(), 1);
-}
-
-TEST(MakePersistentSamplePageDocs, ProducesParseableChunkSampleDoc) {
-    const UUID uuid = UUID::gen();
-    const Date_t now = Date_t::now();
-    std::vector<BSONObj> sample{BSON("a" << 1), BSON("a" << 2)};
-    const boost::optional<int> numChunks{4};
-
-    const auto pages = makePersistentSamplePageDocs(uuid,
-                                                    SamplingTechniqueEnum::kChunk,
-                                                    SamplingTechniqueEnum::kChunk,
-                                                    1000,
-                                                    numChunks,
-                                                    /*genId=*/3,
-                                                    sample,
-                                                    now);
-    ASSERT_EQ(pages.size(), 1u);
-
-    auto swParsed = parsePersistentSample(pages[0]);
-    ASSERT_OK(swParsed.getStatus());
-    const PersistentSampleDoc& parsed = swParsed.getValue();
-    ASSERT(parsed.getSamplingMethod() == SamplingTechniqueEnum::kChunk);
-    ASSERT_TRUE(parsed.getNumChunks().has_value());
-    ASSERT_EQ(parsed.getNumChunks().value(), numChunks.value());
-    ASSERT_EQ(parsed.getPageNo(), 0);
-    ASSERT_EQ(parsed.getDocs().size(), 2u);
-    ASSERT_EQ(parsed.getDocs()[0]["a"].numberInt(), 1);
-    ASSERT_EQ(parsed.getDocs()[1]["a"].numberInt(), 2);
 }
 
 TEST(MakePersistentSamplePageDocs, EveryPageReportsSampleWideDiscardCount) {

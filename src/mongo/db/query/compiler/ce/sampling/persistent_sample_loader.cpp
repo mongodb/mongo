@@ -300,17 +300,6 @@ StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
         return ex.toStatus();
     }
 
-    if (parsed.getSamplingMethod() == SamplingTechniqueEnum::kChunk &&
-        !parsed.getNumChunks().has_value()) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      "persistent sample 'numChunks' is required for chunk-technique samples");
-    }
-    if (parsed.getSamplingMethod() != SamplingTechniqueEnum::kChunk &&
-        parsed.getNumChunks().has_value()) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      "persistent sample 'numChunks' must only be set for chunk-technique samples");
-    }
-
     const auto requestedSampleSize = static_cast<size_t>(parsed.getRequestedSampleSize());
     // It is valid for `docs` to contain fewer entries than `requestedSampleSize`: this happens when
     // the collection is smaller than the requested sample size at analyze time or if the sample was
@@ -385,7 +374,6 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(
             page.getSamplingMethod() != reassembled.getSamplingMethod() ||
             page.getRequestedSamplingMethod() != reassembled.getRequestedSamplingMethod() ||
             page.getRequestedSampleSize() != reassembled.getRequestedSampleSize() ||
-            page.getNumChunks() != reassembled.getNumChunks() ||
             page.getNumDocsDiscarded() != reassembled.getNumDocsDiscarded()) {
             return Status(ErrorCodes::UnsupportedFormat,
                           "persistent sample pages disagree on their identity fields");
@@ -542,11 +530,8 @@ StatusWith<Sample> PersistentSampleLoader::tryLoad(const SampleSpec& spec) {
     const size_t numDocsToUse = std::min(persistedDocs.size(), spec.requestedSampleSize);
     std::vector<BSONObj> docs(persistedDocs.begin(), persistedDocs.begin() + numDocsToUse);
 
-    auto sample = Sample::makePersisted(std::move(docs),
-                                        persisted.getSamplingMethod(),
-                                        persisted.getCreatedAt(),
-                                        numPagesInSample,
-                                        persisted.getNumChunks());
+    auto sample = Sample::makePersisted(
+        std::move(docs), persisted.getSamplingMethod(), persisted.getCreatedAt(), numPagesInSample);
 
     recordPersistentSampleSuccess(tickSource, startTicks, sample, totalPagesRead);
 

@@ -349,7 +349,6 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  SamplingTechniqueEnum method,
                                  size_t requestedSampleSize,
                                  const std::vector<BSONObj>& docs,
-                                 boost::optional<int> numChunks = boost::none,
                                  int schemaVersion = kPersistentSampleSchemaVersion,
                                  BSONObj overrides = BSONObj(),
                                  int pageNo = 0,
@@ -363,7 +362,6 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
 struct PageParams {
     SamplingTechniqueEnum method = SamplingTechniqueEnum::kRandom;
     size_t requestedSampleSize = 384;
-    boost::optional<int> numChunks;
     uint64_t genId = kFirstPersistentSampleGenId;
     int pageNo = 0;
     int numPages = 1;
@@ -411,7 +409,6 @@ void persistSampleForTest(OperationContext* opCtx,
                           SamplingTechniqueEnum method,
                           size_t requestedSampleSize,
                           int numDocs,
-                          boost::optional<int> numChunks = boost::none,
                           BSONObj overrides = BSONObj());
 
 /**

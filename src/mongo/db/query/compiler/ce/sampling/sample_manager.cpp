@@ -97,7 +97,6 @@ void appendSamplePageMetadata(BSONObjBuilder& builder,
                               SamplingTechniqueEnum method,
                               SamplingTechniqueEnum actualMethod,
                               size_t requestedSampleSize,
-                              boost::optional<int> numChunks,
                               uint64_t genId,
                               int pageNo,
                               Date_t createdAt) {
@@ -112,9 +111,6 @@ void appendSamplePageMetadata(BSONObjBuilder& builder,
                    static_cast<long long>(requestedSampleSize));
     builder.append(PersistentSampleDoc::kSamplingMethodFieldName, idlSerialize(actualMethod));
     builder.append(PersistentSampleDoc::kRequestedSamplingMethodFieldName, idlSerialize(method));
-    if (actualMethod == SamplingTechniqueEnum::kChunk) {
-        builder.append(PersistentSampleDoc::kNumChunksFieldName, *numChunks);
-    }
 }
 
 uint64_t findMaxPersistentSampleGenId(OperationContext* opCtx,
@@ -156,7 +152,6 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                                   SamplingTechniqueEnum method,
                                                   SamplingTechniqueEnum actualMethod,
                                                   size_t requestedSampleSize,
-                                                  boost::optional<int> numChunks,
                                                   uint64_t genId,
                                                   const std::vector<BSONObj>& sample,
                                                   Date_t createdAt) {
@@ -178,7 +173,6 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                  method,
                                  actualMethod,
                                  requestedSampleSize,
-                                 numChunks,
                                  genId,
                                  pageNo,
                                  createdAt);
@@ -340,9 +334,6 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
         ? samplingMethodToTechnique(spec.sampleGenerationMethod)
         : actualSamplingMethod;
 
-    const boost::optional<int> numChunks =
-        actualSamplingMethod == SamplingTechniqueEnum::kChunk ? spec.numChunks : boost::none;
-
     if (MONGO_unlikely(hangBeforePersistingSample.shouldFail())) {
         hangBeforePersistingSample.pauseWhileSet();
     }
@@ -416,7 +407,6 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
                                                                          samplingMethodToPersist,
                                                                          actualSamplingMethod,
                                                                          spec.requestedSampleSize,
-                                                                         numChunks,
                                                                          genId,
                                                                          sample.docs(),
                                                                          createdAt);

@@ -1701,7 +1701,6 @@ TEST_F(PlanExplainerTest, CBRSamplingMetadataReportsPagesForPersistedSample) {
                                          ce::SamplingTechniqueEnum::kRandom,
                                          ce::SamplingTechniqueEnum::kRandom,
                                          kPersistedSampleSize,
-                                         /*numChunks=*/boost::none,
                                          /*genId=*/1,
                                          sample,
                                          Date_t::now());

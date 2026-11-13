@@ -110,10 +110,6 @@ describe("persistent sample serverStatus metrics", function () {
             "byMethod.random should increment",
             {before, after},
         );
-        assert.eq(after.byMethod.chunk, before.byMethod.chunk, "byMethod.chunk should not change", {
-            before,
-            after,
-        });
         assert.eq(
             after.byMethod.fullCollScan,
             before.byMethod.fullCollScan,
@@ -159,12 +155,6 @@ describe("persistent sample serverStatus metrics", function () {
             {after, afterSecond},
         );
         assert.eq(
-            afterSecond.byMethod.chunk,
-            after.byMethod.chunk,
-            "byMethod.chunk should not change",
-            {after, afterSecond},
-        );
-        assert.eq(
             afterSecond.byMethod.fullCollScan,
             after.byMethod.fullCollScan,
             "byMethod.fullCollScan should not change",
@@ -200,10 +190,6 @@ describe("persistent sample serverStatus metrics", function () {
             "byMethod.random should not change",
             {before, after},
         );
-        assert.eq(after.byMethod.chunk, before.byMethod.chunk, "byMethod.chunk should not change", {
-            before,
-            after,
-        });
     });
 
     it("excludes discarded documents from docsPersisted", function () {

@@ -38,10 +38,8 @@ public:
     static Sample makePersisted(std::vector<BSONObj> docs,
                                 SamplingTechniqueEnum technique,
                                 Date_t createdAt,
-                                size_t numPages,
-                                boost::optional<int> numChunks = boost::none) {
-        return Sample(
-            std::move(docs), technique, /*isPersisted=*/true, createdAt, numPages, numChunks);
+                                size_t numPages) {
+        return Sample(std::move(docs), technique, /*isPersisted=*/true, createdAt, numPages);
     }
 
     const std::vector<BSONObj>& docs() const {

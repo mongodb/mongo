@@ -21,8 +21,6 @@
 #include <memory>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
-
 namespace mongo::ce {
 
 /**
@@ -37,7 +35,6 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                                   SamplingTechniqueEnum method,
                                                   SamplingTechniqueEnum actualMethod,
                                                   size_t requestedSampleSize,
-                                                  boost::optional<int> numChunks,
                                                   uint64_t genId,
                                                   const std::vector<BSONObj>& sample,
                                                   Date_t createdAt);

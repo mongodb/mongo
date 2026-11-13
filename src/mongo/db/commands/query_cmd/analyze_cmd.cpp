@@ -86,7 +86,6 @@ auto& analyzeDocsPersisted = *MetricBuilder<Counter64>{"query.analyze.sample.doc
 
 // Sampling technique breakdown for how the sample was generated.
 auto& analyzeByMethodRandom = *MetricBuilder<Counter64>{"query.analyze.sample.byMethod.random"};
-auto& analyzeByMethodChunk = *MetricBuilder<Counter64>{"query.analyze.sample.byMethod.chunk"};
 auto& analyzeByMethodFullCollScan =
     *MetricBuilder<Counter64>{"query.analyze.sample.byMethod.fullCollScan"};
 
@@ -117,8 +116,7 @@ void recordPersistedSampleMetrics(const ce::PersistedSampleSummary& summary) {
     analyzeDocsPersisted.incrementRelaxed(summary.docsPersisted);
     switch (summary.samplingMethod) {
         case ce::SamplingTechniqueEnum::kChunk:
-            analyzeByMethodChunk.incrementRelaxed();
-            break;
+            tasserted(13820900, "Chunk samples are never persisted");
         case ce::SamplingTechniqueEnum::kFullCollScan:
             analyzeByMethodFullCollScan.incrementRelaxed();
             break;
