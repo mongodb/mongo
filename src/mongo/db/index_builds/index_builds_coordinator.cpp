@@ -4229,6 +4229,18 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
         } catch (const ExceptionFor<ErrorCodes::PrepareConflict>& ex) {
             invariant(drainPhase == IndexBuildInterceptor::DrainPhase::kBeforeReadiness);
             _waitForPrepareConflict(opCtx, replState, ex->generation());
+        } catch (const ExceptionFor<ErrorCodes::ReadConcernMajorityNotAvailableYet>&) {
+            if (drainPhase != IndexBuildInterceptor::DrainPhase::kAfterReadiness) {
+                throw;
+            }
+            // Post-readiness drains only reduce the work left for the final untimestamped drain.
+            // Return to decision processing.
+            opCtx->checkForInterrupt();
+            LOGV2_DEBUG(13879000,
+                        1,
+                        "Deferring post-readiness index build drain without a majority snapshot",
+                        "buildUUID"_attr = replState->buildUUID);
+            return;
         }
     }
 
