@@ -297,9 +297,14 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerSession session(harnessHelper.getConnection());
     ASSERT_OK(wtRCToStatus(session.create("table:mytable", nullptr), session));
-    // Use connection statistics key which does not apply to a table.
-    auto result = WiredTigerUtil::getStatisticsValue(
-        session, "statistics:table:mytable", "statistics=(fast)", WT_STAT_CONN_SESSION_OPEN);
+    // Use a connection statistics key near the start of the connection range. Connection keys start
+    // at 1000 and table keys start at 2000. Keys are assigned in alphabetical order by stat name.
+    // Do not use a key near the end of the connection range, as it can overlap with the table key
+    // range as stats are added.
+    auto result = WiredTigerUtil::getStatisticsValue(session,
+                                                     "statistics:table:mytable",
+                                                     "statistics=(fast)",
+                                                     WT_STAT_CONN_AUTOCOMMIT_READONLY_RETRY);
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
 }
