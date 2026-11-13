@@ -241,7 +241,9 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
       _lastFetched(config.initialLastFetched),
       _createClientFn([] {
           return std::make_unique<DBClientConnection>(DBClientConnectionOptions{
-              .autoReconnect = true, .connectionPurpose = ConnectionPurpose::kReplication});
+              .autoReconnect = true,
+              .connectionPurpose = ConnectionPurpose::kReplication,
+              .disableCompression = disableReplicationNetworkCompression});
       }),
       _dataReplicatorExternalState(dataReplicatorExternalState),
       _enqueueDocumentsFn(enqueueDocumentsFn),
@@ -262,6 +264,13 @@ OplogFetcher::~OplogFetcher() {
 void OplogFetcher::setConnection(std::unique_ptr<DBClientConnection>&& _connectedClient) {
     // Can only call this once, before startup.
     invariant(!_conn);
+    // An injected connection bypasses _createClientFn, so it must already honor the replication
+    // network compression policy.
+    tassert(13800102,
+            "Connection injected into OplogFetcher must disable network compression when "
+            "disableReplicationNetworkCompression is enabled",
+            !_connectedClient || !disableReplicationNetworkCompression ||
+                _connectedClient->isCompressionDisabled());
     _conn = std::move(_connectedClient);
 }
 

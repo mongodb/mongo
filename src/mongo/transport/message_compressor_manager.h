@@ -53,6 +53,15 @@ public:
     void clientBegin(BSONObjBuilder* output);
 
     /*
+     * Called by a client constructing a "hello" request in place of clientBegin() when the
+     * connection must not negotiate compression. Clears any previously negotiated compressors
+     * (e.g. from before a reconnect) and offers nothing to the server, so subsequent calls to
+     * compressMessage() without an explicit compressorId return the input unchanged.
+     * clientFinish() must not be called after this.
+     */
+    void clientSkipNegotiation();
+
+    /*
      * Called by a client that has received a "hello" response (received after calling
      * clientBegin) and wants to finish negotiating compression.
      *

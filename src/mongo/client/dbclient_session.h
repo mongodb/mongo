@@ -89,7 +89,8 @@ public:
                     MongoURI uri,
                     const HandshakeValidationHook& hook,
                     const ClientAPIVersionParameters* apiParameters,
-                    ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault);
+                    ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault,
+                    bool disableCompression = false);
 
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
@@ -218,6 +219,14 @@ public:
         return _connectionPurpose;
     }
 
+    /**
+     * Returns true if this connection never negotiates network message compression during the
+     * "hello" handshake, regardless of the process-wide compressor configuration.
+     */
+    bool isCompressionDisabled() const {
+        return _disableCompression;
+    }
+
     const MongoURI& getURI() const {
         return _uri;
     }
@@ -263,6 +272,8 @@ protected:
 
     // used for purpose-specific metrics, such as replication
     ConnectionPurpose _connectionPurpose;
+    // If true, the "hello" handshake does not negotiate network message compression.
+    const bool _disableCompression;
     // The session mutex must be held to shutdown the _session from a non-owning thread, or to
     // rebind the handle from the owning thread. The thread that owns this DBClientSession is
     // allowed to use the _session without locking the mutex. This mutex also guards writes to

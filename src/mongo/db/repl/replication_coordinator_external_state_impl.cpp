@@ -476,6 +476,11 @@ void ReplicationCoordinatorExternalStateImpl::startThreads() {
     }
 
     LOGV2(21306, "Starting replication storage threads");
+    if (disableReplicationNetworkCompression) {
+        LOGV2(13800101,
+              "Network message compression is disabled for replication data connections",
+              "disableReplicationNetworkCompression"_attr = true);
+    }
     _service->getStorageEngine()->setJournalListener(this);
 
     _oplogWriterTaskExecutor = makeTaskExecutor(_service, "OplogWriterExecutorPool", "OplogWriter");
