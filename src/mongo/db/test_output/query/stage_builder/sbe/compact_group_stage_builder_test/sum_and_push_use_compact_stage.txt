@@ -1,0 +1,8 @@
+# Golden test output of CompactGroupStageBuilderTest/SumAndPushUseCompactStage
+$$RESULT=s13 env: {  }
+[2] project [s13 = newBsonObj("_id", s12, "p", s5, "s", s7, "t", s9)] 
+[2] compact_group [s11] [s12 = s11] [s5 = _compactPush(s4), s7 = _compactSum(s4), s9 = _compactSum(s3)] 
+[2] project [s11 = (s3 ?: null)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = b] @"UUID" 
+[{"_id" : 1, "p" : [1, 2, 2147483647], "s" : 2147483650, "t" : 3}, {"_id" : 2, "p" : [2.5, 1.5], "s" : 4.0, "t" : 4}, {"_id" : 3, "p" : ["x"], "s" : 0, "t" : 6}]
+

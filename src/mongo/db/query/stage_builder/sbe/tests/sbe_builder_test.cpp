@@ -31,6 +31,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <sstream>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -124,6 +125,29 @@ TEST_F(SbeStageBuilderTest, StreamingGroupEmitsGroupOnKeyChange) {
         {fromjson("{a: 1}"), fromjson("{a: 2}"), fromjson("{a: 1}")},
         fromjson("{_id: '$a', n: {$sum: 1}}"),
         {fromjson("{_id: 1, n: 1}"), fromjson("{_id: 2, n: 1}"), fromjson("{_id: 1, n: 1}")});
+}
+
+TEST_F(SbeStageBuilderTest, StreamingGroupUsesRegularAccumulatorsWithCompactFlag) {
+    unittest::ServerParameterGuard compactFlag("featureFlagSbeCompactHashAgg", true);
+    for (bool singlePurpose : {false, true}) {
+        unittest::ServerParameterGuard accumulatorsFlag("featureFlagSbeAccumulators",
+                                                        singlePurpose);
+        // Non-clustered input distinguishes streaming from hash aggregation even when all
+        // accumulators are eligible for compact aggregation.
+        assertStreamingGroupResults(
+            {fromjson("{a: 1, b: 2}"), fromjson("{a: 2, b: 3}"), fromjson("{a: 1, b: 4}")},
+            fromjson("{_id: '$a', s: {$sum: '$b'}, p: {$push: '$b'}}"),
+            {fromjson("{_id: 1, s: 2, p: [2]}"),
+             fromjson("{_id: 2, s: 3, p: [3]}"),
+             fromjson("{_id: 1, s: 4, p: [4]}")});
+    }
+}
+
+TEST_F(SbeStageBuilderTest, StreamingGroupConstantKeyWithCompactFlag) {
+    unittest::ServerParameterGuard compactFlag("featureFlagSbeCompactHashAgg", true);
+    assertStreamingGroupResults({fromjson("{b: 2}"), fromjson("{b: 3}")},
+                                fromjson("{_id: null, s: {$sum: '$b'}, p: {$push: '$b'}}"),
+                                {fromjson("{_id: null, s: 5, p: [2, 3]}")});
 }
 
 // Accumulators that lower to more than one aggregate ($avg) and ones that don't, none of which have
@@ -488,6 +512,97 @@ TEST_F(GoldenSbeStageBuilderTest, TestCountScanEfficientBoundaryMaterialization)
     unittest::ServerParameterGuard efficientMaterialization(
         "featureFlagSbeEfficientBoundaryMaterialization", true);
     runCountScanTest();
+}
+
+class CompactGroupStageBuilderTest : public GoldenSbeStageBuilderTest {
+public:
+    void setUp() override {
+        GoldenSbeStageBuilderTest::setUp();
+        createCollection({fromjson("{_id: 0, a: 1, b: 1}"),
+                          fromjson("{_id: 1, a: 1, b: NumberLong(2)}"),
+                          fromjson("{_id: 2, a: 1, b: 2147483647}"),
+                          fromjson("{_id: 3, a: 2, b: 2.5}"),
+                          fromjson("{_id: 4, a: 2, b: NumberDecimal('1.5')}"),
+                          fromjson("{_id: 5, a: 3, b: 'x'}"),
+                          fromjson("{_id: 6, a: 3}")},
+                         boost::none);
+    }
+
+protected:
+    PlanRun runGroup(std::string_view accumulators,
+                     bool compactFlag,
+                     bool allowDiskUse,
+                     bool merge = false) {
+        unittest::ServerParameterGuard flag("featureFlagSbeCompactHashAgg", compactFlag);
+        VariablesParseState vps = _expCtx->variablesParseState;
+        std::vector<AccumulationStatement> statements;
+        for (auto&& elem : fromjson(accumulators)) {
+            statements.push_back(
+                AccumulationStatement::parseAccumulationStatement(_expCtx.get(), elem, vps));
+        }
+        auto groupNode =
+            std::make_unique<GroupNode>(getScanNode(),
+                                        ExpressionFieldPath::parse(_expCtx.get(), "$a", vps),
+                                        std::move(statements),
+                                        /*doingMerge=*/false,
+                                        /*willBeMerged=*/merge,
+                                        /*shouldProduceBson=*/true);
+        boost::intrusive_ptr<ExpressionContext> expCtx =
+            new ExpressionContextForTest(operationContext(), _nss);
+        expCtx->setAllowDiskUse(allowDiskUse);
+        expCtx->setNeedsMerge(merge);
+        auto run = runPlan(makeQuerySolution(std::move(groupNode)), {.expCtx = expCtx});
+        run.results = sortArray(run.results.view());
+        return run;
+    }
+
+    static bool isCompact(const PlanRun& run) {
+        return run.explain.find("compact_group") != std::string::npos;
+    }
+
+    static std::string print(const PlanRun& run) {
+        std::ostringstream os;
+        os << run.results.view();
+        return os.str();
+    }
+
+    void assertSameResults(const PlanRun& compact, const PlanRun& reference) {
+        ASSERT_TRUE(isCompact(compact)) << compact.explain;
+        ASSERT_FALSE(isCompact(reference)) << reference.explain;
+        ASSERT_EQ(print(compact), print(reference));
+    }
+
+    void printGolden(const PlanRun& run) {
+        _gctx->outStream() << run.explain << std::endl << print(run) << std::endl << std::endl;
+    }
+};
+
+TEST_F(CompactGroupStageBuilderTest, SumAndPushUseCompactStage) {
+    constexpr auto kAccs = "{p: {$push: '$b'}, s: {$sum: '$b'}, t: {$sum: '$a'}}";
+    auto compact = runGroup(kAccs, true, false);
+    assertSameResults(compact, runGroup(kAccs, false, false));
+
+    _gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
+    printGolden(compact);
+    _gctx->verifyOutput();
+}
+
+TEST_F(CompactGroupStageBuilderTest, PartialAccumulatorsUseCompactStage) {
+    constexpr auto kAccs = "{p: {$push: '$b'}, s: {$sum: '$b'}}";
+    assertSameResults(runGroup(kAccs, true, false, /*merge=*/true),
+                      runGroup(kAccs, false, false, /*merge=*/true));
+}
+
+TEST_F(CompactGroupStageBuilderTest, NoAccumulatorsUsesCompactStage) {
+    assertSameResults(runGroup("{}", true, false), runGroup("{}", false, false));
+}
+
+TEST_F(CompactGroupStageBuilderTest, IneligibleGroupsUseHashAgg) {
+    ASSERT_FALSE(isCompact(runGroup("{s: {$sum: '$b'}}", false, false)));
+    ASSERT_FALSE(isCompact(runGroup("{s: {$sum: '$b'}}", true, true)));
+    ASSERT_FALSE(isCompact(runGroup("{s: {$sum: '$b'}, m: {$avg: '$b'}}", true, false)));
+    ASSERT_FALSE(isCompact(runGroup("{c: {$sum: 1}}", true, false)));
+    ASSERT_FALSE(isCompact(runGroup("{c: {$count: {}}}", true, false)));
 }
 
 TEST_F(GoldenSbeStageBuilderTest, TestLimitSkip) {

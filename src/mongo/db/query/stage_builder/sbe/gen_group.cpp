@@ -14,6 +14,7 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/util/assert_util.h"
 
+#include <algorithm>
 #include <memory>
 
 namespace mongo::stage_builder {
@@ -724,10 +725,20 @@ auto makeValueGuard(auto* dst, auto val) {
     }};
 }
 
+bool useCompactHashAgg(StageBuilderState& state, const GroupNode& groupNode) {
+    return !state.allowDiskUse &&
+        state.expCtx->getIfrContext()->getSavedFlagValue(
+            feature_flags::gFeatureFlagSbeCompactHashAgg) &&
+        std::ranges::all_of(groupNode.accumulators, [](const AccumulationStatement& accStmt) {
+            return AccumOp{accStmt}.canBuildSinglePurposeAccumulator(/*compact=*/true);
+        });
+}
+
 SbHashAggAccumulatorVector generateScalarAccumulators(StageBuilderState& state,
                                                       const GroupNode& groupNode,
                                                       boost::optional<SbSlot> initRootSlot,
-                                                      PlanStageSlots& outputs) {
+                                                      PlanStageSlots& outputs,
+                                                      bool compact) {
     SbHashAggAccumulatorVector accumulatorList;
     auto rootSlot = outputs.getResultObjIfExists();
 
@@ -737,7 +748,9 @@ SbHashAggAccumulatorVector generateScalarAccumulators(StageBuilderState& state,
     for (const auto& accStmt : groupNode.accumulators) {
         AccumOp accOp(accStmt);
 
-        if (enableSinglePurposeAccumulators && accOp.canBuildSinglePurposeAccumulator()) {
+        if (compact ||
+            (enableSinglePurposeAccumulators &&
+             accOp.canBuildSinglePurposeAccumulator(/*compact=*/false))) {
             SbSlot outSlot(state.slotId());
             SbSlot spillSlot(state.slotId());
             auto inputExpression =
@@ -765,12 +778,14 @@ SbHashAggAccumulatorVector generateScalarAccumulators(StageBuilderState& state,
                                                                   std::move(inputs),
                                                                   accStmt.fieldName,
                                                                   std::move(outSlot),
-                                                                  std::move(spillSlot))
+                                                                  std::move(spillSlot),
+                                                                  compact)
                     : accOp.buildSinglePurposeAccumulator(state,
                                                           std::move(inputs),
                                                           accStmt.fieldName,
                                                           std::move(outSlot),
-                                                          std::move(spillSlot)));
+                                                          std::move(spillSlot),
+                                                          compact));
 
             continue;
         }
@@ -1155,8 +1170,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector, SbSlot> buildGroupAggregationBlo
 }  // buildGroupAggregationBlock
 
 /**
- * This function builds a scalar group stage for 'groupNode', which will be either HashAggStage or
- * StreamingAggStage depending on 'isStreaming'.
+ * This function builds a scalar group stage for 'groupNode', which will be HashAggStage,
+ * CompactHashAggStage, or StreamingAggStage depending on 'compact' and 'isStreaming'.
  *
  * Returns a tuple containing the updated SBE plan tree, a list of slots corresponding to the group
  * by inputs, and a list of accumulator output slots corresponding to the accumulators from
@@ -1171,7 +1186,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationScalar(
     SbExpr::Vector groupByKeyExprs,
     const SbHashAggAccumulatorVector& accumulatorList,
     const GroupNode* groupNode,
-    bool isStreaming) {
+    bool isStreaming,
+    bool compact) {
     const PlanNodeId nodeId = groupNode->nodeId();
     SbBuilder b(state, nodeId);
 
@@ -1208,7 +1224,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationScalar(
                          std::move(stage),
                          groupBySlots,
                          accumulatorList,
-                         state.getCollatorSlot());
+                         state.getCollatorSlot(),
+                         compact);
 }  // buildGroupAggregationScalar
 
 /**
@@ -1752,8 +1769,9 @@ SlotBasedStageBuilder::buildGroupImplScalar(SbStage stage,  // moved in
     // but with fillEmptyNull applied correctly to each sub-field.
     isStreaming = isStreaming && (!variableAccInit || idIsSingleKey);
 
+    const bool compact = !isStreaming && useCompactHashAgg(_state, *groupNode);
     auto accumulatorList =
-        generateScalarAccumulators(_state, *groupNode, slotIdForInitRoot, childOutputs);
+        generateScalarAccumulators(_state, *groupNode, slotIdForInitRoot, childOutputs, compact);
 
     // The 'individualSlots' vector is used to keep track of all the slots that are currently
     // "active" that are not present in 'childOutputs'. This vector is used together with
@@ -1790,7 +1808,8 @@ SlotBasedStageBuilder::buildGroupImplScalar(SbStage stage,  // moved in
                                     std::move(groupByKeyExprs),
                                     accumulatorList,
                                     groupNode,
-                                    isStreaming);
+                                    isStreaming,
+                                    compact);
     stage = std::move(outStage);
 
     // After the HashAgg/BlockHashAgg stage, the only slots that are "active" are the group-by slots

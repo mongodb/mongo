@@ -514,7 +514,8 @@ public:
         SbStage stage,
         const SbSlotVector& gbs,
         const SbHashAggAccumulatorVector& accumulatorList,
-        boost::optional<sbe::value::SlotId> collatorSlot);
+        boost::optional<sbe::value::SlotId> collatorSlot,
+        bool compact);
 
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeStreamingAgg(
         const VariableTypes& varTypes,

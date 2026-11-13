@@ -369,6 +369,26 @@ void checkHashAgg(SlotMembershipChecker& c) {
              maxSizeSlot});
 }
 
+void checkCompactHashAgg(SlotMembershipChecker& c) {
+    auto groupBy = c.slot();
+    auto groupByOut = c.slot();
+    auto collator = c.slot();
+    auto out = c.slot();
+    auto unusedSpill = c.slot();
+    auto [transform, transformSlot] = c.expr();
+    SbBlueprintHashAgg hashAgg;
+    hashAgg.groupBySlots = {groupBy};
+    hashAgg.groupByOutSlots = {groupByOut};
+    hashAgg.collatorSlot = collator;
+    hashAgg.compact = true;
+    hashAgg.accumulators.emplace_back(
+        out,
+        unusedSpill,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::CompactSumHashAggAccumulatorTerminal>{
+            std::move(transform)});
+    c.check(hashAgg, {groupByOut, out}, {groupBy, collator, transformSlot});
+}
+
 void checkStreamingAgg(SlotMembershipChecker& c) {
     auto groupBy = c.slot();
     auto groupByOut = c.slot();
@@ -583,6 +603,7 @@ TEST(SbBlueprintNodeSlotMembership, EverySlotMemberIsReported) {
     checkHashJoin(c);
     checkMergeJoin(c);
     checkHashAgg(c);
+    checkCompactHashAgg(c);
     checkStreamingAgg(c);
     checkBlockHashAgg(c);
     checkAggProject(c);

@@ -523,7 +523,8 @@ std::pair<SbSlot /* resultSlot */, SbStage> buildForeignMatchedArray(SbStage inn
                                                         std::move(innerBranch),
                                                         {}, /* groupBy slots */
                                                         accumulatorList,
-                                                        {});
+                                                        {},
+                                                        /*compact=*/false);
     innerBranch = std::move(hashAggStage);
     SbSlot accumulatorSlot = aggOutSlots[0];
 

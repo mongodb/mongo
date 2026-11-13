@@ -15,6 +15,7 @@
  * assumes_against_mongod_not_mongos,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -57,7 +58,10 @@ if (checkSbeFullyEnabled(db)) {
     config = {
         name: "SBE Group",
         framework: "trySbeEngine",
-        stageName: "group", // SBE group stage appears without the dollar sign
+        // SBE group stages appear without the dollar sign.
+        stageName: FeatureFlagUtil.isPresentAndEnabled(db, "SbeCompactHashAgg")
+            ? "compact_group"
+            : "group",
         knobName: "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill",
     };
 } else {
@@ -121,7 +125,8 @@ assert.commandWorked(
             comment: "memory stats group spilling test",
             allowDiskUse: true,
         },
-        stageName: config.stageName,
+        // Compact group cannot spill, so SBE uses the regular group stage when disk use is allowed.
+        stageName: config.stageName === "compact_group" ? "group" : config.stageName,
         expectedNumGetMores: 1,
         // Since we spill, we don't expect to see inUseTrackedMemBytes populated as it should be
         // 0 on each operation.

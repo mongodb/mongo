@@ -9,6 +9,7 @@
 #include "mongo/db/exec/sbe/stages/block_to_row.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/stages/compact_hash_agg.h"
 #include "mongo/db/exec/sbe/stages/extract_field_paths.h"
 #include "mongo/db/exec/sbe/stages/fetch.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -37,6 +38,7 @@
 #include "mongo/util/string_listset.h"
 
 #include <algorithm>
+#include <concepts>
 #include <memory>
 #include <utility>
 #include <variant>
@@ -109,10 +111,14 @@ struct Lowerer {
                             collatorSlot,
                             knobConfig.getMaxPushBytes());
                     },
-                    [&]<class Impl>(SbHashAggSinglePurposeScalarAccumulator<Impl>& impl)
+                    [&]<std::derived_from<sbe::HashAggAccumulator> Impl>(
+                        SbHashAggSinglePurposeScalarAccumulator<Impl>& impl)
                         -> std::unique_ptr<sbe::HashAggAccumulator> {
                         return std::make_unique<Impl>(
                             acc.outSlot, acc.spillSlot, le(impl.transform), collatorSlot);
+                    },
+                    [](auto&) -> std::unique_ptr<sbe::HashAggAccumulator> {
+                        MONGO_UNREACHABLE_TASSERT(13901601);
                     },
                     [&]<class Impl>(SbHashAggMinMaxNAccumulator<Impl>& impl)
                         -> std::unique_ptr<sbe::HashAggAccumulator> {
@@ -339,6 +345,40 @@ struct Lowerer {
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintHashAgg node) {
         auto child = lower(node.child);
+
+        if (node.compact) {
+            const auto& knobConfig = _state.expCtx->getQueryKnobConfiguration();
+            std::vector<std::unique_ptr<sbe::CompactHashAggAccumulator>> compactAccumulators;
+            compactAccumulators.reserve(node.accumulators.size());
+
+            for (auto& acc : node.accumulators) {
+                compactAccumulators.push_back(std::visit(
+                    OverloadedVisitor{
+                        [&](SbHashAggSinglePurposeScalarAccumulator<
+                            sbe::CompactPushHashAggAccumulator>& impl)
+                            -> std::unique_ptr<sbe::CompactHashAggAccumulator> {
+                            return std::make_unique<sbe::CompactPushHashAggAccumulator>(
+                                acc.outSlot, le(impl.transform), knobConfig.getMaxPushBytes());
+                        },
+                        [&]<std::derived_from<sbe::CompactHashAggAccumulator> Impl>(
+                            SbHashAggSinglePurposeScalarAccumulator<Impl>& impl)
+                            -> std::unique_ptr<sbe::CompactHashAggAccumulator> {
+                            return std::make_unique<Impl>(acc.outSlot, le(impl.transform));
+                        },
+                        [](auto&) -> std::unique_ptr<sbe::CompactHashAggAccumulator> {
+                            MONGO_UNREACHABLE_TASSERT(13901600);
+                        }},
+                    acc.implementation));
+            }
+
+            return sbe::makeS<sbe::CompactHashAggStage>(std::move(child),
+                                                        std::move(node.groupBySlots),
+                                                        std::move(node.groupByOutSlots),
+                                                        std::move(compactAccumulators),
+                                                        node.collatorSlot,
+                                                        _state.yieldPolicy,
+                                                        node.nodeId);
+        }
 
         auto loweredAccumulators = lowerAccumulators(node.accumulators, node.collatorSlot);
 

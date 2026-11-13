@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/compact_hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
@@ -766,6 +767,9 @@ struct SbHashAggAccumulator {
         SbHashAggSinglePurposeScalarAccumulator<sbe::CountHashAggAccumulatorPartial>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::FirstHashAggAccumulator>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::CompactSumHashAggAccumulatorTerminal>,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::CompactSumHashAggAccumulatorPartial>,
+        SbHashAggSinglePurposeScalarAccumulator<sbe::CompactPushHashAggAccumulator>,
         SbHashAggMinMaxNAccumulator<sbe::MinNHashAggAccumulator>,
         SbHashAggMinMaxNAccumulator<sbe::MaxNHashAggAccumulator>,
         SbHashAggMinMaxNAccumulator<sbe::MinNHashAggAccumulatorPartial>,

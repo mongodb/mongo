@@ -91,9 +91,9 @@ public:
 
     /**
      * This method returns true this AccumOp supports buildSinglePurposeAccumulator(), otherwise
-     * returns false.
+     * returns false. If 'compact' is true, this checks for a CompactHashAggStage implementation.
      */
-    bool canBuildSinglePurposeAccumulator() const;
+    bool canBuildSinglePurposeAccumulator(bool compact) const;
 
     /**
      * This method generates an expression for a single-purpose accumulator that has native
@@ -106,7 +106,8 @@ public:
                                                        AccumInputsPtr inputs,
                                                        std::string fieldName,
                                                        SbSlot outSlot,
-                                                       SbSlot spillSlot) const;
+                                                       SbSlot spillSlot,
+                                                       bool compact) const;
 
     /**
      * Same as buildSinglePurposeAccumulator() but used when the desired result is a partial
@@ -118,7 +119,8 @@ public:
                                                                AccumInputsPtr inputs,
                                                                std::string fieldName,
                                                                SbSlot outSlot,
-                                                               SbSlot spillSlot) const;
+                                                               SbSlot spillSlot,
+                                                               bool compact) const;
 
     /**
      * Given one or more input expressions ('input' / 'inputs'), these methods generate the

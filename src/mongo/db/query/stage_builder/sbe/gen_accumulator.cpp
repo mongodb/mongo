@@ -8,6 +8,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
+#include "mongo/db/exec/sbe/stages/compact_hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -212,6 +213,8 @@ struct AccumOpInfo {
     size_t numAggs = 1;
     BuildSinglePurposeAccumFn buildSinglePurposeAccum = nullptr;
     BuildSinglePurposeAccumFn buildSinglePurposeAccumForMerge = nullptr;
+    BuildSinglePurposeAccumFn buildCompactAccum = nullptr;
+    BuildSinglePurposeAccumFn buildCompactAccumForMerge = nullptr;
     BuildAccumExprsFn buildAddExprs = nullptr;
     BuildAccumBlockExprsFn buildAddBlockExprs = nullptr;
     BuildAccumAggsFn buildAddAggs = nullptr;
@@ -1662,6 +1665,8 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
     {AccumulatorPush::kName,
      AccumOpInfo{.buildSinglePurposeAccum =
                      makeBuildFn(&buildSinglePurposeAccum<sbe::PushHashAggAccumulator>),
+                 .buildCompactAccum =
+                     makeBuildFn(&buildSinglePurposeAccum<sbe::CompactPushHashAggAccumulator>),
                  .buildAddAggs = makeBuildFn(&buildAccumAggsPush),
                  .buildFinalize = makeBuildFn(&buildFinalizeCappedAccumulator),
                  .buildCombineAggs = makeBuildFn(&buildCombineAggsPush)}},
@@ -1686,7 +1691,11 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
 
     // Sum
     {AccumulatorSum::kName,
-     AccumOpInfo{.buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsSingleInput),
+     AccumOpInfo{.buildCompactAccum = makeBuildFn(
+                     &buildSinglePurposeAccum<sbe::CompactSumHashAggAccumulatorTerminal>),
+                 .buildCompactAccumForMerge = makeBuildFn(
+                     &buildSinglePurposeAccum<sbe::CompactSumHashAggAccumulatorPartial>),
+                 .buildAddBlockExprs = makeBuildFn(&buildAccumBlockExprsSingleInput),
                  .buildAddAggs = makeBuildFn(&buildAccumAggsSum),
                  .buildAddBlockAggs = makeBuildFn(&buildAccumBlockAggsSum),
                  .buildFinalize = makeBuildFn(&buildFinalizeSum),
@@ -1749,37 +1758,42 @@ bool AccumOp::hasBuildAddBlockAggs() const {
     return getOpInfo()->buildAddBlockAggs != nullptr;
 }
 
-bool AccumOp::canBuildSinglePurposeAccumulator() const {
-    return bool{getOpInfo()->buildSinglePurposeAccum};
+bool AccumOp::canBuildSinglePurposeAccumulator(bool compact) const {
+    return bool{compact ? getOpInfo()->buildCompactAccum : getOpInfo()->buildSinglePurposeAccum};
 }
 
 SbHashAggAccumulator AccumOp::buildSinglePurposeAccumulator(StageBuilderState& state,
                                                             AccumInputsPtr inputs,
                                                             std::string fieldName,
                                                             SbSlot outSlot,
-                                                            SbSlot spillSlot) const {
+                                                            SbSlot spillSlot,
+                                                            bool compact) const {
     uassert(11618600,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << _opName,
             _opInfo != nullptr);
-    return _opInfo->buildSinglePurposeAccum(*this,
-                                            std::move(inputs),
-                                            state,
-                                            std::move(fieldName),
-                                            std::move(outSlot),
-                                            std::move(spillSlot));
+    auto& builderFunction = compact ? _opInfo->buildCompactAccum : _opInfo->buildSinglePurposeAccum;
+    return builderFunction(*this,
+                           std::move(inputs),
+                           state,
+                           std::move(fieldName),
+                           std::move(outSlot),
+                           std::move(spillSlot));
 }
 
 SbHashAggAccumulator AccumOp::buildSinglePurposeAccumulatorForMerge(StageBuilderState& state,
                                                                     AccumInputsPtr inputs,
                                                                     std::string fieldName,
                                                                     SbSlot outSlot,
-                                                                    SbSlot spillSlot) const {
+                                                                    SbSlot spillSlot,
+                                                                    bool compact) const {
     uassert(11618700,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << _opName,
             _opInfo != nullptr);
-    auto& builderFunction = _opInfo->buildSinglePurposeAccumForMerge
-        ? _opInfo->buildSinglePurposeAccumForMerge
-        : _opInfo->buildSinglePurposeAccum;
+    auto& forMerge =
+        compact ? _opInfo->buildCompactAccumForMerge : _opInfo->buildSinglePurposeAccumForMerge;
+    auto& builderFunction = forMerge
+        ? forMerge
+        : (compact ? _opInfo->buildCompactAccum : _opInfo->buildSinglePurposeAccum);
     return builderFunction(*this,
                            std::move(inputs),
                            state,
