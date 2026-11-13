@@ -2332,7 +2332,7 @@ TEST_F(SamplingEstimatorTest, SamplingEstimatorLoadsMultiPageSample) {
                                   BSONObj(),
                                   /*pageNo=*/0,
                                   /*numDocsDiscarded=*/0,
-                                  /*genId=*/boost::none,
+                                  /*genId=*/kFirstPersistentSampleGenId,
                                   /*numPages=*/2),
          buildPersistentSampleDoc(uuid,
                                   SamplingTechniqueEnum::kRandom,
@@ -2343,7 +2343,7 @@ TEST_F(SamplingEstimatorTest, SamplingEstimatorLoadsMultiPageSample) {
                                   BSONObj(),
                                   /*pageNo=*/1,
                                   /*numDocsDiscarded=*/0,
-                                  /*genId=*/boost::none,
+                                  /*genId=*/kFirstPersistentSampleGenId,
                                   /*numPages=*/2)},
         /*clustered=*/true);
 
@@ -2390,7 +2390,7 @@ TEST_F(SamplingEstimatorTest, TryLoadReportsPagesReadAndBsonBytes) {
                                                       BSONObj(),
                                                       /*pageNo=*/0,
                                                       /*numDocsDiscarded=*/0,
-                                                      /*genId=*/boost::none,
+                                                      /*genId=*/kFirstPersistentSampleGenId,
                                                       /*numPages=*/2);
     const BSONObj pageOne = buildPersistentSampleDoc(uuid,
                                                      SamplingTechniqueEnum::kRandom,
@@ -2401,7 +2401,7 @@ TEST_F(SamplingEstimatorTest, TryLoadReportsPagesReadAndBsonBytes) {
                                                      BSONObj(),
                                                      /*pageNo=*/1,
                                                      /*numDocsDiscarded=*/0,
-                                                     /*genId=*/boost::none,
+                                                     /*genId=*/kFirstPersistentSampleGenId,
                                                      /*numPages=*/2);
     createCollAndInsertDocuments(
         operationContext(),
@@ -2843,7 +2843,7 @@ TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
                                   BSON(PersistentSampleDoc::kRequestedSampleSizeFieldName << 1LL),
                                   /*pageNo=*/0,
                                   /*numDocsDiscarded=*/0,
-                                  /*genId=*/boost::none,
+                                  /*genId=*/kFirstPersistentSampleGenId,
                                   /*numPages=*/1)},
         /*clustered=*/true);
 

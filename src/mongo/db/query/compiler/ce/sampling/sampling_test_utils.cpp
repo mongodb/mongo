@@ -635,7 +635,7 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  BSONObj overrides,
                                  int pageNo,
                                  size_t numDocsDiscarded,
-                                 boost::optional<uint64_t> genId,
+                                 uint64_t genId,
                                  int numPages) {
     BSONObjBuilder builder;
     builder.append("_id", makePersistentSampleId(collUuid, pageNo, genId));
@@ -690,7 +690,7 @@ BSONObj buildPage(const UUID& uuid, const PageParams& params) {
 
 PersistentSampleGeneration generationOf(std::vector<BSONObj> pages) {
     ASSERT_FALSE(pages.empty());
-    PersistentSampleGeneration generation(kDefaultPersistentSampleGenId,
+    PersistentSampleGeneration generation(kFirstPersistentSampleGenId,
                                           static_cast<int>(pages.size()));
     for (auto& page : pages) {
         ASSERT_OK(generation.addPage(std::move(page)));
@@ -755,7 +755,7 @@ void persistSampleForTest(OperationContext* opCtx,
                                   std::move(overrides),
                                   /*pageNo=*/0,
                                   /*numDocsDiscarded=*/0,
-                                  /*genId=*/boost::none,
+                                  /*genId=*/kFirstPersistentSampleGenId,
                                   /*numPages=*/1)},
         /*clustered=*/true);
 }

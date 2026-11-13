@@ -354,8 +354,7 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  BSONObj overrides = BSONObj(),
                                  int pageNo = 0,
                                  size_t numDocsDiscarded = 0,
-                                 // TODO SERVER-135417: Make non optional.
-                                 boost::optional<uint64_t> genId = boost::none,
+                                 uint64_t genId = kFirstPersistentSampleGenId,
                                  int numPages = 1);
 
 /**
@@ -365,8 +364,7 @@ struct PageParams {
     SamplingTechniqueEnum method = SamplingTechniqueEnum::kRandom;
     size_t requestedSampleSize = 384;
     boost::optional<int> numChunks;
-    // TODO SERVER-135417: Make non optional.
-    boost::optional<uint64_t> genId;
+    uint64_t genId = kFirstPersistentSampleGenId;
     int pageNo = 0;
     int numPages = 1;
     size_t numDocsDiscarded = 0;

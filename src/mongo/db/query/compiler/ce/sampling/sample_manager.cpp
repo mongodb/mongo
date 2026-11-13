@@ -133,7 +133,7 @@ uint64_t findMaxPersistentSampleGenId(OperationContext* opCtx,
         std::move(maxId),
         CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly);
 
-    uint64_t maxGenId = kDefaultPersistentSampleGenId;
+    uint64_t maxGenId = kFirstPersistentSampleGenId;
     BSONObj page;
     // page here is a view into WT's own buffer so adding a projection to only fetch the _id field
     // would not be more efficient.

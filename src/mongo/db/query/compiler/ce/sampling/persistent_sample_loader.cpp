@@ -76,6 +76,8 @@ constexpr int kNumDocsDiscardedFieldBytes = 1 /* type indicator */ +
 /**
  * Builds the part of the `_id` shared by every page of a collection's sample, up to and including
  * the separator that precedes the gen_id (or the page number, for `_id`s without a gen_id).
+ *
+ * SERVER-135417: Note that an `_id` without a gen_id is no longer valid.
  */
 std::string makePersistentSampleIdPrefix(const UUID& collectionUuid) {
     return fmt::format("{}{}{}{}",
@@ -146,15 +148,12 @@ StatusWith<std::vector<BSONObj>> findPersistentSamplePages(OperationContext* opC
 
 }  // namespace
 
-std::string makePersistentSampleId(const UUID& collectionUuid,
-                                   int pageNo,
-                                   boost::optional<uint64_t> genId) {
+std::string makePersistentSampleId(const UUID& collectionUuid, int pageNo, uint64_t genId) {
     tassert(13321001, "Persistent sample page number must be non-negative", pageNo >= 0);
 
     std::string id = makePersistentSampleIdPrefix(collectionUuid);
-    if (genId.has_value()) {
-        fmt::format_to(std::back_inserter(id), "{}{}", genId.value(), kIdSeparator);
-    }
+    fmt::format_to(std::back_inserter(id), "{}{}", genId, kIdSeparator);
+
     // TODO SERVER-138006: Remove the zero padding.
     fmt::format_to(std::back_inserter(id), "{:0{}}", pageNo, kPersistentSamplePageNoWidth);
     return id;
@@ -194,9 +193,9 @@ StatusWith<uint64_t> parsePersistentSampleGenId(std::string_view id, const UUID&
     if (!std::all_of(pageNo.begin(), pageNo.end(), ctype::isDigit)) {
         return malformed();
     }
-    // TODO SERVER-135417. Remove this block once the read path refuses pages without a gen_id.
+
     if (genIdAndPageNo.size() == kPersistentSamplePageNoWidth) {
-        return kDefaultPersistentSampleGenId;
+        return malformed();
     }
 
     const std::string_view genIdAndSeparator =

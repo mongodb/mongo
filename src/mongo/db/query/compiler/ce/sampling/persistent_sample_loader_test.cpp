@@ -40,11 +40,10 @@ std::string expectedIdPrefix() {
     return str::stream() << kUuid.toString() << "_" << kPersistentSampleSchemaVersion << "_";
 }
 
-std::string expectedId(uint64_t pageNo, boost::optional<uint64_t> genId = boost::none) {
+std::string expectedId(uint64_t pageNo, uint64_t genId = kFirstPersistentSampleGenId) {
     std::string id = expectedIdPrefix();
-    if (genId) {
-        id += fmt::format("{}_", *genId);
-    }
+    id += fmt::format("{}_", genId);
+
     return id + fmt::format("{:010}", pageNo);
 }
 
@@ -92,7 +91,7 @@ TEST(MakePersistentSampleId, EveryIdentityFieldChangesTheId) {
     const auto baseline = makePersistentSampleId(kUuid, 1);
     ASSERT_NE(baseline, makePersistentSampleId(UUID::gen(), 1));
     ASSERT_NE(baseline, makePersistentSampleId(kUuid, 2));
-    ASSERT_NE(baseline, makePersistentSampleId(kUuid, 1, /*genId=*/0));
+    ASSERT_NE(baseline, makePersistentSampleId(kUuid, 1, /*genId=*/99));
 }
 
 // ── makePersistentSampleAllGenerationsIdRange ───────────────────────────────────────────────
@@ -136,12 +135,16 @@ TEST(MakePersistentSampleAllGenerationsIdRange, ExcludesOtherCollections) {
 
 // ── parsePersistentSampleGenId ────────────────────────────────────────────────────────────────
 
-TEST(ParsePersistentSampleGenId, IdWithoutGenIdBelongsToTheDefaultGeneration) {
-    for (int pageNo : {0, 7, 383}) {
-        const auto genId = parsePersistentSampleGenId(makePersistentSampleId(kUuid, pageNo), kUuid);
-        ASSERT_OK(genId.getStatus());
-        ASSERT_EQ(genId.getValue(), kDefaultPersistentSampleGenId);
-    }
+TEST(ParsePersistentSampleGenId, IdWithoutGenIdIsRejected) {
+    // Intentionally create an ID that does not include the genId
+    const std::string sampleId = fmt::format("{uuid}{separator}{schema}{separator}{page:d}",
+                                             fmt::arg("uuid", kUuid.toString()),
+                                             fmt::arg("separator", "_"),
+                                             fmt::arg("schema", kPersistentSampleSchemaVersion),
+                                             fmt::arg("page", 1));
+    const auto genId = parsePersistentSampleGenId(sampleId, kUuid);
+
+    ASSERT_EQ(genId.getStatus().code(), ErrorCodes::UnsupportedFormat);
 }
 
 TEST(ParsePersistentSampleGenId, ParsesTheGenIdBeforeThePageNo) {
@@ -281,18 +284,6 @@ TEST(SelectHighestCompleteGeneration, GenerationsAreComparedNumerically) {
     assertSelectedGeneration(select({buildPage(kUuid, {.genId = 9, .pageNo = 0, .numPages = 1}),
                                      buildPage(kUuid, {.genId = 10, .pageNo = 0, .numPages = 1})}),
                              10,
-                             1);
-}
-
-TEST(SelectHighestCompleteGeneration, IdsWithoutGenIdBelongToGenerationZero) {
-    assertSelectedGeneration(select({buildPage(kUuid, {.pageNo = 0, .numPages = 2}),
-                                     buildPage(kUuid, {.pageNo = 1, .numPages = 2}),
-                                     buildPage(kUuid, {.genId = 1, .pageNo = 1, .numPages = 2})}),
-                             0,
-                             2);
-    assertSelectedGeneration(select({buildPage(kUuid, {.pageNo = 0, .numPages = 1}),
-                                     buildPage(kUuid, {.genId = 1, .pageNo = 0, .numPages = 1})}),
-                             1,
                              1);
 }
 
@@ -613,7 +604,7 @@ TEST(ParsePersistentSample, PopulatesNumPages) {
                                  /*overrides=*/BSONObj{},
                                  /*pageNo=*/0,
                                  /*numDocsDiscarded=*/0,
-                                 /*genId=*/boost::none,
+                                 /*genId=*/kFirstPersistentSampleGenId,
                                  /*numPages=*/3));
     ASSERT_OK(result.getStatus());
     ASSERT_EQ(result.getValue().getNumPages(), 3);
@@ -639,7 +630,7 @@ TEST(ParsePersistentSample, RejectsNonPositiveNumPages) {
                                      /*overrides=*/BSONObj{},
                                      /*pageNo=*/0,
                                      /*numDocsDiscarded=*/0,
-                                     /*genId=*/boost::none,
+                                     /*genId=*/kFirstPersistentSampleGenId,
                                      numPages));
         ASSERT_NOT_OK(result.getStatus());
     }
@@ -783,7 +774,7 @@ DEATH_TEST_REGEX(ReassemblePersistentSampleDeathTest, IncompleteGenerationIsReje
     const UUID uuid = UUID::gen();
     const std::vector<BSONObj> pages({buildPage(uuid, {.pageNo = 0, .numPages = 3}),
                                       buildPage(uuid, {.pageNo = 2, .numPages = 3})});
-    PersistentSampleGeneration generation(kDefaultPersistentSampleGenId, 3);
+    PersistentSampleGeneration generation(kFirstPersistentSampleGenId, 3);
     for (auto& page : pages) {
         ASSERT_OK(generation.addPage(std::move(page)));
     }
@@ -866,7 +857,7 @@ TEST(ReassemblePersistentSample, MalformedPagePropagatesError) {
                                  BSON(PersistentSampleDoc::kDocsFieldName << "not-an-array"),
                                  /*pageNo=*/1,
                                  /*numDocsDiscarded=*/0,
-                                 /*genId=*/boost::none,
+                                 /*genId=*/kFirstPersistentSampleGenId,
                                  /*numPages=*/2);
     auto result = reassemblePersistentSample(generationOf({
         buildPage(uuid,

@@ -31,7 +31,7 @@ using namespace std::literals::string_view_literals;
 inline constexpr std::string_view kSamplesCollectionName = "system.stats.samples"sv;
 inline constexpr int kPersistentSampleSchemaVersion = 1;
 // gen_ids are uint64_t: at one refresh per second they would take ~584 billion years to overflow.
-inline constexpr uint64_t kDefaultPersistentSampleGenId = 0;
+inline constexpr uint64_t kFirstPersistentSampleGenId = 1;
 
 // Number of digits the page number is zero-padded to (max num digits in unsigned 32 bit int).
 inline constexpr size_t kPersistentSamplePageNoWidth = 10;
@@ -43,8 +43,7 @@ inline constexpr size_t kPersistentSamplePageNoWidth = 10;
  */
 std::string makePersistentSampleId(const UUID& collectionUuid,
                                    int pageNo = 0,
-                                   // TODO SERVER-135417: Make non optional.
-                                   boost::optional<uint64_t> genId = boost::none);
+                                   uint64_t genId = kFirstPersistentSampleGenId);
 
 /**
  * Returns a pair of strings defining a lookup range for all generations of a persisted sample.
