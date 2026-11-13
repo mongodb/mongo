@@ -4,22 +4,55 @@
 #include "mongo/db/admission/flow_control.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/flow_control_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/flow_control_ticketholder.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
 
 #include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
 namespace mongo {
+
+namespace {
+// Provider for a FlowControl whose refresher job runs: reports flow control as unusable, so each
+// refresh hands out the maximum tickets without consulting replication state.
+class IdleProvider : public FlowControl::TimestampProvider {
+public:
+    Timestamp getCurrSustainerTimestamp() const override {
+        return {};
+    }
+    Timestamp getPrevSustainerTimestamp() const override {
+        return {};
+    }
+    repl::TimestampAndWallTime getTargetTimestampAndWallTime() const override {
+        return {};
+    }
+    repl::TimestampAndWallTime getLastWriteTimestampAndWallTime() const override {
+        return {};
+    }
+    bool flowControlUsable() const override {
+        return false;
+    }
+    bool sustainerAdvanced() const override {
+        return false;
+    }
+    void update() override {}
+};
+}  // namespace
 
 class FlowControlTest : public ServiceContextMongoDTest {
 public:
@@ -40,16 +73,36 @@ public:
 
         client = getServiceContext()->getService()->makeClient("FlowControl Client");
         opCtx = client->makeOperationContext();
+
+        originalPollIntervalMs = gFlowControlPollIntervalMs.load();
     }
 
     void tearDown() override {
+        FlowControl::shutdown(getServiceContext());
+        gFlowControlPollIntervalMs.store(originalPollIntervalMs);
         ServiceContextMongoDTest::tearDown();
+    }
+
+    // Installs a FlowControl with a running refresher job, as the service lifecycles do.
+    FlowControl* installServiceFlowControl() {
+        FlowControl::set(
+            getServiceContext(),
+            std::make_unique<FlowControl>(getServiceContext(), std::make_unique<IdleProvider>()));
+        return FlowControl::get(getServiceContext());
+    }
+
+    // Sets flowControlPollIntervalMs through the same entry point the setParameter command uses.
+    static Status setPollIntervalMs(int value) {
+        return ServerParameterSet::getNodeParameterSet()
+            ->get("flowControlPollIntervalMs")
+            ->set(BSON("flowControlPollIntervalMs" << value).firstElement());
     }
 
     std::unique_ptr<FlowControl> flowControl;
     repl::ReplicationCoordinatorMock* replCoordMock;
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
+    int originalPollIntervalMs = 0;
 };
 
 TEST_F(FlowControlTest, AddingSamples) {
@@ -390,5 +443,86 @@ TEST_F(FlowControlTest, MaxSamplesRuntimeChange) {
 
     // Restore original value.
     gFlowControlMaxSamples.store(originalValue);
+}
+
+TEST_F(FlowControlTest, PollIntervalUpdateReachesLiveFlowControl) {
+    auto* fc = installServiceFlowControl();
+    ASSERT_OK(setPollIntervalMs(300));
+    ASSERT_EQ(300, gFlowControlPollIntervalMs.load());
+    ASSERT_EQ(Milliseconds(300), fc->_getRefreshPeriod_forTest());
+
+    // Out-of-range values are rejected by the validator before anything is stored or applied.
+    ASSERT_NOT_OK(setPollIntervalMs(50));
+    ASSERT_NOT_OK(setPollIntervalMs(6000));
+    ASSERT_EQ(300, gFlowControlPollIntervalMs.load());
+    ASSERT_EQ(Milliseconds(300), fc->_getRefreshPeriod_forTest());
+
+    // A FlowControl installed after a shutdown receives updates again.
+    FlowControl::shutdown(getServiceContext());
+    fc = installServiceFlowControl();
+    ASSERT_OK(setPollIntervalMs(400));
+    ASSERT_EQ(400, gFlowControlPollIntervalMs.load());
+    ASSERT_EQ(Milliseconds(400), fc->_getRefreshPeriod_forTest());
+}
+
+TEST_F(FlowControlTest, PollIntervalUpdateAfterShutdownIsSafe) {
+    installServiceFlowControl();
+    FlowControl::shutdown(getServiceContext());
+    ASSERT_EQ(nullptr, FlowControl::get(getServiceContext()));
+
+    ASSERT_OK(setPollIntervalMs(250));
+    ASSERT_EQ(250, gFlowControlPollIntervalMs.load());
+}
+
+TEST_F(FlowControlTest, PollIntervalUpdatesConcurrentWithShutdownAreSafe) {
+    installServiceFlowControl();
+
+    constexpr int kNumThreads = 4;
+    Atomic<int> threadsWithSetBeforeShutdown{0};
+    Atomic<int> threadsWithSetAfterShutdown{0};
+    Atomic<int> failedSets{0};
+    Atomic<bool> shutdownDone{false};
+    Atomic<bool> stop{false};
+
+    std::vector<stdx::thread> threads;
+    for (int i = 0; i < kNumThreads; ++i) {
+        threads.emplace_back([&, i] {
+            bool countedBefore = false;
+            bool countedAfter = false;
+            for (int iter = 0; !stop.load(); ++iter) {
+                const bool afterShutdown = shutdownDone.load();
+                if (!setPollIntervalMs(100 + 100 * ((i + iter) % 2)).isOK()) {
+                    failedSets.fetchAndAdd(1);
+                    continue;
+                }
+                if (!countedBefore) {
+                    countedBefore = true;
+                    threadsWithSetBeforeShutdown.fetchAndAdd(1);
+                }
+                if (afterShutdown && !countedAfter) {
+                    countedAfter = true;
+                    threadsWithSetAfterShutdown.fetchAndAdd(1);
+                }
+            }
+        });
+    }
+
+    // Every thread has gone through the update hook with a live FlowControl before shutdown runs.
+    while (threadsWithSetBeforeShutdown.load() < kNumThreads) {
+        sleepmillis(1);
+    }
+    FlowControl::shutdown(getServiceContext());
+    shutdownDone.store(true);
+
+    while (threadsWithSetAfterShutdown.load() < kNumThreads) {
+        sleepmillis(1);
+    }
+    stop.store(true);
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    ASSERT_EQ(0, failedSets.load());
+    ASSERT_EQ(nullptr, FlowControl::get(getServiceContext()));
 }
 }  // namespace mongo

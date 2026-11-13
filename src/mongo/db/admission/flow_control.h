@@ -149,6 +149,8 @@ public:
      */
     explicit FlowControl(std::unique_ptr<TimestampProvider> timestampProvider);
 
+    ~FlowControl();
+
     static FlowControl* get(ServiceContext* service);
     static FlowControl* get(ServiceContext& service);
     static FlowControl* get(OperationContext* ctx);
@@ -236,6 +238,10 @@ public:
     typedef std::tuple<std::uint64_t, std::uint64_t, std::int64_t> Sample;
     [[MONGO_MOD_PRIVATE]] const std::deque<Sample>& _getSampledOpsApplied_forTest() {
         return _sampledOpsApplied;
+    }
+
+    [[MONGO_MOD_PRIVATE]] Milliseconds _getRefreshPeriod_forTest() const {
+        return _jobAnchor.getPeriod();
     }
 
 private:

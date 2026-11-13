@@ -23,11 +23,13 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/static_immortal.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -66,6 +68,41 @@ auto& flowControlSection =
     *ServerStatusSectionBuilder<FlowControlServerStatusSection>("flowControl").forShard();
 
 const auto getFlowControl = ServiceContext::declareDecoration<std::unique_ptr<FlowControl>>();
+
+/**
+ * Routes runtime updates of the process-global flowControlPollIntervalMs parameter to the refresher
+ * job of the live FlowControl. The parameter outlives every FlowControl and a setParameter can be
+ * in flight while FlowControl is destroyed at shutdown, so the onUpdate hook is installed once,
+ * never references a FlowControl directly, and only touches `anchor` under `mutex`.
+ */
+struct PollIntervalTarget {
+    std::once_flag registerHookOnce;
+    std::mutex mutex;
+    PeriodicJobAnchor* anchor = nullptr;
+};
+
+PollIntervalTarget& pollIntervalTarget() {
+    static StaticImmortal<PollIntervalTarget> target;
+    return *target;
+}
+
+void registerPollIntervalHookOnce() {
+    auto& target = pollIntervalTarget();
+    std::call_once(target.registerHookOnce, [] {
+        using ParamT =
+            IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, Atomic<int>>;
+        ServerParameterSet::getNodeParameterSet()
+            ->get<ParamT>("flowControlPollIntervalMs")
+            ->setOnUpdate([](const int newValue) -> Status {
+                auto& target = pollIntervalTarget();
+                std::lock_guard<std::mutex> lk(target.mutex);
+                if (target.anchor) {
+                    target.anchor->setPeriod(Milliseconds(newValue));
+                }
+                return Status::OK();
+            });
+    });
+}
 
 int multiplyWithOverflowCheck(double term1, double term2, int maxValue) {
     if (term1 == 0.0 || term2 == 0.0) {
@@ -232,14 +269,20 @@ FlowControl::FlowControl(ServiceContext* service,
          true /*isKillableByStepdown*/});
     _jobAnchor.start();
 
-    using ParamT =
-        IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, Atomic<int>>;
-    ServerParameterSet::getNodeParameterSet()
-        ->get<ParamT>("flowControlPollIntervalMs")
-        ->setOnUpdate([this](const int newValue) -> Status {
-            _jobAnchor.setPeriod(Milliseconds(newValue));
-            return Status::OK();
-        });
+    registerPollIntervalHookOnce();
+    auto& target = pollIntervalTarget();
+    std::lock_guard<std::mutex> lk(target.mutex);
+    target.anchor = &_jobAnchor;
+}
+
+FlowControl::~FlowControl() {
+    // Runs before `_jobAnchor` is destroyed, and blocks until any in-flight poll interval update
+    // that is using it has finished.
+    auto& target = pollIntervalTarget();
+    std::lock_guard<std::mutex> lk(target.mutex);
+    if (target.anchor == &_jobAnchor) {
+        target.anchor = nullptr;
+    }
 }
 
 FlowControl* FlowControl::get(ServiceContext* service) {
