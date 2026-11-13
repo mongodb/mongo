@@ -75,6 +75,11 @@ TEST(ExpressionTypingTest, NegatedOrOfEqualitiesLeavesTypeUnchanged) {
     ASSERT_EQ(narrowedDebugString(expr, input, false), "{a: int, b: string, ...}");
 }
 
+TEST(ExpressionTypingTest, LogicalOutputTypeIsBoolean) {
+    ASSERT_EQ(outputTypeDebugString("{$and: []}"), "bool(S)");
+    ASSERT_EQ(outputTypeDebugString("{$or: []}"), "bool(S)");
+}
+
 TEST(ExpressionTypingTest, ConstantOutputType) {
     ASSERT_EQ(outputTypeDebugString("{$const: 5}"), "int(S)");
     ASSERT_EQ(outputTypeDebugString("{$const: null}"), "null");
@@ -94,7 +99,7 @@ TEST(ExpressionTypingTest, ConstantOutputTypeMatchesEvaluationOnScalars) {
 
 TEST(ExpressionTypingTest, EqualityNarrowingPreservesEvaluationResults) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    const auto values = equalityNarrowingCorpus();
+    const auto values = extendedRepresentatives();
 
     auto path =
         ExpressionFieldPath::createPathFromString(expCtx.get(), "a", expCtx->variablesParseState);
@@ -201,6 +206,16 @@ TEST(ExpressionTypingTest, EqualityNarrowingExcludesNullWhenFalse) {
     ASSERT_EQ(falseType.toDebugString(), "{a: ~null, ...}");
 }
 
+TEST(ExpressionTypingTest, InequalityNarrowingRemainsUnsupported) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const Type anyObject = Type::anyObject();
+    auto expr = parseExpr(fromjson("{$ne: ['$a', 1]}"), *expCtx);
+
+    for (bool assumeTrue : {false, true}) {
+        ASSERT_EQ(narrowType(anyObject, expr.get(), assumeTrue).toDebugString(), "object");
+    }
+}
+
 TEST(ExpressionTypingTest, NegatedEqualityNarrowsOnlyForSingletonOperand) {
     auto input =
         openObject({{"a", allValues(BSONType::null)},
@@ -249,6 +264,134 @@ TEST(ExpressionTypingTest, EqualityNarrowingLeavesUnsupportedOperandsUnchanged) 
         for (bool assumeTrue : {false, true}) {
             ASSERT_EQ(narrowedDebugString(expr, input, assumeTrue), input.toDebugString()) << expr;
         }
+    }
+}
+
+TEST(ExpressionTypingTest, LogicalEmptyChild) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const Type anyObject = Type::anyObject();
+    auto emptyAnd = parseExpr(fromjson("{$and: []}"), *expCtx);
+    auto emptyOr = parseExpr(fromjson("{$or: []}"), *expCtx);
+    ASSERT_EQ(narrowType(anyObject, emptyAnd.get(), true).toDebugString(), "object");
+    ASSERT_EQ(narrowType(anyObject, emptyAnd.get(), false).toDebugString(), "never");
+    ASSERT_EQ(narrowType(anyObject, emptyOr.get(), true).toDebugString(), "never");
+    ASSERT_EQ(narrowType(anyObject, emptyOr.get(), false).toDebugString(), "object");
+}
+
+TEST(ExpressionTypingTest, LogicalSingleChild) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const Type anyObject = Type::anyObject();
+    auto child = parseExpr(fromjson("{$eq: ['$a', 1]}"), *expCtx);
+    auto andExpr = parseExpr(fromjson("{$and: [{$eq: ['$a', 1]}]}"), *expCtx);
+    auto orExpr = parseExpr(fromjson("{$or: [{$eq: ['$a', 1]}]}"), *expCtx);
+    for (bool assumption : {false, true}) {
+        ASSERT_EQ(narrowType(anyObject, andExpr.get(), assumption).toDebugString(),
+                  narrowType(anyObject, child.get(), assumption).toDebugString());
+        ASSERT_EQ(narrowType(anyObject, orExpr.get(), assumption).toDebugString(),
+                  narrowType(anyObject, child.get(), assumption).toDebugString());
+    }
+}
+
+TEST(ExpressionTypingTest, LogicalNarrowingCombinesChildrenAnd) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const Type anyObject = Type::anyObject();
+    auto a = parseExpr(fromjson("{$eq: ['$a', 1]}"), *expCtx);
+    auto b = parseExpr(fromjson("{$eq: ['x', '$b']}"), *expCtx);
+    auto andExpr = parseExpr(fromjson("{$and: [{$eq: ['$a', 1]}, {$eq: ['x', '$b']}]}"), *expCtx);
+    const auto andTrue = narrowType(anyObject, andExpr.get(), true);
+    ASSERT_EQ(andTrue.getField("a").toDebugString(),
+              Type(sameCanonicalClass(BSONType::numberInt)).toDebugString());
+    ASSERT_EQ(andTrue.getField("b").toDebugString(),
+              Type(sameCanonicalClass(BSONType::string)).toDebugString());
+    ASSERT_EQ(
+        narrowType(anyObject, andExpr.get(), false).toDebugString(),
+        unionType(narrowType(anyObject, a.get(), false), narrowType(anyObject, b.get(), false))
+            .toDebugString());
+
+    auto incompatible =
+        parseExpr(fromjson("{$and: [{$eq: ['$a', 1]}, {$eq: ['$a', 'x']}]}"), *expCtx);
+    ASSERT_EQ(narrowType(anyObject, incompatible.get(), true).toDebugString(), "never");
+}
+
+TEST(ExpressionTypingTest, LogicalNarrowingCombinesChildrenOr) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const Type anyObject = Type::anyObject();
+    auto a = parseExpr(fromjson("{$eq: ['$a', 1]}"), *expCtx);
+    auto b = parseExpr(fromjson("{$eq: ['x', '$b']}"), *expCtx);
+    auto orExpr = parseExpr(fromjson("{$or: [{$eq: ['$a', 1]}, {$eq: ['x', '$b']}]}"), *expCtx);
+    const auto orTrue = narrowType(anyObject, orExpr.get(), true);
+    ASSERT_EQ(orTrue.toDebugString(),
+              unionType(narrowType(anyObject, a.get(), true), narrowType(anyObject, b.get(), true))
+                  .toDebugString());
+    ASSERT_EQ(narrowType(anyObject, orExpr.get(), false).toDebugString(),
+              narrowType(narrowType(anyObject, a.get(), false), b.get(), false).toDebugString());
+
+    auto sameField = parseExpr(fromjson("{$or: [{$eq: ['$a', 1]}, {$eq: ['$a', 'x']}]}"), *expCtx);
+    ASSERT_EQ(narrowType(anyObject, sameField.get(), true).getField("a").toDebugString(),
+              unionType(Type(sameCanonicalClass(BSONType::numberInt)),
+                        Type(sameCanonicalClass(BSONType::string)))
+                  .toDebugString());
+}
+
+TEST(ExpressionTypingTest, LogicalNarrowingHonorsConstantOperands) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const Type anyObject = Type::anyObject();
+    auto falseAnd = parseExpr(fromjson("{$and: [false, {$eq: ['$a', 1]}]}"), *expCtx);
+    auto trueOr = parseExpr(fromjson("{$or: [true, {$eq: ['$a', 1]}]}"), *expCtx);
+    auto equality = parseExpr(fromjson("{$eq: ['$a', 1]}"), *expCtx);
+    auto trueAnd = parseExpr(fromjson("{$and: [true, {$eq: ['$a', 1]}]}"), *expCtx);
+    auto falseOr = parseExpr(fromjson("{$or: [false, {$eq: ['$a', 1]}]}"), *expCtx);
+
+    ASSERT_EQ(narrowType(anyObject, falseAnd.get(), true).toDebugString(), "never");
+    ASSERT_EQ(narrowType(anyObject, falseAnd.get(), false).toDebugString(), "object");
+    ASSERT_EQ(narrowType(anyObject, trueOr.get(), true).toDebugString(), "object");
+    ASSERT_EQ(narrowType(anyObject, trueOr.get(), false).toDebugString(), "never");
+    for (bool assumption : {false, true}) {
+        const auto expected = narrowType(anyObject, equality.get(), assumption).toDebugString();
+        ASSERT_EQ(narrowType(anyObject, trueAnd.get(), assumption).toDebugString(), expected);
+        ASSERT_EQ(narrowType(anyObject, falseOr.get(), assumption).toDebugString(), expected);
+    }
+}
+
+TEST(ExpressionTypingTest, LogicalNarrowingUsesConstantTruthiness) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const Type anyObject = Type::anyObject();
+    auto equality = parseExpr(fromjson("{$eq: ['$a', 1]}"), *expCtx);
+    auto truthyAnd = parseExpr(fromjson("{$and: ['x', {$eq: ['$a', 1]}]}"), *expCtx);
+    auto falsyOr = parseExpr(fromjson("{$or: [0, {$eq: ['$a', 1]}]}"), *expCtx);
+
+    for (bool assumption : {false, true}) {
+        const auto expected = narrowType(anyObject, equality.get(), assumption).toDebugString();
+        ASSERT_EQ(narrowType(anyObject, truthyAnd.get(), assumption).toDebugString(), expected);
+        ASSERT_EQ(narrowType(anyObject, falsyOr.get(), assumption).toDebugString(), expected);
+    }
+}
+
+TEST(ExpressionTypingTest, LogicalNarrowingPreservesEvaluationResults) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto values = extendedRepresentatives();
+    for (const auto& spec : {"{$and: [{$eq: ['$a', 1]}, {$eq: ['x', '$b']}]}",
+                             "{$or: [{$eq: [1, '$a']}, {$eq: ['$b', 'x']}]}",
+                             "{$not: [{$and: [{$eq: ['$a', 1]}, {$eq: ['$b', 'x']}]}]}",
+                             "{$and: [{$or: [false, {$eq: ['$a', 1]}]}, "
+                             "{$not: [{$eq: ['x', '$b']}]}]}",
+                             "{$or: [{$add: [1, 2]}, {$eq: ['$a', 1]}]}"}) {
+        auto expr = parseExpr(fromjson(spec), *expCtx);
+        const auto narrowedTrue = narrowType(Type::anyObject(), expr.get(), true);
+        const auto narrowedFalse = narrowType(Type::anyObject(), expr.get(), false);
+        for (const auto& a : values) {
+            for (const auto& b : values) {
+                Document doc{{"a", a}, {"b", b}};
+                const bool result = expr->evaluate(doc, &expCtx->variables, {}).coerceToBool();
+                ASSERT_TRUE((result ? narrowedTrue : narrowedFalse).hasValue(Value(doc)))
+                    << spec << ", document " << doc.toString() << ", result " << result << ", type "
+                    << (result ? narrowedTrue : narrowedFalse).toDebugString();
+            }
+        }
+        const Document missing{};
+        const bool result = expr->evaluate(missing, &expCtx->variables, {}).coerceToBool();
+        ASSERT_TRUE((result ? narrowedTrue : narrowedFalse).hasValue(Value(missing)))
+            << spec << ", type " << (result ? narrowedTrue : narrowedFalse).toDebugString();
     }
 }
 

@@ -61,7 +61,7 @@ std::vector<Value> scalarRepresentatives() {
     };
 }
 
-std::vector<Value> equalityNarrowingCorpus() {
+std::vector<Value> extendedRepresentatives() {
     auto values = scalarRepresentatives();
     values.insert(values.end(),
                   {Value(0),

@@ -51,6 +51,10 @@ struct GetOutputTypeExpressionVisitor final
         returnsBoolean();
     }
 
+    void visit(const ExpressionAnd* expr) override {
+        returnsBoolean();
+    }
+
     void returnsBoolean() {
         outputType = Type(BSONType::boolean, Extent::kSubset);
     }
@@ -67,6 +71,37 @@ const ExpressionFieldPath* getIfExpressionFieldPath(const Expression* expr) {
 }
 
 /**
+ * Returns 'inputType' narrowed by all children assuming each evaluates to 'assumeTrue'.
+ * With no children, returns 'inputType' unchanged.
+ */
+Type narrowByEveryChild(Type inputType,
+                        const Expression::ExpressionVector& children,
+                        bool assumeTrue) {
+    for (const auto& child : children) {
+        inputType = narrowType(std::move(inputType), child.get(), assumeTrue);
+    }
+    return inputType;
+}
+
+/**
+ * Returns the union of input types narrowed by each child assuming it evaluates to 'assumeTrue'.
+ * This represents inputs for which at least one child has that outcome; with no children, the
+ * result is 'never'.
+ */
+Type narrowBySomeChild(Type inputType,
+                       const Expression::ExpressionVector& children,
+                       bool assumeTrue) {
+    if (children.size() == 1) {
+        return narrowType(std::move(inputType), children.front().get(), assumeTrue);
+    }
+    Type result = Type::never();
+    for (const auto& child : children) {
+        result = unionType(std::move(result), narrowType(inputType, child.get(), assumeTrue));
+    }
+    return result;
+}
+
+/**
  * Narrows the input type by every expression which carries type information.
  * An expression left without an override leaves the input type unchanged, which is always valid.
  */
@@ -77,12 +112,20 @@ struct NarrowTypeExpressionVisitor final
     NarrowTypeExpressionVisitor(Type inputType, bool assumeTrue)
         : type(std::move(inputType)), assumeTrue(assumeTrue) {}
 
-    void visit(const ExpressionOr* expr) override {
-        // TODO(SERVER-135985): Implement fully as we do for MatchExpressions.
-        if (expr->getChildren().empty() && assumeTrue) {
-            // An empty $or evaluates to false, so it matches no document.
+    void visit(const ExpressionConstant* expr) override {
+        if (expr->getValue().coerceToBool() != assumeTrue) {
             type = Type::never();
         }
+    }
+
+    void visit(const ExpressionAnd* expr) override {
+        type = assumeTrue ? narrowByEveryChild(std::move(type), expr->getChildren(), true)
+                          : narrowBySomeChild(std::move(type), expr->getChildren(), false);
+    }
+
+    void visit(const ExpressionOr* expr) override {
+        type = assumeTrue ? narrowBySomeChild(std::move(type), expr->getChildren(), true)
+                          : narrowByEveryChild(std::move(type), expr->getChildren(), false);
     }
 
     void visit(const ExpressionCompare* expr) override {
