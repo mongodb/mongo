@@ -17,6 +17,8 @@
 #include "mongo/db/pipeline/explain_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/lite_parsed_lookup.h"
+#include "mongo/db/pipeline/lite_parsed_union_with.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -133,51 +135,105 @@ std::string getStageNameNotAllowedInFacet(const DocumentSource& source,
     return std::string{sourceName};
 }
 
-// Returns true when any $unionWith or $lookup stage in a facet sub-pipeline names a collection
-// that resolves to a view. Handles the string shorthand, {coll} object, and cross-db {db, coll}
-// object forms for both stages, then checks the resolved-namespace map.
+/**
+ * Extract a NamespaceString from a $unionWith spec element (string or {coll[, db]} object) or a
+ * $lookup "from" element (string or {db, coll} object).
+ */
+boost::optional<NamespaceString> parseForeignNss(const BSONElement& elem,
+                                                 const DatabaseName& dbName) {
+    if (elem.type() == BSONType::string) {
+        return NamespaceStringUtil::deserialize(dbName, elem.String());
+    }
+    if (elem.type() == BSONType::object) {
+        auto collElem = elem.Obj()["coll"];
+        if (collElem.type() != BSONType::string)
+            return boost::none;
+        if (auto dbElem = elem.Obj()["db"]; dbElem.type() == BSONType::string) {
+            auto targetDb = DatabaseNameUtil::deserialize(
+                dbName.tenantId(), dbElem.String(), SerializationContext::stateDefault());
+            return NamespaceStringUtil::deserialize(targetDb, collElem.String());
+        }
+        return NamespaceStringUtil::deserialize(dbName, collElem.String());
+    }
+    return boost::none;
+}
+
+/**
+ * Returns true when any $unionWith or $lookup stage names a collection that resolves to a view.
+ * Recurses into the sub-pipelines so a view nested deep inside is recognized as well.
+ */
+bool stageArrayTargetsView(const vector<BSONObj>& stages,
+                           const ResolvedNamespaceMap& resolvedNamespaces,
+                           const DatabaseName& dbName) {
+    // Returns true when 'nss' names a collection that is registered as a view in
+    // 'resolvedNamespaces'.
+    auto isView = [&](const boost::optional<NamespaceString>& nss) {
+        if (!nss) {
+            return false;
+        }
+        auto it = resolvedNamespaces.find(*nss);
+        return it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView();
+    };
+
+    // Collects the object members of a raw (not yet validated) stage array; non-object members
+    // are skipped.
+    auto toStageVec = [](const BSONElement& arrayElem) {
+        vector<BSONObj> stages;
+        if (arrayElem.type() != BSONType::array) {
+            return stages;
+        }
+        for (auto&& elem : arrayElem.Obj()) {
+            if (elem.type() == BSONType::object) {
+                stages.push_back(elem.embeddedObject());
+            }
+        }
+        return stages;
+    };
+
+    for (const auto& stageObj : stages) {
+        std::string_view stageName = stageObj.firstElementFieldNameStringData();
+        BSONObj stageSpec = stageObj.firstElement().type() == BSONType::object
+            ? stageObj.firstElement().Obj()
+            : BSONObj();
+
+        // Descend into the stage's "pipeline" sub-pipeline.
+        if (stageName == LiteParsedUnionWith::kStageName) {
+            if (isView(parseForeignNss(stageObj.firstElement(), dbName))) {
+                return true;
+            }
+            if (stageArrayTargetsView(
+                    toStageVec(stageSpec["pipeline"]), resolvedNamespaces, dbName)) {
+                return true;
+            }
+        } else if (stageName == LiteParsedLookUp::kStageName) {
+            const auto targetNss = parseForeignNss(stageSpec["from"], dbName);
+            if (isView(targetNss)) {
+                return true;
+            }
+            if (stageArrayTargetsView(toStageVec(stageSpec["pipeline"]),
+                                      resolvedNamespaces,
+                                      targetNss ? targetNss->dbName() : dbName)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Returns true when any $unionWith or $lookup stage in a facet sub-pipeline, at any sub-pipeline
+ * nesting depth, names a collection that resolves to a view.
+ *
+ * TODO(SERVER-128245): Once $facet is moved to the LiteParsed/desugaring infrastructure, this guard
+ * should be removed since the sub-pipeline's view resolution will be available from the LiteParsed
+ * representation.
+ */
 bool facetSubPipelinesTargetView(const vector<pair<string, vector<BSONObj>>>& rawFacetPipelines,
                                  const ResolvedNamespaceMap& resolvedNamespaces,
                                  const DatabaseName& dbName) {
-    // Extract a NamespaceString from a $unionWith spec element (string or {coll[, db]} object)
-    // or a $lookup "from" element (string or {db, coll} object).
-    auto parseNss = [&](const BSONElement& elem) -> boost::optional<NamespaceString> {
-        if (elem.type() == BSONType::string) {
-            return NamespaceStringUtil::deserialize(dbName, elem.String());
-        }
-        if (elem.type() == BSONType::object) {
-            auto collElem = elem.Obj()["coll"];
-            if (collElem.type() != BSONType::string)
-                return boost::none;
-            if (auto dbElem = elem.Obj()["db"]; dbElem.type() == BSONType::string) {
-                auto targetDb = DatabaseNameUtil::deserialize(
-                    dbName.tenantId(), dbElem.String(), SerializationContext::stateDefault());
-                return NamespaceStringUtil::deserialize(targetDb, collElem.String());
-            }
-            return NamespaceStringUtil::deserialize(dbName, collElem.String());
-        }
-        return boost::none;
-    };
-
     for (const auto& [facetName, pipeline] : rawFacetPipelines) {
-        for (const auto& stageObj : pipeline) {
-            std::string_view stageName = stageObj.firstElementFieldNameStringData();
-            boost::optional<NamespaceString> targetNss;
-
-            if (stageName == "$unionWith") {
-                targetNss = parseNss(stageObj.firstElement());
-            } else if (stageName == "$lookup") {
-                if (stageObj.firstElement().type() == BSONType::object) {
-                    targetNss = parseNss(stageObj.firstElement().Obj()["from"]);
-                }
-            }
-
-            if (targetNss) {
-                if (auto it = resolvedNamespaces.find(*targetNss);
-                    it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView()) {
-                    return true;
-                }
-            }
+        if (stageArrayTargetsView(pipeline, resolvedNamespaces, dbName)) {
+            return true;
         }
     }
     return false;

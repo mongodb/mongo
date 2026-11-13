@@ -16,15 +16,20 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/explain_util.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -167,6 +172,141 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptLegalSpecification) {
     auto ctx = getExpCtx();
     auto spec = BSON("$facet" << BSON("a" << BSON_ARRAY(BSON("$skip" << 4)) << "b"
                                           << BSON_ARRAY(BSON("$limit" << 3))));
+    auto facetStage = DocumentSourceFacet::createFromBson(spec.firstElement(), ctx);
+    ASSERT_TRUE(facetStage.get());
+}
+
+/**
+ * Tests for the $facet view-targeting guard. When featureFlagExtensionsInsideHybridSearch is
+ * enabled, a $facet sub-pipeline that references a view must kick back so the aggregation is
+ * retried with the flag disabled.
+ */
+
+/**
+ * Builds an ExpressionContext that mimics what mongos holds on the retry iteration after a view
+ * kickback: featureFlagExtensionsInsideHybridSearch is enabled via an IFR context, and
+ * 'resolvedNamespaces' holds the view resolutions shipped back by a shard.
+ */
+boost::intrusive_ptr<ExpressionContext> makeViewKickbackExpCtx(
+    OperationContext* opCtx, ResolvedNamespaceMap resolvedNamespaces) {
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(std::vector<IFRFlagWireEntry>{
+        IFRFlagWireEntry{feature_flags::gFeatureFlagExtensionsInsideHybridSearch.getName(), true}});
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .ns(NamespaceString::createNamespaceString_forTest("testdb", "coll"))
+                      .ifrContext(ifrContext)
+                      .resolvedNamespace(std::move(resolvedNamespaces))
+                      .build();
+    expCtx->setMongoProcessInterface(std::make_unique<StubMongoProcessInterface>());
+    return expCtx;
+}
+
+TEST_F(DocumentSourceFacetTest, LookupNestedInFacetSubpipelineTargetsView) {
+    NamespaceString viewNss = NamespaceString::createNamespaceString_forTest("testdb", "viewColl");
+    NamespaceString backingNss =
+        NamespaceString::createNamespaceString_forTest("testdb", "backingColl");
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[viewNss] = ResolvedNamespace::makeForView(
+        viewNss, backingNss, {fromjson("{$match: {tenant: 'public'}}")});
+
+    auto ctx = makeViewKickbackExpCtx(getOpCtx(), std::move(resolvedNamespaces));
+
+    // The inner $lookup names a view two levels deep in the facet sub-pipeline.
+    auto spec = fromjson(
+        "{$facet: {b: [{$lookup: {from: 'collA', pipeline: [{$lookup: {from: 'viewColl', "
+        "pipeline: [], as: 'inner'}}], as: 'outer'}}]}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                       DBException,
+                       ErrorCodes::IFRFlagRetry);
+}
+
+TEST_F(DocumentSourceFacetTest, LookupDeepInFacetSubpipelineTargetsView) {
+    NamespaceString viewNss = NamespaceString::createNamespaceString_forTest("testdb", "viewColl");
+    NamespaceString backingNss =
+        NamespaceString::createNamespaceString_forTest("testdb", "backingColl");
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[viewNss] = ResolvedNamespace::makeForView(
+        viewNss, backingNss, {fromjson("{$match: {tenant: 'public'}}")});
+
+    auto ctx = makeViewKickbackExpCtx(getOpCtx(), std::move(resolvedNamespaces));
+
+    // The inner $lookup names a view three levels deep in the facet sub-pipeline.
+    auto spec = fromjson(
+        "{$facet: {b: [{$lookup: {from: 'collA', pipeline: [{$lookup: {from: 'collB', "
+        "pipeline: [{$lookup: {from: 'viewColl', pipeline: [], as: 'x'}}], as: 'y'}}], "
+        "as: 'outer'}}]}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                       DBException,
+                       ErrorCodes::IFRFlagRetry);
+}
+
+TEST_F(DocumentSourceFacetTest, UnionWithNestedInFacetSubpipelineTargetsView) {
+    NamespaceString viewNss = NamespaceString::createNamespaceString_forTest("testdb", "viewColl");
+    NamespaceString backingNss =
+        NamespaceString::createNamespaceString_forTest("testdb", "backingColl");
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[viewNss] = ResolvedNamespace::makeForView(
+        viewNss, backingNss, {fromjson("{$match: {tenant: 'public'}}")});
+
+    auto ctx = makeViewKickbackExpCtx(getOpCtx(), std::move(resolvedNamespaces));
+
+    // The $unionWith names a view nested inside a $lookup's sub-pipeline.
+    auto spec = fromjson(
+        "{$facet: {b: [{$lookup: {from: 'collA', pipeline: [{$unionWith: {coll: 'viewColl', "
+        "pipeline: []}}], as: 'outer'}}]}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                       DBException,
+                       ErrorCodes::IFRFlagRetry);
+}
+
+TEST_F(DocumentSourceFacetTest, LookupNestedInUnionWithTargetsView) {
+    auto viewNss = NamespaceString::createNamespaceString_forTest("testdb", "viewColl");
+    auto backingNss = NamespaceString::createNamespaceString_forTest("testdb", "backingColl");
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[viewNss] = ResolvedNamespace::makeForView(
+        viewNss, backingNss, {fromjson("{$match: {tenant: 'public'}}")});
+
+    auto ctx = makeViewKickbackExpCtx(getOpCtx(), std::move(resolvedNamespaces));
+    auto spec = fromjson(
+        "{$facet: {b: [{$unionWith: {coll: 'collA', pipeline: ["
+        "{$lookup: {from: 'viewColl', pipeline: [], as: 'inner'}}]}}]}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                       DBException,
+                       ErrorCodes::IFRFlagRetry);
+}
+
+TEST_F(DocumentSourceFacetTest, NestedLookupsInFacetSubpipelineTargetCollections) {
+    // Only ordinary collections are named, even at nesting depth; no kickback is raised.
+    auto ctx = makeViewKickbackExpCtx(getOpCtx(), ResolvedNamespaceMap{});
+
+    auto spec = fromjson(
+        "{$facet: {b: [{$lookup: {from: 'collA', pipeline: [{$lookup: {from: 'collB', "
+        "pipeline: [], as: 'inner'}}], as: 'outer'}}]}}");
+
+    auto facetStage = DocumentSourceFacet::createFromBson(spec.firstElement(), ctx);
+    ASSERT_TRUE(facetStage.get());
+}
+
+TEST_F(DocumentSourceFacetTest, ViewIsNotReferencedInFacetSubpipeline) {
+    // A view entry in the resolved-namespace map that no stage references must not trigger the
+    // kickback.
+    NamespaceString viewNss = NamespaceString::createNamespaceString_forTest("testdb", "viewColl");
+    NamespaceString backingNss =
+        NamespaceString::createNamespaceString_forTest("testdb", "backingColl");
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[viewNss] = ResolvedNamespace::makeForView(
+        viewNss, backingNss, {fromjson("{$match: {tenant: 'public'}}")});
+
+    auto ctx = makeViewKickbackExpCtx(getOpCtx(), std::move(resolvedNamespaces));
+
+    auto spec = fromjson(
+        "{$facet: {b: [{$lookup: {from: 'collA', pipeline: [{$lookup: {from: 'collB', "
+        "pipeline: [], as: 'inner'}}], as: 'outer'}}]}}");
+
     auto facetStage = DocumentSourceFacet::createFromBson(spec.firstElement(), ctx);
     ASSERT_TRUE(facetStage.get());
 }
