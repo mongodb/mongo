@@ -637,6 +637,7 @@ CollectionReplicatedMetadata makeSizeCount(CollectionSizeCount sizeCount) {
 
 using test_helpers::expectValidatorMetrics;
 using test_helpers::makeCheckpointEntry;
+using test_helpers::makeRepairNoopEntry;
 
 class SizeCountCheckpointValidatorRecoveryTest : public CatalogTestFixture {
 public:
@@ -803,6 +804,34 @@ TEST_F(SizeCountCheckpointValidatorRecoveryTest, MultiCheckpointBatchAdopted) {
           .delta = ReplicatedMetadataDelta{
               .metadata = {.sizeCount = CollectionSizeCount{.size = 5, .count = 0}}}}});
     expectValidatorMetrics(capturer, {.recorded = 3, .evicted = 3, .skipped = 2, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorRecoveryTest, RepairHashSetReplacesPersistentHash) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        *sizeCountStore,
+        uuid,
+        SizeCountStore::Entry{.timestamp = kT1, .size = 10, .count = 1, .hash = 0b0011});
+    applyBatch(validator,
+               {makeWatermarkEntry(kT1),
+                makeCheckpointEntry(kT1,
+                                    {{uuid,
+                                      CollectionReplicatedMetadata{
+                                          .sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                          .hash = 0b0011}}})},
+               {});
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT2, uuid, BSON("hSet" << 0b1111)),
+        makeWatermarkEntry(kT3),
+        makeCheckpointEntry(
+            kT3,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                           .hash = 0b1111}}})};
+    applyBatch(validator, ops, {});
+    expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 1, .validated = 1});
 }
 
 TEST_F(SizeCountCheckpointValidatorRecoveryTest, SingleCheckpointAdoptedMultipleCollections) {
@@ -1565,6 +1594,448 @@ TEST_F(SizeCountCheckpointValidatorTest, HashesValidatePerCollection) {
                         .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 1},
                                      .hash = 0b0101}}}});
     expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairHashSetOverridesPreviousHashAcrossBatches) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    applyBatch(validator,
+               /*ops=*/{},
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                  .hash = 0b0101}}}});
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("sz" << 5 << "ct" << 1 << "hSet" << 0b1111)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 15, .count = 2},
+                                           .hash = 0b1111}}})};
+    applyBatch(validator, ops, {});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairHashSetSkipsPreviousHashInSameBatch) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("hSet" << 0b1111)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 17, .count = 2},
+                                           .hash = 0b1111 ^ 0b0010}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta =
+                     ReplicatedMetadataDelta{
+                         .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                      .hash = 0b0001}}},
+                {.ts = Timestamp(Seconds(220), 0),
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 7, .count = 1},
+                                  .hash = 0b0010}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairHashSetDoesNotChangeEarlierInterval) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(
+            kT1,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                           .hash = 0b0011}}}),
+        makeRepairNoopEntry(Timestamp(Seconds(290), 0), uuid, BSON("hSet" << 0b1111)),
+        makeWatermarkEntry(kT3),
+        makeCheckpointEntry(
+            kT3,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                           .hash = 0b1111}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                  .hash = 0b0011}}}});
+    expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 0, .validated = 2});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairHashSetNoWatermarkCheckedLater) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    applyBatch(
+        validator, {makeRepairNoopEntry(kT1, uuid, BSON("sz" << 2 << "hSet" << 0b1111))}, {});
+    expectValidatorMetrics(capturer, {.recorded = 0, .evicted = 0, .skipped = 0, .validated = 0});
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 5, .count = 1},
+                                           .hash = 0b1111 ^ 0b0010}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = Timestamp(Seconds(220), 0),
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 3, .count = 1},
+                                  .hash = 0b0010}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, MalformedRepairNoopIgnored) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    repl::OplogEntry malformed(BSON("ts"
+                                    << kT1 << "t" << -1 << "v" << 2 << "wall" << Date_t() << "op"
+                                    << "n"
+                                    << "ns" << ""
+                                    << "o"
+                                    << BSON("msg" << "Repairing collection's "
+                                                     "replicated metadata with diffs")
+                                    << "o2"
+                                    << BSON("type" << "repairReplicatedMetadata" << "uuid" << uuid
+                                                   << "m" << BSON("sz" << "notanumber"))));
+    const std::vector<repl::OplogEntry> ops{
+        malformed,
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2, {{adoptUuid, makeSizeCount(CollectionSizeCount{.size = 7, .count = 2})}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = adoptUuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 2, .count = 1},
+                                  .hash = boost::none}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairNoopEmptyMetadataIgnored) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSONObj()),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2, {{adoptUuid, makeSizeCount(CollectionSizeCount{.size = 7, .count = 2})}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = adoptUuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 2, .count = 1},
+                                  .hash = boost::none}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairHashSetForOplogUuidExcluded) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, oplogUuid, BSON("sz" << 100 << "ct" << 5 << "hSet" << 0b1111)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(kT2,
+                            {{adoptUuid, makeSizeCount(CollectionSizeCount{.size = 7, .count = 2})},
+                             {oplogUuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 5000, .count = 42},
+                                  .hash = boost::none}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = adoptUuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 2, .count = 1},
+                                  .hash = boost::none}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairNoopBothHashFieldsIgnored) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("hDiff" << 0b0010 << "hSet" << 0b1111)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2, {{adoptUuid, makeSizeCount(CollectionSizeCount{.size = 7, .count = 2})}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = adoptUuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 2, .count = 1},
+                                  .hash = boost::none}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairSizeOnly) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("sz" << 5)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 15, .count = 1},
+                                           .hash = 0b0011}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                  .hash = 0b0011}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairCountOnly) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("ct" << 2)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 10, .count = 3},
+                                           .hash = 0b0011}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                  .hash = 0b0011}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairDiffOnly) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("hDiff" << 0b0100)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                           .hash = 0b0011 ^ 0b0100}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                  .hash = 0b0011}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairSetOnly) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("hSet" << 0b1111)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                           .hash = 0b1111}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                  .hash = 0b0011}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, LatestHashSetInBatchWins) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("sz" << 1 << "hSet" << 0b0001)),
+        makeRepairNoopEntry(
+            Timestamp(Seconds(220), 0), uuid, BSON("sz" << 2 << "ct" << 1 << "hSet" << 0b1000)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(kT2,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 130, .count = 21},
+                                  .hash = 0b1000 ^ 0b0010}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta =
+                     ReplicatedMetadataDelta{
+                         .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                      .hash = 0b0101}}},
+                {.ts = Timestamp(Seconds(210), 0),
+                 .uuid = uuid,
+                 .delta =
+                     ReplicatedMetadataDelta{
+                         .metadata = {.sizeCount = CollectionSizeCount{.size = 114, .count = 18},
+                                      .hash = 0b0100}}},
+                {.ts = Timestamp(Seconds(230), 0),
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 3, .count = 1},
+                                  .hash = 0b0010}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairHashSetWithNoneHashBaseline) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("sz" << 2 << "ct" << 1 << "hSet" << 0b1111)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 4, .count = 2},
+                                           .hash = 0b1111}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 2, .count = 1},
+                                  // Here, the hash is set to boost::none. The repair entry sets it
+                                  // to 0b1111 after.
+                                  .hash = boost::none}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairHashSetAcrossIntervals) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("sz" << 1 << "hSet" << 0b0001)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 1, .count = 0},
+                                           .hash = 0b0001}}}),
+        makeRepairNoopEntry(kT3, uuid, BSON("sz" << 2 << "ct" << 1 << "hSet" << 0b1000)),
+        makeWatermarkEntry(kT4),
+        makeCheckpointEntry(
+            kT4,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 3, .count = 1},
+                                           .hash = 0b1000}}})};
+    applyBatch(validator, ops, {});
+    expectValidatorMetrics(capturer, {.recorded = 2, .evicted = 2, .skipped = 0, .validated = 2});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairHashSetWithCreate) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("sz" << 5 << "ct" << 2 << "hSet" << 0b1111)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 5, .count = 2},
+                                           .hash = 0b1111}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                  .hash = kEmptyCollectionValidationHash},
+                     .state = DDLState::kCreated}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairHashSetThenDrop) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, adoptUuid, BSON("sz" << 2 << "ct" << 1 << "hSet" << 0b1111)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(kT2, {{adoptUuid, boost::none}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = Timestamp(Seconds(220), 0),
+                 .uuid = adoptUuid,
+                 .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, DropThenRepairHashSet) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, adoptUuid, BSON("sz" << 2 << "ct" << 1 << "hSet" << 0b1111)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(kT2, {{adoptUuid, boost::none}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = adoptUuid,
+                 .delta = ReplicatedMetadataDelta{.state = DDLState::kDropped}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, RepairCommandAndCRUD) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(Timestamp(Seconds(150), 0), uuid, BSON("sz" << 2 << "hDiff" << 0b0010)),
+        makeRepairNoopEntry(kT1, uuid, BSON("sz" << 3 << "ct" << 1 << "hSet" << 0b1000)),
+        makeRepairNoopEntry(Timestamp(Seconds(240), 0), uuid, BSON("hDiff" << 0b0111)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 19, .count = 3},
+                                           .hash = 0b1000 ^ 0b0100 ^ 0b0111}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = uuid,
+                 .delta =
+                     ReplicatedMetadataDelta{
+                         .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1},
+                                      .hash = 0b0001}}},
+                {.ts = Timestamp(Seconds(230), 0),
+                 .uuid = uuid,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 4, .count = 1},
+                                  .hash = 0b0100}}}});
+    expectValidatorMetrics(capturer, {.recorded = 1, .evicted = 1, .skipped = 0, .validated = 1});
+}
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
+             RepairHashSetWrongCheckpointHashFasserts,
+             "13626005") {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeRepairNoopEntry(kT1, uuid, BSON("hSet" << 0b1111)),
+        makeWatermarkEntry(kT2),
+        makeCheckpointEntry(
+            kT2,
+            {{uuid,
+              CollectionReplicatedMetadata{.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                           .hash = 0b0000}}})};
+    applyBatch(validator, ops, {});
 }
 
 DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,

@@ -274,6 +274,8 @@ mongo_cc_library(
         "size_count_checkpoint_validator.cpp",
     ],
     deps = [
+        "repair_replicated_metadata_idl",
+        "replicated_fast_count_delta_utils",
         "replicated_fast_count_metrics",
         "size_count_store",
         "size_count_timestamp_store_oplog",

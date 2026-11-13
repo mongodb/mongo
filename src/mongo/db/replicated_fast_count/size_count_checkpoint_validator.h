@@ -64,6 +64,14 @@ struct ValidatorDeltaRecord {
  */
 using ValidatorBuffers [[MONGO_MOD_PUBLIC]] = std::vector<std::vector<ValidatorDeltaRecord>>;
 
+struct ValidatorIntervalData {
+    ReplicatedMetadataDeltas deltas;
+    // Tracks the timestamps of `repairReplicatedMetadata` oplog entries with `hSet` present. This
+    // field is necessary because while merging `ValidatorBuffers`, we need to know if a given hash
+    // delta should be counted or ignored based on its timestamp.
+    absl::flat_hash_map<UUID, Timestamp> repairHashSetTimestamps;
+};
+
 /**
  * The replicated metadata deltas between the previous `ValidatorInterval` and `cutoff` (exclusive).
  * `cutoff` is the timestamp of a watermark.
@@ -74,7 +82,7 @@ using ValidatorBuffers [[MONGO_MOD_PUBLIC]] = std::vector<std::vector<ValidatorD
  */
 struct ValidatorInterval {
     Timestamp cutoff;
-    ReplicatedMetadataDeltas deltas;
+    ValidatorIntervalData data;
 };
 
 /**
@@ -172,7 +180,7 @@ private:
      *
      * Advances `_baseline` by the sum of deltas in [Timestamp(0,0), validAsOf].
      */
-    CheckpointContents computeExpectedCheckpoint(Timestamp validAsOf);
+    CheckpointContents computeExpectedCheckpoint(Timestamp validAsOf, UUID oplogUuid);
 
     /**
      * Records the provided `watermarkTs` in `_intervals` with any `_ongoing` deltas and resets
@@ -185,6 +193,12 @@ private:
      * Copies the provided `entry` into `_checkpoints` for validation later.
      */
     void recordCheckpoint(const repl::OplogEntry& entry);
+
+    /**
+     * Records the provided replicated metadata in `o2` and `ts` into a `ValidatorInterval` or
+     * `_ongoing`.
+     */
+    void recordRepairDelta(const BSONObj& o2, Timestamp ts);
 
     /**
      * Absolute replicated metadata values since the last `mergeAndValidate()`. Checkpoints in the
@@ -208,7 +222,7 @@ private:
      * The set of deltas with timestamp > the latest watermark entry. These deltas are moved to a
      * `ValidatorInterval` when the next watermark is seen.
      */
-    ReplicatedMetadataDeltas _ongoing;
+    ValidatorIntervalData _ongoing;
 
     /**
      * List of checkpoints to be validated. Sorted in increasing timestamp order.

@@ -882,6 +882,17 @@ repl::OplogEntry makeWatermarkEntry(Timestamp ts) {
                                       << "o" << BSON("msg" << std::string(kWatermarkMsg))));
 }
 
+repl::OplogEntry makeRepairNoopEntry(Timestamp ts, UUID uuid, BSONObj metadata) {
+    return repl::OplogEntry(
+        BSON("ts" << ts << "t" << -1 << "v" << 2 << "wall" << Date_t() << "op"
+                  << "n"
+                  << "ns" << ""
+                  << "o" << BSON("msg" << "Repairing collection's replicated metadata with diffs")
+                  << "o2"
+                  << BSON("type" << kRepairReplicatedMetadataType << "uuid" << uuid << "m"
+                                 << metadata)));
+}
+
 repl::OplogEntry makeCheckpointEntry(Timestamp validAsOf,
                                      const std::vector<CheckpointWriteSpec>& writes) {
     invariant(!writes.empty(),

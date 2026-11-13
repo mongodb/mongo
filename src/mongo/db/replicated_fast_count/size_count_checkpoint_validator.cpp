@@ -8,6 +8,8 @@
 #include "mongo/db/repl/container_oplog_entry_serialization.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/replicated_fast_count/repair_replicated_metadata_gen.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store_oplog.h"
@@ -130,10 +132,15 @@ absl::flat_hash_map<UUID, CollectionReplicatedMetadata> scanMetadataStore(Operat
 }
 
 /**
- * Adds the provided `delta` to the provided `entry`, accounting for DDL state.
+ * Adds the provided `delta` to the provided `entry`, accounting for DDL state and hash update
+ * modes.
  */
 void addDelta(ReplicatedMetadataDelta& entry, const ReplicatedMetadataDelta& delta) {
     entry.metadata = entry.metadata + delta.metadata;
+    if (delta.hashUpdateMode == HashUpdateMode::kSet) {
+        entry.metadata.hash = delta.metadata.hash;
+        entry.hashUpdateMode = HashUpdateMode::kSet;
+    }
     switch (delta.state) {
         case DDLState::kNone:
             // `computeExpectedCheckpoint()` uses DDL state to know if an entry should exist in
@@ -202,8 +209,6 @@ void validateCheckpoint(const CheckpointContents& standby,
                                uuid.toString()));
         } else if (!primaryRemoved && !standbyRemoved) {
             // Check that the metadata match if neither collection was dropped.
-            // TODO(SERVER-137710): Account for hash repairs, which the standby does not record a
-            // delta for.
             if (*standbyIt->second != *metadata) {
                 report(reportingStrategy,
                        13626005,
@@ -337,6 +342,12 @@ void SizeCountCheckpointValidator::preprocessOplogEntry(const repl::OplogEntry& 
     if (entry.getOpType() == repl::OpTypeEnum::kNoop) {
         if (entry.getObject().getStringField("msg") == kWatermarkMsg) {
             recordWatermark(entry.getOpTime().getTimestamp());
+        } else if (const auto& o2 = entry.getObject2();
+                   o2.has_value() && isRepairReplicatedMetadataO2(*o2)) {
+            // `repairReplicatedMetadata` oplog entries with `hSet` present must be serialized with
+            // respect to other replicated metadata deltas, so we record all repair entries here,
+            // during preprocessing.
+            recordRepairDelta(*o2, entry.getOpTime().getTimestamp());
         }
         return;
     }
@@ -353,8 +364,8 @@ void SizeCountCheckpointValidator::recordWatermark(Timestamp watermarkTs) {
                           "watermarkTs={}, cutoff={}",
                           watermarkTs,
                           _intervals.back().cutoff));
-    _intervals.push_back(ValidatorInterval{.cutoff = watermarkTs, .deltas = std::move(_ongoing)});
-    _ongoing = ReplicatedMetadataDeltas{};
+    _intervals.push_back(ValidatorInterval{.cutoff = watermarkTs, .data = std::move(_ongoing)});
+    _ongoing = {};
     incrementWatermarksRecordedCount();
 }
 
@@ -362,6 +373,63 @@ void SizeCountCheckpointValidator::recordCheckpoint(const repl::OplogEntry& entr
     // This copy is cheap because the copy constructor of the BSONObj inside the OplogEntry just
     // increments the reference count of a SharedBuffer.
     _checkpoints.push_back(entry);
+}
+
+void SizeCountCheckpointValidator::recordRepairDelta(const BSONObj& o2, Timestamp ts) {
+    RepairReplicatedMetadataO2 parsed;
+    try {
+        parsed = RepairReplicatedMetadataO2::parse(o2);
+    } catch (const DBException&) {
+        return;
+    }
+
+    const auto& m = parsed.getM();
+    // If `hDiff` and `hSet` are present simultaneously, the primary ignores the oplog entry, so we
+    // ignore the entry here too.
+    if (m.getHDiff() && m.getHSet()) {
+        return;
+    }
+    if (!m.getSz() && !m.getCt() && !m.getHDiff() && !m.getHSet()) {
+        return;
+    }
+
+    boost::optional<int64_t> hash;
+    HashUpdateMode hashUpdateMode = HashUpdateMode::kFold;
+    if (m.getHSet()) {
+        hash = m.getHSet();
+        hashUpdateMode = HashUpdateMode::kSet;
+    } else {
+        hash = m.getHDiff() ? m.getHDiff() : kEmptyCollectionValidationHash;
+    }
+
+    ReplicatedMetadataDelta delta{
+        .metadata = {.sizeCount = CollectionSizeCount{.size = m.getSz().value_or(0),
+                                                      .count = m.getCt().value_or(0)},
+                     .hash = hash},
+        .state = DDLState::kNone,
+        .hashUpdateMode = hashUpdateMode};
+
+    const UUID uuid = parsed.getUuid();
+    auto intervalIt =
+        std::find_if(_intervals.begin(), _intervals.end(), [&](const ValidatorInterval& interval) {
+            return interval.cutoff >= ts;
+        });
+    ValidatorIntervalData& dest = intervalIt != _intervals.end() ? intervalIt->data : _ongoing;
+    // The oplog applier can apply writes to different documents in the same collection in any
+    // order. These writes contribute deltas to collection-level replicated metadata, but we can
+    // usually combine these deltas in any order because of the commutative property of addition and
+    // XOR. However, the `repairReplicatedMetadata` oplog entry with `hSet` present is a special
+    // case because assignment is not commutative. We must assign our expected hash to the new hash
+    // before combining any subsequent hashes, and adding a delta to `dest` before the batch is
+    // applied ensures this. We also insert non-`hSet` deltas here for simplicity, though we could
+    // record them during regular oplog application.
+    addDelta(getOrCreateEntry(dest.deltas, uuid), std::move(delta));
+
+    if (m.getHSet()) {
+        // If there are multiple `hSet` commands for the same UUID in the same interval, we only
+        // record the latest timestamp because the previous hashes get overwritten anyway.
+        dest.repairHashSetTimestamps[uuid] = ts;
+    }
 }
 
 void SizeCountCheckpointValidator::recordDelta(UUID uuid,
@@ -407,7 +475,7 @@ void SizeCountCheckpointValidator::mergeAndValidate(OperationContext* opCtx,
                               "match any recorded watermark after the baseline was initialized",
                               validAsOf));
 
-        const CheckpointContents standby = computeExpectedCheckpoint(validAsOf);
+        const CheckpointContents standby = computeExpectedCheckpoint(validAsOf, oplogUuid);
         CheckpointContents primary = parseCheckpoint(entry);
         // The primary's checkpoint includes replicated metadata for the oplog, but the standby's
         // checkpoint does not. This is because the primary _derives_ oplog replicated metadata
@@ -462,12 +530,17 @@ void SizeCountCheckpointValidator::merge(const ValidatorBuffers& threadRecords) 
                     it->cutoff != rec.ts,
                     "Timestamp of a replicated metadata delta should never equal the timestamp "
                     "of a watermark");
-                addDelta(getOrCreateEntry(it->deltas, rec.uuid), rec.delta);
-            } else {
-                // The watermark will arrive in another batch, so we fold this record into the
-                // _ongoing map.
-                addDelta(getOrCreateEntry(_ongoing, rec.uuid), rec.delta);
             }
+
+            ValidatorIntervalData& dest = it != _intervals.end() ? it->data : _ongoing;
+            const auto hashSetIt = dest.repairHashSetTimestamps.find(rec.uuid);
+            ReplicatedMetadataDelta delta = rec.delta;
+            if (hashSetIt != dest.repairHashSetTimestamps.end() && rec.ts < hashSetIt->second) {
+                // Ignore hashes that precede the `repairReplicatedMetadata` oplog entry with `hSet`
+                // present.
+                delta.metadata.hash = kEmptyCollectionValidationHash;
+            }
+            addDelta(getOrCreateEntry(dest.deltas, rec.uuid), delta);
         }
     }
 }
@@ -524,7 +597,8 @@ void SizeCountCheckpointValidator::adoptCheckpoint(OperationContext* opCtx) {
     _checkpoints.clear();
 }
 
-CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Timestamp validAsOf) {
+CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Timestamp validAsOf,
+                                                                           UUID oplogUuid) {
     invariant(_baseline.has_value(),
               "Expected checkpoint computation requires an initialized baseline");
 
@@ -532,7 +606,7 @@ CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Times
     ReplicatedMetadataDeltas observed;
     auto it = _intervals.begin();
     while (it != _intervals.end() && it->cutoff <= validAsOf) {
-        for (const auto& [uuid, delta] : it->deltas) {
+        for (const auto& [uuid, delta] : it->data.deltas) {
             addDelta(getOrCreateEntry(observed, uuid), delta);
         }
         ++it;
@@ -575,7 +649,10 @@ CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Times
                                                .hash = kEmptyCollectionValidationHash}
                 : baseIt->second;
         }();
-        const CollectionReplicatedMetadata absolute = base + delta.metadata;
+        CollectionReplicatedMetadata absolute = base + delta.metadata;
+        if (delta.hashUpdateMode == HashUpdateMode::kSet) {
+            absolute.hash = delta.metadata.hash;
+        }
         expected[uuid] = absolute;
         (*_baseline)[uuid] = absolute;
     }
@@ -595,6 +672,10 @@ CheckpointContents SizeCountCheckpointValidator::computeExpectedCheckpoint(Times
             }
         }
     }
+
+    // The expected checkpoint can include the oplog UUID if the oplog's size/count was repaired. We
+    // don't want to validate oplog replicated metadata, so we remove its entry here.
+    expected.erase(oplogUuid);
 
     return expected;
 }

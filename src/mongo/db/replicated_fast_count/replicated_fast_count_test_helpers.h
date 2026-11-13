@@ -437,6 +437,8 @@ repl::OplogEntry makeDropOplogEntry(Timestamp ts, NsAndUUID userColl);
  */
 repl::OplogEntry makeWatermarkOplogEntry(Timestamp ts);
 
+repl::OplogEntry makeRepairNoopEntry(Timestamp ts, UUID uuid, BSONObj metadata);
+
 /**
  * Inserts `oplogEntry` into the oplog collection.
  */
