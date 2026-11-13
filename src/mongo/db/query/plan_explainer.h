@@ -18,9 +18,10 @@
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/string_map.h"
 
 #include <cstdint>
+#include <map>
+#include <string>
 #include <vector>
 
 namespace mongo {
@@ -59,6 +60,11 @@ struct SolutionWithPlanStage {
     boost::optional<MultiPlannerStopCondition> estimateStopCondition;
 };
 
+// Per-namespace explain metadata, keyed by serialized namespace. Ordered so that explain lists the
+// namespaces in the same order on every run.
+using CeSamplingMetadataMap = std::map<std::string, cost_based_ranker::SamplingMetadata>;
+using FieldStatsMetadataMap = std::map<std::string, std::vector<ce::PersistedNDVEntry>>;
+
 struct PlanExplainerData {
     std::unique_ptr<WorkingSet> workingSetForRejectedPlansExplain;
     std::vector<SolutionWithPlanStage> rejectedPlansWithStages;
@@ -76,10 +82,10 @@ struct PlanExplainerData {
     cost_based_ranker::EstimateMap estimates;
     // Namespace-keyed map of sampling metadata emitted under queryPlanner.ceSamplingMetadata.
     // Populated on the explain path when CBR used a sampling estimator.
-    StringMap<cost_based_ranker::SamplingMetadata> ceSamplingMetadata;
+    CeSamplingMetadataMap ceSamplingMetadata;
     // Namespace-keyed persisted NDV statistics emitted under queryPlanner.fieldStatsMetadata.
     // Only namespaces that served statistics have entries.
-    StringMap<std::vector<ce::PersistedNDVEntry>> fieldStatsMetadata;
+    FieldStatsMetadataMap fieldStatsMetadata;
     bool fromPlanCache = false;
     // Hash of the join plan cache key. Populated on the explain path of a join eligible query.
     boost::optional<uint32_t> joinPlanCacheKeyHash;
@@ -423,8 +429,7 @@ public:
      * queryPlanner.ceSamplingMetadata in explain output. Returns boost::none if no sampling
      * metadata is available (e.g., CBR was not used, or this is not a classic-engine plan).
      */
-    virtual boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> getCeSamplingMetadata()
-        const {
+    virtual boost::optional<CeSamplingMetadataMap> getCeSamplingMetadata() const {
         return boost::none;
     }
 
@@ -433,8 +438,7 @@ public:
      * under queryPlanner.fieldStatsMetadata in explain output. Returns boost::none if no such
      * statistics were served.
      */
-    virtual boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>> getFieldStatsMetadata()
-        const {
+    virtual boost::optional<FieldStatsMetadataMap> getFieldStatsMetadata() const {
         return boost::none;
     }
 

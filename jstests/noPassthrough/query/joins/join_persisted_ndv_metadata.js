@@ -86,9 +86,9 @@ describe("persistedNdv in join explain", function () {
 
             // Both sides of the edge have persisted statistics, so the join optimizer consults
             // both for the two-sided NDV estimate and both namespaces surface their served
-            // statistics.
+            // statistics, in sorted order.
             assert.eq(
-                Object.keys(fieldStatsMetadata).sort(),
+                Object.keys(fieldStatsMetadata),
                 [this.orders.getFullName(), this.products.getFullName()].sort(),
                 "expected served statistics from both sides of the join edge",
                 {fieldStatsMetadata},

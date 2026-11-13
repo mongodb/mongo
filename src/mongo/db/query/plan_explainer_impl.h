@@ -68,16 +68,14 @@ public:
     std::vector<PlanStatsDetails> getCachedPlanStats(const plan_cache_debug_info::DebugInfo&,
                                                      ExplainOptions::Verbosity) const;
 
-    boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> getCeSamplingMetadata()
-        const override {
+    boost::optional<CeSamplingMetadataMap> getCeSamplingMetadata() const override {
         if (_explainData.ceSamplingMetadata.empty()) {
             return boost::none;
         }
         return _explainData.ceSamplingMetadata;
     }
 
-    boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>> getFieldStatsMetadata()
-        const override {
+    boost::optional<FieldStatsMetadataMap> getFieldStatsMetadata() const override {
         if (_explainData.fieldStatsMetadata.empty()) {
             return boost::none;
         }

@@ -1055,12 +1055,12 @@ std::vector<ExplainPlanEntry> PlanExplainerClassicRuntimePlannerForSBE::getPlanE
     return entries;
 }
 
-boost::optional<StringMap<cost_based_ranker::SamplingMetadata>>
+boost::optional<CeSamplingMetadataMap>
 PlanExplainerClassicRuntimePlannerForSBE::getCeSamplingMetadata() const {
     return _ceSamplingMetadata;
 }
 
-boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>>
+boost::optional<FieldStatsMetadataMap>
 PlanExplainerClassicRuntimePlannerForSBE::getFieldStatsMetadata() const {
     return _fieldStatsMetadata;
 }

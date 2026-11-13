@@ -169,10 +169,8 @@ public:
         PlanStatsFormat format,
         PlanSelectionStrategy decidingPlanRanker) const final;
 
-    boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> getCeSamplingMetadata()
-        const override;
-    boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>> getFieldStatsMetadata()
-        const override;
+    boost::optional<CeSamplingMetadataMap> getCeSamplingMetadata() const override;
+    boost::optional<FieldStatsMetadataMap> getFieldStatsMetadata() const override;
     boost::optional<uint32_t> getJoinPlanCacheKeyHash() const override;
     boost::optional<std::vector<NamespaceString>> getJoinCollectionsWithoutPageCount()
         const override;
@@ -207,8 +205,8 @@ private:
     // can extract the necessary information regarding the classic multi-planner's trial period
     // using the same format as we would for the classic engine.
     const std::unique_ptr<PlanStage> _classicRuntimePlannerStage;
-    boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> _ceSamplingMetadata;
-    boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>> _fieldStatsMetadata;
+    boost::optional<CeSamplingMetadataMap> _ceSamplingMetadata;
+    boost::optional<FieldStatsMetadataMap> _fieldStatsMetadata;
     boost::optional<uint32_t> _joinPlanCacheKeyHash;
     // Copied out of the incoming PlanExplainerData for the same reason as the two fields above: the
     // data is moved into the embedded classic explainer, which does not exist on every path.

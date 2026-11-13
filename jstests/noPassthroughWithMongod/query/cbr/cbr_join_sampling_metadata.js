@@ -102,9 +102,15 @@ describe("ceSamplingMetadata in join explain", function () {
             );
             const ceSamplingMetadata = queryPlanner.ceSamplingMetadata;
 
-            // Verify both namespaces have entries.
+            // Verify both namespaces have entries, in sorted order.
             const ordersNs = orders.getFullName();
             const productsNs = products.getFullName();
+            assert.eq(
+                Object.keys(ceSamplingMetadata),
+                [ordersNs, productsNs].sort(),
+                "expected one entry per namespace, in sorted order",
+                {ceSamplingMetadata},
+            );
 
             const validTechniques = ["random", "chunk", "fullCollScan", "seqScan", "strides"];
 
