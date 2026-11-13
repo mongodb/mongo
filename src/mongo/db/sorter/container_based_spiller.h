@@ -601,6 +601,55 @@ public:
         });
     }
 
+    int64_t spillIncrementally(const SortOptions& opts,
+                               const Settings& settings,
+                               std::span<std::pair<Key, Value>> data) override {
+        if (data.empty()) {
+            return 0;
+        }
+
+        return _runWithSpillCallbacks([&]() -> int64_t {
+            // Hold the writer across calls so that the batches written by successive calls
+            // land in one range instead of one range per call.
+            if (!_writer) {
+                _writer = this->_storage->makeWriter(opts, settings);
+            }
+            auto& containerWriter = *static_cast<SortedContainerWriter<Key, Value>*>(_writer.get());
+
+            const auto batch =
+                data.subspan(0, std::min<int64_t>(_batchSize, static_cast<int64_t>(data.size())));
+            int64_t numWritten = 0;
+            int64_t bytesWritten = 0;
+            writeConflictRetry(&_opCtx,
+                               _ru,
+                               "ContainerBasedSpiller::spillIncrementally",
+                               NamespaceString::kEmpty,
+                               [&] {
+                                   WriteUnitOfWork wuow{&_opCtx};
+                                   const auto result =
+                                       containerWriter.addAlreadySortedBatch(batch, _batchBytes);
+                                   numWritten = result.kvPairsWritten;
+                                   bytesWritten = result.bytesWritten;
+                                   wuow.commit();
+                               });
+            _runOnChunkWritten(bytesWritten);
+
+            _current += numWritten;
+            _containerBasedStorage().updateCurrKey(_current);
+
+            if (numWritten == static_cast<int64_t>(data.size())) {
+                // The whole of 'data' has been written: this logical spill is complete.
+                this->_iterators.push_back(_writer->done());
+                _writer.reset();
+                _runOnSpill();
+            } else {
+                _runOnSpillBatch();
+            }
+
+            return numWritten;
+        });
+    }
+
     void mergeSpills(const SortOptions& opts,
                      const Settings& settings,
                      SorterStats& stats,
@@ -862,6 +911,7 @@ private:
     OperationContext& _opCtx;
     RecoveryUnit& _ru;
     std::unique_ptr<SpillCallbacks> _callbacks;
+    std::unique_ptr<SortedStorageWriter<Key, Value>> _writer;
     int64_t _batchSize;
     int64_t _batchBytes;
     int64_t _current;

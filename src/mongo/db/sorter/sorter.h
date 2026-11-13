@@ -504,6 +504,15 @@ public:
         std::priority_queue<Data, std::vector<Data>, Greater<Key, Value, Comparator>>& heap) = 0;
 
     /**
+     * Spills one batch from the front of 'data' and returns the number of elements written.
+     * Repeated calls with the remaining data contribute to the same spill until 'data' is
+     * exhausted, which completes the spill.
+     */
+    virtual int64_t spillIncrementally(const SortOptions& opts,
+                                       const Settings& settings,
+                                       std::span<std::pair<Key, Value>> data) = 0;
+
+    /**
      * Merge the spiller's iterators in groups of at most 'maxSpillsPerMerge' until at most
      * 'numTargetedSpills' remain.
      */
@@ -561,6 +570,13 @@ public:
             heap.pop();
         }
         return writer->done();
+    }
+
+    int64_t spillIncrementally(const SortOptions& opts,
+                               const Settings& settings,
+                               std::span<std::pair<Key, Value>> data) override {
+        spill(opts, settings, data);
+        return static_cast<int64_t>(data.size());
     }
 
     Storage<Key, Value>& getStorage() override {

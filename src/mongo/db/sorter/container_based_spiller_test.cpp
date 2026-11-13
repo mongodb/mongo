@@ -968,6 +968,74 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     EXPECT_EQ(it2->next().first, 125);
 }
 
+TEST_P(ContainerBasedSpillerTest, IncrementalSpillAccumulatesOneRangeAcrossBatches) {
+    auto opCtx = makeOperationContext();
+
+    auto replCoord = dynamic_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(opCtx.get()));
+    ASSERT(replCoord);
+    replCoord->alwaysAllowWrites(true);
+
+    const auto identStr = ident::generateNewInternalIdent("container_incremental_spill"sv);
+    ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
+    SorterContainerStats stats{nullptr};
+
+    ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
+        *opCtx,
+        *shard_role_details::getRecoveryUnit(opCtx.get()),
+        container,
+        stats,
+        boost::none,
+        sorter::kLatestChecksumVersion,
+        nullptr,
+        batchSize(),
+        batchBytes(),
+        testSpillingMinAvailableDiskSpaceBytes};
+
+    // Pre-sorted input, since addAlreadySortedBatch() requires sorted data.
+    std::vector<std::pair<IntWrapper, NullValue>> data;
+    for (int i = 0; i < 10; ++i) {
+        data.push_back({i, {}});
+    }
+
+    // Feeding the whole span incrementally must not finalize a range until the span is fully
+    // consumed, and the batches must accumulate into a single range.
+    size_t consumed = 0;
+    while (consumed < data.size()) {
+        const int64_t written =
+            spiller.spillIncrementally(SortOptions{},
+                                       Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                                       std::span(data).subspan(consumed));
+        ASSERT_GT(written, 0);
+        consumed += static_cast<size_t>(written);
+        if (consumed < data.size()) {
+            EXPECT_TRUE(spiller.iterators().empty())
+                << "range finalized before the whole span was consumed";
+        }
+    }
+    ASSERT_EQ(spiller.iterators().size(), 1u);
+
+    auto it = spiller.iterators()[0];
+    for (int i = 0; i < 10; ++i) {
+        ASSERT_TRUE(it->more());
+        EXPECT_EQ(it->next().first, i);
+    }
+    EXPECT_FALSE(it->more());
+
+    // A subsequent logical spill produces a second, independent range.
+    std::vector<std::pair<IntWrapper, NullValue>> more{{100, {}}, {101, {}}};
+    size_t consumedMore = 0;
+    while (consumedMore < more.size()) {
+        const int64_t written =
+            spiller.spillIncrementally(SortOptions{},
+                                       Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                                       std::span(more).subspan(consumedMore));
+        ASSERT_GT(written, 0);
+        consumedMore += static_cast<size_t>(written);
+    }
+    EXPECT_EQ(spiller.iterators().size(), 2u);
+}
+
 TEST_P(ContainerBasedSpillerTest, SpillWritesAllEntriesAcrossMultipleBatches) {
     auto opCtx = makeOperationContext();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
@@ -2000,6 +2068,50 @@ TEST_F(ContainerBasedSpillerCallbackTest, OnSpillBatchDoesNotFireForSingleBatch)
 
     std::vector<std::pair<IntWrapper, NullValue>> data{{10, {}}, {20, {}}};
     spiller.spill(SortOptions{}, Settings{}, std::span{data});
+}
+
+TEST_F(ContainerBasedSpillerCallbackTest, IncrementalSpillCallbackOrdering) {
+    std::vector<std::string> events;
+    auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
+    EXPECT_CALL(*callbacks, preSpill).WillRepeatedly([&] { events.push_back("preSpill"); });
+    EXPECT_CALL(*callbacks, postSpill).WillRepeatedly([&] { events.push_back("postSpill"); });
+    EXPECT_CALL(*callbacks, onSpill).WillRepeatedly([&] { events.push_back("onSpill"); });
+    EXPECT_CALL(*callbacks, onSpillBatch).WillRepeatedly([&] { events.push_back("onSpillBatch"); });
+    EXPECT_CALL(*callbacks, onChunkWritten).WillRepeatedly([&](int64_t) {
+        events.push_back("onChunkWritten");
+    });
+    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
+
+    // Drives one logical spill: spillIncrementally() calls until the span drains. Each call emits
+    // preSpill, onChunkWritten, onSpillBatch and postSpill, with the final call's onSpillBatch
+    // replaced by onSpill since it completes the range.
+    std::vector<std::string> expected;
+    auto spillIncrementally = [&](std::span<std::pair<IntWrapper, NullValue>> data) {
+        size_t consumed = 0;
+        while (consumed < data.size()) {
+            const auto written =
+                spiller.spillIncrementally(SortOptions{}, Settings{}, data.subspan(consumed));
+            ASSERT_GT(written, 0);
+            consumed += static_cast<size_t>(written);
+            expected.insert(expected.end(),
+                            {"preSpill", "onChunkWritten", "onSpillBatch", "postSpill"});
+        }
+        expected[expected.size() - 2] = "onSpill";
+    };
+
+    // kBatchSize is 4, so the 6-entry span takes two calls and the 2-entry span one.
+    std::vector<std::pair<IntWrapper, NullValue>> data;
+    for (int i = 0; i < 6; ++i) {
+        data.emplace_back(IntWrapper{i}, NullValue{});
+    }
+    spillIncrementally(std::span{data});
+
+    // A second logical spill gets its own single onSpill.
+    std::vector<std::pair<IntWrapper, NullValue>> more{{100, {}}, {101, {}}};
+    spillIncrementally(std::span{more});
+
+    EXPECT_EQ(events, expected);
+    EXPECT_EQ(spiller.iterators().size(), 2u);
 }
 
 TEST_F(ContainerBasedSpillerCallbackTest, PostSpillThrowingWhileUnwindingDoesNotMaskOriginalError) {
