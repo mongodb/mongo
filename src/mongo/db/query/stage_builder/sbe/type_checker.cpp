@@ -348,7 +348,8 @@ TypeSignature TypeChecker::operator()(abt::ABT& n, abt::NaryOp& op, bool saveInf
                             : TypeSignature::kBooleanType;
     } else if (op.op() == abt::Operations::Add) {
         // The signature of the Add is either numeric or date, plus Nothing.
-        TypeSignature sig = {};
+        // Start the fold from the identity element of include(), which is the empty set.
+        TypeSignature sig = TypeSignature::kNoType;
         for (auto& node : op.nodes()) {
             TypeSignature nodeType = node.visit(*this, false);
             sig = sig.include(nodeType);
@@ -357,8 +358,8 @@ TypeSignature TypeChecker::operator()(abt::ABT& n, abt::NaryOp& op, bool saveInf
             .include(sig.intersect(TypeSignature::kNothingType));
     } else if (op.op() == abt::Operations::Mult) {
         // The signature of the Mult is numeric plus Nothing.
-
-        TypeSignature sig = {};
+        // Start the fold from the identity element of include(), which is the empty set.
+        TypeSignature sig = TypeSignature::kNoType;
         for (auto& node : op.nodes()) {
             TypeSignature nodeType = node.visit(*this, false);
             sig = sig.include(nodeType);
@@ -646,7 +647,9 @@ TypeSignature TypeChecker::operator()(abt::ABT& n, abt::If& op, bool saveInferen
 }
 
 TypeSignature TypeChecker::operator()(abt::ABT& n, abt::Switch& op, bool saveInference) {
-    TypeSignature globalType;
+    // Start the fold over the branches from the identity element of include(), which is the
+    // empty set.
+    TypeSignature globalType = TypeSignature::kNoType;
     for (size_t i = 0; i < op.getNumBranches(); i++) {
         // Define a new binding where the variables used inside the condition can be constrained by
         // the assumption that the condition is either true or false.

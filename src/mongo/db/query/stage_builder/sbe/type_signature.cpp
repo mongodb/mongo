@@ -12,6 +12,8 @@ TypeSignature getTypeSignature(sbe::value::TypeTags type) {
 
 TypeSignature TypeSignature::kAnyType = TypeSignature{TypeSignature::AllTypesTag{}};
 
+const TypeSignature TypeSignature::kNoType = TypeSignature{0};
+
 TypeSignature TypeSignature::kBlockType = getTypeSignature(sbe::value::TypeTags::valueBlock);
 
 TypeSignature TypeSignature::kCellType = getTypeSignature(sbe::value::TypeTags::cellBlock);

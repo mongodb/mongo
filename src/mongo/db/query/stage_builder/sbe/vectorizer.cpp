@@ -638,7 +638,7 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::FunctionCa
         TypeSignature typeSignature = TypeSignature::kAnyScalarType;
         // The fail() function aborts the query and never returns a valid value.
         if (arity == 2 && op.fn() == sbe::EFn::kFail) {
-            typeSignature = TypeSignature();
+            typeSignature = TypeSignature::kNoType;
         }
         return {makeABTFunction(op.fn(), std::move(functionArgs)), typeSignature, {}};
     }

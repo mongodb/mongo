@@ -8,8 +8,35 @@
 
 namespace mongo::stage_builder {
 
-// The signature of an expression is the set of all the types that the Value produced at runtime can
-// assume (including TypeTags::Nothing).
+/**
+ * The signature of an expression is the set of all the types that the Value produced at runtime
+ * can assume (including TypeTags::Nothing).
+ *
+ * Signatures form a lattice ordered by set inclusion, where 'isSubset()' is the ordering,
+ * 'include()' is the join and 'intersect()' is the meet:
+ *
+ *                              kAnyType                     top, every type
+ *                             /        \
+ *                            /          \
+ *                   kNumericType      kNullishType   ...    unions of several types
+ *                       /    \          /     \
+ *                      /      \        /       \
+ *            {NumberInt32}    ...   {Null}   kNothingType   atoms, exactly one type
+ *                      \      |       |       /
+ *                       \     |       |      /
+ *                             kNoType                       bottom, the empty set
+ *
+ * The top, 'kAnyType', means nothing is known about the value, so it is the only safe assumption
+ * to make about an expression whose type has not been inferred.
+ *
+ * The bottom, 'kNoType', means the expression never produces a value at all because evaluating it
+ * does not return. It is different from 'kNothingType', which describes an expression that does
+ * return, producing the value Nothing. An expression that returns a value always has at least one
+ * type in its signature.
+ *
+ * TODO SERVER-123894: Make 'kAnyType' the default-constructed value. The default is currently
+ * 'kNoType', which claims the expression never returns rather than that nothing is known about it.
+ */
 struct TypeSignature {
     using MaskType = uint64_t;
     struct AllTypesTag {};
@@ -19,17 +46,24 @@ struct TypeSignature {
 
     static_assert(8 * sizeof(MaskType) > static_cast<size_t>(sbe::value::TypeTags::TypeTagsMax));
 
+    // The mask holding every known type.
+    static constexpr MaskType kAnyTypeMask =
+        (1ull << static_cast<size_t>(sbe::value::TypeTags::TypeTagsMax)) - 1u;
+
     // Predefined constants for common types.
     static TypeSignature kAnyType, kBlockType, kCellType, kAnyScalarType, kAnyBSONType, kArrayType,
         kBooleanType, kDateTimeType, kNothingType, kNullishType, kNumericType, kObjectType,
         kStringType, kCollatableType;
 
+    // The bottom of the lattice, the empty set. Used for an expression that never returns, such as
+    // a call to fail(). It is also the identity element of 'include()'.
+    static const TypeSignature kNoType;
+
     TypeSignature() noexcept = default;
 
     TypeSignature(MaskType mask) noexcept : typesMask(mask) {}
 
-    TypeSignature(AllTypesTag) noexcept
-        : typesMask((1ull << static_cast<size_t>(sbe::value::TypeTags::TypeTagsMax)) - 1u) {}
+    TypeSignature(AllTypesTag) noexcept : typesMask(kAnyTypeMask) {}
 
     bool operator==(const TypeSignature& o) const {
         return o.typesMask == typesMask;
@@ -112,6 +146,9 @@ public:
 private:
     TypeSignature _ts{sentinelMaskVal};
 };
+
+static_assert(TypeSignature::kAnyTypeMask != OptTypeSignature::sentinelMaskVal,
+              "kAnyType must be distinguishable from OptTypeSignature's sentinel value");
 
 // Return the signature corresponding to the given SBE type.
 TypeSignature getTypeSignature(sbe::value::TypeTags type);
