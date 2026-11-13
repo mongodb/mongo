@@ -48,10 +48,16 @@ CollectionMetadata readCollectionMetadataFromDisk(OperationContext* opCtx,
     }
 
     boost::optional<ExpiredHistoryFilter> expiredFilter;
+    boost::optional<Timestamp> historyFloor;
     if (feature_flags::gShardCatalogExpiredHistoryFiltering.isEnabled()) {
         const auto oldestTimestamp =
             opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp();
         expiredFilter = ExpiredHistoryFilter{ShardingState::get(opCtx)->shardId(), oldestTimestamp};
+        // The aggregation may drop chunks whose ownership history is entirely at or below
+        // 'oldestTimestamp'. Record it as the routing table's history floor so that the resulting
+        // filtering metadata refuses to answer PIT ownership lookups below it for keys that fall
+        // in a dropped chunk's range.
+        historyFloor = oldestTimestamp;
     }
 
     auto aggRequest =
@@ -138,7 +144,8 @@ CollectionMetadata readCollectionMetadataFromDisk(OperationContext* opCtx,
                                                  coll->getTimeseriesFields(),
                                                  coll->getReshardingFields(),
                                                  coll->getAllowMigrations(),
-                                                 chunks))};
+                                                 chunks,
+                                                 historyFloor))};
     auto cm = CurrentChunkManager{std::move(rt)};
     return CollectionMetadata{std::move(cm), ShardingState::get(opCtx)->shardId()};
 }

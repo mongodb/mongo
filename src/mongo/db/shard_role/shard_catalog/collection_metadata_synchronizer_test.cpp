@@ -4,6 +4,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_metadata_synchronizer.h"
 
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/chunk.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/read_concern_mongod_gen.h"
@@ -19,6 +20,15 @@
 
 namespace mongo {
 namespace {
+
+// The history floor of the routing table behind 'metadata', or boost::none if it has no routing
+// table (untracked) or its history is complete.
+boost::optional<Timestamp> historyFloorOf(const CollectionMetadata& metadata) {
+    if (!metadata.hasRoutingTable()) {
+        return boost::none;
+    }
+    return metadata.getChunkManager()->getRoutingTableHistory_forTest().getHistoryFloor();
+}
 
 const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
@@ -127,6 +137,31 @@ void assertChunkPresent(const CollectionMetadata& metadata, const ChunkType& chu
                   chunk.getMax(),
                   chunk.getShard(),
                   chunk.getVersion());
+}
+
+// Asserts that two routing tables describe the same chunks (bounds, owning shard, version) in the
+// same order and agree on the collection placement version.
+void assertRoutingTablesEqual(const CollectionMetadata& lhs, const CollectionMetadata& rhs) {
+    ASSERT_EQ(lhs.getChunkManager()->numChunks(), rhs.getChunkManager()->numChunks());
+    ASSERT_EQ(lhs.getCollPlacementVersion(), rhs.getCollPlacementVersion());
+
+    std::vector<Chunk> rhsChunks;
+    rhs.getChunkManager()->forEachChunk([&](const Chunk& chunk) {
+        rhsChunks.push_back(chunk);
+        return true;
+    });
+
+    size_t seen = 0;
+    lhs.getChunkManager()->forEachChunk([&](const Chunk& chunk) {
+        ASSERT_LT(seen, rhsChunks.size());
+        ASSERT_BSONOBJ_EQ(chunk.getMin(), rhsChunks[seen].getMin());
+        ASSERT_BSONOBJ_EQ(chunk.getMax(), rhsChunks[seen].getMax());
+        ASSERT_EQ(chunk.getShardId(), rhsChunks[seen].getShardId());
+        ASSERT_EQ(chunk.getLastmod(), rhsChunks[seen].getLastmod());
+        seen++;
+        return true;
+    });
+    ASSERT_EQ(rhsChunks.size(), seen);
 }
 
 class MetadataSynchronizerFixture : public ShardServerTestFixture {
@@ -306,6 +341,177 @@ TEST_F(MetadataSynchronizerFixture, RecoveryKeepsExpiredHistoricalChunksWhenFlag
               chunks.retained.size() + chunks.expired.size());
 }
 
+// The history floor stored on the recovered metadata is exactly the timestamp the filter skipped
+// against: the storage engine's oldest at the moment of the recovery. The boundary matches the
+// skip predicate (unowned chunks with onCurrentShardSince <= floor are dropped), and every
+// recovery re-evaluates both against the node's own oldest.
+TEST_F(MetadataSynchronizerFixture,
+       RecoveryStoresHistoryFloorEqualToOldestTimestampUsedForSkipping) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagShardCatalogExpiredHistoryFiltering",
+                                               true};
+    OperationContext* opCtx = operationContext();
+    const auto chunks = seedMixedHistoryCollection(opCtx);
+
+    setOldestTimestamp(kOldest);
+    const auto metadata = recoverMetadata(opCtx);
+
+    ASSERT_TRUE(historyFloorOf(metadata).has_value());
+    ASSERT_EQ(kOldest, *historyFloorOf(metadata));
+    for (const auto& chunk : chunks.retained) {
+        assertChunkPresent(metadata, chunk);
+    }
+    for (const auto& chunk : chunks.expired) {
+        ASSERT_THROWS(
+            metadata.getChunkManager()->findIntersectingChunkWithSimpleCollation(chunk.getMin()),
+            DBException);
+    }
+
+    // A second recovery re-evaluates the skip against the node's own oldest: raising oldest to
+    // kAbove raises the stored floor and expires the previously-reachable unowned chunk B
+    // (onCurrentShardSince == kAbove) along with everything already expired.
+    setOldestTimestamp(kAbove);
+    const auto recoveredAgain = recoverMetadata(opCtx);
+    ASSERT_TRUE(historyFloorOf(recoveredAgain).has_value());
+    ASSERT_EQ(kAbove, *historyFloorOf(recoveredAgain));
+    for (const auto& chunk : chunks.retained) {
+        const bool nowExpired = chunk.getShard() == kOtherShard && chunk.getOnCurrentShardSince() &&
+            *chunk.getOnCurrentShardSince() == kAbove;
+        if (nowExpired) {
+            ASSERT_THROWS(
+                recoveredAgain.getChunkManager()->findIntersectingChunkWithSimpleCollation(
+                    chunk.getMin()),
+                DBException);
+        } else {
+            assertChunkPresent(recoveredAgain, chunk);
+        }
+    }
+    ASSERT_EQ(recoveredAgain.getChunkManager()->numChunks(), chunks.retained.size() - 1);
+}
+
+// The filtering information recovered with skipping equals the information recovered over a copy
+// of the catalog with the expired chunk documents removed, plus the floor: the routing tables are
+// identical and the floor is the only difference between the two metadata objects.
+TEST_F(MetadataSynchronizerFixture,
+       RecoveryWithFilteringEqualsRecoveryOverCopyWithExpiredChunksRemoved) {
+    OperationContext* opCtx = operationContext();
+    const auto chunks = seedMixedHistoryCollection(opCtx);
+
+    CollectionMetadata filtered;
+    {
+        unittest::ServerParameterGuard featureFlag{"featureFlagShardCatalogExpiredHistoryFiltering",
+                                                   true};
+        setOldestTimestamp(kOldest);
+        filtered = recoverMetadata(opCtx);
+    }
+
+    // Remove exactly the documents the filter skipped.
+    {
+        DBDirectClient client(opCtx);
+        for (const auto& chunk : chunks.expired) {
+            client.remove(NamespaceString::kConfigShardCatalogChunksNamespace,
+                          BSON(ChunkType::name.name() << chunk.getName()));
+        }
+    }
+
+    CollectionMetadata pruned;
+    {
+        unittest::ServerParameterGuard featureFlag{"featureFlagShardCatalogExpiredHistoryFiltering",
+                                                   false};
+        pruned = recoverMetadata(opCtx);
+    }
+
+    assertRoutingTablesEqual(filtered, pruned);
+    ASSERT_TRUE(historyFloorOf(filtered).has_value());
+    ASSERT_EQ(kOldest, *historyFloorOf(filtered));
+    ASSERT_EQ(boost::none, historyFloorOf(pruned));
+}
+
+// With the filter disabled nothing is removed, so the filtering information is complete and no
+// floor is recorded.
+TEST_F(MetadataSynchronizerFixture, RecoveryStoresNoHistoryFloorWhenFlagDisabled) {
+    OperationContext* opCtx = operationContext();
+    seedMixedHistoryCollection(opCtx);
+    setOldestTimestamp(kOldest);
+
+    const auto metadata = recoverMetadata(opCtx);
+
+    ASSERT_EQ(boost::none, historyFloorOf(metadata));
+}
+
+// The floor is computed once per recovery, not per skipped document: even when nothing is filtered
+// away (all chunks owned), the recovered metadata still records the floor, so reads below it can
+// never be answered as if the information were complete.
+TEST_F(MetadataSynchronizerFixture, RecoveryStoresHistoryFloorEvenWhenNoChunkIsFiltered) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagShardCatalogExpiredHistoryFiltering",
+                                               true};
+    OperationContext* opCtx = operationContext();
+    const int numChunks = 5;
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, kMyShardName);
+    seedShardCatalogOnDisk(opCtx, collType, chunks);
+    setOldestTimestamp(kOldest);
+
+    const auto metadata = recoverMetadata(opCtx);
+
+    ASSERT_EQ(numChunks, metadata.getChunkManager()->numChunks());
+    ASSERT_TRUE(historyFloorOf(metadata).has_value());
+    ASSERT_EQ(kOldest, *historyFloorOf(metadata));
+}
+
+// A delta applied on top of a filtered, floored metadata carries the floor through unchanged: the
+// incremental update neither loses the floor nor changes its value.
+TEST_F(MetadataSynchronizerFixture, DeltaAppliedOnFilteredMetadataCarriesHistoryFloorUnchanged) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagShardCatalogExpiredHistoryFiltering",
+                                               true};
+    OperationContext* opCtx = operationContext();
+    const auto chunks = seedMixedHistoryCollection(opCtx);
+    setOldestTimestamp(kOldest);
+
+    CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
+    synchronizer.start(opCtx, getExecutor());
+
+    // A delta splitting the retained owned chunk A [MinKey,0) at -25. Its versions are stamped from
+    // the recovered table's placement version (the highest retained version) so it applies as
+    // newer.
+    const auto& chunkA = chunks.retained.front();
+    auto nextVersion = [v = chunks.retained.back().getVersion()]() mutable {
+        v.incMajor();
+        return v;
+    };
+    const auto lowVersion = nextVersion();
+    const auto highVersion = nextVersion();
+    synchronizer.onOplogEntry(lastWrittenTimestamp() + 1,
+                              makeDeltaEntry({makeChunk(chunkA.getCollectionUUID(),
+                                                        chunkA.getMin(),
+                                                        shardKey(-25),
+                                                        lowVersion,
+                                                        kMyShardName),
+                                              makeChunk(chunkA.getCollectionUUID(),
+                                                        shardKey(-25),
+                                                        chunkA.getMax(),
+                                                        highVersion,
+                                                        kMyShardName)}));
+
+    ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(opCtx));
+    auto collMetadata = synchronizer.drainAndApply(opCtx);
+    ASSERT_TRUE(collMetadata);
+
+    // The delta was applied on top of the filtered table and the expired chunks stayed filtered.
+    ASSERT_EQ(highVersion, collMetadata->getCollPlacementVersion());
+    assertChunkAt(
+        *collMetadata, shardKey(-40), chunkA.getMin(), shardKey(-25), kMyShardName, lowVersion);
+    assertChunkAt(
+        *collMetadata, shardKey(-10), shardKey(-25), chunkA.getMax(), kMyShardName, highVersion);
+    for (const auto& chunk : chunks.expired) {
+        ASSERT_THROWS(collMetadata->getChunkManager()->findIntersectingChunkWithSimpleCollation(
+                          chunk.getMin()),
+                      DBException);
+    }
+
+    // The floor rode along unchanged.
+    ASSERT_TRUE(historyFloorOf(*collMetadata).has_value());
+    ASSERT_EQ(kOldest, *historyFloorOf(*collMetadata));
+}
+
 TEST_F(MetadataSynchronizerFixture, QueryableBackupModeRecoversFromLocalCatalogWithoutExecutor) {
     OperationContext* opCtx = operationContext();
     const auto originalQueryableBackupMode = storageGlobalParams.queryableBackupMode;
@@ -404,6 +610,8 @@ TEST_F(MetadataSynchronizerFixture, MetadataSynchronizerCanRecoverFromDiskAnUntr
     ASSERT_TRUE(collMetadata);
 
     ASSERT_FALSE(collMetadata->isSharded());
+    // Untracked metadata is complete by definition: no history floor is recorded.
+    ASSERT_EQ(boost::none, historyFloorOf(*collMetadata));
 }
 
 // A delta that arrives during recovery is applied on top of the metadata recovered from disk.

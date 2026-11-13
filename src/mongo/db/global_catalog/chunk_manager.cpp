@@ -12,6 +12,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/s/query/shard_targeting_collation_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -773,7 +774,8 @@ RoutingTableHistory::RoutingTableHistory(
     boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
     bool allowMigrations,
-    ChunkMap chunkMap)
+    ChunkMap chunkMap,
+    boost::optional<Timestamp> historyFloor)
     : _nss(std::move(nss)),
       _uuid(std::move(uuid)),
       _shardKeyPattern(std::move(shardKeyPattern)),
@@ -783,7 +785,8 @@ RoutingTableHistory::RoutingTableHistory(
       _timeseriesFields(std::move(timeseriesFields)),
       _reshardingFields(std::move(reshardingFields)),
       _allowMigrations(allowMigrations),
-      _chunkMap(std::move(chunkMap)) {}
+      _chunkMap(std::move(chunkMap)),
+      _historyFloor(std::move(historyFloor)) {}
 
 Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
                                           const BSONObj& collation,
@@ -811,6 +814,14 @@ Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
     return Chunk(*chunkInfo, _clusterTime);
 }
 
+void ChunkManager::_throwOwnershipUnknownBelowHistoryFloor(const BSONObj& shardKey) const {
+    const auto& floor = _rt->optRt->getHistoryFloor();
+    uasserted(ErrorCodes::StaleChunkHistory,
+              str::stream() << "Ownership history for " << _rt->optRt->nss().toStringForErrorMsg()
+                            << " below " << floor->toString() << " is not available on this shard; "
+                            << "cannot filter reads at " << _clusterTime->toString());
+}
+
 bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& shardId) const {
     tassert(7626419, "Expected routing table to be initialized", _rt->optRt);
 
@@ -821,6 +832,11 @@ bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& sha
     const auto& chunkMap = _rt->optRt->_chunkMap;
     auto it = chunkMap.find(shardKey);
     if (it == chunkMap.end()) {
+        // The key matches no chunk. Below the history floor, the history information for currently
+        // unowned chunks is unknown, so we must throw `StaleChunkHistory`.
+        if (_isBelowHistoryFloor()) {
+            _throwOwnershipUnknownBelowHistoryFloor(shardKey);
+        }
         return false;
     }
 
@@ -840,6 +856,21 @@ ChunkManager::ChunkOwnership ChunkManager::nearestOwnedChunk(const BSONObj& shar
     const auto& chunkMap = _rt->optRt->_chunkMap;
     const auto rawIt = chunkMap.find(shardKey);
     const bool keyIsInGap = rawIt == chunkMap.end() && chunkMap.allowGaps();
+    const bool belowHistoryFloor = _isBelowHistoryFloor();
+
+    // Unlike keyBelongsToShard(), this scan does not just answer for 'shardKey': it reports the
+    // nearest chunk owned by 'shardId', treating everything it steps over as not owned. Below the
+    // history floor a gap is not known to be unowned, so both the key landing in one and the scan
+    // stepping across one make the answer unknown.
+    if (belowHistoryFloor && keyIsInGap) {
+        _throwOwnershipUnknownBelowHistoryFloor(shardKey);
+    }
+    const auto throwIfGapBetween = [&](const ChunkInfo& left, const ChunkInfo& right) {
+        if (left.getMaxKeyString() != ShardKeyPattern::toKeyString(right.getMin())) {
+            _throwOwnershipUnknownBelowHistoryFloor(shardKey);
+        }
+    };
+
     auto it = keyIsInGap ? chunkMap.findClosestInDirection(shardKey, direction) : rawIt;
     if (it == chunkMap.end()) {
         return {false, boost::none};
@@ -858,7 +889,9 @@ ChunkManager::ChunkOwnership ChunkManager::nearestOwnedChunk(const BSONObj& shar
         if (keyIsInGap && (*it)->getShardIdAt(_clusterTime) == shardId) {
             nearestOwnedChunk.emplace(*(*it).get(), _clusterTime);
         } else {
+            auto previous = *it;
             do {
+                previous = *it;
                 switch (direction) {
                     case ChunkMap::Direction::Forward: {
                         it++;
@@ -871,7 +904,23 @@ ChunkManager::ChunkOwnership ChunkManager::nearestOwnedChunk(const BSONObj& shar
                     default:
                         MONGO_UNREACHABLE_TASSERT(9526306);
                 }
+
+                if (belowHistoryFloor && it != end) {
+                    direction == ChunkMap::Direction::Forward ? throwIfGapBetween(*previous, **it)
+                                                              : throwIfGapBetween(**it, *previous);
+                }
             } while (it != end && it->getShardIdAt(_clusterTime) != shardId);
+
+            if (it == end && belowHistoryFloor) {
+                // The scan ran off the table. Unless the last chunk visited reaches the edge of
+                // the key space, the range beyond it is a gap whose ownership is unknown.
+                const bool reachesEdge = direction == ChunkMap::Direction::Forward
+                    ? ChunkMap::allElementsAreOfType(BSONType::maxKey, previous->getMax())
+                    : ChunkMap::allElementsAreOfType(BSONType::minKey, previous->getMin());
+                if (!reachesEdge) {
+                    _throwOwnershipUnknownBelowHistoryFloor(shardKey);
+                }
+            }
 
             if (it != end) {
                 nearestOwnedChunk.emplace(*(*it).get(), _clusterTime);
@@ -1067,7 +1116,8 @@ RoutingTableHistory RoutingTableHistory::makeNew(
         std::move(reshardingFields),
         allowMigrations,
         ChunkMap{epoch, timestamp, static_cast<size_t>(gRoutingTableCacheChunkBucketSize)}
-            .createMerged(std::move(changedChunkInfos)));
+            .createMerged(std::move(changedChunkInfos)),
+        boost::none /* historyFloor */);
 }
 
 RoutingTableHistory RoutingTableHistory::makeNewAllowingGaps(
@@ -1082,7 +1132,8 @@ RoutingTableHistory RoutingTableHistory::makeNewAllowingGaps(
     boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
     bool allowMigrations,
-    const std::vector<ChunkType>& chunks) {
+    const std::vector<ChunkType>& chunks,
+    boost::optional<Timestamp> historyFloor) {
 
     auto changedChunkInfos = flatten(chunks);
 
@@ -1097,7 +1148,8 @@ RoutingTableHistory RoutingTableHistory::makeNewAllowingGaps(
         std::move(reshardingFields),
         allowMigrations,
         ChunkMap{epoch, timestamp, static_cast<size_t>(gRoutingTableCacheChunkBucketSize), true}
-            .createMerged(std::move(changedChunkInfos)));
+            .createMerged(std::move(changedChunkInfos)),
+        std::move(historyFloor));
 }
 
 // Note that any new parameters added to RoutingTableHistory::makeUpdated() must also be added to
@@ -1126,7 +1178,8 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
                                std::move(timeseriesFields),
                                std::move(reshardingFields),
                                allowMigrations,
-                               std::move(chunkMap));
+                               std::move(chunkMap),
+                               _historyFloor);
 }
 
 Atomic<uint64_t> ComparableChunkVersion::_epochDisambiguatingSequenceNumSource{1ULL};

@@ -26,6 +26,15 @@
 namespace mongo {
 namespace {
 
+// The history floor of the routing table behind 'metadata', or boost::none if it has no routing
+// table (untracked) or its history is complete.
+boost::optional<Timestamp> historyFloorOf(const CollectionMetadata& metadata) {
+    if (!metadata.hasRoutingTable()) {
+        return boost::none;
+    }
+    return metadata.getChunkManager()->getRoutingTableHistory_forTest().getHistoryFloor();
+}
+
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
 const ShardId kThisShard("thisShard");
@@ -125,7 +134,8 @@ ChunkType makeChangedChunk(const CollectionMetadata& metadata,
 // back-filled with kOtherShard chunks.
 CollectionMetadata makeGappedCollectionMetadata(
     const KeyPattern& shardKeyPattern,
-    const std::vector<std::pair<BSONObj, BSONObj>>& ownedChunks) {
+    const std::vector<std::pair<BSONObj, BSONObj>>& ownedChunks,
+    boost::optional<Timestamp> historyFloor = boost::none) {
     const OID epoch = OID::gen();
     const Timestamp timestamp(1, 1);
     const UUID uuid = UUID::gen();
@@ -153,7 +163,8 @@ CollectionMetadata makeGappedCollectionMetadata(
                                                  /*timeseriesFields=*/boost::none,
                                                  /*reshardingFields=*/boost::none,
                                                  true,
-                                                 chunks));
+                                                 chunks,
+                                                 std::move(historyFloor)));
     return CollectionMetadata(CurrentChunkManager(std::move(routingTableHistory)), kThisShard);
 }
 
@@ -420,6 +431,34 @@ TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedWithEmptyDeltaIsNoOp) {
     ASSERT_EQ(metadata.getChunkManager()->numChunks(),
               updatedMetadata.getChunkManager()->numChunks());
     ASSERT(updatedMetadata.keyBelongsToMe(BSON("a" << 15)));
+}
+
+// The history floor is a property of the filtering information the metadata was built from, so
+// incremental updates applied on top of it (makeUpdated) must carry it through unchanged: neither
+// losing it (which would let reads below it be answered from incomplete information) nor changing
+// its value.
+TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedCarriesHistoryFloorUnchanged) {
+    // Metadata built without any filtering information removed carries no floor, and neither does
+    // the untracked placeholder.
+    ASSERT_EQ(boost::none, historyFloorOf(makeTrackedCollectionMetadata()));
+    ASSERT_EQ(boost::none, historyFloorOf(CollectionMetadata::UNTRACKED()));
+
+    const Timestamp kFloor(100, 0);
+    auto metadata = makeGappedCollectionMetadata(
+        KeyPattern(BSON("a" << 1)), {std::make_pair(BSON("a" << 10), BSON("a" << 20))}, kFloor);
+    ASSERT_TRUE(historyFloorOf(metadata).has_value());
+    ASSERT_EQ(kFloor, *historyFloorOf(metadata));
+
+    auto changedChunk =
+        makeChangedChunk(metadata, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, kOtherShard);
+    auto updatedMetadata = metadata.makeUpdated({changedChunk});
+    ASSERT_TRUE(historyFloorOf(updatedMetadata).has_value());
+    ASSERT_EQ(kFloor, *historyFloorOf(updatedMetadata));
+
+    // An applied delta and a no-op delta alike keep the floor.
+    auto unchangedMetadata = updatedMetadata.makeUpdated({});
+    ASSERT_TRUE(historyFloorOf(unchangedMetadata).has_value());
+    ASSERT_EQ(kFloor, *historyFloorOf(unchangedMetadata));
 }
 
 TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedSelectsMaxVersionRegardlessOfOrder) {

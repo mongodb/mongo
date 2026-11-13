@@ -383,7 +383,8 @@ public:
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
         bool allowMigrations,
-        const std::vector<ChunkType>& chunks);
+        const std::vector<ChunkType>& chunks,
+        boost::optional<Timestamp> historyFloor = boost::none);
 
     /**
      * Constructs a new instance with a routing table updated according to the changes described
@@ -467,6 +468,16 @@ public:
         return _chunkMap.allowGaps();
     }
 
+    /**
+     * Marks the end of the ownership history held by this routing table: chunks whose ownership
+     * history entries are all at or below this timestamp may be entirely absent from the table. The
+     * absence of a history entry at a cluster time below the floor therefore means "the history is
+     * incomplete", not "the shard did not own the chunk".
+     */
+    boost::optional<Timestamp> getHistoryFloor() const {
+        return _historyFloor;
+    }
+
     template <typename Callable>
     void forEachChunk(Callable&& handler, const BSONObj& shardKey = BSONObj()) const {
         _chunkMap.forEach(std::forward<Callable>(handler), shardKey);
@@ -544,7 +555,8 @@ private:
                         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
                         boost::optional<TypeCollectionReshardingFields> reshardingFields,
                         bool allowMigrations,
-                        ChunkMap chunkMap);
+                        ChunkMap chunkMap,
+                        boost::optional<Timestamp> historyFloor);
 
     PlacementVersionTargetingInfo _getVersion(const ShardId& shardId) const;
 
@@ -580,6 +592,10 @@ private:
     // Map from the max for each chunk to an entry describing the chunk. The union of all chunks'
     // ranges must cover the complete space from [MinKey, MaxKey).
     ChunkMap _chunkMap;
+
+    // The end of the ownership history held by _chunkMap, or boost::none if it is complete. See
+    // getHistoryFloor().
+    boost::optional<Timestamp> _historyFloor;
 };
 
 /**
@@ -1051,6 +1067,31 @@ public:
 protected:
     ChunkManager(RoutingTableHistoryValueHandle rt, boost::optional<Timestamp> clusterTime)
         : _rt(std::move(rt)), _clusterTime(std::move(clusterTime)) {}
+
+    /**
+     * Returns true if this chunk manager is pinned to a cluster time strictly below the routing
+     * table's history floor, i.e. if a key that matches no chunk may be one whose chunk was
+     * dropped by the expired-history filter rather than one this shard did not own.
+     *
+     * Chunks that are present in the table remain authoritative at any cluster time: their own
+     * ownership history is complete down to its earliest entry, and ChunkInfo::getShardIdAt()
+     * throws StaleChunkHistory when asked below it. Only the gaps are unknown, so this returning
+     * true does not by itself make an ownership question unanswerable.
+     */
+    bool _isBelowHistoryFloor() const {
+        if (!_clusterTime || !_rt->optRt) {
+            return false;
+        }
+        const auto& floor = _rt->optRt->getHistoryFloor();
+        return floor && *_clusterTime < *floor;
+    }
+
+    /**
+     * Throws StaleChunkHistory to report that this shard cannot tell whether it owned 'shardKey'
+     * at this chunk manager's cluster time, because the chunk covering it may have been dropped
+     * from the routing table. Only valid to call when _isBelowHistoryFloor() is true.
+     */
+    [[noreturn]] void _throwOwnershipUnknownBelowHistoryFloor(const BSONObj& shardKey) const;
 
     RoutingTableHistoryValueHandle _rt;
     boost::optional<Timestamp> _clusterTime;

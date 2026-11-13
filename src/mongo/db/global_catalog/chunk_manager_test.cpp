@@ -169,7 +169,9 @@ public:
 
     // Builds a CurrentChunkManager over a gap-allowing routing table, wrapping it the same way
     // CurrentChunkManager::makeUpdated does internally.
-    CurrentChunkManager makeCmAllowingGaps(const std::vector<ChunkType>& chunks) const {
+    CurrentChunkManager makeCmAllowingGaps(
+        const std::vector<ChunkType>& chunks,
+        boost::optional<Timestamp> historyFloor = boost::none) const {
         auto rt = RoutingTableHistory::makeNewAllowingGaps(kNss,
                                                            _collUUID,
                                                            _shardKeyPattern,
@@ -181,7 +183,8 @@ public:
                                                            /*timeseriesFields=*/boost::none,
                                                            /*reshardingFields=*/boost::none,
                                                            true,
-                                                           chunks);
+                                                           chunks,
+                                                           std::move(historyFloor));
         auto version = rt.getVersion();
         auto handle = RoutingTableHistoryValueHandle(
             std::make_shared<RoutingTableHistory>(std::move(rt)),
@@ -276,6 +279,228 @@ TEST_F(CurrentChunkManagerUpdateTest, NearestOwnedChunkBackwardFromGapBetweenChu
     ASSERT_FALSE(result.containsShardKey);
     ASSERT_TRUE(result.nearestOwnedChunk.has_value());
     ASSERT_BSONOBJ_EQ(result.nearestOwnedChunk->getMax(), key(10));
+}
+
+// A routing table built by the shard catalog with the expired-history filter enabled carries a
+// history floor and may be missing chunks whose ownership history is entirely expired. The tests
+// below pin what a point-in-time chunk manager over such a table may and may not answer: chunks
+// that are present answer for themselves at any cluster time (their own history is complete, and
+// ChunkInfo::getShardIdAt throws if it does not reach back far enough), while a key that matches
+// no chunk is unknown below the floor rather than "not owned".
+class PointInTimeHistoryFloorTest : public CurrentChunkManagerUpdateTest {
+public:
+    // A chunk owned by 'shard' since 'onCurrentShardSince', with a single history entry, as the
+    // shard catalog stores it.
+    ChunkType makeChunkOwnedSince(const BSONObj& min,
+                                  const BSONObj& max,
+                                  const ChunkVersion& version,
+                                  const ShardId& shard,
+                                  Timestamp onCurrentShardSince) const {
+        auto chunk = makeChunk(min, max, version, shard);
+        chunk.setOnCurrentShardSince(onCurrentShardSince);
+        chunk.setHistory({ChunkHistory(onCurrentShardSince, shard)});
+        return chunk;
+    }
+
+    static constexpr auto kFloorSecs = 100;
+    const Timestamp kFloor{kFloorSecs, 0};
+    const Timestamp kBelowFloor{kFloorSecs - 50, 0};
+    const Timestamp kAtFloor = kFloor;
+};
+
+// The motivating case: this shard has owned [10, 20) since well before the floor, so its ownership
+// at a cluster time below the floor is known from the chunk's own history. The floor must not
+// refuse it.
+TEST_F(PointInTimeHistoryFloorTest, PresentChunkAnswersBelowFloor) {
+    auto cm = makeCmAllowingGaps(
+        {makeChunkOwnedSince(key(10), key(20), chunkVersion(1, 0), kThisShard, Timestamp(1, 0))},
+        kFloor);
+    auto pit = PointInTimeChunkManager::make(cm, kBelowFloor);
+
+    ASSERT_TRUE(pit.keyBelongsToShard(key(15), kThisShard));
+
+    // A key inside a present, owned chunk is answered without any scan.
+    auto result = pit.nearestOwnedChunk(key(15), kThisShard, ChunkMap::Direction::Forward);
+    ASSERT_TRUE(result.containsShardKey);
+    ASSERT_TRUE(result.nearestOwnedChunk.has_value());
+    ASSERT_BSONOBJ_EQ(result.nearestOwnedChunk->getMin(), key(10));
+}
+
+// Same table, but the chunk's own history does not reach the requested cluster time. The chunk,
+// not the floor, is what refuses -- and it does so with the same error.
+TEST_F(PointInTimeHistoryFloorTest, PresentChunkWithInsufficientHistoryThrowsBelowFloor) {
+    auto cm = makeCmAllowingGaps(
+        {makeChunkOwnedSince(key(10), key(20), chunkVersion(1, 0), kThisShard, Timestamp(80, 0))},
+        kFloor);
+    auto pit = PointInTimeChunkManager::make(cm, Timestamp(60, 0));
+
+    ASSERT_THROWS_CODE(pit.keyBelongsToShard(key(15), kThisShard),
+                       AssertionException,
+                       ErrorCodes::StaleChunkHistory);
+}
+
+// A key in a gap is unknown below the floor: the chunk covering it may have been dropped by the
+// expired-history filter while this shard still owned it at that cluster time.
+TEST_F(PointInTimeHistoryFloorTest, GapThrowsBelowFloor) {
+    auto cm = makeCmAllowingGaps(
+        {makeChunkOwnedSince(key(10), key(20), chunkVersion(1, 0), kThisShard, Timestamp(1, 0))},
+        kFloor);
+    auto pit = PointInTimeChunkManager::make(cm, kBelowFloor);
+
+    ASSERT_THROWS_CODE(pit.keyBelongsToShard(key(50), kThisShard),
+                       AssertionException,
+                       ErrorCodes::StaleChunkHistory);
+}
+
+// At or above the floor every dropped chunk provably moved away no later than the floor, so a gap
+// means "not owned" and is answered normally.
+TEST_F(PointInTimeHistoryFloorTest, GapIsNotOwnedAtFloor) {
+    auto cm = makeCmAllowingGaps(
+        {makeChunkOwnedSince(key(10), key(20), chunkVersion(1, 0), kThisShard, Timestamp(1, 0))},
+        kFloor);
+    auto pit = PointInTimeChunkManager::make(cm, kAtFloor);
+
+    ASSERT_FALSE(pit.keyBelongsToShard(key(50), kThisShard));
+    // The floor is exclusive on the scan path too.
+    ASSERT_FALSE(
+        pit.nearestOwnedChunk(key(50), kThisShard, ChunkMap::Direction::Backward).containsShardKey);
+}
+
+// Without a floor (nothing was filtered out of the table) gaps are authoritative at any cluster
+// time.
+TEST_F(PointInTimeHistoryFloorTest, GapIsNotOwnedWithoutFloor) {
+    auto cm = makeCmAllowingGaps(
+        {makeChunkOwnedSince(key(10), key(20), chunkVersion(1, 0), kThisShard, Timestamp(1, 0))});
+    auto pit = PointInTimeChunkManager::make(cm, kBelowFloor);
+
+    ASSERT_FALSE(pit.keyBelongsToShard(key(50), kThisShard));
+    // Likewise for the scan: a gap key is answered, not refused.
+    ASSERT_FALSE(
+        pit.nearestOwnedChunk(key(50), kThisShard, ChunkMap::Direction::Backward).containsShardKey);
+}
+
+// The floor only constrains point-in-time reads; the current chunk manager over the same table is
+// unaffected.
+TEST_F(PointInTimeHistoryFloorTest, CurrentChunkManagerIgnoresFloor) {
+    auto cm = makeCmAllowingGaps(
+        {makeChunkOwnedSince(key(10), key(20), chunkVersion(1, 0), kThisShard, Timestamp(1, 0))},
+        kFloor);
+
+    ASSERT_FALSE(cm.keyBelongsToShard(key(50), kThisShard));
+    ASSERT_TRUE(cm.keyBelongsToShard(key(15), kThisShard));
+    ASSERT_FALSE(
+        cm.nearestOwnedChunk(key(50), kThisShard, ChunkMap::Direction::Backward).containsShardKey);
+    ASSERT_TRUE(
+        cm.nearestOwnedChunk(key(15), kThisShard, ChunkMap::Direction::Forward).containsShardKey);
+}
+
+// nearestOwnedChunk reports the nearest owned chunk by stepping over everything in between, so
+// below the floor it must refuse when the key itself is in a gap...
+TEST_F(PointInTimeHistoryFloorTest, NearestOwnedChunkThrowsForGapKeyBelowFloor) {
+    auto cm = makeCmAllowingGaps(
+        {makeChunkOwnedSince(key(10), key(20), chunkVersion(1, 0), kThisShard, Timestamp(1, 0))},
+        kFloor);
+    auto pit = PointInTimeChunkManager::make(cm, kBelowFloor);
+
+    ASSERT_THROWS_CODE(pit.nearestOwnedChunk(key(50), kThisShard, ChunkMap::Direction::Forward),
+                       AssertionException,
+                       ErrorCodes::StaleChunkHistory);
+}
+
+// ...and when the scan steps across a gap on its way to the nearest owned chunk, since the skipped
+// range is not known to be unowned at that cluster time.
+TEST_F(PointInTimeHistoryFloorTest, NearestOwnedChunkThrowsWhenScanCrossesGapBelowFloor) {
+    const ShardId kOtherShard{"otherShard"};
+    // Symmetric around the gap, so each direction has an owned chunk waiting on the far side of it.
+    auto cm = makeCmAllowingGaps(
+        {makeChunkOwnedSince(key(0), key(10), chunkVersion(1, 0), kThisShard, Timestamp(1, 0)),
+         makeChunkOwnedSince(key(10), key(20), chunkVersion(1, 1), kOtherShard, Timestamp(1, 0)),
+         // Gap at [20, 30): a chunk dropped by the expired-history filter.
+         makeChunkOwnedSince(key(30), key(40), chunkVersion(1, 2), kOtherShard, Timestamp(1, 0)),
+         makeChunkOwnedSince(key(40), key(50), chunkVersion(1, 3), kThisShard, Timestamp(1, 0))},
+        kFloor);
+    auto pit = PointInTimeChunkManager::make(cm, kBelowFloor);
+
+    for (auto direction : {ChunkMap::Direction::Forward, ChunkMap::Direction::Backward}) {
+        // Start on the near side of the gap, in a chunk owned by the other shard.
+        const auto startKey = direction == ChunkMap::Direction::Forward ? key(15) : key(35);
+        ASSERT_THROWS_CODE(pit.nearestOwnedChunk(startKey, kThisShard, direction),
+                           AssertionException,
+                           ErrorCodes::StaleChunkHistory);
+    }
+}
+
+// A scan that never crosses a gap is answered below the floor: the chunks it steps over are all
+// present and authoritative.
+TEST_F(PointInTimeHistoryFloorTest, NearestOwnedChunkAnswersWhenScanCrossesNoGapBelowFloor) {
+    const ShardId kOtherShard{"otherShard"};
+    // Contiguous, with an owned chunk on either side of the key's chunk. Stepping over a contiguous
+    // neighbour must not be mistaken for a gap, whichever way the scan goes.
+    auto cm = makeCmAllowingGaps(
+        {makeChunkOwnedSince(key(0), key(10), chunkVersion(1, 0), kThisShard, Timestamp(1, 0)),
+         makeChunkOwnedSince(key(10), key(20), chunkVersion(1, 1), kOtherShard, Timestamp(1, 0)),
+         makeChunkOwnedSince(key(20), key(30), chunkVersion(1, 2), kOtherShard, Timestamp(1, 0)),
+         makeChunkOwnedSince(key(30), key(40), chunkVersion(1, 3), kThisShard, Timestamp(1, 0))},
+        kFloor);
+    auto pit = PointInTimeChunkManager::make(cm, kBelowFloor);
+
+    for (auto direction : {ChunkMap::Direction::Forward, ChunkMap::Direction::Backward}) {
+        auto result = pit.nearestOwnedChunk(key(15), kThisShard, direction);
+        ASSERT_FALSE(result.containsShardKey);
+        ASSERT_TRUE(result.nearestOwnedChunk.has_value());
+        ASSERT_BSONOBJ_EQ(result.nearestOwnedChunk->getMin(),
+                          direction == ChunkMap::Direction::Forward ? key(30) : key(0));
+    }
+}
+
+// The scan can also run off the end of the table. Below the floor, the range between the last chunk
+// it visited and the edge of the key space is not known to be unowned either.
+TEST_F(PointInTimeHistoryFloorTest, NearestOwnedChunkThrowsWhenForwardScanRunsIntoTrailingGap) {
+    const ShardId kOtherShard{"otherShard"};
+    auto cm = makeCmAllowingGaps(
+        {makeChunkOwnedSince(key(0), key(10), chunkVersion(1, 0), kOtherShard, Timestamp(1, 0)),
+         // The table ends at 20: [20, MaxKey) was dropped by the expired-history filter.
+         makeChunkOwnedSince(key(10), key(20), chunkVersion(1, 1), kOtherShard, Timestamp(1, 0))},
+        kFloor);
+    auto pit = PointInTimeChunkManager::make(cm, kBelowFloor);
+
+    ASSERT_THROWS_CODE(pit.nearestOwnedChunk(key(5), kThisShard, ChunkMap::Direction::Forward),
+                       AssertionException,
+                       ErrorCodes::StaleChunkHistory);
+}
+
+TEST_F(PointInTimeHistoryFloorTest, NearestOwnedChunkThrowsWhenBackwardScanRunsIntoLeadingGap) {
+    const ShardId kOtherShard{"otherShard"};
+    auto cm = makeCmAllowingGaps(
+        // The table starts at 10: [MinKey, 10) was dropped by the expired-history filter.
+        {makeChunkOwnedSince(key(10), key(20), chunkVersion(1, 0), kOtherShard, Timestamp(1, 0)),
+         makeChunkOwnedSince(key(20), key(30), chunkVersion(1, 1), kOtherShard, Timestamp(1, 0))},
+        kFloor);
+    auto pit = PointInTimeChunkManager::make(cm, kBelowFloor);
+
+    ASSERT_THROWS_CODE(pit.nearestOwnedChunk(key(25), kThisShard, ChunkMap::Direction::Backward),
+                       AssertionException,
+                       ErrorCodes::StaleChunkHistory);
+}
+
+// Control: when the table reaches the edge of the key space there is no gap, so running off the end
+// is a definite "no owned chunk in that direction".
+TEST_F(PointInTimeHistoryFloorTest,
+       NearestOwnedChunkAnswersWhenScanRunsOffContiguousEndBelowFloor) {
+    const ShardId kOtherShard{"otherShard"};
+    const auto min = BSON("a" << MINKEY);
+    const auto max = BSON("a" << MAXKEY);
+    auto cm = makeCmAllowingGaps(
+        {makeChunkOwnedSince(min, key(10), chunkVersion(1, 0), kOtherShard, Timestamp(1, 0)),
+         makeChunkOwnedSince(key(10), max, chunkVersion(1, 1), kOtherShard, Timestamp(1, 0))},
+        kFloor);
+    auto pit = PointInTimeChunkManager::make(cm, kBelowFloor);
+
+    for (auto direction : {ChunkMap::Direction::Forward, ChunkMap::Direction::Backward}) {
+        auto result = pit.nearestOwnedChunk(key(5), kThisShard, direction);
+        ASSERT_FALSE(result.containsShardKey);
+        ASSERT_FALSE(result.nearestOwnedChunk.has_value());
+    }
 }
 
 class ChunkMapFindClosestTest : public unittest::Test {

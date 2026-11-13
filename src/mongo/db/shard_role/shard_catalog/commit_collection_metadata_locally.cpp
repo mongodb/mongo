@@ -342,6 +342,8 @@ CollectionMetadata buildOwnedCollectionMetadata(OperationContext* opCtx,
             return nullptr;
         }();
 
+        // No history floor: 'chunks' comes from fetchOwnedChunks(), which selects on {shard: me} OR
+        // {history.shard: me} with no filter to `onCurrentShardSince`.
         return RoutingTableHistory::makeNewAllowingGaps(nss,
                                                         coll.getUuid(),
                                                         coll.getKeyPattern(),
@@ -353,7 +355,8 @@ CollectionMetadata buildOwnedCollectionMetadata(OperationContext* opCtx,
                                                         coll.getTimeseriesFields(),
                                                         coll.getReshardingFields(),
                                                         coll.getAllowMigrations(),
-                                                        chunks);
+                                                        chunks,
+                                                        boost::none /*historyFloor*/);
     }();
 
     auto version = rt.getVersion();

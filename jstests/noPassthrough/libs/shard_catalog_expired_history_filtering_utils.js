@@ -16,13 +16,13 @@ export const kNs = `${kDbName}.${kCollName}`;
 // remainder of a test even on a loaded machine. Set at startup.
 export const kRetentionWindowSecs = 600;
 
-// Starts the two-shard, two-nodes-per-shard cluster with the expired-history filter enabled and
-// the retention window applied on every shard node, plus any test-specific 'extraSetParameters'.
+// Starts the two-shard cluster with the expired-history filter enabled and the retention window
+// applied on every shard node, plus any test-specific 'extraSetParameters'.
 // The parameters are applied through both options because they are disjoint: a dedicated shard
 // replica set is built from 'rsOptions', while in config-shard mode shard0 is the config replica
 // set, which ShardingTest builds from 'configOptions'. Without both, the shard under test would
 // run with the filter disabled and the default windows in one of the two suites.
-export function startFilteringShardingTest(extraSetParameters = {}) {
+export function startFilteringShardingTest(extraSetParameters = {}, {nodes = 2} = {}) {
     const setParameter = {
         featureFlagShardCatalogExpiredHistoryFiltering: true,
         minSnapshotHistoryWindowInSeconds: kRetentionWindowSecs,
@@ -30,7 +30,7 @@ export function startFilteringShardingTest(extraSetParameters = {}) {
     };
     return new ShardingTest({
         shards: 2,
-        rs: {nodes: 2},
+        rs: {nodes: nodes},
         other: {
             rsOptions: {setParameter},
             configOptions: {setParameter},
