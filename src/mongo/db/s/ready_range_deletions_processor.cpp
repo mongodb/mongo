@@ -25,6 +25,9 @@ namespace mongo {
 using namespace std::literals::string_view_literals;
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(rangeDeleterWaitingForWorkerCapacity);
+
 constexpr auto kRangeDeletionThreadName = "range-deleter"sv;
 const Seconds kCheckForEnabledServiceInterval(10);
 const Seconds kMissingIndexRetryInterval(10);
@@ -79,8 +82,9 @@ ReadyRangeDeletionsProcessor::ReadyRangeDeletionsProcessor(
       _workerPool(std::make_unique<ThreadPool>([this, service = opCtx->getService()] {
           ThreadPool::Options options;
           options.poolName = "RangeDeleterWorkerPool";
-          options.minThreads = _maxThreads;
-          options.maxThreads = _maxThreads;
+          options.minThreads = 1;
+          // Must match the lte of rangeDeleterThreadsCount.
+          options.maxThreads = 256;
           options.threadNamePrefix = "RangeDeleterWorker-";
           options.onCreateThread = [service](const std::string& threadName) {
               Client::initThread(threadName, service);
@@ -138,6 +142,12 @@ void ReadyRangeDeletionsProcessor::shutdown() {
     }
 
     _workerPool->shutdown();
+
+    // Clear the count so a former primary does not keep reporting tasks that are no longer being
+    // processed. The queue itself stays until the processor is destroyed. Counting stays stopped
+    // because the state is already kStopped: emplaceRangeDeletion() does not increment, and the
+    // pop path does not decrement.
+    ShardingStatistics::get(_service).rangeDeleterReadyQueueSize.store(0);
 }
 
 bool ReadyRangeDeletionsProcessor::_stopRequested() const {
@@ -182,12 +192,19 @@ bool ReadyRangeDeletionsProcessor::_isStateTransitionValid(State oldState, State
     MONGO_UNREACHABLE;
 }
 
+void ReadyRangeDeletionsProcessor::updateWorkerThreadCount() {
+    std::unique_lock<std::mutex> lock(_mutex);
+    _condVar.notify_all();
+}
+
 void ReadyRangeDeletionsProcessor::emplaceRangeDeletion(const RangeDeletionTask& rdt) {
     std::unique_lock<std::mutex> lock(_mutex);
     if (_state == kStopped) {
         return;
     }
     _queue.push(rdt);
+    auto& shardingStats = ShardingStatistics::get(_service);
+    shardingStats.rangeDeleterReadyQueueSize.fetchAndAdd(1);
     _condVar.notify_all();
 }
 
@@ -208,6 +225,13 @@ InFlightEntry ReadyRangeDeletionsProcessor::_peekFrontAndAddToInFlight() {
     // Pop the task from the ready queue
     RangeDeletionTask task = std::move(_queue.front());
     _queue.pop();
+    // Once stopped, shutdown() has already reset the metric to 0. Decrementing here would make the
+    // metric negative.
+    if (_state != kStopped) {
+        auto& shardingStats = ShardingStatistics::get(_service);
+        shardingStats.rangeDeleterReadyQueueSize.fetchAndAdd(-1);
+    }
+
     // Create the InFlight entry
     InFlightEntry taskEntry = InFlightEntry{task, nullptr};
     auto emplaceResult = _inflightMap.emplace(task.getId(), taskEntry);
@@ -273,7 +297,14 @@ void ReadyRangeDeletionsProcessor::_dispatchRangeDeletions() {
             std::unique_lock<std::mutex> lock(_mutex);
             try {
                 opCtx->waitForConditionOrInterrupt(_condVar, lock, [&] {
-                    return !_queue.empty() && _maxThreads > _inflightMap.size();
+                    const bool hasQueuedWork = !_queue.empty();
+                    const bool hasAvailableWorker =
+                        _inflightMap.size() < static_cast<size_t>(rangeDeleterThreadsCount.load());
+                    if (hasQueuedWork && !hasAvailableWorker) {
+                        // Record that queued work is waiting for worker capacity.
+                        rangeDeleterWaitingForWorkerCapacity.shouldFail();
+                    }
+                    return hasQueuedWork && hasAvailableWorker;
                 });
             } catch (const DBException& ex) {
                 dassert(!opCtx->checkForInterruptNoAssert().isOK(),
@@ -321,6 +352,10 @@ void ReadyRangeDeletionsProcessor::_dispatchRangeDeletions() {
 }
 
 void ReadyRangeDeletionsProcessor::_processRangeDeletion(InFlightEntry taskEntry) {
+    auto& shardingStats = ShardingStatistics::get(_service);
+    shardingStats.rangeDeleterRunningWorkers.fetchAndAdd(1);
+    ON_BLOCK_EXIT([&] { shardingStats.rangeDeleterRunningWorkers.fetchAndAdd(-1); });
+
     const RangeDeletionTask task = taskEntry.task;
 
     const auto dbName = task.getNss().dbName();

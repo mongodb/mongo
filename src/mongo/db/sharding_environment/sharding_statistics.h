@@ -89,6 +89,18 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingStatistics {
     admission::execution_control::InProgressTimeAccumulator rangeDeleterTicketQueueTime;
     admission::execution_control::InProgressTimeAccumulator rangeDeleterTicketProcessingTime;
 
+    // Number of worker threads currently inside a range deletion. This includes admission waits,
+    // deletion, retries, and the majority wait.
+    Atomic<long long> rangeDeleterRunningWorkers{0};
+
+    // Number of tasks waiting on the ready queue to be processed. Reset to 0 when the processor
+    // stops, since its queue is no longer processed.
+    Atomic<long long> rangeDeleterReadyQueueSize{0};
+
+    // Configured maximum number of range-deleter worker threads. This
+    // remains set while the service is down.
+    Atomic<long long> rangeDeleterMaxThreads{1};
+
     // Cumulative counter of range-deletion tasks for which the guard preserved (did not delete)
     // MaxKey-prefixed documents. One increment per task; the number of preserved documents may be
     // higher.

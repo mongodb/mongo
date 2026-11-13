@@ -237,8 +237,9 @@ void ensureRangeDeletionTaskStillExists(OperationContext* opCtx,
     // document has already been deleted, then it is possible for the range in the user collection
     // to now be owned by this shard and for proceeding with the range deletion to result in data
     // corruption. The scheme for checking whether the range deletion task document still exists
-    // relies on the executor only having a single thread and that thread being solely responsible
-    // for deleting the range deletion task document.
+    // relies on each range-deletion worker deleting only the persistent task document identified by
+    // its own task ID. Since overlapping range deletions are serialized, no other worker can remove
+    // this task document while this operation context is running.
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     const auto query =
         BSON(RangeDeletionTask::kCollectionUuidFieldName
@@ -344,7 +345,7 @@ StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
     int totalNumDeleted = 0, totalBytesDeleted = 0;
     // Delete all batches in this range unless a stepdown error occurs. Do not yield the
     // executor to ensure that this range is fully deleted before another range is
-    // processed.
+    // processed by this worker thread.
     while (!allDocsRemoved) {
         try {
             int numDocsToRemovePerBatch = rangeDeleterBatchSize.load();
@@ -414,9 +415,9 @@ StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
                         "range"_attr = redact(range.toString()));
 
             if (numDeleted > 0) {
-                // (SERVER-62368) The range-deleter executor is mono-threaded, so
-                // sleeping synchronously for `delayBetweenBatches` ensures that no
-                // other batch is going to be cleared up before the expected delay.
+                // (SERVER-62368) Pace the batches of this range deletion. The sleep blocks only
+                // this worker, other range-deletion workers continue deleting their own ranges
+                // during the delay.
                 opCtx->sleepFor(delayBetweenBatches);
             }
 

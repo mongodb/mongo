@@ -42,6 +42,11 @@ public:
      */
     void emplaceRangeDeletion(const RangeDeletionTask& rdt);
 
+    /*
+     * Notify the dispatcher that the max number of threads has changed
+     */
+    void updateWorkerThreadCount();
+
 private:
     enum State { kInitializing, kRunning, kStopped };
 
@@ -103,18 +108,13 @@ private:
     /* Queue containing scheduled range deletions */
     std::queue<RangeDeletionTask> _queue;
 
+    /* Map containing the dispatched range deletions */
     stdx::unordered_map<mongo::UUID, InFlightEntry, UUID::Hash> _inflightMap;
 
     /* Pointer to the (one and only) operation context used by the thread */
     ServiceContext::UniqueOperationContext _threadOpCtxHolder;
 
     SharedPromise<void> _beginProcessingSignal;
-
-    /*
-     * Maximum number of worker threads. Fixed at 1 until a server parameter can change it.
-     * TODO SERVER-137792: Replace _maxThreads with the server parameter rangeDeleterThreadsCount.
-     */
-    size_t _maxThreads{1};
 
     /* Thread pool with the worker threads that will perform the range deletions */
     std::unique_ptr<ThreadPool> _workerPool;

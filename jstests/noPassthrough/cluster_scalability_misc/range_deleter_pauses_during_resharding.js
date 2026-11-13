@@ -34,7 +34,7 @@ function seedCollection(coll) {
     assert.commandWorked(bulk.execute());
 }
 
-function runTest(shouldAbort) {
+function runTest(shouldAbort, workerCount) {
     const reshardingTest = new ReshardingTest({numDonors: 2});
     reshardingTest.setup();
 
@@ -64,6 +64,11 @@ function runTest(shouldAbort) {
     const topology = DiscoverTopology.findConnectedNodes(s);
     const donorShard = new Mongo(topology.shards[donorShardName].primary);
     assert.commandWorked(donorShard.adminCommand({setParameter: 1, orphanCleanupDelaySecs: 0}));
+
+    assert.commandWorked(
+        donorShard.adminCommand({setParameter: 1, rangeDeleterThreadsCount: workerCount}),
+    );
+
     assert.commandWorked(
         donorShard.adminCommand({setParameter: 1, disableResumableRangeDeleter: true}),
     );
@@ -189,5 +194,7 @@ function runTest(shouldAbort) {
     reshardingTest.teardown();
 }
 
-runTest(true);
-runTest(false);
+runTest(true, 1);
+runTest(false, 1);
+runTest(true, 2);
+runTest(false, 2);

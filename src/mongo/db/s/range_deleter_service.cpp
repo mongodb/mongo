@@ -23,6 +23,7 @@
 #include "mongo/db/s/range_deleter_service_op_observer.h"
 #include "mongo/db/s/range_deletion.h"
 #include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
@@ -30,6 +31,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
@@ -82,6 +84,16 @@ void ensureSet(WithLock, boost::optional<SharedPromise<void>>& promise) {
 
 }  // namespace
 
+void RangeDeleterService::updateWorkerThreadCount(int numThreads) {
+    auto lock = _acquireMutexUnconditionally();
+    ShardingStatistics::get(getGlobalServiceContext()).rangeDeleterMaxThreads.store(numThreads);
+
+    if (_state == kDown) {
+        return;
+    }
+    _readyRangeDeletionsProcessorPtr->updateWorkerThreadCount();
+}
+
 const ReplicaSetAwareServiceRegistry::Registerer<RangeDeleterService>
     rangeDeleterServiceRegistryRegisterer("RangeDeleterService",
                                           {"ShardingInitializationMongoDRegistry"});
@@ -98,6 +110,18 @@ void RangeDeleterService::onStartup(OperationContext* opCtx) {
     auto opObserverRegistry =
         checked_cast<OpObserverRegistry*>(opCtx->getServiceContext()->getOpObserver());
     opObserverRegistry->addObserver(std::make_unique<RangeDeleterServiceOpObserver>());
+
+    using ParamT =
+        IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, Atomic<int>>;
+    ServerParameterSet::getNodeParameterSet()
+        ->get<ParamT>("rangeDeleterThreadsCount")
+        ->setOnUpdate([this](const int numThreads) -> Status {
+            updateWorkerThreadCount(numThreads);
+            return Status::OK();
+        });
+
+    ShardingStatistics::get(opCtx->getServiceContext())
+        .rangeDeleterMaxThreads.store(rangeDeleterThreadsCount.load());
 }
 
 void RangeDeleterService::onStepUpBegin(OperationContext* opCtx, long long term) {

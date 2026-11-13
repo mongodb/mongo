@@ -72,6 +72,20 @@ server_parameters:
         default: 20
         redact: false
 
+    rangeDeleterThreadsCount:
+        description: >-
+            The max number of worker threads that can perform range deletions.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<int>
+        cpp_varname: rangeDeleterThreadsCount
+        validator:
+            gte: 1
+            # The worker pool is constructed with maxThreads equal to this bound (ReadyRangeDeletionsProcessor).
+            # Both values must stay equal.
+            lte: 256
+        default: 1
+        redact: false
+
     receiveChunkWaitForRangeDeleterTimeoutMS:
         description: >-
             Maximum amount of time for which the start of a new chunk migration request may be deferred,

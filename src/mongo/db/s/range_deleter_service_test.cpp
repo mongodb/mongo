@@ -713,34 +713,67 @@ TEST_F(RangeDeleterServiceTest, PerformActualRangeDeletion) {
 
 TEST_F(RangeDeleterServiceTest, OnlyRemoveDocumentsInRangeToDelete) {
     auto rds = RangeDeleterService::get(opCtx);
-    auto taskWithOngoingQueries = rangeDeletionTask0ForCollA;
     auto nss = nssWithUuid[uuidCollA];
     DBDirectClient dbclient(opCtx);
 
-    // Insert docs within the range targeted by the deletion task
-    int numDocsToDelete = insertDocsWithinRange(opCtx, nss, 0, 10, 10);
-    ASSERT_EQUALS(dbclient.count(nss), numDocsToDelete);
+    for (const int workerCount : {1, 2}) {
+        unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", workerCount};
 
-    // Insert docs in a different range
-    int numDocsToKeep = insertDocsWithinRange(opCtx, nss, 20, 25, 5);
-    numDocsToKeep += insertDocsWithinRange(opCtx, nss, 100, 105, 5);
-    ASSERT_EQUALS(dbclient.count(nss), numDocsToKeep + numDocsToDelete);
+        // Documents outside both ranges survive deletion, and _id is the shard key.
+        dbclient.remove(nss, BSONObj{});
 
-    auto completionFuture =
-        registerAndCreatePersistentTask(opCtx,
-                                        taskWithOngoingQueries->getTask(),
-                                        taskWithOngoingQueries->getOngoingQueriesFuture());
+        auto taskWithOngoingQueries1 = createRangeDeletionTaskWithOngoingQueries(
+            uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
+        auto taskWithOngoingQueries2 = createRangeDeletionTaskWithOngoingQueries(
+            uuidCollA, BSON(kShardKey << 10), BSON(kShardKey << 20));
 
-    // The task can't be processed (hence completed) before ongoing queries drain
-    ASSERT(!completionFuture.isReady());
-    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
-    ASSERT_EQUALS(dbclient.count(NamespaceString::kRangeDeletionNamespace), 1);
-    verifyRangeDeletionTasks(opCtx, uuidCollA, {taskWithOngoingQueries->getTask().getRange()});
+        // Insert docs within the range targeted by the deletion task
+        int numDocsToDelete = insertDocsWithinRange(opCtx, nss, 0, 10, 10);
+        numDocsToDelete += insertDocsWithinRange(opCtx, nss, 10, 20, 10);
+        ASSERT_EQUALS(dbclient.count(nss), numDocsToDelete);
 
-    // Pretend ongoing queries have drained and make sure only orphans were cleared up
-    taskWithOngoingQueries->drainOngoingQueries();
-    completionFuture.get(opCtx);
-    ASSERT_EQUALS(dbclient.count(nss), numDocsToKeep);
+        // Insert docs in a different range
+        int numDocsToKeep = insertDocsWithinRange(opCtx, nss, 20, 25, 5);
+        numDocsToKeep += insertDocsWithinRange(opCtx, nss, 100, 105, 5);
+        ASSERT_EQUALS(dbclient.count(nss), numDocsToKeep + numDocsToDelete);
+
+        auto completionFuture1 =
+            registerAndCreatePersistentTask(opCtx,
+                                            taskWithOngoingQueries1->getTask(),
+                                            taskWithOngoingQueries1->getOngoingQueriesFuture());
+
+        auto completionFuture2 =
+            registerAndCreatePersistentTask(opCtx,
+                                            taskWithOngoingQueries2->getTask(),
+                                            taskWithOngoingQueries2->getOngoingQueriesFuture());
+        // The task can't be processed (hence completed) before ongoing queries drain
+        ASSERT(!completionFuture1.isReady());
+        ASSERT(!completionFuture2.isReady());
+
+        ASSERT_EQ(2, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+        ASSERT_EQUALS(dbclient.count(NamespaceString::kRangeDeletionNamespace), 2);
+        verifyRangeDeletionTasks(opCtx,
+                                 uuidCollA,
+                                 {taskWithOngoingQueries1->getTask().getRange(),
+                                  taskWithOngoingQueries2->getTask().getRange()});
+
+        // Pretend ongoing queries have drained and make sure only orphans were cleared up
+        taskWithOngoingQueries1->drainOngoingQueries();
+        taskWithOngoingQueries2->drainOngoingQueries();
+
+        completionFuture1.get(opCtx);
+        completionFuture2.get(opCtx);
+        ASSERT_EQUALS(dbclient.count(nss), numDocsToKeep);
+
+        // completeTask() fulfills these futures before removePersistentTask(). Wait for the
+        // persisted documents to disappear so the next iteration's exact count starts from zero.
+        const auto cleanupDeadline = Date_t::now() + Seconds(30);
+        while (dbclient.count(NamespaceString::kRangeDeletionNamespace) != 0 &&
+               Date_t::now() < cleanupDeadline) {
+            sleepmillis(10);
+        }
+        ASSERT_EQUALS(dbclient.count(NamespaceString::kRangeDeletionNamespace), 0);
+    }
 }
 
 TEST_F(RangeDeleterServiceTest, RegisterAndProcessSingleTaskWithKeyPattern) {
@@ -1012,38 +1045,85 @@ TEST_F(RangeDeleterServiceTest, RegisterTaskSucceedsDuringRecoveryPhase) {
     ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
-TEST_F(RangeDeleterServiceTest, RegisterOverlappingTaskWaitsForOlderTask) {
+TEST_F(RangeDeleterServiceTest, RangeDeleterThreadCountHonoredOnStepUp) {
     auto rds = RangeDeleterService::get(opCtx);
+    rds->onStepDown();
 
-    // Register task [0, 10) - this will be the "older" task
+    unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", 2};
+
+    simulateStepup(opCtx, kStartingTerm + 1);
+
+    ASSERT_EQUALS(2, rangeDeleterThreadsCount.load());
+
+    // Register non-overlapping tasks
+    // Task 0: [0, 10)
     auto task0 = createRangeDeletionTaskWithOngoingQueries(
         uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
     auto completionFuture0 =
         registerAndCreatePersistentTask(opCtx, task0->getTask(), task0->getOngoingQueriesFuture());
-    ASSERT_FALSE(completionFuture0.isReady());
-    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 
-    // Register overlapping task [5, 15) - this should be allowed and wait for task0
+    // Task 1: [20, 30) - does NOT overlap with task0
     auto task1 = createRangeDeletionTaskWithOngoingQueries(
-        uuidCollA, BSON(kShardKey << 5), BSON(kShardKey << 15));
+        uuidCollA, BSON(kShardKey << 20), BSON(kShardKey << 30));
     auto completionFuture1 =
         registerAndCreatePersistentTask(opCtx, task1->getTask(), task1->getOngoingQueriesFuture());
-    ASSERT_FALSE(completionFuture1.isReady());
-    // Both tasks should be registered
+
     ASSERT_EQ(2, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 
-    // Drain ongoing queries for task1 first - it should NOT complete yet because it's waiting
-    // for the older overlapping task0 to complete
-    task1->drainOngoingQueries();
-    ASSERT_FALSE(completionFuture1.isReady());
+    // Check that 2 tasks run concurrently
+    {
+        FailPointEnableBlock hangBeforeDoingDeletionFp("hangBeforeDoingDeletion");
+        task0->drainOngoingQueries();
+        task1->drainOngoingQueries();
 
-    // Now drain ongoing queries for task0 - this should allow task0 to complete
-    task0->drainOngoingQueries();
+        hangBeforeDoingDeletionFp.wait(4);
+
+
+        verifyProcessingFlag(opCtx, uuidCollA, task0->getTask().getRange(), true);
+        verifyProcessingFlag(opCtx, uuidCollA, task1->getTask().getRange(), true);
+    }
+
     completionFuture0.get(opCtx);
-
-    // Now task1 should be able to complete (after task0 finished)
     completionFuture1.get(opCtx);
+
     ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+}
+
+TEST_F(RangeDeleterServiceTest, RegisterOverlappingTaskWaitsForOlderTask) {
+    auto rds = RangeDeleterService::get(opCtx);
+    for (const int workerCount : {1, 2}) {
+        unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", workerCount};
+
+        // Register task [0, 10) - this will be the "older" task
+        auto task0 = createRangeDeletionTaskWithOngoingQueries(
+            uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
+        auto completionFuture0 = registerAndCreatePersistentTask(
+            opCtx, task0->getTask(), task0->getOngoingQueriesFuture());
+        ASSERT_FALSE(completionFuture0.isReady());
+        ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+
+        // Register overlapping task [5, 15) - this should be allowed and wait for task0
+        auto task1 = createRangeDeletionTaskWithOngoingQueries(
+            uuidCollA, BSON(kShardKey << 5), BSON(kShardKey << 15));
+        auto completionFuture1 = registerAndCreatePersistentTask(
+            opCtx, task1->getTask(), task1->getOngoingQueriesFuture());
+        ASSERT_FALSE(completionFuture1.isReady());
+        // Both tasks should be registered
+        ASSERT_EQ(2, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+
+        // Drain ongoing queries for task1 first - it should NOT complete yet because it's waiting
+        // for the older overlapping task0 to complete
+        task1->drainOngoingQueries();
+        ASSERT_FALSE(completionFuture1.isReady());
+
+        // Now drain ongoing queries for task0 - this should allow task0 to complete
+        task0->drainOngoingQueries();
+        completionFuture0.get(opCtx);
+
+        // Now task1 should be able to complete (after task0 finished)
+        completionFuture1.get(opCtx);
+        ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+    }
 }
 
 TEST_F(RangeDeleterServiceTestWithMockClock,
@@ -1347,5 +1427,290 @@ TEST_F(RangeDeleterServiceTest, OverlappingTaskWithNoTimestampGetsCurrentTime) {
     completionFuture1.get(opCtx);
 
     ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+}
+
+TEST_F(RangeDeleterServiceTest, MultipleWorkersWorkOnNonOverlappingTasksOnTheSameCollection) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Register non-overlapping tasks
+    // Task 0: [0, 10)
+    auto task0 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
+    auto completionFuture0 =
+        registerAndCreatePersistentTask(opCtx, task0->getTask(), task0->getOngoingQueriesFuture());
+
+    // Task 1: [20, 30) - does NOT overlap with task0
+    auto task1 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 20), BSON(kShardKey << 30));
+    auto completionFuture1 =
+        registerAndCreatePersistentTask(opCtx, task1->getTask(), task1->getOngoingQueriesFuture());
+
+    ASSERT_EQ(2, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+
+    {
+        FailPointEnableBlock hangBeforeDoingDeletionFp("hangBeforeDoingDeletion");
+        task0->drainOngoingQueries();
+        hangBeforeDoingDeletionFp.wait(2);
+
+        task1->drainOngoingQueries();
+
+        // Change the number of worker threads to 2
+        unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", 2};
+
+        hangBeforeDoingDeletionFp.wait(4);
+
+
+        verifyProcessingFlag(opCtx, uuidCollA, task0->getTask().getRange(), true);
+        verifyProcessingFlag(opCtx, uuidCollA, task1->getTask().getRange(), true);
+    }
+
+    completionFuture0.get(opCtx);
+    completionFuture1.get(opCtx);
+
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+}
+
+TEST_F(RangeDeleterServiceTest, MultipleWorkersWorkOnNonOverlappingTasksOnDifferentCollections) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Register non-overlapping tasks
+    // Task 0: [0, 10)
+    auto task0 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
+    auto completionFuture0 =
+        registerAndCreatePersistentTask(opCtx, task0->getTask(), task0->getOngoingQueriesFuture());
+
+    // Task 1: [20, 30) - does NOT overlap with task0
+    auto task1 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollB, BSON(kShardKey << 20), BSON(kShardKey << 30));
+    auto completionFuture1 =
+        registerAndCreatePersistentTask(opCtx, task1->getTask(), task1->getOngoingQueriesFuture());
+
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollB));
+
+    {
+        FailPointEnableBlock hangBeforeDoingDeletionFp("hangBeforeDoingDeletion");
+        task0->drainOngoingQueries();
+        hangBeforeDoingDeletionFp.wait(2);
+
+        task1->drainOngoingQueries();
+
+        // Change the number of worker threads to 2
+        unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", 2};
+
+        hangBeforeDoingDeletionFp.wait(4);
+
+
+        verifyProcessingFlag(opCtx, uuidCollA, task0->getTask().getRange(), true);
+        verifyProcessingFlag(opCtx, uuidCollB, task1->getTask().getRange(), true);
+    }
+
+    completionFuture0.get(opCtx);
+    completionFuture1.get(opCtx);
+
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollB));
+}
+
+TEST_F(RangeDeleterServiceTest, RangeDeletionConcurrencyDoesNotExceedConfiguredLimit) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Set the number of worker threads to 2
+    unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", 2};
+
+    // Register non-overlapping tasks
+    // Task 0: [0, 10)
+    auto task0 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
+    auto completionFuture0 =
+        registerAndCreatePersistentTask(opCtx, task0->getTask(), task0->getOngoingQueriesFuture());
+
+    // Task 1: [20, 30) - does NOT overlap with task0
+    auto task1 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 20), BSON(kShardKey << 30));
+    auto completionFuture1 =
+        registerAndCreatePersistentTask(opCtx, task1->getTask(), task1->getOngoingQueriesFuture());
+
+    // Task 2: [40, 50) - does NOT overlap with any other task
+    auto task2 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 40), BSON(kShardKey << 50));
+    auto completionFuture2 =
+        registerAndCreatePersistentTask(opCtx, task2->getTask(), task2->getOngoingQueriesFuture());
+
+    ASSERT_EQ(3, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+
+    {
+        FailPointEnableBlock hangBeforeDoingDeletionFp("hangBeforeDoingDeletion");
+        // Drain the 2 tasks and hang before deletion
+        task0->drainOngoingQueries();
+        task1->drainOngoingQueries();
+
+        hangBeforeDoingDeletionFp.wait(4);
+
+        verifyProcessingFlag(opCtx, uuidCollA, task0->getTask().getRange(), true);
+        verifyProcessingFlag(opCtx, uuidCollA, task1->getTask().getRange(), true);
+
+        FailPointEnableBlock rangeDeleterWaitingForWorkerCapacityFp(
+            "rangeDeleterWaitingForWorkerCapacity");
+        // Drain the third task
+        task2->drainOngoingQueries();
+        // Check that the dispatcher is waiting for worker to be available
+        rangeDeleterWaitingForWorkerCapacityFp.wait();
+        verifyProcessingFlag(opCtx, uuidCollA, task2->getTask().getRange(), false);
+    }
+
+    completionFuture0.get(opCtx);
+    completionFuture1.get(opCtx);
+    completionFuture2.get(opCtx);
+
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+}
+
+TEST_F(RangeDeleterServiceTest,
+       IncreasingTheRangeDeleterThreadCountCorrectlyAdjustsConcurrencyCap) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Set the number of worker threads to 2
+    unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", 2};
+
+    // Register non-overlapping tasks
+    // Task 0: [0, 10)
+    auto task0 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
+    auto completionFuture0 =
+        registerAndCreatePersistentTask(opCtx, task0->getTask(), task0->getOngoingQueriesFuture());
+
+    // Task 1: [20, 30) - does NOT overlap with task0
+    auto task1 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 20), BSON(kShardKey << 30));
+    auto completionFuture1 =
+        registerAndCreatePersistentTask(opCtx, task1->getTask(), task1->getOngoingQueriesFuture());
+
+    // Task 2: [40, 50) - does NOT overlap with any other task
+    auto task2 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 40), BSON(kShardKey << 50));
+    auto completionFuture2 =
+        registerAndCreatePersistentTask(opCtx, task2->getTask(), task2->getOngoingQueriesFuture());
+
+    ASSERT_EQ(3, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+
+    {
+        FailPointEnableBlock hangBeforeDoingDeletionFp("hangBeforeDoingDeletion");
+        // Drain the 2 tasks and hang before deletion
+        task0->drainOngoingQueries();
+        task1->drainOngoingQueries();
+
+        hangBeforeDoingDeletionFp.wait(4);
+
+        verifyProcessingFlag(opCtx, uuidCollA, task0->getTask().getRange(), true);
+        verifyProcessingFlag(opCtx, uuidCollA, task1->getTask().getRange(), true);
+
+        FailPointEnableBlock rangeDeleterWaitingForWorkerCapacityFp(
+            "rangeDeleterWaitingForWorkerCapacity");
+        // Drain the third task
+        task2->drainOngoingQueries();
+        // Check that the dispatcher is waiting for worker to be available
+        rangeDeleterWaitingForWorkerCapacityFp.wait();
+        verifyProcessingFlag(opCtx, uuidCollA, task2->getTask().getRange(), false);
+
+        // Change the number of worker threads to 3
+        unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", 3};
+
+        hangBeforeDoingDeletionFp.wait(6);
+        verifyProcessingFlag(opCtx, uuidCollA, task2->getTask().getRange(), true);
+    }
+
+    completionFuture0.get(opCtx);
+    completionFuture1.get(opCtx);
+    completionFuture2.get(opCtx);
+
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+}
+
+TEST_F(RangeDeleterServiceTest,
+       DecreasingTheRangeDeleterThreadCountCorrectlyAdjustsConcurrencyCap) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Set the number of worker threads to 2
+    unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", 2};
+
+    // Register non-overlapping tasks
+    // Task 0: [0, 10)
+    auto task0 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
+    auto completionFuture0 =
+        registerAndCreatePersistentTask(opCtx, task0->getTask(), task0->getOngoingQueriesFuture());
+
+    // Task 1: [20, 30) - does NOT overlap with task0
+    auto task1 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 20), BSON(kShardKey << 30));
+    auto completionFuture1 =
+        registerAndCreatePersistentTask(opCtx, task1->getTask(), task1->getOngoingQueriesFuture());
+
+    ASSERT_EQ(2, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+
+    {
+        FailPointEnableBlock hangBeforeDoingDeletionFp("hangBeforeDoingDeletion");
+        // Drain the one of the tasks and hang before deletion
+        task0->drainOngoingQueries();
+
+        hangBeforeDoingDeletionFp.wait(2);
+
+        verifyProcessingFlag(opCtx, uuidCollA, task0->getTask().getRange(), true);
+
+        // Change the number of worker threads to 1
+        unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", 1};
+
+        FailPointEnableBlock rangeDeleterWaitingForWorkerCapacityFp(
+            "rangeDeleterWaitingForWorkerCapacity");
+        task1->drainOngoingQueries();
+        // Check that the dispatcher is waiting for worker to be available
+        rangeDeleterWaitingForWorkerCapacityFp.wait();
+        verifyProcessingFlag(opCtx, uuidCollA, task1->getTask().getRange(), false);
+    }
+
+    completionFuture0.get(opCtx);
+    completionFuture1.get(opCtx);
+
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+}
+
+TEST_F(RangeDeleterServiceTest, StepDownKillsAllWorkers) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Set the number of worker threads to 2
+    unittest::ServerParameterGuard threadCount{"rangeDeleterThreadsCount", 2};
+
+    // Register non-overlapping tasks
+    // Task 0: [0, 10)
+    auto task0 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 0), BSON(kShardKey << 10));
+    auto completionFuture0 =
+        registerAndCreatePersistentTask(opCtx, task0->getTask(), task0->getOngoingQueriesFuture());
+
+    // Task 1: [20, 30) - does NOT overlap with task0
+    auto task1 = createRangeDeletionTaskWithOngoingQueries(
+        uuidCollA, BSON(kShardKey << 20), BSON(kShardKey << 30));
+    auto completionFuture1 =
+        registerAndCreatePersistentTask(opCtx, task1->getTask(), task1->getOngoingQueriesFuture());
+
+    ASSERT_EQ(2, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+
+    {
+        FailPointEnableBlock hangBeforeDoingDeletionFp("hangBeforeDoingDeletion");
+        task0->drainOngoingQueries();
+        task1->drainOngoingQueries();
+
+        hangBeforeDoingDeletionFp.wait(4);
+
+        verifyProcessingFlag(opCtx, uuidCollA, task0->getTask().getRange(), true);
+        verifyProcessingFlag(opCtx, uuidCollA, task1->getTask().getRange(), true);
+
+        rds->onStepDown();
+    }
+
+    ASSERT_THROWS_CODE(completionFuture0.get(opCtx), DBException, ErrorCodes::Interrupted);
+    ASSERT_THROWS_CODE(completionFuture1.get(opCtx), DBException, ErrorCodes::Interrupted);
 }
 }  // namespace mongo

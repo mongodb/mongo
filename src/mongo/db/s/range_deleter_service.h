@@ -209,6 +209,12 @@ private:
                                    bool isMajority,
                                    bool isRollback) final {}
     void onBecomeArbiter() final {}
+
+    /*
+     * Record the configured maximum worker-thread count. When the service is up, apply it to the
+     * live worker pool.
+     */
+    void updateWorkerThreadCount(int numThreads);
 };
 
 /**
@@ -225,5 +231,4 @@ private:
     const Lock::ResourceLock _resourceLock;
     static inline const ResourceMutex _mutex{"ScopedRangeDeleterLock"};
 };
-
 }  // namespace mongo
