@@ -31,6 +31,7 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/ce/persistence/persistent_stats_config_update.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/fle/implicit_validator.h"
 #include "mongo/db/query/util/make_data_structure.h"
@@ -1014,6 +1015,23 @@ void CollectionImpl::setChangeStreamPreAndPostImages(OperationContext* opCtx,
     _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.options.changeStreamPreAndPostImagesOptions = val;
     });
+}
+
+const boost::optional<PersistentStatsConfig>& CollectionImpl::getPersistentStatsConfig() const {
+    return _metadata->options.persistentStatsConfig;
+}
+
+void CollectionImpl::setPersistentStatsConfig(
+    OperationContext* opCtx, const boost::optional<PersistentStatsConfig>& persistentStatsConfig) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
+        md.options.persistentStatsConfig = persistentStatsConfig;
+    });
+}
+
+void CollectionImpl::updatePersistentStatsConfig(OperationContext* opCtx,
+                                                 const PersistentStatsConfigUpdate& update) {
+    setPersistentStatsConfig(opCtx,
+                             applyPersistentStatsConfigUpdate(getPersistentStatsConfig(), update));
 }
 
 bool CollectionImpl::areRecordIdsReplicated() const {

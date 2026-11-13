@@ -18,6 +18,9 @@ filters:
   - "write_change_stream_pit_preimage.js":
     approvers:
       - 10gen/query-execution-change-streams
+  - "persistent_stats_config_in_create_and_collmod.js":
+    approvers:
+      - 10gen/query-optimization-persistent-stats
   - "release_memory/*":
     approvers:
       - 10gen/query-execution

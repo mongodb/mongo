@@ -6,6 +6,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/query/compiler/ce/persistence/persistent_stats_config_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -37,8 +38,10 @@ class PersistentStatsConfigValidationTest : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
-        _featureFlag.emplace("featureFlagPersistentStats", kFeatureFlagEnabled);
+        _featureFlag.emplace("featureFlagPersistentStatsCatalog", kFeatureFlagEnabled);
         _opCtx = makeOperationContext();
+        // (Generic FCV reference): used for testing, should exist across LTS binary versions.
+        _versionContext.emplace(_opCtx.get(), VersionContext{multiversion::GenericFCV::kLatest});
     }
 
     OperationContext* opCtx() const {
@@ -48,6 +51,7 @@ public:
 private:
     boost::optional<unittest::ServerParameterGuard> _featureFlag;
     ServiceContext::UniqueOperationContext _opCtx;
+    boost::optional<VersionContext::ScopedSetDecoration> _versionContext;
 };
 
 using FeatureFlagDisabledTest = PersistentStatsConfigValidationTest<false>;

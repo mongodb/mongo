@@ -215,6 +215,7 @@ CreateCommand makeCreateCommand(OperationContext* opCtx,
     }
     createRequest.setEncryptedFields(request.getEncryptedFields());
     createRequest.setChangeStreamPreAndPostImages(request.getChangeStreamPreAndPostImages());
+    createRequest.setPersistentStatsConfig(request.getPersistentStatsConfig());
     createRequest.setMax(request.getMax());
     createRequest.setFlags(request.getFlags());
     createRequest.setTemp(request.getTemp());

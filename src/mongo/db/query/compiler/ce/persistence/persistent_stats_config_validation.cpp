@@ -4,16 +4,15 @@
 #include "mongo/db/query/compiler/ce/persistence/persistent_stats_config_validation.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/version_context.h"
 
 namespace mongo {
 
 Status validatePersistentStatsConfigIsApplicable(OperationContext* opCtx, bool isView) {
-    if (!feature_flags::gFeatureFlagPersistentStats.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    // The DDL flag is operation_fcv_only: it is checked against the operation's pinned FCV so that
+    // create/collMod behave consistently even if a setFCV interleaves with their execution.
+    if (!gFeatureFlagPersistentStatsCatalog.isEnabled(VersionContext::getDecoration(opCtx))) {
         return {ErrorCodes::InvalidOptions, "unknown option: persistentStatsConfig"};
     }
 

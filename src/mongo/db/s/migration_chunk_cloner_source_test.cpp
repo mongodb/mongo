@@ -273,6 +273,21 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    const boost::optional<PersistentStatsConfig>& getPersistentStatsConfig() const override {
+        return _coll->getPersistentStatsConfig();
+    }
+
+    void setPersistentStatsConfig(
+        OperationContext* opCtx,
+        const boost::optional<PersistentStatsConfig>& persistentStatsConfig) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void updatePersistentStatsConfig(OperationContext* opCtx,
+                                     const PersistentStatsConfigUpdate& update) override {
+        MONGO_UNREACHABLE;
+    }
+
     bool isTemporary() const override {
         return _coll->isTemporary();
     }

@@ -10,6 +10,7 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
+#include "mongo/db/query/compiler/ce/persistence/persistent_stats_config_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/foreign_key_constraint_gen.h"
@@ -156,6 +157,9 @@ struct [[MONGO_MOD_PUBLIC]] CollectionOptions {
     // Foreign-key constraints declared by this child collection, with referenced parents resolved
     // to collection UUIDs.
     std::vector<ForeignKeyConstraint> foreignKeyConstraints;
+
+    // The configuration for the persistent statistics collected for this collection.
+    boost::optional<PersistentStatsConfig> persistentStatsConfig;
 };
 
 [[MONGO_MOD_PRIVATE]]

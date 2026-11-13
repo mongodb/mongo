@@ -196,6 +196,15 @@ feature_flags:
         version: 9.0
         fcv_gated: true
         check_against_fcv: operation_fcv_only
+    # Gates the generation of persisted statistics metadata (the 'persistentStatsConfig' collection
+    # option) in create and collMod. featureFlagPersistentStats gates its consumption.
+    featureFlagPersistentStatsCatalog:
+        description: >-
+            Enables the 'persistentStatsConfig' collection option in create and collMod.
+        cpp_varname: gFeatureFlagPersistentStatsCatalog
+        default: false
+        fcv_gated: true
+        check_against_fcv: operation_fcv_only
     featureFlagMongodProxyProtocolSupport:
         description: "Enables non-OCS proxy protocol connections on Mongos and Mongod"
         cpp_varname: gFeatureFlagMongodProxyProtocolSupport

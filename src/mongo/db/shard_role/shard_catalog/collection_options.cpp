@@ -355,6 +355,17 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             // enabled for DSC. If we ever rebuild DSC clusters from scratch we can safely remove
             // this parameter.
             // TODO SERVER-120943 remove handling of recordIdsReplicated in collectionOptions
+        } else if (fieldName == "persistentStatsConfig") {
+            if (e.type() != BSONType::object) {
+                return {ErrorCodes::TypeMismatch, "'persistentStatsConfig' must be a document"};
+            }
+
+            try {
+                collectionOptions.persistentStatsConfig = PersistentStatsConfig::parse(
+                    e.Obj(), IDLParserContext{"persistentStatsConfig"});
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
         } else if (!createdOn24OrEarlier && !mongo::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream()
@@ -410,6 +421,9 @@ CollectionOptions CollectionOptions::fromCreateCommand(OperationContext* opCtx,
     }
     if (auto changeStreamPreAndPostImagesOptions = cmd.getChangeStreamPreAndPostImages()) {
         options.changeStreamPreAndPostImagesOptions = *changeStreamPreAndPostImagesOptions;
+    }
+    if (auto persistentStatsConfig = cmd.getPersistentStatsConfig()) {
+        options.persistentStatsConfig = *persistentStatsConfig;
     }
     if (auto timeseries = cmd.getTimeseries()) {
         options.timeseries = std::move(*timeseries);
@@ -579,6 +593,10 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
             constraint.serialize(&constraintBuilder);
         }
     }
+
+    if (persistentStatsConfig && shouldAppend("persistentStatsConfig")) {
+        builder->append("persistentStatsConfig", persistentStatsConfig->toBSON());
+    }
 }
 
 bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
@@ -670,6 +688,10 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
     }
 
     if (expireAfterSeconds != other.expireAfterSeconds) {
+        return false;
+    }
+
+    if (persistentStatsConfig != other.persistentStatsConfig) {
         return false;
     }
 

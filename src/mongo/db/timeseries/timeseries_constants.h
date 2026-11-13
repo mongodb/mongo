@@ -74,6 +74,7 @@ inline const StringDataSet kAllowedCollectionCreationOptions{
     CreateCommand::kCollationFieldName,
     CreateCommand::kTimeseriesFieldName,
     CreateCommand::kExpireAfterSecondsFieldName,
+    CreateCommand::kPersistentStatsConfigFieldName,
     CreateCommand::kTempFieldName};
 
 }  // namespace mongo::timeseries

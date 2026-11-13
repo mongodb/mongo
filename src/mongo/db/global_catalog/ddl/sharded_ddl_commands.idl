@@ -259,6 +259,13 @@ structs:
                 description: "The options for point-in-time pre- and post-images in change streams opened on this collection."
                 type: ChangeStreamPreAndPostImagesOptions
                 optional: true
+            persistentStatsConfig:
+                description: >-
+                    The configuration for the persistent statistics collected for this collection,
+                    used by the cost-based ranker and the join optimizer.
+                type: PersistentStatsConfig
+                optional: true
+                stability: unstable
             timeseries:
                 description: "The options to create the time-series collection with."
                 type: TimeseriesOptions

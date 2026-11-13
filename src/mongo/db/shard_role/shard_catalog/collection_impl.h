@@ -208,6 +208,15 @@ public:
     void setChangeStreamPreAndPostImages(OperationContext* opCtx,
                                          ChangeStreamPreAndPostImagesOptions val) final;
 
+    const boost::optional<PersistentStatsConfig>& getPersistentStatsConfig() const final;
+
+    void setPersistentStatsConfig(
+        OperationContext* opCtx,
+        const boost::optional<PersistentStatsConfig>& persistentStatsConfig) final;
+
+    void updatePersistentStatsConfig(OperationContext* opCtx,
+                                     const PersistentStatsConfigUpdate& update) final;
+
     bool isTimeseriesCollection() const final;
 
     bool isNewTimeseriesWithoutView() const final;

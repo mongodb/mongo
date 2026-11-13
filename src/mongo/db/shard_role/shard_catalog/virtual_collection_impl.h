@@ -237,6 +237,21 @@ public:
         unimplementedTasserted();
     }
 
+    const boost::optional<PersistentStatsConfig>& getPersistentStatsConfig() const final {
+        return _options.persistentStatsConfig;
+    }
+
+    void setPersistentStatsConfig(
+        OperationContext* opCtx,
+        const boost::optional<PersistentStatsConfig>& persistentStatsConfig) final {
+        unimplementedTasserted();
+    }
+
+    void updatePersistentStatsConfig(OperationContext* opCtx,
+                                     const PersistentStatsConfigUpdate& update) final {
+        unimplementedTasserted();
+    }
+
     bool isTemporary() const final {
         return true;
     }

@@ -22,6 +22,8 @@
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/compiler/ce/persistence/persistent_stats_config_update.h"
+#include "mongo/db/query/compiler/ce/persistence/persistent_stats_config_validation.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -112,6 +114,7 @@ struct ParsedCollModRequest {
     boost::optional<bool> _removeLegacyTimeseriesBucketingParametersHaveChanged;
     boost::optional<bool> recordIdsReplicated;
     boost::optional<bool> prepareConstraintValidationLevel;
+    boost::optional<PersistentStatsConfigUpdate> persistentStatsConfigUpdate;
 };
 
 Status getNotSupportedOnViewError(std::string_view fieldName) {
@@ -640,6 +643,26 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
         oplogEntryBuilder.append(CollMod::kRecordIdsReplicatedFieldName, false);
     }
 
+    if (auto& persistentStatsConfigUpdate = cmr.getPersistentStatsConfig()) {
+        auto status = validatePersistentStatsConfigIsApplicable(opCtx, isView);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = validatePersistentStatsConfigUpdate(*persistentStatsConfigUpdate);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        parsed.numModifications++;
+        parsed.persistentStatsConfigUpdate = *persistentStatsConfigUpdate;
+
+        // The oplog entry carries the update so it is applied identically when replayed.
+        BSONObjBuilder subObjBuilder(
+            oplogEntryBuilder.subobjStart(CollMod::kPersistentStatsConfigFieldName));
+        persistentStatsConfigUpdate->serialize(&subObjBuilder);
+    }
+
     if (const auto& dryRun = cmr.getDryRun()) {
         parsed.dryRun = *dryRun;
         // The dry run option should never be included in a collMod oplog entry.
@@ -1010,6 +1033,10 @@ Status _collModInternal(OperationContext* opCtx,
                     cmd.toBSON().toString()));
 
             writableColl->unsetRecordIdsReplicated(opCtx);
+        }
+
+        if (cmrNew.persistentStatsConfigUpdate) {
+            writableColl->updatePersistentStatsConfig(opCtx, *cmrNew.persistentStatsConfigUpdate);
         }
 
         // Handle index modifications.

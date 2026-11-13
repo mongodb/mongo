@@ -58,6 +58,11 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModCommandTranslation) {
         boost::make_optional<std::variant<std::string, std::int64_t>>(100));
     collModCmd.setTimeseries(collModTimeseries);
     collModCmd.setTimeseriesBucketsMayHaveMixedSchemaData(true);
+    PersistentStatsSamplesConfigUpdate samples;
+    samples.setSampleSize(SampleSizeUpdate{SetSampleSize{1000}});
+    PersistentStatsConfigUpdate persistentStatsConfig;
+    persistentStatsConfig.setSamples(samples);
+    collModCmd.setPersistentStatsConfig(persistentStatsConfig);
     collModCmd.setDryRun(true);
 
     auto collModBuckets =
@@ -73,6 +78,10 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModCommandTranslation) {
     EXPECT_EQ(std::get<int64_t>(*(collModBuckets->getExpireAfterSeconds())), 100);
     EXPECT_EQ(*(collModBuckets->getTimeseries()->getGranularity()), BucketGranularityEnum::Seconds);
     EXPECT_EQ(*(collModBuckets->getTimeseriesBucketsMayHaveMixedSchemaData()), true);
+    EXPECT_EQ(std::get<SetSampleSize>(
+                  *collModBuckets->getPersistentStatsConfig()->getSamples()->getSampleSize())
+                  .value,
+              1000);
     EXPECT_EQ(*(collModBuckets->getDryRun()), true);
 }
 

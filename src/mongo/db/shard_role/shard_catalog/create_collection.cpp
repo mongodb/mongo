@@ -22,6 +22,7 @@
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/compiler/ce/persistence/persistent_stats_config_validation.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -425,6 +426,18 @@ Status _performCollectionCreationChecks(OperationContext* opCtx,
                 str::stream() << "Cannot create view '" << ns.toStringForErrorMsg()
                               << "' on an internal system.buckets collection",
                 !viewOnNss.isTimeseriesBucketsCollection());
+    }
+
+    if (options.persistentStatsConfig) {
+        auto status = validatePersistentStatsConfigIsApplicable(opCtx, options.isView());
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = validatePersistentStatsConfig(*options.persistentStatsConfig);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     return Status::OK();

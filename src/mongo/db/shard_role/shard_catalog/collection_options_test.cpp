@@ -95,6 +95,36 @@ TEST(CollectionOptions, PrepareConstraintValidationLevelRejectsNonBoolean) {
                       .getStatus());
 }
 
+TEST(CollectionOptions, PersistentStatsConfigRoundTrip) {
+    CollectionOptions options;
+    ASSERT_FALSE(options.toBSON()["persistentStatsConfig"]);
+
+    PersistentStatsSamplesConfig samples;
+    samples.setSampleSize(1000);
+    samples.setJoinSampleSize(2000);
+    PersistentStatsConfig config;
+    config.setSamples(samples);
+    options.persistentStatsConfig = config;
+
+    ASSERT_BSONOBJ_EQ(options.toBSON()["persistentStatsConfig"].Obj(),
+                      fromjson("{samples: {sampleSize: 1000, joinSampleSize: 2000}}"));
+    checkRoundTrip(options);
+}
+
+TEST(CollectionOptions, PersistentStatsConfigRejectsInvalidValues) {
+    ASSERT_NOT_OK(
+        CollectionOptions::parse(fromjson("{persistentStatsConfig: {samples: {sampleSize: 0}}}"))
+            .getStatus());
+    ASSERT_NOT_OK(
+        CollectionOptions::parse(fromjson("{persistentStatsConfig: {samples: {sampleSize: -1}}}"))
+            .getStatus());
+    ASSERT_NOT_OK(CollectionOptions::parse(
+                      fromjson("{persistentStatsConfig: {samples: {joinSampleSize: 0}}}"))
+                      .getStatus());
+    ASSERT_NOT_OK(
+        CollectionOptions::parse(fromjson("{persistentStatsConfig: 'notADocument'}")).getStatus());
+}
+
 TEST(CollectionOptions, ErrorBadSize) {
     ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{capped: true, size: -1}")).getStatus());
     ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{capped: false, size: -1}")).getStatus());

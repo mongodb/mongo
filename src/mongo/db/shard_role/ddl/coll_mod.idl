@@ -10,6 +10,7 @@ imports:
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/auth/access_checks.idl"
     - "mongo/db/basic_types.idl"
+    - "mongo/db/query/compiler/ce/persistence/persistent_stats_config.idl"
     - "mongo/db/shard_role/shard_catalog/collection_options.idl"
     - "mongo/db/timeseries/timeseries.idl"
     - "mongo/db/pipeline/change_stream_pre_and_post_images_options.idl"
@@ -210,6 +211,13 @@ structs:
                     BSONElement::booleanSafe()) if provided.
                 optional: true
                 type: safeBool
+                stability: unstable
+            persistentStatsConfig:
+                description: >-
+                    A partial update to the configuration for the persistent statistics collected
+                    for this collection, used by the cost-based ranker and the join optimizer.
+                optional: true
+                type: PersistentStatsConfigUpdate
                 stability: unstable
 
 commands:

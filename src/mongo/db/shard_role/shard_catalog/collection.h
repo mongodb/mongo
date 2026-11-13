@@ -17,6 +17,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/ce/persistence/persistent_stats_config_gen.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
@@ -442,6 +443,24 @@ public:
     virtual bool isChangeStreamPreAndPostImagesEnabled() const = 0;
     virtual void setChangeStreamPreAndPostImages(OperationContext* opCtx,
                                                  ChangeStreamPreAndPostImagesOptions val) = 0;
+
+    /**
+     * Returns the per-collection persistent statistics configuration, if set.
+     */
+    virtual const boost::optional<PersistentStatsConfig>& getPersistentStatsConfig() const = 0;
+
+    /**
+     * Sets the per-collection persistent statistics configuration for this collection.
+     */
+    virtual void setPersistentStatsConfig(
+        OperationContext* opCtx,
+        const boost::optional<PersistentStatsConfig>& persistentStatsConfig) = 0;
+
+    /**
+     * Applies a 'persistentStatsConfig' update to this collection's configuration.
+     */
+    virtual void updatePersistentStatsConfig(OperationContext* opCtx,
+                                             const PersistentStatsConfigUpdate& update) = 0;
 
     /**
      * Returns true if this is a time-series collection.

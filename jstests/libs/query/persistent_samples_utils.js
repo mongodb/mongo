@@ -160,6 +160,12 @@ export function getCollUUID(db, collName) {
     return extractUUIDFromObject(db.getCollectionInfos({name: collName})[0].info.uuid);
 }
 
+// Returns the 'persistentStatsConfig' collection option of a collection, or undefined when the
+// collection has no such option set.
+export function readPersistentStatsConfig(db, collName) {
+    return db.getCollectionInfos({name: collName}).at(0)?.options?.persistentStatsConfig;
+}
+
 export function getSamplesColl(db) {
     return db[samplesCollName];
 }

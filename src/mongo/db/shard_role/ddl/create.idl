@@ -11,6 +11,7 @@ imports:
     - "mongo/crypto/encryption_fields.idl"
     - "mongo/db/auth/access_checks.idl"
     - "mongo/db/auth/action_type.idl"
+    - "mongo/db/query/compiler/ce/persistence/persistent_stats_config.idl"
     - "mongo/db/shard_role/shard_catalog/collection_options.idl"
     - "mongo/db/shard_role/shard_catalog/clustered_collection_options.idl"
     - "mongo/db/timeseries/timeseries.idl"
@@ -123,6 +124,13 @@ structs:
             changeStreamPreAndPostImages:
                 description: "The options for point-in-time pre- and post-images in change streams opened on this collection."
                 type: ChangeStreamPreAndPostImagesOptions
+                optional: true
+                stability: unstable
+            persistentStatsConfig:
+                description: >-
+                    The configuration for the persistent statistics collected for this collection,
+                    used by the cost-based ranker and the join optimizer.
+                type: PersistentStatsConfig
                 optional: true
                 stability: unstable
             timeseries:
