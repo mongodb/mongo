@@ -84,6 +84,7 @@ using std::string;
 
 MONGO_FAIL_POINT_DEFINE(pauseCollectionValidationWithLock);
 MONGO_FAIL_POINT_DEFINE(throwBeforeIndexValidation);
+MONGO_FAIL_POINT_DEFINE(skipEnforcingHashCorrectness);
 
 namespace collection_validation {
 
@@ -525,13 +526,17 @@ void _compareCollectionHash(OperationContext* opCtx,
     const auto accumulated = results.getXxh3CollectionHash();
     invariant(accumulated.has_value());
     if (!results.recordHashComparison(*accumulated, *expected)) {
-        LOGV2_WARNING(13397000,
-                      "Collection hash does not match the replicated collection validation hash",
-                      logAttrs(validateState.nss()),
-                      logAttrs(validateState.uuid()),
-                      "expectedHash"_attr = *expected,
-                      "accumulatedHash"_attr = *accumulated,
-                      "hashDiff"_attr = static_cast<int64_t>(*accumulated) ^ *expected);
+        LOGV2_IMPL(13397000,
+                   gFeatureFlagPreparedTransactionsPreciseCheckpoints.isEnabled()
+                       ? logv2::LogSeverity::Warning()
+                       : logv2::LogSeverity::Error(),
+                   logv2::LogOptions{LogComponent::kStorage},
+                   "Collection hash does not match the replicated collection validation hash",
+                   logAttrs(validateState.nss()),
+                   logAttrs(validateState.uuid()),
+                   "expectedHash"_attr = *expected,
+                   "accumulatedHash"_attr = *accumulated,
+                   "hashDiff"_attr = static_cast<int64_t>(*accumulated) ^ *expected);
     }
 } catch (const DBException& e) {
     if (!opCtx->checkForInterruptNoAssert().isOK() || e.code() == ErrorCodes::Interrupted) {
@@ -1287,11 +1292,12 @@ Status validate(OperationContext* opCtx,
         }
 
         // Compare the accumulated hash against the replicated metadata system's view of the
-        // collection.
+        // collection, unless a test intentionally leaves the replicated hash inconsistent.
         if (results.getXxh3CollectionHash().has_value() &&
             rss::ReplicatedStorageService::get(opCtx)
                 .getPersistenceProvider()
-                .shouldUseContinuousInternodeValidation()) {
+                .shouldUseContinuousInternodeValidation() &&
+            !MONGO_unlikely(skipEnforcingHashCorrectness.shouldFail())) {
             if (validateState.getOptions().readTimestamp) {
                 results.setHashComparison(ValidateResults::HashComparison::kPinnedReadTimestamp);
             } else {

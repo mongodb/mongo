@@ -259,7 +259,9 @@ public:
 
     /**
      * Records the outcome of comparing the accumulated collection hash against the expected one,
-     * adding a warning when they disagree. Returns true if they matched.
+     * adding an error without stopping validation when they disagree, or a warning while prepared
+     * transaction precise checkpoints are enabled. Returns true if they matched.
+     * TODO SERVER-139224: Remove the prepared transaction precise checkpoints exception.
      */
     bool recordHashComparison(uint64_t accumulated, int64_t expected);
 

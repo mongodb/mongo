@@ -2428,6 +2428,10 @@ public:
     bool shouldUseContinuousInternodeValidation() const override {
         return true;
     }
+
+    bool supportsVersionCursor() const override {
+        return false;
+    }
 };
 
 class CollectionHashComparisonTest : public CollectionValidationTest {
@@ -2897,19 +2901,132 @@ TEST_F(CollectionHashComparisonTest, AFailedComparisonDoesNotCutValidationShort)
     EXPECT_TRUE(results.isValid());
 }
 
-TEST_F(CollectionHashComparisonTest, WarnsButStaysValidWhenThePersistedHashDisagrees) {
+TEST_F(CollectionHashComparisonTest, ErrorsWhenThePersistedHashDisagrees) {
+    unittest::ServerParameterGuard preparedTxnFlag{
+        "featureFlagPreparedTransactionsPreciseCheckpoints", false};
     createFastCountContainers();
     const std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 2)};
     insertDocs(docs);
     // Stands in for the collection having diverged from what replication believes it holds.
     seedPersistedHash(collectionUuid(), static_cast<int64_t>(xxh3Of(docs)) ^ 0xabcd);
 
+    unittest::LogCaptureGuard logs;
+    const auto results = hashValidate();
+    logs.stop();
+
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "mismatched");
+    EXPECT_TRUE(results.getWarnings().empty());
+    ASSERT_EQ(results.getErrors().size(), 1);
+    EXPECT_EQ(*results.getErrors().begin(),
+              "The collection hash does not match the hash accumulated by continuous internode "
+              "validation.");
+    EXPECT_FALSE(results.isValid());
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13397000 << "s" << "E")), 1);
+}
+
+TEST_F(CollectionHashComparisonTest, WarnsWhenTheHashDisagreesWithPreparedTransactionsEnabled) {
+    unittest::ServerParameterGuard preparedTxnFlag{
+        "featureFlagPreparedTransactionsPreciseCheckpoints", true};
+    createFastCountContainers();
+    const std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 2)};
+    insertDocs(docs);
+    seedPersistedHash(collectionUuid(), static_cast<int64_t>(xxh3Of(docs)) ^ 0xabcd);
+
+    unittest::LogCaptureGuard logs;
+    const auto results = hashValidate();
+    logs.stop();
+
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "mismatched");
+    EXPECT_TRUE(results.isValid());
+    EXPECT_TRUE(results.getErrors().empty());
+    ASSERT_EQ(results.getWarnings().size(), 1);
+    EXPECT_EQ(*results.getWarnings().begin(),
+              "The collection hash does not match the hash accumulated by continuous internode "
+              "validation.");
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << 13397000 << "s" << "W")), 1);
+    EXPECT_EQ(results.getIndexResultsMap().at("_id_").getKeysTraversed(), 2);
+}
+
+TEST_F(CollectionHashComparisonTest, HashMismatchDoesNotHideMissingIndexEntries) {
+    createFastCountContainers();
+    const std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 2)};
+    insertDocs(docs);
+    seedPersistedHash(collectionUuid(), static_cast<int64_t>(xxh3Of(docs)) ^ 0xabcd);
+
+    {
+        const AutoGetCollection coll(operationContext(), kNss, MODE_IX);
+        const auto* entry = coll->getIndexCatalog()->findIndexByName(operationContext(), "_id_");
+        ASSERT(entry);
+        auto* sortedData = entry->accessMethod()->asSortedData()->getSortedDataInterface();
+        auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+        const auto first = makeFirstKeyString(*sortedData);
+        auto cursor = sortedData->newCursor(operationContext(), ru);
+        const auto indexEntry = cursor->seekForKeyString(ru, first.getView());
+        ASSERT(indexEntry);
+        const auto key = indexEntry->keyString;
+        cursor.reset();
+
+        WriteUnitOfWork wuow(operationContext());
+        sortedData->unindex(operationContext(), ru, key, /*dupsAllowed=*/false);
+        wuow.commit();
+    }
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    for (const bool preparedTransactionsEnabled : {false, true}) {
+        unittest::ServerParameterGuard preparedTxnFlag{
+            "featureFlagPreparedTransactionsPreciseCheckpoints", preparedTransactionsEnabled};
+        const auto results = hashValidate();
+        ASSERT_TRUE(results.getHashComparison().has_value());
+        EXPECT_EQ(toString(*results.getHashComparison()), "mismatched");
+        EXPECT_FALSE(results.isValid());
+        const auto& findings =
+            preparedTransactionsEnabled ? results.getWarnings() : results.getErrors();
+        EXPECT_TRUE(findings.contains(
+            "The collection hash does not match the hash accumulated by continuous internode "
+            "validation."));
+        EXPECT_EQ(results.getMissingIndexEntries().size(), 1u);
+        EXPECT_FALSE(results.getIndexResultsMap().at("_id_").isValid());
+    }
+
+    FailPointEnableBlock skipHashCorrectness("skipEnforcingHashCorrectness");
+    const auto results = hashValidate();
+    EXPECT_FALSE(results.getHashComparison().has_value());
+    EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
+    EXPECT_TRUE(results.getXxh3CollectionHash().has_value());
+    EXPECT_FALSE(results.isValid());
+    EXPECT_EQ(results.getMissingIndexEntries().size(), 1u);
+    EXPECT_FALSE(results.getIndexResultsMap().at("_id_").isValid());
+}
+
+TEST_F(CollectionHashComparisonTest, SkipHashCorrectnessPreservesOtherValidation) {
+    unittest::ServerParameterGuard preparedTxnFlag{
+        "featureFlagPreparedTransactionsPreciseCheckpoints", false};
+    createFastCountContainers();
+    const std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 2)};
+    insertDocs(docs);
+    seedPersistedHash(collectionUuid(), static_cast<int64_t>(xxh3Of(docs)) ^ 0xabcd);
+
+    {
+        FailPointEnableBlock skipHashCorrectness("skipEnforcingHashCorrectness");
+        const auto results = hashValidate();
+        EXPECT_TRUE(results.isValid());
+        EXPECT_TRUE(results.getErrors().empty());
+        EXPECT_TRUE(results.getWarnings().empty());
+        EXPECT_FALSE(results.getHashComparison().has_value());
+        EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
+        ASSERT_TRUE(results.getXxh3CollectionHash().has_value());
+        EXPECT_EQ(*results.getXxh3CollectionHash(), xxh3Of(docs));
+        ASSERT_TRUE(results.getNumRecords().has_value());
+        EXPECT_EQ(*results.getNumRecords(), 2);
+        EXPECT_EQ(results.getIndexResultsMap().at("_id_").getKeysTraversed(), 2);
+    }
+
     const auto results = hashValidate();
     ASSERT_TRUE(results.getHashComparison().has_value());
     EXPECT_EQ(toString(*results.getHashComparison()), "mismatched");
-    EXPECT_EQ(results.getWarnings().size(), 1);
-    // A divergence is surfaced, but must not by itself declare the collection invalid.
-    EXPECT_TRUE(results.isValid());
+    EXPECT_FALSE(results.isValid());
 }
 
 // An eligible collection with no persisted hash is surfaced, but only as a warning.

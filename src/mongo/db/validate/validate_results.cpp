@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/validate/bson_utf8.h"
 #include "mongo/db/validate/validate_options.h"
 
@@ -109,12 +110,17 @@ bool ValidateResults::recordHashComparison(uint64_t accumulated, int64_t expecte
     const bool matches = static_cast<int64_t>(accumulated) == expected;
     setExpectedXxh3CollectionHash(expected);
     setHashComparison(matches ? HashComparison::kMatched : HashComparison::kMismatched);
-    // TODO SERVER-134248: Change this to an error after we get confidence in the persisted
-    // collection hashes.
     if (!matches) {
-        addWarning(
+        const std::string message =
             "The collection hash does not match the hash accumulated by continuous internode "
-            "validation.");
+            "validation.";
+        // TODO SERVER-139224: Always report an error once prepared transaction recovery preserves
+        // the replicated collection hash.
+        if (gFeatureFlagPreparedTransactionsPreciseCheckpoints.isEnabled()) {
+            addWarning(message);
+        } else {
+            addError(message, /*stopValidation=*/false);
+        }
     }
     return matches;
 }
