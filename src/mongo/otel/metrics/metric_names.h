@@ -153,6 +153,8 @@ public:
         MetricNameMaker::make("mongodb.network.egress.operations_per_connection");
     static constexpr MetricName kNetworkEgressConnectionsClosed =
         MetricNameMaker::make("mongodb.network.egress.connections_closed");
+    static constexpr MetricName kNetworkEgressConnectionAttemptsAfterCancellation =
+        MetricNameMaker::make("mongodb.network.egress.connection_attempts_after_cancellation");
     static constexpr MetricName kNetworkEgressKillOperationsLatency =
         MetricNameMaker::make("mongodb.network.egress.kill_operations_latency");
     static constexpr MetricName kNetworkEgressResolutionOperations =

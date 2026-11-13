@@ -105,7 +105,7 @@ auto& egressConnectionsClosedCounter =
         otel::metrics::MetricUnit::kConnections,
         otel::metrics::AttributeDefinition<std::string_view>{
             .name = "reason",
-            .values = {kCloseReasonMaxTimeMsExpired, kCloseReasonOther},
+            .values = {kCloseReasonMaxTimeMsExpired, kCloseReasonCanceled, kCloseReasonOther},
         },
         otel::metrics::CounterOptions{
             .serverStatusOptions =
@@ -113,10 +113,32 @@ auto& egressConnectionsClosedCounter =
                                                    .role = ClusterRole::None},
             .reportingPolicy = otel::metrics::ReportingPolicy::kUnconditionally});
 
+auto& connectionsAfterCancellationCounter =
+    otel::metrics::MetricsService::instance()
+        .createInt64Counter<std::string_view, std::string_view>(
+            otel::metrics::MetricNames::kNetworkEgressConnectionAttemptsAfterCancellation,
+            fmt::format("Egress connection attempts within {} ms of a connection cancellation.",
+                        kRecentCancellationDuration.count()),
+            otel::metrics::MetricUnit::kConnections,
+            otel::metrics::AttributeDefinition<std::string_view>{
+                .name = "purpose",
+                .values = {kNormalConnectionPurpose, kKillOperationConnectionPurpose}},
+            otel::metrics::AttributeDefinition<std::string_view>{
+                .name = "connection_pool",
+                .values = {kTaskExecutorPoolConnectionPoolAttribute,
+                           kShardingFixedConnectionPoolAttribute,
+                           kOtherConnectionPoolAttribute}},
+            otel::metrics::CounterOptions{
+                .serverStatusOptions = otel::metrics::ServerStatusOptions{
+                    .dottedPath = "network.egress.connectionAttemptsAfterCancellation",
+                    .role = ClusterRole::None}});
+
 std::string_view connectionCloseReasonToAttributeValue(ConnectionCloseReason reason) {
     switch (reason) {
         case ConnectionCloseReason::kMaxTimeMsExpired:
             return kCloseReasonMaxTimeMsExpired;
+        case ConnectionCloseReason::kCanceled:
+            return kCloseReasonCanceled;
         case ConnectionCloseReason::kOther:
             return kCloseReasonOther;
         case ConnectionCloseReason::kNotEstablished:
@@ -830,6 +852,28 @@ void ConnectionPool::shutdown() {
     }
 }
 
+void ConnectionPool::_recordCancellationClosure() {
+    auto* tickSource = _factory->getTickSource();
+    const auto now = tickSource->getTicks();
+
+    const auto expiryInTicks =
+        static_cast<TickSource::Tick>(kRecentCancellationDuration.count() *
+                                      tickSource->getTicksPerSecond() / Milliseconds::period::den);
+    _recentCancellationExpiryTicks.storeRelaxed(now + expiryInTicks);
+}
+
+void ConnectionPool::_recordConnectionAttempt(ConnectionAcquisitionPurpose purpose) {
+    auto* tickSource = _factory->getTickSource();
+    const auto now = tickSource->getTicks();
+
+    if (now >= _recentCancellationExpiryTicks.loadRelaxed()) {
+        return;
+    }
+
+    connectionsAfterCancellationCounter.add(
+        1, {connectionAcquisitionPurposeToAttributeValue(purpose), _connectionPoolAttribute});
+}
+
 void ConnectionPool::dropConnections(const HostAndPort& target, const Status& status) {
     std::unique_lock lk(_mutex);
 
@@ -1393,6 +1437,13 @@ void ConnectionPool::SpecificPool::returnConnection(
     }
 
     if (auto status = conn->getStatus(); !status.isOK()) {
+        if (status == ErrorCodes::CallbackCanceled) {
+            if (conn->_closeReason == ConnectionCloseReason::kOther) {
+                conn->_closeReason = ConnectionCloseReason::kCanceled;
+            }
+            _parent->_recordCancellationClosure();
+        }
+
         // Our error handling here is determined by the MongoDB SDAM specification for handling
         // application errors on established connections. In particular, if a network error occurs,
         // we must close all idle sockets in the connection pool for the server: "if one socket is
@@ -1746,6 +1797,7 @@ void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
             1,
             {connectionAcquisitionPurposeToAttributeValue(purposes[i]),
              _parent->_connectionPoolAttribute});
+        _parent->_recordConnectionAttempt(purposes[i]);
 
         // Run the setup callback
         handle->setup(_parent->_controller->pendingTimeout(),
@@ -1974,6 +2026,10 @@ void ConnectionPool::SpecificPool::updateState(WithLock) {
 
 ClockSource* ConnectionPool::DependentTypeFactoryInterface::getFastClockSource() {
     return getGlobalServiceContext()->getFastClockSource();
+}
+
+TickSource* ConnectionPool::DependentTypeFactoryInterface::getTickSource() {
+    return getGlobalServiceContext()->getTickSource();
 }
 
 }  // namespace executor

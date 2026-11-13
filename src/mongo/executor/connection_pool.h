@@ -28,8 +28,10 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -299,6 +301,9 @@ public:
 private:
     ClockSource* _getFastClockSource() const;
 
+    void _recordCancellationClosure();
+    void _recordConnectionAttempt(ConnectionAcquisitionPurpose purpose);
+
     SemiFuture<ConnectionHandle> _get(const HostAndPort& hostAndPort,
                                       transport::ConnectSSLMode sslMode,
                                       Milliseconds timeout,
@@ -324,6 +329,11 @@ private:
     PoolId _nextPoolId = 0;
     stdx::unordered_map<HostAndPort, std::shared_ptr<SpecificPool>> _pools;
     bool _isShutDown = false;
+
+    // Tracks recent connection cancellations so that connection attempts made shortly after a
+    // cancellation can be attributed as such. Holds the tick at which the most recent dropped
+    // connection is no longer considered recently dropped, or 0 if there is none.
+    Atomic<TickSource::Tick> _recentCancellationExpiryTicks{0};
 
     // Preserves the total created connection count for SpecificPools that were destroyed.
     stdx::unordered_map<HostAndPort, size_t> _cachedCreatedConnections;
@@ -374,6 +384,7 @@ public:
 enum class ConnectionCloseReason {
     kNotEstablished,
     kMaxTimeMsExpired,
+    kCanceled,
     kOther,
 };
 
@@ -635,6 +646,12 @@ public:
     virtual ClockSource* getFastClockSource();
 
     /**
+     * Returns the monotonic tick source.
+     * The default implementation gets it from the global service context.
+     */
+    virtual TickSource* getTickSource();
+
+    /**
      * shutdown
      */
     virtual void shutdown() = 0;
@@ -662,7 +679,10 @@ inline ClockSource* ConnectionPool::_getFastClockSource() const {
 // Possible values for the "egress connections closed" metric attribute
 [[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kCloseReasonMaxTimeMsExpired =
     "maxTimeMsExpired";
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kCloseReasonCanceled = "canceled";
 [[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kCloseReasonOther = "other";
+
+[[MONGO_MOD_FILE_PRIVATE]] constexpr auto kRecentCancellationDuration = Milliseconds(1);
 
 }  // namespace executor
 }  // namespace mongo

@@ -13,6 +13,7 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -158,6 +159,22 @@ public:
         return &_fastClockSource;
     }
 
+    TickSource* getTickSource() override {
+        return &_tickSource;
+    }
+
+    static void advanceTicks(Milliseconds duration) {
+        _tickSource.advance(duration);
+    }
+
+    /**
+     * Restores the default millisecond tick source to its initial state and removes any override.
+     */
+    static void resetTickSource() {
+        _tickSource.reset(1);
+        _tickSource.setAdvanceOnRead(Milliseconds{0});
+    }
+
     void shutdown() override {
         TimerImpl::clear();
     };
@@ -173,6 +190,7 @@ private:
 
     static boost::optional<Date_t> _now;
     static ClockSourceMock _fastClockSource;
+    static TickSourceMock<Milliseconds> _tickSource;
 };
 
 }  // namespace connection_pool_test_details

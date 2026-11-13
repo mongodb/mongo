@@ -79,6 +79,7 @@ protected:
 
         ConnectionImpl::clear();
         TimerImpl::clear();
+        PoolImpl::resetTickSource();
     }
 
     auto makePool(ConnectionPool::Options options = {}) {
@@ -304,6 +305,204 @@ class ConnectionPoolDropTest : public ConnectionPoolTest {};
 class ConnectionPoolCancellationTest : public ConnectionPoolTest {};
 class ConnectionPoolShutdownTest : public ConnectionPoolTest {};
 class ConnectionPoolMetricsTest : public ConnectionPoolTest {};
+
+class ConnectionPoolCancellationMetricsTest : public ConnectionPoolTest {
+protected:
+    auto makeCancellationPool() {
+        ConnectionPool::Options options;
+        options.minConnections = 0;
+        return makePool(options);
+    }
+
+    ConnectionPool::ConnectionHandle connect(const HostAndPort& host = HostAndPort()) {
+        ConnectionImpl::pushSetup(Status::OK());
+        return getFromPool(host, transport::kGlobalSSLMode, Seconds(10)).get();
+    }
+
+    int64_t readAttemptsAfterCancellationCounter(
+        std::string_view purpose = kNormalConnectionPurpose) {
+        try {
+            return _capturer.readInt64Counter(
+                otel::metrics::MetricNames::kNetworkEgressConnectionAttemptsAfterCancellation,
+                std::tuple{purpose, kOtherConnectionPoolAttribute});
+        } catch (const DBException& ex) {
+            if (ex.code() == ErrorCodes::KeyNotFound) {
+                return 0;
+            }
+            throw;
+        }
+    }
+
+    otel::metrics::OtelMetricsCapturer _capturer;
+};
+
+TEST_F(ConnectionPoolCancellationMetricsTest, CountsAttemptWhenSpawnedNotWhenSetupCompletes) {
+    if (!_capturer.canReadMetrics()) {
+        return;
+    }
+    auto pool = makeCancellationPool();
+    auto conn = connect();
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 0);
+    doneWithError(conn, {ErrorCodes::CallbackCanceled, "canceled"});
+    ASSERT_EQ(readEgressConnectionsClosedCounter(_capturer, kCloseReasonCanceled), 1);
+    ASSERT_EQ(readEgressConnectionsClosedCounter(_capturer, kCloseReasonOther), 0);
+
+    auto replacement = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(10));
+    ASSERT_FALSE(replacement.isReady());
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 1);
+    ConnectionImpl::pushSetup({ErrorCodes::ConnectionError, "isolated setup failure"});
+    ASSERT_FALSE(replacement.isReady());
+    // The replacement for the failed setup spawn is also within the window, so it counts too.
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 2);
+    ConnectionImpl::pushSetup(Status::OK());
+    auto replaced = std::move(replacement).get();
+    doneWith(replaced);
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 2);
+}
+
+TEST_F(ConnectionPoolCancellationMetricsTest, AttemptsAfterCancellationIncrementedCorrectly) {
+    if (!_capturer.canReadMetrics()) {
+        return;
+    }
+    for (auto delay : {Milliseconds(0),
+                       kRecentCancellationDuration - Milliseconds(1),
+                       kRecentCancellationDuration,
+                       kRecentCancellationDuration + Milliseconds(1)}) {
+        const auto now = Date_t::now();
+        PoolImpl::setNow(now);
+        auto pool = makeCancellationPool();
+        auto conn = connect();
+        doneWithError(conn, {ErrorCodes::CallbackCanceled, "canceled"});
+        const auto before = readAttemptsAfterCancellationCounter();
+        PoolImpl::advanceTicks(delay);
+        auto replacement = connect();
+        ASSERT_EQ(readAttemptsAfterCancellationCounter() - before,
+                  delay < kRecentCancellationDuration ? 1 : 0);
+        doneWith(replacement);
+    }
+    ASSERT_EQ(readEgressConnectionsClosedCounter(_capturer, kCloseReasonCanceled), 4);
+}
+
+TEST_F(ConnectionPoolCancellationMetricsTest, EveryConnectionAttemptInWindowCounts) {
+    if (!_capturer.canReadMetrics()) {
+        return;
+    }
+    auto pool = makeCancellationPool();
+    auto first = connect();
+    doneWithError(first, {ErrorCodes::CallbackCanceled, "canceled"});
+
+    PoolImpl::advanceTicks(Milliseconds(kRecentCancellationDuration.count() / 2));
+    auto replacement1 = connect();
+    auto replacement2 = connect();
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 2);
+
+    PoolImpl::advanceTicks(Milliseconds(kRecentCancellationDuration.count() / 2 + 1));
+    auto replacement3 = connect();
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 2);
+
+    doneWith(replacement1);
+    doneWith(replacement2);
+    doneWith(replacement3);
+    ASSERT_EQ(readEgressConnectionsClosedCounter(_capturer, kCloseReasonCanceled), 1);
+}
+
+TEST_F(ConnectionPoolCancellationMetricsTest, NewCancellationStartsFreshWindowAfterExpiry) {
+    if (!_capturer.canReadMetrics()) {
+        return;
+    }
+    auto pool = makeCancellationPool();
+    auto first = connect();
+    auto second = connect();
+    doneWithError(first, {ErrorCodes::CallbackCanceled, "first cancellation"});
+    PoolImpl::advanceTicks(Milliseconds(kRecentCancellationDuration.count() + 1));
+
+    // The window from the first cancellation has expired, so this attempt doesn't count.
+    auto afterExpiry = connect();
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 0);
+    doneWith(afterExpiry);
+
+    // A new cancellation opens a fresh window.
+    doneWithError(second, {ErrorCodes::CallbackCanceled, "second cancellation"});
+    auto reuse = connect();  // Takes the idle connection left by afterExpiry; reuse doesn't count.
+    auto fresh = connect();  // Spawns a new connection inside the fresh window.
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 1);
+    ASSERT_EQ(readEgressConnectionsClosedCounter(_capturer, kCloseReasonCanceled), 2);
+    doneWith(reuse);
+    doneWith(fresh);
+}
+
+TEST_F(ConnectionPoolCancellationMetricsTest, MatchesAcrossHostsIncludingKillOperationAttempts) {
+    if (!_capturer.canReadMetrics()) {
+        return;
+    }
+    auto pool = makeCancellationPool();
+    auto conn = connect(HostAndPort("first", 27017));
+    doneWithError(conn, {ErrorCodes::CallbackCanceled, "canceled"});
+    pool->dropConnections(HostAndPort("first", 27017));
+    auto normal = connect(HostAndPort("second", 27017));
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 1);
+    doneWithError(normal, {ErrorCodes::CallbackCanceled, "canceled"});
+
+    ConnectionImpl::pushSetup(Status::OK());
+    auto cleanup = getFromPool(HostAndPort("third", 27017),
+                               transport::kGlobalSSLMode,
+                               Seconds(10),
+                               CancellationToken::uncancelable(),
+                               ConnectionAcquisitionPurpose::kKillOperation)
+                       .get();
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 1);
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(kKillOperationConnectionPurpose), 1);
+    doneWith(cleanup);
+}
+
+TEST_F(ConnectionPoolCancellationMetricsTest, ExcludesReuseAndOrdinaryFailures) {
+    if (!_capturer.canReadMetrics()) {
+        return;
+    }
+    auto pool = makeCancellationPool();
+    auto canceled = connect();
+    auto conn = connect();
+    doneWithError(canceled, {ErrorCodes::CallbackCanceled, "canceled"});
+    const auto id = getId(conn);
+    doneWith(conn);
+    conn = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(10)).get();
+    ASSERT_EQ(getId(conn), id);
+    doneWithError(conn, {ErrorCodes::InternalError, "not cancellation"});
+    ASSERT_EQ(readEgressConnectionsClosedCounter(_capturer, kCloseReasonCanceled), 1);
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 0);
+}
+
+TEST_F(ConnectionPoolCancellationMetricsTest, ExcludesReturnsAfterHostPoolAndFullShutdown) {
+    if (!_capturer.canReadMetrics()) {
+        return;
+    }
+    auto pool = makeCancellationPool();
+    auto conn = connect();
+    pool->dropConnections(HostAndPort());
+    doneWithError(conn, {ErrorCodes::CallbackCanceled, "canceled after drop"});
+    ASSERT_EQ(readEgressConnectionsClosedCounter(_capturer, kCloseReasonCanceled), 0);
+    auto replacement = connect();
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 0);
+
+    pool->shutdown();
+    doneWithError(replacement, {ErrorCodes::CallbackCanceled, "canceled during full shutdown"});
+    ASSERT_EQ(readEgressConnectionsClosedCounter(_capturer, kCloseReasonCanceled), 0);
+}
+
+TEST_F(ConnectionPoolCancellationMetricsTest, ExcludesSetupAndAcquisitionCancellation) {
+    if (!_capturer.canReadMetrics()) {
+        return;
+    }
+    auto pool = makeCancellationPool();
+    CancellationSource source;
+    auto pending =
+        getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(10), source.token());
+    source.cancel();
+    ASSERT_EQ(std::move(pending).getNoThrow().getStatus(), ErrorCodes::CallbackCanceled);
+    ConnectionImpl::pushSetup({ErrorCodes::CallbackCanceled, "setup canceled"});
+    ASSERT_EQ(readEgressConnectionsClosedCounter(_capturer, kCloseReasonCanceled), 0);
+    ASSERT_EQ(readAttemptsAfterCancellationCounter(), 0);
+}
 
 // This fixture is for testing the DynamicLimitController, which is a controller that adjusts
 // the max connections and pending connections limits based on user-provided functions. Since the
@@ -552,7 +751,7 @@ TEST_F(ConnectionPoolMetricsTest, EgressConnectionsClosedMetricCountsDiscardOnce
     auto reused =
         std::move(getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1))).get();
     ASSERT_EQ(getId(reused), id);
-    doneWithError(reused, Status(ErrorCodes::CallbackCanceled, "request canceled"));
+    doneWithError(reused, Status(ErrorCodes::HostUnreachable, "request failed"));
     ASSERT_EQ(readOther(), 1);
 
     pool->dropConnections(HostAndPort());
@@ -588,6 +787,7 @@ TEST_F(ConnectionPoolMetricsTest, EgressConnectionsClosedMetricRecordsMaxTimeMsE
     doneWithError(conn, Status(ErrorCodes::CallbackCanceled, "local deadline expired"));
 
     ASSERT_EQ(readEgressConnectionsClosedCounter(capturer, kCloseReasonMaxTimeMsExpired), 1);
+    ASSERT_EQ(readEgressConnectionsClosedCounter(capturer, kCloseReasonCanceled), 0);
     ASSERT_EQ(readEgressConnectionsClosedCounter(capturer, kCloseReasonOther), 0);
 }
 
