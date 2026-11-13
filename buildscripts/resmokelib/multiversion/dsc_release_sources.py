@@ -61,6 +61,11 @@ ATLAS_FEED_KEY = "server/feeds/all.json"
 # must include this one.
 DSC_MODULE = "atlas"
 
+# The edition labels the atlas feed uses for DSC builds: older trains are
+# labelled "enterprise", newer ones (from 9.1.0-rc1024) "atlas". A query for
+# either label accepts both; any other edition matches exactly.
+DSC_EDITIONS = frozenset({"atlas", "enterprise"})
+
 
 def _default_s3_client() -> object:
     """Build a boto3 S3 client from the ambient credential chain.
@@ -90,10 +95,13 @@ class FeedSource(VersionSource):
     enumeration is ``TagSource``'s job (git topology decides the old side).
 
     "Published DSC binary" means a download entry matching the requested
-    platform/architecture/edition -- the same dimension-keyed lookup
-    db-contrib-tool performs for the download. A download entry that declares
-    its modules must include the disagg/atlas module; entries without module
-    info qualify: the feed's DSC builds do not declare modules.
+    platform/architecture and edition, where the DSC edition labels
+    (``DSC_EDITIONS``: "atlas" and "enterprise") are interchangeable -- as in
+    db-contrib-tool's atlas-feed lookup, which prefers the exact label and
+    falls back to the other. A download entry that declares its modules must
+    include the disagg/atlas module; entries without module info qualify: the
+    feed's DSC builds do not declare modules. Entries that do not qualify are
+    skipped, so another entry for the same version may still qualify.
     """
 
     name = "feed"
@@ -140,17 +148,21 @@ class FeedSource(VersionSource):
         if entry is None:
             LOGGER.debug("Version not in feed", version=version)
             return False
+        editions = (
+            DSC_EDITIONS if self.query.edition in DSC_EDITIONS else frozenset({self.query.edition})
+        )
         for download in entry.get("downloads", []):
+            # Builds are keyed by (arch, edition, target), with the DSC edition
+            # labels interchangeable.
             if (
                 download.get("arch"),
-                download.get("edition"),
                 download.get("target"),
-            ) != (self.query.architecture, self.query.edition, self.query.platform):
+            ) != (self.query.architecture, self.query.platform):
                 continue
-            # Builds are keyed by (arch, edition, target) -- the same lookup
-            # db-contrib-tool performs. A download that declares its modules
-            # must include the disagg module; entries without module info
-            # qualify: the feed's DSC builds do not declare modules.
+            if download.get("edition") not in editions:
+                continue
+            # A download that declares its modules must include the disagg module;
+            # entries without module info qualify: the feed's DSC builds do not declare modules.
             modules = download.get("modules")
             if modules and DSC_MODULE not in modules:
                 LOGGER.debug(
@@ -158,7 +170,7 @@ class FeedSource(VersionSource):
                     version=version,
                     modules=modules,
                 )
-                return False
+                continue
             return True
         LOGGER.debug("No platform build in feed", version=version)
         return False

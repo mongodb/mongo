@@ -8,3 +8,6 @@ filters:
     approvers:
       - 10gen/devprod-test-infrastructure
       - 10gen/devprod-services-integrations
+  - "multiversion/test_dsc_release*.py":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

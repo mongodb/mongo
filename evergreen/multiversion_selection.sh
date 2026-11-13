@@ -66,7 +66,11 @@ resolver_args=()
 if [[ -n "${multiversion_dsc_release}" ]]; then
     resolver_args+=(--override "${multiversion_dsc_release}")
 fi
+release_feed_arg=""
 if [[ "${multiversion_release_feed_source}" == "atlas" ]]; then
+    # The resolver reads its edition from the multiversion_edition env var, not from this shell
+    # variable; both it and db-contrib-tool treat the DSC edition labels "atlas" and "enterprise"
+    # as interchangeable in the atlas feed.
     resolver_output="$(${python} evergreen/resolve_dsc_release.py --debug ${resolver_args[@]+"${resolver_args[@]}"})" &&
         resolver_exit=0 || resolver_exit=$?
     if [[ ${resolver_exit} -ne 0 || -z "${resolver_output}" ]]; then
@@ -78,6 +82,12 @@ if [[ "${multiversion_release_feed_source}" == "atlas" ]]; then
     last_patch_arg="${resolver_output}=last-patch"
     last_continuous_arg=""
     echo "resolved last-patch DSC release: ${resolver_output}"
+    # Evergreen has no atlas-edition build variants, so with --edition atlas every request in the
+    # db-contrib-tool call below (not only the DSC release) resolves from the atlas release feed.
+    # The feed is passed explicitly so the recorded local invocation reproduces that lookup
+    # instead of falling back to the public feed, which has no atlas-edition entries.
+    edition="atlas"
+    release_feed_arg="--releaseFeedSource atlas"
 fi
 
 base_command="db-contrib-tool setup-repro-env"
@@ -86,6 +96,7 @@ evergreen_args="-sb \
   --architecture $architecture \
   --evgVersionsFile multiversion-downloads.json"
 local_args="--edition $edition \
+  ${release_feed_arg} \
   --debug \
   --fallbackToMaster \
   ${last_lts_arg} \

@@ -187,10 +187,11 @@ class FakeS3Client:
         return {"Body": io.BytesIO(self.body.encode())}
 
 
-def make_feed_source(manifest=None, **kwargs):
+def make_feed_source(manifest=None, *, query=None, **kwargs):
     s3 = FakeS3Client(json.dumps(manifest or feed_manifest()))
     source = under_test.FeedSource(
-        DscBinaryQuery(platform="amazon2023", architecture="aarch64", edition="enterprise"),
+        query
+        or DscBinaryQuery(platform="amazon2023", architecture="aarch64", edition="enterprise"),
         s3_client_factory=lambda: s3,
         **kwargs,
     )
@@ -198,6 +199,85 @@ def make_feed_source(manifest=None, **kwargs):
 
 
 class TestFeedSource(unittest.TestCase):
+    def test_atlas_and_enterprise_editions_are_interchangeable(self):
+        for requested in ("atlas", "enterprise"):
+            for published in ("atlas", "enterprise", "base"):
+                with self.subTest(requested=requested, published=published):
+                    manifest = feed_manifest()
+                    manifest["versions"][0]["downloads"][0]["edition"] = published
+                    source, _ = make_feed_source(
+                        manifest,
+                        query=DscBinaryQuery(
+                            platform="amazon2023", architecture="aarch64", edition=requested
+                        ),
+                    )
+                    self.assertEqual(
+                        source.has_published_binary("9.1.0-rc1021"), published != "base"
+                    )
+
+    def test_non_dsc_editions_match_exactly(self):
+        for requested in ("base", "targeted"):
+            for published in ("base", "targeted", "atlas", "enterprise"):
+                with self.subTest(requested=requested, published=published):
+                    manifest = feed_manifest()
+                    manifest["versions"][0]["downloads"][0]["edition"] = published
+                    source, _ = make_feed_source(
+                        manifest,
+                        query=DscBinaryQuery(
+                            platform="amazon2023", architecture="aarch64", edition=requested
+                        ),
+                    )
+                    self.assertEqual(
+                        source.has_published_binary("9.1.0-rc1021"), requested == published
+                    )
+
+    def test_skips_non_dsc_entry_when_other_edition_qualifies(self):
+        for requested in ("atlas", "enterprise"):
+            for rejected in ("atlas", "enterprise"):
+                for rejected_first in (True, False):
+                    with self.subTest(
+                        requested=requested, rejected=rejected, rejected_first=rejected_first
+                    ):
+                        manifest = feed_manifest()
+                        download = manifest["versions"][0]["downloads"][0]
+                        rejected_download = {
+                            **download,
+                            "edition": rejected,
+                            "modules": ["something-else"],
+                        }
+                        qualifying_download = {
+                            **download,
+                            "edition": "enterprise" if rejected == "atlas" else "atlas",
+                            "modules": ["atlas"],
+                        }
+                        downloads = [rejected_download, qualifying_download]
+                        manifest["versions"][0]["downloads"] = (
+                            downloads if rejected_first else downloads[::-1]
+                        )
+                        source, _ = make_feed_source(
+                            manifest,
+                            query=DscBinaryQuery(
+                                platform="amazon2023", architecture="aarch64", edition=requested
+                            ),
+                        )
+                        self.assertTrue(source.has_published_binary("9.1.0-rc1021"))
+
+    def test_atlas_edition_does_not_match_other_architectures(self):
+        manifest = feed_manifest()
+        download = manifest["versions"][0]["downloads"][0]
+        download["edition"] = "atlas"
+        download["arch"] = "x86_64"
+        source, _ = make_feed_source(manifest)
+        self.assertFalse(source.has_published_binary("9.1.0-rc1021"))
+
+    def test_atlas_edition_does_not_match_other_platforms(self):
+        manifest = feed_manifest()
+        download = manifest["versions"][0]["downloads"][0]
+        download["edition"] = "atlas"
+        download["target"] = "ubuntu2204"
+        source, _ = make_feed_source(manifest)
+        self.assertFalse(source.has_published_binary("9.1.0-rc1021"))
+
     def test_probe_only_source_enumerates_nothing(self):
         # The feed is the publication probe: it enumerates no candidates, and
         # enumeration does not touch the manifest (candidate order belongs to
