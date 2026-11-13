@@ -18,7 +18,7 @@ import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {restartServerReplication} from "jstests/libs/write_concern_util.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 
 const kAbsentMultikeyPath = BinData(0, "AA=="); // bytes: [0] -> {}
 const kPathComponentZero = BinData(0, "AQ=="); // bytes: [1] -> {0}
@@ -456,7 +456,10 @@ function assertMultikeyUpdateAgreementAtTimestamps(
 }
 
 function stopSecondaryReplicationAfterBarrier(primary, secondary, label) {
-    const stopReplProducerFailPoint = configureFailPoint(secondary, "stopReplProducer");
+    const replicationPauseFailPoint = configureFailPoint(
+        secondary,
+        isDisagg(primary) ? "hangInStandbyReadLoop" : "stopReplProducer",
+    );
 
     // Force a write to ensure the oplog fetcher is not idle and will observe stopReplProducer immediately.
     // In case there is nothing to replicate, the fetcher would wait 30s before discovering the failpoint.
@@ -464,7 +467,8 @@ function stopSecondaryReplicationAfterBarrier(primary, secondary, label) {
     assert.commandWorked(
         primary.getDB(dbName).replication_barrier.insert({_id: label}, {writeConcern: {w: 1}}),
     );
-    stopReplProducerFailPoint.wait();
+    replicationPauseFailPoint.wait();
+    return replicationPauseFailPoint;
 }
 
 function formatMultikeyTimestampMismatch(field, snapshotTs, transition, expectedPath) {
@@ -550,45 +554,52 @@ function runMixedTxnBtreeCase(mixedCase, rst, primary, secondary) {
     assert.commandWorked(primaryColl.insert(mixedCase.seedDocs, {writeConcern: {w: 2}}));
     rst.awaitReplication();
 
-    stopSecondaryReplicationAfterBarrier(primary, secondary, mixedCase.name);
+    const replicationPause = stopSecondaryReplicationAfterBarrier(
+        primary,
+        secondary,
+        mixedCase.name,
+    );
 
     const opLog = [];
     const firstMultikeyTransition = makeTransitionMap(mixedCase);
     const MultikeyUpdateVerifications = [];
 
-    for (const phase of mixedCase.phases) {
-        if (phase.type === "ScalarInsert") {
-            const insertTs = executeScalarInsertPhase(primary, primaryColl, mixedCase, phase);
-            opLog.push({type: "ScalarInsert", description: phase.description, ts: insertTs});
-        } else if (phase.type.includes("Txn")) {
-            runTxnWrites(primary, mixedCase.collName, phase);
-            opLog.push({type: phase.type, prepare: phase.prepare});
-        } else if (phase.type === "MultikeyUpdate") {
-            const result = executeMultikeyUpdatePhase(primary, primaryColl, mixedCase, phase);
-            opLog.push({type: "MultikeyUpdate", ...result});
+    try {
+        for (const phase of mixedCase.phases) {
+            if (phase.type === "ScalarInsert") {
+                const insertTs = executeScalarInsertPhase(primary, primaryColl, mixedCase, phase);
+                opLog.push({type: "ScalarInsert", description: phase.description, ts: insertTs});
+            } else if (phase.type.includes("Txn")) {
+                runTxnWrites(primary, mixedCase.collName, phase);
+                opLog.push({type: phase.type, prepare: phase.prepare});
+            } else if (phase.type === "MultikeyUpdate") {
+                const result = executeMultikeyUpdatePhase(primary, primaryColl, mixedCase, phase);
+                opLog.push({type: "MultikeyUpdate", ...result});
 
-            if (result.isFirstMultikey) {
-                const field = fieldForArrayPath(mixedCase, result.field);
-                assert(field, `MultikeyUpdate without field config: ${phase.description}`);
-                assert.eq(
-                    null,
-                    firstMultikeyTransition[field.indexPath],
-                    `more than one isFirstMultikey for path "${field.indexPath}" in case=${mixedCase.name}`,
-                );
-                firstMultikeyTransition[field.indexPath] = {
-                    beforeTs: result.beforeUpdateTs,
-                    ts: result.updateTs,
-                    description: result.description,
-                };
+                if (result.isFirstMultikey) {
+                    const field = fieldForArrayPath(mixedCase, result.field);
+                    assert(field, `MultikeyUpdate without field config: ${phase.description}`);
+                    assert.eq(
+                        null,
+                        firstMultikeyTransition[field.indexPath],
+                        `more than one isFirstMultikey for path "${field.indexPath}" in case=${mixedCase.name}`,
+                    );
+                    firstMultikeyTransition[field.indexPath] = {
+                        beforeTs: result.beforeUpdateTs,
+                        ts: result.updateTs,
+                        description: result.description,
+                    };
+                }
+
+                MultikeyUpdateVerifications.push(result);
+            } else {
+                assert(false, `unknown mixed phase type: ${tojson(phase)}`);
             }
-
-            MultikeyUpdateVerifications.push(result);
-        } else {
-            assert(false, `unknown mixed phase type: ${tojson(phase)}`);
         }
+    } finally {
+        replicationPause.off();
     }
 
-    restartServerReplication(secondary);
     rst.awaitReplication();
 
     const transitions = buildMixedCaseTransitions(primary, mixedCase, firstMultikeyTransition);
