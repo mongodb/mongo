@@ -150,9 +150,10 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             case STAGE_IXSCAN: {
                 const IndexScanNode* ixn = static_cast<const IndexScanNode*>(root);
 
-                // Ignore allowBatching until batched classic execution is implemented so rewritten
-                // solutions can still execute and multiplan.
-                // TODO SERVER-136310: Consume allowBatching flag to build batched ixscan
+                // Ignore ixn->allowBatching until batched classic execution is implemented so
+                // rewritten solutions can still execute and multiplan.
+                // TODO SERVER-136310: Consume ixn->allowBatching flag to build batched ixscan
+                // executable stages.
                 invariant(collectionPtr);
                 const auto* entry = collectionPtr->getIndexCatalog()->findIndexByIdent(
                     _opCtx, ixn->index.indexCatalogEntryStorage->getIdent());
