@@ -23,6 +23,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection_critical_section_document_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
@@ -131,11 +132,11 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     // Mark critical section acquisition operations non-deprioritizable
     mongo::admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
 
-    {
-        const auto lockAcquisitionDeadline = lockAcquisitionTimeout
-            ? opCtx->getServiceContext()->getPreciseClockSource()->now() + *lockAcquisitionTimeout
-            : Date_t::max();
+    const auto lockAcquisitionDeadline = lockAcquisitionTimeout
+        ? opCtx->getServiceContext()->getPreciseClockSource()->now() + *lockAcquisitionTimeout
+        : Date_t::max();
 
+    const auto acquireCriticalSection = [&] {
         Lock::GlobalLock lk(
             opCtx, MODE_IX, lockAcquisitionDeadline, Lock::InterruptBehavior::kThrow);
         boost::optional<Lock::DBLock> dbLock;
@@ -200,7 +201,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
                         "reason"_attr = reason,
                         "writeConcern"_attr = writeConcern);
 
-            return;
+            return false;
         }
 
         // TODO(SERVER-100328): remove after 9.0 is branched.
@@ -240,6 +241,13 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
                     reason.toString(),
                     NamespaceString::kCollectionCriticalSectionsNamespace.toStringForErrorMsg()),
                 batchedResponse.getN() > 0);
+        return true;
+    };
+    if (!writeConflictRetry(opCtx,
+                            "acquire recoverable critical section",
+                            NamespaceString::kCollectionCriticalSectionsNamespace,
+                            acquireCriticalSection)) {
+        return;
     }
 
     WriteConcernResult ignoreResult;
@@ -274,11 +282,11 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                         reason.toString()),
             !shard_role_details::getLocker(opCtx)->isLocked());
 
-    {
-        const auto lockAcquisitionDeadline = lockAcquisitionTimeout
-            ? opCtx->getServiceContext()->getPreciseClockSource()->now() + *lockAcquisitionTimeout
-            : Date_t::max();
+    const auto lockAcquisitionDeadline = lockAcquisitionTimeout
+        ? opCtx->getServiceContext()->getPreciseClockSource()->now() + *lockAcquisitionTimeout
+        : Date_t::max();
 
+    const auto promoteCriticalSection = [&] {
         boost::optional<Lock::DBLock> dbLock;
         boost::optional<Lock::CollectionLock> collLock;
         if (nss.isDbOnly()) {
@@ -326,7 +334,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                         logAttrs(nss),
                         "reason"_attr = reason,
                         "writeConcern"_attr = writeConcern);
-            return;
+            return false;
         }
 
         // TODO(SERVER-100328): remove after 9.0 is branched.
@@ -374,6 +382,13 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                         nss.toStringForErrorMsg(),
                         reason.toString()),
             batchedResponse.getNModified() > 0);
+        return true;
+    };
+    if (!writeConflictRetry(opCtx,
+                            "promote recoverable critical section",
+                            NamespaceString::kCollectionCriticalSectionsNamespace,
+                            promoteCriticalSection)) {
+        return;
     }
 
     WriteConcernResult ignoreResult;
@@ -426,7 +441,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable> deprioGuard(
         opCtx);
 
-    {
+    const auto releaseCriticalSection = [&] {
         Lock::DBLock dbLock{opCtx, nss.dbName(), MODE_IX};
 
         boost::optional<Lock::CollectionLock> collLock;
@@ -451,7 +466,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
                         logAttrs(nss),
                         "reason"_attr = reason,
                         "writeConcern"_attr = writeConcern);
-            return;
+            return false;
         }
 
         BSONObj bsonObj = cursor->next();
@@ -468,7 +483,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
                         "callerReason"_attr = reason,
                         "storedReason"_attr = collCSDoc.getReason(),
                         "writeConcern"_attr = writeConcern);
-            return;
+            return false;
         }
 
         tassert(7032366,
@@ -523,6 +538,13 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
                         nss.toStringForErrorMsg(),
                         reason.toString()),
             batchedResponse.getN() > 0);
+        return true;
+    };
+    if (!writeConflictRetry(opCtx,
+                            "release recoverable critical section",
+                            NamespaceString::kCollectionCriticalSectionsNamespace,
+                            releaseCriticalSection)) {
+        return;
     }
 
     WriteConcernResult ignoreResult;
