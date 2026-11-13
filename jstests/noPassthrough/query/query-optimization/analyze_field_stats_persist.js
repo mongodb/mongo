@@ -137,9 +137,12 @@ describe("analyze mode: fieldStats", function () {
         );
 
         assert.eq(doc.schemaVersion, kExpectedSchemaVersion, "unexpected doc", {doc});
-        assert.eq(bsonWoCompare(doc.collectionUuid, collUuid), 0, "unexpected doc", {doc});
-        assert.eq(doc.sortedFieldPaths, ["a"], "unexpected doc", {doc});
-        assert(doc.createdAt instanceof Date, "createdAt must be a date", {doc});
+        assert(doc.collectedAt instanceof Date, "collectedAt must be a date", {doc});
+        assert.eq(doc.totalDocs, NumberLong(5), "unexpected totalDocs", {doc});
+        assert.eq(doc.nonScalarDocs, NumberLong(1), "unexpected nonScalarDocs", {doc});
+        assert.eq(doc.nullDocs, NumberLong(0), "unexpected nullDocs", {doc});
+        assert.eq(doc.missingDocs, NumberLong(1), "unexpected missingDocs", {doc});
+        assert.eq(doc.undefinedDocs, NumberLong(0), "unexpected undefinedDocs", {doc});
 
         const sketches = doc.ndv.sketches;
         assert.eq(sketches.length, 1, "expected one sketch per field", {doc});
@@ -161,7 +164,7 @@ describe("analyze mode: fieldStats", function () {
         assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
         assert.eq(this.statsDocs().length, 1, "rerun must replace, not duplicate");
 
-        // A new distinct value must be reflected after a rerun, along with a fresh createdAt.
+        // A new distinct value must be reflected after a rerun, along with a fresh collectedAt.
         assert.commandWorked(this.coll.insert({a: 9}));
         sleep(10);
         assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
@@ -170,13 +173,14 @@ describe("analyze mode: fieldStats", function () {
             this.statsDocs()[0].mcv.sketches[0].entries.map((entry) => entry.value),
             [7, 8, 9],
         );
-        assert.gt(this.statsDocs()[0].createdAt, firstRun[0].createdAt);
+        assert.gt(this.statsDocs()[0].collectedAt, firstRun[0].collectedAt);
 
         // A different key gets its own document. Distinct values of "a.b": 1 and missing.
         assert.commandWorked(this.analyze({mode: "fieldStats", key: "a.b"}));
         const docs = this.statsDocs();
         assert.eq(docs.length, 2, "expected one doc per field", {docs});
-        const dottedDoc = docs.find((doc) => doc.sortedFieldPaths[0] === "a.b");
+        const dottedId = `${kExpectedSchemaVersion}|${extractUUIDFromObject(this.coll.getUUID())}|a.b`;
+        const dottedDoc = docs.find((doc) => doc._id === dottedId);
         assert.eq(dottedDoc.ndv.sketches[0].ndv, NumberLong(2), "unexpected ndv", {dottedDoc});
     });
 
@@ -203,7 +207,6 @@ describe("analyze mode: fieldStats", function () {
             "unexpected _id",
             {doc},
         );
-        assert.eq(doc.sortedFieldPaths, ["a", "other"], "unexpected doc", {doc});
 
         assert.eq(doc.mcv.sketches.length, 2, "expected one MCV sketch per field", {doc});
 
@@ -255,7 +258,6 @@ describe("analyze mode: fieldStats", function () {
 
     it("keys stats by collection UUID across drop and recreate", function () {
         assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
-        const oldUuid = this.coll.getUUID();
 
         this.coll.drop();
         assert.commandWorked(this.coll.insert({a: 1}));
@@ -265,22 +267,57 @@ describe("analyze mode: fieldStats", function () {
         // as an orphan (cleanup after collection drop is an accepted non-goal for now).
         const docs = this.statsDocs();
         assert.eq(docs.length, 2, "expected one doc per collection incarnation", {docs});
-        const newDoc = docs.find((doc) => bsonWoCompare(doc.collectionUuid, oldUuid) !== 0);
+        const newId = `${kExpectedSchemaVersion}|${extractUUIDFromObject(this.coll.getUUID())}|a`;
+        const newDoc = docs.find((doc) => doc._id === newId);
         assert.eq(newDoc.ndv.sketches[0].ndv, NumberLong(1), "unexpected ndv", {docs});
     });
 
-    it("keeps the previous stats doc when the collection has been emptied", function () {
-        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
-        const before = this.statsDocs();
-        assert.eq(before.length, 1);
+    const zero = NumberLong(0);
+    for (const {name, key, expectedNdvs, expectedMcvs} of [
+        {name: "singleton", key: "a", expectedNdvs: [zero], expectedMcvs: [[]]},
+        {
+            name: "composite",
+            key: ["a", "other"],
+            expectedNdvs: [zero, zero, zero, zero],
+            expectedMcvs: [[], []],
+        },
+    ]) {
+        it(`replaces ${name} statistics after an empty scan`, function () {
+            assert.commandWorked(this.analyze({mode: "fieldStats", key}));
 
-        // An empty scan produces no new statistics, so the previous (now stale)
-        // document stays. Stats invalidation is out of scope for now; the read path clamps
-        // served estimates to the current collection cardinality, which covers this case.
-        assert.commandWorked(this.coll.deleteMany({}));
-        assert.commandWorked(this.analyze({mode: "fieldStats", key: "a"}));
-        assert.eq(this.statsDocs(), before, "previous stats doc must remain");
-    });
+            // Seed an old timestamp so refresh is observable without waiting for the clock.
+            const previousCollectedAt = new Date(0);
+            assert.commandWorked(
+                this.fieldStats.updateOne({}, {$set: {collectedAt: previousCollectedAt}}),
+            );
+            assert.commandWorked(this.coll.deleteMany({}));
+            assert.commandWorked(this.analyze({mode: "fieldStats", key}));
+
+            const docs = this.statsDocs();
+            assert.eq(docs.length, 1, "rerun must replace the stats document", {docs});
+            const doc = docs[0];
+            assert.gt(doc.collectedAt, previousCollectedAt, "timestamp must be refreshed", {doc});
+
+            assert.eq(doc.totalDocs, zero, "unexpected totalDocs", {doc});
+            assert.eq(doc.nonScalarDocs, zero, "unexpected nonScalarDocs", {doc});
+            assert.eq(doc.nullDocs, zero, "unexpected nullDocs", {doc});
+            assert.eq(doc.missingDocs, zero, "unexpected missingDocs", {doc});
+            assert.eq(doc.undefinedDocs, zero, "unexpected undefinedDocs", {doc});
+
+            assert.eq(
+                doc.ndv.sketches.map(({ndv}) => ndv),
+                expectedNdvs,
+                "unexpected NDV sketches",
+                {doc},
+            );
+            assert.eq(
+                doc.mcv.sketches.map(({entries}) => entries),
+                expectedMcvs,
+                "unexpected MCV sketches",
+                {doc},
+            );
+        });
+    }
 
     it("excludes multikey documents from persisted NDV", function () {
         assert.commandWorked(this.coll.insert({a: [{b: 2}, {b: 3}]}));

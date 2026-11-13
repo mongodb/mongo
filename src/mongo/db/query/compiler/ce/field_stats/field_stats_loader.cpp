@@ -23,8 +23,7 @@ StatusWith<FieldStatsDoc> loadFieldStats(OperationContext* opCtx,
     const std::string docId = makeFieldStatsId(collectionUuid, std::move(fieldPaths));
 
     // The _id string embeds the schema version, collection UUID and field paths, so an exact
-    // _id match is an exact identity match. The reader still cross-checks the top-level copies
-    // of these fields defensively, since they come from storage all the same.
+    // _id match is an exact identity match.
     try {
         DBDirectClient client(opCtx);
         const BSONObj doc = client.findOne(nss, BSON("_id" << docId));

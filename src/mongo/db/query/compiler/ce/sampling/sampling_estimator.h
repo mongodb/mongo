@@ -26,7 +26,7 @@ using SamplingMetadata = mongo::cost_based_ranker::SamplingMetadata;
 
 /**
  * One persisted NDV statistic (analyze mode "fieldStats") that served an estimate: the (sorted)
- * field paths it describes and the statistics document's creation time. Deliberately not part of
+ * field paths it describes and the statistics collection time. Deliberately not part of
  * SamplingMetadata: NDV statistics are field statistics, unrelated to the sample, even though
  * the sampling estimator serves both.
  */
@@ -34,7 +34,7 @@ struct PersistedNDVEntry {
     std::vector<std::string> sortedFieldPaths;
     // When 'analyze' built this statistic; one namespace may serve several NDV statistics, each
     // analyzed at its own time.
-    Date_t createdAt;
+    Date_t collectedAt;
     // The NDV of each persisted sketch variant, in the persisted order (see NdvStats in
     // field_stats.idl). Lets the reader cache a loaded statistic compactly, without the
     // 16KB-per-sketch registers.

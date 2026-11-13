@@ -9,6 +9,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <string>
 #include <utility>
 
@@ -54,20 +55,31 @@ FieldStatsBuilder::FieldStatsBuilder(const std::vector<std::string>& fieldPaths,
 void FieldStatsBuilder::accumulate(const BSONObj& document) {
     try {
         const auto [tuples, hasNonScalar] = stats::extractFieldValues(document, _parsedPaths);
-        if (!hasNonScalar) {
+        if (hasNonScalar) {
+            ++_nonScalarDocs;
+        } else {
+            bool hasNull = false;
+            bool hasMissing = false;
+            bool hasUndefined = false;
             for (const auto& tuple : tuples) {
+                for (const auto value : tuple) {
+                    hasNull |= value.tag == sbe::value::TypeTags::Null;
+                    hasMissing |= value.tag == sbe::value::TypeTags::Nothing;
+                    hasUndefined |= value.tag == sbe::value::TypeTags::bsonUndefined;
+                }
                 _ndvBuilder.accumulate(tuple);
                 _mcvBuilder.accumulate(tuple);
             }
+            // Composite paths can share a category; count each document only once per category.
+            _nullDocs += hasNull;
+            _missingDocs += hasMissing;
+            _undefinedDocs += hasUndefined;
         }
     } catch (const ExceptionFor<ErrorCodes::ExceededMemoryLimit>&) {
         // Oversized array products are excluded from these statistics anyway.
+        ++_nonScalarDocs;
     }
     ++_numDocumentsObserved;
-}
-
-size_t FieldStatsBuilder::getNumDocumentsObserved() const {
-    return _numDocumentsObserved;
 }
 
 FieldStatsDoc FieldStatsBuilder::getStats() const {
@@ -78,11 +90,14 @@ FieldStatsDoc FieldStatsBuilder::getStats() const {
     }
 
     FieldStatsDoc document;
-    document.set_id(makeFieldStatsId(_collectionUuid, fieldPaths));
+    document.set_id(makeFieldStatsId(_collectionUuid, std::move(fieldPaths)));
     document.setSchemaVersion(kFieldStatsSchemaVersion);
-    document.setCollectionUuid(_collectionUuid);
-    document.setSortedFieldPaths(std::move(fieldPaths));
-    document.setCreatedAt(_createdAt);
+    document.setCollectedAt(_collectedAt);
+    document.setTotalDocs(_numDocumentsObserved);
+    document.setNonScalarDocs(_nonScalarDocs);
+    document.setNullDocs(_nullDocs);
+    document.setMissingDocs(_missingDocs);
+    document.setUndefinedDocs(_undefinedDocs);
     document.setNdv(_ndvBuilder.getStats());
     document.setMcv(_mcvBuilder.getStats());
     return document;

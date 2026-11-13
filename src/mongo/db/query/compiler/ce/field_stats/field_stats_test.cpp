@@ -56,9 +56,7 @@ TEST(FieldStatsIdTest, CompositeIdsStayInjectiveUnderEscaping) {
     ASSERT_NE(makeFieldStatsId(uuid, {"a|b", "c"}), makeFieldStatsId(uuid, {"a", "b|c"}));
 }
 
-TEST(FieldStatsDocTest, SerializationGolden) {
-    // Deterministic inputs so the golden below pins the exact persisted format; any schema
-    // change breaks this test visibly.
+FieldStatsDoc makeStatsDoc() {
     const UUID uuid = uassertStatusOK(UUID::parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
 
     NdvSketch sketch;
@@ -71,9 +69,12 @@ TEST(FieldStatsDocTest, SerializationGolden) {
     FieldStatsDoc doc;
     doc.set_id(makeFieldStatsId(uuid, {"a.b"}));
     doc.setSchemaVersion(kFieldStatsSchemaVersion);
-    doc.setCollectionUuid(uuid);
-    doc.setSortedFieldPaths(std::vector<std::string>{"a.b"});
-    doc.setCreatedAt(Date_t::fromMillisSinceEpoch(1000));
+    doc.setCollectedAt(Date_t::fromMillisSinceEpoch(1000));
+    doc.setTotalDocs(10);
+    doc.setNonScalarDocs(2);
+    doc.setNullDocs(1);
+    doc.setMissingDocs(3);
+    doc.setUndefinedDocs(1);
     doc.setNdv(std::move(ndvStats));
 
     McvEntry entry;
@@ -86,15 +87,22 @@ TEST(FieldStatsDocTest, SerializationGolden) {
     mcvStats.setSketches({std::move(mcvSketch)});
     doc.setMcv(std::move(mcvStats));
 
+    return doc;
+}
+
+TEST(FieldStatsDocTest, SerializationGolden) {
+    const auto doc = makeStatsDoc();
+
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "_id": "1|aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee|a.b",
             "schemaVersion": 1,
-            "collectionUuid": {"$uuid":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"},
-            "sortedFieldPaths": [
-                "a.b"
-            ],
-            "createdAt": {"$date":"1970-01-01T00:00:01.000Z"},
+            "collectedAt": {"$date":"1970-01-01T00:00:01.000Z"},
+            "totalDocs": 10,
+            "nonScalarDocs": 2,
+            "nullDocs": 1,
+            "missingDocs": 3,
+            "undefinedDocs": 1,
             "ndv": {
                 "sketches": [
                     {
@@ -131,45 +139,56 @@ TEST(FieldStatsDocTest, McvEntriesRejectInvalidCounts) {
 }
 
 TEST(FieldStatsDocTest, RoundTripsThroughIdl) {
-    const UUID uuid = UUID::gen();
-
-    NdvSketch sketch;
-    sketch.setNdv(3);
-    sketch.setRegisters(std::vector<std::uint8_t>(1 << 14));
-    sketch.setPrecision(14);
-    NdvStats ndvStats;
-    ndvStats.setSketches({std::move(sketch)});
-
-    FieldStatsDoc doc;
-    doc.set_id(makeFieldStatsId(uuid, {"a.b"}));
-    doc.setSchemaVersion(kFieldStatsSchemaVersion);
-    doc.setCollectionUuid(uuid);
-    doc.setSortedFieldPaths(std::vector<std::string>{"a.b"});
-    doc.setCreatedAt(Date_t::now());
-    doc.setNdv(std::move(ndvStats));
-
-    McvEntry entry;
-    entry.setValue(IDLAnyTypeOwned(BSON("value" << 1.5).firstElement()));
-    entry.setEstFreq(5);
-    entry.setErr(2);
-    McvSketch mcvSketch;
-    mcvSketch.setEntries({std::move(entry)});
-    McvStats mcvStats;
-    mcvStats.setSketches({std::move(mcvSketch)});
-    doc.setMcv(std::move(mcvStats));
+    const auto doc = makeStatsDoc();
 
     const BSONObj serialized = doc.toBSON();
     const auto parsed = FieldStatsDoc::parse(serialized, IDLParserContext("FieldStatsDoc"));
     // Serialize -> parse -> serialize must be the identity.
     ASSERT_BSONOBJ_EQ(parsed.toBSON(), serialized);
-    ASSERT_EQ(parsed.get_id(), makeFieldStatsId(uuid, {"a.b"}));
-    ASSERT_EQ(parsed.getCollectionUuid(), uuid);
+    ASSERT_EQ(parsed.get_id(), doc.get_id());
     ASSERT_EQ(parsed.getSchemaVersion(), kFieldStatsSchemaVersion);
-    ASSERT_EQ(parsed.getSortedFieldPaths().size(), 1u);
-    ASSERT_EQ(parsed.getSortedFieldPaths().front(), "a.b");
     ASSERT_EQ(parsed.getNdv().getSketches().size(), 1u);
     ASSERT_EQ(parsed.getNdv().getSketches().front().getNdv(), 3);
 }
+
+class FieldStatsCounterTest : public ::testing::TestWithParam<const char*> {};
+
+TEST_P(FieldStatsCounterTest, RejectsNegativeCount) {
+    const auto bson = makeStatsDoc()
+                          .toBSON()
+                          .removeField(GetParam())
+                          .addField(BSON(GetParam() << -1LL).firstElement());
+    ASSERT_THROWS_CODE(FieldStatsDoc::parse(bson, IDLParserContext("FieldStatsDoc")),
+                       DBException,
+                       ErrorCodes::BadValue);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    DocumentCounters,
+    FieldStatsCounterTest,
+    ::testing::Values("totalDocs", "nonScalarDocs", "nullDocs", "missingDocs", "undefinedDocs"));
+
+class FieldStatsRequiredFieldTest : public ::testing::TestWithParam<const char*> {};
+
+TEST_P(FieldStatsRequiredFieldTest, RejectsMissingField) {
+    ASSERT_THROWS_CODE(FieldStatsDoc::parse(makeStatsDoc().toBSON().removeField(GetParam()),
+                                            IDLParserContext("FieldStatsDoc")),
+                       DBException,
+                       ErrorCodes::IDLFailedToParse);
+}
+
+INSTANTIATE_TEST_SUITE_P(RequiredFields,
+                         FieldStatsRequiredFieldTest,
+                         ::testing::Values("_id",
+                                           "schemaVersion",
+                                           "collectedAt",
+                                           "totalDocs",
+                                           "nonScalarDocs",
+                                           "nullDocs",
+                                           "missingDocs",
+                                           "undefinedDocs",
+                                           "ndv",
+                                           "mcv"));
 
 }  // namespace
 }  // namespace mongo::ce

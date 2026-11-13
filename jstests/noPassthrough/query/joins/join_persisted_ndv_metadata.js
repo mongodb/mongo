@@ -101,7 +101,7 @@ describe("persistedNdv in join explain", function () {
             assert(productsNdv, "expected ndv metadata for products", {fieldStatsMetadata});
             assert.eq(productsNdv.length, 1, "expected one served entry", {productsNdv});
             assert.eq(productsNdv[0].fieldPaths, ["sku"], "unexpected fieldPaths", {productsNdv});
-            assert(productsNdv[0].createdAt instanceof Date, "createdAt must be a date", {
+            assert(productsNdv[0].collectedAt instanceof Date, "collectedAt must be a date", {
                 productsNdv,
             });
         });

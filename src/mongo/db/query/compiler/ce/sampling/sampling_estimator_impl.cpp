@@ -754,18 +754,10 @@ boost::optional<PersistedNDVEntry> SamplingEstimatorImpl::loadPersistedNDVStats(
         return boost::none;
     }
 
-    // The _id lookup encodes the identity, but the top-level copies of these fields come
-    // from storage all the same; treat a document whose copies disagree as unusable
-    // instead of trusting it.
-    const auto& docPaths = swDoc.getValue().getSortedFieldPaths();
-    const bool identityMatches = swDoc.getValue().getSchemaVersion() == kFieldStatsSchemaVersion &&
-        swDoc.getValue().getCollectionUuid() == collection->uuid() &&
-        std::equal(docPaths.begin(), docPaths.end(), sortedPaths.begin(), sortedPaths.end());
-    if (!identityMatches) {
+    if (swDoc.getValue().getSchemaVersion() != kFieldStatsSchemaVersion) {
         LOGV2_DEBUG(13176601,
                     5,
-                    "Ignoring persisted NDV statistics document with inconsistent "
-                    "identity fields",
+                    "Ignoring persisted NDV statistics document with inconsistent schema version",
                     logAttrs(_nss),
                     "paths"_attr = sortedPaths);
         return boost::none;
@@ -790,7 +782,7 @@ boost::optional<PersistedNDVEntry> SamplingEstimatorImpl::loadPersistedNDVStats(
     // rather than staying resident in the planner for its lifetime.
     PersistedNDVEntry summary;
     summary.sortedFieldPaths = sortedPaths;
-    summary.createdAt = swDoc.getValue().getCreatedAt();
+    summary.collectedAt = swDoc.getValue().getCollectedAt();
     summary.ndvPerSketch.reserve(sketches.size());
     for (const auto& sketch : sketches) {
         summary.ndvPerSketch.push_back(sketch.getNdv());

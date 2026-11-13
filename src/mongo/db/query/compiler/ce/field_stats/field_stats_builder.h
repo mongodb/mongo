@@ -11,7 +11,7 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
-#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -29,17 +29,19 @@ public:
 
     void accumulate(const BSONObj& document);
 
-    size_t getNumDocumentsObserved() const;
-
     FieldStatsDoc getStats() const;
 
 private:
     const std::vector<FieldPath> _parsedPaths;
     const UUID _collectionUuid;
-    const Date_t _createdAt = Date_t::now();
+    const Date_t _collectedAt = Date_t::now();
     NdvSketchBuilder _ndvBuilder{_parsedPaths.size()};
     McvSketchBuilder _mcvBuilder{_parsedPaths.size()};
-    size_t _numDocumentsObserved = 0;
+    std::int64_t _numDocumentsObserved = 0;
+    std::int64_t _nonScalarDocs = 0;
+    std::int64_t _nullDocs = 0;
+    std::int64_t _missingDocs = 0;
+    std::int64_t _undefinedDocs = 0;
 };
 
 }  // namespace mongo::ce

@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
@@ -67,8 +68,8 @@ McvStats McvSketchBuilder::getStats() const {
 
             auto& entry = entries.emplace_back();
             entry.setValue(IDLAnyTypeOwned(valueBson.firstElement(), valueBson));
-            entry.setEstFreq(counter.estFreq);
-            entry.setErr(counter.err);
+            entry.setEstFreq(static_cast<std::int64_t>(counter.estFreq));
+            entry.setErr(static_cast<std::int64_t>(counter.err));
         }
 
         sketches.emplace_back(std::move(entries));

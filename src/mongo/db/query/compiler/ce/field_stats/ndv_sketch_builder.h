@@ -8,6 +8,7 @@
 #include "mongo/db/query/compiler/ce/field_stats/hyperloglog.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <span>
 #include <vector>
 
@@ -17,7 +18,7 @@ namespace mongo::ce {
 class NdvSketchBuilder {
 public:
     // 16 KiB of registers per sketch, with standard error approximately 0.81%.
-    static constexpr size_t kPrecision = 14;
+    static constexpr std::int32_t kPrecision = 14;
 
     explicit NdvSketchBuilder(size_t numFields);
 

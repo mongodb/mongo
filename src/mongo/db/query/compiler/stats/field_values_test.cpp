@@ -60,6 +60,24 @@ TEST(FieldValuesTest, RetainsNonScalarFlagFromEarlierPath) {
     ASSERT_TRUE(hasNonScalar);
 }
 
+TEST(FieldValuesTest, MarksArrayTraversalToNullAsNonScalar) {
+    const auto doc = fromjson("{a: [{b: null}]}");
+    const auto [tuples, hasNonScalar] = extractFieldValues(doc, makePaths({"a.b"}));
+    ASSERT_TRUE(hasNonScalar);
+    ASSERT_EQ(tuples.size(), 1u);
+    ASSERT_EQ(tuples[0].size(), 1u);
+    ASSERT_EQ(tuples[0][0].tag, TypeTags::Null);
+}
+
+TEST(FieldValuesTest, MarksArrayTraversalToMissingAsNonScalar) {
+    const auto doc = fromjson("{a: [{c: 1}]}");
+    const auto [tuples, hasNonScalar] = extractFieldValues(doc, makePaths({"a.b"}));
+    ASSERT_TRUE(hasNonScalar);
+    ASSERT_EQ(tuples.size(), 1u);
+    ASSERT_EQ(tuples[0].size(), 1u);
+    ASSERT_EQ(tuples[0][0].tag, TypeTags::Nothing);
+}
+
 TEST(FieldValuesTest, MarksTerminalObjectsAsNonScalar) {
     for (const auto& doc : {fromjson("{a: {}, c: 9}"), fromjson("{a: {b: 1}, c: 9}")}) {
         const auto [tuples, hasNonScalar] = extractFieldValues(doc, makePaths({"a", "c"}));

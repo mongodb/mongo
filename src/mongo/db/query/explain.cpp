@@ -208,7 +208,7 @@ void appendQueryPlannerCommonInfo(PlanExecutor* exec,
             for (const auto& entry : entries) {
                 BSONObjBuilder entryBob(ndvArr.subobjStart());
                 entryBob.append("fieldPaths", entry.sortedFieldPaths);
-                entryBob.appendDate("createdAt", entry.createdAt);
+                entryBob.appendDate("collectedAt", entry.collectedAt);
             }
         }
     }

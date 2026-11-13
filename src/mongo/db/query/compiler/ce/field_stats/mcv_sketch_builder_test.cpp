@@ -86,6 +86,21 @@ TEST(McvSketchBuilderTest, SkipsOversizedValuesWithoutShiftingOtherFields) {
                     {makeEntry(BSON("value" << 2), 2)}});
 }
 
+TEST(McvSketchBuilderTest, CombinesNumericallyEqualValuesAcrossTypes) {
+    McvSketchBuilder builder(1);
+    accumulateTuple(builder, BSON("a" << 7));
+    accumulateTuple(builder, BSON("a" << 7LL));
+    assertSketches(builder.getStats(), {{makeEntry(BSON("value" << 7), 2)}});
+}
+
+TEST(McvSketchBuilderTest, CapsCountersPerField) {
+    McvSketchBuilder builder(1);
+    for (int i = 0; i < 101; ++i) {
+        accumulateTuple(builder, BSON("a" << i));
+    }
+    ASSERT_EQ(builder.getStats().getSketches()[0].getEntries().size(), 100u);
+}
+
 TEST(McvSketchBuilderTest, MismatchedTupleSizesLeaveExistingSketchesUnchanged) {
     for (const auto& tuple : {BSON("a" << 3), BSON("a" << 3 << "b" << 4 << "c" << 5)}) {
         SCOPED_TRACE(tuple);

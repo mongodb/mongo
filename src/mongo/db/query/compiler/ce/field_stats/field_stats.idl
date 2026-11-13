@@ -14,7 +14,7 @@ structs:
         description: >-
             The NDV section of a field-stats document, excluding documents with array traversal
             or terminal object values at any analyzed path.
-        strict: true
+        strict: false
         fields:
             sketches:
                 # One sketch per null/missing folding variant, positionally keyed off the
@@ -26,10 +26,10 @@ structs:
 
     McvStats:
         description: "The MCV section of a field-stats document."
-        strict: true
+        strict: false
         fields:
             sketches:
-                # One sketch per field, in sortedFieldPaths order, including empty sketches.
+                # One sketch per field, in the canonical path order in _id, including empty sketches.
                 type: array<McvSketch>
 
     FieldStatsDoc:
@@ -38,7 +38,7 @@ structs:
             statistics. Written by the analyze command and consumed by the optimizer's read
             path. Each statistic kind lives in its own top-level section so more can be added
             over time.
-        strict: true
+        strict: false
         fields:
             _id:
                 # Canonical id string built by makeFieldStatsId(); a string key avoids the
@@ -47,14 +47,31 @@ structs:
             schemaVersion:
                 type: int
                 validator: {gte: 1}
-            collectionUuid:
-                type: uuid
-            sortedFieldPaths:
-                # Sorted canonically, matching the order the _id string is built in.
-                # Positions identify fields in the sketches; the statistics describe the set.
-                type: array<string>
-            createdAt:
+            collectedAt:
                 type: date
+            totalDocs:
+                description: "Documents observed by the scan."
+                type: long
+                validator: {gte: 0}
+            # Singleton categories are disjoint; composite special-value categories may overlap.
+            nonScalarDocs:
+                description: >-
+                    Documents with an array along or an array/object at any analyzed path,
+                    or exceeding the extraction tuple limit.
+                type: long
+                validator: {gte: 0}
+            nullDocs:
+                description: "Sketch-eligible documents with explicit null at any analyzed path."
+                type: long
+                validator: {gte: 0}
+            missingDocs:
+                description: "Sketch-eligible documents with an analyzed path yielding Nothing."
+                type: long
+                validator: {gte: 0}
+            undefinedDocs:
+                description: "Sketch-eligible documents with BSON Undefined at any analyzed path."
+                type: long
+                validator: {gte: 0}
             ndv:
                 type: NdvStats
             mcv:

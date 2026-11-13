@@ -34,8 +34,8 @@ protected:
     // test can always tell which path produced an estimate.
     static constexpr int kDataNDV = 7;
     static constexpr long long kPersistedNDV = 123;
-    // Fixed creation time so metadata assertions can compare exactly.
-    const Date_t kCreatedAt = Date_t::fromMillisSinceEpoch(42000);
+    // Fixed collection time so metadata assertions can compare exactly.
+    const Date_t kCollectedAt = Date_t::fromMillisSinceEpoch(42000);
 
     void setUp() override {
         SamplingEstimatorTest::setUp();
@@ -98,9 +98,12 @@ protected:
         FieldStatsDoc doc;
         doc.set_id(makeFieldStatsId(collUuid, {path}));
         doc.setSchemaVersion(kFieldStatsSchemaVersion);
-        doc.setCollectionUuid(collUuid);
-        doc.setSortedFieldPaths(std::vector<std::string>{path});
-        doc.setCreatedAt(kCreatedAt);
+        doc.setCollectedAt(kCollectedAt);
+        doc.setTotalDocs(kCollCard);
+        doc.setNonScalarDocs(0);
+        doc.setNullDocs(0);
+        doc.setMissingDocs(0);
+        doc.setUndefinedDocs(0);
         doc.setNdv(std::move(ndvStats));
         doc.setMcv(std::move(mcvStats));
         return doc.toBSON();
@@ -135,9 +138,12 @@ protected:
         FieldStatsDoc doc;
         doc.set_id(makeFieldStatsId(collUuid, {"a"}));
         doc.setSchemaVersion(kFieldStatsSchemaVersion);
-        doc.setCollectionUuid(collUuid);
-        doc.setSortedFieldPaths(std::vector<std::string>{"a"});
-        doc.setCreatedAt(Date_t::now());
+        doc.setCollectedAt(kCollectedAt);
+        doc.setTotalDocs(kCollCard);
+        doc.setNonScalarDocs(0);
+        doc.setNullDocs(0);
+        doc.setMissingDocs(0);
+        doc.setUndefinedDocs(0);
         doc.setNdv(std::move(ndvStats));
         doc.setMcv(std::move(mcvStats));
         insertStatsDoc(doc.toBSON());
@@ -173,9 +179,12 @@ protected:
         FieldStatsDoc doc;
         doc.set_id(makeFieldStatsId(collUuid, paths));
         doc.setSchemaVersion(kFieldStatsSchemaVersion);
-        doc.setCollectionUuid(collUuid);
-        doc.setSortedFieldPaths(paths);
-        doc.setCreatedAt(kCreatedAt);
+        doc.setCollectedAt(kCollectedAt);
+        doc.setTotalDocs(kCollCard);
+        doc.setNonScalarDocs(0);
+        doc.setNullDocs(0);
+        doc.setMissingDocs(0);
+        doc.setUndefinedDocs(0);
         doc.setNdv(std::move(ndvStats));
         doc.setMcv(std::move(mcvStats));
         insertStatsDoc(doc.toBSON());
@@ -232,7 +241,7 @@ TEST_F(PersistentNDVTest, MetadataRecordsServedPaths) {
         const auto meta = estimator.getPersistedNDVMetadata();
         ASSERT_EQ(meta.size(), 1u);
         ASSERT_EQ(meta.front().sortedFieldPaths, std::vector<std::string>{"a"});
-        ASSERT_EQ(meta.front().createdAt, kCreatedAt);
+        ASSERT_EQ(meta.front().collectedAt, kCollectedAt);
     });
 }
 
@@ -424,24 +433,6 @@ TEST_F(PersistentNDVTest, InconsistentSchemaVersionFallsBack) {
     ASSERT_NE(estimateForA(), kPersistedNDV);
 }
 
-TEST_F(PersistentNDVTest, InconsistentBodyUuidFallsBack) {
-    // A body whose collectionUuid disagrees with the _id's identity must not be trusted.
-    BSONObjBuilder bob;
-    UUID::gen().appendToBuilder(&bob, "collectionUuid");
-    bob.appendElementsUnique(makeStatsDoc(kPersistedNDV));
-    insertStatsDoc(bob.obj());
-    ASSERT_NE(estimateForA(), kPersistedNDV);
-}
-
-TEST_F(PersistentNDVTest, InconsistentBodyPathsFallsBack) {
-    // Same for sortedFieldPaths disagreeing with the requested path set.
-    BSONObjBuilder bob;
-    bob.append("sortedFieldPaths", BSON_ARRAY("z"));
-    bob.appendElementsUnique(makeStatsDoc(kPersistedNDV));
-    insertStatsDoc(bob.obj());
-    ASSERT_NE(estimateForA(), kPersistedNDV);
-}
-
 TEST_F(PersistentNDVTest, MissingNdvSectionFallsBack) {
     // The ndv section is required by the schema, so a stored document lacking it fails to
     // parse on the read path and must not be served.
@@ -575,7 +566,7 @@ TEST_F(PersistentNDVTest, CompositeMetadataRecordsAllPaths) {
         const auto meta = estimator.getPersistedNDVMetadata();
         ASSERT_EQ(meta.size(), 1u);
         ASSERT_EQ(meta.front().sortedFieldPaths, (std::vector<std::string>{"a", "b"}));
-        ASSERT_EQ(meta.front().createdAt, kCreatedAt);
+        ASSERT_EQ(meta.front().collectedAt, kCollectedAt);
     });
 }
 

@@ -52,9 +52,9 @@ NormalizedTuple normalizeTuple(std::span<const TagValueView> values) {
     return tuple;
 }
 
-long long roundNdvEstimate(double estimate) {
-    // LLONG_MAX rounds up to 2^63 as a double, which is outside llround()'s range.
-    constexpr auto kMaxNdv = std::numeric_limits<long long>::max();
+std::int64_t roundNdvEstimate(double estimate) {
+    // INT64_MAX rounds up to 2^63 as a double, which is outside llround()'s range.
+    constexpr auto kMaxNdv = std::numeric_limits<std::int64_t>::max();
     if (estimate >= static_cast<double>(kMaxNdv)) {
         return kMaxNdv;
     }
@@ -125,7 +125,7 @@ NdvStats NdvSketchBuilder::getStats() const {
         NdvSketch sketch;
         sketch.setNdv(roundNdvEstimate(hll.estimate()));
         sketch.setRegisters(std::vector<std::uint8_t>(registers.begin(), registers.end()));
-        sketch.setPrecision(static_cast<int>(hll.precision()));
+        sketch.setPrecision(static_cast<std::int32_t>(hll.precision()));
 
         sketches.push_back(std::move(sketch));
     }

@@ -6,13 +6,14 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace mongo::ce {
 
-inline constexpr int kFieldStatsSchemaVersion = 1;
+inline constexpr std::int32_t kFieldStatsSchemaVersion = 1;
 
 // Maximum number of fields a composite field statistic may cover. Enforced on user input by the
 // field statistics builder.
