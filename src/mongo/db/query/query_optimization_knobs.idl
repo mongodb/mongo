@@ -746,6 +746,23 @@ server_parameters:
                 fcv:
                     min: "9.1"
 
+    internalQueryParallelQueryMinCollectionSizeBytes:
+        description: >-
+            Minimum data size, in bytes, of a query's base collection for the parallelism planner
+            to consider parallelizing the query.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryParallelQueryMinCollectionSizeBytes"
+        cpp_vartype: Atomic<long long>
+        default: 8388608
+        validator:
+            gte: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: parallelQueryMinCollectionSizeBytes
+                fcv:
+                    min: "9.1"
+
     internalQueryBypassParallelGates:
         mod_visibility: needs_replacement
         description: >-

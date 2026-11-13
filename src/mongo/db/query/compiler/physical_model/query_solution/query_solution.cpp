@@ -401,10 +401,26 @@ int QuerySolution::removePathFromExtension(PlanNodeId targetNode) {
 void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {
     uassert(6882300, "QuerySolutionNode must be non null", root);
     _root = std::move(root);
+    // A parallel alternative was built from the old serial plan.
+    _parallelRoot.reset();
     _enumeratorExplainInfo.hitScanLimit = _root->getScanLimit();
 
     PlanNodeId lastNodeId = 0;
     assignNodeIds(lastNodeId, *_root);
+}
+
+void QuerySolution::setParallelRoot(std::unique_ptr<QuerySolutionNode> parallelRoot) {
+    tassert(13623411, "A parallel root requires a serial root", _root);
+    tassert(13623412, "Parallel root must be non null", parallelRoot);
+    // The ids that mark the extension are specific to the serial tree. Tracking them in the
+    // alternative is not supported yet.
+    tassert(13623413,
+            "A parallel root over a solution extended with a pipeline is not supported",
+            !hasExtension());
+    _parallelRoot = std::move(parallelRoot);
+
+    PlanNodeId lastNodeId = 0;
+    assignNodeIds(lastNodeId, *_parallelRoot);
 }
 
 std::vector<NamespaceStringOrUUID> QuerySolution::getAllSecondaryNamespaces(

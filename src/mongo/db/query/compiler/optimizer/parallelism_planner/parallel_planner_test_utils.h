@@ -4,16 +4,12 @@
 #pragma once
 
 #include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/db/query/compiler/optimizer/parallelism_planner/parallelism_planner_context.h"
-#include "mongo/db/query/compiler/optimizer/parallelism_planner/required_distribution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/unittest/unittest.h"
 
 #include <memory>
 
 namespace mongo::parallelism_planner {
 
-// A degree of parallelism high enough for the planner to parallelize.
 inline constexpr int kMaxDoPForTests = 8;
 
 /**
@@ -52,7 +48,6 @@ struct MockSortedNode : public QuerySolutionNode {
     ProvidedSortSet sorts;
 };
 
-// A node type that has not opted in to QuerySolutionNode::isParallelEligible().
 struct IneligibleNode : public QuerySolutionNode {
     explicit IneligibleNode(std::unique_ptr<QuerySolutionNode> child)
         : QuerySolutionNode(std::move(child)) {}
@@ -84,35 +79,24 @@ struct IneligibleNode : public QuerySolutionNode {
     }
 };
 
-/**
- * Shared fixture for the parallelism planner tests. Suites that need its helpers alias it, e.g.
- * 'using ExchangeNodeTest = ParallelismPlannerTest;'.
- */
-class ParallelismPlannerTest : public unittest::Test {
-protected:
-    static std::unique_ptr<QuerySolutionNode> scan() {
-        return std::make_unique<CollectionScanNode>();
-    }
+// Plan-building helpers shared by various parallelism planner tests.
+inline std::unique_ptr<QuerySolutionNode> scan() {
+    return std::make_unique<CollectionScanNode>();
+}
 
-    static std::unique_ptr<QuerySolutionNode> matchOver(std::unique_ptr<QuerySolutionNode> child) {
-        return std::make_unique<MatchNode>(std::move(child),
-                                           std::make_unique<AlwaysTrueMatchExpression>());
-    }
+inline std::unique_ptr<QuerySolutionNode> matchOver(std::unique_ptr<QuerySolutionNode> child) {
+    return std::make_unique<MatchNode>(std::move(child),
+                                       std::make_unique<AlwaysTrueMatchExpression>());
+}
 
-    static std::unique_ptr<QuerySolutionNode> ineligibleOver(
-        std::unique_ptr<QuerySolutionNode> child) {
-        return std::make_unique<IneligibleNode>(std::move(child));
-    }
+inline std::unique_ptr<QuerySolutionNode> ineligibleOver(std::unique_ptr<QuerySolutionNode> child) {
+    return std::make_unique<IneligibleNode>(std::move(child));
+}
 
-    static std::unique_ptr<QuerySolution> solutionWithRoot(
-        std::unique_ptr<QuerySolutionNode> root) {
-        auto solution = std::make_unique<QuerySolution>();
-        solution->setRoot(std::move(root));
-        return solution;
-    }
-
-    const ParallelismPlannerContext _parallelCtx{kMaxDoPForTests};
-    const ParallelismPlannerContext _serialCtx{1};
-};
+inline std::unique_ptr<QuerySolution> solutionWithRoot(std::unique_ptr<QuerySolutionNode> root) {
+    auto solution = std::make_unique<QuerySolution>();
+    solution->setRoot(std::move(root));
+    return solution;
+}
 
 }  // namespace mongo::parallelism_planner

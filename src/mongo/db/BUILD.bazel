@@ -1045,6 +1045,7 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/optimizer/join:plan_enumerator",
         "//src/mongo/db/query/compiler/optimizer/join:reorder_joins",
         "//src/mongo/db/query/compiler/optimizer/join:solution_storage",
+        "//src/mongo/db/query/compiler/optimizer/parallelism_planner",
         "//src/mongo/db/query/plan_cache:join_plan_cache",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
         "//src/mongo/db/query/plan_ranking:plan_selection_strategy",

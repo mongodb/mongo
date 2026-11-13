@@ -24,7 +24,10 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/query:canonical_query_base",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query/compiler/physical_model/query_solution",
+        "//src/mongo/db/shard_role",
     ],
 )
 
@@ -33,7 +36,7 @@ mongo_cc_unit_test(
     srcs = [
         "required_distribution_test.cpp",
     ],
-    private_hdrs = ["parallelism_planner_test_fixture.h"],
+    private_hdrs = ["parallel_planner_test_utils.h"],
     tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":parallelism_planner",
@@ -46,9 +49,14 @@ mongo_cc_unit_test(
     srcs = [
         "parallelism_planner_test.cpp",
     ],
-    private_hdrs = ["parallelism_planner_test_fixture.h"],
+    private_hdrs = ["parallel_planner_test_utils.h"],
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":parallelism_planner",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/unittest",
     ],
 )

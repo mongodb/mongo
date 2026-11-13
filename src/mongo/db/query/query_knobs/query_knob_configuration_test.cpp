@@ -45,6 +45,7 @@ TEST_F(QueryKnobConfigurationTest, ParallelQueryIsDisabledAndSerialByDefault) {
     auto config = makeConfig();
     ASSERT_FALSE(config.isParallelQueryEnabled());
     ASSERT_EQ(config.getMaxDegreeOfParallelism(), 1);
+    ASSERT_EQ(config.getParallelQueryMinCollectionSizeBytes(), 8 * 1024 * 1024);
 }
 
 TEST_F(QueryKnobConfigurationTest, ParallelQueryKnobsFollowSetParameter) {
@@ -54,6 +55,12 @@ TEST_F(QueryKnobConfigurationTest, ParallelQueryKnobsFollowSetParameter) {
     auto config = makeConfig();
     ASSERT_TRUE(config.isParallelQueryEnabled());
     ASSERT_EQ(config.getMaxDegreeOfParallelism(), 8);
+}
+
+TEST_F(QueryKnobConfigurationTest, ParallelQueryMinCollectionSizeFollowsSetParameter) {
+    unittest::ServerParameterGuard minSizeGuard{"internalQueryParallelQueryMinCollectionSizeBytes",
+                                                1024};
+    ASSERT_EQ(makeConfig().getParallelQueryMinCollectionSizeBytes(), 1024);
 }
 
 TEST_F(QueryKnobConfigurationTest, BypassParallelGatesIsOffByDefault) {

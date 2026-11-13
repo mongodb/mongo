@@ -19,10 +19,14 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_executor_sbe.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -258,6 +262,55 @@ TEST_F(DeferredEngineChoiceLoweringTest, GroupQueryUsesSbe) {
                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                pipeline.get());
     ASSERT(dynamic_cast<PlanExecutorSBE*>(exec.get()));
+}
+
+// With parallel query enabled, an eligible collection scan gets a parallel plan attached before
+// SBE lowering.
+TEST_F(DeferredEngineChoiceLoweringTest, ParallelPlanIsAttachedButExecutionStaysSerial) {
+    QueryKnobGuardForTest enableParallel{
+        operationContext(), "internalQueryEnableParallelQuery", true};
+    QueryKnobGuardForTest maxDoP{operationContext(), "internalQueryMaxDegreeOfParallelism", 4};
+    QueryKnobGuardForTest minSize{
+        operationContext(), "internalQueryParallelQueryMinCollectionSizeBytes", 0};
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kQuery,
+                                                       logv2::LogSeverity::Debug(3)};
+
+    // Release the fixture's lock-free read acquisition so that we can write.
+    collections().clear();
+    ASSERT_OK(storageInterface()->insertDocuments(operationContext(),
+                                                  kNss,
+                                                  {InsertStatement(BSON("_id" << 1 << "a" << 1)),
+                                                   InsertStatement(BSON("_id" << 2 << "a" << 2))}));
+    acquireCollectionForRead();
+
+    auto [cq, plannerData] = createPlannerData();
+    auto solution = std::make_unique<QuerySolution>();
+    solution->setRoot(std::make_unique<CollectionScanNode>(kNss));
+    PlanRankingResult rankingResult{.plannerParams = std::move(plannerData.plannerParams),
+                                    .engineSelection = EngineChoice::kSbe};
+    rankingResult.solutions.push_back(std::move(solution));
+
+    unittest::LogCaptureGuard logs;
+    auto exec = lowerPlanRankingResult(std::move(cq),
+                                       std::move(rankingResult),
+                                       operationContext(),
+                                       collections(),
+                                       PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                       /*pipeline=*/nullptr);
+    logs.stop();
+
+    // The parallel alternative was built...
+    ASSERT_EQ(logs.countTextContaining("Built a parallel plan"), 1);
+
+    // ...but the executor is SBE and still runs the serial scan.
+    ASSERT(dynamic_cast<PlanExecutorSBE*>(exec.get()));
+    size_t numDocs = 0;
+    Document doc;
+    while (exec->getNextDocument(doc) == PlanExecutor::ADVANCED) {
+        ++numDocs;
+    }
+    ASSERT_EQ(numDocs, 2u);
+    exec->dispose(operationContext());
 }
 
 // With 'classicOnly', a query that would otherwise use SBE uses classic, and the root stage is

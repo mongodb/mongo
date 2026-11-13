@@ -10,6 +10,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/optimizer/parallelism_planner/parallelism_planner.h"
 #include "mongo/db/query/engine_selection.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -171,6 +172,11 @@ private:
                                                _rankingResult.cachedPlanHash,
                                                _rankingResult.planSelectionStrategy);
         }
+
+        // Build a parallel plan if eligible. Note that the returned 'solution' may contain both the
+        // serial original as well as the parallel alternative.
+        solution = parallelism_planner::addParallelPlan(
+            *_cq, _collections, plannerParams()->querySettingsApplied, std::move(solution));
 
         auto sbeYieldPolicy =
             PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _cq->nss());

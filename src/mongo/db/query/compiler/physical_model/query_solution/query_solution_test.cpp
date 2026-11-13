@@ -30,9 +30,11 @@
 #include "mongo/db/query/wildcard_test_utils.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
+#include <functional>
 #include <initializer_list>
 #include <memory>
 #include <ostream>
@@ -2866,6 +2868,79 @@ TEST(QuerySolutionTest, CloneKeepsPhysicalPropsOfExistingNodeTypes) {
     assertCloneKeepsPhysicalProps(std::make_unique<ShardingFilterNode>());
 }
 
+TEST(QuerySolutionTest, HasNoParallelRootByDefault) {
+    QuerySolution solution;
+    solution.setRoot(std::make_unique<CollectionScanNode>());
+    ASSERT_FALSE(solution.hasParallelRoot());
+    ASSERT_EQ(solution.parallelRoot(), nullptr);
+}
+
+TEST(QuerySolutionTest, ParallelRootLeavesTheSerialPlanAlone) {
+    QuerySolution solution;
+    solution.setRoot(std::make_unique<CollectionScanNode>());
+    const auto serialRoot = solution.root();
+    const auto serialHash = solution.hash();
+
+    solution.setParallelRoot(
+        std::make_unique<ExchangeNode>(solution.root()->clone(), ExchangeRouting::gather(false)));
+
+    ASSERT_TRUE(solution.hasParallelRoot());
+    ASSERT_EQ(solution.parallelRoot()->getType(), STAGE_EXCHANGE);
+    ASSERT_EQ(solution.parallelRoot()->children[0]->getType(), STAGE_COLLSCAN);
+
+    // The serial plan is still the plan of record.
+    ASSERT_EQ(solution.root(), serialRoot);
+    ASSERT_EQ(solution.root()->getType(), STAGE_COLLSCAN);
+    ASSERT_EQ(solution.hash(), serialHash);
+    ASSERT_FALSE(solution.hasNode(STAGE_EXCHANGE));
+}
+
+TEST(QuerySolutionTest, ParallelRootIsNumberedBottomUpOnItsOwn) {
+    QuerySolution solution;
+    solution.setRoot(std::make_unique<CollectionScanNode>());
+    ASSERT_EQ(solution.root()->nodeId(), 1u);
+
+    solution.setParallelRoot(
+        std::make_unique<ExchangeNode>(solution.root()->clone(), ExchangeRouting::gather(false)));
+
+    // Ids are unique within a tree but not across the two, and parents outrank their children.
+    const auto* exchange = solution.parallelRoot();
+    ASSERT_EQ(exchange->children[0]->nodeId(), 1u);
+    ASSERT_EQ(exchange->nodeId(), 2u);
+    ASSERT_EQ(solution.root()->nodeId(), 1u);
+}
+
+TEST(QuerySolutionTest, SettingTheSerialRootDiscardsTheParallelRoot) {
+    QuerySolution solution;
+    solution.setRoot(std::make_unique<CollectionScanNode>());
+    solution.setParallelRoot(
+        std::make_unique<ExchangeNode>(solution.root()->clone(), ExchangeRouting::gather(false)));
+    ASSERT_TRUE(solution.hasParallelRoot());
+
+    solution.setRoot(std::make_unique<CollectionScanNode>());
+    ASSERT_FALSE(solution.hasParallelRoot());
+}
+
+DEATH_TEST_REGEX(QuerySolutionDeathTest, ParallelRootRequiresASerialRoot, "13623411") {
+    QuerySolution solution;
+    solution.setParallelRoot(std::make_unique<CollectionScanNode>());
+}
+
+DEATH_TEST_REGEX(QuerySolutionDeathTest, ParallelRootIsNotSupportedOverAnExtension, "13623413") {
+    QuerySolution solution;
+    solution.setRoot(std::make_unique<CollectionScanNode>());
+    solution.extendWith(std::make_unique<LimitNode>(
+        std::make_unique<SentinelNode>(), 10, LimitSkipParameterization::Disabled));
+    ASSERT_TRUE(solution.hasExtension());
+    solution.setParallelRoot(std::make_unique<CollectionScanNode>());
+}
+
+DEATH_TEST_REGEX(QuerySolutionDeathTest, ParallelRootMustBeNonNull, "13623412") {
+    QuerySolution solution;
+    solution.setRoot(std::make_unique<CollectionScanNode>());
+    solution.setParallelRoot(nullptr);
+}
+
 TEST(QuerySolutionTest, ParallelEligibleNodes) {
     const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     auto scan = [] {
@@ -2876,10 +2951,48 @@ TEST(QuerySolutionTest, ParallelEligibleNodes) {
     ASSERT_TRUE(ShardingFilterNode().isParallelEligible());
     ASSERT_TRUE(ExchangeNode(scan(), ExchangeRouting::gather(false)).isParallelEligible());
 
-    // A clustered scan provides a sort order, so it is not eligible.
-    auto clusteredScan = scan();
-    clusteredScan->clusteredIndex = ClusteredIndexSpec{};
-    ASSERT_FALSE(clusteredScan->isParallelEligible());
+    const std::vector<std::pair<std::string, std::function<void(CollectionScanNode&)>>> variants{
+        {"clusteredIndex",
+         [](auto& n) {
+             n.clusteredIndex = ClusteredIndexSpec{};
+         }},
+        {"isClustered",
+         [](auto& n) {
+             n.isClustered = true;
+         }},
+        {"isOplog",
+         [](auto& n) {
+             n.isOplog = true;
+         }},
+        {"reverse",
+         [](auto& n) {
+             n.direction = -1;
+         }},
+        {"tailable",
+         [](auto& n) {
+             n.tailable = true;
+         }},
+        {"requestResumeToken",
+         [](auto& n) {
+             n.requestResumeToken = true;
+         }},
+        // Built in place: assigning a temporary ResumeScanPoint trips a GCC -Warray-bounds false
+        // positive in RecordId's destructor.
+        {"resumeScanPoint",
+         [](auto& n) {
+             n.resumeScanPoint.emplace();
+         }},
+        // An empty range list is bounded: it matches no records at all.
+        {"boundedRangeList",
+         [](auto& n) {
+             n.rangeList = RecordIdRangeList::makeUnion({});
+         }},
+    };
+    for (const auto& [name, mutate] : variants) {
+        CollectionScanNode node;
+        mutate(node);
+        ASSERT_FALSE(node.isParallelEligible()) << name;
+    }
 
     auto [filter, projection] = createMatchExprAndProjection(BSONObj(), BSON("a" << 1));
     ASSERT_TRUE(MatchNode(scan(), filter->clone()).isParallelEligible());

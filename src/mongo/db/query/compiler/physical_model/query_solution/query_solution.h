@@ -474,6 +474,24 @@ public:
     void setRoot(std::unique_ptr<QuerySolutionNode> root);
 
     /**
+     * Attaches a parallel alternative to the serial plan this solution describes. The serial root
+     * stays the plan of record: root(), hash(), hasNode(), isEligibleForPlanCache() and the rest
+     * of the solution's metadata keep describing it.
+     */
+    void setParallelRoot(std::unique_ptr<QuerySolutionNode> parallelRoot);
+
+    bool hasParallelRoot() const {
+        return _parallelRoot != nullptr;
+    }
+
+    /**
+     * The parallel alternative to root(), or nullptr if there is none.
+     */
+    const QuerySolutionNode* parallelRoot() const {
+        return _parallelRoot.get();
+    }
+
+    /**
      * Returns a vector containing all of the secondary namespaces referenced by this tree, except
      * for 'mainNss'. This vector is used to track which secondary namespaces we should acquire
      * locks for. Note that the namespaces are returned in sorted order.
@@ -561,6 +579,7 @@ private:
     void assignNodeIds(PlanNodeId& lastNodeId, QuerySolutionNode& node);
 
     std::unique_ptr<QuerySolutionNode> _root;
+    std::unique_ptr<QuerySolutionNode> _parallelRoot;
     PlanNodeId _unextendedRootId{kEmptyPlanNodeId};
 };
 
@@ -575,9 +594,8 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     }
 
     bool isParallelEligible() const override {
-        // A clustered scan provides a sort order, which the parallel planner cannot yet preserve
-        // through a gather.
-        return !clusteredIndex;
+        return !isClustered && !clusteredIndex && !isOplog && rangeList.isUnbounded() &&
+            !resumeScanPoint && !requestResumeToken && !tailable && direction == 1;
     }
 
     void computeProperties() override;
