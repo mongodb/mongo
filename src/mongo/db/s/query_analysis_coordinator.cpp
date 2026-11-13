@@ -171,17 +171,24 @@ void QueryAnalysisCoordinator::onSamplerDelete(const MongosType& doc) {
     _samplers.erase(doc.getName());
 }
 
-void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
+void QueryAnalysisCoordinator::onConsistentDataAvailable(OperationContext* opCtx,
+                                                         bool isMajority,
+                                                         bool isRollback) {
     if (MONGO_unlikely(disableQueryAnalysisCoordinator.shouldFail())) {
         return;
     }
-
+    // TODO SERVER-139253: Determine if rollback case needs to be handled differently.
+    if (isRollback) {
+        return;
+    }
     std::lock_guard<std::mutex> lk(_mutex);
 
     DBDirectClient client(opCtx);
 
     {
-        invariant(_configurations.empty());
+        // Clear any stale configurations so the reload from consistent data is the most recent and
+        // idempotent.
+        _configurations.clear();
         FindCommandRequest findRequest{NamespaceString::kConfigQueryAnalyzersNamespace};
         findRequest.setFilter(BSON(QueryAnalyzerDocument::kModeFieldName << BSON("$ne" << "off")));
         auto cursor = client.find(std::move(findRequest));
@@ -199,8 +206,9 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        invariant(_samplers.empty());
-
+        // Clear any stale samplers so the reload from consistent data is the most recent and
+        // idempotent.
+        _samplers.clear();
         auto minPingTime = _getMinLastPingTime();
         FindCommandRequest findRequest{MongosType::ConfigNS};
         findRequest.setFilter(BSON(MongosType::ping << BSON("$gte" << minPingTime)));

@@ -81,7 +81,10 @@ public:
     static QueryAnalysisCoordinator* get(OperationContext* opCtx);
     static QueryAnalysisCoordinator* get(ServiceContext* serviceContext);
 
-    void onStartup(OperationContext* opCtx) final;
+    void onStartup(OperationContext* opCtx) final {}
+
+    void onConsistentDataAvailable(OperationContext* opCtx, bool isMajority, bool isRollback) final;
+
 
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
 
@@ -137,10 +140,6 @@ private:
      * replica set configuration.
      */
     void onSetCurrentConfig(OperationContext* opCtx) final;
-
-    void onConsistentDataAvailable(OperationContext* opCtx,
-                                   bool isMajority,
-                                   bool isRollback) final {}
 
     void onShutdown() final {}
 

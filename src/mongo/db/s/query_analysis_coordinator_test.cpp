@@ -364,7 +364,7 @@ TEST_F(QueryAnalysisCoordinatorTest, DeleteConfigurationsModeOff) {
     ASSERT(configurations.empty());
 }
 
-TEST_F(QueryAnalysisCoordinatorTest, CreateConfigurationsOnStartUp) {
+TEST_F(QueryAnalysisCoordinatorTest, CreateConfigurationsOnConsistentDataAvailable) {
     auto coordinator = QueryAnalysisCoordinator::get(operationContext());
 
     // There are no configuration initially.
@@ -372,7 +372,7 @@ TEST_F(QueryAnalysisCoordinatorTest, CreateConfigurationsOnStartUp) {
     ASSERT(configurations.empty());
 
     // There are no configuration to create upon startup since there are no analyzer documents.
-    coordinator->onStartup(operationContext());
+    coordinator->onConsistentDataAvailable(operationContext(), true, false);
     configurations = coordinator->getConfigurationsForTest();
     ASSERT(configurations.empty());
 
@@ -400,7 +400,7 @@ TEST_F(QueryAnalysisCoordinatorTest, CreateConfigurationsOnStartUp) {
 
     // After stepup, the configurations for collection0 and collection1 to get recreated. There
     // should not be a configuration for collection2 since the mode is "off".
-    coordinator->onStartup(operationContext());
+    coordinator->onConsistentDataAvailable(operationContext(), true, false);
     configurations = coordinator->getConfigurationsForTest();
     ASSERT_EQ(configurations.size(), 2U);
     assertContainsConfiguration(configurations, analyzerDoc0);
@@ -522,15 +522,15 @@ TEST_F(QueryAnalysisCoordinatorTest, RemoveSamplersOnDelete) {
     ASSERT(samplers.empty());
 }
 
-TEST_F(QueryAnalysisCoordinatorTest, CreateSamplersOnStartup) {
+TEST_F(QueryAnalysisCoordinatorTest, CreateSamplersOnConsistentDataAvailable) {
     auto coordinator = QueryAnalysisCoordinator::get(operationContext());
 
     // There are no samplers initially.
     auto samplers = coordinator->getSamplersForTest();
     ASSERT(samplers.empty());
 
-    // There are no samplers to create upon startup since there are no mongos documents.
-    coordinator->onStartup(operationContext());
+    // There are no samplers to create initially since there are no mongos documents.
+    coordinator->onConsistentDataAvailable(operationContext(), true, false);
     samplers = coordinator->getSamplersForTest();
     ASSERT(samplers.empty());
 
@@ -552,9 +552,9 @@ TEST_F(QueryAnalysisCoordinatorTest, CreateSamplersOnStartup) {
     samplers = coordinator->getSamplersForTest();
     ASSERT(samplers.empty());
 
-    // After startup, the samplers for mongos1 and mongos2 should get recreated. There should not be
-    // a sampler for mongos0 since it is inactive.
-    coordinator->onStartup(operationContext());
+    // Once consistent data is available, the samplers for mongos1 and mongos2 should get recreated.
+    // There should not be a sampler for mongos0 since it is inactive.
+    coordinator->onConsistentDataAvailable(operationContext(), true, false);
     samplers = coordinator->getSamplersForTest();
     ASSERT_EQ(samplers.size(), 2U);
     assertContainsSampler(samplers, mongosDoc1);
