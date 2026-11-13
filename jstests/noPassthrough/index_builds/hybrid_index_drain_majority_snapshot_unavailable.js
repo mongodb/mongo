@@ -1,6 +1,6 @@
 /**
- * Tests majority snapshot loss during side write draining. After voting for commit readiness, the
- * build must tolerate snapshot loss and retry draining or complete through the final untimestamped
+ * Tests majority snapshot loss during side write draining. The build must tolerate snapshot loss
+ * before and after commit readiness, and retry draining or complete through the final untimestamped
  * drain.
  *
  * @tags: [
@@ -54,7 +54,7 @@ describe("majority snapshot unavailable during index build drains", function () 
         return index.indexBuildInfo;
     }
 
-    function startPausedBuild(collName, secondaryPauseName, expectedError) {
+    function startPausedBuild(collName, secondaryPauseName) {
         const build = {
             coll: testDB.getCollection(collName),
             secondaryColl: secondaryDB.getCollection(collName),
@@ -74,7 +74,7 @@ describe("majority snapshot unavailable during index build drains", function () 
         build.secondaryPause = configureFailPoint(secondary, secondaryPauseName);
         build.awaitBuild = startParallelShell(
             funWithArgs(
-                function (dbName, collName, expectedError) {
+                function (dbName, collName) {
                     const result = db.getSiblingDB(dbName).runCommand({
                         createIndexes: collName,
                         indexes: [
@@ -85,15 +85,10 @@ describe("majority snapshot unavailable during index build drains", function () 
                         // Return without waiting for the paused secondary.
                         writeConcern: {w: 1},
                     });
-                    if (expectedError === undefined) {
-                        assert.commandWorked(result);
-                    } else {
-                        assert.commandFailedWithCode(result, expectedError);
-                    }
+                    assert.commandWorked(result);
                 },
                 testDB.getName(),
                 collName,
-                expectedError,
             ),
             primary.port,
         );
@@ -181,6 +176,26 @@ describe("majority snapshot unavailable during index build drains", function () 
         assertMajoritySnapshotUnavailable();
     }
 
+    function waitForPreReadinessSnapshotWait(build) {
+        const opid = getBuildInfo(build).opid;
+        const initialAttempts = getDrainAttempts();
+        build.secondaryPause.off();
+        assert.soon(() => {
+            if (getDrainAttempts() <= initialAttempts) {
+                return false;
+            }
+            const [op] = secondaryDB
+                .getSiblingDB("admin")
+                .aggregate([
+                    {$currentOp: {allUsers: true, idleConnections: true}},
+                    {$match: {opid}},
+                ])
+                .toArray();
+            return op && Object.keys(op.locks || {}).length === 0;
+        }, "Expected a pre-readiness wait for snapshot recovery");
+        assertMajoritySnapshotUnavailable();
+    }
+
     function assertCommittedIndexContents(build) {
         const coll = build.secondaryColl;
         IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1", "b_1"]);
@@ -198,35 +213,34 @@ describe("majority snapshot unavailable during index build drains", function () 
         );
     }
 
-    it("aborts on snapshot loss before voting for commit readiness and before a commit decision", function () {
-        // Snapshot loss: before voting for commit readiness, before any commit decision.
-        // Snapshot recovery: after both nodes apply the abort decision and remove the indexes.
-        // Expected: coordinated abort removes the unfinished indexes on both nodes.
+    it("resumes side-write draining after snapshot recovery before voting for commit readiness", function () {
+        // Snapshot loss: before voting for commit readiness.
+        // Snapshot recovery: before voting for commit readiness.
+        // Expected: retry the required drain before voting, then process the commit decision.
         const build = startPausedBuild(
-            "beforeVote",
+            "beforeVoteRecovery",
             "hangAfterIndexBuildDumpsInsertsFromBulk",
-            ErrorCodes.IndexBuildAborted,
         );
-        // Inspect the failure before the abort vote can trigger index cleanup.
-        const abortPause = configureFailPoint(
+        const beforeVote = configureFailPoint(
             secondary,
-            "hangIndexBuildBeforeSignalingPrimaryForAbort",
+            "hangIndexBuildBeforeSignalPrimaryForCommitReadiness",
         );
         loseMajoritySnapshot(build);
-        build.secondaryPause.off();
-        abortPause.wait();
-        assert.eq(
-            ErrorCodes.ReadConcernMajorityNotAvailableYet,
-            getBuildInfo(build).replicationState.code,
-        );
-        abortPause.off();
+        waitForPreReadinessSnapshotWait(build);
+        // Observe the required retry so the final drain cannot hide a skipped pre-readiness drain.
+        const retryDrain = configureFailPoint(secondary, "hangDuringIndexBuildDrainYield", {
+            namespace: build.coll.getFullName(),
+        });
+        restoreMajoritySnapshot(build);
+        retryDrain.wait();
+        retryDrain.off();
+        beforeVote.wait();
+        beforeVote.off();
 
         build.primaryPause.off();
         build.awaitBuild();
         rst.awaitReplication();
-        restoreMajoritySnapshot(build);
-        IndexBuildTest.assertIndexes(build.coll, 1, ["_id_"]);
-        IndexBuildTest.assertIndexes(build.secondaryColl, 1, ["_id_"]);
+        assertCommittedIndexContents(build);
         assert.commandWorked(testDB.runCommand({drop: build.coll.getName()}));
     });
 
