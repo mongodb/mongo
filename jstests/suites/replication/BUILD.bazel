@@ -112,37 +112,6 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "concurrency_sharded_replication",
-    size = "enormous",
-    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication.yml",
-    data = [
-        "//jstests/concurrency/reshard_collection_util:reshard_collection_util.js",
-        "//jstests/sharding/libs:all_subpackage_javascript_files",
-    ] + CONCURRENCY_DATA,
-    shard_count = 40,
-    tags = [
-        "ci-all-variants",
-        "common",
-        "concurrency",
-        "incompatible_debug_mode",
-        "large",
-        "read_concern_maj",
-        "sharded",
-    ],
-    target_compatible_with = select({
-        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
-        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
-        "@platforms//os:macos": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/s:mongos",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
     name = "replica_sets",
     size = "large",
     config = "//buildscripts/resmokeconfig:suites/replica_sets.yml",
@@ -668,71 +637,6 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "concurrency_sharded_initial_sync",
-    size = "large",
-    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_initial_sync.yml",
-    shard_count = 8,
-    tags = [
-        "ci-default",
-        "concurrency",
-        "incompatible_debug_mode",
-        "incompatible_inmemory",
-        "initsync",
-        "large",
-        "sharded",
-        "stepdowns",
-    ],
-    target_compatible_with = select({
-        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/s:mongos",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
-    name = "concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer",
-    size = "large",
-    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer.yml",
-    shard_count = 9,
-    tags = [
-        "ci-default",
-        "concurrency",
-        "incompatible_debug_mode",
-        "large",
-        "sharded",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/s:mongos",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
-    name = "concurrency_sharded_stepdown_terminate_kill_primary_with_balancer",
-    size = "large",
-    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_stepdown_terminate_kill_primary_with_balancer.yml",
-    shard_count = 20,
-    tags = [
-        "ci-default",
-        "concurrency",
-        "incompatible_debug_mode",
-        "kill_terminate",
-        "sharded",
-        "stepdowns",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/s:mongos",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
     name = "replica_sets_fcbis_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/replica_sets_fcbis_jscore_passthrough.yml",
     shard_count = 16,
@@ -1150,44 +1054,6 @@ resmoke_suite_test(
         "ci-default",
         "magic_restore",
         "suggested_excluding_required__for_devprod_mitigation_only",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/s:mongos",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
-    name = "concurrency_sharded_local_read_write_multi_stmt_txn",
-    size = "large",
-    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_local_read_write_multi_stmt_txn.yml",
-    shard_count = 30,
-    tags = [
-        "ci-default",
-        "concurrency",
-        "incompatible_debug_mode",
-        "sharded",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/s:mongos",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
-    name = "concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary",
-    size = "large",
-    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary.yml",
-    shard_count = 40,
-    tags = [
-        "ci-default",
-        "concurrency",
-        "incompatible_debug_mode",
-        "kill_terminate",
-        "sharded",
-        "stepdowns",
     ],
     deps = [
         "//src/mongo/db:mongod",
