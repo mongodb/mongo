@@ -94,6 +94,44 @@ TEST(TypeSetTest, FromBSONTypeHoldingSingleValueCoveredInFull) {
     }
 }
 
+TEST(TypeSetTest, SameCanonicalClassCoversOnlyComparableTypes) {
+    for (auto type : kAllTypes) {
+        const auto comparisonClass = sameCanonicalClass(type);
+        for (auto candidate : kAllTypes) {
+            const bool sameClass = canonicalizeBSONType(type) == canonicalizeBSONType(candidate);
+            ASSERT_EQ(comparisonClass.hasType(candidate), sameClass)
+                << typeName(type) << " and " << typeName(candidate);
+            if (sameClass) {
+                ASSERT_EQ(comparisonClass.getExtent(candidate),
+                          TypeSet(candidate, Extent::kSubset).getExtent(candidate))
+                    << typeName(type) << " and " << typeName(candidate);
+            }
+        }
+    }
+}
+
+TEST(TypeSetTest, SameCanonicalClassesWidensEachIncludedType) {
+    const auto types = unionType(TypeSet(BSONType::numberInt, Extent::kSubset),
+                                 TypeSet(BSONType::string, Extent::kSubset));
+    ASSERT_EQ(
+        sameCanonicalClasses(types),
+        unionType(sameCanonicalClass(BSONType::numberInt), sameCanonicalClass(BSONType::string)));
+}
+
+TEST(TypeSetTest, SameCanonicalClassesLeavesAnyUnconstrained) {
+    ASSERT_EQ(sameCanonicalClasses(TypeSet::any()), TypeSet::any());
+}
+
+TEST(TypeSetTest, SameCanonicalClassRejectsInvalidBSONTypes) {
+    for (auto type : {static_cast<BSONType>(-2),
+                      static_cast<BSONType>(20),
+                      static_cast<BSONType>(126),
+                      static_cast<BSONType>(128)}) {
+        ASSERT_THROWS_CODE(
+            sameCanonicalClass(type), AssertionException, ErrorCodes::InvalidBSONType);
+    }
+}
+
 TEST(TypeSetTest, ExtentIsSubsetIfAnyTypeIsCoveredAsSubset) {
     ASSERT_TRUE(isAll(TypeSet::any().getExtent()));
     ASSERT_TRUE(isAll(TypeSet::never().getExtent()));
@@ -128,6 +166,23 @@ TEST(TypeSetTest, HasOnlyTypeRejectsSetsCoveringOtherTypes) {
     ASSERT_FALSE(
         unionType(TypeSet(BSONType::object, Extent::kAll), TypeSet(BSONType::array, Extent::kAll))
             .hasOnlyType(BSONType::object));
+}
+
+TEST(TypeSetTest, IsSingletonTypeRequiresExactlyOneSingleton) {
+    for (auto type :
+         {BSONType::eoo, BSONType::undefined, BSONType::null, BSONType::minKey, BSONType::maxKey}) {
+        ASSERT_TRUE(TypeSet(type, Extent::kAll).isSingletonType());
+        ASSERT_TRUE(Type(type, Extent::kAll).isSingletonType());
+    }
+    ASSERT_FALSE(TypeSet::never().isSingletonType());
+    ASSERT_FALSE(TypeSet::any().isSingletonType());
+    ASSERT_FALSE(TypeSet(BSONType::numberInt, Extent::kSubset).isSingletonType());
+    ASSERT_FALSE(
+        unionType(TypeSet(BSONType::null, Extent::kAll), TypeSet(BSONType::numberInt, Extent::kAll))
+            .isSingletonType());
+    ASSERT_FALSE(
+        unionType(TypeSet(BSONType::null, Extent::kAll), TypeSet(BSONType::minKey, Extent::kAll))
+            .isSingletonType());
 }
 
 TEST(TypeSetTest, IsNeverHoldsOnlyForEmptySet) {

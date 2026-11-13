@@ -61,6 +61,28 @@ std::vector<Value> scalarRepresentatives() {
     };
 }
 
+std::vector<Value> equalityNarrowingCorpus() {
+    auto values = scalarRepresentatives();
+    values.insert(values.end(),
+                  {Value(0),
+                   Value("sym"sv),
+                   Value(BSONObj()),
+                   Value(BSON("x" << 1)),
+                   Value(BSON("x" << 1.0)),
+                   Value(BSON("x" << BSON("y" << 1))),
+                   Value(BSON("x" << BSON("y" << 1.0))),
+                   Value(BSON("x" << BSON_ARRAY(1))),
+                   Value(BSON("x" << 1 << "x" << 2)),
+                   Value(BSON("x" << 1.0 << "x" << 2)),
+                   Value(BSON("x" << BSON("y" << 1 << "y" << 2))),
+                   Value(BSON("x" << BSON("y" << 1.0 << "y" << 2))),
+                   Value(std::vector<Value>{}),
+                   Value(std::vector<Value>{Value(1)}),
+                   Value(std::vector<Value>{Value(1.0)}),
+                   Value(std::vector<Value>{Value(2)})});
+    return values;
+}
+
 namespace {
 /**
  * Returns arrays in which each element of 'elements' is nested within an array or two arrays.

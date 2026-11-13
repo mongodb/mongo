@@ -25,6 +25,14 @@ struct GetOutputTypeExpressionVisitor final
         outputType = Type::fromValue(expr->getValue());
     }
 
+    void visit(const ExpressionArray*) override {
+        outputType = Type::someArray();
+    }
+
+    void visit(const ExpressionObject*) override {
+        outputType = Type(BSONType::object, Extent::kSubset);
+    }
+
     void visit(const ExpressionFieldPath* expr) override {
         if (expr->isVariableReference()) {
             // The value of a variable other than ROOT/CURRENT is not modelled.
@@ -51,6 +59,13 @@ struct GetOutputTypeExpressionVisitor final
     Type outputType{Type::any()};
 };
 
+const ExpressionFieldPath* getIfExpressionFieldPath(const Expression* expr) {
+    const ExpressionFieldPath* path = nullptr;
+    FieldPathVisitor visitor([&](const ExpressionFieldPath* fieldPath) { path = fieldPath; });
+    expr->acceptVisitor(&visitor);
+    return path;
+}
+
 /**
  * Narrows the input type by every expression which carries type information.
  * An expression left without an override leaves the input type unchanged, which is always valid.
@@ -67,6 +82,40 @@ struct NarrowTypeExpressionVisitor final
         if (expr->getChildren().empty() && assumeTrue) {
             // An empty $or evaluates to false, so it matches no document.
             type = Type::never();
+        }
+    }
+
+    void visit(const ExpressionCompare* expr) override {
+        // TODO(SERVER-139188): Support additional comparison operators.
+        if (expr->getOp() != ExpressionCompare::EQ) {
+            return;
+        }
+
+        // Only equality involving a field path is modeled.
+        const auto& children = expr->getChildren();
+        tassert(13598400, "$eq must have two operands", children.size() == 2);
+
+        // Either operand may be the field path.
+        for (auto [pathIndex, otherIndex] : {std::pair{0, 1}, std::pair{1, 0}}) {
+            const ExpressionFieldPath* path = getIfExpressionFieldPath(children[pathIndex].get());
+            if (!path || path->isVariableReference() || path->isROOT()) {
+                continue;
+            }
+
+            const Type outputType = getOutputType(type, children[otherIndex].get());
+            // Under negation, only a singleton type identifies the other operand's value.
+            if (outputType.getTypeSet() == TypeSet::any() ||
+                (!assumeTrue && !outputType.isSingletonType())) {
+                continue;
+            }
+
+            Type constraint(sameCanonicalClasses(outputType.getTypeSet()));
+            type = expression::narrowPath(std::move(type),
+                                          path->getFieldPathWithoutCurrentPrefix(),
+                                          expression::PathSemantics::kFieldPath,
+                                          std::move(constraint),
+                                          assumeTrue);
+            return;
         }
     }
 

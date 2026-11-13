@@ -94,6 +94,9 @@ public:
     /// Returns true if 'type' is the only type contained in the set, whatever its extent.
     bool hasOnlyType(BSONType type) const;
 
+    /// Returns true if the set contains exactly one singleton BSON type.
+    bool isSingletonType() const;
+
     /// Returns true if the set covers no values at all.
     bool isNever() const;
 
@@ -116,6 +119,7 @@ private:
     friend TypeSet unionType(TypeSet lhs, TypeSet rhs);
     friend TypeSet intersectType(TypeSet lhs, TypeSet rhs);
     friend TypeSet complement(TypeSet typeSet);
+    friend TypeSet sameCanonicalClass(BSONType type);
 
     TypeSet(detail::TypeMask types, detail::TypeMask subsetTypes);
 
@@ -214,6 +218,9 @@ public:
     /// Returns true if 'type' is the only type contained in the set, whatever its extent.
     bool hasOnlyType(BSONType type) const;
 
+    /// Returns true if the type contains exactly one singleton BSON type.
+    bool isSingletonType() const;
+
     /// Returns true if no value at all is covered.
     bool isNever() const;
 
@@ -301,6 +308,16 @@ Type intersectType(Type lhs, Type rhs);
  * covered as subset.
  */
 Type complement(Type type);
+
+/**
+ * Returns the set of BSON types that can compare equal to 'type' under BSON ordering: those sharing
+ * its canonical type (numbers together, string and symbol together, eoo and undefined together).
+ * Covered as a subset.
+ */
+TypeSet sameCanonicalClass(BSONType type);
+
+/// Returns the union of the equality comparison classes for all types represented by 'types'.
+TypeSet sameCanonicalClasses(TypeSet types);
 
 /**
  * Returns 'input' with the type of the 'fieldName' field of the object intersected with

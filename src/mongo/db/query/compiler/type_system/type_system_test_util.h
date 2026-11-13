@@ -52,6 +52,12 @@ Type numbers(Extent extent = Extent::kAll);
 std::vector<Value> scalarRepresentatives();
 
 /**
+ * Returns values exercising equality within BSON comparison classes, including equal values with
+ * different representations and unequal values with the same type.
+ */
+std::vector<Value> equalityNarrowingCorpus();
+
+/**
  * Returns a corpus of documents where the values along the path take every possible BSON type,
  * including missing, null, array and array of arrays as well as objects.
  * Arrays also appear empty or with the value at position 0 or 1:

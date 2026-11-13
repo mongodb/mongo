@@ -1668,6 +1668,15 @@ TEST(MatcherTypingTest, ExprMatchExpressionNarrowing) {
     ASSERT_EQ(narrowedDebugString(predicate, input), expected);
 }
 
+TEST(MatcherTypingTest, NorOfFieldEqualityKeepsPossibleDocuments) {
+    auto input =
+        openObject({{"a", allValues(BSONType::null)},
+                    {"b", unionType(allValues(BSONType::null), allValues(BSONType::numberInt))}});
+    const std::string predicate = "{$nor: [{$expr: {$eq: ['$a', '$b']}}]}";
+    ASSERT_TRUE(matches(predicate, "{a: null, b: 5}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), "{a: null, b: int, ...}");
+}
+
 TEST(MatcherTypingTest, InternalSchemaObjectMatchNarrowsChildWithoutLeafTraversal) {
     const std::string query =
         "{x: {$_internalSchemaObjectMatch: {b: {$_internalSchemaType: 'number'}}}}";

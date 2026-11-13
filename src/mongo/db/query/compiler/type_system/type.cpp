@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -94,6 +95,18 @@ constexpr std::array kAllTypes{
     BSONType::regEx,         BSONType::dbRef,     BSONType::code,         BSONType::symbol,
     BSONType::codeWScope,    BSONType::numberInt, BSONType::timestamp,    BSONType::numberLong,
     BSONType::numberDecimal, BSONType::maxKey};
+
+constexpr std::int8_t kCanonicalTypeMin = canonicalizeBSONTypeUnsafeLookup(BSONType::minKey);
+constexpr std::int8_t kCanonicalTypeMax = canonicalizeBSONTypeUnsafeLookup(BSONType::maxKey);
+
+constexpr auto kCanonicalClassMasks = [] {
+    std::array<TypeMask, kCanonicalTypeMax - kCanonicalTypeMin + 1> masks{};
+    for (BSONType type : kAllTypes) {
+        const std::int8_t canonical = canonicalizeBSONTypeUnsafeLookup(type);
+        masks[canonical - kCanonicalTypeMin] |= typeMask(type);
+    }
+    return masks;
+}();
 
 /// A bitmask containing all BSONTypes.
 constexpr TypeMask kAllTypesMask = typeMask(kAllTypes.begin(), kAllTypes.end());
@@ -341,6 +354,10 @@ bool TypeSet::hasOnlyType(BSONType type) const {
     return _types == typeMask(type);
 }
 
+bool TypeSet::isSingletonType() const {
+    return std::popcount(_types) == 1 && (_types & kSingletonTypesMask) != 0;
+}
+
 bool TypeSet::isNever() const {
     return _types == 0;
 }
@@ -497,6 +514,10 @@ bool Type::hasType(BSONType type) const {
 
 bool Type::hasOnlyType(BSONType type) const {
     return _typeSet.hasOnlyType(type);
+}
+
+bool Type::isSingletonType() const {
+    return _typeSet.isSingletonType();
 }
 
 bool Type::isNever() const {
@@ -694,5 +715,24 @@ Type narrowField(Type input, std::string_view fieldName, Type fieldType) {
         clearShape(input._typeSet, input._shape);
     }
     return Type(input._typeSet, std::move(input._shape));
+}
+
+TypeSet sameCanonicalClass(BSONType type) {
+    const auto canonical = canonicalizeBSONType(type);
+    const TypeMask types = kCanonicalClassMasks[canonical - kCanonicalTypeMin];
+    return TypeSet(types, types);
+}
+
+TypeSet sameCanonicalClasses(TypeSet types) {
+    if (types == TypeSet::any()) {
+        return types;
+    }
+    TypeSet result = TypeSet::never();
+    for (BSONType type : kAllTypes) {
+        if (types.hasType(type)) {
+            result = unionType(std::move(result), sameCanonicalClass(type));
+        }
+    }
+    return result;
 }
 }  // namespace mongo::pipeline::type_system

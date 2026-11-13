@@ -8,13 +8,17 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/type_system/type_system_test_util.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace mongo::pipeline::type_system {
 namespace {
+
+using namespace std::literals::string_view_literals;
 
 using expression::narrowPath;
 using expression::PathSemantics;
@@ -63,6 +67,14 @@ TEST(ExpressionTypingTest, EmptyOrMatchesNoDocument) {
     ASSERT_EQ(narrowedDebugString(expr, input, false), narrowedAssumeFalse);
 }
 
+TEST(ExpressionTypingTest, NegatedOrOfEqualitiesLeavesTypeUnchanged) {
+    auto input =
+        openObject({{"a", allValues(BSONType::numberInt)}, {"b", allValues(BSONType::string)}});
+    const auto expr = "{$not: {$or: [{$eq: ['$a', 5]}, {$eq: ['$b', 'lalala']}]}}";
+    ASSERT_EQ(narrowedDebugString(expr, input), "{a: int, b: string, ...}");
+    ASSERT_EQ(narrowedDebugString(expr, input, false), "{a: int, b: string, ...}");
+}
+
 TEST(ExpressionTypingTest, ConstantOutputType) {
     ASSERT_EQ(outputTypeDebugString("{$const: 5}"), "int(S)");
     ASSERT_EQ(outputTypeDebugString("{$const: null}"), "null");
@@ -77,6 +89,166 @@ TEST(ExpressionTypingTest, ConstantOutputTypeMatchesEvaluationOnScalars) {
         const Type output = getOutputType(Type::anyObject(), expr.get());
         ASSERT_TRUE(output.hasValue(value))
             << "constant " << value.toString() << " but inferred " << output.toDebugString();
+    }
+}
+
+TEST(ExpressionTypingTest, EqualityNarrowingPreservesEvaluationResults) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto values = equalityNarrowingCorpus();
+
+    auto path =
+        ExpressionFieldPath::createPathFromString(expCtx.get(), "a", expCtx->variablesParseState);
+    for (const auto& constant : values) {
+        auto literal = ExpressionConstant::create(expCtx.get(), constant);
+        for (bool reverse : {false, true}) {
+            auto expr = reverse
+                ? ExpressionCompare::create(expCtx.get(), ExpressionCompare::EQ, literal, path)
+                : ExpressionCompare::create(expCtx.get(), ExpressionCompare::EQ, path, literal);
+            const auto narrowedTrue = narrowType(Type::anyObject(), expr.get(), true);
+            const auto narrowedFalse = narrowType(Type::anyObject(), expr.get(), false);
+            for (const auto& candidate : values) {
+                Document doc{{"a", candidate}};
+                const bool matches = expr->evaluate(doc, &expCtx->variables, {}).getBool();
+                const auto& narrowed = matches ? narrowedTrue : narrowedFalse;
+                ASSERT_TRUE(narrowed.hasValue(Value(doc)))
+                    << "constant " << constant.toString() << ", candidate " << candidate.toString()
+                    << ", reverse " << reverse << ", result " << matches << ", type "
+                    << narrowed.toDebugString();
+            }
+        }
+    }
+}
+
+TEST(ExpressionTypingTest, EqualityNarrowingUsesComparisonClasses) {
+    auto input = Type::anyObject();
+    const auto assertFieldType = [&](const std::string& expr, const Type& expected) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        auto parsed = parseExpr(fromjson(expr), *expCtx);
+        ASSERT_EQ(narrowType(input, parsed.get(), true).getField("a").toDebugString(),
+                  expected.toDebugString());
+    };
+    assertFieldType("{$eq: ['$a', 1]}", numbers(Extent::kSubset));
+    assertFieldType("{$eq: [1, '$a']}", numbers(Extent::kSubset));
+    assertFieldType("{$eq: ['$a', {$literal: 1}]}", numbers(Extent::kSubset));
+    assertFieldType("{$eq: ['$a', {$const: {x: 1}}]}", Type(BSONType::object, Extent::kSubset));
+    assertFieldType("{$eq: ['$a', {x: {y: 1}}]}", Type(BSONType::object, Extent::kSubset));
+    assertFieldType("{$eq: ['$a', 'str']}", Type(sameCanonicalClass(BSONType::string)));
+    assertFieldType("{$eq: ['$a', [1, 'str']]}", Type::someArray());
+    assertFieldType("{$eq: ['$a', {$const: {}}]}", Type(BSONType::object, Extent::kSubset));
+    assertFieldType("{$eq: ['$$CURRENT.a', 1]}", numbers(Extent::kSubset));
+}
+
+TEST(ExpressionTypingTest, EqualityNarrowingDottedPaths) {
+    for (const auto& expr : {"{$eq: ['$a.b', 1]}",
+                             "{$eq: [1, '$a.b']}",
+                             "{$eq: ['$$ROOT.a.b', 1]}",
+                             "{$eq: ['$$CURRENT.a.b', 1]}"}) {
+        ASSERT_EQ(narrowedDebugString(expr, Type::anyObject()), "{a: {b: number(S), ...}, ...}")
+            << expr;
+    }
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$a.b.c', 1]}", Type::anyObject()),
+              "{a: {b: {c: number(S), ...}, ...}, ...}");
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$a.b', {$const: [1]}]}", Type::anyObject()),
+              "{a: {b: array(S), ...}|array(S), ...}");
+
+    auto input = openObject({{"a", openObject({{"b", allValues(BSONType::string)}})}});
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$a.b', 1]}", input), "never");
+}
+
+TEST(ExpressionTypingTest, EqualityNarrowingDottedPathsWhenFalse) {
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$a.b', 1]}", Type::anyObject(), false), "object");
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$$ROOT.a.b.c', null]}", Type::anyObject(), false),
+              "{a: ~object|{b: ~object|{c: ~null, ...}, ...}, ...}");
+    ASSERT_EQ(
+        narrowedDebugString("{$eq: [{$const: [1]}, '$$CURRENT.a.b']}", Type::anyObject(), false),
+        "object");
+}
+
+TEST(ExpressionTypingTest, EqualityNarrowingUsesOtherOperandOutputType) {
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$a', {$or: [true]}]}", Type::anyObject()),
+              "{a: bool(S), ...}");
+}
+
+TEST(ExpressionTypingTest, EqualityNarrowingWithUntypedOperandLeavesInputUnchanged) {
+    auto input = openObject({{"a", allValues(BSONType::string)}});
+    for (const auto& expr : {"{$eq: ['$a', {$arrayElemAt: ['$b', 1]}]}",
+                             "{$eq: [{$arrayElemAt: ['$b', 1]}, '$a.b']}"}) {
+        ASSERT_EQ(narrowedDebugString(expr, input), "{a: string, ...}") << expr;
+        ASSERT_EQ(narrowedDebugString(expr, input, false), "{a: string, ...}") << expr;
+    }
+}
+
+TEST(ExpressionTypingTest, EqualityNarrowingIntersectsWithExistingFieldType) {
+    const auto stringInput = openObject({{"a", allValues(BSONType::string)}});
+    const auto doubleInput = openObject({{"a", allValues(BSONType::numberDouble)}});
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$a', 1]}", stringInput), "never");
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$a', 1]}", doubleInput), "{a: double(S), ...}");
+}
+
+TEST(ExpressionTypingTest, EqualityNarrowingKeepsUnequalValuesOfTheSameType) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto expr = parseExpr(fromjson("{$eq: ['$a', 1]}"), *expCtx);
+    auto trueType = narrowType(Type::anyObject(), expr.get(), true);
+    auto falseType = narrowType(Type::anyObject(), expr.get(), false);
+    ASSERT_EQ(trueType.toDebugString(), "{a: number(S), ...}");
+    ASSERT_EQ(falseType.toDebugString(), "object");
+}
+
+TEST(ExpressionTypingTest, EqualityNarrowingExcludesNullWhenFalse) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto expr = parseExpr(fromjson("{$eq: ['$a', null]}"), *expCtx);
+    auto falseType = narrowType(Type::anyObject(), expr.get(), false);
+    ASSERT_EQ(falseType.toDebugString(), "{a: ~null, ...}");
+}
+
+TEST(ExpressionTypingTest, NegatedEqualityNarrowsOnlyForSingletonOperand) {
+    auto input =
+        openObject({{"a", allValues(BSONType::null)},
+                    {"b", unionType(allValues(BSONType::null), allValues(BSONType::numberInt))}});
+    for (const auto& expr : {"{$eq: ['$a', '$b']}", "{$eq: ['$b', '$a']}"}) {
+        ASSERT_EQ(narrowedDebugString(expr, input, false), "{a: null, b: int, ...}") << expr;
+    }
+    auto mixed =
+        openObject({{"a", unionType(allValues(BSONType::null), allValues(BSONType::numberInt))},
+                    {"b", unionType(allValues(BSONType::null), allValues(BSONType::numberInt))}});
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$a', '$b']}", mixed, false),
+              "{a: null|int, b: null|int, ...}");
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$a', 5]}", Type::anyObject(), false), "object");
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$a', 'lalala']}", Type::anyObject(), false), "object");
+    ASSERT_EQ(narrowedDebugString("{$eq: ['$a', {$or: [true]}]}", Type::anyObject(), false),
+              "object");
+}
+
+TEST(ExpressionTypingTest, EqualityNarrowingDoesNotEvaluateArrayOrObjectOperands) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto assertType = [&](const std::string& spec, BSONType bsonType) {
+        auto expr = parseExpr(fromjson(spec), *expCtx);
+        const auto trueType = narrowType(Type::anyObject(), expr.get(), true);
+        const auto falseType = narrowType(Type::anyObject(), expr.get(), false);
+        ASSERT_EQ(trueType.getField("a").toDebugString(),
+                  Type(bsonType, Extent::kSubset).toDebugString())
+            << spec;
+        ASSERT_TRUE(falseType.getField("a").hasType(bsonType))
+            << spec << ", inferred " << falseType.getField("a").toDebugString();
+    };
+    assertType("{$eq: ['$a', ['$b', {$divide: [1, 0]}]]}", BSONType::array);
+    assertType("{$eq: [['$b', {$divide: [1, 0]}], '$a']}", BSONType::array);
+    assertType("{$eq: ['$a', {x: '$b', y: {$divide: [1, 0]}}]}", BSONType::object);
+    assertType("{$eq: [{x: '$b', y: {$divide: [1, 0]}}, '$a']}", BSONType::object);
+}
+
+TEST(ExpressionTypingTest, EqualityNarrowingLeavesUnsupportedOperandsUnchanged) {
+    auto input = openObject({{"a", allValues(BSONType::string)}});
+    for (const auto& expr : {"{$eq: ['$$ROOT', 1]}",
+                             "{$eq: ['$$NOW', 1]}",
+                             "{$eq: [1, 1]}",
+                             "{$eq: ['$a', {$add: [1, 1]}]}",
+                             "{$eq: ['$a', '$$NOW']}",
+                             "{$eq: [{$add: ['$a', 1]}, 1]}",
+                             "{$gt: ['$a', 1]}"}) {
+        for (bool assumeTrue : {false, true}) {
+            ASSERT_EQ(narrowedDebugString(expr, input, assumeTrue), input.toDebugString()) << expr;
+        }
     }
 }
 
