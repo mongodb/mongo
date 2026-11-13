@@ -9,7 +9,8 @@
  *     evaluated against that database.
  * A caller with rights only on their own namespace cannot target a namespace they lack rights on by
  * pointing "ui" at it (the op fails with Unauthorized), while a caller authorized for the resolved
- * target may target it by UUID even when "o" names a different collection.
+ * target may target it by UUID even when "o" names a different collection. This holds for every
+ * client-supplied oplogApplicationMode.
  *
  * @tags: [requires_auth]
  */
@@ -129,10 +130,10 @@ describe("applyOps authorization for UUID-targeted command ops", function () {
     }
 
     // Runs an applyOps command as eve (whose user doc lives on "admin"; auth is connection-wide).
-    function asEve(conn, op) {
+    function asEve(conn, op, extraFields = {}) {
         assert(conn.getDB("admin").auth("eve", "pwd"));
         try {
-            return conn.getDB(kDbName).runCommand({applyOps: [op]});
+            return conn.getDB(kDbName).runCommand({applyOps: [op], ...extraFields});
         } finally {
             conn.getDB("admin").logout();
         }
@@ -204,6 +205,75 @@ describe("applyOps authorization for UUID-targeted command ops", function () {
         assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
         assert(collExists(this.conn, kDbName, kVictim), "victim database must not be dropped");
     });
+
+    // ---- Rejected regardless of the client-supplied oplogApplicationMode. ----
+
+    for (const mode of ["ApplyOps", "Secondary", "InitialSync", "Recovering"]) {
+        it(`rejects a ui-redirected drop with oplogApplicationMode ${mode}`, function () {
+            const res = asEve(
+                this.conn,
+                {op: "c", ns: kDbName + "." + kMine, ui: this.victimUUID, o: {drop: kMine}},
+                {oplogApplicationMode: mode},
+            );
+            assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
+            assert(collExists(this.conn, kDbName, kVictim), "victim must not be dropped");
+        });
+
+        it(`rejects a ui-redirected dropIndexes with oplogApplicationMode ${mode}`, function () {
+            const res = asEve(
+                this.conn,
+                {
+                    op: "c",
+                    ns: kDbName + "." + kMine,
+                    ui: this.victimUUID,
+                    o: {dropIndexes: kMine, index: "secret_1"},
+                },
+                {oplogApplicationMode: mode},
+            );
+            assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
+            assert(
+                collHasIndex(this.conn, kVictim, "secret_1"),
+                "victim's index must not be dropped",
+            );
+        });
+
+        it(`rejects a ui-redirected collMod with oplogApplicationMode ${mode}`, function () {
+            const res = asEve(
+                this.conn,
+                {
+                    op: "c",
+                    ns: kDbName + "." + kMine,
+                    ui: this.victimUUID,
+                    o: {collMod: kMine, index: {keyPattern: {secret: 1}, hidden: true}},
+                },
+                {oplogApplicationMode: mode},
+            );
+            assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
+        });
+
+        it(`rejects a ui-redirected renameCollection with oplogApplicationMode ${mode}`, function () {
+            const res = asEve(
+                this.conn,
+                {
+                    op: "c",
+                    ns: kDbName + "." + kMine,
+                    ui: this.victimUUID,
+                    o: {
+                        renameCollection: kDbName + "." + kMine,
+                        to: kDbName + "." + kRenamed,
+                        dropTarget: false,
+                    },
+                },
+                {oplogApplicationMode: mode},
+            );
+            assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
+            assert(collExists(this.conn, kDbName, kVictim), "victim must not be renamed");
+            assert(
+                !collExists(this.conn, kDbName, kRenamed),
+                "victim must not be renamed to an attacker name",
+            );
+        });
+    }
 
     // ---- Still allowed: ui and o name the same authorized namespace. ----
 
