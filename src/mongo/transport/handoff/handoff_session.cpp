@@ -9,7 +9,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/auth_options_gen.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/handoff/session_handoff_message_gen.h"
 #include "mongo/transport/message_filter_hooks.h"
@@ -48,6 +50,24 @@ constexpr size_t kProxyV2FixedHeaderSize = 16;
 // Number of bytes to peek: enough to identify PROXY v1 ("PROXY", 5 bytes) or the start of
 // the PROXY v2 signature ("\r\n\r\n", first 4 bytes of kProxyV2Signature).
 constexpr size_t kProxyPeekSize = transport::kProxyV1Signature.size();
+
+// The number of successful and failed connection handoffs.
+otel::metrics::Counter<int64_t>& totalSuccessfulConnectionHandoffs =
+    otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kNetworkConnectionHandoffsSucceeded,
+        "Total number of connection handoffs that succeeded.",
+        otel::metrics::MetricUnit::kConnections,
+        otel::metrics::CounterOptions{
+            .serverStatusOptions = otel::metrics::ServerStatusOptions{
+                .dottedPath = "network.handoff.succeeded", .role = ClusterRole::None}});
+otel::metrics::Counter<int64_t>& totalFailedConnectionHandoffs =
+    otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kNetworkConnectionHandoffsFailed,
+        "Total number of connection handoffs that failed.",
+        otel::metrics::MetricUnit::kConnections,
+        otel::metrics::CounterOptions{
+            .serverStatusOptions = otel::metrics::ServerStatusOptions{
+                .dottedPath = "network.handoff.failed", .role = ClusterRole::None}});
 
 /**
  * Given an s2n return code, returns OK on S2N_SUCCESS or an InternalError with the s2n error
@@ -393,6 +413,7 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
     //     udsFd is shut down and closed
 
     ScopeGuard cleanupOnFailure([&] {
+        totalFailedConnectionHandoffs.add(1);
         if (clientFd >= 0) {
             _posix.shutdown(clientFd, SHUT_RDWR);
             _posix.close(clientFd);
@@ -500,6 +521,7 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
     }
 
     cleanupOnFailure.dismiss();
+    totalSuccessfulConnectionHandoffs.add(1);
 
     LOGV2(12823501,
           "S2N session handoff complete",

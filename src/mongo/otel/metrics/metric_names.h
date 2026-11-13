@@ -204,6 +204,10 @@ public:
         MetricNameMaker::make("mongodb.network.ingress_hello_latency");
     static constexpr MetricName kIngressAuthLatency =
         MetricNameMaker::make("mongodb.network.ingress_auth_latency");
+    static constexpr MetricName kNetworkConnectionHandoffsSucceeded =
+        MetricNameMaker::make("mongodb.network.handoff.succeeded");
+    static constexpr MetricName kNetworkConnectionHandoffsFailed =
+        MetricNameMaker::make("mongodb.network.handoff.failed");
     static constexpr MetricName kHandoffListenerProcessingTime =
         MetricNameMaker::make("mongodb.network.handoff.listener_processing.time_micros");
     static constexpr MetricName kHandoffListenerProcessingLatency =

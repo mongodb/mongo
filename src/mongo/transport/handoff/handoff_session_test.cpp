@@ -6,7 +6,11 @@
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/handoff/handoff_s2n_init.h"
 #include "mongo/transport/handoff/handoff_test_util.h"
@@ -48,12 +52,29 @@
 #include <unistd.h>
 
 #include <arpa/inet.h>
+#include <boost/optional/optional.hpp>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 
 namespace mongo::transport {
 namespace {
+
+enum class HandoffOutcome { Succeeded, Failed };
+
+/**
+ * Returns the value of the "handoff" counter for `outcome`. Asserts that the
+ * metric is present.
+ */
+long long getHandoffServerStatusMetric(HandoffOutcome outcome) {
+    BSONObjBuilder bob;
+    globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+    const BSONObj root = bob.obj();
+    const char* leaf = outcome == HandoffOutcome::Succeeded ? "succeeded" : "failed";
+    BSONElement elem = root["metrics"]["network"]["handoff"][leaf];
+    ASSERT_FALSE(elem.eoo());
+    return elem.isNumber() ? elem.numberLong() : 0;
+}
 
 /**
  * Reads an entire buffer from an fd, retrying short reads.
@@ -1057,6 +1078,14 @@ class HandoffSessionHandoffTransitionTest : public HandoffSessionTLSFixture {};
  * A valid OP_HANDOFF transitions the session to TLS mode and causes proxyUdsFd to reach EOF.
  */
 TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoff) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const auto numSuccessfulHandoffsBefore =
+        getHandoffServerStatusMetric(HandoffOutcome::Succeeded);
+    const boost::optional<int64_t> otelSuccessfulHandoffsBefore = capturer.canReadMetrics()
+        ? boost::make_optional(capturer.readInt64Counter(
+              otel::metrics::MetricNames::kNetworkConnectionHandoffsSucceeded))
+        : boost::none;
+
     serializeConnection();
     Message handoffMsg = buildSessionHandoffMessage(serializedState, extraCleartext);
     sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
@@ -1086,6 +1115,14 @@ TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoff) {
     ASSERT_EQ(memcmp(result.getValue().buf(), msg.buf(), msg.size()), 0);
     ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
     ASSERT_TRUE(session->isConnected());
+
+    ASSERT_EQ(getHandoffServerStatusMetric(HandoffOutcome::Succeeded),
+              numSuccessfulHandoffsBefore + 1);
+    if (otelSuccessfulHandoffsBefore) {
+        ASSERT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kNetworkConnectionHandoffsSucceeded),
+                  *otelSuccessfulHandoffsBefore + 1);
+    }
 }
 
 /**
@@ -1123,6 +1160,13 @@ TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoffUpdatesEndpoints) {
  * The received client fd is closed. The session is left disconnected.
  */
 TEST_F(HandoffSessionHandoffTransitionTest, FailedHandoffWithCorruptState) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const auto numFailedHandoffsBefore = getHandoffServerStatusMetric(HandoffOutcome::Failed);
+    const boost::optional<int64_t> otelFailedHandoffsBefore = capturer.canReadMetrics()
+        ? boost::make_optional(capturer.readInt64Counter(
+              otel::metrics::MetricNames::kNetworkConnectionHandoffsFailed))
+        : boost::none;
+
     // Use a pipe instead of proxyTlsFd to verify the session closes its received client fd on
     // failure. isConnected() only confirms mongodUdsFd was closed. A raw recv on clientTlsFd
     // would bypass the live s2n session that setUp established. A pipe has no such baggage.
@@ -1157,6 +1201,13 @@ TEST_F(HandoffSessionHandoffTransitionTest, FailedHandoffWithCorruptState) {
     ssize_t n = ::read(pipeRead, &buf, 1);
     ASSERT_EQ(n, 0) << "received fd was not closed by the session";
     ::close(pipeRead);
+
+    ASSERT_EQ(getHandoffServerStatusMetric(HandoffOutcome::Failed), numFailedHandoffsBefore + 1);
+    if (otelFailedHandoffsBefore) {
+        ASSERT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kNetworkConnectionHandoffsFailed),
+            *otelFailedHandoffsBefore + 1);
+    }
 }
 
 /**
