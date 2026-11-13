@@ -8,7 +8,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/collection_crud/capped_utils.h"
 #include "mongo/db/commands.h"
@@ -52,8 +54,10 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName, cmdObj),
-                                                  ActionType::find)) {
+        PrivilegeVector fromPrivileges{
+            Privilege(parseResourcePattern(dbName, cmdObj), ActionType::find)};
+        auth::addImplicitPrivilegesForRestrictedNamespaces(&fromPrivileges);
+        if (!as->isAuthorizedForPrivileges(fromPrivileges)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 
@@ -67,9 +71,11 @@ public:
                 str::stream() << "Invalid target namespace: " << nss.toStringForErrorMsg(),
                 nss.isValid());
 
-        if (!as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(nss),
-                {ActionType::insert, ActionType::createIndex, ActionType::convertToCapped})) {
+        PrivilegeVector toPrivileges{
+            Privilege(ResourcePattern::forExactNamespace(nss),
+                      {ActionType::insert, ActionType::createIndex, ActionType::convertToCapped})};
+        auth::addImplicitPrivilegesForRestrictedNamespaces(&toPrivileges);
+        if (!as->isAuthorizedForPrivileges(toPrivileges)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 
@@ -177,8 +183,10 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName, cmdObj),
-                                                  ActionType::convertToCapped)) {
+        PrivilegeVector privileges{
+            Privilege(parseResourcePattern(dbName, cmdObj), ActionType::convertToCapped)};
+        auth::addImplicitPrivilegesForRestrictedNamespaces(&privileges);
+        if (!as->isAuthorizedForPrivileges(privileges)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 

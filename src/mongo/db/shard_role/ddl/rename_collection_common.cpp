@@ -6,7 +6,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
@@ -16,6 +18,26 @@
 
 namespace mongo {
 namespace rename_collection {
+namespace {
+
+// Wrapper around AuthorizationSession::isAuthorizedForActionsOnResource which additionally requires
+// the implicit privilege of any restricted namespace. Prefer this over calling AuthorizationSession
+// directly from this file. See auth::getImplicitPrivilegeForRestrictedNamespace.
+bool isAuthorizedForActionsOnNamespace(AuthorizationSession* authSession,
+                                       const NamespaceString& ns,
+                                       const ActionSet& actions) {
+    const auto resource = ResourcePattern::forExactNamespace(ns);
+    if (auto implicitPrivilege =
+            auth::getImplicitPrivilegeForRestrictedNamespace(resource, actions)) {
+        if (!authSession->isAuthorizedForPrivilege(*implicitPrivilege)) {
+            return false;
+        }
+    }
+
+    return authSession->isAuthorizedForActionsOnResource(resource, actions);
+}
+
+}  // namespace
 
 Status checkAuthForRenameCollectionCommand(Client* client, const RenameCollectionCommand& request) {
     const auto& sourceNS = request.getCommandParameter();
@@ -30,22 +52,27 @@ Status checkAuthForRenameCollectionCommand(Client* client, const RenameCollectio
         return true;
     }();
 
-    if (sourceNS.dbName() == targetNS.dbName() && sourceNS.isNormalCollection() &&
+    auto* authSession = AuthorizationSession::get(client);
+
+    // A rename within one database can be authorized by 'renameCollectionSameDB' on a single
+    // database. However, a restricted namespace will need extra privileges so they must
+    // undergo the more complete check below.
+    if (!auth::isRestrictedNamespace(sourceNS) && !auth::isRestrictedNamespace(targetNS) &&
+        sourceNS.dbName() == targetNS.dbName() && sourceNS.isNormalCollection() &&
         targetNS.isNormalCollection()) {
-        const bool canRename = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+        const bool canRename = authSession->isAuthorizedForActionsOnResource(
             ResourcePattern::forDatabaseName(sourceNS.dbName()),
             ActionType::renameCollectionSameDB);
 
         bool canDropTargetIfNeeded = true;
         if (dropTarget) {
-            canDropTargetIfNeeded =
-                AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(targetNS), ActionType::dropCollection);
+            canDropTargetIfNeeded = authSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forExactNamespace(targetNS), ActionType::dropCollection);
         }
 
-        bool canReadSrc = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+        bool canReadSrc = authSession->isAuthorizedForActionsOnResource(
             ResourcePattern::forExactNamespace(sourceNS), ActionType::find);
-        bool canReadDest = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+        bool canReadDest = authSession->isAuthorizedForActionsOnResource(
             ResourcePattern::forExactNamespace(targetNS), ActionType::find);
 
         // Even if the user can rename collections and can drop the target collection,
@@ -57,23 +84,18 @@ Status checkAuthForRenameCollectionCommand(Client* client, const RenameCollectio
     }
 
     // Check privileges on source collection
-    ActionSet actions;
-    actions.addAction(ActionType::find);
-    actions.addAction(ActionType::dropCollection);
-    if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-            ResourcePattern::forExactNamespace(sourceNS), actions)) {
+    ActionSet sourceActions{ActionType::find, ActionType::dropCollection};
+    if (!isAuthorizedForActionsOnNamespace(authSession, sourceNS, sourceActions)) {
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
     // Check privileges on dest collection
-    actions.removeAllActions();
-    actions.addAction(ActionType::insert);
-    actions.addAction(ActionType::createIndex);
+    ActionSet targetActions{ActionType::insert, ActionType::createIndex};
     if (dropTarget) {
-        actions.addAction(ActionType::dropCollection);
+        targetActions.addAction(ActionType::dropCollection);
     }
-    if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-            ResourcePattern::forExactNamespace(targetNS), actions)) {
+
+    if (!isAuthorizedForActionsOnNamespace(authSession, targetNS, targetActions)) {
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
