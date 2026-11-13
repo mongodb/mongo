@@ -405,71 +405,6 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough",
-    config = "//buildscripts/resmokeconfig:suites/replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough.yml",
-    shard_count = 3,
-    tags = [
-        "ci-default",
-        "incompatible_debug_mode",
-        "non_live_record",
-        "non_maj_read",
-        "replica_sets",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
-    name = "replica_sets_multi_stmt_txn_kill_stepdown_terminate_jscore_passthrough",
-    config = "//buildscripts/resmokeconfig:suites/replica_sets_multi_stmt_txn_kill_stepdown_terminate_jscore_passthrough.yml",
-    shard_count = 3,
-    tags = [
-        "ci-default",
-        "incompatible_debug_mode",
-        "non_maj_read",
-        "replica_sets",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
-    name = "replica_sets_multi_stmt_txn_stepdown_jscore_passthrough",
-    config = "//buildscripts/resmokeconfig:suites/replica_sets_multi_stmt_txn_stepdown_jscore_passthrough.yml",
-    shard_count = 3,
-    tags = [
-        "ci-default",
-        "incompatible_debug_mode",
-        "non_maj_read",
-        "replica_sets",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
-    name = "replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough",
-    config = "//buildscripts/resmokeconfig:suites/replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough.yml",
-    shard_count = 3,
-    tags = [
-        "ci-default",
-        "incompatible_debug_mode",
-        "non_maj_read",
-        "replica_sets",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
     name = "replica_sets_reconfig_jscore_stepdown_passthrough",
     config = "//buildscripts/resmokeconfig:suites/replica_sets_reconfig_jscore_stepdown_passthrough.yml",
     shard_count = 5,
@@ -585,22 +520,6 @@ resmoke_suite_test(
         "large",
         "replica_sets",
         "san",
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
-    name = "replica_sets_multi_stmt_txn_jscore_passthrough",
-    config = "//buildscripts/resmokeconfig:suites/replica_sets_multi_stmt_txn_jscore_passthrough.yml",
-    shard_count = 8,
-    tags = [
-        "ci-default",
-        "incompatible_debug_mode",
-        "large",
-        "replica_sets",
     ],
     deps = [
         "//src/mongo/db:mongod",
