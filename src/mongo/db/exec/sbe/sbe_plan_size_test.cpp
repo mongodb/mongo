@@ -219,6 +219,9 @@ TEST_F(PlanSizeTest, MergeJoin) {
                                        mockSV(),
                                        mockSV(),
                                        mockSV(),
+                                       mockSV(),
+                                       mockSV(),
+                                       mockSV(),
                                        std::move(sortDirs),
                                        kEmptyPlanNodeId);
     assertPlanSize(*stage);

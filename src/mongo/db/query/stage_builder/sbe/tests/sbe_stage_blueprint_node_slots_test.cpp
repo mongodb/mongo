@@ -312,14 +312,20 @@ void checkMergeJoin(SlotMembershipChecker& c) {
     auto outerProj = c.slot();
     auto innerKey = c.slot();
     auto innerProj = c.slot();
+    auto keyOut = c.slot();
+    auto outerOut = c.slot();
+    auto innerOut = c.slot();
     c.check(SbBlueprintMergeJoin{.info = std::make_unique<SbBlueprintMergeJoinInfo>(
                                      SbBlueprintMergeJoinInfo{
                                          .outerKeySlots = {outerKey},
                                          .outerProjectSlots = {outerProj},
                                          .innerKeySlots = {innerKey},
                                          .innerProjectSlots = {innerProj},
+                                         .keyOutputs = {keyOut},
+                                         .outerProjectOutputs = {outerOut},
+                                         .innerProjectOutputs = {innerOut},
                                          .dirs = {sbe::value::SortDirection::Ascending}})},
-            {},
+            {keyOut, outerOut, innerOut},
             {outerKey, outerProj, innerKey, innerProj});
 }
 

@@ -612,6 +612,9 @@ struct Lowerer {
                                                std::move(node.info->outerProjectSlots),
                                                std::move(node.info->innerKeySlots),
                                                std::move(node.info->innerProjectSlots),
+                                               std::move(node.info->keyOutputs),
+                                               std::move(node.info->outerProjectOutputs),
+                                               std::move(node.info->innerProjectOutputs),
                                                toStdVector(node.info->dirs),
                                                node.nodeId);
     }

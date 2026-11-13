@@ -24,6 +24,8 @@ namespace mongo::sbe {
  * given by the 'outerKeys' slot vector and the join key from the inner side is given by the
  * 'innerKeys' slot vector. In addition, each resulting row returned by the join has the
  * 'outerProjects' values from the outer side and the 'innerProjects' values from the inner side.
+ * Above the stage, 'keyOutputs' exposes the buffered outer key for each match, and
+ * 'outerProjectOutputs' and 'innerProjectOutputs' expose the corresponding projected values.
  *
  * The stage expects the data to be sorted according to the 'sortDirs' parameter. This describes the
  * sort direction for each of keys on which we are joining, so the 'sortDirs', 'outerKeys', and
@@ -31,9 +33,9 @@ namespace mongo::sbe {
  *
  * Debug string format:
  *
- *   mj [asc|desc, ...]
- *     left [<outer keys>] [<outer projects>] childStage
- *     right [<inner keys>] [<inner projects>] childStage
+ *   mj [asc|desc, ...] [<key output> = <outer key>, ...]
+ *     left [<outer keys>] [<outer project output> = <outer project>, ...] childStage
+ *     right [<inner keys>] [<inner project output> = <inner project>, ...] childStage
  */
 class MergeJoinStage final : public PlanStage {
 public:
@@ -43,6 +45,9 @@ public:
                    value::SlotVector outerProjects,
                    value::SlotVector innerKeys,
                    value::SlotVector innerProjects,
+                   value::SlotVector keyOutputs,
+                   value::SlotVector outerProjectOutputs,
+                   value::SlotVector innerProjectOutputs,
                    std::vector<value::SortDirection> sortDirs,
                    PlanNodeId planNodeId,
                    bool participateInTrialRunTracking = true);
@@ -74,10 +79,13 @@ private:
     const value::SlotVector _outerProjects;
     const value::SlotVector _innerKeys;
     const value::SlotVector _innerProjects;
+    const value::SlotVector _keyOutputs;
+    const value::SlotVector _outerProjectOutputs;
+    const value::SlotVector _innerProjectOutputs;
 
     const std::vector<value::SortDirection> _dirs;
 
-    // All defined values / projects from the outer side.
+    // Output accessors for the shared key and both sides' projects.
     value::SlotAccessorMap _outOuterAccessors;
 
     // Accessors for outer projects in the buffer.

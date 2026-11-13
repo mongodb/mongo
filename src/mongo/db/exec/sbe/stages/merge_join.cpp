@@ -52,6 +52,9 @@ MergeJoinStage::MergeJoinStage(std::unique_ptr<PlanStage> outer,
                                value::SlotVector outerProjects,
                                value::SlotVector innerKeys,
                                value::SlotVector innerProjects,
+                               value::SlotVector keyOutputs,
+                               value::SlotVector outerProjectOutputs,
+                               value::SlotVector innerProjectOutputs,
                                std::vector<value::SortDirection> sortDirs,
                                PlanNodeId planNodeId,
                                bool participateInTrialRunTracking)
@@ -60,6 +63,9 @@ MergeJoinStage::MergeJoinStage(std::unique_ptr<PlanStage> outer,
       _outerProjects(std::move(outerProjects)),
       _innerKeys(std::move(innerKeys)),
       _innerProjects(std::move(innerProjects)),
+      _keyOutputs(std::move(keyOutputs)),
+      _outerProjectOutputs(std::move(outerProjectOutputs)),
+      _innerProjectOutputs(std::move(innerProjectOutputs)),
       _dirs(std::move(sortDirs)),
       _currentOuterKey(0),
       _currentInnerKey(0),
@@ -69,6 +75,11 @@ MergeJoinStage::MergeJoinStage(std::unique_ptr<PlanStage> outer,
     tassert(5073701,
             "sort direction size does not match number of key slots",
             _outerKeys.size() == _dirs.size());
+    tassert(13920000,
+            "MergeJoinStage needs one output slot for each key and project",
+            _keyOutputs.size() == _outerKeys.size() &&
+                _outerProjectOutputs.size() == _outerProjects.size() &&
+                _innerProjectOutputs.size() == _innerProjects.size());
 
     _children.emplace_back(std::move(outer));
     _children.emplace_back(std::move(inner));
@@ -81,6 +92,9 @@ std::unique_ptr<PlanStage> MergeJoinStage::clone() const {
                                             _outerProjects,
                                             _innerKeys,
                                             _innerProjects,
+                                            _keyOutputs,
+                                            _outerProjectOutputs,
+                                            _innerProjectOutputs,
                                             _dirs,
                                             _commonStats.nodeId,
                                             participateInTrialRunTracking());
@@ -90,57 +104,55 @@ void MergeJoinStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
     _children[1]->prepare(ctx);
 
-    size_t counter = 0;
     value::SlotSet dupCheck;
-    for (auto& slot : _outerKeys) {
+    for (size_t i = 0; i < _outerKeys.size(); ++i) {
+        auto slot = _outerKeys[i];
         auto [it, inserted] = dupCheck.emplace(slot);
         uassert(5073702, str::stream() << "duplicate field: " << slot, inserted);
 
         _outerKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
 
-        // Keys from the outer side should point to the keys in the current '_bufferKey' row, since
-        // that is the where we point whichever key that we are using to attempt the join and we
-        // want to make those outer keys accessible to the stage above.
+        // The output key is the buffered outer key for the current match.
         _outOuterInnerKeyAccessors.emplace_back(
-            std::make_unique<value::MaterializedSingleRowAccessor>(_bufferKey, counter++));
-        _outOuterAccessors[slot] = _outOuterInnerKeyAccessors.back().get();
+            std::make_unique<value::MaterializedSingleRowAccessor>(_bufferKey, i));
+        _outOuterAccessors[_keyOutputs[i]] = _outOuterInnerKeyAccessors.back().get();
     }
 
-    counter = 0;
     for (auto& slot : _innerKeys) {
         auto [it, inserted] = dupCheck.emplace(slot);
         uassert(5073703, str::stream() << "duplicate field: " << slot, inserted);
 
         _innerKeyAccessors.emplace_back(_children[1]->getAccessor(ctx, slot));
-
-        // Keys from the inner side should point to the same accessors as for the outer side keys
-        // for same reason as the outer keys, since we attempt to join on whatever the '_bufferKey'
-        // is and make inner keys also accessible to the stage above.
-        _outOuterAccessors[slot] = _outOuterInnerKeyAccessors[counter++].get();
     }
 
-    counter = 0;
-    for (auto& slot : _outerProjects) {
+    for (size_t i = 0; i < _outerProjects.size(); ++i) {
+        auto slot = _outerProjects[i];
         auto [it, inserted] = dupCheck.emplace(slot);
         uassert(5073704, str::stream() << "duplicate field: " << slot, inserted);
 
         _outerProjectAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
         _outOuterProjectAccessors.emplace_back(std::make_unique<MergeJoinBufferAccessor>(
-            _outerProjectsBuffer, _outerProjectsBufferIt, counter++));
-        _outOuterAccessors[slot] = _outOuterProjectAccessors.back().get();
+            _outerProjectsBuffer, _outerProjectsBufferIt, i));
+        _outOuterAccessors[_outerProjectOutputs[i]] = _outOuterProjectAccessors.back().get();
     }
 
-    counter = 0;
-    for (auto& slot : _innerProjects) {
+    for (size_t i = 0; i < _innerProjects.size(); ++i) {
+        auto slot = _innerProjects[i];
         auto [it, inserted] = dupCheck.emplace(slot);
         uassert(5073705, str::stream() << "duplicate field: " << slot, inserted);
 
         _innerProjectAccessors.emplace_back(_children[1]->getAccessor(ctx, slot));
 
         _outInnerProjectAccessors.emplace_back(
-            std::make_unique<value::MaterializedSingleRowAccessor>(_currentInnerProject,
-                                                                   counter++));
-        _outOuterAccessors[slot] = _outInnerProjectAccessors.back().get();
+            std::make_unique<value::MaterializedSingleRowAccessor>(_currentInnerProject, i));
+        _outOuterAccessors[_innerProjectOutputs[i]] = _outInnerProjectAccessors.back().get();
+    }
+
+    for (const auto* slots : {&_keyOutputs, &_outerProjectOutputs, &_innerProjectOutputs}) {
+        for (auto slot : *slots) {
+            auto [_, inserted] = dupCheck.emplace(slot);
+            tassert(13920001, "duplicate merge join output slot", inserted);
+        }
     }
 
     _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
@@ -332,6 +344,9 @@ std::unique_ptr<PlanStageStats> MergeJoinStage::getStats(bool includeDebugInfo) 
         bob.append("outerProjects", _outerProjects.begin(), _outerProjects.end());
         bob.append("innerKeys", _innerKeys.begin(), _innerKeys.end());
         bob.append("innerProjects", _innerProjects.begin(), _innerProjects.end());
+        bob.append("keyOutputs", _keyOutputs.begin(), _keyOutputs.end());
+        bob.append("outerProjectOutputs", _outerProjectOutputs.begin(), _outerProjectOutputs.end());
+        bob.append("innerProjectOutputs", _innerProjectOutputs.begin(), _innerProjectOutputs.end());
         bob.append("sortDirs", _dirs);
         if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
             bob.appendNumber("peakTrackedMemBytes",
@@ -363,6 +378,17 @@ void MergeJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
+    ret.emplace_back(DebugPrinter::Block("[`"));
+    for (size_t idx = 0; idx < _keyOutputs.size(); ++idx) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
+        DebugPrinter::addIdentifier(ret, _keyOutputs[idx]);
+        ret.emplace_back("=");
+        DebugPrinter::addIdentifier(ret, _outerKeys[idx]);
+    }
+    ret.emplace_back(DebugPrinter::Block("`]"));
+
     DebugPrinter::addKeyword(ret, "left");
 
     ret.emplace_back(DebugPrinter::Block("[`"));
@@ -381,6 +407,8 @@ void MergeJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
 
+        DebugPrinter::addIdentifier(ret, _outerProjectOutputs[idx]);
+        ret.emplace_back("=");
         DebugPrinter::addIdentifier(ret, _outerProjects[idx]);
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
@@ -406,6 +434,8 @@ void MergeJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
 
+        DebugPrinter::addIdentifier(ret, _innerProjectOutputs[idx]);
+        ret.emplace_back("=");
         DebugPrinter::addIdentifier(ret, _innerProjects[idx]);
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
@@ -424,6 +454,9 @@ size_t MergeJoinStage::estimateCompileTimeSize() const {
     size += size_estimator::estimate(_outerProjects);
     size += size_estimator::estimate(_innerKeys);
     size += size_estimator::estimate(_innerProjects);
+    size += size_estimator::estimate(_keyOutputs);
+    size += size_estimator::estimate(_outerProjectOutputs);
+    size += size_estimator::estimate(_innerProjectOutputs);
     size += size_estimator::estimate(_dirs);
     return size;
 }

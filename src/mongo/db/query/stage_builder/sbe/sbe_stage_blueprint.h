@@ -851,9 +851,16 @@ struct SbBlueprintMergeJoinInfo {
     sbe::value::SlotVector outerProjectSlots;
     sbe::value::SlotVector innerKeySlots;
     sbe::value::SlotVector innerProjectSlots;
+    sbe::value::SlotVector keyOutputs;
+    sbe::value::SlotVector outerProjectOutputs;
+    sbe::value::SlotVector innerProjectOutputs;
     SbSortDirectionVector dirs;
 
-    void def(SbSlotCollector&) const {}
+    void def(SbSlotCollector& out) const {
+        out.add(keyOutputs);
+        out.add(outerProjectOutputs);
+        out.add(innerProjectOutputs);
+    }
 
     void use(SbSlotCollector& out) const {
         out.add(outerKeySlots);

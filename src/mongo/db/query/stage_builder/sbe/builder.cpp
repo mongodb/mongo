@@ -3553,17 +3553,21 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildAndSorted(
         innerProjectSlots.push_back(innerPrefetchedResultSlot);
         outputs.set(kPrefetchedResult, innerPrefetchedResultSlot);
     }
+    const auto originalInnerProjectSlots = innerProjectSlots;
 
     std::vector<sbe::value::SortDirection> sortDirs(outerKeySlots.size(),
                                                     sbe::value::SortDirection::Ascending);
 
-    auto stage = b.makeMergeJoin(std::move(outerStage),
-                                 std::move(innerStage),
-                                 outerKeySlots,
-                                 outerProjectSlots,
-                                 innerKeySlots,
-                                 innerProjectSlots,
-                                 sortDirs);
+    auto [stage, keyOutputs, outerProjectOutputs, innerProjectOutputs] =
+        b.makeMergeJoin(std::move(outerStage),
+                        std::move(innerStage),
+                        outerKeySlots,
+                        outerProjectSlots,
+                        innerKeySlots,
+                        innerProjectSlots,
+                        sortDirs);
+    innerKeySlots = std::move(keyOutputs);
+    innerProjectSlots = std::move(innerProjectOutputs);
 
     // If there are more than 2 children, iterate all remaining children and merge
     // join together.
@@ -3578,13 +3582,26 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildAndSorted(
         keySlots.emplace_back(idSlot);
         projectSlots.emplace_back(resultSlot);
 
-        stage = b.makeMergeJoin(std::move(childStage),
-                                std::move(stage),
-                                keySlots,
-                                projectSlots,
-                                innerKeySlots,
-                                innerProjectSlots,
-                                sortDirs);
+        auto [joined, joinedKeys, joinedOuterProjects, joinedInnerProjects] =
+            b.makeMergeJoin(std::move(childStage),
+                            std::move(stage),
+                            keySlots,
+                            projectSlots,
+                            innerKeySlots,
+                            innerProjectSlots,
+                            sortDirs);
+        stage = std::move(joined);
+        innerKeySlots = std::move(joinedKeys);
+        innerProjectSlots = std::move(joinedInnerProjects);
+    }
+
+    absl::flat_hash_map<sbe::value::SlotId, SbSlot> outputSlots;
+    outputSlots.emplace(innerIdSlot.getId(), innerKeySlots[0]);
+    for (size_t i = 0; i < originalInnerProjectSlots.size(); ++i) {
+        outputSlots.emplace(originalInnerProjectSlots[i].getId(), innerProjectSlots[i]);
+    }
+    for (const auto& [name, slot] : outputs.getSlotNameToIdMap()) {
+        outputs.set(name, outputSlots.at(slot.getId()));
     }
 
     return {std::move(stage), std::move(outputs)};

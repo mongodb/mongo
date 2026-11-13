@@ -50,6 +50,7 @@ public:
         auto innerProjectsSlots = makeSV(innerSlots[1]);
 
         std::vector<value::SortDirection> sortDirs(1, sortDir);
+        auto outputSlots = generateMultipleSlotIds(3);
 
         auto mergeJoin = makeS<MergeJoinStage>(std::move(outerStage),
                                                std::move(innerStage),
@@ -57,12 +58,15 @@ public:
                                                outerProjectsSlots,
                                                innerKeySlots,
                                                innerProjectsSlots,
+                                               makeSV(outputSlots[0]),
+                                               makeSV(outputSlots[1]),
+                                               makeSV(outputSlots[2]),
                                                std::move(sortDirs),
                                                kEmptyPlanNodeId);
 
         // Get back a full generated row with the keys joined upon, projects from the outer side,
         // and projects from the inner side.
-        auto resultSlots = makeSV(outerSlots[0], innerSlots[0], outerSlots[1], innerSlots[1]);
+        auto resultSlots = makeSV(outputSlots[0], outputSlots[0], outputSlots[1], outputSlots[2]);
 
         auto ctx = makeCompileCtx();
         auto resultAccessors = prepareTree(ctx.get(), mergeJoin.get(), resultSlots);
@@ -91,6 +95,17 @@ public:
         ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
     }
 };
+
+TEST_F(MergeJoinStageTest, OutputKeyUsesBufferedOuterKeyType) {
+    auto [accessors, stage] = makeMergeJoin(BSON_ARRAY(BSON_ARRAY(1 << "outer")),
+                                            BSON_ARRAY(BSON_ARRAY(1.0 << "inner")),
+                                            value::SortDirection::Ascending);
+    ASSERT_EQ(stage->getNext(), PlanState::ADVANCED);
+    auto [tag, val] = accessors[0]->getViewOfValue();
+    ASSERT_EQ(tag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(val), 1);
+    ASSERT_EQ(stage->getNext(), PlanState::IS_EOF);
+}
 
 TEST_F(MergeJoinStageTest, MergeJoinManyToManyIdenticalKeys) {
     auto outerData =
