@@ -3,6 +3,7 @@
 import functools
 import glob
 import http
+import json
 import os
 import shutil
 from subprocess import DEVNULL, STDOUT, call, check_output
@@ -14,9 +15,12 @@ from retry import retry
 
 import buildscripts.resmokelib.config as _config
 from buildscripts.resmokelib.multiversion.multiversion_service import (
+    ASCLastPatchBehavior,
+    DSCLastPatchBehavior,
     MongoReleases,
     MongoVersion,
     MultiversionService,
+    VersionConstantValues,
 )
 from buildscripts.resmokelib.multiversionsetupconstants import USE_EXISTING_RELEASES_FILE
 from buildscripts.util.expansions import get_expansion
@@ -154,22 +158,73 @@ def evg_project_str(version):
     return "mongodb-mongo-v{}.{}".format(version.major, version.minor)
 
 
-multiversion_service = MultiversionService(
-    mongo_version=MongoVersion.from_yaml_file(_config.MONGO_VERSION_FILE),
-    mongo_releases=MongoReleases.from_yaml_file(_config.RELEASES_FILE),
-)
+def _read_downloads(path: str) -> list[dict]:
+    with open(path, encoding="utf8") as manifest:
+        downloads = json.load(manifest)
+    if not isinstance(downloads, list):
+        raise ValueError(f"Expected a list of downloads in {path}")
+    return downloads
 
-version_constants = multiversion_service.get_version_constants()
+
+def _read_installed_downloads() -> list[dict]:
+    paths = [
+        os.path.join(directory, "multiversion-downloads.json")
+        for directory in _config.MULTIVERSION_DIRS
+    ]
+    paths = [path for path in paths if os.path.isfile(path)]
+    if not paths:
+        paths = [os.path.join(_config.RESMOKE_ROOT, "multiversion-downloads.json")]
+    downloads = []
+    for path in paths:
+        downloads.extend(_read_downloads(path))
+    return downloads
+
+
+_service: MultiversionService | None = None
+_service_manifest_file: str | None = None
+
+
+def get_multiversion_service(manifest_file: str | None = None) -> MultiversionService:
+    """Construct once; later explicit manifests must match the initial configuration.
+
+    No-argument calls always retrieve the existing service without changing its configuration.
+    """
+    global _service, _service_manifest_file
+    if _service is None:
+        mongo_version = MongoVersion.from_yaml_file(_config.MONGO_VERSION_FILE)
+        mongo_releases = MongoReleases.from_yaml_file(_config.RELEASES_FILE)
+        if (
+            get_expansion("multiversion_release_feed_source") == "atlas"
+            or os.environ.get("DB_CONTRIB_TOOL_RELEASE_FEED_SOURCE") == "atlas"
+        ):
+            loader = (
+                functools.partial(_read_downloads, manifest_file)
+                if manifest_file is not None
+                else _read_installed_downloads
+            )
+            behavior = DSCLastPatchBehavior(mongo_version, mongo_releases, loader)
+        else:
+            behavior = ASCLastPatchBehavior(mongo_version)
+        _service = MultiversionService(mongo_version, mongo_releases, last_patch_behavior=behavior)
+        _service_manifest_file = manifest_file
+    elif manifest_file is not None and manifest_file != _service_manifest_file:
+        raise ValueError(
+            f"Multiversion service already initialized with manifest_file={_service_manifest_file!r}; "
+            f"cannot use manifest_file={manifest_file!r}"
+        )
+    return _service
+
+
+version_constants = VersionConstantValues.calculate(
+    MongoVersion.from_yaml_file(_config.MONGO_VERSION_FILE),
+    MongoReleases.from_yaml_file(_config.RELEASES_FILE),
+)
 
 LAST_LTS_FCV = version_constants.get_last_lts_fcv()
 LAST_CONTINUOUS_FCV = version_constants.get_last_continuous_fcv()
 LATEST_FCV = version_constants.get_latest_fcv()
 
-# Last patch release info (e.g. version '8.3.1', FCV '8.3') is derived from
-# git tag history. Resolution is on-demand and memoized: callers reach it via
-# multiversion_service.get_last_patch_version() / .get_last_patch_fcv() to
-# keep import-time free of git work.
-
+# Last patch release info is resolved on demand through get_multiversion_service().
 REQUIRES_FCV_TAG_LATEST = version_constants.get_latest_tag()
 
 # Generate tags for all FCVS in (lastLTS, latest].

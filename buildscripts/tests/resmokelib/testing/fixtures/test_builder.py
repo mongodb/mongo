@@ -97,12 +97,12 @@ class TestBuildShardedCluster(unittest.TestCase):
         from buildscripts.resmokelib import multiversionconstants
 
         last_lts_mongod_binary = (
-            multiversionconstants.multiversion_service.get_binary_name_for_version(
+            multiversionconstants.get_multiversion_service().get_binary_name_for_version(
                 config.MultiversionOptions.LAST_LTS, config.MONGOD_BIN_NAME
             )
         )
         last_lts_mongos_binary = (
-            multiversionconstants.multiversion_service.get_binary_name_for_version(
+            multiversionconstants.get_multiversion_service().get_binary_name_for_version(
                 config.MultiversionOptions.LAST_LTS, config.MONGOS_BIN_NAME
             )
         )

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 import re
+from abc import ABC, abstractmethod
 from bisect import bisect_left, bisect_right
+from functools import cache
 from typing import Callable, NamedTuple, Optional
 
 import structlog
@@ -62,6 +64,39 @@ class VersionConstantValues(NamedTuple):
     fcvs_less_than_latest: list[Version]
     eols: list[Version]
 
+    @classmethod
+    def calculate(
+        cls, mongo_version: MongoVersion, mongo_releases: MongoReleases
+    ) -> VersionConstantValues:
+        """Calculate constants from version/release data, independently of service construction."""
+        latest = mongo_version.get_version()
+        fcvs = mongo_releases.get_fcv_versions()
+        lts = mongo_releases.get_lts_versions()
+        eols = mongo_releases.get_eol_versions()
+
+        # Highest release less than latest.
+        last_continuous = fcvs[bisect_left(fcvs, latest) - 1]
+
+        # Highest LTS release less than latest.
+        last_lts = lts[bisect_left(lts, latest) - 1]
+
+        # All FCVs greater than last LTS, up to latest.
+        requires_fcv_tag_list = fcvs[bisect_right(fcvs, last_lts) : bisect_right(fcvs, latest)]
+        requires_fcv_tag_list_continuous = [latest]
+
+        # All FCVs less than latest.
+        fcvs_less_than_latest = fcvs[: bisect_left(fcvs, latest)]
+
+        return cls(
+            latest=latest,
+            last_continuous=last_continuous,
+            last_lts=last_lts,
+            requires_fcv_tag_list=requires_fcv_tag_list,
+            requires_fcv_tag_list_continuous=requires_fcv_tag_list_continuous,
+            fcvs_less_than_latest=fcvs_less_than_latest,
+            eols=eols,
+        )
+
     def get_fcv_tag_list(self) -> str:
         """Get a comma joined string of all the fcv tags."""
         return ",".join([tag_str(tag) for tag in self.requires_fcv_tag_list])
@@ -100,6 +135,15 @@ class VersionConstantValues(NamedTuple):
     def get_eols(self) -> list[str]:
         """Get EOL'd versions as list of strings."""
         return [version_str(eol) for eol in self.eols]
+
+    def get_last_versions(self) -> list[str]:
+        """Return the supported last-LTS and last-continuous multiversion options."""
+        last_lts = self.get_last_lts_fcv()
+        last_continuous = self.get_last_continuous_fcv()
+        last_versions = [config.MultiversionOptions.LAST_LTS]
+        if last_continuous != last_lts and last_continuous not in self.get_eols():
+            last_versions.append(config.MultiversionOptions.LAST_CONTINUOUS)
+        return last_versions
 
 
 class MongoVersion(BaseModel):
@@ -196,88 +240,129 @@ class MultiversionService:
         self,
         mongo_version: MongoVersion,
         mongo_releases: MongoReleases,
-        last_patch_resolver: Optional[Callable[[str], Optional[str]]] = None,
+        last_patch_behavior: LastPatchBehavior,
     ) -> None:
         """
         Initialize the service.
 
         :param mongo_version: Contents of the Mongo Version file.
         :param mongo_releases: Contents of the Mongo Releases file.
-        :param last_patch_resolver: Callable taking a tag glob pattern and a
-          ``exclude_prerelease`` flag, returning the last patch release tag or None. Defaults to
-          ``find_previous_release_tag`` targeting HEAD. Tests can inject a fake to
-          avoid invoking git.
+        :param last_patch_behavior: The ASC or DSC behavior selected at construction.
         """
         self.mongo_version = mongo_version
         self.mongo_releases = mongo_releases
-        self.last_patch_resolver = last_patch_resolver or (
-            lambda tag_pattern, exclude_prerelease=False: find_previous_release_tag(
-                "HEAD", tag_pattern=tag_pattern, exclude_prerelease=exclude_prerelease
-            )
-        )
-        self._last_patch_cache: object = _UNRESOLVED
-        self._version_constants: Optional[VersionConstantValues] = None
+        self.last_patch_behavior = last_patch_behavior
+        self._version_constants = VersionConstantValues.calculate(mongo_version, mongo_releases)
 
     def get_version_constants(self) -> VersionConstantValues:
-        """Get the multiversion constants, computing them once on first call."""
-        if self._version_constants is None:
-            self._version_constants = self._calculate_version_constants()
+        """Get the constants calculated for this service's fixed configuration."""
         return self._version_constants
-
-    def _calculate_version_constants(self) -> VersionConstantValues:
-        """Calculate multiversion constants from data files."""
-        latest = self.mongo_version.get_version()
-        fcvs = self.mongo_releases.get_fcv_versions()
-        lts = self.mongo_releases.get_lts_versions()
-        eols = self.mongo_releases.get_eol_versions()
-
-        # Highest release less than latest.
-        last_continuous = fcvs[bisect_left(fcvs, latest) - 1]
-
-        # Highest LTS release less than latest.
-        last_lts = lts[bisect_left(lts, latest) - 1]
-
-        # All FCVs greater than last LTS, up to latest.
-        requires_fcv_tag_list = fcvs[bisect_right(fcvs, last_lts) : bisect_right(fcvs, latest)]
-        requires_fcv_tag_list_continuous = [latest]
-
-        # All FCVs less than latest.
-        fcvs_less_than_latest = fcvs[: bisect_left(fcvs, latest)]
-
-        return VersionConstantValues(
-            latest=latest,
-            last_continuous=last_continuous,
-            last_lts=last_lts,
-            requires_fcv_tag_list=requires_fcv_tag_list,
-            requires_fcv_tag_list_continuous=requires_fcv_tag_list_continuous,
-            fcvs_less_than_latest=fcvs_less_than_latest,
-            eols=eols,
-        )
 
     def get_last_patch_version(self) -> Optional[str]:
         """Get the version to use for last-patch testing (e.g. '8.0.29').
 
-        This is the newest *published* release of the current series, bounded by
-        the newest release tag reachable from HEAD so that a build is never
-        tested against a release newer than itself.
+        The selected behavior resolves a git tag for ASC or the recorded requested release for
+        DSC. A requested release is not proof of the artifact installed after download fallback.
 
         Resolved lazily on first call, then memoized for the lifetime of the
-        service. Returns ``None`` when the series has nothing to upgrade from --
-        which callers treat as "skip last-patch testing".
+        service. ASC returns ``None`` when the series has nothing to upgrade from;
+        DSC raises LastPatchSelectionError when required selection metadata is unavailable.
         """
-        # Cached `None` is a valid resolved value, so we use a sentinel to
-        # distinguish it from "not computed yet".
-        if self._last_patch_cache is _UNRESOLVED:
-            self._last_patch_cache = self._resolve_last_patch()
-        return self._last_patch_cache  # type: ignore[return-value]
+        return self.last_patch_behavior.get_version()
 
     def get_last_patch_fcv(self) -> Optional[str]:
-        """Get the FCV derived from the last patch tag (e.g. '8.3')."""
-        last_patch = self.get_last_patch_version()
-        if last_patch is None:
+        """Get the FCV derived from the selected old release (e.g. '8.3')."""
+        return self.last_patch_behavior.get_fcv()
+
+    def get_supported_fcv_for_last_patch_bin(self) -> str:
+        """Return last-continuous FCV when supported, falling back to last-LTS.
+
+        A recorded last-LTS release remains a supported peer after the target advances.
+        Reject other old releases that cannot support last-continuous FCV.
+        """
+        versions = self.get_version_constants()
+        last_continuous_fcv = versions.get_last_continuous_fcv()
+        old_fcv = self.get_last_patch_fcv()
+        if old_fcv is not None and Version(old_fcv) >= Version(last_continuous_fcv):
+            return last_continuous_fcv
+        last_lts_fcv = versions.get_last_lts_fcv()
+        if old_fcv == last_lts_fcv:
+            return last_lts_fcv
+        raise ValueError(
+            f"Selected last-patch binary supports FCV {old_fcv}, "
+            f"but FCV {last_continuous_fcv} is required"
+        )
+
+    def has_released_patch_version(self) -> bool:
+        """Return whether there is a last-patch version to offer as a default peer.
+
+        Deliberately strict and independent of the environment: this decides whether
+        LAST_PATCH joins `last_versions` for every suite that declares it, and it runs
+        during task generation, where the general suites' opt-in is not set. A variant
+        that wants last-patch on a series with no GA release overrides `last_versions`
+        directly, which is how the disagg suites run on a pre-release series.
+        """
+        return self.last_patch_behavior.has_released_patch_version()
+
+    def get_binary_name_for_version(self, version: str, base_name: str) -> str:
+        """Return the old binary name (e.g. 'mongod-8.0') for a multiversion option.
+
+        :param version: One of the config.MultiversionOptions constants (LAST_LTS,
+            LAST_CONTINUOUS, LAST_PATCH).
+        :param base_name: The binary base name, e.g. 'mongod' or 'mongos'.
+        """
+        version_constants = self.get_version_constants()
+        suffix_for_option = {
+            config.MultiversionOptions.LAST_LTS: version_constants.get_last_lts_fcv,
+            config.MultiversionOptions.LAST_CONTINUOUS: version_constants.get_last_continuous_fcv,
+            config.MultiversionOptions.LAST_PATCH: self.last_patch_behavior.get_bin_suffix,
+        }
+        if version not in suffix_for_option:
+            raise ValueError(f"Unknown multiversion option: {version}")
+        suffix = suffix_for_option[version]()
+        if suffix is None:
+            raise ValueError("No eligible last-patch release is available for executable naming")
+        return f"{base_name}-{suffix}"
+
+    def get_last_versions(self) -> list[str]:
+        """Return the last release version names to use in multiversion testing.
+
+        These are the latest release versions from which an upgrade to the current release is
+        supported. Returns ``[LAST_LTS]`` when last-continuous equals last-LTS or is EOL'd,
+        otherwise ``[LAST_LTS, LAST_CONTINUOUS]``.
+        """
+        return self._version_constants.get_last_versions()
+
+
+class LastPatchBehavior(ABC):
+    """Source-specific last-patch resolution for one invocation."""
+
+    def __init__(self, mongo_version: MongoVersion) -> None:
+        self.mongo_version = mongo_version
+
+    @abstractmethod
+    def get_version(self) -> Optional[str]:
+        """Return the requested old release, or None when ASC has no eligible release."""
+
+    @abstractmethod
+    def get_bin_suffix(self) -> Optional[str]:
+        """Return the suffix used for the old executable."""
+
+    def has_released_patch_version(self) -> bool:
+        """Preserve the current-series GA eligibility rule used by task generation."""
+        return self._resolve_last_patch_tag(exclude_prerelease=True) is not None
+
+    def get_fcv(self) -> Optional[str]:
+        """Derive the old FCV from the resolved release."""
+        version = self.get_version()
+        if version is None:
             return None
-        major, minor, _ = last_patch.split(".", 2)
+        major, minor, _ = version.split(".", 2)
         return f"{major}.{minor}"
+
+    def get_metadata(self) -> dict:
+        """Return available artifact metadata."""
+        return {}
 
     def _current_series_tag_pattern(self) -> str:
         """Return a git tag glob matching every tag in the current release series."""
@@ -296,8 +381,8 @@ class MultiversionService:
         """
         tag_pattern = self._current_series_tag_pattern()
         try:
-            last_patch_tag = self.last_patch_resolver(
-                tag_pattern, exclude_prerelease=exclude_prerelease
+            last_patch_tag = find_previous_release_tag(
+                "HEAD", tag_pattern=tag_pattern, exclude_prerelease=exclude_prerelease
             )
         except Exception as exc:
             LOGGER.info("Failed to resolve last patch tag", tag_pattern=tag_pattern, error=exc)
@@ -324,6 +409,23 @@ class MultiversionService:
             )
             return None
         return last_patch_tag[1:]
+
+
+class ASCLastPatchBehavior(LastPatchBehavior):
+    """The existing ASC git-tag resolution."""
+
+    def __init__(self, mongo_version: MongoVersion) -> None:
+        super().__init__(mongo_version)
+        self._last_patch_cache: object = _UNRESOLVED
+
+    def get_version(self) -> Optional[str]:
+        # Cached None is a valid result.
+        if self._last_patch_cache is _UNRESOLVED:
+            self._last_patch_cache = self._resolve_last_patch()
+        return self._last_patch_cache  # type: ignore[return-value]
+
+    def get_bin_suffix(self) -> Optional[str]:
+        return self.get_fcv()
 
     def _resolve_last_patch(self) -> Optional[str]:
         """Resolve the version to hand to db-contrib-tool for last-patch.
@@ -356,50 +458,65 @@ class MultiversionService:
         """
         return bool(os.environ.get(LAST_PATCH_EXCLUDE_PRERELEASE_ENV_VAR, "").strip())
 
-    def has_released_patch_version(self) -> bool:
-        """Return whether there is a last-patch version to offer as a default peer.
 
-        Deliberately strict and independent of the environment: this decides whether
-        LAST_PATCH joins `last_versions` for every suite that declares it, and it runs
-        during task generation, where the general suites' opt-in is not set. A variant
-        that wants last-patch on a series with no GA release overrides `last_versions`
-        directly, which is how the disagg suites run on a pre-release series.
-        """
-        return self._resolve_last_patch_tag(exclude_prerelease=True) is not None
+class LastPatchSelectionError(ValueError):
+    """The required DSC selection is missing or inconsistent."""
 
-    def get_binary_name_for_version(self, version: str, base_name: str) -> str:
-        """Return the old binary name (e.g. 'mongod-8.0') for a multiversion option.
 
-        :param version: One of the config.MultiversionOptions constants (LAST_LTS,
-            LAST_CONTINUOUS, LAST_PATCH).
-        :param base_name: The binary base name, e.g. 'mongod' or 'mongos'.
-        """
-        version_constants = self.get_version_constants()
-        fcv_for_option = {
-            config.MultiversionOptions.LAST_LTS: version_constants.get_last_lts_fcv,
-            config.MultiversionOptions.LAST_CONTINUOUS: version_constants.get_last_continuous_fcv,
-            config.MultiversionOptions.LAST_PATCH: self.get_last_patch_fcv,
-        }
-        if version not in fcv_for_option:
-            raise ValueError(f"Unknown multiversion option: {version}")
-        return f"{base_name}-{fcv_for_option[version]()}"
+class DSCLastPatchBehavior(LastPatchBehavior):
+    """Resolve the old DSC binary exclusively from the recorded download manifest."""
 
-    def get_last_versions(self) -> list[str]:
-        """Return the last release version names to use in multiversion testing.
+    def __init__(
+        self,
+        mongo_version: MongoVersion,
+        mongo_releases: MongoReleases,
+        manifest_loader: Callable[[], list[dict]],
+    ) -> None:
+        super().__init__(mongo_version)
+        self.mongo_releases = mongo_releases
+        self.manifest_loader = manifest_loader
 
-        These are the latest release versions from which an upgrade to the current release is
-        supported. Returns ``[LAST_LTS]`` when last-continuous equals last-LTS or is EOL'd,
-        otherwise ``[LAST_LTS, LAST_CONTINUOUS]``.
-        """
-        version_constants = self.get_version_constants()
-        last_lts_fcv = version_constants.get_last_lts_fcv()
-        last_continuous_fcv = version_constants.get_last_continuous_fcv()
-        if (
-            last_continuous_fcv == last_lts_fcv
-            or last_continuous_fcv in version_constants.get_eols()
-        ):
-            return [config.MultiversionOptions.LAST_LTS]
-        return [
-            config.MultiversionOptions.LAST_LTS,
-            config.MultiversionOptions.LAST_CONTINUOUS,
-        ]
+    @cache
+    def get_metadata(self) -> dict:
+        """Read and validate the selected entry once; retain available artifact identities."""
+        try:
+            downloads = self.manifest_loader()
+            if not isinstance(downloads, list):
+                raise ValueError("expected a list of downloads")
+            entries = [
+                entry
+                for entry in downloads
+                if entry.get("discovery_request", {}).get("request_type")
+                == "mongo_last_patch_version"
+            ]
+            if not entries:
+                raise ValueError("missing selected last-patch download")
+            if len(entries) != 1:
+                raise ValueError("multiple last-patch downloads")
+            entry = entries[0]
+            release = entry["discovery_request"]["identifier"]
+            suffix = entry["bin_suffix"]
+            if not RELEASE_TAG_RE.fullmatch(f"r{release}"):
+                raise ValueError(f"invalid requested release {release!r}")
+            if not re.fullmatch(r"[a-zA-Z0-9_.-]+", suffix):
+                raise ValueError(f"invalid executable suffix {suffix!r}")
+            series = ".".join(release.split(".")[:2])
+            suffix_series = VERSION_RE.match(suffix)
+            if suffix_series and suffix_series.group() != series:
+                raise ValueError("selected series and executable suffix disagree")
+            if (
+                series not in self.mongo_releases.feature_compatibility_versions
+                or Version(series) > self.mongo_version.get_version()
+            ):
+                raise ValueError(f"unsupported selected series {series}")
+            if len([other for other in downloads if other.get("bin_suffix") == suffix]) > 1:
+                raise ValueError(f"multiple downloads use suffix {suffix!r}")
+            return entry
+        except (AttributeError, KeyError, OSError, TypeError, ValueError) as exc:
+            raise LastPatchSelectionError(f"Invalid DSC last-patch metadata: {exc}") from exc
+
+    def get_version(self) -> str:
+        return self.get_metadata()["discovery_request"]["identifier"]
+
+    def get_bin_suffix(self) -> str:
+        return self.get_metadata()["bin_suffix"]

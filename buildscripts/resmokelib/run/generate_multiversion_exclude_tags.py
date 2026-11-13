@@ -127,9 +127,9 @@ def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Log
     # Get the state of the backports_required_for_multiversion_tests.yml file for the old
     # binary we are running tests against. We do this by using the commit hash from the old
     # mongo shell executable.
-    from buildscripts.resmokelib import multiversionconstants
+    from buildscripts.resmokelib.multiversionconstants import get_multiversion_service
 
-    old_mongod = multiversionconstants.multiversion_service.get_binary_name_for_version(
+    old_mongod = get_multiversion_service().get_binary_name_for_version(
         old_bin_version, config.MONGOD_BIN_NAME
     )
 

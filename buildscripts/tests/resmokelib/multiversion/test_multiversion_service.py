@@ -2,6 +2,7 @@
 
 import os
 import unittest
+from copy import deepcopy
 from unittest import TestCase, mock
 
 from packaging.version import Version
@@ -66,12 +67,9 @@ class TestCalculateFcvConstants(TestCase):
             }
         )
 
-        multiversion_service = under_test.MultiversionService(
-            mongo_version=mongo_version,
-            mongo_releases=mongo_releases,
+        version_constants = under_test.VersionConstantValues.calculate(
+            mongo_version, mongo_releases
         )
-
-        version_constants = multiversion_service.get_version_constants()
 
         self.assertEqual(version_constants.latest, Version("6.0"))
         self.assertEqual(version_constants.last_continuous, Version("5.3"))
@@ -125,12 +123,9 @@ class TestCalculateFcvConstants(TestCase):
             }
         )
 
-        multiversion_service = under_test.MultiversionService(
-            mongo_version=mongo_version,
-            mongo_releases=mongo_releases,
+        version_constants = under_test.VersionConstantValues.calculate(
+            mongo_version, mongo_releases
         )
-
-        version_constants = multiversion_service.get_version_constants()
 
         self.assertEqual(version_constants.latest, Version("100.0"))
         self.assertEqual(version_constants.last_continuous, Version("6.1"))
@@ -163,7 +158,7 @@ class TestCalculateFcvConstants(TestCase):
 
 class TestLastPatchOnMultiversionService(TestCase):
     # Resolution is git-only: the newest release tag of the current series before HEAD.
-    # Tests inject the tag resolver so git is never invoked.
+    # Tests mock the git lookup so git is never invoked.
 
     def _make_service(self, resolver, mongo_version="6.0.5", exclude_prerelease=False):
         mongo_releases = under_test.MongoReleases(
@@ -180,15 +175,21 @@ class TestLastPatchOnMultiversionService(TestCase):
         )
         patcher.start()
         self.addCleanup(patcher.stop)
+        tag_lookup = mock.patch.object(
+            under_test, "find_previous_release_tag", side_effect=resolver
+        )
+        tag_lookup.start()
+        self.addCleanup(tag_lookup.stop)
+        version = under_test.MongoVersion(mongo_version=mongo_version)
         return under_test.MultiversionService(
-            mongo_version=under_test.MongoVersion(mongo_version=mongo_version),
+            mongo_version=version,
             mongo_releases=mongo_releases,
-            last_patch_resolver=resolver,
+            last_patch_behavior=under_test.ASCLastPatchBehavior(version),
         )
 
     @staticmethod
     def _resolver(tag, capture=None):
-        def resolve(tag_pattern, exclude_prerelease=False):
+        def resolve(_target, tag_pattern, exclude_prerelease=False):
             if capture is not None:
                 capture.append((tag_pattern, exclude_prerelease))
             return tag
@@ -250,6 +251,15 @@ class TestLastPatchOnMultiversionService(TestCase):
         self.assertIsNone(service.get_last_patch_version())
         self.assertIsNone(service.get_last_patch_fcv())
 
+    def test_supported_fixture_fcv_rejects_an_unavailable_old_fcv(self):
+        service = self._make_service(self._resolver(None))
+        with self.assertRaisesRegex(ValueError, "FCV None.*5.0"):
+            service.get_supported_fcv_for_last_patch_bin()
+
+    def test_supported_fixture_fcv_is_last_continuous_for_a_current_series_release(self):
+        service = self._make_service(self._resolver("r6.0.4"))
+        self.assertEqual(service.get_supported_fcv_for_last_patch_bin(), "5.0")
+
     def test_resolver_returning_unparseable_tag_falls_back_to_none(self):
         self.assertIsNone(self._make_service(self._resolver("v6.0.4")).get_last_patch_version())
 
@@ -260,7 +270,7 @@ class TestLastPatchOnMultiversionService(TestCase):
         self.assertIsNone(self._make_service(self._resolver("rfoo")).get_last_patch_version())
 
     def test_resolver_raising_falls_back_to_none(self):
-        def resolver(_tag_pattern, exclude_prerelease=False):
+        def resolver(_target, tag_pattern, exclude_prerelease=False):
             raise RuntimeError("git is unhappy")
 
         service = self._make_service(resolver)
@@ -268,7 +278,7 @@ class TestLastPatchOnMultiversionService(TestCase):
         self.assertIsNone(service.get_last_patch_fcv())
 
     def test_get_version_constants_does_not_invoke_resolver(self):
-        def resolver(_tag_pattern, exclude_prerelease=False):
+        def resolver(_target, tag_pattern, exclude_prerelease=False):
             raise AssertionError("resolver should not be called from get_version_constants")
 
         self._make_service(resolver).get_version_constants()
@@ -320,14 +330,140 @@ class TestLastPatchOnMultiversionService(TestCase):
         self.assertEqual(captured, [("r6.0.*", False)])
 
 
+class TestDSCLastPatchBehavior(TestCase):
+    def make_service(self, target="42.3.0", download=None, suffix="42.2", lts=None):
+        entry = {
+            "bin_suffix": suffix,
+            "discovery_request": {
+                "request_type": "mongo_last_patch_version",
+                "identifier": "42.2.0-rc9",
+            },
+            "evg_urls_info": {"evg_revision": "abcdef"},
+            "release_urls_info": {"git_hash": "fedcba"},
+        }
+        loader = mock.Mock(return_value=[entry] if download is None else download)
+        version = under_test.MongoVersion(mongo_version=target)
+        releases = under_test.MongoReleases(
+            **{
+                "featureCompatibilityVersions": ["41.0", "42.2", "42.3", "42.4"],
+                "longTermSupportReleases": ["41.0"] if lts is None else lts,
+                "eolVersions": [],
+            }
+        )
+        behavior = under_test.DSCLastPatchBehavior(version, releases, loader)
+        service = under_test.MultiversionService(version, releases, last_patch_behavior=behavior)
+        return service, loader, entry
+
+    def test_supported_fixture_fcv_survives_target_bumps_for_a_last_lts_release(self):
+        for target in ("42.3.0", "42.4.0"):
+            with self.subTest(target=target):
+                service, _, _ = self.make_service(target=target, lts=["41.0", "42.2"])
+                self.assertEqual(service.get_supported_fcv_for_last_patch_bin(), "42.2")
+
+    def test_supported_fixture_fcv_is_capped_at_last_continuous(self):
+        for series in ("42.3", "42.4"):
+            with self.subTest(series=series):
+                _, _, entry = self.make_service()
+                entry["bin_suffix"] = series
+                entry["discovery_request"]["identifier"] = f"{series}.0-rc9"
+                service, _, _ = self.make_service(target="42.4.0", download=[entry])
+                self.assertEqual(service.get_supported_fcv_for_last_patch_bin(), "42.3")
+
+    def test_supported_fixture_fcv_rejects_an_unsupported_series(self):
+        service, _, _ = self.make_service(target="42.4.0")
+        with self.assertRaisesRegex(ValueError, "42.2.*42.3"):
+            service.get_supported_fcv_for_last_patch_bin()
+
+    def test_selection_and_cache_survive_target_bumps(self):
+        for target in ("42.2.0", "42.3.0", "42.4.0"):
+            with self.subTest(target=target):
+                service, loader, entry = self.make_service(target)
+                with mock.patch.object(
+                    under_test.ASCLastPatchBehavior,
+                    "get_version",
+                    side_effect=AssertionError("must not resolve DSC from git"),
+                ):
+                    for _ in range(2):
+                        self.assertEqual(service.get_last_patch_version(), "42.2.0-rc9")
+                        self.assertEqual(service.get_last_patch_fcv(), "42.2")
+                        self.assertEqual(
+                            service.get_binary_name_for_version("last_patch", "mongod"),
+                            "mongod-42.2",
+                        )
+                        self.assertEqual(
+                            service.get_binary_name_for_version("last_patch", "mongos"),
+                            "mongos-42.2",
+                        )
+                loader.assert_called_once_with()
+
+    def test_recorded_suffix_override_is_authoritative(self):
+        service, _, _ = self.make_service(suffix="dsc-old")
+        self.assertEqual(
+            service.get_binary_name_for_version("last_patch", "mongod"), "mongod-dsc-old"
+        )
+        self.assertEqual(service.get_last_patch_fcv(), "42.2")
+
+    def test_recorded_release_override_is_authoritative(self):
+        _, _, entry = self.make_service()
+        entry["discovery_request"]["identifier"] = "42.2.1-rc7"
+        entry["discovery_request"]["bin_suffix"] = "ignored-request-suffix"
+        service, _, _ = self.make_service(download=[entry])
+        self.assertEqual(service.get_last_patch_version(), "42.2.1-rc7")
+        self.assertEqual(service.get_binary_name_for_version("last_patch", "mongod"), "mongod-42.2")
+
+    def test_missing_and_inconsistent_metadata(self):
+        _, _, entry = self.make_service()
+        cases = [[], {}, [None], [entry, deepcopy(entry)], [entry, {"bin_suffix": "42.2"}]]
+        cases.extend([{**entry, "bin_suffix": suffix}] for suffix in (None, "", "../old", "42.3"))
+        cases.append(
+            [
+                {
+                    **entry,
+                    "discovery_request": {
+                        "request_type": "mongo_last_patch_version",
+                        "identifier": "invalid",
+                    },
+                }
+            ]
+        )
+        for manifest in cases:
+            with self.subTest(manifest=manifest):
+                service, _, _ = self.make_service(download=manifest)
+                with self.assertRaises(under_test.LastPatchSelectionError):
+                    service.get_binary_name_for_version("last_patch", "mongod")
+
+    def test_other_modes_do_not_load_the_manifest(self):
+        service, loader, _ = self.make_service()
+        self.assertEqual(service.get_binary_name_for_version("last_lts", "mongod"), "mongod-41.0")
+        self.assertEqual(
+            service.get_binary_name_for_version("last_continuous", "mongod"), "mongod-42.2"
+        )
+        loader.assert_not_called()
+
+    def test_ga_eligibility_is_shared_without_loading_dsc_metadata(self):
+        service, loader, _ = self.make_service()
+        with mock.patch.object(
+            under_test, "find_previous_release_tag", return_value="r42.3.0"
+        ) as lookup:
+            self.assertTrue(service.has_released_patch_version())
+        lookup.assert_called_once_with("HEAD", tag_pattern="r42.3.*", exclude_prerelease=True)
+        loader.assert_not_called()
+
+
 class TestHasReleasedPatchVersion(TestCase):
     # Decides whether LAST_PATCH joins `last_versions` for every suite that declares it.
     # Always strict and environment-independent: it runs during task generation, where
     # the general suites' opt-in is not set.
 
     def _make_service(self, resolver, mongo_version="9.0.1"):
+        tag_lookup = mock.patch.object(
+            under_test, "find_previous_release_tag", side_effect=resolver
+        )
+        tag_lookup.start()
+        self.addCleanup(tag_lookup.stop)
+        version = under_test.MongoVersion(mongo_version=mongo_version)
         return under_test.MultiversionService(
-            mongo_version=under_test.MongoVersion(mongo_version=mongo_version),
+            mongo_version=version,
             mongo_releases=under_test.MongoReleases(
                 **{
                     "featureCompatibilityVersions": ["8.0", "9.0", "100.0"],
@@ -335,12 +471,12 @@ class TestHasReleasedPatchVersion(TestCase):
                     "eolVersions": [],
                 }
             ),
-            last_patch_resolver=resolver,
+            last_patch_behavior=under_test.ASCLastPatchBehavior(version),
         )
 
     @staticmethod
     def _resolver(tag, capture=None):
-        def resolve(tag_pattern, exclude_prerelease=False):
+        def resolve(_target, tag_pattern, exclude_prerelease=False):
             if capture is not None:
                 capture.append((tag_pattern, exclude_prerelease))
             return tag
@@ -374,8 +510,9 @@ class TestHasReleasedPatchVersion(TestCase):
 
 class TestGetOldVersions(TestCase):
     def _make_service(self, fcvs, lts, eols):
+        version = under_test.MongoVersion(mongo_version=fcvs[-1])
         return under_test.MultiversionService(
-            mongo_version=under_test.MongoVersion(mongo_version=fcvs[-1]),
+            mongo_version=version,
             mongo_releases=under_test.MongoReleases(
                 **{
                     "featureCompatibilityVersions": fcvs,
@@ -383,6 +520,7 @@ class TestGetOldVersions(TestCase):
                     "eolVersions": eols,
                 }
             ),
+            last_patch_behavior=under_test.ASCLastPatchBehavior(version),
         )
 
     def test_last_continuous_distinct_and_not_eol_returns_both(self):

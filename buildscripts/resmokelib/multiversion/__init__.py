@@ -65,10 +65,10 @@ class MultiversionConfigSubcommand(Subcommand):
           release fields (last_patch_version, last_patch_fcv). When False, those
           fields are left unset and omitted from the output.
         """
-        from buildscripts.resmokelib import multiversionconstants
+        from buildscripts.resmokelib.multiversionconstants import get_multiversion_service
 
-        version_constants = multiversionconstants.version_constants
-        multiversion_service = multiversionconstants.multiversion_service
+        multiversion_service = get_multiversion_service()
+        version_constants = multiversion_service.get_version_constants()
         last_patch_version = (
             multiversion_service.get_last_patch_version() if include_last_patch else None
         )

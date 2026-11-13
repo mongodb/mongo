@@ -326,9 +326,9 @@ class ReplSetBuilder(FixtureBuilder):
         binary_versions = [BinVersionEnum.NEW for _ in range(kwargs["num_nodes"])]
 
         if mixed_bin_versions is not None:
-            from buildscripts.resmokelib.multiversionconstants import multiversion_service
+            from buildscripts.resmokelib.multiversionconstants import get_multiversion_service
 
-            old_mongod_version = multiversion_service.get_binary_name_for_version(
+            old_mongod_version = get_multiversion_service().get_binary_name_for_version(
                 old_bin_version, config.MONGOD_BIN_NAME
             )
 
@@ -345,20 +345,17 @@ class ReplSetBuilder(FixtureBuilder):
         :param old_bin_version: old bin version
         :return: FCV
         """
-        from buildscripts.resmokelib.multiversionconstants import (
-            LAST_CONTINUOUS_FCV,
-            LAST_LTS_FCV,
-            LATEST_FCV,
-            multiversion_service,
-        )
+        from buildscripts.resmokelib.multiversionconstants import get_multiversion_service
 
-        fcv = LATEST_FCV
+        service = get_multiversion_service()
+        versions = service.get_version_constants()
+        fcv = versions.get_latest_fcv()
         if is_multiversion:
             fcv = {
-                config.MultiversionOptions.LAST_LTS: LAST_LTS_FCV,
-                config.MultiversionOptions.LAST_CONTINUOUS: LAST_CONTINUOUS_FCV,
-                config.MultiversionOptions.LAST_PATCH: multiversion_service.get_last_patch_fcv(),
-            }[old_bin_version]
+                config.MultiversionOptions.LAST_LTS: versions.get_last_lts_fcv,
+                config.MultiversionOptions.LAST_CONTINUOUS: versions.get_last_continuous_fcv,
+                config.MultiversionOptions.LAST_PATCH: service.get_last_patch_fcv,
+            }[old_bin_version]()
 
         return fcv
 
@@ -635,9 +632,9 @@ class ShardedClusterBuilder(FixtureBuilder):
         _class = cls.LATEST_MONGOS_CLASS
 
         if mixed_bin_versions is not None:
-            from buildscripts.resmokelib.multiversionconstants import multiversion_service
+            from buildscripts.resmokelib.multiversionconstants import get_multiversion_service
 
-            old_mongos_version = multiversion_service.get_binary_name_for_version(
+            old_mongos_version = get_multiversion_service().get_binary_name_for_version(
                 old_bin_version, config.MONGOS_BIN_NAME
             )
 

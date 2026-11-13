@@ -15,6 +15,12 @@ from pathlib import Path
 from unittest import mock
 
 from buildscripts import multiversion_downloads_filter as under_test
+from buildscripts.resmokelib.multiversion.multiversion_service import (
+    DSCLastPatchBehavior,
+    MongoReleases,
+    MongoVersion,
+    MultiversionService,
+)
 
 
 def download_entry(bin_suffix: str) -> dict:
@@ -43,10 +49,7 @@ class TestSuffixesFromVersions(unittest.TestCase):
     """Aliases resolve through resmoke; anything else is an exact version."""
 
     def resolve(self, versions: str) -> set:
-        with mock.patch.object(
-            under_test.multiversionconstants, "multiversion_service", fake_service()
-        ):
-            return under_test.suffixes_from_versions(versions)
+        return under_test.suffixes_from_versions(versions, fake_service())
 
     def test_single_alias(self):
         self.assertEqual(self.resolve("last_lts"), {"9.0"})
@@ -90,13 +93,86 @@ class MainTestCase(unittest.TestCase):
         with (
             mock.patch.object(under_test.sys, "argv", argv),
             mock.patch.object(
-                under_test.multiversionconstants, "multiversion_service", fake_service()
+                under_test.multiversionconstants,
+                "get_multiversion_service",
+                return_value=fake_service(),
             ),
         ):
             return under_test.main()
 
 
 class TestMain(MainTestCase):
+    def test_missing_dsc_selection_fails_without_rewriting_the_manifest(self):
+        version = MongoVersion(mongo_version="42.3.0")
+        releases = MongoReleases(
+            **{
+                "featureCompatibilityVersions": ["41.0", "42.2", "42.3"],
+                "longTermSupportReleases": ["41.0"],
+                "eolVersions": [],
+            }
+        )
+        service = MultiversionService(
+            version,
+            releases,
+            last_patch_behavior=DSCLastPatchBehavior(version, releases, lambda: ALL_ENTRIES),
+        )
+        argv = ["filter", "--input", str(self.input), "--versions", "last_patch"]
+        with (
+            mock.patch.object(under_test.sys, "argv", argv),
+            mock.patch.object(
+                under_test.multiversionconstants, "get_multiversion_service", return_value=service
+            ),
+        ):
+            self.assertEqual(under_test.main(), 1)
+        self.assertEqual(json.loads(self.input.read_text()), ALL_ENTRIES)
+
+    def test_last_patch_retains_the_recorded_binary(self):
+        selected = download_entry("42.2")
+        selected["discovery_request"] = {
+            "request_type": "mongo_last_patch_version",
+            "identifier": "42.2.0-rc9",
+        }
+        self.write([selected, download_entry("42.3")])
+        for target in ("42.2.0", "42.3.0", "42.4.0"):
+            with self.subTest(target=target):
+                self.write([selected, download_entry("42.3")])
+                version = MongoVersion(mongo_version=target)
+                releases = MongoReleases(
+                    **{
+                        "featureCompatibilityVersions": ["41.0", "42.2", "42.3", "42.4"],
+                        "longTermSupportReleases": ["41.0"],
+                        "eolVersions": [],
+                    }
+                )
+                service = MultiversionService(
+                    version,
+                    releases,
+                    last_patch_behavior=DSCLastPatchBehavior(
+                        version,
+                        releases,
+                        lambda: json.loads(self.input.read_text()),
+                    ),
+                )
+                argv = [
+                    "filter",
+                    "--input",
+                    str(self.input),
+                    "--versions",
+                    "last_patch",
+                    "--strict",
+                ]
+                with (
+                    mock.patch.object(under_test.sys, "argv", argv),
+                    mock.patch.object(
+                        under_test.multiversionconstants,
+                        "get_multiversion_service",
+                        return_value=service,
+                    ) as factory,
+                ):
+                    self.assertEqual(under_test.main(), 0)
+                    factory.assert_called_once_with(manifest_file=str(self.input))
+                self.assertEqual(json.loads(self.input.read_text()), [selected])
+
     def test_keeps_only_the_requested_version(self):
         self.assertEqual(self.run_main("last_lts"), 0)
         self.assertEqual(self.suffixes(), ["9.0"])

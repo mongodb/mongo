@@ -8,6 +8,12 @@ from tempfile import TemporaryDirectory
 from mock import MagicMock, patch
 
 from buildscripts.resmokelib.config import MultiversionOptions
+from buildscripts.resmokelib.multiversion.multiversion_service import (
+    DSCLastPatchBehavior,
+    MongoReleases,
+    MongoVersion,
+    MultiversionService,
+)
 from buildscripts.resmokelib.run import generate_multiversion_exclude_tags as under_test
 from buildscripts.util.fileops import read_yaml_file
 
@@ -34,10 +40,16 @@ class TestGenerateExcludeYaml(unittest.TestCase):
             "get_old_yaml": MagicMock(return_value=old),
         }
 
-        with patch.multiple(
-            "buildscripts.resmokelib.run.generate_multiversion_exclude_tags",
-            **mock_multiversion_methods,
+        with (
+            patch.multiple(
+                "buildscripts.resmokelib.run.generate_multiversion_exclude_tags",
+                **mock_multiversion_methods,
+            ),
+            patch(
+                "buildscripts.resmokelib.multiversionconstants.get_multiversion_service"
+            ) as factory,
         ):
+            factory.return_value.get_binary_name_for_version.return_value = "mongod-test"
             with patch(
                 "buildscripts.resmokelib.run.generate_multiversion_exclude_tags.read_yaml_file",
                 return_value=latest,
@@ -52,6 +64,54 @@ class TestGenerateExcludeYaml(unittest.TestCase):
                 mock_read_yaml.assert_called_once()
                 mock_multiversion_methods["get_backports_required_hash"].assert_called_once()
                 mock_multiversion_methods["get_old_yaml"].assert_called_once()
+
+    def test_last_patch_exclusions_inspect_the_installed_fallback(self):
+        version = MongoVersion(mongo_version="42.3.0")
+        releases = MongoReleases(
+            **{
+                "featureCompatibilityVersions": ["41.0", "42.2", "42.3"],
+                "longTermSupportReleases": ["41.0"],
+                "eolVersions": [],
+            }
+        )
+        entry = {
+            "bin_suffix": "42.2",
+            "discovery_request": {
+                "request_type": "mongo_last_patch_version",
+                "identifier": "42.2.0-rc9",
+            },
+            "evg_urls_info": {"evg_revision": "abcdef"},
+            "release_urls_info": {"git_hash": "fedcba"},
+        }
+        service = MultiversionService(
+            version,
+            releases,
+            last_patch_behavior=DSCLastPatchBehavior(
+                version,
+                releases,
+                lambda: [entry],
+            ),
+        )
+        backports = {"last-patch": {"all": [], "suites": {}}}
+        with (
+            patch(
+                "buildscripts.resmokelib.multiversionconstants.get_multiversion_service",
+                return_value=service,
+            ),
+            patch.object(under_test, "read_yaml_file", return_value=backports),
+            patch.object(under_test, "get_old_yaml", return_value=backports) as old_yaml,
+            patch.object(
+                under_test,
+                "get_binary_version_output",
+                return_value='Build Info: {\n "gitVersion": "fedcba"\n}',
+            ) as binary,
+        ):
+            under_test.generate_exclude_yaml(
+                "last_patch", os.path.join(self._tmpdir.name, EXCLUDE_TAGS_FILE), MagicMock()
+            )
+        binary.assert_called_once_with("mongod-42.2")
+        self.assertEqual(old_yaml.call_args.args[0], "fedcba")
+        self.assertEqual(service.get_last_patch_version(), "42.2.0-rc9")
 
     def test_create_yaml_suite1(self):
         latest_yaml = {

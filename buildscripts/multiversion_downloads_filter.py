@@ -49,12 +49,16 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from buildscripts.resmokelib import multiversionconstants
+from buildscripts.resmokelib.multiversion.multiversion_service import (
+    LastPatchSelectionError,
+    MultiversionService,
+)
 
 # Aliases that resolve to a concrete version. Anything else is treated as an exact version.
 KNOWN_ALIASES = ("last_lts", "last_continuous", "last_patch")
 
 
-def suffixes_from_versions(versions: str) -> set[str]:
+def suffixes_from_versions(versions: str, service: MultiversionService) -> set[str]:
     """Resolve a space-delimited version list to the `bin_suffix` values the file uses.
 
     Elements are either an alias (`last_lts`, or `last-lts` -- MultiversionOptions uses
@@ -63,7 +67,6 @@ def suffixes_from_versions(versions: str) -> set[str]:
     Aliases go through the helper that names the binary on disk, with the base name stripped,
     rather than reading the FCV constants directly -- if the naming scheme changes, this follows it.
     """
-    service = multiversionconstants.multiversion_service
     suffixes = set()
     for element in versions.split():
         alias = element.replace("-", "_")
@@ -112,7 +115,11 @@ def main() -> int:
         return 0
 
     try:
-        required = suffixes_from_versions(args.versions)
+        service = multiversionconstants.get_multiversion_service(manifest_file=args.input)
+        required = suffixes_from_versions(args.versions, service)
+    except LastPatchSelectionError as exc:
+        print(f"multiversion filter: {exc}", file=sys.stderr)
+        return 1
     except Exception as exc:
         print(
             f"multiversion filter: could not resolve {args.versions!r} ({exc}); "
