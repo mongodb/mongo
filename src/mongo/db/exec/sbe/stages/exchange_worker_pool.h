@@ -106,6 +106,9 @@ public:
     /**
      * Leases up to 'count' workers, reusing parked ones if there are any and creating new threads
      * otherwise.
+     *
+     * The OperationContext of every leased worker reads with the view of 'mainOpCtx' (see
+     * SharedReadView). No worker is leased when the reads of 'mainOpCtx' cannot be shared.
      */
     std::vector<Handle> acquire(OperationContext* mainOpCtx, size_t count);
 

@@ -180,6 +180,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/stages:merge_join.cpp",
         "//src/mongo/db/exec/sbe/stages:project.cpp",
         "//src/mongo/db/exec/sbe/stages:search_cursor.cpp",
+        "//src/mongo/db/exec/sbe/stages:shared_read_view.cpp",
         "//src/mongo/db/exec/sbe/stages:sort.cpp",
         "//src/mongo/db/exec/sbe/stages:sort_stage_sort_impl.cpp",
         "//src/mongo/db/exec/sbe/stages:sorted_merge.cpp",
@@ -199,6 +200,7 @@ mongo_cc_library(
         "//src/mongo/db:sbe_values",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/exec:scoped_timer",
@@ -211,7 +213,9 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/metadata:query_metadata",
         "//src/mongo/db/query/compiler/physical_model/index_bounds",
         "//src/mongo/db/query/stage_memory_limit_knobs",
+        "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/db/shard_role/shard_catalog:allow_read_from_latest_on_secondary",
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:encryption_hooks",
@@ -328,6 +332,22 @@ mongo_cc_unit_test(
         "//src/mongo/otel/traces:traces_test_util",
         "//src/mongo/otel/traces:tracing",
         "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "exchange_worker_read_view_test",
+    srcs = [
+        "exchange_worker_read_view_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":query_sbe_stages",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:timestamp_block",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:allow_read_from_latest_on_secondary",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )
 

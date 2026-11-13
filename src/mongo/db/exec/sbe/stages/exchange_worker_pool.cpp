@@ -5,13 +5,17 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/exec/sbe/stages/shared_read_view.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
 #include <functional>
 #include <utility>
 
 #include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::sbe {
 namespace {
@@ -123,6 +127,15 @@ void ExchangeWorkerPool::shutdown() {
 std::vector<ExchangeWorkerPool::Handle> ExchangeWorkerPool::acquire(OperationContext* mainOpCtx,
                                                                     size_t count) {
     std::vector<Handle> workers;
+    auto swReadView = SharedReadView::capture(mainOpCtx);
+    if (!swReadView.isOK()) {
+        LOGV2_DEBUG(13436703,
+                    1,
+                    "Not leasing exchange workers: the reads of the operation can't be shared",
+                    "reason"_attr = swReadView.getStatus().reason());
+        return workers;
+    }
+    const auto readView = std::move(swReadView.getValue());
     {
         std::lock_guard lk(_mutex);
         tassert(13436104, "ExchangeWorkerPool has been shut down", !_shutdown);
@@ -163,6 +176,7 @@ std::vector<ExchangeWorkerPool::Handle> ExchangeWorkerPool::acquire(OperationCon
         ForwardableOperationMetadata fom(mainOpCtx);
         workers[i]->opCtxHolder = futures[i].get()->makeOperationContext();
         fom.setOn(workers[i]->opCtxHolder.get());
+        readView.applyTo(workers[i]->opCtxHolder.get());
     }
 
     return workers;
