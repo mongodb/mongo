@@ -1,14 +1,16 @@
 /**
  * Tests that serverStatus correctly reflects the change stream cursor option histogram metrics
- * (metrics.changeStreams.option.cursor.batchSize and metrics.changeStreams.option.cursor.maxTimeMS)
+ * (metrics.changeStreams.option.cursor.batchSize and metrics.changeStreams.option.cursor.maxAwaitTimeMS)
  * when change stream aggregate/getMore commands set these options. The metrics are registered
  * with ClusterRole::None, so they must be exercised on both mongod and mongos.
  *
  * Coverage includes:
  * - boundary values that land in every histogram bucket, including the lowest (underflow) and
- *   highest (overflow) buckets, for both the batchSize and maxTimeMS histograms;
- * - aggregate and getMore commands that omit maxTimeMS, which must not increment the maxTimeMS
- *   histogram at all;
+ *   highest (overflow) buckets, for both the batchSize and maxAwaitTimeMS (getMore maxTimeMS) histograms;
+ * - aggregate commands, which must never increment the maxAwaitTimeMS histogram even when they
+ *   set maxTimeMS, since an aggregate's maxTimeMS is not the cursor's maxAwaitTimeMS option;
+ * - getMore commands that omit maxTimeMS, which must not increment the maxAwaitTimeMS histogram
+ *   at all;
  * - getMore commands that omit batchSize, which must not increment the batchSize histogram at
  *   all;
  * - aggregate commands that omit cursor.batchSize: unlike getMore, the aggregate command's IDL
@@ -149,13 +151,13 @@ function buildTests() {
         }
     });
 
-    it("aggregate maxTimeMS is recorded for a change stream", function () {
-        const before = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+    it("aggregate maxTimeMS is not recorded as maxAwaitTimeMS for a change stream", function () {
+        const before = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
 
         const res = openChangeStream(this.testDB, this.collName, {maxTimeMS: 1500});
         try {
-            const after = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
-            assertBucketIncrement(before, after, "[1000, 2000)", "maxTimeMS=1500");
+            const after = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
+            assertNoIncrement(before, after, "maxAwaitTimeMS");
         } finally {
             killCursor(this.testDB, this.collName, res.cursor.id);
         }
@@ -169,7 +171,9 @@ function buildTests() {
             assert.commandWorked(this.testDB.getCollection(this.collName).insertOne({a: 1}));
 
             const beforeBatchSize = ServerStatusMetrics.getCsCursorOptionBatchSize(this.testDB);
-            const beforeMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+            const beforeMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(
+                this.testDB,
+            );
 
             runGetMore(this.testDB, this.collName, res.cursor.id, {
                 batchSize: 50,
@@ -177,7 +181,7 @@ function buildTests() {
             });
 
             const afterBatchSize = ServerStatusMetrics.getCsCursorOptionBatchSize(this.testDB);
-            const afterMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+            const afterMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
 
             assertBucketIncrement(beforeBatchSize, afterBatchSize, "[10, 100)", "batchSize=50");
             assertBucketIncrement(beforeMaxTimeMS, afterMaxTimeMS, "[200, 500)", "maxTimeMS=300");
@@ -200,14 +204,14 @@ function buildTests() {
         }
     });
 
-    it("aggregate maxTimeMS lands in the correct bucket across the full histogram range", function () {
+    it("aggregate maxTimeMS never increments maxAwaitTimeMS across the full histogram range", function () {
         for (const {value, bucket} of kMaxTimeMSBucketCases) {
-            const before = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+            const before = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
 
             const res = openChangeStream(this.testDB, this.collName, {maxTimeMS: value});
             try {
-                const after = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
-                assertBucketIncrement(before, after, bucket, `maxTimeMS=${value}`);
+                const after = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
+                assertNoIncrement(before, after, `aggregate maxTimeMS=${value} (${bucket})`);
             } finally {
                 killCursor(this.testDB, this.collName, res.cursor.id);
             }
@@ -228,12 +232,16 @@ function buildTests() {
                 assert.commandWorked(this.testDB.getCollection(this.collName).insertOne({a: 1}));
 
                 const beforeBatchSize = ServerStatusMetrics.getCsCursorOptionBatchSize(this.testDB);
-                const beforeMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+                const beforeMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(
+                    this.testDB,
+                );
 
                 runGetMore(this.testDB, this.collName, res.cursor.id, {batchSize, maxTimeMS});
 
                 const afterBatchSize = ServerStatusMetrics.getCsCursorOptionBatchSize(this.testDB);
-                const afterMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+                const afterMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(
+                    this.testDB,
+                );
 
                 assertBucketIncrement(
                     beforeBatchSize,
@@ -269,11 +277,11 @@ function buildTests() {
     });
 
     it("aggregate without maxTimeMS does not increment the maxTimeMS histogram", function () {
-        const before = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+        const before = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
 
         const res = openChangeStream(this.testDB, this.collName, {batchSize: 5});
         try {
-            const after = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+            const after = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
             assertNoIncrement(before, after, "maxTimeMS");
         } finally {
             killCursor(this.testDB, this.collName, res.cursor.id);
@@ -282,12 +290,12 @@ function buildTests() {
 
     it("aggregate without cursor.batchSize or maxTimeMS records the default batchSize only", function () {
         const beforeBatchSize = ServerStatusMetrics.getCsCursorOptionBatchSize(this.testDB);
-        const beforeMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+        const beforeMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
 
         const res = openChangeStream(this.testDB, this.collName);
         try {
             const afterBatchSize = ServerStatusMetrics.getCsCursorOptionBatchSize(this.testDB);
-            const afterMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+            const afterMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
             assertBucketIncrement(
                 beforeBatchSize,
                 afterBatchSize,
@@ -321,11 +329,11 @@ function buildTests() {
         try {
             assert.commandWorked(this.testDB.getCollection(this.collName).insertOne({a: 1}));
 
-            const before = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+            const before = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
 
             runGetMore(this.testDB, this.collName, res.cursor.id, {batchSize: 5});
 
-            const after = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+            const after = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
             assertNoIncrement(before, after, "maxTimeMS");
         } finally {
             killCursor(this.testDB, this.collName, res.cursor.id);
@@ -338,12 +346,14 @@ function buildTests() {
             assert.commandWorked(this.testDB.getCollection(this.collName).insertOne({a: 1}));
 
             const beforeBatchSize = ServerStatusMetrics.getCsCursorOptionBatchSize(this.testDB);
-            const beforeMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+            const beforeMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(
+                this.testDB,
+            );
 
             runGetMore(this.testDB, this.collName, res.cursor.id);
 
             const afterBatchSize = ServerStatusMetrics.getCsCursorOptionBatchSize(this.testDB);
-            const afterMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+            const afterMaxTimeMS = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
             assertNoIncrement(beforeBatchSize, afterBatchSize, "batchSize");
             assertNoIncrement(beforeMaxTimeMS, afterMaxTimeMS, "maxTimeMS");
         } finally {

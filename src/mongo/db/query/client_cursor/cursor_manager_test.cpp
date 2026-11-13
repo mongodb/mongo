@@ -1159,7 +1159,7 @@ TEST_F(CursorManagerTest, ChangeStreamMetricsAreRegisteredAtStartup) {
 
     auto options = metrics.getObjectField("option").getObjectField("cursor");
     ASSERT(options.getObjectField("batchSize")["totalCount"].isNumber());
-    ASSERT(options.getObjectField("maxTimeMS")["totalCount"].isNumber());
+    ASSERT(options.getObjectField("maxAwaitTimeMS")["totalCount"].isNumber());
 }
 
 /**

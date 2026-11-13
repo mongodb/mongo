@@ -135,8 +135,7 @@ public:
             globalOpCounters().gotAggregate();
 
             if (_liteParsedPipeline.hasChangeStream()) {
-                change_stream::recordCursorOptionMetrics(request().getCursor().getBatchSize(),
-                                                         request().getMaxTimeMS());
+                change_stream::recordCursorBatchSize(request().getCursor().getBatchSize());
             }
 
             const auto& body = unparsedRequest().body;

@@ -1103,7 +1103,9 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         CurOp::get(opCtx)->debug().isChangeStreamQuery =
             pinnedCursor.getValue()->isChangeStreamCursor();
         if (pinnedCursor.getValue()->isChangeStreamCursor()) {
-            change_stream::recordCursorOptionMetrics(cmd.getBatchSize(), cmd.getMaxTimeMS());
+            change_stream::recordCursorBatchSize(cmd.getBatchSize());
+            // The getMore's maxTimeMS is the change stream cursor's maxAwaitTimeMS.
+            change_stream::recordCursorMaxAwaitTimeMS(cmd.getMaxTimeMS());
         }
         std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(

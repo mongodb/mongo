@@ -107,8 +107,8 @@ export class ServerStatusMetrics {
         return this.getCsMetrics(db).option.cursor.batchSize;
     }
 
-    static getCsCursorOptionMaxTimeMS(db) {
-        return this.getCsMetrics(db).option.cursor.maxTimeMS;
+    static getCsCursorOptionMaxAwaitTimeMS(db) {
+        return this.getCsMetrics(db).option.cursor.maxAwaitTimeMS;
     }
 
     static getSsMetrics(db) {

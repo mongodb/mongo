@@ -576,7 +576,7 @@ TEST_F(ClusterClientCursorImplTest, ChangeStreamMetricsAreRegisteredAtStartup) {
 
     auto options = metrics.getObjectField("option").getObjectField("cursor");
     ASSERT(options.getObjectField("batchSize")["totalCount"].isNumber());
-    ASSERT(options.getObjectField("maxTimeMS")["totalCount"].isNumber());
+    ASSERT(options.getObjectField("maxAwaitTimeMS")["totalCount"].isNumber());
 }
 
 TEST_F(ClusterClientCursorImplTest, CheckChangeStreamServerStatusCursorMetrics) {

@@ -169,45 +169,49 @@ inline otel::metrics::Histogram<int64_t>& cursorBatchSizeHistogram() {
     return kCursorBatchSizeHistogram;
 }
 
-inline otel::metrics::Histogram<int64_t>& createCursorMaxTimeMSHistogram() {
+inline otel::metrics::Histogram<int64_t>& createCursorMaxAwaitTimeMSHistogram() {
     otel::metrics::HistogramOptions opts{};
     opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
-        .dottedPath = "changeStreams.option.cursor.maxTimeMS",
+        .dottedPath = "changeStreams.option.cursor.maxAwaitTimeMS",
         .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
     };
     opts.serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts;
     opts.explicitBucketBoundaries = std::vector<double>(
         {100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000});
     return otel::metrics::MetricsService::instance().createInt64Histogram(
-        otel::metrics::MetricNames::kChangeStreamOptionCursorMaxTimeMS,
-        "maxTimeMS requested for change stream aggregate/getMore commands, in milliseconds.",
+        otel::metrics::MetricNames::kChangeStreamOptionCursorMaxAwaitTimeMS,
+        "maxAwaitTimeMS requested for change stream getMore commands, in milliseconds.",
         otel::metrics::MetricUnit::kMilliseconds,
         opts);
 };
 
-// Histogram for the OTEL metric "serverStatus.metrics.changeStreams.option.cursor.maxTimeMS".
-// Tracks the 'maxTimeMS' request field of change stream aggregate/getMore commands, on both
-// mongod and mongos.
+// Histogram for the OTEL metric "serverStatus.metrics.changeStreams.option.cursor.maxAwaitTimeMS".
+// Tracks the change stream cursor 'maxAwaitTimeMS' option, which getMore commands carry as
+// 'maxTimeMS', on both mongod and mongos.
 // Needs to be created and registered already at static-initialization time rather than lazily on
 // first use, because the metrics tree is frozen shortly after startup.
-inline otel::metrics::Histogram<int64_t>& kCursorMaxTimeMSHistogram =
-    createCursorMaxTimeMSHistogram();
+inline otel::metrics::Histogram<int64_t>& kCursorMaxAwaitTimeMSHistogram =
+    createCursorMaxAwaitTimeMSHistogram();
 
-inline otel::metrics::Histogram<int64_t>& cursorMaxTimeMSHistogram() {
-    return kCursorMaxTimeMSHistogram;
+inline otel::metrics::Histogram<int64_t>& cursorMaxAwaitTimeMSHistogram() {
+    return kCursorMaxAwaitTimeMSHistogram;
 }
 
-// Records cursor option usage metrics for a change stream aggregate/getMore command. Must only
-// be called when the command/cursor is a change stream. Each option is recorded if the parsed
-// request provides a value for it (which may include IDL-backfilled defaults, e.g. aggregate
-// may backfill a default cursor.batchSize when the client omits it).
-inline void recordCursorOptionMetrics(boost::optional<std::int64_t> batchSize,
-                                      boost::optional<std::int64_t> maxTimeMS) {
+// Records the 'batchSize' of a change stream aggregate/getMore command, if the parsed request
+// provides one (which may include an IDL-backfilled default, e.g. aggregate may backfill a default
+// cursor.batchSize when the client omits it). Must only be called for change streams.
+inline void recordCursorBatchSize(boost::optional<std::int64_t> batchSize) {
     if (batchSize) {
         cursorBatchSizeHistogram().record(*batchSize);
     }
+}
+
+// Records the change stream cursor 'maxAwaitTimeMS' option, which a getMore carries as its
+// 'maxTimeMS'. Must only be called for change stream getMore commands: the 'maxTimeMS' of an
+// aggregate is a different option and must not be recorded here.
+inline void recordCursorMaxAwaitTimeMS(boost::optional<std::int64_t> maxTimeMS) {
     if (maxTimeMS) {
-        cursorMaxTimeMSHistogram().record(*maxTimeMS);
+        cursorMaxAwaitTimeMSHistogram().record(*maxTimeMS);
     }
 }
 

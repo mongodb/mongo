@@ -498,8 +498,8 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.scope.collection");
     static constexpr MetricName kChangeStreamOptionCursorBatchSize =
         MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.option.cursor.batchSize");
-    static constexpr MetricName kChangeStreamOptionCursorMaxTimeMS =
-        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.option.cursor.maxTimeMS");
+    static constexpr MetricName kChangeStreamOptionCursorMaxAwaitTimeMS = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.option.cursor.maxAwaitTimeMS");
     static constexpr MetricName kChangeStreamCursorDocsReturned =
         MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.docsReturned");
     static constexpr MetricName kChangeStreamCursorBytesReturned =

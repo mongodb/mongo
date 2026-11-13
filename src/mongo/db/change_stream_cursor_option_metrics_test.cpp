@@ -7,6 +7,9 @@
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 
+#include <set>
+#include <string>
+
 #include <boost/optional.hpp>
 
 namespace mongo::change_stream {
@@ -41,7 +44,8 @@ TEST(RecordCursorOptionMetricsTest, StaticCursorRegistrationsUseCompleteOptions)
 // "before" snapshot in each test below is guaranteed to already have a data point (avoiding
 // KeyNotFound on the very first read in the binary).
 void warmUp() {
-    recordCursorOptionMetrics(0, 0);
+    recordCursorBatchSize(0);
+    recordCursorMaxAwaitTimeMS(0);
 }
 
 // Reads the actual serverStatus tree, including when OTel is disabled on Windows.
@@ -60,8 +64,10 @@ TEST(RecordCursorOptionMetricsTest, RepeatedRecordingIsReflectedInServerStatus) 
     // The option histograms must already be registered before the first command records them.
     auto before = readCursorOptionMetrics();
 
-    recordCursorOptionMetrics(7, 700);
-    recordCursorOptionMetrics(7, 700);
+    recordCursorBatchSize(7);
+    recordCursorBatchSize(7);
+    recordCursorMaxAwaitTimeMS(700);
+    recordCursorMaxAwaitTimeMS(700);
 
     auto after = readCursorOptionMetrics();
 
@@ -72,8 +78,16 @@ TEST(RecordCursorOptionMetricsTest, RepeatedRecordingIsReflectedInServerStatus) 
     };
     assertTwoRecords(
         before.getObjectField("batchSize"), after.getObjectField("batchSize"), "[1, 10)");
-    assertTwoRecords(
-        before.getObjectField("maxTimeMS"), after.getObjectField("maxTimeMS"), "[500, 1000)");
+    assertTwoRecords(before.getObjectField("maxAwaitTimeMS"),
+                     after.getObjectField("maxAwaitTimeMS"),
+                     "[500, 1000)");
+}
+
+TEST(RecordCursorOptionMetricsTest, OnlyBatchSizeAndMaxAwaitTimeMSAreExposed) {
+    auto cursor = readCursorOptionMetrics();
+    auto fieldNames = cursor.getFieldNames<std::set<std::string>>();
+    ASSERT_EQ(fieldNames, (std::set<std::string>{"batchSize", "maxAwaitTimeMS"}));
+    ASSERT(cursor["maxTimeMS"].eoo());
 }
 
 TEST(RecordCursorOptionMetricsTest, BatchSizeIsRecordedWithCorrectValue) {
@@ -85,29 +99,12 @@ TEST(RecordCursorOptionMetricsTest, BatchSizeIsRecordedWithCorrectValue) {
 
     auto before =
         capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorBatchSize);
-    recordCursorOptionMetrics(42, boost::none);
+    recordCursorBatchSize(42);
     auto after =
         capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorBatchSize);
 
     ASSERT_EQ(after.count, before.count + 1);
     ASSERT_EQ(after.sum, before.sum + 42);
-}
-
-TEST(RecordCursorOptionMetricsTest, MaxTimeMSIsRecordedWithCorrectValue) {
-    otel::metrics::OtelMetricsCapturer capturer;
-    if (!capturer.canReadMetrics()) {
-        return;
-    }
-    warmUp();
-
-    auto before =
-        capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorMaxTimeMS);
-    recordCursorOptionMetrics(boost::none, 12345);
-    auto after =
-        capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorMaxTimeMS);
-
-    ASSERT_EQ(after.count, before.count + 1);
-    ASSERT_EQ(after.sum, before.sum + 12345);
 }
 
 TEST(RecordCursorOptionMetricsTest, UnsetBatchSizeDoesNotRecord) {
@@ -119,7 +116,7 @@ TEST(RecordCursorOptionMetricsTest, UnsetBatchSizeDoesNotRecord) {
 
     auto before =
         capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorBatchSize);
-    recordCursorOptionMetrics(boost::none, boost::none);
+    recordCursorBatchSize(boost::none);
     auto after =
         capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorBatchSize);
 
@@ -127,24 +124,62 @@ TEST(RecordCursorOptionMetricsTest, UnsetBatchSizeDoesNotRecord) {
     ASSERT_EQ(after.sum, before.sum);
 }
 
-TEST(RecordCursorOptionMetricsTest, UnsetMaxTimeMSDoesNotRecord) {
+TEST(RecordCursorOptionMetricsTest, MaxAwaitTimeMSIsRecordedWithCorrectValue) {
     otel::metrics::OtelMetricsCapturer capturer;
     if (!capturer.canReadMetrics()) {
         return;
     }
     warmUp();
 
-    auto before =
-        capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorMaxTimeMS);
-    recordCursorOptionMetrics(boost::none, boost::none);
-    auto after =
-        capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorMaxTimeMS);
+    auto before = capturer.readInt64Histogram(
+        otel::metrics::MetricNames::kChangeStreamOptionCursorMaxAwaitTimeMS);
+    recordCursorMaxAwaitTimeMS(12345);
+    auto after = capturer.readInt64Histogram(
+        otel::metrics::MetricNames::kChangeStreamOptionCursorMaxAwaitTimeMS);
+
+    ASSERT_EQ(after.count, before.count + 1);
+    ASSERT_EQ(after.sum, before.sum + 12345);
+}
+
+TEST(RecordCursorOptionMetricsTest, BucketBoundariesAreRespected) {
+    // Bucket boundaries are 100, 200, ..., 1000000, and buckets are [lower, upper).
+    recordCursorMaxAwaitTimeMS(0);  // Ensure the histogram has data points.
+    auto before = readCursorOptionMetrics().getObjectField("maxAwaitTimeMS").getOwned();
+    recordCursorMaxAwaitTimeMS(99);
+    recordCursorMaxAwaitTimeMS(100);
+    recordCursorMaxAwaitTimeMS(999);
+    recordCursorMaxAwaitTimeMS(1000);
+    auto after = readCursorOptionMetrics().getObjectField("maxAwaitTimeMS").getOwned();
+
+    ASSERT_EQ(after.getIntField("totalCount"), before.getIntField("totalCount") + 4);
+    auto delta = [&](const char* bucket) {
+        return after.getObjectField(bucket).getIntField("count") -
+            before.getObjectField(bucket).getIntField("count");
+    };
+    ASSERT_EQ(delta("(-inf, 100)"), 1);
+    ASSERT_EQ(delta("[100, 200)"), 1);
+    ASSERT_EQ(delta("[500, 1000)"), 1);
+    ASSERT_EQ(delta("[1000, 2000)"), 1);
+}
+
+TEST(RecordCursorOptionMetricsTest, UnsetMaxAwaitTimeMSDoesNotRecord) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    warmUp();
+
+    auto before = capturer.readInt64Histogram(
+        otel::metrics::MetricNames::kChangeStreamOptionCursorMaxAwaitTimeMS);
+    recordCursorMaxAwaitTimeMS(boost::none);
+    auto after = capturer.readInt64Histogram(
+        otel::metrics::MetricNames::kChangeStreamOptionCursorMaxAwaitTimeMS);
 
     ASSERT_EQ(after.count, before.count);
     ASSERT_EQ(after.sum, before.sum);
 }
 
-TEST(RecordCursorOptionMetricsTest, BothOptionsAreRecordedIndependently) {
+TEST(RecordCursorOptionMetricsTest, OptionsAreRecordedIndependently) {
     otel::metrics::OtelMetricsCapturer capturer;
     if (!capturer.canReadMetrics()) {
         return;
@@ -153,20 +188,27 @@ TEST(RecordCursorOptionMetricsTest, BothOptionsAreRecordedIndependently) {
 
     auto beforeBatchSize =
         capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorBatchSize);
-    auto beforeMaxTimeMS =
-        capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorMaxTimeMS);
+    auto beforeMaxAwaitTimeMS = capturer.readInt64Histogram(
+        otel::metrics::MetricNames::kChangeStreamOptionCursorMaxAwaitTimeMS);
 
-    recordCursorOptionMetrics(7, 700);
+    recordCursorMaxAwaitTimeMS(700);
 
     auto afterBatchSize =
         capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorBatchSize);
-    auto afterMaxTimeMS =
-        capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorMaxTimeMS);
+    auto afterMaxAwaitTimeMS = capturer.readInt64Histogram(
+        otel::metrics::MetricNames::kChangeStreamOptionCursorMaxAwaitTimeMS);
+    ASSERT_EQ(afterBatchSize.count, beforeBatchSize.count);
+    ASSERT_EQ(afterMaxAwaitTimeMS.count, beforeMaxAwaitTimeMS.count + 1);
 
-    ASSERT_EQ(afterBatchSize.count, beforeBatchSize.count + 1);
-    ASSERT_EQ(afterBatchSize.sum, beforeBatchSize.sum + 7);
-    ASSERT_EQ(afterMaxTimeMS.count, beforeMaxTimeMS.count + 1);
-    ASSERT_EQ(afterMaxTimeMS.sum, beforeMaxTimeMS.sum + 700);
+    recordCursorBatchSize(7);
+
+    auto finalBatchSize =
+        capturer.readInt64Histogram(otel::metrics::MetricNames::kChangeStreamOptionCursorBatchSize);
+    auto finalMaxAwaitTimeMS = capturer.readInt64Histogram(
+        otel::metrics::MetricNames::kChangeStreamOptionCursorMaxAwaitTimeMS);
+    ASSERT_EQ(finalBatchSize.count, beforeBatchSize.count + 1);
+    ASSERT_EQ(finalBatchSize.sum, beforeBatchSize.sum + 7);
+    ASSERT_EQ(finalMaxAwaitTimeMS.count, afterMaxAwaitTimeMS.count);
 }
 
 }  // namespace

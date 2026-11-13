@@ -1,8 +1,10 @@
 /**
  * Tests that the change stream cursor option histogram metrics
- * (metrics.changeStreams.option.cursor.batchSize and metrics.changeStreams.option.cursor.maxTimeMS)
- * are NOT recorded for ordinary (non-change-stream) aggregate/getMore commands, even when those
- * commands set the same request fields. Verified on both mongod and mongos.
+ * (metrics.changeStreams.option.cursor.batchSize and
+ * metrics.changeStreams.option.cursor.maxAwaitTimeMS) are NOT recorded for ordinary
+ * (non-change-stream) aggregate/getMore commands, even when those commands set the same request
+ * fields (including a getMore's maxTimeMS, which is the maxAwaitTimeMS of a tailable awaitData
+ * cursor). Verified on both mongod and mongos.
  *
  * @tags: [
  *   requires_sharding,
@@ -75,14 +77,14 @@ function buildTests() {
     });
 
     it("aggregate maxTimeMS is not recorded for a non-change-stream aggregate", function () {
-        const before = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+        const before = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
 
         const res = runPlainAggregate(this.testDB, this.collName, {
             batchSize: 1,
             maxTimeMS: 1500,
         });
         try {
-            const after = ServerStatusMetrics.getCsCursorOptionMaxTimeMS(this.testDB);
+            const after = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
             assert.eq(
                 after.totalCount,
                 before.totalCount,
@@ -96,7 +98,7 @@ function buildTests() {
 
     it("getMore cursor.batchSize is not recorded for a non-change-stream cursor", function () {
         // maxTimeMS on getMore is illegal for a non-awaitData cursor, so only batchSize is
-        // exercised here; the maxTimeMS-on-aggregate case above already covers that field.
+        // exercised here; the awaitData getMore case below covers maxTimeMS.
         const res = runPlainAggregate(this.testDB, this.collName, {batchSize: 1});
         try {
             const before = ServerStatusMetrics.getCsCursorOptionBatchSize(this.testDB);
@@ -112,6 +114,44 @@ function buildTests() {
             );
         } finally {
             killCursor(this.testDB, this.collName, res.cursor.id);
+        }
+    });
+
+    it("getMore maxTimeMS is not recorded as maxAwaitTimeMS for a non-change-stream cursor", function () {
+        // A tailable awaitData cursor on a capped collection is the non-change-stream cursor for
+        // which getMore accepts maxTimeMS.
+        const cappedName = this.collName + "_capped";
+        assertDropAndRecreateCollection(this.testDB, cappedName, {capped: true, size: 1024 * 1024});
+        assert.commandWorked(this.testDB.getCollection(cappedName).insertMany([{a: 1}, {a: 2}]));
+
+        const res = assert.commandWorked(
+            this.testDB.runCommand({
+                find: cappedName,
+                tailable: true,
+                awaitData: true,
+                batchSize: 1,
+            }),
+        );
+        try {
+            const before = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
+
+            assert.commandWorked(
+                this.testDB.runCommand({
+                    getMore: res.cursor.id,
+                    collection: cappedName,
+                    maxTimeMS: 300,
+                }),
+            );
+
+            const after = ServerStatusMetrics.getCsCursorOptionMaxAwaitTimeMS(this.testDB);
+            assert.eq(
+                after.totalCount,
+                before.totalCount,
+                "maxTimeMS should not be recorded for a non-change-stream getMore",
+                {before, after},
+            );
+        } finally {
+            killCursor(this.testDB, cappedName, res.cursor.id);
         }
     });
 }
@@ -147,8 +187,8 @@ describe("change stream cursor option metrics do not track non-change-stream com
         assertDropAndRecreateCollection(this.testDB, this.collName);
         assert.commandWorked(this.testDB.getCollection(this.collName).insertMany([{a: 1}, {a: 2}]));
 
-        // Warm up the histograms: they are lazily registered with serverStatus on the first call
-        // to recordCursorOptionMetrics, so a fresh server has no 'option.cursor' key at all.
+        // Warm up the histograms so this test can safely read the 'option.cursor' keys regardless of
+        // whether they have recorded any data points yet.
         openAndCloseChangeStream(this.testDB, this.collName);
     });
 

@@ -1040,8 +1040,9 @@ public:
                 ensureChangeStreamGetMorePreconditions(opCtx, cursorPin);
 
                 if (cursorPin->isChangeStreamQuery()) {
-                    change_stream::recordCursorOptionMetrics(cmd.getBatchSize(),
-                                                             cmd.getMaxTimeMS());
+                    change_stream::recordCursorBatchSize(cmd.getBatchSize());
+                    // The getMore's maxTimeMS is the change stream cursor's maxAwaitTimeMS.
+                    change_stream::recordCursorMaxAwaitTimeMS(cmd.getMaxTimeMS());
                 }
 
                 // Get the read concern level here in case the cursor is exhausted while iterating.
