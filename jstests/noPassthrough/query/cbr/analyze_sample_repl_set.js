@@ -10,7 +10,6 @@
 
 import {after, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -124,24 +123,6 @@ describe("analyze sample on replica sets", function () {
                     analyze: kCollName,
                     mode: "sample",
                 }),
-            );
-            rst.awaitReplication();
-
-            const uuid = PersistentSamplesUtils.getCollUUID(primaryDB, kCollName);
-            const expectedId = PersistentSamplesUtils.getExpectedId(uuid);
-
-            assertSampleDocReplicatedExactly(expectedId);
-        });
-
-        it("chunk sample document replicates from primary to secondary", function () {
-            const kNumChunks = PersistentSamplesUtils.defaultNumChunks(primaryDB);
-            runWithKnobs(
-                primaryDB,
-                () =>
-                    assert.commandWorked(
-                        primaryDB.runCommand({analyze: kCollName, mode: "sample"}),
-                    ),
-                {internalQuerySamplingCEMethodForPersistentSamples: "chunk"},
             );
             rst.awaitReplication();
 

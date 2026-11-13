@@ -272,8 +272,7 @@ void runSampleMode(OperationContext* opCtx, const NamespaceString& nss) {
     const ce::SampleSpec spec{
         .nss = nss,
         .requestedSampleSize = requestedSampleSize,
-        .sampleGenerationMethod = qkc.getInternalQuerySamplingCEMethodForPersistentSamples(),
-        .numChunks = qkc.getNumChunksForChunkBasedSampling(),
+        .sampleGenerationMethod = SamplingCEMethodEnum::kRandom,
         .samplingSource = SamplingSourceEnum::kOnTheFlySample,
         .topLevelSampleFieldNames = {},
     };

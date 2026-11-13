@@ -1037,6 +1037,7 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
+    # TODO SERVER-139266: Remove this knob
     internalQuerySamplingCEMethodForPersistentSamples:
         mod_visibility: public
         description: >-

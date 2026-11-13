@@ -62,7 +62,6 @@ describe("persistent sample serverStatus metrics", function () {
                 internalQuerySamplingBySequentialScan: false,
                 internalQuerySamplingByStrides: false,
                 internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
             }),
         );
 
@@ -170,49 +169,6 @@ describe("persistent sample serverStatus metrics", function () {
             after.byMethod.fullCollScan,
             "byMethod.fullCollScan should not change",
             {after, afterSecond},
-        );
-    });
-
-    it("increments write-path metrics for a chunk-technique run", function () {
-        const before = getAnalyzeMetrics(db);
-
-        // Both consumers' method knobs must agree, or analyze persists a chunk sample for CBR and
-        // a random one for join optimization, moving two sets of per-method counters.
-        runWithKnobs(
-            db,
-            () => assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"})),
-            {
-                internalQuerySamplingCEMethodForPersistentSamples: "chunk",
-                internalJoinOptimizationSamplingCEMethod: "chunk",
-            },
-        );
-
-        const after = getAnalyzeMetrics(db);
-
-        // Chunk sampling persists a variable number of docs, so only assert the counter increased.
-        assert.gt(
-            after.docsPersisted,
-            before.docsPersisted,
-            "docsPersisted should increase for a chunk-technique run",
-            {before, after},
-        );
-        assert.eq(
-            after.byMethod.chunk,
-            before.byMethod.chunk + 1,
-            "byMethod.chunk should increment",
-            {before, after},
-        );
-        assert.eq(
-            after.byMethod.random,
-            before.byMethod.random,
-            "byMethod.random should not change",
-            {before, after},
-        );
-        assert.eq(
-            after.byMethod.fullCollScan,
-            before.byMethod.fullCollScan,
-            "byMethod.fullCollScan should not change",
-            {before, after},
         );
     });
 

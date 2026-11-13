@@ -89,7 +89,6 @@ try {
             db.adminCommand({
                 setParameter: 1,
                 internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
             }),
         );
         resetCollections();
@@ -129,7 +128,6 @@ try {
             db.adminCommand({
                 setParameter: 1,
                 internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
             }),
         );
         resetCollections();
@@ -152,91 +150,11 @@ try {
     }
 
     {
-        jsTest.log.info("Testing chunk sampling technique with a persistent sample hit");
-        assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQuerySamplingCEMethod: "chunk",
-                internalQuerySamplingCEMethodForPersistentSamples: "chunk",
-            }),
-        );
-        resetCollections();
-
-        // Collect a sample
-        assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"}));
-
-        // Chunk sampling scans full WiredTiger pages so the actual doc count may be less than
-        // requestedSampleSize; compare sampleDocCount against what was actually stored, not the
-        // request size.
-        const storedDocCount = (() => {
-            const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
-            const id = PersistentSamplesUtils.getExpectedId(uuid);
-            const doc = PersistentSamplesUtils.getSampleDoc(
-                PersistentSamplesUtils.getSamplesColl(db),
-                id,
-            );
-            return doc[PersistentSamplesUtils.sampleDocFieldNames.docsField].length;
-        })();
-
-        const meta = getWinningPlanMetadata({a: {$gte: 0}});
-        assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
-        assert.eq(meta.sampleTechnique, "chunk", "expected chunk technique", {meta});
-        assert.eq(meta.sampleNumChunks, kNumChunks, "expected numChunks to match", {meta});
-        assert.eq(
-            meta.sampleDocCount,
-            Math.min(storedDocCount, kSampleSize),
-            "expected docCount to match number of docs loaded from the persisted sample",
-            {meta},
-        );
-        assert.eq(
-            meta.sampleRequestedDocCount,
-            kSampleSize,
-            "expected requestedDocCount to match",
-            {meta},
-        );
-        PersistentSamplesUtils.assertPersistedSampleMetadataPresent(meta);
-    }
-
-    // TODO SERVER-138209: Remove
-    {
-        jsTest.log.info(
-            "Testing a persisted chunk sample reports the numChunks it was generated with",
-        );
-        assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQuerySamplingCEMethod: "chunk",
-                internalQuerySamplingCEMethodForPersistentSamples: "chunk",
-            }),
-        );
-        resetCollections();
-
-        const persistedNumChunks = kNumChunks + 1;
-        runWithKnobs(
-            db,
-            () => assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"})),
-            {internalQueryNumChunksForChunkBasedSampling: persistedNumChunks},
-        );
-
-        // The query requests the default number of chunks, which differs from the persisted one.
-        const meta = getWinningPlanMetadata({a: {$gte: 0}});
-        assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
-        assert.eq(meta.sampleTechnique, "chunk", "expected chunk technique", {meta});
-        assert.eq(
-            meta.sampleNumChunks,
-            persistedNumChunks,
-            "expected the numChunks the persisted sample was generated with",
-            {meta},
-        );
-    }
-
-    {
         jsTest.log.info("Testing chunk sampling technique with a persistent sample miss");
         assert.commandWorked(
             db.adminCommand({
                 setParameter: 1,
                 internalQuerySamplingCEMethod: "chunk",
-                internalQuerySamplingCEMethodForPersistentSamples: "chunk",
             }),
         );
         resetCollections();
@@ -258,7 +176,6 @@ try {
     // technique it was generated with.
     for (const {onTheFlyMethod, persistedMethod} of [
         {onTheFlyMethod: "chunk", persistedMethod: "random"},
-        {onTheFlyMethod: "random", persistedMethod: "chunk"},
     ]) {
         jsTest.log.info(
             `Testing a persisted ${persistedMethod} sample hit when the on-the-fly method is ${onTheFlyMethod}`,
@@ -273,7 +190,6 @@ try {
             },
             {
                 internalQuerySamplingCEMethod: onTheFlyMethod,
-                internalQuerySamplingCEMethodForPersistentSamples: persistedMethod,
             },
         );
         assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
@@ -297,7 +213,6 @@ try {
             db.adminCommand({
                 setParameter: 1,
                 internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
             }),
         );
         coll.drop();
@@ -346,7 +261,6 @@ try {
             db.adminCommand({
                 setParameter: 1,
                 internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
             }),
         );
         coll.drop();
@@ -392,7 +306,6 @@ try {
             db.adminCommand({
                 setParameter: 1,
                 internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
             }),
         );
         resetCollections();
@@ -426,7 +339,6 @@ try {
             db.adminCommand({
                 setParameter: 1,
                 internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
             }),
         );
         coll.drop();
@@ -559,11 +471,7 @@ try {
         );
         resetCollections();
 
-        runWithKnobs(
-            db,
-            () => assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"})),
-            {internalQuerySamplingCEMethodForPersistentSamples: "chunk"},
-        );
+        assert.commandWorked(db.runCommand({analyze: collName, mode: "sample"}));
 
         const meta = getWinningPlanMetadata({a: {$gte: 0}});
         assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
@@ -631,7 +539,6 @@ try {
             db.adminCommand({
                 setParameter: 1,
                 internalQuerySamplingCEMethod: "random",
-                internalQuerySamplingCEMethodForPersistentSamples: "random",
                 internalQuerySamplingBySequentialScan: false,
                 internalQuerySamplingByStrides: false,
             }),

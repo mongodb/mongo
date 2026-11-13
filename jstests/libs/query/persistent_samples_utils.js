@@ -113,13 +113,7 @@ export function expectedPersistedSampleSize(db) {
 export function runAnalyzeSampleWithKnobs(
     db,
     collName,
-    {
-        sampleSize,
-        joinSampleSize = sampleSize,
-        enableJoinOptimization,
-        samplingMethod,
-        numChunks,
-    } = {},
+    {sampleSize, joinSampleSize = sampleSize, enableJoinOptimization, numChunks} = {},
 ) {
     const knobs = {};
     if (sampleSize !== undefined) {
@@ -130,9 +124,6 @@ export function runAnalyzeSampleWithKnobs(
     }
     if (enableJoinOptimization !== undefined) {
         knobs.internalEnableJoinOptimization = enableJoinOptimization;
-    }
-    if (samplingMethod !== undefined) {
-        knobs.internalQuerySamplingCEMethodForPersistentSamples = samplingMethod;
     }
     if (numChunks !== undefined) {
         knobs.internalQueryNumChunksForChunkBasedSampling = numChunks;

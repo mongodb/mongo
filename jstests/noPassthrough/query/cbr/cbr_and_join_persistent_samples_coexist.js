@@ -29,7 +29,6 @@ const conn = MongoRunner.runMongod({
         internalEnableJoinOptimization: true,
         internalQueryDisablePlanCache: true,
         internalQuerySamplingCEMethod: "random",
-        internalQuerySamplingCEMethodForPersistentSamples: "random",
         internalJoinOptimizationSamplingCEMethod: "random",
         internalQuerySamplingBySequentialScan: false,
         internalQuerySamplingByStrides: false,
@@ -308,43 +307,6 @@ describe("the single persisted sample shared by CBR and join optimization", () =
             assertSampleMetadata(meta, {
                 expectedSource: "onTheFly",
                 expectedSize: kLargerSize,
-                expectedTechnique: kChunkSamplingMethod,
-            });
-        }
-    });
-
-    // TODO SERVER-138209: stop supporting chunk sampling for persisted samples
-    it("is loaded by join optimization regardless of its own on-the-fly method knob", () => {
-        // Persist a chunk sample while join optimization's on-the-fly method stays "random";
-        // the loaded sample reports the technique it was generated with.
-        setSampleSizeKnobs({cbrSampleSize: kSmallerSize, joinSampleSize: kSmallerSize});
-        runWithKnobs(db, analyzeBoth, {
-            internalQuerySamplingCEMethodForPersistentSamples: kChunkSamplingMethod,
-        });
-
-        const defaultNumChunks = PersistentSamplesUtils.defaultNumChunks(db);
-        for (const collName of [ordersName, productsName]) {
-            PersistentSamplesUtils.validatePersistentSample(db, {
-                sampledCollName: collName,
-                samplingMethod: kChunkSamplingMethod,
-                requestedSampleSize: kSmallerSize,
-                actualSampleSize: kSmallerSize,
-                numChunks: defaultNumChunks,
-            });
-        }
-
-        assertSampleMetadata(getCbrSamplingMetadata(), {
-            expectedSource: "persisted",
-            expectedSize: kSmallerSize,
-            expectedTechnique: kChunkSamplingMethod,
-        });
-
-        const ceSamplingMetadata = getJoinSamplingMetadata();
-        for (const coll of [orders, products]) {
-            const meta = ceSamplingMetadata[coll.getFullName()];
-            assertSampleMetadata(meta, {
-                expectedSource: "persisted",
-                expectedSize: kSmallerSize,
                 expectedTechnique: kChunkSamplingMethod,
             });
         }

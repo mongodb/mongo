@@ -1,6 +1,5 @@
 /**
- * Tests that the analyze command with mode: "sample" persists a sample whose size, sampling
- * method and chunk count are taken from the corresponding query knobs.
+ * Tests that the analyze command with mode: "sample" persists a sample with the right attributes
  *
  * @tags: [
  *   # Requires featureFlagPersistentStats for persisted samples.
@@ -32,7 +31,6 @@ const coll = db[collName];
 const samplesColl = PersistentSamplesUtils.getSamplesColl(db);
 
 const defaultSampleSize = PersistentSamplesUtils.defaultSampleSize(db);
-const defaultNumChunks = PersistentSamplesUtils.defaultNumChunks(db);
 const defaultPersistedSampleSize = PersistentSamplesUtils.expectedPersistedSampleSize(db);
 
 function cleanup() {
@@ -70,7 +68,6 @@ insertDocs(20);
     assert.commandWorked(
         PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
             sampleSize: 10,
-            samplingMethod: "random",
         }),
     );
     PersistentSamplesUtils.validatePersistentSample(db, {
@@ -90,7 +87,6 @@ insertDocs(20);
     assert.commandWorked(
         PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
             sampleSize: 100,
-            samplingMethod: "random",
         }),
     );
     PersistentSamplesUtils.validatePersistentSample(db, {
@@ -111,7 +107,6 @@ insertDocs(20);
     assert.commandWorked(
         PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
             sampleSize: 10,
-            samplingMethod: "random",
         }),
     );
     const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
@@ -124,7 +119,6 @@ insertDocs(20);
     assert.commandWorked(
         PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
             sampleSize: 10,
-            samplingMethod: "random",
         }),
     );
     const secondPages = PersistentSamplesUtils.validatePersistentSample(db, {
@@ -265,7 +259,6 @@ assert.commandWorked(db.createCollection(collName));
     assert.commandWorked(
         PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
             sampleSize: 10,
-            samplingMethod: "random",
         }),
     );
     PersistentSamplesUtils.validatePersistentSample(db, {
@@ -343,7 +336,6 @@ insertDocs(500);
     assert.commandWorked(
         PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
             sampleSize: overrideSize,
-            samplingMethod: "random",
         }),
     );
     PersistentSamplesUtils.validatePersistentSample(db, {
@@ -390,41 +382,6 @@ for (const enableJoinOptimization of [true, false]) {
     }
 }
 
-// =============================================================================
-// internalQuerySamplingCEMethodForPersistentSamples and
-// internalQueryNumChunksForChunkBasedSampling knobs
-// =============================================================================
-
-// Confirms the persisted method and chunk count track their knobs rather than hardcoded
-// defaults, so both are set to non-default values here.
-cleanup();
-insertDocs(20);
-{
-    const sampleSize = 10;
-    const numChunks = 5;
-    assert.neq(
-        numChunks,
-        defaultNumChunks,
-        "numChunks must differ from the default for this test to be meaningful",
-    );
-    assert.commandWorked(
-        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
-            sampleSize: sampleSize,
-            samplingMethod: "chunk",
-            numChunks: numChunks,
-        }),
-    );
-    PersistentSamplesUtils.validatePersistentSample(db, {
-        sampledCollName: collName,
-        samplingMethod: "chunk",
-        requestedSampleSize: sampleSize,
-        actualSampleSize: sampleSize,
-        numChunks: numChunks,
-        expectedSchemaVersion: expectedSchemaVersion,
-        expectedFields: sourceDocFields,
-    });
-}
-
 // Invalid mode values/types fail to parse.
 cleanup();
 insertDocs(20);
@@ -461,34 +418,13 @@ assert.commandFailedWithCode(
 db[tsCollName].drop();
 
 // =============================================================================
-// Test-only sampling modes override specified samplingMethod
+// Test-only sampling modes override the default sampling method
 // =============================================================================
 
 // Enable internalQuerySamplingBySequentialScan
 assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}),
 );
-
-// Chunk sample when internalQuerySamplingBySequentialScan is enabled
-cleanup();
-insertDocs(20);
-{
-    const sampleSize = 10;
-    assert.commandWorked(
-        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
-            sampleSize: sampleSize,
-            samplingMethod: "chunk",
-        }),
-    );
-    PersistentSamplesUtils.validatePersistentSample(db, {
-        sampledCollName: collName,
-        samplingMethod: "seqScan",
-        requestedSampleSize: sampleSize,
-        actualSampleSize: sampleSize,
-        expectedSchemaVersion: expectedSchemaVersion,
-        expectedFields: sourceDocFields,
-    });
-}
 
 // Random sample when internalQuerySamplingBySequentialScan is enabled
 cleanup();
@@ -498,7 +434,6 @@ insertDocs(20);
     assert.commandWorked(
         PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
             sampleSize: sampleSize,
-            samplingMethod: "random",
         }),
     );
     PersistentSamplesUtils.validatePersistentSample(db, {
@@ -522,7 +457,6 @@ insertDocs(20);
     assert.commandWorked(
         PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
             sampleSize: sampleSize,
-            samplingMethod: "random",
         }),
     );
     PersistentSamplesUtils.validatePersistentSample(db, {
@@ -540,27 +474,6 @@ assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}),
 );
 
-// Chunk sample when internalQuerySamplingByStrides is enabled
-cleanup();
-insertDocs(20);
-{
-    const sampleSize = 10;
-    assert.commandWorked(
-        PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
-            sampleSize: sampleSize,
-            samplingMethod: "chunk",
-        }),
-    );
-    PersistentSamplesUtils.validatePersistentSample(db, {
-        sampledCollName: collName,
-        samplingMethod: "strides",
-        requestedSampleSize: sampleSize,
-        actualSampleSize: sampleSize,
-        expectedSchemaVersion: expectedSchemaVersion,
-        expectedFields: sourceDocFields,
-    });
-}
-
 // Random sample when internalQuerySamplingByStrides is enabled
 cleanup();
 insertDocs(20);
@@ -569,7 +482,6 @@ insertDocs(20);
     assert.commandWorked(
         PersistentSamplesUtils.runAnalyzeSampleWithKnobs(db, collName, {
             sampleSize: sampleSize,
-            samplingMethod: "random",
         }),
     );
     PersistentSamplesUtils.validatePersistentSample(db, {
