@@ -2374,6 +2374,10 @@ DbResponse makeCommandResponse(const HandleRequest::ExecutionContext& execContex
         generateErrorResponse(
             opCtx, errorReplyBuilder, ex.toStatus(), metadataBob.obj(), extraFieldsBuilder.obj());
         dbResponse.response = errorReplyBuilder->done();
+        // The successful reply was replaced by an error, so the exhaust stream must end here.
+        // Otherwise the error would be sent with moreToCome and the command would run again.
+        dbResponse.shouldRunAgainForExhaust = false;
+        dbResponse.nextInvocation = boost::none;
     }
     CurOp::get(opCtx)->debug().responseLength = dbResponse.response.header().dataLen();
 
