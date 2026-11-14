@@ -154,6 +154,194 @@ TEST_F(SbeTimeseriesTest, TestMatch) {
     runTest(std::move(projectNode), BSONArray(fromjson("[{ a: 101, tag: 'B'}]")));
 }
 
+TEST_F(SbeTimeseriesTest, TestMatchAndOfFourConditions) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(bucketWithMeta1), BSON_ARRAY(bucketWithMeta2)};
+    auto vsNode =
+        std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
+
+    // Each condition rejects at least one measurement; only {_id: 3, a: 100} satisfies all four:
+    //  - 'time' rejects {_id: 0}
+    //  - 'a' >= 1 rejects {_id: 1}
+    //  - 'a' < 101 rejects {_id: 4}
+    //  - '_id' > 2 rejects the remaining ones from the first bucket.
+    BSONObj query = fromjson(R"({$and: [
+        {time: {$gt: {$date: "2025-01-20T00:00:00.000Z"}}},
+        {a: {$gte: 1}},
+        {a: {$lt: 101}},
+        {_id: {$gt: 2}}
+    ]})");
+    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, _expCtx));
+
+    auto unpackNode = std::make_unique<UnpackTsBucketNode>(
+        std::move(vsNode),
+        timeseries::BucketSpec{"time" /* timeField */,
+                               std::string("tag") /* metaField */,
+                               {"_id", "a", "time"} /* fields */,
+                               timeseries::BucketSpec::Behavior::kInclude},
+        std::move(matchExpr),
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/true);
+
+    auto projectNode = makeProjNode<ProjectionNodeDefault>(
+        _expCtx, std::move(unpackNode), BSON("a" << 1 << "tag" << 1 << "_id" << 0));
+
+    runTest(std::move(projectNode), BSONArray(fromjson("[{ a: 100, tag: 'B'}]")));
+}
+
+TEST_F(SbeTimeseriesTest, TestMatchOrOfFourConditions) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(bucketWithMeta1), BSON_ARRAY(bucketWithMeta2)};
+    auto vsNode =
+        std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
+
+    // {_id: 0} is accepted by 'time', {_id: 3} by '_id', {_id: 4} by 'a > 100'; the 'a < 0'
+    // condition is never true, and {_id: 1} is rejected by all of them.
+    BSONObj query = fromjson(R"({$or: [
+        {time: {$lt: {$date: "2025-01-14T00:00:00.000Z"}}},
+        {_id: 3},
+        {a: {$gt: 100}},
+        {a: {$lt: 0}}
+    ]})");
+    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, _expCtx));
+
+    auto unpackNode = std::make_unique<UnpackTsBucketNode>(
+        std::move(vsNode),
+        timeseries::BucketSpec{"time" /* timeField */,
+                               std::string("tag") /* metaField */,
+                               {"_id", "a", "time"} /* fields */,
+                               timeseries::BucketSpec::Behavior::kInclude},
+        std::move(matchExpr),
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/true);
+
+    auto projectNode = makeProjNode<ProjectionNodeDefault>(
+        _expCtx, std::move(unpackNode), BSON("a" << 1 << "tag" << 1 << "_id" << 0));
+
+    runTest(std::move(projectNode),
+            BSONArray(fromjson("[{a: 9, tag: 'A'}, {a: 100, tag: 'B'}, {a: 101, tag: 'B'}]")));
+}
+
+TEST_F(SbeTimeseriesTest, TestMatchTwoAndWithFirstConditionEvaluatingNothing) {
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(bucketWithNoMeta1), BSON_ARRAY(bucketWithNoMeta2)};
+    auto vsNode =
+        std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
+
+    // 'd.a.b' is missing (so the first condition evaluates to Nothing) in all measurements.
+    BSONObj query = fromjson(R"({$and: [
+        {a: {$gte: "string"}},
+        {a: {$gt: 1}}
+    ]})");
+    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, _expCtx));
+
+    auto unpackNode = std::make_unique<UnpackTsBucketNode>(
+        std::move(vsNode),
+        timeseries::BucketSpec{"time" /* timeField */,
+                               boost::none /* metaField */,
+                               {"a", "b", "time"} /* fields */,
+                               timeseries::BucketSpec::Behavior::kInclude},
+        std::move(matchExpr),
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/false);
+
+    auto projectNode = makeProjNode<ProjectionNodeDefault>(
+        _expCtx, std::move(unpackNode), BSON("a" << 1 << "_id" << 0));
+
+    runTest(std::move(projectNode), BSONArray());
+}
+
+TEST_F(SbeTimeseriesTest, TestMatchFourAndWithFirstConditionEvaluatingNothing) {
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(bucketWithNoMeta1), BSON_ARRAY(bucketWithNoMeta2)};
+    auto vsNode =
+        std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
+
+    // 'd.a.b' is missing (so the first condition evaluates to Nothing) in all measurements.
+    BSONObj query = fromjson(R"({$and: [
+        {a: {$gte: "string"}},
+        {a: {$gt: 1}},
+        {a: {$lt: 30}},
+        {time: {$gt: {$date: "2025-02-05T19:59:30.000Z"}}}
+    ]})");
+    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, _expCtx));
+
+    auto unpackNode = std::make_unique<UnpackTsBucketNode>(
+        std::move(vsNode),
+        timeseries::BucketSpec{"time" /* timeField */,
+                               boost::none /* metaField */,
+                               {"a", "b", "time"} /* fields */,
+                               timeseries::BucketSpec::Behavior::kInclude},
+        std::move(matchExpr),
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/false);
+
+    auto projectNode = makeProjNode<ProjectionNodeDefault>(
+        _expCtx, std::move(unpackNode), BSON("a" << 1 << "_id" << 0));
+
+    runTest(std::move(projectNode), BSONArray());
+}
+
+TEST_F(SbeTimeseriesTest, TestMatchFourAndWithSecondConditionEvaluatingNothing) {
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(bucketWithNoMeta1), BSON_ARRAY(bucketWithNoMeta2)};
+    auto vsNode =
+        std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
+
+    // 'd.a.b' is missing (so the first condition evaluates to Nothing) in all measurements.
+    BSONObj query = fromjson(R"({$and: [
+        {a: {$gt: 1}},
+        {a: {$gte: "string"}},
+        {a: {$lt: 30}},
+        {time: {$gt: {$date: "2025-02-05T19:59:30.000Z"}}}
+    ]})");
+    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, _expCtx));
+
+    auto unpackNode = std::make_unique<UnpackTsBucketNode>(
+        std::move(vsNode),
+        timeseries::BucketSpec{"time" /* timeField */,
+                               boost::none /* metaField */,
+                               {"a", "b", "time"} /* fields */,
+                               timeseries::BucketSpec::Behavior::kInclude},
+        std::move(matchExpr),
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/false);
+
+    auto projectNode = makeProjNode<ProjectionNodeDefault>(
+        _expCtx, std::move(unpackNode), BSON("a" << 1 << "_id" << 0));
+
+    runTest(std::move(projectNode), BSONArray());
+}
+
+TEST_F(SbeTimeseriesTest, TestMatchFourAndWithLastConditionEvaluatingNothing) {
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(bucketWithNoMeta1), BSON_ARRAY(bucketWithNoMeta2)};
+    auto vsNode =
+        std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
+
+    // 'd.a.b' is missing (so the first condition evaluates to Nothing) in all measurements.
+    BSONObj query = fromjson(R"({$and: [
+        {a: {$gt: 1}},
+        {a: {$lt: 30}},
+        {time: {$gt: {$date: "2025-02-05T19:59:30.000Z"}}},
+        {a: {$gte: "string"}}
+    ]})");
+    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, _expCtx));
+
+    auto unpackNode = std::make_unique<UnpackTsBucketNode>(
+        std::move(vsNode),
+        timeseries::BucketSpec{"time" /* timeField */,
+                               boost::none /* metaField */,
+                               {"a", "b", "time"} /* fields */,
+                               timeseries::BucketSpec::Behavior::kInclude},
+        std::move(matchExpr),
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/false);
+
+    auto projectNode = makeProjNode<ProjectionNodeDefault>(
+        _expCtx, std::move(unpackNode), BSON("a" << 1 << "_id" << 0));
+
+    runTest(std::move(projectNode), BSONArray());
+}
+
 TEST_F(SbeTimeseriesTest, TestCount) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(bucketWithMeta1), BSON_ARRAY(bucketWithMeta2)};
     auto vsNode =

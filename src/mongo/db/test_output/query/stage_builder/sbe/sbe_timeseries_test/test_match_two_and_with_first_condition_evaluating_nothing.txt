@@ -1,0 +1,9 @@
+# Golden test output of SbeTimeseriesTest/TestMatchTwoAndWithFirstConditionEvaluatingNothing
+$$RESULT=s11 env: { s9 = Nothing (nothing) }
+[3] project [s11 = newBsonObj("a", s10)] 
+[2] block_to_row blocks[s4] row[s10] s8 
+[2] filter {!(valueBlockNone(s8, true))} 
+[2] project [s8 = valueBlockLogicalAnd(s3, valueBlockLogicalAnd(cellFoldValues_F(valueBlockFillEmpty(valueBlockGteScalar(cellBlockGetFlatValuesBlock(s7), "string"), false), s7), cellFoldValues_F(valueBlockFillEmpty(valueBlockGtScalar(cellBlockGetFlatValuesBlock(s7), 1), false), s7)))] 
+[2] ts_bucket_to_cellblock s2 pathReqs[s4 = ProjectPath(Get(a)/Id), s5 = ProjectPath(Get(b)/Id), s6 = ProjectPath(Get(time)/Id), s7 = FilterPath(Get(a)/Traverse/Id)] bitmap = s3 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"_id" : bsonObjectId("64a5cb841ade1be79f4cc8c7"), "control" : {"version" : 1}, "data" : {"a" : {"0" : 11, "1" : 22, "2" : 33}, "b" : {"0" : {"a" : {"a" : 1, "b" : 2}}, "2" : {"a" : {...}}}, "time" : {"0" : Date(1738785568339), "1" : Date(1738785578396), "2" : Date(1738785590772)}}}], [{"_id" : bsonObjectId("64a5cb841ade1be79f4cc8c7"), "control" : {"version" : 1}, "data" : {"a" : {"0" : 1, "1" : 2, "2" : 3}, "b" : {"0" : {"a" : {...}}, "1" : {...}, ...}, "time" : {"0" : Date(1738871968339), "1" : Date(1738871978396), "2" : Date(1738871990772)}}}]]} 

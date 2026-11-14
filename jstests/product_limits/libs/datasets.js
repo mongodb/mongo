@@ -492,3 +492,31 @@ export class DatasetSharded extends DatasetManyFields {
         this.shardedTest.stop();
     }
 }
+export class DatasetTimeseriesOneField extends Dataset {
+    workloads() {
+        return [
+            OperatorWorkloads.WorkloadSwitchOneFieldManyDocs,
+            MatchWorkloads.WorkloadAndOverSingleFieldWithInclusionProjection,
+            MatchWorkloads.WorkloadAndPlusOrOverSingleFieldWithInclusionProjection,
+            MatchWorkloads.WorkloadInWithInclusionProjection,
+            MatchWorkloads.WorkloadOrOverSingleFieldWithInclusionProjection,
+            MatchWorkloads.WorkloadOrPlusAndOverSingleFieldWithInclusionProjection,
+        ];
+    }
+
+    populate(db) {
+        assert.commandWorked(
+            db.createCollection(this.collection(), {
+                timeseries: {timeField: "t", metaField: "m"},
+            }),
+        );
+        const coll = db.getCollection(this.collection());
+        for (let i = 0; i < this.scale(); i++) {
+            assert.commandWorked(coll.insert({t: new Date(i), m: 0, f0: i}));
+        }
+    }
+
+    data() {
+        return range(this.scale()).map((i) => ({f0: i}));
+    }
+}

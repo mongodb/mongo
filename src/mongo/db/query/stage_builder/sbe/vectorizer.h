@@ -101,15 +101,12 @@ public:
 
 private:
     // Helper function that encapsulates the logic to vectorize And/Or statement.
-    template <typename Lhs, typename Rhs>
-    Tree vectorizeLogicalOp(abt::Operations opType, Lhs lhsNode, Rhs rhsNode);
+    template <typename OperandsArray>
+    Tree vectorizeLogicalOp(abt::Operations opType, const OperandsArray& nodes);
 
     // Helper function that encapsulates the logic to vectorize arithmetic operations.
     template <typename Lhs, typename Rhs>
     Tree vectorizeArithmeticOp(abt::Operations opType, Lhs lhsNode, Rhs rhsNode);
-
-    // Helper function that allows the recursive transformation of a N-ary statement.
-    Tree vectorizeNaryHelper(const abt::NaryOp& op, size_t argIdx);
 
     // Helper function that encapsules the logic to vectorize an If statement.
     template <typename Cond, typename Then, typename Else>

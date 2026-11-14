@@ -73,17 +73,15 @@ void Vectorizer::foldIfNecessary(Tree& tree, bool useFoldF) {
 abt::ABT Vectorizer::generateMaskArg() {
     if (_activeMasks.empty()) {
         return abt::Constant::nothing();
+    } else if (_activeMasks.size() == 1) {
+        return makeVariable(_activeMasks.front());
     }
-    boost::optional<abt::ABT> tree;
+    abt::ABTVector args;
+    args.reserve(_activeMasks.size());
     for (const auto& var : _activeMasks) {
-        if (!tree.has_value()) {
-            tree = makeVariable(var);
-        } else {
-            tree = makeABTFunction(
-                sbe::EFn::kValueBlockLogicalAnd, std::move(*tree), makeVariable(var));
-        }
+        args.emplace_back(makeVariable(var));
     }
-    return std::move(*tree);
+    return makeABTFunction(sbe::EFn::kValueBlockLogicalAnd, std::move(args));
 }
 
 abt::ProjectionName Vectorizer::generateLocalVarName() {
@@ -126,9 +124,11 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::Variable& 
     return {n, TypeSignature::kAnyScalarType, {}};
 }
 
-template <typename Lhs, typename Rhs>
-Vectorizer::Tree Vectorizer::vectorizeLogicalOp(abt::Operations opType, Lhs lhsNode, Rhs rhsNode) {
-    Tree lhs = lhsNode();
+template <typename OperandsArray>
+Vectorizer::Tree Vectorizer::vectorizeLogicalOp(abt::Operations opType,
+                                                const OperandsArray& nodes) {
+    // Process the first child node.
+    Tree lhs = nodes[0].visit(*this);
     if (!lhs.expr.has_value()) {
         return lhs;
     }
@@ -137,57 +137,80 @@ Vectorizer::Tree Vectorizer::vectorizeLogicalOp(abt::Operations opType, Lhs lhsN
     foldIfNecessary(lhs, true);
 
     if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
-        // Treat the result of the left side as the mask to be applied on the right side.
-        // This way, the right side can decide whether to skip the processing of the indexes
-        // where the left side produced a false result.
-        auto lhsVar = generateLocalVarName();
+        // The first node is a block value, all the remainder nodes must be block values too.
 
-        auto mask = opType == abt::Operations::And ? lhsVar : generateLocalVarName();
+        TypeSignature typeSignature = lhs.typeSignature;
+        std::vector<std::pair<abt::ProjectionName, abt::ABT>> operands;
+        operands.emplace_back(generateLocalVarName(), std::move(*lhs.expr));
 
-        _activeMasks.push_back(mask);
-        Tree rhs = rhsNode();
-        _activeMasks.pop_back();
-        if (!rhs.expr.has_value()) {
-            return rhs;
+        // Keep track of the logical operands (excluding the variables used as masks).
+        std::vector<abt::ProjectionName> logicalOperands;
+        logicalOperands.push_back(operands.back().first);
+
+        size_t numMasks = _activeMasks.size();
+        // Process all the operands, reject vectorization of vector vs scalar.
+        for (size_t i = 1; i < nodes.size(); i++) {
+            // Accumulate all the operands into a mask variable. For AND operations, the operand
+            // itself operates also as the mask for the following operands. For OR operations,
+            // we need to compute the mask by negating the previous operand. This way, the
+            // current operand can decide whether to skip the processing of the indexes where
+            // one of the previous operands produced a false result.
+            if (opType == abt::Operations::Or) {
+                operands.emplace_back(std::make_pair(
+                    generateLocalVarName(),
+                    makeABTFunction(sbe::EFn::kValueBlockLogicalNot,
+                                    makeABTFunction(sbe::EFn::kValueBlockFillEmpty,
+                                                    makeVariable(operands.back().first),
+                                                    abt::Constant::boolean(false)))));
+            }
+            _activeMasks.push_back(operands.back().first);
+
+            Tree rhs = nodes[i].visit(*this);
+            if (!rhs.expr.has_value() || !TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                while (_activeMasks.size() > numMasks) {
+                    _activeMasks.pop_back();
+                }
+                return {{}, TypeSignature::kAnyScalarType, {}};
+            }
+            foldIfNecessary(rhs, true);
+            typeSignature = TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                                .include(typeSignature.include(rhs.typeSignature)
+                                             .intersect(TypeSignature::kNothingType));
+            operands.emplace_back(generateLocalVarName(), std::move(*rhs.expr));
+            logicalOperands.push_back(operands.back().first);
         }
-        foldIfNecessary(rhs, true);
-
-        if (TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
-            return {opType == abt::Operations::And
-                        ? makeLet(lhsVar,
-                                  std::move(*lhs.expr),
-                                  makeABTFunction(sbe::EFn::kValueBlockLogicalAnd,
-                                                  makeVariable(lhsVar),
-                                                  std::move(*rhs.expr)))
-                        : makeLet(lhsVar,
-                                  std::move(*lhs.expr),
-                                  makeLet(mask,
-                                          makeABTFunction(
-                                              sbe::EFn::kValueBlockLogicalNot,
-                                              makeABTFunction(sbe::EFn::kValueBlockFillEmpty,
-                                                              makeVariable(lhsVar),
-                                                              abt::Constant::boolean(false))),
-                                          makeABTFunction(sbe::EFn::kValueBlockLogicalOr,
-                                                          makeVariable(lhsVar),
-                                                          std::move(*rhs.expr)))),
-                    TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
-                        .include(lhs.typeSignature.include(rhs.typeSignature)
-                                     .intersect(TypeSignature::kNothingType)),
-                    {}};
+        while (_activeMasks.size() > numMasks) {
+            _activeMasks.pop_back();
         }
+
+        abt::ABTVector args;
+        args.reserve(logicalOperands.size());
+        for (auto& var : logicalOperands) {
+            args.emplace_back(makeVariable(var));
+        }
+        abt::ABT expr =
+            makeABTFunction(opType == abt::Operations::And ? sbe::EFn::kValueBlockLogicalAnd
+                                                           : sbe::EFn::kValueBlockLogicalOr,
+                            std::move(args));
+        return {abt::make<abt::MultiLet>(std::move(operands), std::move(expr)), typeSignature, {}};
     } else {
-        Tree rhs = rhsNode();
-        if (!rhs.expr.has_value()) {
-            return rhs;
+        // The first node is a scalar value, all the remainder nodes must be scalars too.
+        TypeSignature typeSignature = lhs.typeSignature;
+        abt::ABTVector operands;
+        operands.emplace_back(std::move(*lhs.expr));
+
+        // Process all the operands, reject vectorization of scalar vs vector.
+        for (size_t i = 1; i < nodes.size(); i++) {
+            Tree rhs = nodes[i].visit(*this);
+            if (!rhs.expr.has_value() || TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                return {{}, TypeSignature::kAnyScalarType, {}};
+            }
+            typeSignature = TypeSignature::kBooleanType.include(
+                typeSignature.include(rhs.typeSignature).intersect(TypeSignature::kNothingType));
+            operands.emplace_back(std::move(*rhs.expr));
         }
-        // Preserve scalar operation, reject vectorization of scalar vs vector.
-        if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
-            return {
-                make<abt::BinaryOp>(opType, std::move(*lhs.expr), std::move(*rhs.expr)),
-                TypeSignature::kBooleanType.include(lhs.typeSignature.include(rhs.typeSignature)
-                                                        .intersect(TypeSignature::kNothingType)),
-                {}};
-        }
+
+        return {abt::make<abt::NaryOp>(opType, std::move(operands)), typeSignature, {}};
     }
     return {{}, TypeSignature::kAnyScalarType, {}};
 }
@@ -451,10 +474,10 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::BinaryOp& 
         }
         case abt::Operations::And:
         case abt::Operations::Or: {
-            return vectorizeLogicalOp(
-                op.op(),
-                [&]() { return op.getLeftChild().visit(*this); },
-                [&]() { return op.getRightChild().visit(*this); });
+            std::vector<abt::ABT> nodes;
+            nodes.emplace_back(op.getLeftChild().ref());
+            nodes.emplace_back(op.getRightChild().ref());
+            return vectorizeLogicalOp(op.op(), std::move(nodes));
             break;
         }
         case abt::Operations::Add:
@@ -474,42 +497,19 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::BinaryOp& 
     return {{}, TypeSignature::kAnyScalarType, {}};
 }
 
-Vectorizer::Tree Vectorizer::vectorizeNaryHelper(const abt::NaryOp& op, size_t argIdx) {
-    // Verify that we have at least 2 items to process.
-    tassert(10199602, "index out of range", argIdx < op.nodes().size() - 1);
-    // Only the And/Or logical operations are supported here. Add/Mult must not be handled by this
-    // helper because its right-nested recursion does not preserve their left-associative
-    // evaluation order (see operator()(const abt::NaryOp&) below).
-    switch (op.op()) {
-        case abt::Operations::And:
-        case abt::Operations::Or: {
-            auto lhsNode = [&]() {
-                return op.nodes()[argIdx].visit(*this);
-            };
-            auto rhsNode = [&]() {
-                // If this is the last item, process it directly, otherwise recurse simulating
-                // the presence of a nested logical operation.
-                size_t rhsIdx = argIdx + 1;
-                return (rhsIdx == op.nodes().size() - 1) ? op.nodes()[rhsIdx].visit(*this)
-                                                         : vectorizeNaryHelper(op, rhsIdx);
-            };
-            return vectorizeLogicalOp(op.op(), lhsNode, rhsNode);
-        }
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
 Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::NaryOp& op) {
     switch (op.op()) {
         case abt::Operations::And:
         case abt::Operations::Or:
-            // Keep the original right-nested recursion to preserve operand order and short-circuit
-            // evaluation; vectorizeLogicalOp() treats the result of the left side as the mask to be
-            // applied when processing the right side.
-            return vectorizeNaryHelper(op, 0);
+            return vectorizeLogicalOp(op.op(), op.nodes());
         case abt::Operations::Add:
         case abt::Operations::Mult: {
+            // Avoid generating deep recursive trees.
+            if (op.nodes().size() >
+                static_cast<size_t>(
+                    internalQuerySlotBasedExecutionBlockProcessingMaxRecursiveOpArgs.load())) {
+                return {{}, TypeSignature::kAnyScalarType, {}};
+            }
             // Add and Mult are only left-associative: the scalar SBE VM and the ABT constant
             // folder both evaluate them by combining the operands from left to right, and a
             // different order can produce different results due to type promotion rules and
@@ -979,13 +979,15 @@ Vectorizer::Tree Vectorizer::vectorizeCond(Cond condNode, Then thenNode, Else el
     auto blockify = [](Tree& tree, const std::list<abt::ProjectionName>& bitmapVars) {
         if (!TypeSignature::kBlockType.isSubset(tree.typeSignature)) {
             boost::optional<abt::ABT> bitmapExpr;
-            for (const auto& var : bitmapVars) {
-                if (!bitmapExpr.has_value()) {
-                    bitmapExpr = makeVariable(var);
-                } else {
-                    bitmapExpr = makeABTFunction(
-                        sbe::EFn::kValueBlockLogicalAnd, std::move(*bitmapExpr), makeVariable(var));
+            if (bitmapVars.size() == 1) {
+                bitmapExpr = makeVariable(bitmapVars.front());
+            } else {
+                abt::ABTVector args;
+                args.reserve(bitmapVars.size());
+                for (const auto& var : bitmapVars) {
+                    args.emplace_back(makeVariable(var));
                 }
+                bitmapExpr = makeABTFunction(sbe::EFn::kValueBlockLogicalAnd, std::move(args));
             }
 
             if (!tree.expr->cast<abt::Constant>()) {
@@ -1185,6 +1187,12 @@ Vectorizer::Tree Vectorizer::vectorizeSwitchHelper(const abt::Switch& op, size_t
 }
 
 Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::Switch& op) {
+    // Avoid generating deep recursive trees.
+    if (op.getNumBranches() >
+        static_cast<size_t>(
+            internalQuerySlotBasedExecutionBlockProcessingMaxRecursiveOpArgs.load())) {
+        return {{}, TypeSignature::kAnyScalarType, {}};
+    }
     // A switch is syntactic sugar for if(cond0) then then0 else (if (cond1) then then1 else (...)).
     // We process it using recursion so that we don't risk to generate a vectorized code that
     // processes a branch on a value that has been guarded by a previous "if" branch.

@@ -2228,24 +2228,13 @@ template <int op>
 value::TagValueMaybeOwned ByteCode::builtinValueBlockLogicalOperation(ArityType arity) {
     static_assert(op >= 0 && op <= 1, "op should be either 0 or 1");
 
-    tassert(11079908, "Unexpected arity value", arity == 2);
+    tassert(11079908, "Unexpected arity value", arity >= 2);
     auto leftInput = viewFromStack(0);
     tassert(8625714,
-            "Expected 'left' argument to be of valueBlock type",
+            "Expected first argument to be of valueBlock type",
             leftInput.tag == value::TypeTags::valueBlock);
-    auto* leftValueBlock = value::bitcastTo<value::ValueBlock*>(leftInput.value);
 
-    auto rightInput = viewFromStack(1);
-    tassert(8625715,
-            "Expected 'right' argument to be of valueBlock type",
-            rightInput.tag == value::TypeTags::valueBlock);
-    auto* rightValueBlock = value::bitcastTo<value::ValueBlock*>(rightInput.value);
-
-    auto leftBlockSize = leftValueBlock->count();
-    auto rightBlockSize = rightValueBlock->count();
-
-    tassert(8649600, "Mismatch on size", leftBlockSize == rightBlockSize);
-    tassert(8625712, "Expected bitmap vectors to be non-empty", leftBlockSize > 0);
+    value::TagValueMaybeOwned leftValue(false, leftInput.tag, leftInput.value);
 
     auto outputLeft = [](value::TypeTags lTag, value::Value lValue) -> bool {
         if constexpr (static_cast<int>(LogicalOp::AND) == op) {
@@ -2254,47 +2243,58 @@ value::TagValueMaybeOwned ByteCode::builtinValueBlockLogicalOperation(ArityType 
             return (lTag == value::TypeTags::Boolean && value::bitcastTo<bool>(lValue));
         }
     };
-
-    if (auto leftMonoBlock = leftValueBlock->as<value::MonoBlock>(); leftMonoBlock) {
-        // If the first item is a Nothing, the answer is always Nothing.
-        if (leftMonoBlock->getTag() == value::TypeTags::Nothing) {
-            auto nothingBlock =
-                std::make_unique<value::MonoBlock>(leftBlockSize, value::TypeTags::Nothing, 0);
-            return value::TagValueMaybeOwned(
-                true,
-                value::TypeTags::valueBlock,
-                value::bitcastFrom<value::ValueBlock*>(nothingBlock.release()));
-        }
-
-        if (outputLeft(leftMonoBlock->getTag(), leftMonoBlock->getValue())) {
-            return moveMaybeOwnedFromStack(0);
-        } else {
-            return moveMaybeOwnedFromStack(1);
+    if (arity == 2) {
+        auto* leftValueBlock = value::bitcastTo<value::ValueBlock*>(leftValue.value());
+        if (auto leftMonoBlock = leftValueBlock->as<value::MonoBlock>(); leftMonoBlock) {
+            // If the first item is a Nothing, the answer is always Nothing.
+            if (leftMonoBlock->getTag() == value::TypeTags::Nothing ||
+                outputLeft(leftMonoBlock->getTag(), leftMonoBlock->getValue())) {
+                return moveMaybeOwnedFromStack(0);
+            } else {
+                return moveMaybeOwnedFromStack(1);
+            }
         }
     }
 
-    auto left = leftValueBlock->extract();
-    auto right = rightValueBlock->extract();
+    // Process all the operands in sequence.
+    for (size_t idx = 1; idx < arity; idx++) {
+        auto* leftValueBlock = value::bitcastTo<value::ValueBlock*>(leftValue.value());
+        auto rightInput = viewFromStack(idx);
+        tassert(8625715,
+                str::stream() << "Expected " << idx << " argument to be of valueBlock type",
+                rightInput.tag == value::TypeTags::valueBlock);
+        auto* rightValueBlock = value::bitcastTo<value::ValueBlock*>(rightInput.value);
 
-    std::vector<value::TypeTags> tagsOut(leftBlockSize, value::TypeTags::Nothing);
-    std::vector<value::Value> valuesOut(leftBlockSize, 0);
+        auto leftBlockSize = leftValueBlock->count();
+        auto rightBlockSize = rightValueBlock->count();
 
-    for (size_t i = 0; i < leftBlockSize; ++i) {
-        if (left.tags()[i] == value::TypeTags::Nothing) {
-            continue;
+        tassert(8649600, "Mismatch on size", leftBlockSize == rightBlockSize);
+        tassert(8625712, "Expected bitmap vectors to be non-empty", leftBlockSize > 0);
+
+        auto left = leftValueBlock->extract();
+        auto right = rightValueBlock->extract();
+
+        std::vector<value::TypeTags> tagsOut(leftBlockSize, value::TypeTags::Nothing);
+        std::vector<value::Value> valuesOut(leftBlockSize, 0);
+
+        for (size_t i = 0; i < leftBlockSize; ++i) {
+            if (left.tags()[i] == value::TypeTags::Nothing) {
+                continue;
+            }
+            auto [resTag, resVal] = outputLeft(left.tags()[i], left.vals()[i])
+                ? std::pair(left.tags()[i], left.vals()[i])
+                : value::copyValue(right.tags()[i], right.vals()[i]);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
         }
-        auto [resTag, resVal] = outputLeft(left.tags()[i], left.vals()[i])
-            ? std::pair(left.tags()[i], left.vals()[i])
-            : value::copyValue(right.tags()[i], right.vals()[i]);
-        tagsOut[i] = resTag;
-        valuesOut[i] = resVal;
+
+        auto blockOut = buildBlockFromStorage(std::move(tagsOut), std::move(valuesOut));
+        leftValue =
+            value::TagValueMaybeOwned(true,
+                                      value::TypeTags::valueBlock,
+                                      value::bitcastFrom<value::ValueBlock*>(blockOut.release()));
     }
-
-    auto blockOut = buildBlockFromStorage(std::move(tagsOut), std::move(valuesOut));
-
-    return value::TagValueMaybeOwned(true,
-                                     value::TypeTags::valueBlock,
-                                     value::bitcastFrom<value::ValueBlock*>(blockOut.release()));
+    return leftValue;
 }
 
 value::TagValueMaybeOwned ByteCode::builtinValueBlockLogicalAnd(ArityType arity) {
