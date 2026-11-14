@@ -12,7 +12,7 @@ format itself, refer to
 
 Objects or arrays in interleaved mode are encoded with a sequence that begins with a reference
 object, which contains a superset of all nested fields in order in the series (order is important as
-this allows us to specify delta streams across all of the elemtns). This is followed by a series of
+this allows us to specify delta streams across all of the elements). This is followed by a series of
 Simple8b blocks that contains diffs in interleaved-order across all of the fields. In order to find
 suitable objects for such a sequence, the `BSONColumnBuilder` will build the reference object
 speculatively while receiving objects, using merges as necessary to maintain a superset of fields.
@@ -95,7 +95,7 @@ cases, we can pass these deltas to Simple8b as well, and furthermore in some cas
 fit within 60 meaningful bits when we restrict the deltas to the higher order bits of the string. To
 handle this, we use extended selectors: in two of the Simple8b selectors there are 4 additional
 "leftover" bits we can use (the 7 value selector and the 8 value selector). We then use these extra
-bits to define where the delta is occuring in the 128-bit value.
+bits to define where the delta is occurring in the 128-bit value.
 
 Finally, one last selector is reserved for run-length encoding. This value indicates we should use
 the 4 extended bits to define how many blocks of 120 repeats occur in sequence.
