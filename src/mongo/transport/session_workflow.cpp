@@ -614,7 +614,8 @@ public:
     }
 
     Message compressResponse(Message msg) {
-        if (!_compressorId)
+        if (!_compressorId ||
+            msg.size() < gNetworkMessageCompressionMinResponseSizeBytes.loadRelaxed())
             return msg;
         auto cid = *_compressorId;
         return uassertStatusOK(compressorMgr().compressMessage(msg, &cid));
