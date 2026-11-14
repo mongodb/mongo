@@ -17,10 +17,8 @@
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
-#include "mongo/db/query/query_stats/query_stats_bm_util.h"
 #include "mongo/db/query/query_stats/query_stats_entry.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
-#include "mongo/db/shard_role/transaction_resources.h"
 
 #include <map>
 #include <memory>
@@ -33,13 +31,29 @@ namespace mongo {
 
 namespace {
 
-using query_stats_bm::kLargeStoreSize;
-using query_stats_bm::kSmallStoreSize;
-using query_stats_bm::makeDistinctFilter;
-using query_stats_bm::makeFindKey;
+// Two query stats store sizes.
+constexpr size_t kLargeStoreSize = 300'000;
+constexpr size_t kSmallStoreSize = 1'000;
 
 // The two stored query shapes.
 enum class ShapeKind { kSimpleFind, kNestedPipeline };
+
+/**
+ * Builds an equality filter of 'numFields' predicates named "<prefix><i>_<field>", e.g. for
+ * prefix "f_", i = 0, numFields = 10:
+ *
+ *   {f_0_0: {$eq: 1}, f_0_1: {$eq: 1}, ..., f_0_9: {$eq: 1}}
+ *
+ * Putting 'i' in the field names ensures each entry is a distinct query shape.
+ */
+BSONObj makeDistinctFilter(std::string_view prefix, size_t i, size_t numFields) {
+    BSONObjBuilder filter;
+    for (size_t field = 0; field < numFields; ++field) {
+        std::string fieldName = str::stream() << prefix << i << "_" << field;
+        filter << fieldName << BSON("$eq" << 1);
+    }
+    return filter.obj();
+}
 
 /**
  * Assembles a find command with a distinct 10-field equality filter, e.g. for i = 0:
@@ -48,9 +62,15 @@ enum class ShapeKind { kSimpleFind, kNestedPipeline };
  */
 std::unique_ptr<const query_stats::Key> makeSimpleFindKey(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, size_t i) {
-    return makeFindKey(expCtx,
-                       NamespaceString::createNamespaceString_forTest("bench.coll"),
-                       makeDistinctFilter("f_", i, 10));
+    NamespaceStringOrUUID nss{NamespaceString::createNamespaceString_forTest("bench.coll")};
+    auto fcr = std::make_unique<FindCommandRequest>(nss);
+    fcr->setFilter(makeDistinctFilter("f_", i, 10));
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+    return std::make_unique<query_stats::FindKey>(
+        expCtx,
+        *parsedFind->findCommandRequest,
+        std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx),
+        query_shape::CollectionType::kCollection);
 }
 
 /**
@@ -119,11 +139,8 @@ struct Fixture {
         opCtx = client->makeOperationContext();
 
         // Install a shard-role Locker on the opCtx to avoid failures when reading locker->stats()
-        // mid-pipeline for slow query logging. A linked client observer may already have installed
-        // one, and installing a second trips an invariant.
-        if (!shard_role_details::getLocker(opCtx.get())) {
-            opCtx->setLockState_DO_NOT_USE(std::make_unique<Locker>(opCtx->getServiceContext()));
-        }
+        // mid-pipeline for slow query logging.
+        opCtx->setLockState_DO_NOT_USE(std::make_unique<Locker>(opCtx->getServiceContext()));
 
         auto keyExpCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());
 

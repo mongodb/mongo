@@ -22,8 +22,6 @@ selector:
     - bazel-bin/**/plan_shape_counters_bm*
     - bazel-bin/**/query_settings_lookup_bm*
     - bazel-bin/**/rate_limiting_bm*
-    - bazel-bin/**/match_pushdown_bm*
-    - bazel-bin/**/query_stats_store_insert_bm*
     - bazel-bin/**/shapifying_bm*
     - bazel-bin/**/shapifying_insert_bm*
     - bazel-bin/**/shapifying_update_bm*
