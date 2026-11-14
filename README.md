@@ -68,7 +68,6 @@ This will generate RPM and Debian packages.
 ## Learn MongoDB
 
 - Documentation - https://docs.mongodb.com/manual/
-- Developer Center - https://www.mongodb.com/developer/
 - MongoDB University - https://learn.mongodb.com
 
 ## Cloud Hosted MongoDB
