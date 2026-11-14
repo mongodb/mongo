@@ -773,7 +773,6 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
             if (control == stdx::to_underlying(elementType)) {
                 return true;
             } else if (control == stdx::to_underlying(BSONType::eoo)) {
-                // TODO(SERVER-74926): check for valid encoding
                 // reached end of column
                 return false;
             }
@@ -782,8 +781,6 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
                 std::span{byteIter, columnEnd}, 1, BSONElement::TrustedInitTag{});
             byteIter += literalElem.size();
         } else if (bsoncolumn::isInterleavedStartControlByte(*byteIter)) {
-
-            // TODO SERVER-74926 add interleaved support
             uasserted(ErrorCodes::InvalidBSONColumn,
                       "Interleaved mode not yet supported for BSONColumn::contains_forTest.");
         } else { /* Simple-8b Delta Block */
