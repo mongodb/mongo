@@ -163,7 +163,7 @@ TEST_F(ContainerWriteTest, StringKeyedBatchWithIdenticalValuesEmitsSingleOplogEn
     const auto entries = getNContainerInsertEntries(1, raw);
 
     ASSERT_TRUE(entries[0].getKey().isArrayKey());
-    const auto& parsedKeys = entries[0].getKey().getArrayKey();
+    const auto& parsedKeys = entries[0].getKey().getBytesArrayKey();
     ASSERT_EQ(parsedKeys.size(), keys.size());
     for (size_t i = 0; i < parsedKeys.size(); ++i) {
         EXPECT_EQ(view(parsedKeys[i]), keys[i]);
@@ -190,7 +190,7 @@ TEST_F(ContainerWriteTest, StringKeyedBatchWithEmptyValuesOmitsValueField) {
     const auto entries = getNContainerInsertEntries(1, raw);
 
     ASSERT_TRUE(entries[0].getKey().isArrayKey());
-    ASSERT_EQ(entries[0].getKey().getArrayKey().size(), keys.size());
+    ASSERT_EQ(entries[0].getKey().getArrayKeySize(), keys.size());
     ASSERT_FALSE(entries[0].getValue().has_value());
 }
 
@@ -288,13 +288,13 @@ TEST_F(ContainerWriteTest, StringKeyedBatchWithDifferingValuesEmitsOneOplogEntry
     std::vector<BSONObj> raw;
     const auto entries = getNContainerInsertEntries(2, raw);
 
-    const auto& firstKeys = entries[0].getKey().getArrayKey();
+    const auto& firstKeys = entries[0].getKey().getBytesArrayKey();
     ASSERT_EQ(firstKeys.size(), 2u);
     EXPECT_EQ(view(firstKeys[0]), "k0");
     EXPECT_EQ(view(firstKeys[1]), "k1");
     EXPECT_EQ(view(entries[0].getValue()->data()), "v1");
 
-    const auto& secondKeys = entries[1].getKey().getArrayKey();
+    const auto& secondKeys = entries[1].getKey().getBytesArrayKey();
     ASSERT_EQ(secondKeys.size(), 2u);
     EXPECT_EQ(view(secondKeys[0]), "k2");
     EXPECT_EQ(view(secondKeys[1]), "k3");
@@ -316,13 +316,13 @@ TEST_F(ContainerWriteTest, StringKeyedBatchWithDifferingLastValueEmitsOneOplogEn
     std::vector<BSONObj> raw;
     const auto entries = getNContainerInsertEntries(2, raw);
 
-    const auto& firstKeys = entries[0].getKey().getArrayKey();
+    const auto& firstKeys = entries[0].getKey().getBytesArrayKey();
     ASSERT_EQ(firstKeys.size(), 2u);
     EXPECT_EQ(view(firstKeys[0]), "k0");
     EXPECT_EQ(view(firstKeys[1]), "k1");
     EXPECT_EQ(view(entries[0].getValue()->data()), "v1");
 
-    const auto& secondKeys = entries[1].getKey().getArrayKey();
+    const auto& secondKeys = entries[1].getKey().getBytesArrayKey();
     ASSERT_EQ(secondKeys.size(), 1u);
     EXPECT_EQ(view(secondKeys[0]), "k2");
     EXPECT_EQ(view(entries[1].getValue()->data()), "v2");

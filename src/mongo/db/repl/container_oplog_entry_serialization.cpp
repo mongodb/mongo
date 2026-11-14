@@ -45,6 +45,28 @@ void appendBinDataArray(std::string_view fieldName,
     }
 }
 
+// Unpack a BSONObject or BSONArray of NumberLong integer keys
+std::vector<int64_t> unpackNumberLongValues(const auto& arr) {
+    std::vector<int64_t> keys;
+    keys.reserve(arr.nFields());  // Pre-allocate based on number of array elements
+    std::transform(arr.begin(), arr.end(), std::back_inserter(keys), [](const BSONElement& val) {
+        uassert(ErrorCodes::TypeMismatch,
+                "Container array expected NumberLong elements",
+                val.type() == BSONType::numberLong);
+        return val.numberLong();
+    });
+    return keys;
+}
+
+void appendNumberLongArray(std::string_view fieldName,
+                           std::span<const int64_t> elems,
+                           BSONObjBuilder* builder) {
+    BSONArrayBuilder bab(builder->subarrayStart(fieldName));
+    for (const auto& elem : elems) {
+        bab.append(elem);
+    }
+}
+
 template <typename T>
 const T& assertedGet(auto&& gettable) {
     const auto* gotten = std::get_if<T>(&gettable);
@@ -59,10 +81,14 @@ const T& assertedGet(auto&& gettable) {
 
 ContainerKey ContainerKey::parse(const BSONElement& elem) {
     switch (elem.type()) {
-        case BSONType::array:
+        case BSONType::array: {
             // Pass as an embedded object to avoid reasserting the type and heap allocation from
             // Array()
+            if (elem.embeddedObject().firstElementType() == BSONType::numberLong) {
+                return ContainerKey(unpackNumberLongValues(elem.embeddedObject()));
+            }
             return ContainerKey(unpackBinDataValues(elem.embeddedObject()));
+        }
         case BSONType::numberLong:
             return ContainerKey(elem.Long());
         case BSONType::binData: {
@@ -86,6 +112,9 @@ void ContainerKey::serialize(std::string_view fieldName, BSONObjBuilder* builder
                    [&](const std::vector<std::span<const char>>& keys) {
                        appendBinDataArray(fieldName, keys, builder);
                    },
+                   [&](const std::vector<int64_t>& keys) {
+                       appendNumberLongArray(fieldName, keys, builder);
+                   },
                    [&](int64_t key) { builder->append(fieldName, key); },
                    [&](std::span<const char> key) {
                        builder->appendBinData(
@@ -95,9 +124,29 @@ void ContainerKey::serialize(std::string_view fieldName, BSONObjBuilder* builder
                _key);
 }
 
+size_t ContainerKey::getArrayKeySize() const {
+    return std::visit(
+        OverloadedVisitor{
+            [](const std::vector<std::span<const char>>& keys) { return keys.size(); },
+            [](const std::vector<int64_t>& keys) { return keys.size(); },
+            [](int64_t) {
+                masserted(13181600, "Container variant is not an array type");
+                return size_t(0);
+            },
+            [](std::span<const char>) {
+                masserted(13181601, "Container variant is not an array type");
+                return size_t(0);
+            },
+        },
+        _key);
+}
 
-const std::vector<std::span<const char>>& ContainerKey::getArrayKey() const {
+const std::vector<std::span<const char>>& ContainerKey::getBytesArrayKey() const {
     return assertedGet<std::vector<std::span<const char>>>(_key);
+}
+
+const std::vector<int64_t>& ContainerKey::getIntArrayKey() const {
+    return assertedGet<std::vector<int64_t>>(_key);
 }
 
 int64_t ContainerKey::getIntKey() const {

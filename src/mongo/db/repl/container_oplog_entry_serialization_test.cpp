@@ -14,6 +14,8 @@
 namespace mongo::repl {
 namespace {
 using namespace std::literals::string_view_literals;
+using BytesT = std::span<const char>;
+
 // Round trip tests
 TEST(ContainerOplogEntrySerializationTest, IntKeyRoundTrip) {
     ContainerKey key{int64_t{42}};
@@ -22,7 +24,8 @@ TEST(ContainerOplogEntrySerializationTest, IntKeyRoundTrip) {
     EXPECT_FALSE(key.isBytesKey());
     EXPECT_EQ(key.getIntKey(), 42);
     EXPECT_ANY_THROW(key.getBytesKey());
-    EXPECT_ANY_THROW(key.getArrayKey());
+    EXPECT_ANY_THROW(key.getBytesArrayKey());
+    EXPECT_ANY_THROW(key.getIntArrayKey());
 }
 
 // ContainerKey and ContainerVal expose the "bytes" and "array" alternatives under different member
@@ -40,17 +43,19 @@ bool isArray(const ContainerKey& c) {
 bool isArray(const ContainerVal& c) {
     return c.isArrayVal();
 }
-std::span<const char> getBytes(const ContainerKey& c) {
+BytesT getBytes(const ContainerKey& c) {
     return c.getBytesKey();
 }
-std::span<const char> getBytes(const ContainerVal& c) {
+BytesT getBytes(const ContainerVal& c) {
     return c.data();
 }
-auto getArray(const ContainerKey& c) {
-    return c.getArrayKey();
-}
-auto getArray(const ContainerVal& c) {
-    return c.getArrayVal();
+template <typename T>
+std::vector<T> getArray(const auto& c) {
+    return c.visit(OverloadedVisitor{[](const std::vector<T>& keys) { return keys; },
+                                     [](const auto&) {
+                                         masserted(13181699, "not the expected array type");
+                                         return std::vector<T>{};
+                                     }});
 }
 
 template <typename T>
@@ -62,18 +67,17 @@ TYPED_TEST_P(TypedContainerOplogEntrySerializationTest, BytesRoundTrip) {
     EXPECT_TRUE(isBytes(c));
     EXPECT_FALSE(isArray(c));
     EXPECT_EQ(std::string_view(getBytes(c).data(), getBytes(c).size()), "Hello World\0"sv);
-    EXPECT_ANY_THROW(getArray(c));
+    EXPECT_ANY_THROW(getArray<BytesT>(c));
 }
 
-TYPED_TEST_P(TypedContainerOplogEntrySerializationTest, ArrayRoundTrip) {
+TYPED_TEST_P(TypedContainerOplogEntrySerializationTest, BytesArrayRoundTrip) {
     const auto sv0 = "Hello World\0"sv;
     const auto sv1 = "World Hello\0"sv;
-    const std::vector<std::span<const char>> arr{std::span<const char>{sv0.data(), sv0.size()},
-                                                 std::span<const char>{sv1.data(), sv1.size()}};
+    const std::vector<BytesT> arr{BytesT{sv0.data(), sv0.size()}, BytesT{sv1.data(), sv1.size()}};
     TypeParam c{arr};
     EXPECT_FALSE(isBytes(c));
     EXPECT_TRUE(isArray(c));
-    auto got = getArray(c);
+    auto got = getArray<BytesT>(c);
     ASSERT_EQ(got.size(), 2u);
     EXPECT_EQ(std::string_view(got[0].data(), got[0].size()), sv0);
     EXPECT_EQ(std::string_view(got[1].data(), got[1].size()), sv1);
@@ -97,11 +101,10 @@ TYPED_TEST_P(TypedContainerOplogEntrySerializationTest, BytesSerializeRoundTrip)
 
 // Serialize an array, then parse it back out of the resulting BSON. Also exercises the array branch
 // of parse() and the appendBinDataArray helper.
-TYPED_TEST_P(TypedContainerOplogEntrySerializationTest, ArraySerializeRoundTrip) {
+TYPED_TEST_P(TypedContainerOplogEntrySerializationTest, BytesArraySerializeRoundTrip) {
     const auto sv0 = "Hello World\0"sv;
     const auto sv1 = "World Hello\0"sv;
-    std::vector<std::span<const char>> arr{std::span<const char>{sv0.data(), sv0.size()},
-                                           std::span<const char>{sv1.data(), sv1.size()}};
+    std::vector<BytesT> arr{BytesT{sv0.data(), sv0.size()}, BytesT{sv1.data(), sv1.size()}};
     TypeParam original{arr};
     BSONObjBuilder builder;
     original.serialize("f", &builder);
@@ -110,7 +113,7 @@ TYPED_TEST_P(TypedContainerOplogEntrySerializationTest, ArraySerializeRoundTrip)
     const auto parsed = TypeParam::parse(obj["f"]);
     EXPECT_TRUE(isArray(parsed));
     EXPECT_FALSE(isBytes(parsed));
-    auto got = getArray(parsed);
+    auto got = getArray<BytesT>(parsed);
     ASSERT_EQ(got.size(), 2u);
     EXPECT_EQ(std::string_view(got[0].data(), got[0].size()), sv0);
     EXPECT_EQ(std::string_view(got[1].data(), got[1].size()), sv1);
@@ -118,9 +121,9 @@ TYPED_TEST_P(TypedContainerOplogEntrySerializationTest, ArraySerializeRoundTrip)
 
 REGISTER_TYPED_TEST_SUITE_P(TypedContainerOplogEntrySerializationTest,
                             BytesRoundTrip,
-                            ArrayRoundTrip,
+                            BytesArrayRoundTrip,
                             BytesSerializeRoundTrip,
-                            ArraySerializeRoundTrip);
+                            BytesArraySerializeRoundTrip);
 
 using ContainerTypes = testing::Types<ContainerKey, ContainerVal>;
 INSTANTIATE_TYPED_TEST_SUITE_P(KeyAndVal,
@@ -175,8 +178,8 @@ TEST(ContainerOplogEntrySerializationTest, RangeInsertForStringKeyedContainer) {
     const auto parsed = ContainerInsertOplogEntryO::parse(
         rangeInsertStringKeyed, IDLParserContext("RangeInsertForStringKeyedContainer"));
 
-    EXPECT_TRUE(parsed.getKey().isArrayKey());
-    const auto& keys = parsed.getKey().getArrayKey();
+    EXPECT_TRUE(parsed.getKey().isBytesArrayKey());
+    const auto& keys = parsed.getKey().getBytesArrayKey();
     ASSERT_EQ(keys.size(), 3u);
     EXPECT_EQ(std::string_view(keys[0].data(), keys[0].size()), "a"sv);
     EXPECT_EQ(std::string_view(keys[1].data(), keys[1].size()), "b"sv);
@@ -195,6 +198,40 @@ TEST(ContainerOplogEntrySerializationTest, IntKeySerializeRoundTrip) {
     const auto parsed = ContainerKey::parse(obj["k"]);
     EXPECT_TRUE(parsed.isIntKey());
     EXPECT_EQ(parsed.getIntKey(), 42);
+}
+
+// Int-array keys are ContainerKey-only, so this round trip is not part of the typed suite.
+TEST(ContainerOplogEntrySerializationTest, IntArrayRoundTrip) {
+    const auto int0 = 456;
+    const auto int1 = 789;
+    const std::vector<int64_t> arr{int0, int1};
+    ContainerKey c{arr};
+    EXPECT_FALSE(isBytes(c));
+    EXPECT_TRUE(isArray(c));
+    auto got = getArray<int64_t>(c);
+    ASSERT_EQ(got.size(), 2u);
+    EXPECT_EQ(got[0], int0);
+    EXPECT_EQ(got[1], int1);
+    EXPECT_ANY_THROW(getBytes(c));
+}
+
+// Int-array keys are ContainerKey-only, so this round trip is not part of the typed suite.
+TEST(ContainerOplogEntrySerializationTest, IntArraySerializeRoundTrip) {
+    const auto int0 = 456;
+    const auto int1 = 789;
+    const std::vector<int64_t> arr{int0, int1};
+    ContainerKey original{arr};
+    BSONObjBuilder builder;
+    original.serialize("f", &builder);
+    const auto obj = builder.obj();
+
+    const auto parsed = ContainerKey::parse(obj["f"]);
+    EXPECT_TRUE(isArray(parsed));
+    EXPECT_FALSE(isBytes(parsed));
+    auto got = getArray<int64_t>(parsed);
+    ASSERT_EQ(got.size(), 2u);
+    EXPECT_EQ(got[0], int0);
+    EXPECT_EQ(got[1], int1);
 }
 
 // Negative parse cases.

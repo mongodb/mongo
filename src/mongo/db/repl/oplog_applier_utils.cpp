@@ -46,6 +46,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
@@ -341,12 +342,14 @@ bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& ex
             const auto& key = insertO.getKey();
             const auto& maybeVal = insertO.getValue();
 
-            if (maybeVal && maybeVal->isArrayVal()) {
-                const auto& values = maybeVal->getArrayVal();
-                if (key.isIntKey()) {
+            return key.visit(OverloadedVisitor{
+                [&](int64_t baseKey) -> bool {
+                    if (!maybeVal || !maybeVal->isArrayVal()) {
+                        MONGO_UNREACHABLE_TASSERT(13181602);
+                    }
                     // A single int key with an array of values inserts at the consecutive keys
                     // starting at that key, matching applyContainerOperations().
-                    const int64_t baseKey = key.getIntKey();
+                    const auto& values = maybeVal->getArrayVal();
                     reserveAdditional(expanded, values.size());
                     for (size_t i = 0; i < values.size(); ++i) {
                         expanded.emplace_back(
@@ -356,42 +359,50 @@ bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& ex
                                            ContainerVal(values[i]))));
                     }
                     return true;
-                }
-                // Otherwise keys and values are paired off; DurableOplogEntry's constructor has
-                // already checked that the two arrays are the same length.
-                const auto& keys = key.getArrayKey();
-                invariant(keys.size() == values.size(), op.toStringForLogging());
-                reserveAdditional(expanded, keys.size());
-                for (size_t i = 0; i < keys.size(); ++i) {
-                    expanded.emplace_back(
-                        withObject(rawWithoutO,
-                                   makeSingleContainerInsertO(ContainerKey(keys[i]),
-                                                              ContainerVal(values[i]))));
-                }
-                return true;
-            }
-
-            // An array of keys sharing one (possibly absent) value.
-            invariant(key.isArrayKey(), op.toStringForLogging());
-            const auto& keys = key.getArrayKey();
-            reserveAdditional(expanded, keys.size());
-            for (auto&& singleKey : keys) {
-                expanded.emplace_back(withObject(
-                    rawWithoutO, makeSingleContainerInsertO(ContainerKey(singleKey), maybeVal)));
-            }
-            return true;
+                },
+                [&]<typename KeyT>(const std::vector<KeyT>& keys) -> bool {
+                    if (maybeVal && maybeVal->isArrayVal()) {
+                        // Keys and values are paired off; DurableOplogEntry's constructor has
+                        // already checked that the two arrays are the same length.
+                        const auto& values = maybeVal->getArrayVal();
+                        invariant(keys.size() == values.size(), op.toStringForLogging());
+                        reserveAdditional(expanded, keys.size());
+                        for (size_t i = 0; i < keys.size(); ++i) {
+                            expanded.emplace_back(
+                                withObject(rawWithoutO,
+                                           makeSingleContainerInsertO(ContainerKey(keys[i]),
+                                                                      ContainerVal(values[i]))));
+                        }
+                        return true;
+                    } else {
+                        // An array of keys sharing one (possibly absent) value.
+                        reserveAdditional(expanded, keys.size());
+                        for (auto&& singleKey : keys) {
+                            expanded.emplace_back(withObject(
+                                rawWithoutO,
+                                makeSingleContainerInsertO(ContainerKey(singleKey), maybeVal)));
+                        }
+                        return true;
+                    }
+                },
+                [&](std::span<const char>) -> bool { MONGO_UNREACHABLE_TASSERT(13181603); },
+            });
         }
         case OpTypeEnum::kContainerDelete: {
             const auto deleteO = ContainerDeleteOplogEntryO::parse(
                 o, IDLParserContext("ContainerDeleteOplogEntryO"));
-            const auto& keys = deleteO.getKey().getArrayKey();
-            reserveAdditional(expanded, keys.size());
-            for (auto&& singleKey : keys) {
-                ContainerDeleteOplogEntryO singleO;
-                singleO.setKey(ContainerKey(singleKey));
-                expanded.emplace_back(withObject(rawWithoutO, singleO.toBSON()));
-            }
-            return true;
+            return deleteO.getKey().visit(OverloadedVisitor{
+                [&]<typename KeyT>(const std::vector<KeyT>& keys) -> bool {
+                    reserveAdditional(expanded, keys.size());
+                    for (auto&& singleKey : keys) {
+                        ContainerDeleteOplogEntryO singleO;
+                        singleO.setKey(ContainerKey(singleKey));
+                        expanded.emplace_back(withObject(rawWithoutO, singleO.toBSON()));
+                    }
+                    return true;
+                },
+                [&](const auto&) -> bool { MONGO_UNREACHABLE_TASSERT(13181604); },
+            });
         }
         case OpTypeEnum::kContainerUpdate:
             // Container updates are always a single key and a single value, enforced by

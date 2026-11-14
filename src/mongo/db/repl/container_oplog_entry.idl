@@ -14,8 +14,8 @@ types:
     containerKey:
         bson_serialization_type: any
         description:
-            "A container key that is either a NumberLong, BinData(Generic), or an array of BinData.
-            This is a non-owning view; the source BSONObj must outlive it."
+            "A container key that is either a NumberLong, BinData(Generic), or an array of
+            NumberLong or BinData. This is a non-owning view; the source BSONObj must outlive it."
         cpp_type: "mongo::repl::ContainerKey"
         serializer: "mongo::repl::ContainerKey::serialize"
         deserializer: "mongo::repl::ContainerKey::parse"
@@ -39,7 +39,7 @@ structs:
             k:
                 cpp_name: key
                 type: containerKey
-                description: "The container key (NumberLong, BinData, or an array of BinData)"
+                description: "The container key (NumberLong, BinData, or an array of NumberLong or BinData)"
             v:
                 cpp_name: value
                 type: containerVal
@@ -70,4 +70,4 @@ structs:
             k:
                 cpp_name: key
                 type: containerKey
-                description: "The container key (NumberLong, BinData, or an array of BinData)"
+                description: "The container key (NumberLong, BinData, or an array of NumberLong or BinData)"

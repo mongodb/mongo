@@ -3744,10 +3744,10 @@ Status applyContainerOperations(OperationContext* opCtx,
                     o, IDLParserContext("ContainerInsertOplogEntryO"));
                 const auto& maybeVal = parsed.getValue();
                 s = parsed.getKey().visit(OverloadedVisitor{
-                    [&](std::vector<std::span<const char>> keys) -> Status {
-                        // Bytes-keyed range insert: supports a single value for all keys, an empty
-                        // value for all keys, or an array of values, with one for each key. The
-                        // batch commits together with the enclosing wuow.
+                    [&]<typename KeyT>(const std::vector<KeyT>& keys) -> Status {
+                        // Range write (int or bytes keys): supports a single value for all keys, an
+                        // empty value for all keys, or an array of values, with one for each key.
+                        // The batch commits together with the enclosing wuow.
                         if (maybeVal && maybeVal->isArrayVal()) {
                             const auto& values = maybeVal->getArrayVal();
                             uassert(13064104,
@@ -3833,7 +3833,7 @@ Status applyContainerOperations(OperationContext* opCtx,
                 invariant(!parsed.getValue().isArrayVal() && !parsed.getKey().isArrayKey());
                 auto valSpan = parsed.getValue().data();
                 s = parsed.getKey().visit(OverloadedVisitor{
-                    [&](const std::vector<std::span<const char>>&) -> Status { MONGO_UNREACHABLE; },
+                    [&]<typename KeyT>(const std::vector<KeyT>&) -> Status { MONGO_UNREACHABLE; },
                     [&](auto key) -> Status {
                         auto status = cursor->update(*ru, key, valSpan);
                         // Initial sync may have seeded a store that is missing an entry the sync
@@ -3854,8 +3854,8 @@ Status applyContainerOperations(OperationContext* opCtx,
                 auto parsed = repl::ContainerDeleteOplogEntryO::parse(
                     o, IDLParserContext("ContainerDeleteOplogEntryO"));
                 s = parsed.getKey().visit(OverloadedVisitor{
-                    [&](std::vector<std::span<const char>> keys) -> Status {
-                        // Bytes-keyed range delete (SERVER-130645): an array of keys to remove.
+                    [&]<typename KeyT>(const std::vector<KeyT>& keys) -> Status {
+                        // Int or bytes-keyed range delete: an array of keys to remove.
                         for (auto key : keys) {
                             if (auto status = cursor->remove(*ru, key); !status.isOK()) {
                                 return status;

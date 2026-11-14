@@ -76,6 +76,22 @@ const cases = [
         },
     },
     {
+        uri: "index-multiintkeys",
+        cfg: "key_format=q,value_format=u",
+        ops: [
+            (uri) => ci(ns, uri, [NumberLong(1), NumberLong(2)], binA),
+            (uri) => ci(ns, uri, [NumberLong(3), NumberLong(4)]),
+            (uri) => ci(ns, uri, [NumberLong(5), NumberLong(6)], [binB, binC]),
+            (uri) => cd(ns, uri, [NumberLong(1), NumberLong(4)]),
+        ],
+        expected: {
+            2: "A",
+            3: "",
+            5: "B",
+            6: "C",
+        },
+    },
+    {
         uri: "index-stringkeys",
         cfg: "key_format=u,value_format=u",
         ops: [

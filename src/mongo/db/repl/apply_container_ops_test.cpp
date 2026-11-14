@@ -1208,6 +1208,19 @@ TEST_F(ContainerOpExpansionEquivalenceTest, BytesKeyArrayWithSingleValue) {
     }
 }
 
+// Branch: array of int keys sharing one value.
+TEST_F(ContainerOpExpansionEquivalenceTest, IntKeyArrayWithSingleValue) {
+    const int64_t k1 = 12, k2 = 34, k3 = 56;
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+
+    auto o = BSON("k" << BSON_ARRAY(k1 << k2 << k3) << "v" << v);
+    ASSERT_EQ(3, applyPackedAndExpanded(OpTypeEnum::kContainerInsert, o, _intIdent, _intIdentB));
+
+    for (int64_t k : {k1, k2, k3}) {
+        assertBothHave(k, v);
+    }
+}
+
 // Branch: array of bytes keys with no value at all, which must stay absent rather than becoming an
 // empty BinData.
 TEST_F(ContainerOpExpansionEquivalenceTest, BytesKeyArrayWithNoValue) {
@@ -1224,8 +1237,22 @@ TEST_F(ContainerOpExpansionEquivalenceTest, BytesKeyArrayWithNoValue) {
     }
 }
 
-// Branch: keys and values paired off positionally.
-TEST_F(ContainerOpExpansionEquivalenceTest, PairedKeyAndValueArrays) {
+// Branch: array of int keys with no value at all, which must stay absent rather than becoming an
+// empty BinData.
+TEST_F(ContainerOpExpansionEquivalenceTest, IntKeyArrayWithNoValue) {
+    const int64_t k1 = 12, k2 = 34;
+
+    auto o = BSON("k" << BSON_ARRAY(k1 << k2));
+    ASSERT_EQ(2, applyPackedAndExpanded(OpTypeEnum::kContainerInsert, o, _intIdent, _intIdentB));
+
+    for (int64_t k : {k1, k2}) {
+        ASSERT_OK(_get(_opCtx.get(), _intIdent, k).getStatus());
+        ASSERT_OK(_get(_opCtx.get(), _intIdentB, k).getStatus());
+    }
+}
+
+// Branch: keys (bytes) and values paired off positionally.
+TEST_F(ContainerOpExpansionEquivalenceTest, PairedByteKeyAndValueArrays) {
     constexpr std::string_view k1 = "K1", k2 = "K2";
     auto v1 = BSONBinData("A", 1, BinDataGeneral);
     auto v2 = BSONBinData("B", 1, BinDataGeneral);
@@ -1239,6 +1266,20 @@ TEST_F(ContainerOpExpansionEquivalenceTest, PairedKeyAndValueArrays) {
     // Pairing must be positional, not shuffled.
     assertBothHave(span(k1), v1);
     assertBothHave(span(k2), v2);
+}
+
+// Branch: keys (int) and values paired off positionally.
+TEST_F(ContainerOpExpansionEquivalenceTest, PairedIntKeyAndValueArrays) {
+    const int64_t k1 = 12, k2 = 34;
+    auto v1 = BSONBinData("A", 1, BinDataGeneral);
+    auto v2 = BSONBinData("B", 1, BinDataGeneral);
+
+    auto o = BSON("k" << BSON_ARRAY(k1 << k2) << "v" << BSON_ARRAY(v1 << v2));
+    ASSERT_EQ(2, applyPackedAndExpanded(OpTypeEnum::kContainerInsert, o, _intIdent, _intIdentB));
+
+    // Pairing must be positional, not shuffled.
+    assertBothHave(k1, v1);
+    assertBothHave(k2, v2);
 }
 
 // Branch: int base key with an array of values, writing at consecutive keys.
@@ -1282,6 +1323,26 @@ TEST_F(ContainerOpExpansionEquivalenceTest, BytesKeyArrayDelete) {
     assertBothMissing(span(k1));
     assertBothMissing(span(k2));
     assertBothHave(span(k3), v);
+}
+
+// Branch: array of int keys to delete, leaving untargeted keys alone.
+TEST_F(ContainerOpExpansionEquivalenceTest, IntKeyArrayDelete) {
+    const int64_t k1 = 12, k2 = 34, k3 = 56;
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+
+    for (std::string_view ident : {std::string_view(_intIdent), std::string_view(_intIdentB)}) {
+        for (int64_t k : {k1, k2, k3}) {
+            ASSERT_OK(applyContainerOpHelper(_opCtx.get(),
+                                             makeContainerInsertOplogEntry(OpTime(), ident, k, v)));
+        }
+    }
+
+    auto o = BSON("k" << BSON_ARRAY(k1 << k2));
+    ASSERT_EQ(2, applyPackedAndExpanded(OpTypeEnum::kContainerDelete, o, _intIdent, _intIdentB));
+
+    assertBothMissing(k1);
+    assertBothMissing(k2);
+    assertBothHave(k3, v);
 }
 
 }  // namespace

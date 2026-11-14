@@ -25,6 +25,7 @@ class [[MONGO_MOD_PUBLIC]] ContainerKey {
 public:
     ContainerKey() : _key(int64_t{0}) {}
     explicit ContainerKey(std::vector<std::span<const char>> keys) : _key(std::move(keys)) {}
+    explicit ContainerKey(std::vector<int64_t> keys) : _key(std::move(keys)) {}
     explicit ContainerKey(int64_t key) : _key(key) {}
     explicit ContainerKey(std::span<const char> key) : _key(key) {}
 
@@ -39,7 +40,15 @@ public:
     void serialize(std::string_view fieldName, BSONObjBuilder* builder) const;
 
     bool isArrayKey() const {
+        return isBytesArrayKey() || isIntArrayKey();
+    }
+
+    bool isBytesArrayKey() const {
         return std::holds_alternative<std::vector<std::span<const char>>>(_key);
+    }
+
+    bool isIntArrayKey() const {
+        return std::holds_alternative<std::vector<int64_t>>(_key);
     }
 
     bool isIntKey() const {
@@ -50,7 +59,11 @@ public:
         return std::holds_alternative<std::span<const char>>(_key);
     }
 
-    const std::vector<std::span<const char>>& getArrayKey() const;
+    size_t getArrayKeySize() const;
+
+    const std::vector<std::span<const char>>& getBytesArrayKey() const;
+
+    const std::vector<int64_t>& getIntArrayKey() const;
 
     int64_t getIntKey() const;
 
@@ -65,7 +78,11 @@ public:
     }
 
 private:
-    std::variant<std::vector<std::span<const char>>, int64_t, std::span<const char>> _key;
+    std::variant<std::vector<std::span<const char>>,
+                 std::vector<int64_t>,
+                 int64_t,
+                 std::span<const char>>
+        _key;
 };
 
 /**

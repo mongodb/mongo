@@ -354,7 +354,7 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
                             "length array of keys",
                             key.isIntKey() ||
                                 (key.isArrayKey() &&
-                                 key.getArrayKey().size() == maybeVal->getArrayVal().size()));
+                                 key.getArrayKeySize() == maybeVal->getArrayVal().size()));
                 }
             } break;
             case OpTypeEnum::kContainerUpdate: {
