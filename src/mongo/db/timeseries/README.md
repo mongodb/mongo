@@ -142,7 +142,7 @@ its data, the measurements for that field are stored in a BSONColumn
 
 Starting in 8.0, newly created buckets will be V2 by default. V2 and V3 buckets in the BucketCatalog
 maintain a BSONColumnBuilder for each data field. These builders are append-only, meaning that new
-measurements can only be added to the end of the builder." If measurements come out of order by time
+measurements can only be added to the end of the builder. If measurements come out of order by time
 into the same bucket (which is more likely to happen during low cardinality concurrent bulk loads),
 we will promote a V2 bucket to a V3 bucket. The bucket will behave the same way, the only difference
 being that the measurements in a V3 bucket are not guaranteed to be in-order on time (and in fact,
@@ -495,8 +495,6 @@ acquisition of the stripe lock:
 > is retrying writes from the outside the server in the driver. This section discusses retries within
 > the server, which also handles retryable writes (see contains retry in the image below).
 
-![SERVER-103329 Drawings (7)](https://github.com/user-attachments/assets/aceb7dfb-45f3-4aac-a0cb-744f080ead76)
-
 #### Error Examples
 
 - Continuable
@@ -549,11 +547,6 @@ struct stores most of the core components of the
 [Bucket Catalog](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L161-L191).
 The structures within it generally compose the memory usage of the Bucket Catalog (see:
 [bucket_catalog::getMemoryUsage](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.cpp#L190-L206)).
-
-# References
-
-See:
-[MongoDB Blog: Time Series Data and MongoDB: Part 2 - Schema Design Best Practices](https://www.mongodb.com/blog/post/time-series-data-and-mongodb-part-2-schema-design-best-practices)
 
 # Glossary
 
