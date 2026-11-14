@@ -825,12 +825,6 @@ protected:
                                  uint64_t generation);
 
     /**
-     * Waits for a majority snapshot with no builder locks or storage transaction.
-     */
-    void _waitForMajoritySnapshot(OperationContext* opCtx,
-                                  const std::shared_ptr<ReplIndexBuildState>& replState);
-
-    /**
      * Reads the commit ready members list for index build UUID in 'replState' from
      * "config.system.indexBuilds" collection. And, signals the index builder thread on primary to
      * commit the index build if the number of voters have satisfied the commit quorum for that
