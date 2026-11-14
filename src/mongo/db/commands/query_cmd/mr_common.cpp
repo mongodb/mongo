@@ -10,9 +10,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/map_reduce_javascript_code.h"
@@ -370,9 +368,7 @@ Status checkAuthForMapReduce(const BasicCommand* commandTemplate,
             !emptyNss && inputResource.isExactNamespacePattern());
 
     auto* as = AuthorizationSession::get(opCtx->getClient());
-    PrivilegeVector inputPrivileges{Privilege(inputResource, ActionType::find)};
-    auth::addImplicitPrivilegesForRestrictedNamespaces(&inputPrivileges);
-    if (!as->isAuthorizedForPrivileges(inputPrivileges)) {
+    if (!as->isAuthorizedForActionsOnResource(inputResource, ActionType::find)) {
         return {ErrorCodes::Unauthorized, "unauthorized"};
     }
 
@@ -396,11 +392,8 @@ Status checkAuthForMapReduce(const BasicCommand* commandTemplate,
                               << outputResource.ns().toStringForErrorMsg(),
                 outputResource.ns().isValid());
 
-        PrivilegeVector outputPrivileges{Privilege(outputResource, outputActions)};
-        auth::addImplicitPrivilegesForRestrictedNamespaces(&outputPrivileges);
-
         // TODO: check if outputNs exists and add createCollection privilege if not
-        if (!as->isAuthorizedForPrivileges(outputPrivileges)) {
+        if (!as->isAuthorizedForActionsOnResource(outputResource, outputActions)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
     }

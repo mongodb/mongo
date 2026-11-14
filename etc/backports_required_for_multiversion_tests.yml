@@ -119,8 +119,6 @@ last-patch:
       ticket: SERVER-134519
     - test_file: jstests/sharding/index_builds/resharding_recipient_buildindex_stepup_deadlock.js
       ticket: SERVER-127745
-    - test_file: jstests/sharding/migration_blocking_operation/multi_update_coordinator_state_document_privilege_escalation.js
-      ticket: SERVER-133600
     - test_file: jstests/sharding/migration_coordinator_basic.js
       ticket: SERVER-136722
     - test_file: jstests/sharding/migration_coordinator_basic.js
@@ -284,8 +282,6 @@ last-continuous:
       ticket: SERVER-127745
     - test_file: jstests/sharding/index_commands_shard_targeting.js
       ticket: SERVER-131386
-    - test_file: jstests/sharding/migration_blocking_operation/multi_update_coordinator_state_document_privilege_escalation.js
-      ticket: SERVER-133600
     - test_file: jstests/sharding/migration_coordinator_basic.js
       ticket: SERVER-136722
     - test_file: jstests/sharding/migration_coordinator_basic.js
@@ -503,8 +499,6 @@ last-lts:
       ticket: SERVER-127745
     - test_file: jstests/sharding/index_commands_shard_targeting.js
       ticket: SERVER-131386
-    - test_file: jstests/sharding/migration_blocking_operation/multi_update_coordinator_state_document_privilege_escalation.js
-      ticket: SERVER-133600
     - test_file: jstests/sharding/migration_coordinator_basic.js
       ticket: SERVER-136722
     - test_file: jstests/sharding/migration_coordinator_basic.js

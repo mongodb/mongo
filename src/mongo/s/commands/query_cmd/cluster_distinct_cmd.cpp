@@ -373,12 +373,10 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             auto* as = AuthorizationSession::get(opCtx->getClient());
-            PrivilegeVector privileges{
-                Privilege(CommandHelpers::resourcePatternForNamespace(ns()), ActionType::find)};
-            auth::addImplicitPrivilegesForRestrictedNamespaces(&privileges);
             uassert(ErrorCodes::Unauthorized,
                     "unauthorized",
-                    as->isAuthorizedForPrivileges(privileges));
+                    as->isAuthorizedForActionsOnResource(
+                        CommandHelpers::resourcePatternForNamespace(ns()), ActionType::find));
         }
 
         void explain(OperationContext* opCtx,

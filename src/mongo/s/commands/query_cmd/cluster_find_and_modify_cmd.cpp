@@ -12,9 +12,7 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/explain_gen.h"
@@ -408,11 +406,10 @@ void FindAndModifyCmd::Invocation::doCheckAuthorization(OperationContext* opCtx)
             "Invalid target namespace " + resource.toString(),
             resource.isExactNamespacePattern());
 
-    PrivilegeVector privileges{Privilege(resource, actions)};
-    auth::addImplicitPrivilegesForRestrictedNamespaces(&privileges);
-
     auto* as = AuthorizationSession::get(opCtx->getClient());
-    uassert(ErrorCodes::Unauthorized, "unauthorized", as->isAuthorizedForPrivileges(privileges));
+    uassert(ErrorCodes::Unauthorized,
+            "unauthorized",
+            as->isAuthorizedForActionsOnResource(resource, actions));
 }
 
 namespace {

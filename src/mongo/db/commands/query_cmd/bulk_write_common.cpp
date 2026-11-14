@@ -9,7 +9,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"
@@ -112,8 +111,6 @@ std::vector<Privilege> getPrivileges(const BulkWriteCommandRequest& req) {
         auto& privilege = privileges[nsInfoIdx];
         privilege.addActions(newActions);
     }
-
-    auth::addImplicitPrivilegesForRestrictedNamespaces(&privileges);
 
     return privileges;
 }
