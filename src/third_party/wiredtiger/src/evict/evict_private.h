@@ -121,7 +121,8 @@ extern int __wti_evict_lru_walk(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_evict_page(WT_SESSION_IMPL *session, bool is_server)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_evict_walk(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue)
+extern int __wti_evict_walk(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue,
+  uint64_t *tree_walk_nsp, uint64_t *lock_wait_nsp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wti_evict_queue_clear_page(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wti_evict_queue_clear_page_locked(

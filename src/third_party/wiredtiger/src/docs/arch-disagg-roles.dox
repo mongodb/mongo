@@ -5,26 +5,23 @@ persists it to shared storage. A connection's role determines its access to shar
 view it reads, and the work it performs on behalf of the cluster. Changing that role affects
 the whole storage engine, not only individual tables or cursors.
 
+This page describes how WiredTiger implements roles and role changes. For the application
+contract, including configuration, call sequences, and restrictions, see
+@ref disagg_role_management.
+
 @section disagg-roles-steady-state Leader and follower
 
-The <b>leader</b> is the sole writer of shared tables and produces the checkpoints that other
+The <b>leader</b> is the only node that writes to shared storage: it writes the stable shared
+tables, publishes schema changes to shared metadata, and produces the checkpoints that other
 nodes read. A <b>follower</b> reads a checkpointed view of those tables and applies recent changes
-locally, without writing them back to shared storage.
+locally, without writing them back to shared storage. A follower can create and drop tables
+locally, but only a leader publishes those changes to other nodes.
 
 For application data, @ref arch-disagg-layered "a layered table" combines a shared <b>stable
-table</b> with a node-local, in-memory <b>ingest table</b>. These have different uses in the two
-steady-state roles:
-
-| Responsibility | Leader | Follower |
-|----------------|--------|----------|
-| Stable table view | Live, writable shared btree | Read-only shared checkpoint |
-| Ingest table content | Empty | Recent local changes, including covered content awaiting safe removal |
-| Layered-table writes | Shared stable table | Local ingest table |
-| Shared checkpoints | Produces them | Adopts checkpoints produced by the leader |
-
-A follower accepts writes to apply changes replicated from the leader. It writes those changes
-to the local ingest table, and read operations merge the stable table and ingest table views.
-For a key visible in both tables, the ingest table content always takes precedence.
+table</b> with a node-local, in-memory <b>ingest table</b>. On a leader, the stable table is a live
+writable btree and the ingest table is empty. On a follower, the stable table is a read-only
+checkpoint view, with ingest table changes layered over it. The two constituents allow
+checkpoint adoption without writing follower changes into the shared btree.
 
 Followers eventually adopt new checkpoints produced by the leader. Adopting a checkpoint makes
 covered ingest table content eligible for removal once it is safe for readers. See
@@ -34,97 +31,161 @@ A follower never takes a checkpoint of its own: a checkpoint call on a follower 
 without doing any work, so the only checkpoints it can adopt are the ones the leader produced. See
 @ref arch-checkpoint.
 
-The table above describes steady state; the rules can differ during role transitions.
+@section disagg-roles-coordination Role changes
 
-@htmlonly
-<style>@media print { .disagg-role-example { display:none; } }</style>
-<div class="disagg-role-example">
-<iframe src="disagg-roles-animation.html" title="Leader and follower checkpoint example"
-  style="width:100%;height:580px;border:0;"></iframe>
-</div>
-@endhtmlonly
+The application changes a connection's role through WT_CONNECTION::reconfigure. <b>Step-up</b>
+changes a follower into a leader, and <b>step-down</b> changes a leader into a follower. The two
+transitions are asymmetric: step-up incorporates the follower's local changes into the shared
+tables it starts writing, while step-down switches to a read-only view of a checkpoint and
+retains any later changes in the ingest tables. The diagram summarizes both roles and the
+transitions between them.
 
-@section disagg-roles-coordination Coordinating a role change
-
-The application decides which node owns shared writes and coordinates elections, replication,
-and the handoff between nodes. It asks each connection to assume the appropriate role through
-WT_CONNECTION::reconfigure with <code>disaggregated=(role=leader)</code> or
-<code>disaggregated=(role=follower)</code>.
-
-<b>Step-up</b> changes a follower into a leader; <b>step-down</b> changes a leader into a follower.
-Reconfiguration performs the local storage-engine transition, not the election or replication
-of changes to another node. The application must prevent competing shared writers and satisfy
-the transition's transaction and checkpoint requirements.
-
-These transitions are asymmetric. Step-up incorporates recent local changes into the shared
-writer's state. Step-down switches to a checkpointed stable table view, retaining any later
-changes in the ingest table. Reconfiguration coordinates these changes with ongoing engine
-work; it does more than select a different destination for new writes.
+@image html disagg-roles.svg
 
 @section disagg-roles-effects Effects across WiredTiger
 
-The role applies to all shared state on the connection. The following responsibilities must
-change together:
+Because the role applies to all shared state on the connection, each role change updates the
+following responsibilities together:
 
 | Area | Effect of the role |
 |------|--------------------|
 | Shared checkpoints | The leader writes the shared checkpoint; followers adopt it as a new base for reads. |
-| Shared metadata | The leader populates shared metadata with schema changes during checkpointing; followers adopt the published schema with the checkpoint. Local schema state is distinct from shared publication. |
+| Shared metadata | The leader publishes schema changes to shared metadata during checkpointing; followers adopt the published schema with the checkpoint. |
 | Shared history store | The leader writes historical versions to shared storage. Followers read the history associated with their checkpoint. |
 | Encryption key-provider metadata | The leader persists encryption key-provider metadata with shared checkpoints; followers read the published metadata. |
 | Shared table views | Step-up switches from checkpoint views to live writable tables; step-down switches to read-only checkpoint views. |
 | Eviction | A leader can reconcile shared pages. A follower reclaims covered ingest table content without writing it back to shared storage. |
+| Shared disk cache | A follower caches shared page images locally. Step-up makes the cache read-only until it is retired; step-down re-enables it. |
 | Background work | Checkpoint cleanup is leader-only work; the deferred checkpoint pickup server runs on followers. Step-up and step-down stop or restart these services. |
 
-The table above shows how a role transition coordinates different parts of WiredTiger. See
-@ref arch-disagg-layered for layered tables, @ref arch-hs for historical versions,
-@ref arch-disagg-key-provider for encryption key metadata, and @ref arch-eviction for page reclamation.
-
-@section disagg-roles-transitions Role transitions diagram
-
-@htmlonly
-<img src="disagg-roles.svg" alt="The leader writes shared checkpoints; the follower applies local
-changes and adopts checkpoints. Step-up and step-down change these responsibilities." />
-@endhtmlonly
+See @ref arch-disagg-layered for layered tables, @ref arch-hs for historical versions,
+@ref arch-disagg-key-provider for encryption key metadata, and @ref arch-eviction for page
+reclamation.
 
 @section disagg-roles-step-up Step-up
 
 Before step-up, a follower already has a shared checkpoint view and recent changes in its
-ingest tables. Step-up adopts any pending checkpoints, creates missing stable tables, and
-incorporates the remaining ingest table changes into the stable tables. After successful
-reconfiguration, the connection can perform normal leader writes and produce shared checkpoints
-from that base.
+ingest tables. Step-up first adopts any checkpoint whose pickup was deferred, so the new leader
+continues the shared checkpoint lineage from the newest base rather than forking it from an
+older one. It then switches the role, restarts any in-progress checkpoint, creates the stable
+tables missing for tables created on the follower, and drains the remaining ingest table changes
+into the stable tables. After successful reconfiguration, the connection can perform normal
+leader writes and produce shared checkpoints from that base.
 
 Step-up does more than allow writes to the follower's existing view: it combines checkpointed
-data and local changes into a consistent live shared tree. Transactions and positioned cursors
-must not span step-up. The application must finish transactions and reset or close positioned
-cursors before the step-up reconfiguration; it can start new work after the transition completes.
+data and local changes into a consistent live shared tree. Draining moves ingest content from
+under positioned cursors, and a snapshot taken on the follower cannot be consistent with the
+drained and adopted stable tables, so transactions and positioned cursors must not span
+step-up. See @ref disagg_role_management_step_up for the application requirements.
 
 @section disagg-roles-step-down Step-down
 
-Step-down transfers shared-write responsibility without restarting the old leader. There are
-two ways to prepare for the transition:
+Step-down transfers shared-write responsibility without restarting the old leader and changes
+it to a follower. After the transition, the node reads its stable tables through read-only views
+of the concluding checkpoint, so every change it must still serve has to be either in that
+checkpoint or in its ingest tables. The application therefore needs a clear boundary between
+writes that belong in the concluding checkpoint handed to the next leader and later writes that
+must be stored locally for follower operations. There are two ways to establish it.
 
-- <b>Blocking step-down:</b> the application no longer initiates new write transactions, finishes
-  existing write transactions, advances the stable timestamp to cover their changes, and takes
-  the concluding checkpoint. Writes remain stopped until it reconfigures the connection as a
-  follower. No step-down timestamp is set;
-  the application must ensure that the checkpoint contains all changes being handed off.
-- <b>Asynchronous step-down:</b> the application sets a step-down timestamp to define the boundary
-  for the concluding checkpoint. Once the step-down timestamp is set, new write transactions
-  write to local ingest tables, allowing writes to continue during checkpoint preparation.
-  Write transactions already in progress when the timestamp is set, including those that span
-  the transition, are rolled back to prevent an inconsistent state.
+@subsection disagg-step-down-blocking Blocking step-down
 
-In both cases, the application coordinates checkpoint handoff and finishes all write
-transactions before reconfiguring the old leader as a follower. The connection then reads
-stable tables through read-only views of the concluding checkpoint and merges them with any
-newer changes in its local ingest tables.
+The simplest boundary is to stop writing. In <b>blocking step-down</b>, writes stop while the
+concluding checkpoint is taken and remain stopped through the reconfiguration. Until
+reconfiguration, the node still operates as a leader and writes to its live stable tables.
+Reconfiguration switches those tables to read-only checkpoint views, so updates newer than the
+checkpoint would no longer be available through the follower's stable tables. The concluding
+checkpoint's latency therefore becomes part of the period in which the application cannot write.
 
-Asynchronous step-down does not allow writers to run during or span the step-down reconfiguration.
-Read transactions are allowed at all times, but those without read timestamps are rolled back
-if they span reconfiguration. See
-WT_CONNECTION::set_timestamp for the step-down timestamp API and @ref error_handling for
-rollback handling.
+@subsection disagg-step-down-async Asynchronous step-down
+
+<b>Asynchronous step-down</b> defines the boundary in advance so writes can continue while the
+concluding checkpoint is taken. The application sets a step-down timestamp N, and transactions
+that begin after it is set keep a copy of their writes in the ingest tables. The concluding
+checkpoint is taken at N, so the node can switch to checkpointed stable table views without
+losing newer writes. Writes must still stop for the step-down reconfiguration itself, so
+asynchronous step-down shortens the period of write unavailability but does not eliminate it.
+
+The rest of this section describes how writes are routed while N is set, why some transactions
+are rolled back, how reads and schema operations behave, and what the reconfiguration does.
+
+@subsection disagg-step-down-routing Write routing
+
+WiredTiger chooses the destination of a transaction's writes using the step-down state recorded
+at transaction begin. A transaction that began before N was set writes to the stable tables
+only. A transaction that began after N was set writes to the ingest tables, and in the default
+mode to the stable tables as well.
+
+Writes above N must be retained in the ingest tables because they are not included in the
+concluding checkpoint. After the step-down reconfiguration, stable-table reads use the read-only
+checkpoint view, so those newer writes must remain available in the ingest tables.
+
+The <code>disaggregated=(stepdown_write_mirroring)</code> setting of ::wiredtiger_open selects
+between the two modes for transactions that begin after N. For applications, the modes differ
+mainly in the write-conflict detection they guarantee: mirrored writes detect every conflict at
+the conflicting write, as outside a step-down, while ingest-only writes can miss a conflict with
+a straddling writer until that writer is rolled back.
+
+- <b>Mirrored writes (default):</b> each write to an existing layered table goes to the stable
+  table first and then to the ingest table, within the same transaction. Because every writer,
+  including those that began before N was set, writes to the stable table, WiredTiger's normal
+  single-btree conflict detection handles conflicts between them. The stable table versions
+  above N are excluded from the concluding checkpoint by its timestamp.
+- <b>Ingest-only writes (legacy):</b> writes go to the ingest tables only. Writers on the two
+  sides of the boundary no longer share an update chain, so each ingest-only write performs an
+  explicit check against the stable table for conflicting updates. This check does not always
+  detect conflicts immediately with writers that began before N was set and straddle setting
+  the step-down timestamp. Those writers are rolled back rather than committed, so the missed
+  conflicts cannot persist.
+
+In both modes, the ingest table holds the copy that survives the step-down reconfiguration.
+Mirroring trades additional stable table writes and reconciliation for immediate conflict
+detection through a single btree; ingest-only writes avoid the extra copy but rely on the
+cross-table check.
+
+@subsection disagg-step-down-transactions Why straddling writers are rolled back
+
+WiredTiger chooses the destination of transaction writes using the step-down state recorded at
+transaction begin for two reasons:
+
+1. A transaction can set its commit timestamp after it has already written, and the write cannot
+   be moved to the alternative table afterwards. A write with a commit timestamp at or below N
+   belongs in the stable table, so the destination needs to be chosen before the relevant commit
+   timestamp exists.
+2. Straddler rollback keeps each transaction's write destinations consistent with its begin-time
+   state, so the state recorded at begin provides the correct destination for every write of
+   that transaction.
+
+A layered-table write checks whether the transaction began before N was set and returns
+WT_ROLLBACK when it observes the change, failing the transaction early. The commit path also
+checks for straddling writers and is synchronized with setting the step-down timestamp. Under
+the application contract, this ensures such writers cannot commit above N. A retried transaction
+begins with N set and writes to the ingest tables.
+
+@subsection disagg-step-down-reads Reads during step-down
+
+Reads follow the same decision made at transaction begin. This is possible because layered-table
+operations always run in explicit snapshot-isolation transactions, and WT_SESSION::reset_snapshot
+is not allowed while the step-down timestamp is set. A transaction that began after N was set
+reads the ingest table layered over the still-live stable table. One that began earlier reads
+the stable table alone, which already holds everything its snapshot can see. The decision stays
+correct only while the transaction keeps reading the state it saw at begin.
+
+The step-down reconfiguration replaces each live stable table with a view of the concluding
+checkpoint. The checkpoint keeps older versions in the shared history store, which supports
+reads at a timestamp, so a transaction with a read timestamp selects the same versions from the
+checkpoint view. A transaction without a read timestamp that straddles reconfiguration may be
+rolled back because its snapshot cannot be assumed to select consistent content from the
+replacement.
+
+@subsection disagg-step-down-schema Schema changes during step-down
+
+A layered table created after N is set has the follower table shape: only its local ingest
+table is created. Writes to such a table always go to the ingest table and are never mirrored,
+so a stable table would stay empty, and the concluding checkpoint must not include the table.
+
+Without schema epochs, the concluding checkpoint applies every other schema operation queued
+when it starts, including drops issued after N was set. With schema epochs, the step-down epoch
+divides schema operations the same way N divides data. See @ref disagg_role_management_schema
+for the schema-epoch contract.
 
 */

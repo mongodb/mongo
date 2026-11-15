@@ -2325,7 +2325,7 @@ __wt_page_del_visible_all(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, b
 
     if (hide_prepared) {
         WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, page_del->prepare_state);
-        if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
+        if (__wt_prepare_state_unresolved(prepare_state))
             return (false);
     }
 
@@ -2351,7 +2351,7 @@ __wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool 
 
     if (hide_prepared) {
         WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, page_del->prepare_state);
-        if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
+        if (__wt_prepare_state_unresolved(prepare_state))
             return (false);
     }
 

@@ -372,10 +372,12 @@ __evict_btree_has_interest(WT_SESSION_IMPL *session)
 
 /*
  * __wti_evict_walk --
- *     Fill in the array by walking the next set of pages.
+ *     Fill in the array by walking the next set of pages, and return the time spent walking trees
+ *     and waiting for the handle list lock.
  */
 int
-__wti_evict_walk(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue)
+__wti_evict_walk(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, uint64_t *tree_walk_nsp,
+  uint64_t *lock_wait_nsp)
 {
     WT_BTREE *btree;
     WT_CACHE *cache;
@@ -385,12 +387,15 @@ __wti_evict_walk(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue)
     WT_EVICT *evict;
     WT_TRACK_OP_DECL;
     wt_timestamp_t create_epoch;
+    uint64_t time_start, time_stop;
     uint32_t dominating_flags, evict_walk_flags, evict_walk_period;
     u_int loop_count, max_entries, retries, slot, start_slot;
     u_int total_candidates;
     bool aggressive, covered, dhandle_list_locked, resume, shutdown, try_publish, wanted;
 
     WT_TRACK_OP_INIT(session);
+
+    *tree_walk_nsp = *lock_wait_nsp = 0;
 
     conn = S2C(session);
     cache = conn->cache;
@@ -446,7 +451,13 @@ retry:
          */
         if (!dhandle_list_locked) {
             /* The lock attempt only gives up when the walk is interrupted. */
-            if ((ret = __wti_evict_lock_handle_list(session)) == EBUSY)
+            time_start = WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
+            ret = __wti_evict_lock_handle_list(session);
+            if (time_start != 0) {
+                time_stop = __wt_clock(session);
+                *lock_wait_nsp += WT_CLOCKDIFF_NS(time_stop, time_start);
+            }
+            if (ret == EBUSY)
                 WT_STAT_CONN_INCR(session, eviction_server_refill_end_interrupted);
             WT_ERR(ret);
             dhandle_list_locked = true;
@@ -708,8 +719,13 @@ retry:
         if (__wt_btree_eviction_enabled(btree) &&
           !__wt_spin_trylock(session, &evict->evict_walk_lock)) {
             if (__wt_btree_eviction_enabled(btree) && btree->root.page != NULL) {
+                time_start = WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
                 WT_WITH_DHANDLE(
                   session, dhandle, ret = __evict_walk_tree(session, queue, max_entries, &slot));
+                if (time_start != 0) {
+                    time_stop = __wt_clock(session);
+                    *tree_walk_nsp += WT_CLOCKDIFF_NS(time_stop, time_start);
+                }
 
                 WT_ASSERT(session, __wt_session_gen(session, WT_GEN_SPLIT) == 0);
             }

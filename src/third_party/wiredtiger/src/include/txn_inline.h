@@ -187,6 +187,17 @@ __wt_txn_op_set_key(WT_SESSION_IMPL *session, const WT_ITEM *key)
 }
 
 /*
+ * __wt_prepare_state_unresolved --
+ *     Return if a prepare state describes an unresolved prepared operation. The caller is
+ *     responsible for loading the state with the ordering its context requires.
+ */
+static WT_INLINE bool
+__wt_prepare_state_unresolved(uint8_t prepare_state)
+{
+    return (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED);
+}
+
+/*
  * __txn_apply_prepare_state_update --
  *     Change the prepared state of an update using the provided time point.
  */

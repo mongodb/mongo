@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 620" role="img" aria-labelledby="title desc">
+  <title id="title">Asynchronous shared-write handoff between two nodes</title>
+  <desc id="desc">Time advances from left to right. Node A sets the step-down timestamp, takes
+    the concluding checkpoint, finishes writers and reconfigures as a follower. While still a
+    follower, node B receives the checkpoint metadata, adopts the checkpoint and applies later
+    replicated data and schema operations. Node B finishes transactions and resets positioned
+    cursors before reconfiguring as leader, only after node A's step-down completes. Transfers
+    are coordinated by the application; checkpoint data is read from shared storage.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8" fill="#555"/>
+    </marker>
+    <marker id="transfer" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8" fill="#306f96"/>
+    </marker>
+  </defs>
+  <rect width="1320" height="620" fill="#fff"/>
+  <g font-family="Arial, sans-serif" font-size="18" fill="#222">
+    <text x="20" y="180" font-weight="bold">Node A</text>
+    <text x="20" y="206">Old leader</text>
+    <text x="20" y="437" font-weight="bold">Node B</text>
+    <text x="20" y="463">Next leader</text>
+    <path d="M170 185 H1290" fill="none" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M170 440 H1290" fill="none" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="170" y="202" width="865" height="31" fill="#eaf4ee"/>
+    <rect x="1035" y="202" width="245" height="31" fill="#edf3fa"/>
+    <text x="540" y="224" text-anchor="middle">Leader</text>
+    <text x="1157" y="224" text-anchor="middle">Follower</text>
+    <rect x="170" y="457" width="1010" height="31" fill="#edf3fa"/>
+    <rect x="1180" y="457" width="100" height="31" fill="#eaf4ee"/>
+    <text x="650" y="479" text-anchor="middle">Follower: applies replicated changes locally</text>
+    <text x="1230" y="479" text-anchor="middle">Leader</text>
+
+    <g text-anchor="middle" font-size="17">
+      <circle cx="235" cy="185" r="5" fill="#35754a"/>
+      <path d="M235 180 V125" stroke="#999"/>
+      <text x="250" y="85">set_timestamp()</text>
+      <text x="250" y="108" font-family="monospace" font-size="15">step_down_timestamp=N</text>
+
+      <circle cx="480" cy="185" r="5" fill="#35754a"/>
+      <path d="M480 180 V125" stroke="#999"/>
+      <text x="485" y="39">Earlier commits finished</text>
+      <text x="485" y="62">set_timestamp()</text>
+      <text x="485" y="85" font-family="monospace" font-size="15">stable_timestamp=N</text>
+      <text x="485" y="108">checkpoint() completes at N</text>
+
+      <circle cx="820" cy="185" r="5" fill="#35754a"/>
+      <path d="M820 180 V125" stroke="#999"/>
+      <text x="810" y="62">Stop new writes</text>
+      <text x="810" y="85">Finish write transactions</text>
+      <text x="810" y="108">Reset write cursors</text>
+
+      <rect x="900" y="176" width="135" height="18" rx="3" fill="#f0d7c7" stroke="#97522e"/>
+      <path d="M970 176 V125" stroke="#999"/>
+      <text x="1000" y="85">reconfigure()</text>
+      <text x="1000" y="108" font-family="monospace" font-size="15">role=follower</text>
+
+      <circle cx="635" cy="440" r="5" fill="#55739b"/>
+      <path d="M635 445 V513" stroke="#999"/>
+      <text x="635" y="540">reconfigure()</text>
+      <text x="635" y="563" font-family="monospace" font-size="15">checkpoint_meta=...</text>
+      <text x="635" y="586">Adopt shared checkpoint</text>
+
+      <circle cx="875" cy="440" r="5" fill="#55739b"/>
+      <path d="M875 445 V513" stroke="#999"/>
+      <text x="875" y="540">Apply post-N operations</text>
+      <text x="875" y="563">Schema before dependent writes</text>
+
+      <circle cx="1095" cy="440" r="5" fill="#55739b"/>
+      <path d="M1095 435 V382 H1130" fill="none" stroke="#999"/>
+      <text x="1130" y="340">Finish transactions</text>
+      <text x="1130" y="363">Reset positioned cursors</text>
+
+      <rect x="1110" y="431" width="70" height="18" rx="3" fill="#dcebdc" stroke="#35754a"/>
+      <path d="M1145 449 V513" stroke="#999"/>
+      <text x="1170" y="540">reconfigure()</text>
+      <text x="1170" y="563" font-family="monospace" font-size="15">role=leader</text>
+      <text x="1170" y="586">Then accept leader writes</text>
+    </g>
+
+    <path d="M510 237 L630 432" fill="none" stroke="#306f96" stroke-width="2" marker-end="url(#transfer)"/>
+    <text x="210" y="272" fill="#306f96">Application passes</text>
+    <text x="210" y="296" fill="#306f96">checkpoint metadata</text>
+    <text x="210" y="320" fill="#306f96">B reads data from shared storage</text>
+
+    <path d="M710 237 L870 432" fill="none" stroke="#306f96" stroke-width="2" marker-end="url(#transfer)"/>
+    <text x="625" y="280" fill="#306f96">Application</text>
+    <text x="625" y="303" fill="#306f96">replication</text>
+    <text x="625" y="326" fill="#306f96">or replay</text>
+
+    <path d="M1035 153 V493" fill="none" stroke="#97522e" stroke-dasharray="5 5"/>
+    <text x="1050" y="270" font-size="16" fill="#97522e">A's reconfiguration completes</text>
+    <text x="1050" y="292" font-size="16" fill="#97522e">B may step up only after this</text>
+  </g>
+</svg>

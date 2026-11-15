@@ -1,0 +1,242 @@
+/*! @page disagg_role_management Managing disaggregated storage roles
+
+In disaggregated storage, the application decides which node owns shared writes and coordinates
+elections, replication, and the handoff between nodes. WiredTiger provides leader and follower
+roles so the application can choose which node persists data to shared storage without
+restarting the connections.
+
+This page describes roles from the application's perspective, including configuration,
+expected call sequences, and restrictions. See @ref arch-disagg-roles for their architecture
+and implementation.
+
+@section disagg_role_management_roles Leader and follower
+
+There are two roles: the leader and the follower.
+
+The <b>leader</b> accepts application writes and persists their changes in shared storage through
+checkpoints. A <b>follower</b> accepts replicated writes and stores their changes locally,
+without persisting them to shared storage. Both serve reads from shared data: a leader reads the
+current data, while a follower reads the most recent checkpoint it adopted, together with newer
+replicated changes it applied locally.
+
+| Responsibility | Leader | Follower |
+|----------------|--------|----------|
+| Accepted writes | Application writes | Writes replicated from the leader |
+| Where changes are persisted | Shared storage through checkpoints | Not persisted to shared storage by this node |
+| Readable data | Current data | Shared checkpointed data and newer local changes |
+| Shared checkpoints | Produces them | Adopts checkpoints produced by the leader |
+
+Once an adopted checkpoint contains a change, the follower can remove its local copy when it is
+no longer needed by readers. Frequent leader checkpoints and follower checkpoint adoption
+therefore reduce the amount of data followers must retain locally. A local copy is not removed
+merely because a checkpoint was produced; the follower must first adopt it, and removal must be
+safe for existing readers.
+
+Keeping changes locally does not persist them to shared storage. Applications remain
+responsible for replication and for replaying changes needed after a restart.
+
+@htmlonly
+<style>@media print { .disagg-role-example { display:none; } }</style>
+<div class="disagg-role-example">
+<iframe src="disagg-roles-animation.html" title="Leader and follower checkpoint example"
+  style="width:100%;height:580px;border:0;"></iframe>
+</div>
+@endhtmlonly
+
+@section disagg_role_management_changes Changing a node's role
+
+The application changes a node's role using WT_CONNECTION::reconfigure with
+<code>disaggregated=(role=...)</code>. There are two role changes: <b>step-up</b> changes a follower
+into a leader, and <b>step-down</b> changes a leader into a follower. Reconfiguration performs
+the local storage-engine transition, not the election or replication of changes to another node.
+The application must prevent competing shared writers and satisfy the transaction and checkpoint
+requirements of each role change.
+
+@section disagg_role_management_handoff Handing off shared writes
+
+Moving shared-write responsibility from one node to another combines a step-down on the old
+leader with a step-up on the new one. The last shared checkpoint the old leader takes before
+stepping down is the <b>concluding checkpoint</b>; it is the base from which the new leader
+continues. A complete handoff usually proceeds as follows:
+
+1. The old leader takes the concluding checkpoint and steps down, as described in
+   @ref disagg_role_management_step_down.
+2. The application passes the concluding checkpoint's metadata to the node that will become the
+   new leader, which adopts it through WT_CONNECTION::reconfigure with
+   <code>disaggregated=(checkpoint_meta=...)</code>.
+3. The new leader steps up, as described in @ref disagg_role_management_step_up. The old leader
+   can write to shared storage until its step-down reconfiguration completes, so the new leader
+   must not step up before then.
+4. Data writes and schema operations not included in the concluding checkpoint are applied on
+   the new leader, either before step-up as replicated follower writes or after it as leader
+   writes. Retaining them locally on the old leader does not transfer them to another node.
+
+Step 4 applies whether or not schema epochs are used: schema epochs select which schema
+operations a checkpoint includes, but do not replace replication. The application must make the
+corresponding schema available before applying data writes that depend on it.
+
+The diagram shows one asynchronous handoff in which the next leader adopts the checkpoint
+while still a follower, before the old leader completes its step-down. The example omits schema
+epochs; their additional settings are described in @ref disagg_role_management_schema.
+
+@htmlonly
+<div style="overflow-x:auto;" tabindex="0" aria-label="Shared-write handoff timeline">
+<div style="min-width:1100px;">
+@endhtmlonly
+@image html disagg-handoff.svg
+@htmlonly
+</div></div>
+@endhtmlonly
+
+@section disagg_role_management_step_up Step-up
+
+Step-up is initiated by calling WT_CONNECTION::reconfigure with
+<code>disaggregated=(role=leader)</code> on a follower. After the call completes, the node can
+accept leader writes and produce shared checkpoints for the disaggregated database.
+
+@subsection disagg_role_management_step_up_requirements Requirements
+
+Transactions and positioned cursors must not span step-up. The application must finish
+transactions and reset or close positioned cursors before the step-up reconfiguration.
+
+@subsection disagg_role_management_step_up_flow Usual flow
+
+The usual flow of step-up is:
+
+1. Finish transactions and reset or close positioned cursors.
+2. Ensure the follower has adopted the concluding checkpoint and has applied the replicated
+   operations needed for it to become the new leader.
+3. Call WT_CONNECTION::reconfigure with <code>disaggregated=(role=leader)</code>.
+4. Start new leader operations after reconfiguration completes.
+
+@section disagg_role_management_step_down Step-down
+
+Step-down changes a leader into a follower by calling WT_CONNECTION::reconfigure with
+<code>disaggregated=(role=follower)</code>. The node stops persisting shared writes and instead
+stores replicated changes locally while continuing to read shared checkpointed data.
+
+Every change the node accepted as leader must end up either in the concluding checkpoint or in a
+local copy that survives the reconfiguration. The application chooses between two ways of
+drawing that boundary: blocking step-down stops writes while the concluding checkpoint is
+taken, while asynchronous step-down declares the boundary in advance so writes can continue
+during the checkpoint.
+
+@subsection disagg_role_management_blocking Blocking step-down
+
+The simplest approach, once the application decides to step down, is to take a concluding
+checkpoint and then call WT_CONNECTION::reconfigure with
+<code>disaggregated=(role=follower)</code>. This approach cannot accept writes that will not be
+included in the concluding checkpoint, so the application must stop serving writes while taking
+that checkpoint and reconfiguring the connection.
+
+@subsubsection disagg_role_management_blocking_requirements Requirements
+
+- All write transactions must finish before taking the concluding checkpoint. No writes are
+  allowed from the start of that checkpoint through the step-down reconfiguration.
+- The stable timestamp must cover every committed change before the concluding checkpoint is
+  taken.
+- Cursors used for writes must be reset or closed before the step-down reconfiguration.
+  Committing a transaction does not reset its cursors, and neither does an auto-commit write.
+
+@subsubsection disagg_role_management_blocking_flow Usual flow
+
+1. Stop new writes and finish all write transactions.
+2. Advance the stable timestamp to cover their changes and take the concluding checkpoint with
+   WT_SESSION::checkpoint.
+3. Hand off the concluding checkpoint, reset or close cursors used for writes, and call
+   WT_CONNECTION::reconfigure with <code>disaggregated=(role=follower)</code>, keeping writes
+   stopped through the call.
+4. Resume follower operations after reconfiguration completes.
+
+@subsection disagg_role_management_async Asynchronous step-down
+
+Asynchronous step-down is initiated by calling WT_CONNECTION::set_timestamp with
+<code>step_down_timestamp=N</code> on a leader. N defines the concluding checkpoint's boundary:
+changes committed at or below N are included, while later writes are retained locally. Reads,
+writes, and schema operations can continue while the checkpoint is taken and handed to the next
+leader. Writes must still stop for the step-down reconfiguration itself, so asynchronous
+step-down shortens the period of write unavailability compared with blocking step-down, but does
+not eliminate it.
+
+@subsubsection disagg_role_management_async_requirements Requirements
+
+The application must meet the following requirements and the timestamp API contract described
+in WT_CONNECTION::set_timestamp:
+
+- The step-down timestamp can only be set on a leader, and only once per step-down. Once set,
+  it cannot be changed or cleared; only the step-down reconfiguration clears it, so a step-down
+  cannot be abandoned after N is set.
+- N must be newer than every committed transaction's commit timestamp.
+- Write transactions beginning after N is set must commit with a timestamp higher than N.
+- Operations on layered tables must use explicit snapshot-isolation transactions. Auto-commit,
+  read-committed, and read-uncommitted operations must not occur while N is set.
+- WT_SESSION::reset_snapshot must not be called while N is set.
+- Prepared transactions and truncate operations must finish before N is set and must not occur
+  while it is set.
+- The stable timestamp must not advance above N. Both the stable timestamp and the timestamp of
+  the last completed shared checkpoint must equal N at the step-down reconfiguration.
+- All write transactions must finish, and cursors used for writes must be reset or closed,
+  before the step-down reconfiguration. No writes or active write transactions may run during
+  that call.
+- Operations above N must be applied on the new leader, as described in
+  @ref disagg_role_management_handoff.
+- When schema epochs are used, the requirements in @ref disagg_role_management_schema also
+  apply.
+
+@subsubsection disagg_role_management_async_flow Usual flow
+
+The usual flow of asynchronous step-down is:
+
+1. <b>Set the step-down timestamp:</b> choose N newer than every allocated commit timestamp and
+   call WT_CONNECTION::set_timestamp.
+2. <b>Create the concluding checkpoint:</b> advance <code>stable_timestamp</code> to N once every
+   commit at or below N has completed, and call WT_SESSION::checkpoint. WiredTiger rolls back
+   write transactions that began before N was set, so the only such commits are those already
+   in progress when N was set.
+3. <b>Hand off the concluding checkpoint:</b> writes can continue while the next leader adopts
+   it.
+4. <b>Stop serving write operations:</b> stop new writes, wait for all ongoing write transactions
+   to finish, and reset or close cursors used for writes. Writes must remain stopped during the
+   step-down reconfiguration.
+5. <b>Reconfigure:</b> call WT_CONNECTION::reconfigure with
+   <code>disaggregated=(role=follower)</code> to switch WiredTiger to follower operations.
+6. Resume follower operations after reconfiguration completes.
+
+@subsubsection disagg_role_management_rollbacks Rollbacks during step-down
+
+Some transactions that overlap an asynchronous step-down receive WT_ROLLBACK:
+
+- A write transaction that began before N was set receives WT_ROLLBACK if it straddles setting the
+step-down timestamp.
+- A transaction without a read timestamp whose snapshot spans the step-down reconfiguration
+  receives WT_ROLLBACK. Transactions with a read timestamp continue across the reconfiguration,
+  and positioned read cursors remain usable.
+
+See @ref error_handling for rollback handling.
+
+@subsection disagg_role_management_schema Schema operations during step-down
+
+Data timestamps and <b>schema epochs</b> describe different boundaries: one selects record
+versions, while the other selects schema operations included in shared metadata. Creating or
+dropping a table locally does not publish the change to other nodes. The application
+replicates schema operations, and shared checkpoints contain the corresponding metadata. With
+schema epochs, WT_SESSION::publish assigns epochs to pending schema operations for a table;
+checkpointing includes published operations through the stable schema epoch.
+
+Without schema epochs, the concluding checkpoint includes the schema operations issued before it
+starts, with one exception: tables created after the step-down timestamp was set are not
+included.
+
+When schema epochs are in use with asynchronous step-down,
+<code>step_down_disaggregated_schema_epoch=E</code> must be provided together with the
+step-down timestamp N. Before taking the concluding checkpoint, the schema operations required
+through epoch E must be completed and published, and <code>stable_disaggregated_schema_epoch</code>
+must advance to E. E must not be older than the existing stable schema epoch. The stable schema
+epoch must not advance above E during the step-down process and must remain at E through the
+step-down reconfiguration.
+
+With blocking step-down, no step-down epoch is set. The concluding checkpoint includes published
+operations through the stable schema epoch, so the application advances that epoch to cover the
+schema operations being handed off before taking the checkpoint.
+
+*/

@@ -228,26 +228,14 @@
     } while (0)
 
 /*
- * Update a time aggregate from a page deleted structure. A page delete is equivalent to an entire
- * page of identical tombstones; this operation is equivalent to applying WT_TIME_AGGREGATE_UPDATE
- * for each tombstone. Note that it does not affect the start times.
- */
-#define WT_TIME_AGGREGATE_UPDATE_PAGE_DEL(session, ta, page_del)                          \
-    do {                                                                                  \
-        WT_ASSERT(session, (ta)->init_merge == 1);                                        \
-        (ta)->newest_stop_durable_ts =                                                    \
-          WT_MAX((page_del)->pg_del_durable_ts, (ta)->newest_stop_durable_ts);            \
-        (ta)->newest_txn = WT_MAX((page_del)->txnid, (ta)->newest_txn);                   \
-        (ta)->newest_stop_ts = WT_MAX((page_del)->pg_del_start_ts, (ta)->newest_stop_ts); \
-        (ta)->newest_stop_txn = WT_MAX((page_del)->txnid, (ta)->newest_stop_txn);         \
-        if ((page_del)->txnid != WT_TXN_NONE)                                             \
-            (ta)->oldest_stop_txn = WT_MIN((page_del)->txnid, (ta)->oldest_stop_txn);     \
-    } while (0)
-
-/*
  * Merge a page deletion as the global stop point for every record in an aggregate. The aggregate
  * unpacked from a deleted-address cell describes the child page as it was before the truncate, so
  * its stop information is stale and must be replaced.
+ *
+ * No prepared page deletion reaches this macro yet, so plain reads are sufficient. Once one can,
+ * callers must pass a private copy rather than the live ref->page_del, which a concurrent prepared
+ * commit or rollback can modify or free. Page deletions never enter WT_PREPARE_LOCKED; the shared
+ * predicate covers it only defensively.
  */
 #define WT_TIME_AGGREGATE_MERGE_PAGE_DEL(ta, page_del)                                \
     do {                                                                              \
@@ -257,6 +245,8 @@
         (ta)->newest_stop_txn = (page_del)->txnid;                                    \
         if ((page_del)->txnid != WT_TXN_NONE)                                         \
             (ta)->oldest_stop_txn = WT_MIN((page_del)->txnid, (ta)->oldest_stop_txn); \
+        if (__wt_prepare_state_unresolved((page_del)->prepare_state))                 \
+            (ta)->prepare = 1;                                                        \
     } while (0)
 
 /* Merge an aggregated time window into another - choosing the most conservative value from each. */

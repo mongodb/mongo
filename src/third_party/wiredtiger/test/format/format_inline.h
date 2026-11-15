@@ -307,8 +307,11 @@ table_cursor(TINFO *tinfo, u_int id)
     --id;
 
     if (tinfo->cursors[id] == NULL) {
-        /* Configure "append", in the case of column stores, we append when inserting new rows. */
-        config = table->type == ROW ? NULL : "append";
+        /* Column stores append when inserting new rows. */
+        if (table->type != ROW)
+            config = "append";
+        else
+            config = TV(DISAGG_BLIND_REMOVE) ? "blind_remove=true" : NULL;
         wt_wrap_open_cursor(tinfo->session, table->uri, config, &tinfo->cursors[id]);
     }
     return (tinfo->cursors[id]);

@@ -159,6 +159,13 @@ config_random(TABLE *table, bool table_only)
             continue;
 
         /*
+         * Non-layered tables don't support blind removes, so don't randomly turn them on. Skipping
+         * the random pick also keeps saved CONFIG files replaying the same way.
+         */
+        if (cp->off == V_TABLE_DISAGG_BLIND_REMOVE && !DATASOURCE(table, "layered"))
+            continue;
+
+        /*
          * Boolean flags are 0 or 1, where the variable's "min" value is the percent chance the flag
          * is "on" (so "on" if random rolled <= N, otherwise "off").
          */
@@ -301,6 +308,14 @@ config_table(TABLE *table, void *arg)
 
     /* Fill in random values for the rest of the run. */
     config_random(table, true);
+
+    /* Only layered tables support blind removes. */
+    if (!DATASOURCE(table, "layered")) {
+        if (config_explicit(table, "disagg.blind_remove") && TV(DISAGG_BLIND_REMOVE))
+            WARN("turning off disagg.blind_remove for table%" PRIu32 " as it isn't layered",
+              table->id);
+        config_off(table, "disagg.blind_remove");
+    }
 
     /* Page sizes are configured using powers-of-two or megabytes, convert them. */
     table->max_intl_page = 1U << TV(BTREE_INTERNAL_PAGE_MAX);

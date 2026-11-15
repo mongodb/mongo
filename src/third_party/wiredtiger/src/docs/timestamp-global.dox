@@ -31,6 +31,9 @@ Note that updating the stable timestamp does not itself trigger a database
 checkpoint or change data durability; updates before the new stable timestamp
 become stable (and thus visible after recovery) as part of the next checkpoint.
 
+For step-down timestamps and their application contract in disaggregated storage, see
+@ref disagg_role_management.
+
 @section timestamp_global_setting_timestamps Setting global timestamps
 
 The following table lists the global timestamps an application can set using the
@@ -40,6 +43,7 @@ WT_CONNECTION::set_timestamp method, including constraints.
 |-----------|-------------|-------------|
 | durable_timestamp | none | temporarily set the system's maximum durable timestamp, bounding the timestamp returned by \c all_durable. |
 | oldest_timestamp | <= stable; may not move backward, set to the value as of the last checkpoint during recovery | Inform the system future reads and writes will never be earlier than the specified timestamp. |
+| stable_disaggregated_schema_epoch | may not move backward; on a leader, >= the schema epoch of the last checkpoint; not restored on restart | Inform the system checkpoints should not include schema operations published at a later schema epoch. Disaggregated storage only. |
 | stable_timestamp | may not move backward, set to the stable timestamp during rollback-to-stable and recovery | Inform the system checkpoints should not include commits newer than the specified timestamp. |
 
 @subsection timestamp_global_set_api_durable_timestamp Setting the global "durable_timestamp" timestamp
@@ -101,6 +105,71 @@ be useful for backup scenarios where rolling back to a stable timestamp
 isn't possible and it's useful for a checkpoint to contain the most recent
 possible data.
 
+@subsection timestamp_global_set_api_stable_schema_epoch Setting the "stable_disaggregated_schema_epoch" timestamp
+
+In disaggregated storage, the leader writes the creates and drops of layered
+tables to the shared metadata with each checkpoint, and other nodes learn about
+them from there. Schema epochs determine which of these operations a checkpoint
+includes: the application assigns each operation a schema epoch, and a
+checkpoint includes the operations at or below the
+\c stable_disaggregated_schema_epoch. Schema epochs use the same format as
+timestamps, but advance independently of the commit and stable timestamps.
+
+On every node, a create or drop of a layered table is pending until the shared
+metadata includes it. A pending operation is unpublished until the application
+assigns it a schema epoch with WT_SESSION::publish, for example
+<tt>disaggregated=(schema_epoch=20)</tt>. When a checkpoint starts, it reads the
+current stable schema epoch. The checkpoint includes the pending operations
+published at or below that epoch and records the epoch. Operations published
+above it, and unpublished operations, stay pending for a later checkpoint.
+
+The application runs the same schema operations on followers and publishes them
+at the same schema epochs as on the leader. When a follower picks up a
+checkpoint, it discards its pending operations at or below the schema epoch
+recorded in that checkpoint. After a step-up, the new leader's pending
+operations are those the shared metadata does not include yet.
+
+WT_SESSION::publish applies to \c table: and \c layered: URIs and assigns the
+given schema epoch to every unpublished operation for the table. It fails with
+\c EINVAL if:
+- the schema epoch is not later than the stable schema epoch;
+- the schema epoch is not later than the schema epoch of the last checkpoint
+(see @ref timestamp_global_query_api_last_schema_epoch);
+- the table has no pending operations.
+
+WiredTiger panics if the stable schema epoch is not set, or if the table was
+created before it was set. Dropping a table whose create is still unpublished
+cancels the create, and neither operation is published.
+
+A layered table created while the stable schema epoch is set stays in memory
+until a checkpoint includes the create. A checkpoint that does not include a
+table's create fails with \c EINVAL if the table holds data with a durable
+timestamp at or below the stable timestamp. Therefore, before the stable
+timestamp reaches the durable timestamp of the first update to the table:
+- publish the table at a schema epoch;
+- advance the stable schema epoch to at least that epoch.
+
+The stable schema epoch has these constraints:
+- It may not move backward, even with <tt>force=true</tt>. Setting the current
+value again has no effect.
+- On a leader, it may not be set below the schema epoch recorded in the shared
+metadata by the last checkpoint.
+- Once set, it cannot be unset. It is not saved across restarts: the
+application must set it again after a restart.
+- For a planned step-down, the application sets
+\c step_down_disaggregated_schema_epoch with \c step_down_timestamp.
+Operations issued before the step-down timestamp was set must be published at
+or below the step-down schema epoch, and operations issued after it above. The
+stable schema epoch may not pass the step-down schema epoch, and must equal it
+when the node steps down.
+
+If the stable schema epoch is not set, schema operations are not gated: each
+checkpoint includes the operations pending when it started, and
+WT_SESSION::publish is not used. A checkpoint with <tt>use_timestamp=false</tt>
+is not gated either, even when the stable schema epoch is set: it also includes
+unpublished operations. In both cases, the checkpoint keeps the schema epoch of
+the previous checkpoint in the shared metadata.
+
 @section timestamp_global_querying_timestamps Querying global timestamps
 
 The following table lists the global timestamps an application can query using
@@ -113,10 +182,12 @@ or \c oldest_reader if there are no active transactions.
 |-----------|-------------|-------------|
 | all_durable | None | The largest timestamp such that all timestamps up to that value have been made durable, bounded by the \c durable timestamp. |
 | last_checkpoint | <= stable | The stable timestamp at which the last checkpoint ran. |
+| last_disaggregated_schema_epoch | None | The schema epoch of the last checkpoint this node wrote or picked up. |
 | oldest_reader | None | The timestamp of the oldest currently active read transaction. |
 | oldest_timestamp | <= stable | The current application-set \c oldest_timestamp value. |
 | pinned | <= oldest | The minimum of the \c oldest_timestamp and the oldest active reader. |
 | recovery | <= stable | The stable timestamp used in the most recent checkpoint prior to the last shutdown. |
+| stable_disaggregated_schema_epoch | None | The current application-set \c stable_disaggregated_schema_epoch value. |
 | stable_timestamp | None | The current application-set \c stable_timestamp value. |
 
 @subsection timestamp_global_query_api_all_durable Reading the "all_durable" timestamp
@@ -167,6 +238,15 @@ of the \c recovery timestamp. Generally, applications are expected to use the
 
 The \c last_checkpoint timestamp is read-only.
 
+@subsection timestamp_global_query_api_last_schema_epoch Reading the "last_disaggregated_schema_epoch" timestamp
+
+The \c last_disaggregated_schema_epoch is the schema epoch of the last
+checkpoint this node wrote or picked up, or 0 after a checkpoint with
+<tt>use_timestamp=false</tt>. Read after a restart, before the first
+checkpoint, it is the minimum a leader may set the stable schema epoch to.
+
+The \c last_disaggregated_schema_epoch timestamp is read-only.
+
 @subsection timestamp_global_query_api_oldest_reader Reading the "oldest_reader" timestamp
 
 The \c oldest_reader timestamp is the oldest transaction read timestamp active,
@@ -196,6 +276,12 @@ performed on startup. Applications can use the \c recovery timestamp to
 retrieve the value the stable timestamp had at system startup.
 
 The \c recovery timestamp is read-only.
+
+@subsection timestamp_global_query_api_stable_schema_epoch Reading the "stable_disaggregated_schema_epoch" timestamp
+
+The \c stable_disaggregated_schema_epoch is the current
+\c stable_disaggregated_schema_epoch as set by the application, or 0 if it is
+not set.
 
 @subsection timestamp_global_query_api_stable_timestamp Reading the "stable_timestamp" timestamp
 

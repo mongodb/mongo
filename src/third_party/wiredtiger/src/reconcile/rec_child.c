@@ -62,7 +62,7 @@ __rec_child_deleted(
 
             if (visible) {
                 prepare_state = __wt_atomic_load_uint8_v_acquire(&page_del->prepare_state);
-                if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
+                if (__wt_prepare_state_unresolved(prepare_state))
                     visible = false;
             }
 
@@ -146,7 +146,7 @@ __rec_child_deleted(
      * lost in hard-to-debug ways.
      */
     prepare_state = __wt_atomic_load_uint8_v_acquire(&page_del->prepare_state);
-    if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED) {
+    if (__wt_prepare_state_unresolved(prepare_state)) {
         WT_ASSERT_ALWAYS(session, !F_ISSET(r, WT_REC_EVICT),
           "In progress prepares should never be seen in eviction");
         WT_ASSERT(session, !visible_all);

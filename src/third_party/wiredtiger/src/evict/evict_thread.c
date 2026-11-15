@@ -616,6 +616,23 @@ __evict_update_work(WT_SESSION_IMPL *session, bool *eviction_needed)
 }
 
 /*
+ * __evict_pass_charge --
+ *     Add the time since the last charge to the pass time. Charge right after recording a timed
+ *     sub-interval so the pass time never lags the sub-interval times for a concurrent reader.
+ */
+static inline void
+__evict_pass_charge(WT_SESSION_IMPL *session, uint64_t *time_lastp)
+{
+    uint64_t time_now;
+
+    if (!WT_STAT_ENABLED(session))
+        return;
+    time_now = __wt_clock(session);
+    WT_STAT_CONN_INCRV(session, eviction_server_pass_time, WT_CLOCKDIFF_US(time_now, *time_lastp));
+    *time_lastp = time_now;
+}
+
+/*
  * __evict_pass --
  *     Evict pages from memory.
  */
@@ -627,7 +644,7 @@ __evict_pass(WT_SESSION_IMPL *session)
     WT_EVICT *evict;
     WT_TXN_GLOBAL *txn_global;
     uint64_t eviction_progress, oldest_id, prev_oldest_id;
-    uint64_t time_now, time_prev;
+    uint64_t time_last, time_now, time_prev, time_start, time_stop;
     u_int loop;
     bool eviction_needed;
 
@@ -636,6 +653,7 @@ __evict_pass(WT_SESSION_IMPL *session)
     evict = conn->evict;
     eviction_needed = false;
     txn_global = &conn->txn_global;
+    time_last = 0;
     time_prev = 0; /* [-Wconditional-uninitialized] */
 
     /* Track whether pages are being evicted and progress is made. */
@@ -647,6 +665,12 @@ __evict_pass(WT_SESSION_IMPL *session)
         time_now = __wt_clock(session);
         if (loop == 0)
             time_prev = time_now;
+
+        /* Charge pass time every iteration: under sustained pressure the pass may not return. */
+        if (time_last != 0)
+            WT_STAT_CONN_INCRV(
+              session, eviction_server_pass_time, WT_CLOCKDIFF_US(time_now, time_last));
+        time_last = time_now;
 
         __evict_tune_workers(session);
         /*
@@ -666,7 +690,13 @@ __evict_pass(WT_SESSION_IMPL *session)
          * to prevent the oldest ID falling too far behind. Don't wait to lock the table: with
          * highly threaded workloads, that creates a bottleneck.
          */
+        time_start = WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
         WT_RET(__wt_txn_update_oldest(session, WT_TXN_OLDEST_STRICT));
+        if (time_start != 0) {
+            time_stop = __wt_clock(session);
+            WT_STAT_CONN_INCRV(
+              session, eviction_server_oldest_id_time, WT_CLOCKDIFF_US(time_stop, time_start));
+        }
 
         WT_RET(__evict_update_work(session, &eviction_needed));
         if (!eviction_needed)
@@ -680,8 +710,10 @@ __evict_pass(WT_SESSION_IMPL *session)
             __wt_atomic_load_uint64_relaxed(&cache->bytes_dirty_leaf),
           __wt_atomic_load_uint64_relaxed(&cache->bytes_updates));
 
-        if (F_ISSET(evict, WT_EVICT_CACHE_ALL))
+        if (F_ISSET(evict, WT_EVICT_CACHE_ALL)) {
             WT_RET(__wti_evict_lru_walk(session));
+            __evict_pass_charge(session, &time_last);
+        }
 
         /*
          * If the queue has been empty recently, keep queuing more pages to evict. If the rate of
@@ -738,7 +770,14 @@ __evict_pass(WT_SESSION_IMPL *session)
                  * wait for a non-zero number of microseconds).
                  */
                 WT_STAT_CONN_INCR(session, eviction_server_slept);
+                time_start = WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
                 __wt_cond_wait(session, evict->evict_cond, WT_THOUSAND, NULL);
+                if (time_start != 0) {
+                    time_stop = __wt_clock(session);
+                    WT_STAT_CONN_INCRV(
+                      session, eviction_server_slept_time, WT_CLOCKDIFF_US(time_stop, time_start));
+                    __evict_pass_charge(session, &time_last);
+                }
                 continue;
             }
 
@@ -750,6 +789,9 @@ __evict_pass(WT_SESSION_IMPL *session)
         loop = 0;
         eviction_progress = __wt_atomic_load_uint64_v_relaxed(&evict->eviction_progress);
     }
+
+    if (time_last != 0)
+        __evict_pass_charge(session, &time_last);
     return (0);
 }
 

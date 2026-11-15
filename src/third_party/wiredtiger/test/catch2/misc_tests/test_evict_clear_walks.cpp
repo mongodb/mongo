@@ -303,7 +303,9 @@ TEST_CASE("Skipping idle trees lets a waiting writer take the handle list lock",
         });
 
         scanning = true;
-        int ret = __wti_evict_walk(t.evict->walk_session, t.evict->evict_fill_queue);
+        uint64_t tree_walk_ns, lock_wait_ns;
+        int ret = __wti_evict_walk(
+          t.evict->walk_session, t.evict->evict_fill_queue, &tree_walk_ns, &lock_wait_ns);
         scan_done = true;
         writer_thread.join();
 
@@ -403,7 +405,8 @@ TEST_CASE("A walk that moves on to the root does not save it as a walk point", "
     queue->evict_entries = slot;
     __wti_evict_set_saved_walk_tree(t.session, dhandle);
 
-    ret = __wti_evict_walk(walk_session, queue);
+    uint64_t tree_walk_ns, lock_wait_ns;
+    ret = __wti_evict_walk(walk_session, queue, &tree_walk_ns, &lock_wait_ns);
     uint32_t queued = queue->evict_entries - slot;
     WT_REF *queued_ref = queue->evict_queue[slot].ref;
     WT_REF *saved = __wt_atomic_load_ptr_relaxed(&btree->evict_ref);

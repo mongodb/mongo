@@ -218,6 +218,7 @@ ar
 archiver
 arg
 args
+async
 atomicity
 atomics
 autoconf
@@ -725,6 +726,7 @@ statlog
 stderr
 stdin
 stdout
+stepdown
 str
 strerror
 strftime
@@ -746,6 +748,7 @@ sys
 syscalls
 sz
 tRuE
+tabindex
 table's
 tablename
 tagrex

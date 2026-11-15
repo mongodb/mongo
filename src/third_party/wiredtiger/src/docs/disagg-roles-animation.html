@@ -69,18 +69,18 @@
         <section class="box write"><h2>Write</h2><span class="entry">A</span></section>
         <section class="box leader" id="leader"><h2>Leader</h2>
           <div class="tables">
-            <div class="table ingest"><h3>Ingest table</h3></div>
-            <div class="table stable" id="leader-stable"><h3>Stable table</h3><span class="entry" data-entry="leader">A</span></div>
+            <div class="table ingest"><h3>Local</h3></div>
+            <div class="table stable" id="leader-stable"><h3>Shared</h3><span class="entry" data-entry="leader">A</span></div>
           </div>
         </section>
         <section class="box log" id="log"><h2>Log service</h2><span class="entry" data-entry="log">A</span></section>
         <section class="box follower" id="follower"><h2>Follower</h2>
           <div class="tables">
-            <div class="table ingest" id="follower-ingest"><h3>Ingest table</h3><span class="entry" data-entry="ingest" hidden>A</span></div>
-            <div class="table stable" id="follower-stable"><h3>Stable table</h3><span class="entry" data-entry="stable">A</span></div>
+            <div class="table ingest" id="follower-ingest"><h3>Local</h3><span class="entry" data-entry="ingest" hidden>A</span></div>
+            <div class="table stable" id="follower-stable"><h3>Shared</h3><span class="entry" data-entry="stable">A</span></div>
           </div>
         </section>
-        <section class="box storage" id="storage"><h2>Storage</h2><span>Checkpoint</span><br><span class="entry" data-entry="checkpoint">A</span></section>
+        <section class="box storage" id="storage"><h2>Shared storage</h2><span>Checkpoint</span><br><span class="entry" data-entry="checkpoint">A</span></section>
         <svg class="paths couriers" viewBox="0 0 1000 340" preserveAspectRatio="none" aria-hidden="true">
           <g class="packet"><rect class="courier" x="-12" y="-13" width="24" height="26" rx="4"/>
             <text y="6">A</text></g>
@@ -88,7 +88,7 @@
       </div>
     </div>
     <p class="caption" id="caption" aria-live="polite" aria-atomic="true">The leader's write is
-      checkpointed and adopted by the follower. Its covered ingest table copy can be removed
+      checkpointed and adopted by the follower. Its covered local copy can be removed
       when no longer needed by readers.</p>
     <div class="controls" hidden>
       <button type="button" id="prev">Prev</button>
@@ -96,20 +96,20 @@
       <button type="button" id="loop" aria-pressed="false">Loop</button>
       <span id="position"></span>
     </div>
-    <p class="note">Each loop repeats an independent write. Checkpoint adoption makes the ingest
-      table copy eligible for eviction; removal waits until it is safe.</p>
+    <p class="note">Each loop repeats an independent write. Checkpoint adoption makes the local
+      copy eligible for removal; cleanup waits until it is safe for readers.</p>
   </main>
   <script>
     (() => {
       "use strict";
       const frames = [
-        {entries: [], target: "leader-stable", path: 0, text: "The user write reaches the leader's stable table."},
+        {entries: [], target: "leader-stable", path: 0, text: "The leader accepts the application write."},
         {entries: ["leader"], target: "log", path: 1, text: "The change is recorded in the log service by the application."},
-        {entries: ["leader", "log"], target: "follower-ingest", path: 2, text: "The application replicates the write into the follower's ingest table."},
-        {entries: ["leader", "log", "ingest"], target: "storage", path: 3, text: "The leader checkpoints the write to storage."},
-        {entries: ["leader", "log", "ingest", "checkpoint"], target: "follower-stable", path: 4, text: "The follower adopts the checkpoint as its stable table view."},
-        {entries: ["leader", "log", "ingest", "checkpoint", "stable"], target: "follower-ingest", path: 5, text: "When safe for readers, eviction removes the covered ingest table copy."},
-        {entries: ["leader", "log", "checkpoint", "stable"], text: "The write remains in the checkpoint. Its ingest table copy has been reclaimed."}
+        {entries: ["leader", "log"], target: "follower-ingest", path: 2, text: "The application replicates the write to the follower, which stores it locally."},
+        {entries: ["leader", "log", "ingest"], target: "storage", path: 3, text: "The leader persists the write in a shared checkpoint."},
+        {entries: ["leader", "log", "ingest", "checkpoint"], target: "follower-stable", path: 4, text: "The follower adopts the checkpoint and can access the shared data."},
+        {entries: ["leader", "log", "ingest", "checkpoint", "stable"], target: "follower-ingest", path: 5, text: "When safe for readers, cleanup removes the covered local copy."},
+        {entries: ["leader", "log", "checkpoint", "stable"], text: "The write remains in the shared checkpoint. Its local copy has been reclaimed."}
       ];
       const paths = [...document.querySelectorAll(".wire, .eviction-path")];
       const packet = document.querySelector(".packet");

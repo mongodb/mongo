@@ -45,6 +45,9 @@ each of which is ordered by one or more columns.
 - @subpage readonly
 - @subpage signals
 
+<h2>Disaggregated storage</h2>
+- @subpage disagg_role_management
+
 <h2>Advanced topics</h2>
 - @subpage backup
 - @subpage compact
