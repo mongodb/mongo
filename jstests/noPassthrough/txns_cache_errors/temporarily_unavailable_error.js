@@ -15,6 +15,9 @@ const replSet = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
         wiredTigerCacheSizeGB: 0.256,
+        // Pin the updates eviction trigger (10% of the cache), which this test depends on to reach
+        // cache pressure with a small cache, so it does not rely on the WiredTiger default.
+        wiredTigerEngineConfigString: "eviction_updates_trigger=10",
         setParameter: {
             logComponentVerbosity: tojson({control: 1, write: 1}),
             // Lower these values from the defaults to speed up the test.

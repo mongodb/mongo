@@ -15,8 +15,9 @@ import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 const replSet = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
-        // Shrink the cache to cause cache pressure sooner.
-        wiredTigerEngineConfigString: "cache_size=256M",
+        // Shrink the cache to cause cache pressure sooner, and pin the updates eviction trigger
+        // (10% of the cache) so the test does not depend on the WiredTiger default.
+        wiredTigerEngineConfigString: "cache_size=256M,eviction_updates_trigger=10",
         setParameter: {
             // Disable the transaction too large for cache check.
             transactionTooLargeForCacheThreshold: 0.1,

@@ -45,7 +45,10 @@ function testIdleAbort() {
             // Shrink the cache to cause cache pressure sooner, and keep WiredTiger from giving up
             // on eviction while the cache is stuck.
             wiredTigerCacheSizeGB: 0.256,
-            wiredTigerEngineConfigString: "cache_stuck_timeout_ms=600000",
+            // Pin the updates eviction trigger (10% of the cache) so the test does not depend on
+            // the WiredTiger default.
+            wiredTigerEngineConfigString:
+                "cache_stuck_timeout_ms=600000,eviction_updates_trigger=10",
             setParameter: {
                 // Start with a long lifetime so the churn transactions below can accumulate
                 // pinned dirty data. It is lowered once the cache is full.
@@ -111,8 +114,9 @@ function testCachePressureAbort() {
     let replSet = new ReplSetTest({
         nodes: 1,
         nodeOptions: {
-            // Shrink the cache to cause cache pressure sooner.
-            wiredTigerEngineConfigString: "cache_size=256M",
+            // Shrink the cache to cause cache pressure sooner, and pin the updates eviction
+            // trigger (10% of the cache) so the test does not depend on the WiredTiger default.
+            wiredTigerEngineConfigString: "cache_size=256M,eviction_updates_trigger=10",
             setParameter: {
                 // Prevent the idle-timeout from doing anything.
                 transactionLifetimeLimitSeconds: 24 * 60 * 60,
