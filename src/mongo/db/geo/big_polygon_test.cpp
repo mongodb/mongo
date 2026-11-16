@@ -44,11 +44,24 @@ S2Loop* loop(const PointBuilder& builder) {
     return new S2Loop(builder.points);
 }
 
-vector<S2Loop*>* loopVec(const PointBuilder& builder) {
-    static vector<S2Loop*> loops;
-    loops.clear();
-    loops.push_back(loop(builder));
-    return &loops;
+// Owns the loop for a single-loop S2Polygon and converts to the vector pointer its
+// constructor expects. S2Polygon::Init() swaps the loops out, so the temporary is empty
+// by the time it is destroyed at the end of the full expression.
+class LoopVec {
+public:
+    explicit LoopVec(const PointBuilder& builder) {
+        loops_.push_back(loop(builder));
+    }
+    operator vector<S2Loop*>*() {
+        return &loops_;
+    }
+
+private:
+    vector<S2Loop*> loops_;
+};
+
+LoopVec loopVec(const PointBuilder& builder) {
+    return LoopVec(builder);
 }
 
 S2LatLng LatLng(double lat, double lng) {
@@ -58,10 +71,23 @@ S2LatLng LatLng(double lat, double lng) {
 // Syntax sugar for PointBuilder, which can be used to construct
 // - vector<S2Point> pointVec()
 // - S2Loop* loop()
-// - vector<S2Loop*>* loopVec()
+// - LoopVec loopVec()
 //
 // e.g. points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0) << LatLng(0.0, 0.0))
 typedef PointBuilder points;
+
+// Builds a closed convex ring of 'n' distinct vertices around a circle centered at
+// (lat, lng), with the given radius in degrees.
+PointBuilder ringPoints(int n, double radiusDeg, double lat = 0.0, double lng = 0.0) {
+    PointBuilder builder;
+    for (int i = 0; i < n; ++i) {
+        // Negative angle sweeps the ring clockwise in (lat, lng), matching the ordering
+        // used elsewhere in this file, so the loop encloses the small interior region.
+        const double angle = -2.0 * M_PI * i / n;
+        builder << LatLng(lat + radiusDeg * std::cos(angle), lng + radiusDeg * std::sin(angle));
+    }
+    return builder;
+}
 
 TEST(BigSimplePolygon, Basic) {
     // A 20x20 square centered at [0,0]
@@ -578,6 +604,91 @@ TEST(BigSimplePolygon, ConcurrentBorderCacheInitIsThreadSafe) {
                 ASSERT_TRUE(bigPoly.Intersects(innerPoly));
                 ASSERT_TRUE(bigPoly.Intersects(innerLine));
                 ASSERT_TRUE(bigPoly.Contains(innerLine));
+            }
+        });
+    }
+
+    for (auto& th : threads)
+        th.join();
+}
+
+TEST(S2Polygon, ConcurrentContainsOnSharedPolygonIsThreadSafe) {
+    // A polygon with >2000 vertices, large enough to exercise S2's
+    // lazily-initialized internal state. Concurrent queries against the same
+    // shared polygon must not race on that state.
+    S2Polygon sharedPoly(loopVec(ringPoints(2500, 1.0)));
+
+    // A second polygon used as the argument to the containment and intersection
+    // queries below.
+    S2Polygon innerPoly(loopVec(ringPoints(40, 0.1)));
+    const S2Point center = LatLng(0.0, 0.0).ToPoint();
+
+    // Sanity-check the geometry before exercising it from multiple threads.
+    ASSERT_TRUE(sharedPoly.Contains(center));
+
+    constexpr int kThreads = 16;
+    constexpr int kIters = 100;
+    std::vector<std::thread> threads;
+    threads.reserve(kThreads);
+
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&] {
+            for (int i = 0; i < kIters; ++i) {
+                ASSERT_TRUE(sharedPoly.Contains(&innerPoly));
+                ASSERT_TRUE(sharedPoly.Contains(center));
+                ASSERT_TRUE(sharedPoly.Intersects(&innerPoly));
+            }
+        });
+    }
+
+    for (auto& th : threads)
+        th.join();
+}
+
+TEST(BigSimplePolygon, ConcurrentContainsPointIsThreadSafe) {
+    // BigSimplePolygon::Contains(S2Point) delegates to S2Loop::Contains(S2Point),
+    // which for large loops queries lazily-initialized internal state. Concurrent
+    // calls against the same shared object must not race on that state.
+    BigSimplePolygon bigPoly(loop(ringPoints(2500, 2.0)));
+    const S2Point center = LatLng(0.0, 0.0).ToPoint();
+
+    constexpr int kThreads = 16;
+    constexpr int kIters = 100;
+    std::vector<std::thread> threads;
+    threads.reserve(kThreads);
+
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&] {
+            for (int i = 0; i < kIters; ++i) {
+                ASSERT_TRUE(bigPoly.Contains(center));
+            }
+        });
+    }
+
+    for (auto& th : threads)
+        th.join();
+}
+
+TEST(S2Polygon, ConcurrentFindVertexOnPrewarmedLoopIsThreadSafe) {
+    // A polygon with >2000 vertices whose edge index is pre-built, leaving the
+    // loop's lazily-initialized vertex lookup state for concurrent queries to
+    // populate. Concurrent queries against the same shared polygon must not race
+    // on that state.
+    S2Polygon sharedPoly(loopVec(ringPoints(2500, 1.0)));
+    // This call pre-builds the edge index:
+    ASSERT_TRUE(sharedPoly.loop(0)->IsValid());
+
+    S2Polygon innerPoly(loopVec(ringPoints(6, 0.1)));
+
+    constexpr int kThreads = 16;
+    constexpr int kIters = 100;
+    std::vector<std::thread> threads;
+    threads.reserve(kThreads);
+
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&] {
+            for (int i = 0; i < kIters; ++i) {
+                ASSERT_TRUE(sharedPoly.Intersects(&innerPoly));
             }
         });
     }

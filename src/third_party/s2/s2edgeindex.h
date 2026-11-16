@@ -5,10 +5,12 @@
 #ifndef UTIL_GEOMETRY_S2EDGEINDEX_H_
 #define UTIL_GEOMETRY_S2EDGEINDEX_H_
 
+#include <atomic>
 #include <map>
 using std::map;
 using std::multimap;
 
+#include <mutex>
 #include <utility>
 using std::pair;
 using std::make_pair;
@@ -79,6 +81,12 @@ class S2Cell;
 //
 // TODO(user): Get a better API without the clumsy GetCandidates().
 //   Maybe edge_index.GetIterator()?
+//
+// Thread safety. An S2EdgeIndex may be shared across threads, and the index is
+// built lazily the first time candidates are requested. ComputeIndex() and Reset() are
+// internally synchronized; once the index has been computed it is immutable and may be
+// queried concurrently without holding any lock. Reset() must not be called concurrently
+// with queries (it is only invoked from construction/Decode/Init/Invert paths).
 class S2EdgeIndex {
  public:
   S2EdgeIndex() { Reset(); }
@@ -215,17 +223,24 @@ class S2EdgeIndex {
 
   // Maps cell ids to covered edges; has the property that the set of all cell
   // ids mapping to a particular edge forms a covering of that edge.
+  //
+  // mapping_ and minimum_s2_level_used_ are written only while holding mutex_
+  // (in ComputeIndex()/Reset()) and are published to lock-free readers by the
+  // release-store of index_computed_ at the end of ComputeIndex().
   CellEdgeMultimap mapping_;
 
   // No cell strictly below this level appears in mapping_.  Initially leaf
   // level, that's the minimum level at which we will ever look for test edges.
   int minimum_s2_level_used_;
 
-  // Has the index been computed already?
-  bool index_computed_;
-
-  // Number of queries so far
-  int query_count_;
+  // Thread-safety for the lazily built index.
+  //   - mutex_ serializes ComputeIndex() and Reset(); it is never held on the read path.
+  //   - index_computed_ is set with a release-store once mapping_ is fully built; all
+  //     reads use an acquire-load, which publishes the map to other threads.
+  //   - query_count_ is only a heuristic, so it is a relaxed atomic.
+  mutable std::mutex mutex_;
+  mutable std::atomic<bool> index_computed_;
+  mutable std::atomic<int> query_count_;
 
   DISALLOW_COPY_AND_ASSIGN(S2EdgeIndex);
 };
