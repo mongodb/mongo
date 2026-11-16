@@ -1,5 +1,5 @@
-------------------------- MODULE MCExactInitialSync -------------------------
-EXTENDS ExactInitialSync
+------------------------- MODULE MCBufferedInitialSync -------------------------
+EXTENDS BufferedInitialSync
 
 MCParts == << {1, 2}, {3} >>
 

@@ -1,7 +1,7 @@
--------------------------- MODULE ExactInitialSync --------------------------
-\* Exact initial sync.
+-------------------------- MODULE BufferedInitialSync --------------------------
+\* Buffered initial sync.
 \*
-\* A model of the per-partition copy / route / flush procedure for exact
+\* A model of the per-partition copy / route / flush procedure for buffered
 \* initial sync: snapshot a source while it is being mutated, then switch to
 \* a change stream and apply every event exactly once. The design relies on
 \* the following assumptions marked [A1]..[A4].
