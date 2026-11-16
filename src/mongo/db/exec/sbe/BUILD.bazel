@@ -234,6 +234,7 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/exec/sbe/stages:batched_simple_ix_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:generic_scan.cpp",
+        "//src/mongo/db/exec/sbe/stages:index_key_checks.cpp",
         "//src/mongo/db/exec/sbe/stages:ix_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:multi_range_clustered_scan_stage.cpp",
         "//src/mongo/db/exec/sbe/stages:random_scan.cpp",

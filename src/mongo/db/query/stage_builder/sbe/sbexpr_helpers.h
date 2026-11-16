@@ -729,8 +729,7 @@ public:
                                DatabaseName dbName,
                                SbSlot seekSlot,
                                std::vector<std::string> scanFieldNames,
-                               const SbIndexInfoSlots& indexInfoSlots,
-                               sbe::FetchCallbacks scanCallbacks);
+                               const SbIndexInfoSlots& indexInfoSlots);
 
     SbStage makeExtractFieldPaths(SbStage child,
                                   std::vector<sbe::PathSlot> inputs,

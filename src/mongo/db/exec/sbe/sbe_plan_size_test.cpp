@@ -320,8 +320,7 @@ TEST_F(PlanSizeTest, Fetch) {
                                                         generateSlotId(),
                                                         generateSlotId(),
                                                         StringListSet({}),
-                                                        value::SlotVector(),
-                                                        FetchCallbacks());
+                                                        value::SlotVector());
     auto stage = makeS<FetchStage>(
         mockS(), collUuid, DatabaseName(), fetchState, nullptr, kEmptyPlanNodeId, true);
     assertPlanSize(*stage);

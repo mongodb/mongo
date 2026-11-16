@@ -5,9 +5,6 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
@@ -103,174 +100,6 @@ uint32_t dateTypeMask() {
             getBSONTypeMask(sbe::value::TypeTags::bsonObjectId));
 }
 
-/**
- * Callback function that logs a message and uasserts if it detects a corrupt index key. An index
- * key is considered corrupt if it has no corresponding Record.
- */
-void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
-                                     sbe::value::SlotAccessor* snapshotIdAccessor,
-                                     sbe::value::SlotAccessor* indexKeyAccessor,
-                                     sbe::value::SlotAccessor* indexKeyPatternAccessor,
-                                     const RecordId& rid,
-                                     const NamespaceString& nss) {
-    // Having a recordId but no record is only an issue when we are not ignoring prepare conflicts.
-    if (!ignoresPrepareConflicts(
-            shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior())) {
-        tassert(5113700, "Should have snapshot id accessor", snapshotIdAccessor);
-        auto currentSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
-        auto [snapshotIdTag, snapshotIdVal] = snapshotIdAccessor->getViewOfValue();
-        const auto msgSnapshotIdTag = snapshotIdTag;
-        tassert(5113701,
-                str::stream() << "SnapshotId is of wrong type: " << msgSnapshotIdTag,
-                snapshotIdTag == sbe::value::TypeTags::NumberInt64);
-        auto snapshotId = sbe::value::bitcastTo<uint64_t>(snapshotIdVal);
-
-        // If we have a recordId but no corresponding record, this means that said record has been
-        // deleted. This can occur during yield, in which case the snapshot id would be incremented.
-        // If, on the other hand, the current snapshot id matches that of the recordId, this
-        // indicates an error as no yield could have taken place.
-        if (snapshotId == currentSnapshotId.toNumber()) {
-            tassert(5113703, "Should have index key accessor", indexKeyAccessor);
-            tassert(5113704, "Should have key pattern accessor", indexKeyPatternAccessor);
-
-            auto [ksTag, ksVal] = indexKeyAccessor->getViewOfValue();
-            auto [kpTag, kpVal] = indexKeyPatternAccessor->getViewOfValue();
-
-            const auto msgKsTag = ksTag;
-            tassert(5113706,
-                    str::stream() << "KeyString is of wrong type: " << msgKsTag,
-                    ksTag == sbe::value::TypeTags::keyString);
-
-            const auto msgKpTag = kpTag;
-            tassert(5113707,
-                    str::stream() << "Index key pattern is of wrong type: " << msgKpTag,
-                    kpTag == sbe::value::TypeTags::bsonObject);
-
-            auto keyString = sbe::value::getKeyString(ksVal);
-            tassert(5113708, "KeyString does not exist", keyString);
-
-            BSONObj bsonKeyPattern(sbe::value::bitcastTo<const char*>(kpVal));
-            auto bsonKeyString = key_string::toBson(keyString->getKeyStringView(),
-                                                    Ordering::make(bsonKeyPattern),
-                                                    keyString->getTypeBitsView(),
-                                                    keyString->getVersion());
-            auto hydratedKey = IndexKeyEntry::rehydrateKey(bsonKeyPattern, bsonKeyString);
-
-            LOGV2_ERROR_OPTIONS(
-                5113709,
-                {logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)},
-                "Erroneous index key found with reference to non-existent record id. Consider "
-                "dropping and then re-creating the index and then running the validate command "
-                "on the collection.",
-                logAttrs(nss),
-                "recordId"_attr = rid,
-                "indexKeyData"_attr = hydratedKey);
-        }
-    }
-}
-
-/**
- * Callback function that returns true if a given index key is valid, false otherwise. An index key
- * is valid if either the snapshot id of the underlying index scan matches the current snapshot id,
- * or that the index keys are still part of the underlying index.
- */
-bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
-                                      StringMap<const IndexCatalogEntry*>& entryMap,
-                                      sbe::value::SlotAccessor* snapshotIdAccessor,
-                                      sbe::value::SlotAccessor* indexIdentAccessor,
-                                      sbe::value::SlotAccessor* indexKeyAccessor,
-                                      const CollectionPtr& collection,
-                                      const Record& nextRecord) {
-    // The index consistency check is only performed when 'snapshotIdAccessor' is set.
-    if (snapshotIdAccessor) {
-        auto currentSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
-        auto [snapshotIdTag, snapshotIdVal] = snapshotIdAccessor->getViewOfValue();
-        const auto msgSnapshotIdTag = snapshotIdTag;
-        tassert(5290704,
-                str::stream() << "SnapshotId is of wrong type: " << msgSnapshotIdTag,
-                snapshotIdTag == sbe::value::TypeTags::NumberInt64);
-
-        auto snapshotId = sbe::value::bitcastTo<uint64_t>(snapshotIdVal);
-        if (currentSnapshotId.toNumber() != snapshotId) {
-            tassert(5290707, "Should have index key accessor", indexKeyAccessor);
-            tassert(5290714, "Should have index ident accessor", indexIdentAccessor);
-
-            auto [identTag, identVal] = indexIdentAccessor->getViewOfValue();
-            auto [ksTag, ksVal] = indexKeyAccessor->getViewOfValue();
-
-            const auto msgIdentTag = identTag;
-            tassert(5290708,
-                    str::stream() << "Index name is of wrong type: " << msgIdentTag,
-                    sbe::value::isString(identTag));
-
-            const auto msgKsTag = ksTag;
-            tassert(5290710,
-                    str::stream() << "KeyString is of wrong type: " << msgKsTag,
-                    ksTag == sbe::value::TypeTags::keyString);
-
-            auto keyString = sbe::value::getKeyString(ksVal);
-            auto indexIdent = sbe::value::getStringView(identTag, identVal);
-            tassert(5290712, "KeyString does not exist", keyString);
-
-            auto it = entryMap.find(indexIdent);
-
-            // If 'entryMap' doesn't contain an entry for 'indexIdent', create one.
-            if (it == entryMap.end()) {
-                auto indexCatalog = collection->getIndexCatalog();
-                auto entry = indexCatalog->findIndexByIdent(opCtx, indexIdent);
-                auto indexDesc = entry ? entry->descriptor() : nullptr;
-
-                // Throw an error if we can't get the IndexDescriptor or the IndexCatalogEntry
-                // (or if the index is dropped).
-                uassert(ErrorCodes::QueryPlanKilled,
-                        str::stream() << "query plan killed :: index dropped: " << indexIdent,
-                        indexDesc && entry);
-
-                auto [newIt, _] = entryMap.emplace(indexIdent, entry);
-
-                it = newIt;
-            }
-
-            auto entry = it->second;
-            auto iam = entry->accessMethod()->asSortedData();
-            tassert(5290709,
-                    str::stream() << "Expected to find SortedDataIndexAccessMethod for index: "
-                                  << indexIdent,
-                    iam);
-
-            auto& containerPool = PreallocatedContainerPool::get(opCtx);
-            auto keys = containerPool.keys();
-            SharedBufferFragmentBuilder pooledBuilder(
-                key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
-
-            // There's no need to compute the prefixes of the indexed fields that cause the
-            // index to be multikey when ensuring the keyData is still valid.
-            KeyStringSet* multikeyMetadataKeys = nullptr;
-            MultikeyPaths* multikeyPaths = nullptr;
-
-            iam->getKeys(opCtx,
-                         collection,
-                         entry,
-                         pooledBuilder,
-                         nextRecord.data.toBson(),
-                         InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,
-                         SortedDataIndexAccessMethod::GetKeysContext::kValidatingKeys,
-                         keys.get(),
-                         multikeyMetadataKeys,
-                         multikeyPaths,
-                         nextRecord.id);
-
-            return keys->count(keyString->getValueCopy());
-        }
-    }
-
-    return true;
-}
-
-sbe::FetchCallbacks makeFetchCallbacks() {
-    return sbe::FetchCallbacks(indexKeyCorruptionCheckCallback, indexKeyConsistencyCheckCallback);
-}
-
 std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
     SbStage inputStage,
     std::vector<std::string> fields,
@@ -291,9 +120,6 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
     // in the QSN tree to indicate which collection we are fetching over.
     tassert(6355301, "Cannot fetch from a collection that doesn't exist", collToFetch);
 
-    sbe::FetchCallbacks callbacks(indexKeyCorruptionCheckCallback,
-                                  indexKeyConsistencyCheckCallback);
-
     SbIndexInfoSlots indexInfoSlots;
     indexInfoSlots.indexIdentSlot = indexIdentSlot;
     indexInfoSlots.indexKeySlot = indexKeySlot;
@@ -306,8 +132,7 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
                            collToFetch->ns().dbName(),
                            seekRecordIdSlot,
                            fields,
-                           indexInfoSlots,
-                           callbacks);
+                           indexInfoSlots);
     };
 
     if (!prefetchedResultSlot) {

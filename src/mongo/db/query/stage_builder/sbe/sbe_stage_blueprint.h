@@ -1401,7 +1401,6 @@ struct SbBlueprintFetchInfo {
     sbe::value::SlotId seekSlot{0};
     SbIndexInfoSlots indexInfoSlots;
     std::vector<std::string> scanFieldNames;
-    sbe::FetchCallbacks scanCallbacks;
 
     sbe::value::SlotId recordSlot{0};
     sbe::value::SlotId recordIdSlot{0};

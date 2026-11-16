@@ -7,7 +7,6 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/scan_helpers.h"
@@ -17,6 +16,8 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_listset.h"
@@ -33,19 +34,6 @@
 namespace mongo {
 namespace sbe {
 
-struct FetchCallbacks {
-    FetchCallbacks(IndexKeyCorruptionCheckCallback indexKeyCorruptionCheck = nullptr,
-                   IndexKeyConsistencyCheckCallback indexKeyConsistencyCheck = nullptr,
-                   ScanOpenCallback scanOpen = nullptr)
-        : indexKeyCorruptionCheckCallback(std::move(indexKeyCorruptionCheck)),
-          indexKeyConsistencyCheckCallback(std::move(indexKeyConsistencyCheck)),
-          scanOpenCallback(std::move(scanOpen)) {}
-
-    IndexKeyCorruptionCheckCallback indexKeyCorruptionCheckCallback = nullptr;
-    IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallback = nullptr;
-    ScanOpenCallback scanOpenCallback = nullptr;
-};
-
 struct FetchStageState {
     // Input slots
     value::SlotId seekSlot;
@@ -59,8 +47,6 @@ struct FetchStageState {
     value::SlotId recordIdSlot;
     StringListSet scanFieldNames;
     value::SlotVector scanFieldSlots;
-
-    FetchCallbacks fetchCallbacks;
 };
 
 /**

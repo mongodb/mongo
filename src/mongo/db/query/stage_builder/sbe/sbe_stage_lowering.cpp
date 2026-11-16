@@ -507,8 +507,7 @@ struct Lowerer {
             node.info->recordSlot,
             node.info->recordIdSlot,
             StringListSet(node.info->scanFieldNames),
-            std::move(node.info->scanFieldSlots),
-            std::move(node.info->scanCallbacks));
+            std::move(node.info->scanFieldSlots));
 
         return sbe::makeS<sbe::FetchStage>(std::move(child),
                                            std::move(node.info->collectionUuid),

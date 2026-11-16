@@ -9,7 +9,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/stages/index_key_checks.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
@@ -170,10 +172,6 @@ void FetchStage::open(bool reOpen) {
     _children[0]->open(reOpen);
     _recordIdAccessor.reset(
         value::TagValueView{value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_seekRid)});
-
-    if (_state->fetchCallbacks.scanOpenCallback) {
-        _state->fetchCallbacks.scanOpenCallback(_opCtx, _coll->getCollectionPtr());
-    }
 }
 
 PlanState FetchStage::getNext() {
@@ -190,24 +188,8 @@ PlanState FetchStage::getNext() {
 
     boost::optional<Record> record;
 
-    // TODO SERVER-113879 investigate whether callbacks can use a named function instead, to
-    // guarantee inlining.
-    auto checkRecordConsistency = [&]() -> bool {
-        const auto callback = _state->fetchCallbacks.indexKeyConsistencyCheckCallback;
-        if (!callback) {
-            return true;
-        }
-        return callback(_opCtx,
-                        _indexCatalogEntryMap,
-                        _snapshotIdAccessor,
-                        _indexIdentAccessor,
-                        _indexKeyAccessor,
-                        _coll->getCollectionPtr(),
-                        *record);
-    };
-
-    // For as long as we haven't found a valid record, the record fails the consistency check,
-    // try to seek the record id.
+    // Look up index entries until we find one with a matching record in the collection that is
+    // still consistent with the index key.
     do {
         auto state = _children[0]->getNext();
         if (state == PlanState::IS_EOF) {
@@ -224,19 +206,49 @@ PlanState FetchStage::getNext() {
         _seekRid = *value::getRecordIdView(seekVal);
         tassert(11430201, "Cursor must not be null", _cursor);
         record = _cursor->seekExact(_seekRid);
-        if (!record) {
-            if (_state->fetchCallbacks.indexKeyCorruptionCheckCallback) {
-                tassert(10794901, "Collection name should be initialized", _coll.has_value());
-                _state->fetchCallbacks.indexKeyCorruptionCheckCallback(
-                    _opCtx,
-                    _snapshotIdAccessor,
-                    _indexKeyAccessor,
-                    _indexKeyPatternAccessor,
-                    _seekRid,
-                    _coll->getCollectionPtr()->ns());
+
+        if (_snapshotIdAccessor != nullptr) {
+            auto [snapshotIdTag, snapshotIdVal] = _snapshotIdAccessor->getViewOfValue();
+            const auto msgSnapshotIdTag = snapshotIdTag;
+            tassert(5113701,
+                    str::stream() << "SnapshotId is of wrong type: " << msgSnapshotIdTag,
+                    snapshotIdTag == value::TypeTags::NumberInt64);
+            auto snapshotId = value::bitcastTo<uint64_t>(snapshotIdVal);
+
+            if (snapshotId ==
+                shard_role_details::getRecoveryUnit(_opCtx)->getSnapshotId().toNumber()) {
+                // We are fetching from the same snapshot that our index scan obtained its record id
+                // from, so we expect to find the record unless we are observing the effects of a
+                // prepared transaction conflict.
+                if (!record) {
+                    tassert(10794901, "Collection name should be initialized", _coll.has_value());
+                    checkIndexKeyCorruption(_opCtx,
+                                            _indexKeyAccessor,
+                                            _indexKeyPatternAccessor,
+                                            _seekRid,
+                                            _coll->getCollectionPtr()->ns());
+                }
+            } else if (record) {
+                // We found a record from a different snapshot than the one our index scan used. If
+                // modifications to the document make it inconsistent with the index key, it's
+                // possible that it no longer matches the predicate used to choose the index bounds,
+                // so we skip it.
+                if (!isIndexKeyConsistent(_opCtx,
+                                          _indexCatalogEntryMap,
+                                          _indexIdentAccessor,
+                                          _indexKeyAccessor,
+                                          _coll->getCollectionPtr(),
+                                          *record)) {
+                    record.reset();
+                    continue;
+                }
+            } else {
+                // We did not find a record, but we assume that the record existed in the snapshot
+                // used for the index scan and does not exist in the current snapshot, which is not
+                // an error.
             }
         }
-    } while (!record || !checkRecordConsistency());
+    } while (!record);
 
     _recordAccessor.reset(value::TagValueView{
         value::TypeTags::bsonObject, value::bitcastFrom<const char*>(record->data.data())});

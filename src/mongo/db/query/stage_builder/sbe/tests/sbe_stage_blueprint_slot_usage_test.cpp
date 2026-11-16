@@ -281,13 +281,8 @@ TEST_F(SbBlueprintSlotUsageTest, FetchAndMultiRangeScanRecordsAreObjects) {
     const auto scanUsage = SbBlueprintSlotUsage::build(blueprint(), scan.idx(), {});
     ASSERT_EQ(scanUsage.getInfo(scanRecord.getId()).typeSig, TypeSignature::kObjectType);
 
-    auto [fetch, fetchRecord, fetchRecordId, fetchFields] = b.makeFetch(std::move(scan),
-                                                                        UUID::gen(),
-                                                                        DatabaseName::kAdmin,
-                                                                        scanRecordId,
-                                                                        {},
-                                                                        SbIndexInfoSlots{},
-                                                                        {});
+    auto [fetch, fetchRecord, fetchRecordId, fetchFields] = b.makeFetch(
+        std::move(scan), UUID::gen(), DatabaseName::kAdmin, scanRecordId, {}, SbIndexInfoSlots{});
     const auto fetchUsage = SbBlueprintSlotUsage::build(blueprint(), fetch.idx(), {});
     ASSERT_EQ(fetchUsage.getInfo(fetchRecord.getId()).typeSig, TypeSignature::kObjectType);
 }

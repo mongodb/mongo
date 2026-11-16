@@ -81,8 +81,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToFetchStage) {
                                                         generateSlotId(),
                                                         generateSlotId(),
                                                         StringListSet({}),
-                                                        value::SlotVector(),
-                                                        FetchCallbacks());
+                                                        value::SlotVector());
     auto fetchStage = makeS<sbe::FetchStage>(makeS<CoScanStage>(kEmptyPlanNodeId),
                                              collUuid,
                                              DatabaseName(),

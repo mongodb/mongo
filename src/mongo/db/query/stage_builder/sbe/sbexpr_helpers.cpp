@@ -1290,8 +1290,7 @@ SbBuilder::FetchBuildResult SbBuilder::makeFetch(SbStage child,
                                                  DatabaseName dbName,
                                                  SbSlot seekSlot,
                                                  std::vector<std::string> scanFieldNames,
-                                                 const SbIndexInfoSlots& indexInfoSlots,
-                                                 sbe::FetchCallbacks scanCallbacks) {
+                                                 const SbIndexInfoSlots& indexInfoSlots) {
     auto resultSlot = SbSlot{_state.slotId()};
     auto recordIdSlot = SbSlot{_state.slotId()};
 
@@ -1311,7 +1310,6 @@ SbBuilder::FetchBuildResult SbBuilder::makeFetch(SbStage child,
                                                   .seekSlot = seekSlot.getId(),
                                                   .indexInfoSlots = indexInfoSlots,
                                                   .scanFieldNames = std::move(scanFieldNames),
-                                                  .scanCallbacks = std::move(scanCallbacks),
                                                   .recordSlot = resultSlot.getId(),
                                                   .recordIdSlot = recordIdSlot.getId(),
                                                   .scanFieldSlots = lower(scanFieldSlots)})});
