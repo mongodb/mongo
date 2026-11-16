@@ -47,6 +47,10 @@ struct GetOutputTypeExpressionVisitor final
                                               expression::PathSemantics::kFieldPath);
     }
 
+    void visit(const ExpressionNot* expr) override {
+        returnsBoolean();
+    }
+
     void visit(const ExpressionOr* expr) override {
         returnsBoolean();
     }
@@ -118,6 +122,11 @@ struct NarrowTypeExpressionVisitor final
         }
     }
 
+    void visit(const ExpressionNot* expr) override {
+        tassert(13918800, "$not must have one operand", expr->getChildren().size() == 1);
+        type = narrowType(std::move(type), expr->getChildren().front().get(), !assumeTrue);
+    }
+
     void visit(const ExpressionAnd* expr) override {
         type = assumeTrue ? narrowByEveryChild(std::move(type), expr->getChildren(), true)
                           : narrowBySomeChild(std::move(type), expr->getChildren(), false);
@@ -129,10 +138,11 @@ struct NarrowTypeExpressionVisitor final
     }
 
     void visit(const ExpressionCompare* expr) override {
-        // TODO(SERVER-139188): Support additional comparison operators.
-        if (expr->getOp() != ExpressionCompare::EQ) {
+        const auto op = expr->getOp();
+        if (op != ExpressionCompare::EQ && op != ExpressionCompare::NE) {
             return;
         }
+        const bool assumeEqual = op == ExpressionCompare::EQ ? assumeTrue : !assumeTrue;
 
         // Only equality involving a field path is modeled.
         const auto& children = expr->getChildren();
@@ -148,7 +158,7 @@ struct NarrowTypeExpressionVisitor final
             const Type outputType = getOutputType(type, children[otherIndex].get());
             // Under negation, only a singleton type identifies the other operand's value.
             if (outputType.getTypeSet() == TypeSet::any() ||
-                (!assumeTrue && !outputType.isSingletonType())) {
+                (!assumeEqual && !outputType.isSingletonType())) {
                 continue;
             }
 
@@ -157,7 +167,7 @@ struct NarrowTypeExpressionVisitor final
                                           path->getFieldPathWithoutCurrentPrefix(),
                                           expression::PathSemantics::kFieldPath,
                                           std::move(constraint),
-                                          assumeTrue);
+                                          assumeEqual);
             return;
         }
     }

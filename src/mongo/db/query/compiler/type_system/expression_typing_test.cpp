@@ -5,13 +5,17 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/type_system/type_system_test_util.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
 
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -206,13 +210,16 @@ TEST(ExpressionTypingTest, EqualityNarrowingExcludesNullWhenFalse) {
     ASSERT_EQ(falseType.toDebugString(), "{a: ~null, ...}");
 }
 
-TEST(ExpressionTypingTest, InequalityNarrowingRemainsUnsupported) {
+TEST(ExpressionTypingTest, InequalityNarrowingLeavesUntypedOperandsUnchanged) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const Type anyObject = Type::anyObject();
-    auto expr = parseExpr(fromjson("{$ne: ['$a', 1]}"), *expCtx);
-
-    for (bool assumeTrue : {false, true}) {
-        ASSERT_EQ(narrowType(anyObject, expr.get(), assumeTrue).toDebugString(), "object");
+    for (const auto& spec :
+         {"{$ne: ['$a', '$b']}", "{$ne: ['$a', '$$NOW']}", "{$ne: ['$a', {$add: [1, 1]}]}"}) {
+        auto expr = parseExpr(fromjson(spec), *expCtx);
+        for (bool assumeTrue : {false, true}) {
+            ASSERT_EQ(narrowType(anyObject, expr.get(), assumeTrue).toDebugString(), "object")
+                << spec << ", assumption " << assumeTrue;
+        }
     }
 }
 
@@ -367,32 +374,308 @@ TEST(ExpressionTypingTest, LogicalNarrowingUsesConstantTruthiness) {
     }
 }
 
-TEST(ExpressionTypingTest, LogicalNarrowingPreservesEvaluationResults) {
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
-    const auto values = extendedRepresentatives();
-    for (const auto& spec : {"{$and: [{$eq: ['$a', 1]}, {$eq: ['x', '$b']}]}",
-                             "{$or: [{$eq: [1, '$a']}, {$eq: ['$b', 'x']}]}",
-                             "{$not: [{$and: [{$eq: ['$a', 1]}, {$eq: ['$b', 'x']}]}]}",
-                             "{$and: [{$or: [false, {$eq: ['$a', 1]}]}, "
-                             "{$not: [{$eq: ['x', '$b']}]}]}",
-                             "{$or: [{$add: [1, 2]}, {$eq: ['$a', 1]}]}"}) {
-        auto expr = parseExpr(fromjson(spec), *expCtx);
-        const auto narrowedTrue = narrowType(Type::anyObject(), expr.get(), true);
-        const auto narrowedFalse = narrowType(Type::anyObject(), expr.get(), false);
-        for (const auto& a : values) {
-            for (const auto& b : values) {
-                Document doc{{"a", a}, {"b", b}};
-                const bool result = expr->evaluate(doc, &expCtx->variables, {}).coerceToBool();
-                ASSERT_TRUE((result ? narrowedTrue : narrowedFalse).hasValue(Value(doc)))
-                    << spec << ", document " << doc.toString() << ", result " << result << ", type "
-                    << (result ? narrowedTrue : narrowedFalse).toDebugString();
-            }
-        }
-        const Document missing{};
-        const bool result = expr->evaluate(missing, &expCtx->variables, {}).coerceToBool();
-        ASSERT_TRUE((result ? narrowedTrue : narrowedFalse).hasValue(Value(missing)))
-            << spec << ", type " << (result ? narrowedTrue : narrowedFalse).toDebugString();
+TEST(ExpressionTypingTest, LogicalNarrowingExpectedTypes) {
+    for (const auto& [spec, expectedTrue, expectedFalse] : {
+             std::tuple{"{$and: [{$eq: ['$a', 1]}, {$eq: ['x', '$b']}]}",
+                        "{a: number(S), b: string(S)|symbol(S), ...}",
+                        "object"},
+             std::tuple{"{$or: [{$eq: [1, '$a']}, {$eq: ['$b', 'x']}]}", "object(S)", "object"},
+             std::tuple{"{$not: [{$and: [{$eq: ['$a', 1]}, {$eq: ['$b', 'x']}]}]}",
+                        "object",
+                        "{a: number(S), b: string(S)|symbol(S), ...}"},
+             std::tuple{"{$and: [{$or: [false, {$eq: ['$a', 1]}]}, "
+                        "{$not: [{$eq: ['x', '$b']}]}]}",
+                        "{a: number(S), ...}",
+                        "object"},
+             std::tuple{"{$or: [{$add: [1, 2]}, {$eq: ['$a', 1]}]}", "object", "object"},
+             std::tuple{"{$or: [{$eq: ['$a', null]}, {$eq: ['$b', null]}]}",
+                        "object(S)",
+                        "{a: ~null, b: ~null, ...}"},
+             std::tuple{"{$not: [{$or: [{$eq: ['$a', null]}, {$eq: ['$b', null]}]}]}",
+                        "{a: ~null, b: ~null, ...}",
+                        "object(S)"},
+         }) {
+        ASSERT_EQ(narrowedDebugString(spec, Type::anyObject(), true), expectedTrue) << spec;
+        ASSERT_EQ(narrowedDebugString(spec, Type::anyObject(), false), expectedFalse) << spec;
     }
+}
+
+TEST(ExpressionTypingTest, InequalityNarrowingIsNegatedEquality) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    for (const auto& operands : {"['$a', 1]",
+                                 "[1, '$a']",
+                                 "['$a', null]",
+                                 "[null, '$a']",
+                                 "['$a', '$b']",
+                                 "['$b', '$a']",
+                                 "['$a', [1]]",
+                                 "[{x: 1}, '$a']",
+                                 "['$a', {$add: [1, 1]}]"}) {
+        auto eq = parseExpr(fromjson(std::string("{$eq: ") + operands + "}"), *expCtx);
+        auto ne = parseExpr(fromjson(std::string("{$ne: ") + operands + "}"), *expCtx);
+        for (bool assumeTrue : {false, true}) {
+            ASSERT_EQ(narrowType(Type::anyObject(), ne.get(), assumeTrue).toDebugString(),
+                      narrowType(Type::anyObject(), eq.get(), !assumeTrue).toDebugString())
+                << operands << ", assumption " << assumeTrue;
+        }
+    }
+
+    auto number = parseExpr(fromjson("{$ne: ['$a', 1]}"), *expCtx);
+    auto unequalNumbers = narrowType(Type::anyObject(), number.get(), true);
+    ASSERT_EQ(unequalNumbers.toDebugString(), "object");
+    auto equalNumbers = narrowType(Type::anyObject(), number.get(), false);
+    ASSERT_EQ(equalNumbers.toDebugString(), "{a: number(S), ...}");
+
+    auto null = parseExpr(fromjson("{$ne: ['$a', null]}"), *expCtx);
+    auto notNull = narrowType(Type::anyObject(), null.get(), true);
+    ASSERT_EQ(notNull.toDebugString(), "{a: ~null, ...}");
+}
+
+TEST(ExpressionTypingTest, InequalityNarrowingExpectedTypes) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    struct TestCase {
+        Value constant;
+        const char* ifEqual;
+        const char* ifNotEqual;
+    };
+    const std::vector<TestCase> cases{
+        {Value(), "missing|undefined", "~(missing|undefined)"},
+        {Value(BSONUndefined), "missing|undefined", "~(missing|undefined)"},
+        {Value(BSONNULL), "null", "~null"},
+        {Value(MINKEY), "minKey", "~minKey"},
+        {Value(MAXKEY), "maxKey", "~maxKey"},
+        {Value(0), "number(S)", "any"},
+        {Value(1), "number(S)", "any"},
+        {Value(2), "number(S)", "any"},
+        {Value(1LL), "number(S)", "any"},
+        {Value(1.0), "number(S)", "any"},
+        {Value(Decimal128(1)), "number(S)", "any"},
+        {Value("str"sv), "string(S)|symbol(S)", "any"},
+        {Value(BSONSymbol("sym")), "string(S)|symbol(S)", "any"},
+        {Value(BSONBinData("", 0, BinDataGeneral)), "binData(S)", "any"},
+        {Value(OID("0123456789abcdef01234567")), "objectId(S)", "any"},
+        {Value(Date_t()), "date(S)", "any"},
+        {Value(Timestamp(1, 1)), "timestamp(S)", "any"},
+        {Value(BSONRegEx("a")), "regex(S)", "any"},
+        {Value(BSONDBRef("db.coll", OID("0123456789abcdef01234567"))), "dbPointer(S)", "any"},
+        {Value(BSONCode("f()")), "javascript(S)", "any"},
+        {Value(BSONCodeWScope("f()", BSON("a" << 1))), "javascriptWithScope(S)", "any"},
+        {Value(false), "bool(S)", "any"},
+        {Value(true), "bool(S)", "any"},
+        {Value(BSONObj()), "object(S)", "any"},
+        {Value(BSON("x" << 1)), "object(S)", "any"},
+        {Value(std::vector<Value>{}), "array(S)", "any"},
+        {Value(std::vector<Value>{Value(1)}), "array(S)", "any"},
+    };
+    auto path =
+        ExpressionFieldPath::createPathFromString(expCtx.get(), "a", expCtx->variablesParseState);
+    for (const auto& [constant, ifEqual, ifNotEqual] : cases) {
+        auto literal = ExpressionConstant::create(expCtx.get(), constant);
+        for (bool reverse : {false, true}) {
+            auto expr = reverse
+                ? ExpressionCompare::create(expCtx.get(), ExpressionCompare::NE, literal, path)
+                : ExpressionCompare::create(expCtx.get(), ExpressionCompare::NE, path, literal);
+            ASSERT_EQ(
+                narrowType(Type::anyObject(), expr.get(), false).getField("a").toDebugString(),
+                ifEqual)
+                << "constant " << constant.toString() << ", reverse " << reverse;
+            ASSERT_EQ(narrowType(Type::anyObject(), expr.get(), true).getField("a").toDebugString(),
+                      ifNotEqual)
+                << "constant " << constant.toString() << ", reverse " << reverse;
+        }
+    }
+}
+
+TEST(ExpressionTypingTest, InequalityNarrowingDottedPaths) {
+    for (const auto& [spec, expectedTrue, expectedFalse] : {
+             std::tuple{"{$ne: ['$a.b', 1]}", "object", "{a: {b: number(S), ...}, ...}"},
+             std::tuple{"{$ne: [1, '$a.b']}", "object", "{a: {b: number(S), ...}, ...}"},
+             std::tuple{"{$ne: ['$a.b', null]}",
+                        "{a: ~object|{b: ~null, ...}, ...}",
+                        "{a: {b: null, ...}, ...}"},
+             std::tuple{"{$ne: [null, '$a.b']}",
+                        "{a: ~object|{b: ~null, ...}, ...}",
+                        "{a: {b: null, ...}, ...}"},
+             std::tuple{"{$ne: ['$$ROOT.a.b', 1]}", "object", "{a: {b: number(S), ...}, ...}"},
+             std::tuple{"{$ne: [null, '$$CURRENT.a.b']}",
+                        "{a: ~object|{b: ~null, ...}, ...}",
+                        "{a: {b: null, ...}, ...}"},
+         }) {
+        ASSERT_EQ(narrowedDebugString(spec, Type::anyObject(), true), expectedTrue) << spec;
+        ASSERT_EQ(narrowedDebugString(spec, Type::anyObject(), false), expectedFalse) << spec;
+    }
+}
+
+TEST(ExpressionTypingTest, InequalityNarrowingIntersectsWithExistingFieldType) {
+    for (const auto& [spec, input, expectedTrue, expectedFalse] : {
+             std::tuple{"{$ne: ['$a', 1]}",
+                        openObject({{"a", allValues(BSONType::string)}}),
+                        "{a: string, ...}",
+                        "never"},
+             std::tuple{"{$ne: [1, '$a']}",
+                        openObject({{"a", allValues(BSONType::numberDouble)}}),
+                        "{a: double, ...}",
+                        "{a: double(S), ...}"},
+             std::tuple{"{$ne: ['$a', null]}",
+                        openObject({{"a", allValues(BSONType::null)}}),
+                        "never",
+                        "{a: null, ...}"},
+             std::tuple{
+                 "{$ne: [null, '$a']}",
+                 openObject(
+                     {{"a", unionType(allValues(BSONType::null), allValues(BSONType::numberInt))}}),
+                 "{a: int, ...}",
+                 "{a: null, ...}"},
+         }) {
+        ASSERT_EQ(narrowedDebugString(spec, input, true), expectedTrue) << spec;
+        ASSERT_EQ(narrowedDebugString(spec, input, false), expectedFalse) << spec;
+    }
+}
+
+TEST(ExpressionTypingTest, InequalityNarrowingUsesSingletonFieldOperand) {
+    const auto input =
+        openObject({{"a", allValues(BSONType::null)},
+                    {"b", unionType(allValues(BSONType::null), allValues(BSONType::numberInt))}});
+    for (const auto& spec : {"{$ne: ['$a', '$b']}", "{$ne: ['$b', '$a']}"}) {
+        ASSERT_EQ(narrowedDebugString(spec, input, true), "{a: null, b: int, ...}") << spec;
+    }
+
+    const auto mixed =
+        openObject({{"a", unionType(allValues(BSONType::null), allValues(BSONType::numberInt))},
+                    {"b", unionType(allValues(BSONType::null), allValues(BSONType::numberInt))}});
+    for (const auto& spec : {"{$ne: ['$a', '$b']}", "{$ne: ['$b', '$a']}"}) {
+        ASSERT_EQ(narrowedDebugString(spec, mixed, true), "{a: null|int, b: null|int, ...}")
+            << spec;
+    }
+}
+
+TEST(ExpressionTypingTest, InequalityNarrowingDoesNotEvaluateArrayOrObjectOperands) {
+    for (const auto& [spec, expectedFalse] : {
+             std::pair{"{$ne: ['$a', ['$b', {$divide: [1, 0]}]]}", "{a: array(S), ...}"},
+             std::pair{"{$ne: [['$b', {$divide: [1, 0]}], '$a']}", "{a: array(S), ...}"},
+             std::pair{"{$ne: ['$a', {x: '$b', y: {$divide: [1, 0]}}]}", "{a: object(S), ...}"},
+             std::pair{"{$ne: [{x: '$b', y: {$divide: [1, 0]}}, '$a']}", "{a: object(S), ...}"},
+         }) {
+        ASSERT_EQ(narrowedDebugString(spec, Type::anyObject(), true), "object") << spec;
+        ASSERT_EQ(narrowedDebugString(spec, Type::anyObject(), false), expectedFalse) << spec;
+    }
+}
+
+TEST(ExpressionTypingTest, InequalityNarrowingLogicalExpectedTypes) {
+    for (const auto& [spec, expectedTrue, expectedFalse] : {
+             std::tuple{"{$and: [{$ne: ['$a', 1]}, {$ne: ['$b', 'x']}]}", "object", "object(S)"},
+             std::tuple{
+                 "{$or: [{$ne: ['$a', 1]}, {$eq: ['$b', 'x']}]}", "object", "{a: number(S), ...}"},
+             std::tuple{"{$not: [{$ne: ['$a', 1]}]}", "{a: number(S), ...}", "object"},
+             std::tuple{"{$and: [{$or: [{$ne: ['$a', 1]}, {$eq: ['$b', 'x']}]}, "
+                        "{$not: [{$ne: ['$b', 2]}]}]}",
+                        "{b: number(S), ...}",
+                        "object"},
+             std::tuple{"{$and: [{$ne: ['$a', null]}, {$ne: ['$b', null]}]}",
+                        "{a: ~null, b: ~null, ...}",
+                        "object(S)"},
+             std::tuple{"{$or: [{$ne: ['$a', null]}, {$ne: ['$b', null]}]}",
+                        "object(S)",
+                        "{a: null, b: null, ...}"},
+         }) {
+        ASSERT_EQ(narrowedDebugString(spec, Type::anyObject(), true), expectedTrue) << spec;
+        ASSERT_EQ(narrowedDebugString(spec, Type::anyObject(), false), expectedFalse) << spec;
+    }
+}
+
+TEST(ExpressionTypingTest, NotNarrowingUsesConstantTruthiness) {
+    const auto input = openObject({{"a", allValues(BSONType::string)}});
+    for (const auto& [spec, expectedTrue, expectedFalse] : {
+             std::tuple{"{$not: [false]}", "{a: string, ...}", "never"},
+             std::tuple{"{$not: [true]}", "never", "{a: string, ...}"},
+             std::tuple{"{$not: [0]}", "{a: string, ...}", "never"},
+             std::tuple{"{$not: [1]}", "never", "{a: string, ...}"},
+             std::tuple{"{$not: [null]}", "{a: string, ...}", "never"},
+             std::tuple{"{$not: ['']}", "never", "{a: string, ...}"},
+             std::tuple{"{$not: ['x']}", "never", "{a: string, ...}"},
+             std::tuple{"{$not: [{$literal: []}]}", "never", "{a: string, ...}"},
+             std::tuple{"{$not: [{$literal: {}}]}", "never", "{a: string, ...}"},
+         }) {
+        ASSERT_EQ(narrowedDebugString(spec, input, true), expectedTrue) << spec;
+        ASSERT_EQ(narrowedDebugString(spec, input, false), expectedFalse) << spec;
+    }
+}
+
+TEST(ExpressionTypingTest, NotNarrowingLeavesUnsupportedChildUnchanged) {
+    const auto input = openObject({{"a", allValues(BSONType::string)}});
+    for (const auto& spec : {"{$not: [{$add: [1, 2]}]}", "{$not: ['$a']}", "{$not: ['$$NOW']}"}) {
+        ASSERT_EQ(narrowedDebugString(spec, input, true), "{a: string, ...}") << spec;
+        ASSERT_EQ(narrowedDebugString(spec, input, false), "{a: string, ...}") << spec;
+    }
+}
+
+TEST(ExpressionTypingTest, DoubleNotNarrowingPreservesChildConstraints) {
+    for (const auto& [spec, expectedTrue, expectedFalse] : {
+             std::tuple{
+                 "{$not: [{$not: [{$eq: ['$a', null]}]}]}", "{a: null, ...}", "{a: ~null, ...}"},
+             std::tuple{"{$not: [{$not: [{$ne: ['$a', 1]}]}]}", "object", "{a: number(S), ...}"},
+             std::tuple{"{$not: [{$not: [{$and: [{$eq: ['$a', 1]}, "
+                        "{$eq: ['$a', 'x']}]}]}]}",
+                        "never",
+                        "object"},
+             std::tuple{"{$not: [{$not: [{$add: [1, 2]}]}]}", "object", "object"},
+         }) {
+        ASSERT_EQ(narrowedDebugString(spec, Type::anyObject(), true), expectedTrue) << spec;
+        ASSERT_EQ(narrowedDebugString(spec, Type::anyObject(), false), expectedFalse) << spec;
+    }
+}
+
+TEST(ExpressionTypingTest, ConstantNarrowingUsesTruthiness) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto values = scalarRepresentatives();
+    values.insert(values.end(),
+                  {Value(),
+                   Value(BSONNULL),
+                   Value(false),
+                   Value(true),
+                   Value(0),
+                   Value(1),
+                   Value(0LL),
+                   Value(0.0),
+                   Value(Decimal128(0)),
+                   Value(""sv),
+                   Value(BSONObj()),
+                   Value(std::vector<Value>{})});
+    const Type input = openObject({{"a", allValues(BSONType::string)}});
+    for (const auto& value : values) {
+        auto expr = ExpressionConstant::create(expCtx.get(), value);
+        for (bool assumeTrue : {false, true}) {
+            const auto narrowed = narrowType(input, expr.get(), assumeTrue);
+            ASSERT_EQ(narrowed.toDebugString(),
+                      value.coerceToBool() == assumeTrue ? "{a: string, ...}" : "never")
+                << "value " << value.toString() << ", assumption " << assumeTrue;
+        }
+    }
+}
+
+TEST(ExpressionTypingTest, LogicalNarrowingWithConstantsAndUnsupportedChildren) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const Type input = Type::anyObject();
+    auto eq = parseExpr(fromjson("{$eq: ['$a', 1]}"), *expCtx);
+    auto orFalse = parseExpr(fromjson("{$or: [false, {$eq: ['$a', 1]}]}"), *expCtx);
+    auto andTrue = parseExpr(fromjson("{$and: [true, {$eq: ['$a', 1]}]}"), *expCtx);
+    auto andFalse = parseExpr(fromjson("{$and: [false, {$eq: ['$a', 1]}]}"), *expCtx);
+    auto orTrue = parseExpr(fromjson("{$or: [true, {$eq: ['$a', 1]}]}"), *expCtx);
+    for (bool assumption : {false, true}) {
+        ASSERT_EQ(narrowType(input, orFalse.get(), assumption).toDebugString(),
+                  narrowType(input, eq.get(), assumption).toDebugString());
+        ASSERT_EQ(narrowType(input, andTrue.get(), assumption).toDebugString(),
+                  narrowType(input, eq.get(), assumption).toDebugString());
+    }
+    ASSERT_EQ(narrowType(input, andFalse.get(), true).toDebugString(), "never");
+    ASSERT_EQ(narrowType(input, orTrue.get(), false).toDebugString(), "never");
+
+    auto unknownOr = parseExpr(fromjson("{$or: [{$add: [1, 2]}, {$eq: ['$a', 1]}]}"), *expCtx);
+    auto unknownAnd = parseExpr(fromjson("{$and: [{$add: [1, 2]}, {$eq: ['$a', 1]}]}"), *expCtx);
+    ASSERT_EQ(narrowType(input, unknownOr.get(), true).toDebugString(), "object");
+    ASSERT_EQ(narrowType(input, unknownAnd.get(), false).toDebugString(), "object");
+    ASSERT_EQ(narrowType(input, unknownAnd.get(), true).toDebugString(), "{a: number(S), ...}");
+    ASSERT_EQ(narrowType(input, unknownOr.get(), false).toDebugString(), "object");
 }
 
 /// Returns the type the field path expression evaluates to.
