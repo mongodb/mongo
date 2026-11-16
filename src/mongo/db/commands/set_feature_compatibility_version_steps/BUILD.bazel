@@ -1,11 +1,10 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
     glob([
         "*.h",
-        "*.cpp",
     ]),
 )
 
@@ -20,6 +19,83 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "index_builds_fcv_step",
+    srcs = [
+        "index_builds_fcv_step.cpp",
+    ],
+    deps = [
+        ":set_feature_compatibility_version_steps",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+    ],
+)
+
+mongo_cc_library(
+    name = "invalid_wildcard_index_fcv_step",
+    srcs = [
+        "invalid_wildcard_index_fcv_step.cpp",
+    ],
+    deps = [
+        ":set_feature_compatibility_version_steps",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
+    ],
+)
+
+mongo_cc_library(
+    name = "legacy_fcv_step",
+    srcs = [
+        "legacy_fcv_step.cpp",
+    ],
+    deps = [
+        ":set_feature_compatibility_version_steps",
+        "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_init",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_manager",
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/s:sharding_commands_d",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
+        "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries_sharded_cluster",
+    ],
+)
+
+mongo_cc_library(
+    name = "persistent_stats_fcv_step",
+    srcs = [
+        "persistent_stats_fcv_step.cpp",
+    ],
+    deps = [
+        ":set_feature_compatibility_version_steps",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
+    ],
+)
+
+mongo_cc_library(
+    name = "set_clear_shard_uuids_fcv_step",
+    srcs = [
+        "set_clear_shard_uuids_fcv_step.cpp",
+    ],
+    deps = [
+        ":set_feature_compatibility_version_steps",
+        "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager",
+        "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/transaction:transaction_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "fcv_step_impl",
+    deps = [
+        ":index_builds_fcv_step",
+        ":invalid_wildcard_index_fcv_step",
+        ":legacy_fcv_step",
+        ":persistent_stats_fcv_step",
+        ":set_clear_shard_uuids_fcv_step",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "fcv_step_test",
     srcs = [
@@ -29,5 +105,21 @@ mongo_cc_unit_test(
     deps = [
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/commands/set_feature_compatibility_version_steps",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "index_builds_fcv_step_test",
+    srcs = [
+        "index_builds_fcv_step_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":index_builds_fcv_step",
+        ":set_feature_compatibility_version_steps",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/index_builds:index_builds_common",
+        "//src/mongo/db/index_builds:index_builds_coordinator_mock",
+        "//src/mongo/db/index_builds/primary_driven:primary_driven_index_builds",
     ],
 )
