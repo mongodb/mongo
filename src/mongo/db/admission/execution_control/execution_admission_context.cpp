@@ -169,20 +169,22 @@ boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionCon
         return boost::none;
     }
 
-    // Append CPU, elapsed time, and load-shed stats only if the operation is not composed solely of
-    // exempted admissions.
-    if (getAdmissions() > getExemptedAdmissions()) {
-        // Record CPU and elapsed time to the appropriate finalized stats bucket
-        // (deprioritizable/non-deprioritizable). This is independent of operation type (read/write)
-        // since the type may have changed during the operation's lifetime.
+    // Record finalized stats when the operation used non-exempt admissions, or when it was shed
+    // before acquiring execution tickets (admissions may be zero).
+    const bool hasNonExemptAdmissions = getAdmissions() > getExemptedAdmissions();
+    if (hasNonExemptAdmissions || getLoadShed()) {
+        // Updates go to the deprioritizable or non-deprioritizable finalized bucket, not
+        // read/write, since operation type may have changed during the operation's lifetime.
         auto& stats = _isDeprioritizable(/*isFinalization=*/true) ? _deprioritizableFinalStats
                                                                   : _nonDeprioritizableFinalStats;
 
-        stats.totalOpsFinished.fetchAndAddRelaxed(1);
-        stats.totalCPUUsageMicros.fetchAndAddRelaxed(cpuUsageMicros);
-        stats.totalElapsedTimeMicros.fetchAndAddRelaxed(elapsedMicros);
+        if (hasNonExemptAdmissions) {
+            stats.totalOpsFinished.fetchAndAddRelaxed(1);
+            stats.totalCPUUsageMicros.fetchAndAddRelaxed(cpuUsageMicros);
+            stats.totalElapsedTimeMicros.fetchAndAddRelaxed(elapsedMicros);
+        }
 
-        // Record final CPU, elapsed time and number of admissions to the load shed bucket.
+        // Record final CPU, elapsed time, and admissions to the load-shed counters in that bucket.
         if (getLoadShed()) {
             stats.totalCPUUsageLoadShed.fetchAndAddRelaxed(cpuUsageMicros);
             stats.totalElapsedTimeMicrosLoadShed.fetchAndAddRelaxed(elapsedMicros);
@@ -369,11 +371,13 @@ bool ExecutionAdmissionContext::_isDeprioritizable(bool isFinalization) const {
         return false;
     }
 
-    // Calculate the admission count at decision time. When holding a ticket or during finalization,
-    // we decrement by 1 because the current admission has already been counted but the
-    // deprioritization decision was made before this admission.
+    // Calculate the admission count at decision time. When holding a ticket, or during
+    // finalization if an admission was counted, decrement by 1 because that admission is already
+    // in getAdmissions() but the deprioritization decision was made before it. Skip the decrement
+    // when finalizing with zero admissions (shed before a ticket) so the count does not go
+    // negative.
     int32_t admissions = getAdmissions();
-    if (isHoldingTicket() || isFinalization) {
+    if (isHoldingTicket() || (isFinalization && admissions > 0)) {
         admissions -= 1;
     }
 

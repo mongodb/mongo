@@ -21,11 +21,9 @@ namespace {
 
 using OperationType = execution_control::OperationType;
 
-class TicketingSystemTest : public ServiceContextTest,
-                            public testing::WithParamInterface<OperationType> {
+class TicketingSystemTestBase : public ServiceContextTest {
 protected:
     static constexpr int kTickets = 10;
-
 
     std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
         return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
@@ -39,12 +37,8 @@ protected:
         _installTicketingSystem();
     }
 
-    ~TicketingSystemTest() override {
+    ~TicketingSystemTestBase() override {
         TicketingSystem::use(_svcCtx, nullptr);
-    }
-
-    OperationType opType() const {
-        return GetParam();
     }
 
     TicketingSystem* ticketingSystem() {
@@ -63,14 +57,6 @@ protected:
         ASSERT_OK(ts->setHeuristicDeprioritization(heuristic));
         ASSERT_OK(ts->setBackgroundTasksDeprioritization(backgroundTasks));
         ASSERT_OK(ts->setDeprioritizationGate(gate));
-    }
-
-    TicketHolder* normalHolder() const {
-        return opType() == OperationType::kRead ? _normalRead : _normalWrite;
-    }
-
-    TicketHolder* lowHolder() const {
-        return opType() == OperationType::kRead ? _lowRead : _lowWrite;
     }
 
     void assertOnlyHolderUsed(TicketHolder* expected) {
@@ -132,6 +118,22 @@ private:
                 std::move(normal),
                 std::move(low),
                 ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions));
+    }
+};
+
+class TicketingSystemTest : public TicketingSystemTestBase,
+                            public testing::WithParamInterface<OperationType> {
+protected:
+    OperationType opType() const {
+        return GetParam();
+    }
+
+    TicketHolder* normalHolder() const {
+        return opType() == OperationType::kRead ? _normalRead : _normalWrite;
+    }
+
+    TicketHolder* lowHolder() const {
+        return opType() == OperationType::kRead ? _lowRead : _lowWrite;
     }
 };
 
@@ -378,6 +380,58 @@ TEST_P(TicketingSystemTest, QueueWaitTimeHistogramRecordsNonWaitingOpsInZeroBuck
     for (auto&& el : lowHist.Array()) {
         ASSERT_EQ(el.Obj()["count"].Long(), 0);
     }
+}
+
+// Op had non-exempt admissions and was load-shed. One snapshot carries both finished and shed
+// counters; appendStats must merge that snapshot once.
+TEST_F(TicketingSystemTestBase, LoadShedAfterAdmissionsMergesFinalizedStatsOnce) {
+    auto [client, opCtx] = makeClientAndOpCtx();
+    auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
+    admCtx.setAdmission_forTest(3);
+    admCtx.recordOperationLoadShed();
+
+    constexpr int64_t kElapsedMicros = 1000;
+    constexpr int64_t kCpuUsageMicros = 40;
+    ticketingSystem()->finalizeOperationStats(opCtx.get(), kElapsedMicros, kCpuUsageMicros);
+
+    BSONObjBuilder b;
+    ticketingSystem()->appendStats(b);
+    auto root = b.obj();
+    auto stats = root["nonDeprioritizable"].Obj();
+    ASSERT_EQ(stats["totalOpsFinished"].Long(), 1);
+    ASSERT_EQ(stats["totalOpsLoadShed"].Long(), 1);
+    ASSERT_EQ(stats["totalElapsedTimeMicros"].Long(), kElapsedMicros);
+    ASSERT_EQ(stats["totalCPUUsageMicros"].Long(), kCpuUsageMicros);
+    ASSERT_EQ(stats["totalElapsedTimeMicrosLoadShed"].Long(), kElapsedMicros);
+    ASSERT_EQ(stats["totalCPUUsageLoadShed"].Long(), kCpuUsageMicros);
+    ASSERT_EQ(stats["totalAdmissionsLoadShed"].Long(), 3);
+    ASSERT_EQ(root["deprioritizable"].Obj()["totalOpsLoadShed"].Long(), 0);
+}
+
+// Shed before any admission: totalOpsFinished stays 0 while load-shed counters are set.
+// TicketingSystem must merge on totalOpsLoadShed alone (addFinalizedIfPresent).
+TEST_F(TicketingSystemTestBase, LoadShedWithoutAdmissionsRollsUpFinalizedStats) {
+    auto [client, opCtx] = makeClientAndOpCtx();
+    auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
+    admCtx.recordOperationLoadShed();
+
+    constexpr int64_t kElapsedMicros = 1000;
+    constexpr int64_t kCpuUsageMicros = 40;
+    ticketingSystem()->finalizeOperationStats(opCtx.get(), kElapsedMicros, kCpuUsageMicros);
+
+    BSONObjBuilder b;
+    ticketingSystem()->appendStats(b);
+    auto root = b.obj();
+    auto stats = root["nonDeprioritizable"].Obj();
+    ASSERT_EQ(stats["totalOpsFinished"].Long(), 0);
+    ASSERT_EQ(stats["totalOpsLoadShed"].Long(), 1);
+    ASSERT_EQ(stats["totalElapsedTimeMicrosLoadShed"].Long(), kElapsedMicros);
+    ASSERT_EQ(stats["totalCPUUsageLoadShed"].Long(), kCpuUsageMicros);
+    ASSERT_EQ(stats["totalAdmissionsLoadShed"].Long(), 0);
+    ASSERT_EQ(stats["totalCPUUsageMicros"].Long(), 0);
+    ASSERT_EQ(stats["totalElapsedTimeMicros"].Long(), 0);
+    ASSERT_EQ(root["deprioritizable"].Obj()["totalOpsLoadShed"].Long(), 0);
+    ASSERT_EQ(root["deprioritizable"].Obj()["totalOpsFinished"].Long(), 0);
 }
 
 }  // namespace

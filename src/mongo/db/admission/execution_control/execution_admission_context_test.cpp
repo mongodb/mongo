@@ -586,5 +586,39 @@ DEATH_TEST_F(TaskTypeDeathTest, CannotCreateScopeInMultiDocTransaction, "Invaria
 
 #endif
 
+class ExecutionAdmissionContextFinalizeStatsTest : public ServiceContextTest {};
+
+TEST_F(ExecutionAdmissionContextFinalizeStatsTest, LoadShedStatsRecordedWithoutAdmissions) {
+    auto opCtx = makeOperationContext();
+    auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
+    admCtx.recordOperationLoadShed();
+    constexpr int64_t kCpuUsageMicros = 40;
+    constexpr int64_t kElapsedMicros = 1000;
+    auto maybeStats = admCtx.finalizeStats(kCpuUsageMicros, kElapsedMicros);
+    ASSERT(maybeStats.has_value());
+    ASSERT_EQ(maybeStats->nonDeprioritizable.totalOpsLoadShed.loadRelaxed(), 1);
+    ASSERT_EQ(maybeStats->nonDeprioritizable.totalOpsFinished.loadRelaxed(), 0);
+    ASSERT_EQ(maybeStats->nonDeprioritizable.totalCPUUsageLoadShed.loadRelaxed(), kCpuUsageMicros);
+    ASSERT_EQ(maybeStats->nonDeprioritizable.totalElapsedTimeMicrosLoadShed.loadRelaxed(),
+              kElapsedMicros);
+    ASSERT_EQ(maybeStats->nonDeprioritizable.totalCPUUsageMicros.loadRelaxed(), 0);
+    ASSERT_EQ(maybeStats->nonDeprioritizable.totalElapsedTimeMicros.loadRelaxed(), 0);
+    ASSERT_EQ(maybeStats->deprioritizable.totalOpsLoadShed.loadRelaxed(), 0);
+}
+
+TEST_F(ExecutionAdmissionContextFinalizeStatsTest,
+       LoadShedWithoutAdmissionsUsesHeuristicAtFinalizeWithZeroThreshold) {
+    unittest::ServerParameterGuard thresholdGuard(
+        "executionControlHeuristicNumAdmissionsDeprioritizeThreshold", 0);
+    auto opCtx = makeOperationContext();
+    auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
+    admCtx.recordOperationLoadShed();
+    auto maybeStats = admCtx.finalizeStats(0, 0);
+    ASSERT(maybeStats.has_value());
+    ASSERT_EQ(maybeStats->deprioritizable.totalOpsLoadShed.loadRelaxed(), 1);
+    ASSERT_EQ(maybeStats->deprioritizable.totalOpsFinished.loadRelaxed(), 0);
+    ASSERT_EQ(maybeStats->nonDeprioritizable.totalOpsLoadShed.loadRelaxed(), 0);
+}
+
 }  // namespace
 }  // namespace mongo::admission::execution_control

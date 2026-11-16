@@ -669,13 +669,15 @@ void TicketingSystem::finalizeOperationStats(OperationContext* opCtx,
     };
 
     // Increment finalized stats (CPU, elapsed, load shed) - depend on deprioritizable
-    // classification.
-    addIfNonZero(_operationStats.nonDeprioritizable,
-                 finalizedStats.nonDeprioritizable,
-                 &OperationFinalizedStats::totalOpsFinished);
-    addIfNonZero(_operationStats.deprioritizable,
-                 finalizedStats.deprioritizable,
-                 &OperationFinalizedStats::totalOpsFinished);
+    // classification. Use one operator+= per bucket when either totalOpsFinished or
+    // totalOpsLoadShed is set so shed-only ops roll up and a single snapshot is never merged twice.
+    auto addFinalizedIfPresent = [](auto& dst, const auto& src) {
+        if (src.totalOpsFinished.loadRelaxed() > 0 || src.totalOpsLoadShed.loadRelaxed() > 0) {
+            dst += src;
+        }
+    };
+    addFinalizedIfPresent(_operationStats.nonDeprioritizable, finalizedStats.nonDeprioritizable);
+    addFinalizedIfPresent(_operationStats.deprioritizable, finalizedStats.deprioritizable);
 
     // Increment per-acquisition execution stats (deprioritizable/non-deprioritizable) by read/write
     // type.

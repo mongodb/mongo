@@ -418,10 +418,17 @@ describe("Execution control statistics and observability", function () {
 
         it("should report 'priorityLowered: true' in $currentOp while active", function () {
             const currentOpComment = findComment + "_currentop";
-            const failPoint = configureFailPoint(mongod, "setPreYieldWait", {
-                waitForMillis: 200,
+
+            // Hang after the first yield so priorityLowered is set while the find is still active.
+            const preYield = configureFailPoint(mongod, "setPreYieldWait", {
                 comment: currentOpComment,
             });
+            const hangAfterDeprioritize = configureFailPoint(
+                mongod,
+                "setPreYieldWaitDeferred",
+                {},
+                {skip: 1},
+            );
 
             const joinShell = startParallelShell(
                 funWithArgs(
@@ -440,18 +447,22 @@ describe("Execution control statistics and observability", function () {
                 mongod.port,
             );
 
-            failPoint.wait({timesEntered: 3});
+            try {
+                hangAfterDeprioritize.wait();
 
-            // Check $currentOp for the 'priorityLowered' flag while the operation is active.
-            const curOpResult = db.currentOp({
-                "command.comment": currentOpComment,
-                "ns": coll.getFullName(),
-                active: true,
-            });
-            assert.eq(1, curOpResult.inprog.length, tojson(curOpResult));
-            assert.eq(true, curOpResult.inprog[0].priorityLowered);
-
-            joinShell();
+                const curOpResult = db.currentOp({
+                    "command.comment": currentOpComment,
+                    "command.find": {$exists: true},
+                    "ns": coll.getFullName(),
+                    active: true,
+                });
+                assert.eq(1, curOpResult.inprog.length, tojson(curOpResult));
+                assert.eq(true, curOpResult.inprog[0].priorityLowered, tojson(curOpResult));
+            } finally {
+                hangAfterDeprioritize.off();
+                preYield.off();
+                joinShell();
+            }
         });
 
         it("should report 'priorityLowered: true' in the slow query log", function () {
@@ -629,6 +640,9 @@ describe("Execution control statistics and observability", function () {
         const kNumWriteTickets = 5;
         const kQueuedReaders = 20;
         const kBusyTimeMs = 2000;
+        const kDefaultReadMaxQueueDepth = 1000000;
+        const kHoldTicketsForShedComment = "exhaust_read_tickets_hold";
+        const kHoldTicketsForOverloadComment = "exhaust_read_tickets_overload_hold";
         let replTest, mongod, db, coll;
 
         // Keys for per-acquisition stats (in read/write nonDeprioritizable/deprioritizable).
@@ -752,23 +766,55 @@ describe("Execution control statistics and observability", function () {
             );
         }
 
-        function assertExecutionShedStatsCorrect(executionStats) {
-            assert.gt(
-                executionStats.nonDeprioritizable.totalOpsLoadShed +
+        function getAggregatedLoadShedStats(executionStats) {
+            return {
+                totalOpsLoadShed:
+                    executionStats.nonDeprioritizable.totalOpsLoadShed +
                     executionStats.deprioritizable.totalOpsLoadShed,
-                0,
-                "totalOpsLoadShed mismatch: " + tojson(executionStats),
+                totalElapsedTimeMicrosLoadShed:
+                    executionStats.nonDeprioritizable.totalElapsedTimeMicrosLoadShed +
+                    executionStats.deprioritizable.totalElapsedTimeMicrosLoadShed,
+            };
+        }
+
+        function assertExecutionShedStatsCorrect(executionStats, beforeStats) {
+            const after = getAggregatedLoadShedStats(executionStats);
+            const before = getAggregatedLoadShedStats(beforeStats);
+            assert.gt(
+                after.totalOpsLoadShed,
+                before.totalOpsLoadShed,
+                "totalOpsLoadShed mismatch: before=" + tojson(before) + " after=" + tojson(after),
             );
             assert.gt(
-                executionStats.nonDeprioritizable.totalElapsedTimeMicrosLoadShed +
-                    executionStats.deprioritizable.totalElapsedTimeMicrosLoadShed,
-                0,
-                "totalElapsedTimeMicrosLoadShed mismatch: " + tojson(executionStats),
+                after.totalElapsedTimeMicrosLoadShed,
+                before.totalElapsedTimeMicrosLoadShed,
+                "totalElapsedTimeMicrosLoadShed mismatch: before=" +
+                    tojson(before) +
+                    " after=" +
+                    tojson(after),
             );
         }
 
-        function exhaustReadTicketsForLimitedTime() {
-            let threads = [];
+        function sumReadAddedToQueue(executionStats) {
+            return (
+                executionStats.read.normalPriority.addedToQueue +
+                executionStats.read.lowPriority.addedToQueue
+            );
+        }
+
+        function assertReadOverloadObserved(beforeStats, afterStats) {
+            assert.gt(
+                sumReadAddedToQueue(afterStats),
+                sumReadAddedToQueue(beforeStats),
+                "Expected overload to enqueue read operations: before=" +
+                    tojson(beforeStats.read) +
+                    " after=" +
+                    tojson(afterStats.read),
+            );
+        }
+
+        function runConcurrentCountReaders() {
+            const threads = [];
             jsTestLog("Starting " + kQueuedReaders + " readers for " + kBusyTimeMs + " ms");
             for (let i = 0; i < kQueuedReaders; i++) {
                 threads.push(
@@ -782,7 +828,6 @@ describe("Execution control statistics and observability", function () {
                                 try {
                                     db[collName].aggregate([{"$count": "x"}]);
                                 } catch (e) {
-                                    // Ignore errors due to operation being shed.
                                     if (e.code == ErrorCodes.AdmissionQueueOverflow) {
                                         continue;
                                     }
@@ -800,6 +845,132 @@ describe("Execution control statistics and observability", function () {
             threads.forEach((thread) => thread.start());
             jsTestLog("Waiting for " + kQueuedReaders + " readers to finish");
             threads.forEach((thread) => thread.join());
+        }
+
+        function holdAllReadTickets(holdComment) {
+            const priorFrameworkControl = assert.commandWorked(
+                mongod.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+            ).internalQueryFrameworkControl;
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    internalQueryFrameworkControl: "forceClassicEngine",
+                }),
+            );
+            const preYield = configureFailPoint(mongod, "setPreYieldWait", {comment: holdComment});
+            const holdFailPoint = configureFailPoint(
+                mongod,
+                "setPreYieldWaitDeferred",
+                {},
+                {skip: 0},
+            );
+            const holdJoinShells = [];
+            for (let i = 0; i < kNumReadTickets; i++) {
+                holdJoinShells.push(
+                    startParallelShell(
+                        funWithArgs(
+                            (dbName, collName, comment) => {
+                                db.getSiblingDB(dbName)
+                                    [collName].find()
+                                    .hint({$natural: 1})
+                                    .comment(comment)
+                                    .batchSize(3)
+                                    .limit(3)
+                                    .toArray();
+                            },
+                            dbName,
+                            collName,
+                            holdComment,
+                        ),
+                        mongod.port,
+                    ),
+                );
+            }
+            holdFailPoint.wait({timesEntered: kNumReadTickets});
+            return {priorFrameworkControl, preYield, holdFailPoint, holdJoinShells};
+        }
+
+        function releaseHeldReadTickets(holdState) {
+            if (!holdState) {
+                return;
+            }
+            holdState.holdFailPoint.off();
+            holdState.preYield.off();
+            assert.commandWorked(
+                mongod.adminCommand({
+                    setParameter: 1,
+                    internalQueryFrameworkControl: holdState.priorFrameworkControl,
+                }),
+            );
+            holdState.holdJoinShells.forEach((joinShell) => joinShell());
+        }
+
+        function exhaustReadTicketsForLimitedTime({forceLoadShedding = false} = {}) {
+            const holdComment = forceLoadShedding
+                ? kHoldTicketsForShedComment
+                : kHoldTicketsForOverloadComment;
+            let holdState;
+            const challengerJoinShells = [];
+
+            try {
+                holdState = holdAllReadTickets(holdComment);
+
+                if (forceLoadShedding) {
+                    setExecutionControlReadMaxQueueDepth(mongod, 0);
+                    setExecutionControlReadLowPriorityMaxQueueDepth(mongod, 0);
+                    runConcurrentCountReaders();
+                } else {
+                    // Deterministic queue observation: extra readers must wait while tickets are held.
+                    const baselineAdded = sumReadAddedToQueue(db.serverStatus().queues.execution);
+                    const kChallengers = kNumReadTickets + 1;
+                    jsTestLog(
+                        "Starting " +
+                            kChallengers +
+                            " challenger reads while all read tickets are held",
+                    );
+                    for (let i = 0; i < kChallengers; i++) {
+                        challengerJoinShells.push(
+                            startParallelShell(
+                                funWithArgs(
+                                    (dbName, collName) => {
+                                        db.getSiblingDB(dbName)
+                                            [collName].find()
+                                            .hint({$natural: 1})
+                                            .batchSize(1)
+                                            .limit(1)
+                                            .toArray();
+                                    },
+                                    dbName,
+                                    collName,
+                                ),
+                                mongod.port,
+                            ),
+                        );
+                    }
+                    assert.soon(function () {
+                        const execution = db.serverStatus().queues.execution;
+                        return (
+                            execution.read.normalPriority.queueLength > 0 ||
+                            sumReadAddedToQueue(execution) > baselineAdded
+                        );
+                    }, "expected read operations to queue while all read tickets are held");
+                }
+            } finally {
+                if (forceLoadShedding) {
+                    setExecutionControlReadMaxQueueDepth(mongod, kDefaultReadMaxQueueDepth);
+                    setExecutionControlReadLowPriorityMaxQueueDepth(
+                        mongod,
+                        kDefaultReadMaxQueueDepth,
+                    );
+                }
+                releaseHeldReadTickets(holdState);
+                challengerJoinShells.forEach((joinShell) => joinShell());
+            }
+
+            // Original overload coverage: concurrent $count turnover against the small ticket pool.
+            if (!forceLoadShedding) {
+                runConcurrentCountReaders();
+            }
         }
 
         before(function () {
@@ -933,36 +1104,46 @@ describe("Execution control statistics and observability", function () {
             });
         });
 
-        function configureExecutionControlState(enableDeprioritization, shedding) {
+        function configureExecutionControlState(enableDeprioritization) {
             setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
 
             setDeprioritizationGate(mongod, enableDeprioritization);
 
-            if (shedding) {
-                setExecutionControlReadMaxQueueDepth(mongod, 0);
-                setExecutionControlReadLowPriorityMaxQueueDepth(mongod, 0);
-            }
+            // Shed tests set queue depth to 0 in exhaustReadTicketsForLimitedTime after read tickets
+            // are held so holder shells are not shed before setPreYieldWaitDeferred.
+            setExecutionControlReadMaxQueueDepth(mongod, kDefaultReadMaxQueueDepth);
+            setExecutionControlReadLowPriorityMaxQueueDepth(mongod, kDefaultReadMaxQueueDepth);
         }
 
         it("Check that nonDeprioritizable/deprioritizable stats are correct without deprioritization", function () {
-            configureExecutionControlState(false /*deprioritization*/, false /*shedding*/);
+            configureExecutionControlState(false /*deprioritization*/);
+            const beforeStats = db.serverStatus().queues.execution;
             exhaustReadTicketsForLimitedTime();
-            assertExecutionStatsCorrect(db.serverStatus().queues.execution);
+            const afterStats = db.serverStatus().queues.execution;
+            assertReadOverloadObserved(beforeStats, afterStats);
+            assertExecutionStatsCorrect(afterStats);
         });
         it("Check that nonDeprioritizable/deprioritizable stats are correct with deprioritization", function () {
-            configureExecutionControlState(true /*deprioritization*/, false /*shedding*/);
+            configureExecutionControlState(true /*deprioritization*/);
+            const beforeStats = db.serverStatus().queues.execution;
             exhaustReadTicketsForLimitedTime();
-            assertExecutionStatsCorrect(db.serverStatus().queues.execution);
+            const afterStats = db.serverStatus().queues.execution;
+            assertReadOverloadObserved(beforeStats, afterStats);
+            assertExecutionStatsCorrect(afterStats);
         });
         it("Checks the shed operations are counted in the stats without deprioritization", function () {
-            configureExecutionControlState(false /*deprioritization*/, true /*shedding*/);
-            exhaustReadTicketsForLimitedTime();
-            assertExecutionShedStatsCorrect(db.serverStatus().queues.execution);
+            configureExecutionControlState(false /*deprioritization*/);
+            const beforeStats = db.serverStatus().queues.execution;
+            exhaustReadTicketsForLimitedTime({forceLoadShedding: true});
+            // Queue depth is 0, so these ops are shed rather than queued; do not require queued time.
+            assertExecutionShedStatsCorrect(db.serverStatus().queues.execution, beforeStats);
         });
         it("Checks the shed operations are counted in the stats with deprioritization", function () {
-            configureExecutionControlState(true /*deprioritization*/, true /*shedding*/);
-            exhaustReadTicketsForLimitedTime();
-            assertExecutionShedStatsCorrect(db.serverStatus().queues.execution);
+            configureExecutionControlState(true /*deprioritization*/);
+            const beforeStats = db.serverStatus().queues.execution;
+            exhaustReadTicketsForLimitedTime({forceLoadShedding: true});
+            // Queue depth is 0, so these ops are shed rather than queued; do not require queued time.
+            assertExecutionShedStatsCorrect(db.serverStatus().queues.execution, beforeStats);
         });
     });
 });
