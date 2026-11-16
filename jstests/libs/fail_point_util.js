@@ -186,6 +186,26 @@ export function configureFailPointForAllShardsAndMongos({
 }
 
 /**
+ * Like 'withFailPoint', but arms the fail point on every non-config node of the fixture (see
+ * 'configureFailPointForAllShardsAndMongos') and guarantees it is turned off on all of them
+ * afterwards. Returns the value returned by 'callback'.
+ */
+export function withFailPointForAllShardsAndMongos({
+    conn,
+    failPointName,
+    callback,
+    data = {},
+    failPointMode = "alwaysOn",
+}) {
+    configureFailPointForAllShardsAndMongos({conn, failPointName, data, failPointMode});
+    try {
+        return callback();
+    } finally {
+        configureFailPointForAllShardsAndMongos({conn, failPointName, failPointMode: "off"});
+    }
+}
+
+/**
  * Configures the given fail point, runs 'callback(fp)' with it armed, and guarantees the fail
  * point is turned back off afterwards, whether the callback returns, throws, or fails an
  * assertion. 'fp' is the configured fail point, so the callback can wait on it or read its

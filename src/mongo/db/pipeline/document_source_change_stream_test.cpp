@@ -69,6 +69,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
@@ -3243,6 +3244,53 @@ DEATH_TEST_F(ChangeStreamStageTestDeathTest,
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}}}}}};
     LogicalSessionFromClient lsid = testLsid();
     getApplyOpsResults(applyOpsDoc, lsid);  // Should crash.
+}
+
+namespace {
+Document makeSingleInsertApplyOps(const NamespaceString& nss, const UUID& uuid) {
+    return Document{{"applyOps",
+                     Value{std::vector<Document>{
+                         Document{{"op", "i"sv},
+                                  {"ns", nss.ns_forTest()},
+                                  {"ui", uuid},
+                                  {"o", Value{Document{{"_id", 123}, {"x", "hallo"sv}}}}}}}}};
+}
+}  // namespace
+
+TEST_F(ChangeStreamStageTest, TransactionOpIndexBelowInt32MaxSucceeds) {
+    // The last encodable index is INT32_MAX - 1.
+    FailPointEnableBlock fp("changeStreamUnwindTransactionInitialTxnOpIndex",
+                            BSON("index" << (static_cast<long long>(INT32_MAX) - 1)));
+    auto results = getApplyOpsResults(makeSingleInsertApplyOps(nss, testUuid()), testLsid());
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST_F(ChangeStreamStageTest, TransactionOpIndexOfInt32MaxFailsWithFatalError) {
+    FailPointEnableBlock fp("changeStreamUnwindTransactionInitialTxnOpIndex",
+                            BSON("index" << static_cast<long long>(INT32_MAX)));
+    ASSERT_THROWS_CODE(getApplyOpsResults(makeSingleInsertApplyOps(nss, testUuid()), testLsid()),
+                       DBException,
+                       ErrorCodes::ChangeStreamFatalError);
+}
+
+TEST_F(ChangeStreamStageTest, TransactionOpIndexAboveInt32MaxFailsWithFatalError) {
+    FailPointEnableBlock fp("changeStreamUnwindTransactionInitialTxnOpIndex",
+                            BSON("index" << (static_cast<long long>(INT32_MAX) + 5)));
+    ASSERT_THROWS_CODE(getApplyOpsResults(makeSingleInsertApplyOps(nss, testUuid()), testLsid()),
+                       DBException,
+                       ErrorCodes::ChangeStreamFatalError);
+}
+
+TEST_F(ChangeStreamStageTest, TransactionOpIndexFailPointIgnoresNonTransactionApplyOps) {
+    // Internal 'applyOps' entries that are not part of a transaction (no txnNumber) must not be
+    // affected by the fail point, even when it would overflow the index for a real transaction.
+    FailPointEnableBlock fp("changeStreamUnwindTransactionInitialTxnOpIndex",
+                            BSON("index" << static_cast<long long>(INT32_MAX)));
+    auto results = getApplyOpsResults(makeSingleInsertApplyOps(nss, testUuid()),
+                                      testLsid(),
+                                      kDefaultSpec,
+                                      /*hasTxnNumber=*/false);
+    ASSERT_EQ(results.size(), 1u);
 }
 
 TEST_F(ChangeStreamStageTest, TransformNonTxnNumberApplyOps) {

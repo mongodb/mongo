@@ -19,6 +19,7 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
 #include <string_view>
@@ -27,6 +28,9 @@ namespace mongo {
 using FieldAccessors = change_stream::HashedFieldAccessors;
 
 using namespace std::literals::string_view_literals;
+
+// Test-only: starts the 'txnOpIndex' of each unwound transaction at data.index instead of 0.
+MONGO_FAIL_POINT_DEFINE(changeStreamUnwindTransactionInitialTxnOpIndex);
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamUnwindTransactionToStageFn(
     const boost::intrusive_ptr<DocumentSource>& documentSource) {
@@ -536,6 +540,26 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
     _currentApplyOpsTs = firstTimestamp.getTimestamp();
     _currentApplyOpsIndex = 0;
     _txnOpIndex = 0;
+    changeStreamUnwindTransactionInitialTxnOpIndex.execute([&](const BSONObj& data) {
+        // Only real transactions are affected. Internal 'applyOps' entries that are not part of a
+        // transaction (e.g. container writes in 'admin') flow through this stage too, and must keep
+        // counting from zero so that the fail point cannot make them overflow.
+        if (_lsid && _txnNumber) {
+            _txnOpIndex = static_cast<size_t>(data["index"].safeNumberLong());
+        }
+    });
+}
+
+void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_assertTxnOpIndexIsEncodable()
+    const {
+    // 'txnOpIndex' is encoded as a 32-bit value in resume tokens, and 'kEndOfTransactionTxnOpIndex'
+    // (INT32_MAX) is reserved, so a transaction operation whose index is INT32_MAX or more cannot
+    // be represented by a change stream.
+    uassert(ErrorCodes::ChangeStreamFatalError,
+            str::stream() << "Change stream cannot process a transaction operation with "
+                             "'txnOpIndex' >= "
+                          << kEndOfTransactionTxnOpIndex << ", as it cannot be encoded",
+            txnOpIndex() < kEndOfTransactionTxnOpIndex);
 }
 
 boost::optional<Document>
@@ -546,6 +570,8 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::getNextTransactionOp(
             Document doc = (_currentApplyOpsIt++)->getDocument();
             ++_currentApplyOpsIndex;
             ++_txnOpIndex;
+
+            _assertTxnOpIndexIsEncodable();
 
             _assertExpectedTransactionEventFormat(doc);
 
@@ -728,6 +754,10 @@ Document
 ChangeStreamUnwindTransactionStage::TransactionOpIterator::_makeEndOfTransactionDocument() {
     ++_currentApplyOpsIndex;
     ++_txnOpIndex;
+    if (_endOfTransactionBehavior != change_stream::EndOfTransactionBehavior::kNew) {
+        // The legacy behavior uses the index after the last operation.
+        _assertTxnOpIndexIsEncodable();
+    }
 
     std::vector<NamespaceString> namespaces{_affectedNamespaces.begin(), _affectedNamespaces.end()};
     auto lsid = LogicalSessionId::parse(_lsid->toBson(), IDLParserContext("LogicalSessionId"));

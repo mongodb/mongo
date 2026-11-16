@@ -167,6 +167,11 @@ private:
         boost::optional<Document> getNextTransactionOp(OperationContext* opCtx);
 
     private:
+        /**
+         * Throws ChangeStreamFatalError if the index of the current operation cannot be encoded.
+         */
+        void _assertTxnOpIndexIsEncodable() const;
+
         // Perform a find on the oplog to find an OplogEntry by its OpTime.
         repl::OplogEntry _lookUpOplogEntryByOpTime(OperationContext* opCtx,
                                                    repl::OpTime lookupTime) const;
