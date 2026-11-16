@@ -224,7 +224,7 @@ void DatabaseShardingRuntime::assertIsPrimaryShardForDb(OperationContext* opCtx)
         uassert(7393700,
                 fmt::format("The config server is the primary shard for database: {}",
                             _dbName.toStringForErrorMsg()),
-                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+                isPrimaryShardForDb(opCtx));
         return;
     }
 
@@ -256,6 +256,17 @@ void DatabaseShardingRuntime::assertIsPrimaryShardForDb(OperationContext* opCtx)
                     primaryShardId.toString(),
                     thisShardId.toString()),
         primaryShardId == thisShardId);
+}
+
+bool DatabaseShardingRuntime::isPrimaryShardForDb(OperationContext* opCtx) const {
+    if (_dbName == DatabaseName::kConfig || _dbName == DatabaseName::kAdmin) {
+        // The config and admin databases have no primary row in the global catalog; the config
+        // server owns them.
+        return serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer);
+    }
+
+    const auto dbPrimaryShardId = _dbMetadataAccessor.getDbPrimaryShard(opCtx);
+    return dbPrimaryShardId && *dbPrimaryShardId == ShardingState::get(opCtx)->shardId();
 }
 
 void DatabaseShardingRuntime::setDbMetadata(OperationContext* opCtx,

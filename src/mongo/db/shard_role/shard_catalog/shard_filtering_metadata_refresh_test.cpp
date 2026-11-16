@@ -14,9 +14,11 @@
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
 #include "mongo/db/shard_role/shard_catalog/shard_catalog_recoverer_tracker.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -1872,6 +1874,70 @@ TEST_F(AuthoritativeRefreshFixture, NonDbPrimaryMetadataIsClearedOutAfterUpgrade
         auto dsr = DatabaseShardingRuntime::acquireShared(opCtx, kTestNss.dbName());
         auto primaryShard = dsr->getDbPrimaryShard(opCtx);
         ASSERT_FALSE(primaryShard);
+    }
+}
+
+void configureAsConfigServerProcess() {
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+}
+
+// Config DB collections on the config server are DB-primary even when DSR has no entry (config is
+// not in config.databases). Empty-catalog recovery must install kUntracked, not kUnowned.
+TEST_F(AuthoritativeRefreshFixture, ConfigDbEmptyCatalogOnConfigServerRecoversAsUntracked) {
+    auto* opCtx = operationContext();
+    const auto savedClusterRole = serverGlobalParams.clusterRole;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = savedClusterRole; });
+    configureAsConfigServerProcess();
+
+    const auto configNss =
+        NamespaceString::createNamespaceString_forTest("config", "system.sessions");
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, configNss);
+        csr->clearCollectionMetadata(opCtx);
+    }
+
+    ASSERT_OK(onShardVersionMismatch(opCtx, configNss, boost::none));
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, configNss);
+        ASSERT_FALSE(csr->needsDbPrimaryClassification());
+        ASSERT_FALSE(csr->isUnowned());
+        ASSERT_TRUE(csr->getCurrentMetadataIfKnown());
+        ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
+    }
+}
+
+TEST_F(AuthoritativeRefreshFixture,
+       ConfigDbEmptyCatalogOnConfigServerRecoversAsUntrackedWithNeedsDbPrimaryClassification) {
+    auto* opCtx = operationContext();
+    const auto savedClusterRole = serverGlobalParams.clusterRole;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = savedClusterRole; });
+    configureAsConfigServerProcess();
+
+    const auto configNss =
+        NamespaceString::createNamespaceString_forTest("config", "system.sessions");
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, configNss);
+        csr->clearCollectionMetadata(opCtx);
+        csr->setNeedsDbPrimaryClassification(true);
+    }
+
+    ASSERT_OK(onShardVersionMismatch(opCtx, configNss, boost::none));
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, configNss);
+        ASSERT_FALSE(csr->needsDbPrimaryClassification());
+        ASSERT_FALSE(csr->isUnowned());
+        ASSERT_TRUE(csr->getCurrentMetadataIfKnown());
+        ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
     }
 }
 

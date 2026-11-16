@@ -8,12 +8,14 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/shard_role/ddl/drop_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/sharding_environment/client/shard.h"
@@ -68,9 +70,16 @@ public:
         }
         Reply typedRun(OperationContext* opCtx) final {
             auto nss = request().getNamespace();
+            uassert(ErrorCodes::InvalidOptions,
+                    "collectionUUID cannot be specified when dropping config.system.sessions",
+                    nss != NamespaceString::kLogicalSessionsNamespace ||
+                        !request().getCollectionUUID());
+
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot drop collection in 'config' database in sharded cluster",
-                    nss.dbName() != DatabaseName::kConfig);
+                    nss.dbName() != DatabaseName::kConfig ||
+                        (nss == NamespaceString::kLogicalSessionsNamespace &&
+                         allowDropSystemSessionCollection.load()));
 
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot drop collection in 'admin' database in sharded cluster",
@@ -90,6 +99,24 @@ public:
                 dropCollectionCommand.setCollectionUUID(request().getCollectionUUID());
                 generic_argument_util::setMajorityWriteConcern(dropCollectionCommand,
                                                                &opCtx->getWriteConcern());
+
+                if (nss == NamespaceString::kLogicalSessionsNamespace) {
+                    const auto dbInfo = uassertStatusOK(
+                        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
+                    const auto cmdResponse = cluster::executeDDLAgainstFirstShard(
+                        opCtx,
+                        nss.dbName(),
+                        nss,
+                        dbInfo,
+                        dropCollectionCommand.toBSON(),
+                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                        Shard::RetryPolicy::kIdempotent);
+                    const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                    auto resultObj =
+                        CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data);
+                    uassertStatusOK(getStatusFromWriteCommandReply(resultObj));
+                    return DropReply::parse(resultObj, IDLParserContext{"drop"});
+                }
 
                 sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
                 return router.route(

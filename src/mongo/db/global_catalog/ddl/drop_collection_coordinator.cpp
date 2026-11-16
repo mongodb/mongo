@@ -203,8 +203,12 @@ void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
     auto* opCtx = opCtxHolder.get();
 
     // If the request had an expected UUID for the collection being dropped, we should verify that
-    // it matches the one from the local catalog
-    {
+    // it matches the one from the local catalog.
+    // config.system.sessions is skipped: the coordinator runs on the first data shard, which may
+    // not have a local copy. For the same reason, setting an expected UUID for that collection is
+    // not allowed. This is fine, because drops on system.sessions are for emergency only and this
+    // is an alternative path to drop the collection manually shard by shard.
+    if (nss() != NamespaceString::kLogicalSessionsNamespace) {
         AutoGetCollection coll{opCtx,
                                nss(),
                                MODE_IS,
@@ -357,14 +361,17 @@ void DropCollectionCoordinator::_commitDropCollection(
 
         if (isAuthoritative) {
             const auto session = getNewSession(opCtx);
+            auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+            // CreateCollectionCoordinator writes config.system.sessions metadata to the config
+            // server's shard catalog. getAllShardIds() already includes the config server when it
+            // is also a data shard, so only append when missing.
+            if (nss() == NamespaceString::kLogicalSessionsNamespace &&
+                std::find(shardIds.begin(), shardIds.end(), ShardId::kConfigServerId) ==
+                    shardIds.end()) {
+                shardIds.push_back(ShardId::kConfigServerId);
+            }
             sharding_ddl_util::commitDropCollectionMetadataToShardCatalog(
-                opCtx,
-                nss(),
-                _doc.getCollInfo()->getUuid(),
-                Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
-                session,
-                executor,
-                token);
+                opCtx, nss(), _doc.getCollInfo()->getUuid(), shardIds, session, executor, token);
         }
     }
 

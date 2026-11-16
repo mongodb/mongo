@@ -3,11 +3,16 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
+#include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/util/modules.h"
 
 #include <boost/none.hpp>
@@ -15,6 +20,19 @@
 
 namespace mongo {
 namespace cluster {
+
+/**
+ * Executes a DDL command against the first shard alphabetically, attaching the database version.
+ * This should only be used for config.system.sessions.
+ */
+[[MONGO_MOD_NEEDS_REPLACEMENT]] AsyncRequestsSender::Response executeDDLAgainstFirstShard(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const NamespaceString& nss,
+    const CachedDatabaseInfo& dbInfo,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy);
 
 /**
  * Creates (or ensures that it is created) a database `dbName`, with `suggestedPrimaryId` as the

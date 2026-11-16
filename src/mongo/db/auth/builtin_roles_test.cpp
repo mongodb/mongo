@@ -144,5 +144,21 @@ TEST(BuiltinRoles, addSystemBucketsPrivilegesForBuiltinRoleClusterManager) {
         }
     }
 }
+
+TEST(BuiltinRoles, ClusterAdminCanDropLogicalSessionsCollection) {
+    PrivilegeVector privs;
+    ASSERT(auth::addPrivilegesForBuiltinRole(RoleName("clusterAdmin", "admin"), &privs));
+
+    const auto sessionsResource =
+        ResourcePattern::forExactNamespace(NamespaceString::kLogicalSessionsNamespace);
+    for (const auto& priv : privs) {
+        if (priv.getResourcePattern() == sessionsResource) {
+            ASSERT_TRUE(priv.getActions().contains(ActionType::dropCollection));
+            return;
+        }
+    }
+
+    FAIL("clusterAdmin lacks a privilege for config.system.sessions");
+}
 }  // namespace
 }  // namespace mongo

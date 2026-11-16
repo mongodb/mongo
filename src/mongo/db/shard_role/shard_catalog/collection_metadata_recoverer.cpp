@@ -6,12 +6,14 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_migration_critical_section.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata_synchronizer.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
@@ -370,8 +372,10 @@ SemiFuture<void> recoverEmptyCatalogFromDisk(ServiceContext* serviceContext,
                           "during drain");
             }
 
-            const auto noRoutingTableAs =
-                dbPrimarySnapshot->shardId == ShardingState::get(opCtx)->shardId()
+            // Untracked on the database primary, unowned elsewhere. The DSR owns the
+            // classification, including for the config database, which has no primary row in
+            // the global catalog.
+            const auto noRoutingTableAs = scopedDsr->isPrimaryShardForDb(opCtx)
                 ? CollectionShardingRuntime::NoRoutingTableAs::kUntracked
                 : CollectionShardingRuntime::NoRoutingTableAs::kUnowned;
 

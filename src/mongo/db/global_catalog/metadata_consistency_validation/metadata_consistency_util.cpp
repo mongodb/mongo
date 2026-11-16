@@ -184,8 +184,10 @@ bool isNamespacePermittedToHaveUntrackedCssInconsistency(OperationContext* opCtx
  * The three accepted scenarios are:
  * 1. The current node is a secondary. Catalog stability is given by the DDL lock held by the
  *    primary, if the primary dies then there's no stability guarantee.
- * 2. The collection is `config.system.sessions` - this is acceptable since this collection is only
- *    droppable via direct shard connection.
+ * 2. The collection is `config.system.sessions`. CheckMetadataConsistency does not serialize with
+ *    dropping this collection (via mongos, or via a direct shard connection).
+ *    The collection can therefore disappear during the check, even on a primary. Report
+ *    ConflictingOperationInProgress instead of tasserting so that the caller can retry.
  * 3. This node is a config server - this can happen since transitionToDedicated drops collections
  *    in the background.
  */

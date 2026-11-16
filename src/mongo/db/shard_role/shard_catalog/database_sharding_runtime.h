@@ -103,6 +103,8 @@ public:
 
     void assertIsPrimaryShardForDb(OperationContext* opCtx) const override;
 
+    bool isPrimaryShardForDb(OperationContext* opCtx) const override;
+
     bool isMovePrimaryInProgress() const override {
         return _dbMetadataAccessor.isMovePrimaryInProgress();
     }

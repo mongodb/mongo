@@ -88,6 +88,7 @@ export var MetadataConsistencyChecker = (function () {
             // Note that we check TestData here rather than jsTestOptions because this option is
             // used in passthroughs which use the python class of this hook and thus we pass
             // arguments via the suite + testData.
+            // Also note that the DropSessionCollection hook will run manually the cmc before and after the drop.
             const isSessionsCollectionDropSuite = Boolean(TestData.backgroundSessionCollectionDrop);
             if (isSessionsCollectionDropSuite) {
                 for (let i = inconsistencies.length - 1; i >= 0; i--) {

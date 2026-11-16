@@ -35,6 +35,16 @@ server_parameters:
         default: false
         redact: false
 
+    allowDropSystemSessionCollection:
+        description:
+            Allows bypassing the sharded-cluster guard that normally prevents dropping config.system.sessions via mongos.
+            Disabled by default; intended for specialized administrators only. Do not enable while a topology change is in progress.
+        set_at: runtime
+        cpp_vartype: Atomic<bool>
+        cpp_varname: allowDropSystemSessionCollection
+        default: false
+        redact: false
+
     TransactionRecordMinimumLifetimeMinutes:
         # The minimum lifetime for a transaction record is how long it has to have lived on the server
         # before we'll consider it for cleanup. This is effectively the window for how long it is

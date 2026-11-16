@@ -17,7 +17,6 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/shard_registry.h"
-#include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -47,43 +46,27 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(createUnshardedCollectionRandomizeDataShard);
 MONGO_FAIL_POINT_DEFINE(hangCreateUnshardedCollection);
 
-std::vector<AsyncRequestsSender::Request> buildUntrackedRequestsForAllShards(
-    OperationContext* opCtx, std::vector<ShardId> shardIds, const BSONObj& cmdObj) {
-    auto cmdToSend = cmdObj;
-    appendShardVersion(cmdToSend, ShardVersion::UNTRACKED());
+}  // namespace
 
-    std::vector<AsyncRequestsSender::Request> requests;
-    requests.reserve(shardIds.size());
-    for (auto&& shardId : shardIds)
-        requests.emplace_back(std::move(shardId), cmdToSend);
-
-    return requests;
-}
-
-AsyncRequestsSender::Response executeCommandAgainstFirstShard(OperationContext* opCtx,
-                                                              const DatabaseName& dbName,
-                                                              const NamespaceString& nss,
-                                                              const CachedDatabaseInfo& dbInfo,
-                                                              const BSONObj& cmdObj,
-                                                              const ReadPreferenceSetting& readPref,
-                                                              Shard::RetryPolicy retryPolicy) {
+AsyncRequestsSender::Response executeDDLAgainstFirstShard(OperationContext* opCtx,
+                                                          const DatabaseName& dbName,
+                                                          const NamespaceString& nss,
+                                                          const CachedDatabaseInfo& dbInfo,
+                                                          const BSONObj& cmdObj,
+                                                          const ReadPreferenceSetting& readPref,
+                                                          Shard::RetryPolicy retryPolicy) {
     auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     uassert(ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
     std::sort(shardIds.begin(), shardIds.end());
     ShardId shardId = shardIds[0];
+    auto cmdToSend = appendDbVersionIfPresent(cmdObj, dbInfo);
+    std::vector<AsyncRequestsSender::Request> requests;
+    requests.emplace_back(std::move(shardId), cmdToSend);
 
     auto responses =
-        gatherResponses(opCtx,
-                        dbName,
-                        nss,
-                        readPref,
-                        retryPolicy,
-                        buildUntrackedRequestsForAllShards(
-                            opCtx, {shardId}, appendDbVersionIfPresent(cmdObj, dbInfo)));
+        gatherResponses(opCtx, dbName, nss, readPref, retryPolicy, std::move(requests));
     return std::move(responses.front());
 }
-
-}  // namespace
 
 CachedDatabaseInfo createDatabase(OperationContext* opCtx,
                                   const DatabaseName& dbName,
@@ -231,13 +214,13 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
         const auto dbInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
         const auto cmdResponse =
-            executeCommandAgainstFirstShard(opCtx,
-                                            nss.dbName(),
-                                            nss,
-                                            dbInfo,
-                                            cmdObjWithWc,
-                                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                            Shard::RetryPolicy::kIdempotent);
+            executeDDLAgainstFirstShard(opCtx,
+                                        nss.dbName(),
+                                        nss,
+                                        dbInfo,
+                                        cmdObjWithWc,
+                                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                        Shard::RetryPolicy::kIdempotent);
         remoteResponse = uassertStatusOK(cmdResponse.swResponse);
         uassertStatusOK(getStatusFromCommandResult(remoteResponse->data));
         uassertStatusOK(getWriteConcernStatusFromCommandResult(remoteResponse->data));

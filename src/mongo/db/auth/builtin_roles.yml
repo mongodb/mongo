@@ -418,6 +418,11 @@ roles:
       - hostManager
       - clusterManager
     privileges:
+      - matchType: exact_namespace
+        db: "config"
+        collection: "system.sessions"
+        actions:
+          - dropCollection
       - matchType: any_normal
         actions:
           - dropDatabase

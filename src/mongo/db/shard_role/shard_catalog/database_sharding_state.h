@@ -121,6 +121,13 @@ public:
     virtual void assertIsPrimaryShardForDb(OperationContext* opCtx) const = 0;
 
     /**
+     * Returns true if the current shard server is the primary for the given database. The
+     * config and admin databases have no primary in the global catalog and are owned by the
+     * config server.
+     */
+    virtual bool isPrimaryShardForDb(OperationContext* opCtx) const = 0;
+
+    /**
      * Returns `true` whether a `movePrimary` operation on this database is in progress, `false`
      * otherwise.
      */

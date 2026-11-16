@@ -1,4 +1,4 @@
-"""Test hook that periodically drops and rereates the sessions collection."""
+"""Test hook that periodically drops and recreates the sessions collection."""
 
 import os.path
 import random
@@ -7,7 +7,7 @@ import time
 
 import pymongo.errors
 
-from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import core, errors
 from buildscripts.resmokelib.testing.fixtures import replicaset, shardedcluster
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
@@ -197,106 +197,75 @@ class _DropSessionsCollectionThread(threading.Thread):
         primary = rs_fixture.get_primary().mongo_client()
         primary.config.system.sessions.drop()
 
-    def _sc_block_sessions_refresh(self, sc_fixture):
-        # First configure the failpoint on all CSRS nodes - this will fail any refresh which tries
-        # to create the sessions collection.
-        failpoint_cmd = {
-            "configureFailPoint": "preventSessionsCollectionSharding",
-            "mode": "alwaysOn",
-        }
-        for node in sc_fixture.configsvr.nodes:
-            client = node.mongo_client()
-            client.admin.command(failpoint_cmd)
-        # Now run a refresh, this will take the mutex protecting collection creation thus ensuring
-        # any ongoing periodic refresh is drained.
+    def _sc_drop_collection(self, sc_fixture):
         try:
-            with_naive_retry(lambda: self._refresh_sessions_collection(sc_fixture))
-        except pymongo.errors.OperationFailure as err:
-            # 117 = ConflictingOperationInProgress - this is the error code the failpoint throws.
-            if err.code != 117:
-                raise err
-
-    def _sc_unblock_sessions_refresh(self, sc_fixture):
-        # Turn off the failpoint on all nodes, thus re-allowing refreshes
-        failpoint_cmd = {
-            "configureFailPoint": "preventSessionsCollectionSharding",
-            "mode": "off",
-        }
-        for node in sc_fixture.configsvr.nodes:
-            client = node.mongo_client()
-            client.admin.command(failpoint_cmd)
-
-    def _is_authoritative_shards_crud_enabled(self, mongo_client):
-        # TODO (SERVER-98118): Remove this once 9.0 becomes last LTS.
-        try:
-            flag_doc = mongo_client.admin.command(
-                {"getParameter": 1, "featureFlagAuthoritativeShardsCRUD": 1}
+            self._set_allow_drop(sc_fixture, True)
+            sc_fixture.mongos[0].mongo_client().get_database("config").command(
+                {"drop": "system.sessions"}
             )
-        except pymongo.errors.OperationFailure:
-            # The parameter doesn't exist on this binary version; treat it as disabled.
-            return False
-        return bool(
-            flag_doc.get("featureFlagAuthoritativeShardsCRUD", {}).get("currentlyEnabled", False)
-        )
+        finally:
+            self._set_allow_drop(sc_fixture, False)
 
-    def _sc_drop_collection(self, sc_fixture, uuid):
-        config_primary = sc_fixture.configsvr.get_primary().mongo_client()
-        config_db = config_primary.get_database(
-            "config",
-            read_concern=pymongo.read_concern.ReadConcern(level="majority"),
-            write_concern=pymongo.write_concern.WriteConcern(w="majority"),
-        )
-        # Drop sharding catalog metadata
-        config_db.collections.delete_one({"_id": "config.system.sessions"})
-        config_db.chunks.delete_many({"uuid": uuid})
-        # Drop collection on all replica sets
-        config_db.system.sessions.drop()
-        # _flushRoutingTableCacheUpdatesWithWriteConcern is deprecated and rejected once shards are
-        # authoritative for collection metadata (config.cache collections are no longer relied
-        # upon), so only issue it against the legacy (non-authoritative) refresh protocol.
-        if not self._is_authoritative_shards_crud_enabled(config_primary):
-            config_primary.admin.command(
-                {
-                    "_flushRoutingTableCacheUpdatesWithWriteConcern": "config.system.sessions",
-                    "writeConcern": {"w": "majority"},
-                }
+    @staticmethod
+    def _set_allow_drop(sc_fixture, enabled):
+        """Toggle the allowDropSystemSessionCollection server parameter on all mongos."""
+        for mongos in sc_fixture.mongos:
+            mongos.mongo_client().admin.command(
+                {"setParameter": 1, "allowDropSystemSessionCollection": enabled}
             )
-        for shard in sc_fixture.shards:
-            shard_primary = shard.get_primary().mongo_client()
-            shard_primary.get_database(
-                "config",
-                read_concern=pymongo.read_concern.ReadConcern(level="majority"),
-                write_concern=pymongo.write_concern.WriteConcern(w="majority"),
-            ).system.sessions.drop()
-            if not self._is_authoritative_shards_crud_enabled(shard_primary):
-                shard_primary.admin.command(
-                    {
-                        "_flushRoutingTableCacheUpdatesWithWriteConcern": "config.system.sessions",
-                        "writeConcern": {"w": "majority"},
-                    }
-                )
 
     def _drop_sessions_collection(self, fixture):
-        self.logger.info("Starting drop of the sessions collection.")
+        # The production escape hatch is intended only for repairing a corrupted sessions
+        # collection; this hook deliberately exercises it. Since checkMetadataConsistency does not
+        # serialize with the drop, bracket the operation with consistency checks. The independent
+        # background CMC hook ignores transient sessions inconsistencies during the drop.
+        self._check_metadata_consistency(fixture, "beforeDrop")
+        self.logger.info(
+            "Starting sessions collection drop (cluster=%s).",
+            fixture.get_driver_connection_url(),
+        )
         if isinstance(fixture, replicaset.ReplicaSetFixture):
             with_naive_retry(lambda: self._rs_drop_collection(fixture))
         elif isinstance(fixture, shardedcluster.ShardedClusterFixture):
-            coll_doc = with_naive_retry(
-                lambda: fixture.configsvr.get_primary()
-                .mongo_client()
-                .config.get_collection(
-                    "collections",
-                    read_concern=pymongo.read_concern.ReadConcern(level="majority"),
-                    write_concern=pymongo.write_concern.WriteConcern(w="majority"),
-                )
-                .find_one({"_id": "config.system.sessions"})
+            with_naive_retry(lambda: self._sc_drop_collection(fixture))
+        self.logger.info(
+            "Finished sessions collection drop (cluster=%s).",
+            fixture.get_driver_connection_url(),
+        )
+        self._check_metadata_consistency(fixture, "afterDrop")
+
+    def _check_metadata_consistency(self, fixture, when):
+        """Run cluster-level checkMetadataConsistency, including config.system.sessions."""
+        if not isinstance(fixture, shardedcluster.ShardedClusterFixture) or not fixture.mongos:
+            return
+
+        cluster_url = fixture.get_driver_connection_url()
+        self.logger.info(
+            "Running checkMetadataConsistency (phase=%s, cluster=%s).", when, cluster_url
+        )
+        # Reuse the JS MetadataConsistencyChecker so the error handling (transient errors,
+        # Unauthorized on auth suites, sessions-collection filtering) lives in one place.
+        js_cmds = """
+            const {MetadataConsistencyChecker} = await import(
+                "jstests/libs/server_catalog/check_metadata_consistency_helpers.js");
+            MetadataConsistencyChecker.run(db.getMongo());
+        """
+        shell_proc = core.programs.mongo_shell_program(
+            self.logger,
+            test_name="check_metadata_consistency_sessions_drop",
+            connection_string=fixture.get_shell_connection_url(),
+            global_vars={"TestData": {"skipCheckingIndexesConsistentAcrossCluster": True}},
+            eval=js_cmds,
+        )
+        shell_proc.start()
+        return_code = shell_proc.wait()
+        if return_code:
+            raise errors.ServerFailure(
+                f"checkMetadataConsistency failed (phase={when}, cluster={cluster_url})"
             )
-            if not coll_doc or "uuid" not in coll_doc:
-                return
-            self._sc_block_sessions_refresh(fixture)
-            with_naive_retry(lambda: self._sc_drop_collection(fixture, coll_doc["uuid"]))
-            self._sc_unblock_sessions_refresh(fixture)
-        self.logger.info("Finished drop of the sessions collection.")
+        self.logger.info(
+            "Completed checkMetadataConsistency (phase=%s, cluster=%s).", when, cluster_url
+        )
 
     def _refresh_sessions_collection(self, fixture):
         primary_conn = None
