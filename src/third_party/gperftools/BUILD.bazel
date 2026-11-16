@@ -1,6 +1,15 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
+
+selects.config_setting_group(
+    name = "windows_static",
+    match_all = [
+        "@platforms//os:windows",
+        "//bazel/config:linkstatic_enabled",
+    ],
+)
 
 mongo_cc_library(
     name = "tcmalloc_minimal",
@@ -98,6 +107,15 @@ mongo_cc_library(
         ],
         "@//bazel/config:windows_x86_64": [
             "platform/windows_x86_64/include",
+        ],
+        "//conditions:default": [],
+    }),
+    # MSVC resolves the public headers' dllimport references to this static archive.
+    # Suppress those diagnostics while preserving the existing allocator exports.
+    linkopts = select({
+        ":windows_static": [
+            "/IGNORE:4217",
+            "/IGNORE:4286",
         ],
         "//conditions:default": [],
     }),
