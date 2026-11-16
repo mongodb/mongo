@@ -19,6 +19,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/sdam_json_test.yml",
     tags = [
         "ci-default",
+        "release_critical",
         "requires_compile_variant",
     ],
     deps = [
@@ -31,6 +32,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/server_selection_json_test.yml",
     tags = [
         "ci-default",
+        "release_critical",
         "requires_compile_variant",
     ],
     deps = [
