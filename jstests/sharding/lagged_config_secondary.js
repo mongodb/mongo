@@ -6,6 +6,8 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
@@ -47,7 +49,22 @@ assert.commandWorked(testDB.user.insert({_id: 1}));
 // Ensures that all metadata writes thus far have been replicated to all nodes
 st.configRS.awaitReplication();
 
-stopServerReplication(delayedConfigSecondary);
+// ASC uses the oplog applier, which stopServerReplication() pauses. DSC standbys instead
+// replay the disaggregated log through the standby read loop, so pause that loop to keep
+// the secondary lagged across the collMod catalog updates.
+let standbyReadLoopFailPoint = null;
+if (isDisagg(st.configRS.getPrimary())) {
+    standbyReadLoopFailPoint = configureFailPoint(delayedConfigSecondary, "hangInStandbyReadLoop");
+    assert.commandWorked(
+        st.configRS
+            .getPrimary()
+            .getDB("test")
+            .replication_barrier.insert({_id: 1}, {writeConcern: {w: 1}}),
+    );
+    standbyReadLoopFailPoint.wait();
+} else {
+    stopServerReplication(delayedConfigSecondary);
+}
 
 // Do one metadata write in order to bump the optime on mongos
 assert.commandWorked(st.getDB("config").TestConfigColl.insert({TestKey: "Test value"}));
@@ -95,5 +112,9 @@ assert.soon(
 );
 
 // Can't do clean shutdown with this failpoint on.
-restartServerReplication(delayedConfigSecondary);
+if (standbyReadLoopFailPoint !== null) {
+    standbyReadLoopFailPoint.off();
+} else {
+    restartServerReplication(delayedConfigSecondary);
+}
 st.stop();
