@@ -121,8 +121,13 @@ describe("change stream and update lookup read preference", function () {
             shards: 2,
             rs: {
                 nodes: 2,
-                // Use a higher frequency for periodic noops to speed up the test.
-                setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
+                setParameter: {
+                    // Use a higher frequency for periodic noops to speed up the test.
+                    periodicNoopIntervalSecs: 1,
+                    writePeriodicNoops: true,
+                    // Disable mirrored reads to avoid extra '_id_' index access.
+                    mirrorReads: {samplingRate: 0.0, targetedMirroring: {samplingRate: 0.0}},
+                },
             },
         });
 
