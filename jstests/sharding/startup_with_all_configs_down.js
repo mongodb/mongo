@@ -5,10 +5,18 @@
 // However, if a shard mongod is restarted without --shardsvr mode then the shard mongod
 // will NOT wait until there is a config server online before continuing replication.
 //
+// In ASC, the lagged secondary catches up from another secondary while no primary is available.
+// In DSC, standbys read from SLS instead of another replica set member. The DSC path pauses only
+// the standby's read loop so the primary can continue accepting majority writes. It then kills the
+// paused standby before restart because the read-loop failpoint is uninterruptible. After restart
+// without --shardsvr, the standby must catch up from SLS without config servers or a primary.
+//
 // This test involves restarting a standalone shard, so cannot be run on ephemeral storage engines.
 // A restarted standalone will lose all data when using an ephemeral storage engine.
 // @tags: [requires_persistence]
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {stopServerReplication} from "jstests/libs/write_concern_util.js";
 
@@ -46,7 +54,12 @@ assert.eq(100, st.s.getDB("test").foo.find().itcount());
 // We pause replication on one of the replica set shard secondaries and perform some additional
 // writes to later verify the secondary will catch up when --shardsvr is omitted.
 const secondary = st.rs1.getSecondary();
-stopServerReplication(secondary);
+const usesDisagg = isDisagg(secondary);
+if (usesDisagg) {
+    configureFailPoint(secondary, "hangInStandbyReadLoop").wait();
+} else {
+    stopServerReplication(secondary);
+}
 
 const collection = st.s0.getCollection("test.foo");
 for (let i = 75; i < 100; ++i) {
@@ -69,6 +82,12 @@ assert.throws(function () {
 });
 
 jsTestLog("Restarting a shard WITHOUT --shardsvr while there are no config servers up");
+if (usesDisagg) {
+    st.rs1.stop(secondary, 9, {
+        allowedExitCode: MongoRunner.EXIT_SIGKILL,
+        skipValidation: true,
+    });
+}
 // We won't be able to compare dbHashes because server replication was stopped on the secondary.
 st.rs1.stopSet(undefined, true, {skipCheckDBHashes: true, skipValidation: true});
 
@@ -85,7 +104,11 @@ for (let node of st.rs1.nodes) {
     }
 }
 
-// Verify the non-voting shard mongod successfully syncs from the former primary.
+jsTest.log.info(
+    usesDisagg
+        ? "Waiting for the standby to catch up from SLS without config servers or a primary"
+        : "Waiting for the non-voting secondary to catch up from the former primary",
+);
 st.rs1.awaitReplication(undefined, undefined, undefined, undefined, st.rs1.nodes[0]);
 
 jsTestLog("Restarting a shard WITH --shardsvr while there are no config servers up");
