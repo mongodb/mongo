@@ -99,7 +99,6 @@ TEST_TAGS = {
     "query_bm": 1,
     "repl_bm": 1,
     "sharding_bm": 1,
-    "eot_bm": 1,
     "sep_bm": 1,
     "storage_bm": 1,
     "first_half_bm": 1,

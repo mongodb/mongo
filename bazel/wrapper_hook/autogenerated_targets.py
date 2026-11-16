@@ -21,7 +21,6 @@ bazel_tags_to_autogenerate = [
     "query_bm",
     "repl_bm",
     "sharding_bm",
-    "eot_bm",
     "sep_bm",
     "storage_bm",
     "first_half_bm",

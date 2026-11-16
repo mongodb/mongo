@@ -45,9 +45,6 @@ filters:
   - "benchmarks_abt_lowering.yml":
     approvers:
       - 10gen/query-execution-sbe
-  - "benchmarks_eot.yml":
-    approvers:
-      - 10gen/query-execution-change-streams
   - "benchmarks_expression.yml":
     approvers:
       - 10gen/query-execution-classic

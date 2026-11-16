@@ -9,9 +9,6 @@ filters:
   - "*txn*":
     approvers:
       - 10gen/server-transactions
-  - "end_of_transaction*":
-    approvers:
-      - 10gen/query-execution-change-streams
   - "shardsvr_resolve_view_command_test.cpp":
     approvers:
       - 10gen/query-integration-search
