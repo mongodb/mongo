@@ -541,8 +541,8 @@ public:
             resharding::processReshardingFieldsForCollection(
                 opCtx, kTemporaryReshardingNss, temporaryCollMetadata, reshardingFields);
 
-            // featureFlagReshardingCloneNoRefresh is enabled at every reachable FCV, so the shard
-            // version refresh above does not initiate cloning; the coordinator drives it directly.
+            // The shard version refresh above does not initiate cloning; the coordinator drives it
+            // directly.
             ASSERT_FALSE(getPersistedRecipientDocument(opCtx, kReshardingUUID).getCloneTimestamp());
             (*recipientStateMachine)
                 ->onCoordinatorStateAdvanced(

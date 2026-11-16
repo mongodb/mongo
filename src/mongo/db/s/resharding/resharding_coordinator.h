@@ -583,11 +583,6 @@ private:
     void _tellAllRecipientsToRefresh(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
-     * Sends '_flushReshardingStateChange' for the original namespace to all donor shards.
-     */
-    void _tellAllDonorsToRefresh(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
-
-    /**
      * Sends '_shardsvrReshardDonorCriticalSectionStarted' to all donor shards.
      */
     void _notifyDonorsCriticalSectionStarted(

@@ -42,14 +42,6 @@ public:
                                         const NamespaceString& nss) override {
         MONGO_UNREACHABLE;
     }
-    void tellAllDonorsToRefresh(OperationContext*,
-                                const NamespaceString&,
-                                const UUID&,
-                                const std::vector<DonorShardEntry>&,
-                                const std::shared_ptr<executor::TaskExecutor>&,
-                                CancellationToken) override {
-        MONGO_UNREACHABLE;
-    }
     void tellAllRecipientsToRefresh(OperationContext*,
                                     const NamespaceString&,
                                     const UUID&,

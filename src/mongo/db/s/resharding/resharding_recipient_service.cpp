@@ -845,8 +845,7 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
 
     std::lock_guard<std::mutex> lk(_mutex);
     auto coordinatorState = reshardingFields.getState();
-    // featureFlagReshardingCloneNoRefresh is enabled at every reachable FCV, so a shard version
-    // refresh never drives cloning; the coordinator drives it directly through
+    // A shard version refresh never drives cloning; the coordinator drives it directly through
     // onCoordinatorStateAdvanced().
     _onCoordinatorStateAdvanced(lk, coordinatorState, /*cloneDetails=*/boost::none);
 }

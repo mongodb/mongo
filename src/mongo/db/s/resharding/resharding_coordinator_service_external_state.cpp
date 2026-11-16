@@ -274,18 +274,6 @@ bool ReshardingCoordinatorExternalStateImpl::searchIndexExistsForCollection(
     }
 }
 
-void ReshardingCoordinatorExternalStateImpl::tellAllDonorsToRefresh(
-    OperationContext* opCtx,
-    const NamespaceString& sourceNss,
-    const UUID& reshardingUUID,
-    const std::vector<mongo::DonorShardEntry>& donorShards,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    CancellationToken token) {
-    auto donorShardIds = resharding::extractShardIdsFromParticipantEntries(donorShards);
-    resharding::sendFlushReshardingStateChangeToShards(
-        opCtx, sourceNss, reshardingUUID, donorShardIds, executor, token);
-}
-
 void ReshardingCoordinatorExternalStateImpl::tellAllRecipientsToRefresh(
     OperationContext* opCtx,
     const NamespaceString& nssToRefresh,

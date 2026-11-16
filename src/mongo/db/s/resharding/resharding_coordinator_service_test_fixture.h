@@ -32,7 +32,6 @@
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/executor/mock_async_rpc.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/assert_util.h"
@@ -67,7 +66,6 @@ public:
     };
 
     enum class ExternalFunction {
-        kTellAllDonorsToRefresh,
         kTellAllRecipientsToRefresh,
         kGetDocumentsDeltaFromDonors,
     };
@@ -117,22 +115,6 @@ public:
 
     void pushResumeMigrationsError(ErrorCodes::Error errorCode) {
         _resumeMigrationsErrors.push_back(errorCode);
-    }
-
-    void tellAllDonorsToRefresh(OperationContext* opCtx,
-                                const NamespaceString& sourceNss,
-                                const UUID& reshardingUUID,
-                                const std::vector<DonorShardEntry>& donorShards,
-                                const std::shared_ptr<executor::TaskExecutor>& executor,
-                                CancellationToken token) override {
-        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kTellAllDonorsToRefresh);
-        resharding::sendFlushReshardingStateChangeToShards(
-            opCtx,
-            sourceNss,
-            reshardingUUID,
-            resharding::extractShardIdsFromParticipantEntries(donorShards),
-            executor,
-            token);
     }
 
     void tellAllRecipientsToRefresh(OperationContext* opCtx,

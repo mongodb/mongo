@@ -890,8 +890,7 @@ public:
     void notifyToStartCloning(OperationContext* opCtx,
                               RecipientStateMachine& recipient,
                               const ReshardingRecipientDocument& recipientDoc) {
-        // featureFlagReshardingCloneNoRefresh is enabled at every reachable FCV, so the coordinator
-        // always drives cloning directly.
+        // The coordinator always drives cloning directly.
         auto ignore = notifyToStartCloningUsingCmd(recipient, recipientDoc);
     }
 
@@ -1150,9 +1149,8 @@ protected:
             return;
         }
 
-        // featureFlagReshardingCloneNoRefresh is enabled at every reachable FCV, so the coordinator
-        // drives cloning. The coordinator sends copy metrics according to the chunk manager, which
-        // ignores the arbitrary noChunksToCopy value set in unit tests.
+        // The coordinator drives cloning and sends copy metrics according to the chunk manager,
+        // which ignores the arbitrary noChunksToCopy value set in unit tests.
         auto expectedApproxDocsToCopy = approxDocumentsToCopy;
         auto expectedApproxBytesToCopy = approxBytesToCopy;
 
@@ -1447,12 +1445,6 @@ protected:
         checkRecipientDocumentRemoved(opCtx.get());
     }
 
-    void setupFeatureFlags(const TestOptions& testOptions) {
-        // featureFlagReshardingCloneNoRefresh is enabled at every reachable FCV, so the flag is
-        // never overridden.
-        _cloneNoRefreshController.reset();
-    }
-
 private:
     TypeCollectionRecipientFields _makeRecipientFields(
         const ReshardingRecipientDocument& recipientDoc) {
@@ -1501,15 +1493,10 @@ private:
     // Set the batch size 1 to test multi-batch processing in unit tests with multiple events.
     unittest::ServerParameterGuard _batchSize{
         "reshardingVerificationChangeStreamsEventsBatchSizeLimit", 1};
-
-    // Feature flag controller for test options
-    boost::optional<unittest::ServerParameterGuard> _cloneNoRefreshController;
 };
 
 TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(5551105,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -1609,8 +1596,6 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
                                                           RecipientStateEnum::kStrictConsistency,
                                                           RecipientStateEnum::kDone};
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(5551106,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -1710,8 +1695,6 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
 
 TEST_F(ReshardingRecipientServiceTest, ReportForCurrentOpAfterCompletion) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9297801,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -1769,8 +1752,6 @@ TEST_F(ReshardingRecipientServiceTest, ReportForCurrentOpAfterCompletion) {
 
 TEST_F(ReshardingRecipientServiceTest, OpCtxKilledWhileRestoringMetrics) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(5992701,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -1825,8 +1806,6 @@ TEST_F(ReshardingRecipientServiceTest, OpCtxKilledWhileRestoringMetrics) {
 using ReshardingRecipientServiceTestDeathTest = ReshardingRecipientServiceTest;
 DEATH_TEST_REGEX_F(ReshardingRecipientServiceTestDeathTest, CommitFn, "4457001.*tripwire") {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9297802,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -1852,8 +1831,6 @@ DEATH_TEST_REGEX_F(ReshardingRecipientServiceTestDeathTest, CommitFn, "4457001.*
 
 TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(11543200,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -1917,8 +1894,6 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
 
 TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbortWithFailover) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(5551107,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -2071,8 +2046,6 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
 
 TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9297804,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -2128,7 +2101,6 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnRecoveryInStrictCon
     // performVerification=true enables the change streams monitor path where resharding hangs due
     // to a missing recipient oplog
     TestOptions testOptions{.isAlsoDonor = false, .performVerification = true};
-    setupFeatureFlags(testOptions);
 
     // Ensure the ReshardDoneCatchUpChangeEventO2Field entry is absent from the oplog
     auto skipOplogWriteFp =
@@ -2183,7 +2155,6 @@ TEST_F(ReshardingRecipientServiceTest, SkipsDuplicateOplogEntryOnRecoveryInStric
     // Verify that if the ReshardDoneCatchUp oplog entry was already written on the normal path,
     // a recovery in kStrictConsistency does not write a duplicate.
     TestOptions testOptions{.isAlsoDonor = false, .performVerification = true};
-    setupFeatureFlags(testOptions);
 
     PauseDuringStateTransitions stateTransitionsGuard{controller(),
                                                       RecipientStateEnum::kStrictConsistency};
@@ -2236,8 +2207,6 @@ TEST_F(ReshardingRecipientServiceTest, SkipsDuplicateOplogEntryOnRecoveryInStric
 
 TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardCollection) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9297805,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -2299,8 +2268,6 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
 
 TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(5568600,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -2347,8 +2314,6 @@ TEST_F(ReshardingRecipientServiceTest, SkipCloningAndApplying) {
     FailPointEnableBlock fp("failToCreateReshardingDataReplicationForTest");
 
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9110903,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -2376,8 +2341,6 @@ TEST_F(ReshardingRecipientServiceTest, SkipCloningAndApplying) {
 
 TEST_F(ReshardingRecipientServiceTest, skipCloning) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         externalState()->setShouldSkipCloning(testOptions.skipCloning);
         LOGV2(11192901,
               "Running case",
@@ -2434,8 +2397,6 @@ TEST_F(ReshardingRecipientServiceTest, SkipBuildingIndexesPhase) {
 
 TEST_F(ReshardingRecipientServiceTest, MetricsSuccessfullyShutDownOnUserCancelation) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9297806,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -2465,8 +2426,6 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
                                                           RecipientStateEnum::kDone};
 
     for (auto& testOptions : makeAllTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9297807,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -2600,8 +2559,6 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                                                           RecipientStateEnum::kDone};
 
     for (const auto& testOptions : makeAllTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9297808,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -2713,8 +2670,6 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
 
 TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgressDoc) {
     for (const auto& testOptions : makeAllTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9297809,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -2778,7 +2733,6 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgr
 
 TEST_F(ReshardingRecipientServiceTest, AbortWhileChangeStreamsMonitorInProgress) {
     TestOptions testOptions{.isAlsoDonor = false, .performVerification = true};
-    setupFeatureFlags(testOptions);
 
     // Skip the oplog write so the CSM is genuinely waiting for the finalEvent that
     // will never arrive — this is the window where abort should interrupt it.
@@ -2890,8 +2844,6 @@ TEST_F(ReshardingRecipientServiceTest,
 
 TEST_F(ReshardingRecipientServiceTest, AbortWhileWaitingForCriticalSectionStarted) {
     for (auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         if (!testOptions.skipCloningAndApplying) {
             // A recipient only explicitly waits for the critical section to start before
             // transitioning to "strict-consistency" when it skips cloning and applying.
@@ -2944,8 +2896,6 @@ TEST_F(ReshardingRecipientServiceTest, AbortWhileWaitingForCriticalSectionStarte
 TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinator) {
     repl::primaryOnlyServiceTestStepUpWaitForRebuildComplete.setMode(FailPoint::alwaysOn);
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(8743301,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3004,8 +2954,6 @@ TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordi
 
 TEST_F(ReshardingRecipientServiceTest, FailoverDuringErrorState) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(8916100,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3056,8 +3004,6 @@ TEST_F(ReshardingRecipientServiceTest, FailoverDuringErrorState) {
 // so the verification will pass since both index specs are equal.
 TEST_F(ReshardingRecipientServiceTest, TestVerifyIndexSpecsHappyPath) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(11863900,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3092,8 +3038,6 @@ TEST_F(ReshardingRecipientServiceTest, TestVerifyIndexSpecsThrowsExceptionOnMism
                                              << "a_1")};
 
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(11863901,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3137,8 +3081,6 @@ TEST_F(ReshardingRecipientServiceTest,
                                              << "a_1")};
 
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(11863902,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3171,8 +3113,6 @@ TEST_F(ReshardingRecipientServiceTest,
 // so this test will pass since both collection options are equal.
 TEST_F(ReshardingRecipientServiceTest, TestVerifyCollectionOptionsHappyPath) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9799201,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3207,8 +3147,6 @@ TEST_F(ReshardingRecipientServiceTest,
     tempReshardingCollectionOptions = BSONObjBuilder().append("viewOn", "bar").obj();
 
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9799202,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3253,8 +3191,6 @@ TEST_F(ReshardingRecipientServiceTest,
     unittest::ServerParameterGuard countVerificationFeatureFlag("featureFlagReshardingVerification",
                                                                 true);
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(9799203,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3291,8 +3227,6 @@ TEST_F(ReshardingRecipientServiceTest, VerifyRecipientRetriesOnLockTimeoutError)
                                                           RecipientStateEnum::kStrictConsistency};
 
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(10568802,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3335,8 +3269,6 @@ TEST_F(ReshardingRecipientServiceTest, VerifyRecipientRetriesOnLockTimeoutError)
 
 TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringCreatingCollection) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(10494600,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3348,8 +3280,6 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringCreatingCollectio
 
 TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringCloning) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(10494601,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3360,8 +3290,6 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringCloning) {
 
 TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringBuildingIndex) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(10494602,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3373,8 +3301,6 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringBuildingIndex) {
 
 TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringApplying) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
         LOGV2(10494603,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -3387,7 +3313,6 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringApplying) {
 
 TEST_F(ReshardingRecipientServiceTest, StepDownBeforeRunFulfillsCompletionPromise) {
     auto testOptions = makeBasicTestOptions().front();
-    setupFeatureFlags(testOptions);
 
     auto& fp = repl::PrimaryOnlyServiceHangBeforeRunningInstance;
     auto timesEntered = fp.setMode(FailPoint::alwaysOn);

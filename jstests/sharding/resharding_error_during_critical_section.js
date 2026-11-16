@@ -9,7 +9,6 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -42,35 +41,20 @@ assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
 );
 
-// Feature is FCV-gated, so effective state is cluster-wide; one node is enough (config primary).
-const cloneNoRefreshEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    configPrimary,
-    "ReshardingCloneNoRefresh",
-);
-const noRefreshApplyingAndBlockingWritesEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    configPrimary,
-    "ReshardingNoRefreshApplyingAndBlockingWrites",
-);
-
 const testCriticalSectionTimeoutMS = 1000;
 const cmdBlockTimeoutMS = 60 * 60 * 1000;
 let testNum = 0;
 
-function configureFailPointToBlockCommand(node, cmdName, numSkips) {
-    return configureFailPoint(
-        node,
-        "failCommand",
-        {
-            failCommands: [cmdName],
-            blockConnection: true,
-            blockTimeMS: cmdBlockTimeoutMS,
-            failInternalCommands: true,
-        },
-        {skip: numSkips},
-    );
+function configureFailPointToBlockCommand(node, cmdName) {
+    return configureFailPoint(node, "failCommand", {
+        failCommands: [cmdName],
+        blockConnection: true,
+        blockTimeMS: cmdBlockTimeoutMS,
+        failInternalCommands: true,
+    });
 }
 
-function testCriticalSectionTimeoutWhileWaiting(cmdName, numSkips) {
+function testCriticalSectionTimeoutWhileWaiting(cmdName) {
     jsTest.log(
         "Test resharding critical section timeout while coordinator is waiting for responses for " +
             cmdName,
@@ -93,7 +77,7 @@ function testCriticalSectionTimeoutWhileWaiting(cmdName, numSkips) {
             reshardingCriticalSectionTimeoutMillis: testCriticalSectionTimeoutMS,
         }),
     ).was;
-    const fp = configureFailPointToBlockCommand(shard0Primary, cmdName, numSkips);
+    const fp = configureFailPointToBlockCommand(shard0Primary, cmdName);
 
     const moveThread = new Thread(runMoveCollection, st.s.host, ns, st.shard1.shardName);
     moveThread.start();
@@ -112,7 +96,7 @@ function testCriticalSectionTimeoutWhileWaiting(cmdName, numSkips) {
     );
 }
 
-function testAbortWhileWaiting(cmdName, numSkips) {
+function testAbortWhileWaiting(cmdName) {
     jsTest.log(
         "Test aborting resharding while coordinator is waiting for responses for " + cmdName,
     );
@@ -128,7 +112,7 @@ function testAbortWhileWaiting(cmdName, numSkips) {
         ]),
     );
 
-    const fp = configureFailPointToBlockCommand(shard0Primary, cmdName, numSkips);
+    const fp = configureFailPointToBlockCommand(shard0Primary, cmdName);
 
     const moveThread = new Thread(runMoveCollection, st.s.host, ns, st.shard1.shardName);
     moveThread.start();
@@ -141,36 +125,16 @@ function testAbortWhileWaiting(cmdName, numSkips) {
     fp.off();
 }
 
-// Determine which command to block in order to stall the coordinator during the critical section
-// (kBlockingWrites). When featureFlagReshardingNoRefreshApplyingAndBlockingWrites is on, the
-// coordinator sends '_shardsvrReshardDonorCriticalSectionStarted' to donors instead of
-// '_flushReshardingStateChange', so we block on that command directly.
-//
-// When that flag is off, the coordinator sends '_flushReshardingStateChange' to donors in both
-// kApplying and kBlockingWrites, plus once during cloning when featureFlagReshardingCloneNoRefresh
-// is off. We therefore skip the first calls to _flushReshardingStateChange, which occur before the
-// critical section, and block on the one that occurs during the critical section.
-const criticalSectionDonorBlock = (() => {
-    if (noRefreshApplyingAndBlockingWritesEnabled) {
-        return {cmdName: "_shardsvrReshardDonorCriticalSectionStarted", numSkips: 0};
-    }
-    return {
-        cmdName: "_flushReshardingStateChange",
-        numSkips: cloneNoRefreshEnabled ? 1 : 2,
-    };
-})();
+// Stall the coordinator during the critical section (kBlockingWrites) by blocking the commands it
+// sends to donors and recipients once the critical section has started.
 const cmdsToBlock = [
-    criticalSectionDonorBlock,
-    {
-        cmdName: "_shardsvrReshardRecipientCriticalSectionStarted",
-        // No skipping.
-        numSkips: 0,
-    },
+    "_shardsvrReshardDonorCriticalSectionStarted",
+    "_shardsvrReshardRecipientCriticalSectionStarted",
 ];
 
-for (const {cmdName, numSkips} of cmdsToBlock) {
-    testCriticalSectionTimeoutWhileWaiting(cmdName, numSkips);
-    testAbortWhileWaiting(cmdName, numSkips);
+for (const cmdName of cmdsToBlock) {
+    testCriticalSectionTimeoutWhileWaiting(cmdName);
+    testAbortWhileWaiting(cmdName);
 }
 
 st.stop();

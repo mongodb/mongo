@@ -45,13 +45,6 @@ public:
 
     bool getIsUnsplittable(OperationContext* opCtx, const NamespaceString& nss);
 
-    virtual void tellAllDonorsToRefresh(OperationContext* opCtx,
-                                        const NamespaceString& sourceNss,
-                                        const UUID& reshardingUUID,
-                                        const std::vector<mongo::DonorShardEntry>& donorShards,
-                                        const std::shared_ptr<executor::TaskExecutor>& executor,
-                                        CancellationToken token) = 0;
-
     virtual void tellAllRecipientsToRefresh(
         OperationContext* opCtx,
         const NamespaceString& nssToRefresh,
@@ -159,13 +152,6 @@ public:
 
     bool searchIndexExistsForCollection(OperationContext* opCtx,
                                         const NamespaceString& nss) override;
-
-    void tellAllDonorsToRefresh(OperationContext* opCtx,
-                                const NamespaceString& sourceNss,
-                                const UUID& reshardingUUID,
-                                const std::vector<mongo::DonorShardEntry>& donorShards,
-                                const std::shared_ptr<executor::TaskExecutor>& executor,
-                                CancellationToken token) override;
 
     void tellAllRecipientsToRefresh(OperationContext* opCtx,
                                     const NamespaceString& nssToRefresh,

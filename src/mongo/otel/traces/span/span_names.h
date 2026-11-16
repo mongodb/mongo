@@ -47,8 +47,8 @@ SPAN_NAME_(kReshardingCoordinatorFetchAndPersistNumDocumentsToCloneFromDonors,
            "resharding_coordinator.fetch_and_persist_num_documents_to_clone_from_donors");
 SPAN_NAME_(kReshardingCoordinatorAwaitAllRecipientsFinishedCloning,
            "resharding_coordinator.await_all_recipients_finished_cloning");
-SPAN_NAME_(kReshardingCoordinatorTellAllDonorsToRefresh,
-           "resharding_coordinator.tell_all_donors_to_refresh");
+SPAN_NAME_(kReshardingCoordinatorNotifyDonorsCloningComplete,
+           "resharding_coordinator.notify_donors_cloning_complete");
 SPAN_NAME_(kReshardingCoordinatorAwaitAllRecipientsFinishedApplying,
            "resharding_coordinator.await_all_recipients_finished_applying");
 SPAN_NAME_(kReshardingCoordinatorTellAllParticipantsReshardingReadyToCommit,

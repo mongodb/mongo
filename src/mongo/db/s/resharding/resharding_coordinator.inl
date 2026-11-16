@@ -496,13 +496,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                                _startSpan(telemetryCtx,
                                           otel::traces::span_names::
                                               kReshardingCoordinatorAwaitAllRecipientsCloning);
-                           if (resharding::isEnabledWithPinnedVersion(
-                                   _forwardableOpMetadata,
-                                   resharding::gFeatureFlagReshardingCloneNoRefresh)) {
-                               _tellAllRecipientsToClone(executor);
-                           } else {
-                               _tellAllRecipientsToRefresh(executor);
-                           }
+                           _tellAllRecipientsToClone(executor);
                            _launchDonorValidations(executor, telemetryCtx);
                        }
                    })
@@ -515,17 +509,11 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                    })
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kApplying) {
-                           auto span = _startSpan(telemetryCtx,
-                                                  otel::traces::span_names::
-                                                      kReshardingCoordinatorTellAllDonorsToRefresh);
-                           if (resharding::isEnabledWithPinnedVersion(
-                                   _forwardableOpMetadata,
-                                   resharding::
-                                       gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites)) {
-                               _notifyDonorsCloningComplete(executor);
-                           } else {
-                               _tellAllDonorsToRefresh(executor);
-                           }
+                           auto span =
+                               _startSpan(telemetryCtx,
+                                          otel::traces::span_names::
+                                              kReshardingCoordinatorNotifyDonorsCloningComplete);
+                           _notifyDonorsCloningComplete(executor);
                        }
                    })
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
@@ -541,14 +529,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                                telemetryCtx,
                                otel::traces::span_names::
                                    kReshardingCoordinatorTellAllParticipantsReshardingReadyToCommit);
-                           if (resharding::isEnabledWithPinnedVersion(
-                                   _forwardableOpMetadata,
-                                   resharding::
-                                       gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites)) {
-                               _notifyDonorsCriticalSectionStarted(executor);
-                           } else {
-                               _tellAllDonorsToRefresh(executor);
-                           }
+                           _notifyDonorsCriticalSectionStarted(executor);
                            if (resharding::isEnabledWithPinnedVersion(
                                    _forwardableOpMetadata,
                                    resharding::
@@ -735,23 +716,9 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                            .then([this, executor] {
                                return _awaitAllParticipantShardsDone(executor);
                            })
-                           .then([this, executor] {
+                           .then([this] {
                                _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                                    resharding::getCurrentTime());
-
-                               if (resharding::isEnabledWithPinnedVersion(
-                                       _forwardableOpMetadata,
-                                       resharding::
-                                           gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites)) {
-                                   return;
-                               }
-
-                               // Best-effort attempt to trigger a refresh on the participant shards
-                               // so they see the collection metadata without reshardingFields and
-                               // no longer throw ReshardCollectionInProgress. There is no guarantee
-                               // this logic ever runs if the config server primary steps down after
-                               // having removed the coordinator state document.
-                               _tellAllRecipientsToRefresh(executor);
                            });
                    })
                 .onTransientError([this](const Status& status) {
@@ -2383,18 +2350,6 @@ void ReshardingCoordinator::_tellAllRecipientsToRefresh(
         _coordinatorDoc.getRecipientShards(),
         **executor,
         std::move(token));
-}
-
-void ReshardingCoordinator::_tellAllDonorsToRefresh(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _makeOperationContext();
-
-    _reshardingCoordinatorExternalState->tellAllDonorsToRefresh(opCtx.get(),
-                                                                _coordinatorDoc.getSourceNss(),
-                                                                _coordinatorDoc.getReshardingUUID(),
-                                                                _coordinatorDoc.getDonorShards(),
-                                                                **executor,
-                                                                _ctHolder->getAbortToken());
 }
 
 void ReshardingCoordinator::_notifyDonorsCriticalSectionStarted(

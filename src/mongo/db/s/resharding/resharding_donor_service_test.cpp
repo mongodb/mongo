@@ -32,7 +32,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -359,44 +358,22 @@ public:
         }
     }
 
-    void notifyRecipientsDoneCloning(OperationContext* opCtx,
-                                     DonorStateMachine& donor,
-                                     const ReshardingDonorDocument& donorDoc) {
-        notifyRecipientsDoneCloningNoWait(opCtx, donor, donorDoc);
-        if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
-                .isEnabledAndIgnoreFCVUnsafe()) {
-            ASSERT_OK(donor.awaitInDonatingOplogEntries().waitNoThrow(opCtx));
-        }
+    void notifyRecipientsDoneCloning(OperationContext* opCtx, DonorStateMachine& donor) {
+        notifyRecipientsDoneCloningNoWait(donor);
+        ASSERT_OK(donor.awaitInDonatingOplogEntries().waitNoThrow(opCtx));
     }
 
-    void notifyRecipientsDoneCloningNoWait(OperationContext* opCtx,
-                                           DonorStateMachine& donor,
-                                           const ReshardingDonorDocument& donorDoc) {
-        if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
-                .isEnabledAndIgnoreFCVUnsafe()) {
-            donor.onCoordinatorStateAdvanced(CoordinatorStateEnum::kApplying);
-        } else {
-            _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kApplying);
-        }
+    void notifyRecipientsDoneCloningNoWait(DonorStateMachine& donor) {
+        donor.onCoordinatorStateAdvanced(CoordinatorStateEnum::kApplying);
     }
 
-    void notifyToStartBlockingWrites(OperationContext* opCtx,
-                                     DonorStateMachine& donor,
-                                     const ReshardingDonorDocument& donorDoc) {
-        notifyToStartBlockingWritesNoWait(opCtx, donor, donorDoc);
+    void notifyToStartBlockingWrites(OperationContext* opCtx, DonorStateMachine& donor) {
+        notifyToStartBlockingWritesNoWait(donor);
         ASSERT_OK(donor.awaitCriticalSectionAcquired().waitNoThrow(opCtx));
     }
 
-    void notifyToStartBlockingWritesNoWait(OperationContext* opCtx,
-                                           DonorStateMachine& donor,
-                                           const ReshardingDonorDocument& donorDoc) {
-        if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
-                .isEnabledAndIgnoreFCVUnsafe()) {
-            donor.onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
-        } else {
-            _onReshardingFieldsChanges(
-                opCtx, donor, donorDoc, CoordinatorStateEnum::kBlockingWrites);
-        }
+    void notifyToStartBlockingWritesNoWait(DonorStateMachine& donor) {
+        donor.onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
     }
 
     void awaitChangeStreamsMonitorCompleted(OperationContext* opCtx,
@@ -519,11 +496,11 @@ private:
         }
 
         if (targetState >= DonorStateEnum::kDonatingOplogEntries) {
-            notifyRecipientsDoneCloning(opCtx, donor, donorDoc);
+            notifyRecipientsDoneCloning(opCtx, donor);
         }
 
         if (targetState >= DonorStateEnum::kPreparingToBlockWrites) {
-            notifyToStartBlockingWritesNoWait(opCtx, donor, donorDoc);
+            notifyToStartBlockingWritesNoWait(donor);
         }
     }
 
@@ -563,8 +540,8 @@ TEST_F(ReshardingDonorServiceTest, CanTransitionThroughEachStateToCompletion) {
         auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-        notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
-        notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+        notifyRecipientsDoneCloning(opCtx.get(), *donor);
+        notifyToStartBlockingWrites(opCtx.get(), *donor);
         awaitChangeStreamsMonitorCompleted(opCtx.get(), *donor, doc);
         notifyReshardingCommitting(opCtx.get(), *donor, doc);
 
@@ -587,8 +564,8 @@ TEST_F(ReshardingDonorServiceTest, FailedDoneValidationStillReleasesCriticalSect
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
     notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
-    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor);
+    notifyToStartBlockingWrites(opCtx.get(), *donor);
     awaitChangeStreamsMonitorCompleted(opCtx.get(), *donor, doc);
 
     FailPointEnableBlock failpoint("reshardingDonorCorruptContextBeforeValidation",
@@ -701,8 +678,8 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
     notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
-    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor);
+    notifyToStartBlockingWrites(opCtx.get(), *donor);
 
     blockingWritesTransitionGuard->wait(DonorStateEnum::kBlockingWrites);
     stepDown();
@@ -806,11 +783,11 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
             switch (state) {
                 case DonorStateEnum::kDonatingOplogEntries: {
                     notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-                    notifyRecipientsDoneCloningNoWait(opCtx.get(), *donor, doc);
+                    notifyRecipientsDoneCloningNoWait(*donor);
                     break;
                 }
                 case DonorStateEnum::kPreparingToBlockWrites: {
-                    notifyToStartBlockingWritesNoWait(opCtx.get(), *donor, doc);
+                    notifyToStartBlockingWritesNoWait(*donor);
                     break;
                 }
                 case DonorStateEnum::kBlockingWrites: {
@@ -826,7 +803,7 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
                     //     RecoverRefreshThread having already been notified the donor about the
                     //     CoordinatorStateEnum::kBlockingWrites state before.
                     if (!critSecHeld) {
-                        notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+                        notifyToStartBlockingWrites(opCtx.get(), *donor);
                     }
                     break;
                 }
@@ -936,11 +913,11 @@ DEATH_TEST_REGEX_F(ReshardingDonorServiceTestDeathTest, CommitFn, "4457001.*trip
         auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-        notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+        notifyRecipientsDoneCloning(opCtx.get(), *donor);
 
         ASSERT_THROWS_CODE(donor->commit(), DBException, ErrorCodes::ReshardCollectionInProgress);
 
-        notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+        notifyToStartBlockingWrites(opCtx.get(), *donor);
         awaitChangeStreamsMonitorCompleted(opCtx.get(), *donor, doc);
 
         donor->awaitInBlockingWritesOrError().get();
@@ -961,8 +938,8 @@ TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
     notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
-    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor);
+    notifyToStartBlockingWrites(opCtx.get(), *donor);
 
     {
         const auto coll = acquireCollection(
@@ -1004,8 +981,8 @@ TEST_F(ReshardingDonorServiceTest, RenamesTemporaryReshardingCollectionWhenDone)
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
     notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
-    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor);
+    notifyToStartBlockingWrites(opCtx.get(), *donor);
 
     {
         const auto coll = acquireCollection(
@@ -1062,7 +1039,7 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
         auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-        notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+        notifyRecipientsDoneCloning(opCtx.get(), *donor);
         // The call to notifyToStartBlockingWrites() is skipped here because the donor is being
         // notified that the resharding operation is aborting before the donor would have
         // transitioned to kBlockingWrites.
@@ -1169,8 +1146,8 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
         auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-        notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
-        notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+        notifyRecipientsDoneCloning(opCtx.get(), *donor);
+        notifyToStartBlockingWrites(opCtx.get(), *donor);
 
         {
             const auto coll =
@@ -1221,7 +1198,7 @@ TEST_F(ReshardingDonorServiceTest, TruncatesXLErrorOnDonorDocument) {
         auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-        notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+        notifyRecipientsDoneCloning(opCtx.get(), *donor);
 
         auto localTransitionToErrorFuture = donor->awaitInBlockingWritesOrError();
         ASSERT_OK(localTransitionToErrorFuture.getNoThrow());
@@ -1524,8 +1501,8 @@ TEST_F(ReshardingDonorServiceTest, RetryableErrorDuringChangeStreamsMonitorTrigg
     fp->setMode(FailPoint::nTimes, 1, BSON("errorCode" << ErrorCodes::HostUnreachable));
 
     notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
-    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor);
+    notifyToStartBlockingWrites(opCtx.get(), *donor);
     awaitChangeStreamsMonitorCompleted(opCtx.get(), *donor, doc);
     notifyReshardingCommitting(opCtx.get(), *donor, doc);
 
@@ -1632,8 +1609,8 @@ TEST_F(ReshardingDonorServiceTestWithWCE,
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
     notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
-    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor);
+    notifyToStartBlockingWrites(opCtx.get(), *donor);
     awaitDonorState(opCtx.get(), doc.getReshardingUUID(), DonorStateEnum::kBlockingWrites);
 
     // At this point we've entered the critical section. Turn on the failpoint to force a
@@ -1693,8 +1670,8 @@ TEST_F(ReshardingDonorServiceTest, PostValidationReadsMajorityCommittedState) {
                                       FailPoint::ModeOptions{.mode = FailPoint::nTimes, .val = 1});
 
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
-    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
-    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor);
+    notifyToStartBlockingWrites(opCtx.get(), *donor);
     notifyReshardingCommitting(opCtx.get(), *donor, doc);
 
     ASSERT_OK(donor->getCompletionFuture().getNoThrow());

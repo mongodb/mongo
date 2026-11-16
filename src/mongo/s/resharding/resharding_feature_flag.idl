@@ -100,14 +100,6 @@ feature_flags:
         default: true
         version: 9.0
         fcv_gated: true
-    featureFlagReshardingCloneNoRefresh:
-        mod_visibility: public
-        description: "Feature flag to enable not using shard version refresh for resharding's clone phase."
-        cpp_varname: gFeatureFlagReshardingCloneNoRefresh
-        default: true
-        version: 9.0
-        fcv_gated: true
-        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage:
         mod_visibility: public
         description:
@@ -127,14 +119,6 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
         default: true
         version: 8.3
-        fcv_gated: true
-    featureFlagReshardingNoRefreshApplyingAndBlockingWrites:
-        mod_visibility: public
-        description: >-
-            Feature flag to skip shard version refresh during applying and blocking writes.
-        cpp_varname: gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
-        default: true
-        version: 9.0
         fcv_gated: true
     featureFlagConcurrentResharding:
         mod_visibility: public
