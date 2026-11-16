@@ -4230,17 +4230,23 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
             invariant(drainPhase == IndexBuildInterceptor::DrainPhase::kBeforeReadiness);
             _waitForPrepareConflict(opCtx, replState, ex->generation());
         } catch (const ExceptionFor<ErrorCodes::ReadConcernMajorityNotAvailableYet>&) {
-            if (drainPhase != IndexBuildInterceptor::DrainPhase::kAfterReadiness) {
-                throw;
-            }
-            // Post-readiness drains only reduce the work left for the final untimestamped drain.
-            // Return to decision processing.
             opCtx->checkForInterrupt();
-            LOGV2_DEBUG(13879000,
+            switch (drainPhase) {
+                case IndexBuildInterceptor::DrainPhase::kBeforeReadiness:
+                    _waitForMajoritySnapshot(opCtx, replState);
+                    break;
+                case IndexBuildInterceptor::DrainPhase::kAfterReadiness:
+                    // Post-readiness drains only reduce the work left for the final untimestamped
+                    // drain. Return to decision processing.
+                    LOGV2_DEBUG(
+                        13879000,
                         1,
                         "Deferring post-readiness index build drain without a majority snapshot",
                         "buildUUID"_attr = replState->buildUUID);
-            return;
+                    return;
+                case IndexBuildInterceptor::DrainPhase::kFinal:
+                    MONGO_UNREACHABLE_TASSERT(13928501);
+            }
         }
     }
 
@@ -4264,6 +4270,21 @@ void IndexBuildsCoordinator::_waitForPrepareConflict(
           "Index build: waiting for a prepared transaction outside locks",
           "buildUUID"_attr = replState->buildUUID);
     ru->waitForPrepareConflictResolution(*opCtx, generation);
+}
+
+void IndexBuildsCoordinator::_waitForMajoritySnapshot(
+    OperationContext* opCtx, const std::shared_ptr<ReplIndexBuildState>& replState) {
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    auto* ru = shard_role_details::getRecoveryUnit(opCtx);
+    invariant(!ru->isActive());
+    invariant(!ru->inUnitOfWork());
+    opCtx->checkForInterrupt();
+    LOGV2(13928500,
+          "Index build: waiting for a majority snapshot",
+          "buildUUID"_attr = replState->buildUUID,
+          "opid"_attr = opCtx->getOpID());
+    // A default timestamp waits for any committed snapshot to become available.
+    repl::ReplicationCoordinator::get(opCtx)->waitUntilSnapshotCommitted(opCtx, Timestamp());
 }
 
 /**
