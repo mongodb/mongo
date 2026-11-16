@@ -4,12 +4,8 @@ Two table-driven tests:
 
 * test_check_file: the file's contents, as YAML, and the errors check_file reports for them.
 * test_cli: git operations that build a history, and the CLI's exit code and output for it.
-
-Both run in a scratch tree that has TEST_FILE, OTHER_TEST_FILE and a suite that excludes the
-SUITE_KEY tag.
 """
 
-import contextlib
 import re
 import shlex
 import subprocess
@@ -17,7 +13,6 @@ import tempfile
 import textwrap
 import unittest
 import unittest.mock
-from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,27 +24,7 @@ from buildscripts import lint_backports_required_multiversion as lint
 
 TEST_FILE = "jstests/replsets/server_status_metrics.js"
 OTHER_TEST_FILE = "jstests/core/query/bson_size_limit_agg.js"
-MODULE_DIR = "src/mongo/db/modules/enterprise"
 SUITE_KEY = "replica_sets_multiversion"
-SUITE_CONFIG = "buildscripts/resmokeconfig/suites/multiversion.yml"
-
-
-@contextlib.contextmanager
-def scratch_tree(module_checked_out: bool = False) -> Iterator[Path]:
-    with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        for path in (TEST_FILE, OTHER_TEST_FILE):
-            (root / path).parent.mkdir(parents=True, exist_ok=True)
-            (root / path).touch()
-        (root / SUITE_CONFIG).parent.mkdir(parents=True)
-        (root / SUITE_CONFIG).write_text(
-            "exclude_with_any_tags:\n"
-            "- backport_required_multiversion\n"
-            f"- {SUITE_KEY}{lint.SUITE_TAG_SUFFIX}\n"
-        )
-        if module_checked_out:
-            (root / MODULE_DIR).mkdir(parents=True)
-        yield root
 
 
 @dataclass(frozen=True)
@@ -57,7 +32,6 @@ class FileCase:
     contents: str
     # A substring of each error check_file should report, in order.
     errors: tuple[str, ...] = ()
-    module_checked_out: bool = False
 
 
 FILE_CASES = {
@@ -175,36 +149,6 @@ FILE_CASES = {
         )
         for ticket in ("WT-12345", "SECBUG-9")
     },
-    "missing test file": FileCase(
-        """
-        last-lts:
-          all:
-          - test_file: jstests/core/nope.js
-            ticket: SERVER-1
-          suites:
-        """,
-        ("last-lts.all: jstests/core/nope.js (SERVER-1): test_file does not exist",),
-    ),
-    "test file in a module that is not checked out": FileCase(
-        f"""
-        last-lts:
-          all:
-          - test_file: {MODULE_DIR}/jstests/foo.js
-            ticket: SERVER-1
-          suites:
-        """
-    ),
-    "missing test file in a module that is checked out": FileCase(
-        f"""
-        last-lts:
-          all:
-          - test_file: {MODULE_DIR}/jstests/foo.js
-            ticket: SERVER-1
-          suites:
-        """,
-        ("test_file does not exist",),
-        module_checked_out=True,
-    ),
     "duplicate entry": FileCase(
         f"""
         last-lts:
@@ -231,17 +175,6 @@ FILE_CASES = {
           suites:
         """
     ),
-    "unknown suite key": FileCase(
-        f"""
-        last-lts:
-          all:
-          suites:
-            replica_sets:
-            - test_file: {TEST_FILE}
-              ticket: SERVER-1
-        """,
-        (f"no suite excludes the tag 'replica_sets{lint.SUITE_TAG_SUFFIX}'",),
-    ),
     "suite entries are checked": FileCase(
         f"""
         last-lts:
@@ -266,19 +199,6 @@ FILE_CASES = {
           suites:
         """,
         ("SERVER_1", "missing key 'ticket'"),
-    ),
-    "tree errors are reported together": FileCase(
-        """
-        last-lts:
-          all:
-          - test_file: jstests/core/nope.js
-            ticket: SERVER-1
-          suites:
-            replica_sets:
-            - test_file: jstests/core/gone.js
-              ticket: SERVER-1
-        """,
-        ("replica_sets", "jstests/core/nope.js", "jstests/core/gone.js"),
     ),
 }
 
@@ -454,25 +374,6 @@ CLI_CASES = {
         ),
         output=(PASSES,),
     ),
-    "file and added-entry errors are reported together": CliCase(
-        (
-            *RELEASE_CUT,
-            Commit(
-                "SERVER-113184 [v1.0] Backport initial sync fix",
-                f"""
-                last-continuous:
-                  all:
-                  - test_file: {TEST_FILE}
-                    ticket: SERVER-120318
-                  - test_file: jstests/core/nope.js
-                    ticket: SERVER-113184
-                  suites:
-                """,
-            ),
-        ),
-        exit_code=1,
-        output=("jstests/core/nope.js (SERVER-113184): test_file does not exist", NOT_MENTIONED),
-    ),
     "auto compares against the merge base with DEFAULT_ORIGIN_BRANCH": CliCase(
         (*RELEASE_CUT, Commit("SERVER-12 [v1.0] Unrelated")),
         output=("Checked entries added relative to <origin/v1.0>.", PASSES),
@@ -558,8 +459,8 @@ def _run_ops(root: Path, ops: tuple[Commit | str, ...]) -> None:
 class TestLintBackportsRequiredMultiversion(unittest.TestCase):
     def test_check_file(self):
         for name, case in FILE_CASES.items():
-            with self.subTest(name), scratch_tree(case.module_checked_out) as root:
-                errors = lint.check_file(textwrap.dedent(case.contents), root)
+            with self.subTest(name):
+                errors = lint.check_file(textwrap.dedent(case.contents))
                 self.assertEqual(len(errors), len(case.errors), errors)
                 for expected, error in zip(case.errors, errors):
                     self.assertIn(expected, error)
@@ -568,7 +469,7 @@ class TestLintBackportsRequiredMultiversion(unittest.TestCase):
         for name, case in CLI_CASES.items():
             with (
                 self.subTest(name),
-                scratch_tree() as root,
+                tempfile.TemporaryDirectory() as tmp,
                 unittest.mock.patch.object(
                     lint.evergreen_git, "DEFAULT_ORIGIN_BRANCH", case.default_origin_branch
                 ),
@@ -576,6 +477,7 @@ class TestLintBackportsRequiredMultiversion(unittest.TestCase):
                 # get_diff_revision caches by argument, which would leak one case's repo into
                 # the next.
                 lint.evergreen_git.get_diff_revision.cache_clear()
+                root = Path(tmp)
                 _run_ops(root, case.ops)
                 args = list(case.args)
                 if case.expansions is not None:

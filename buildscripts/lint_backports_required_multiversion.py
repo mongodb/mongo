@@ -19,7 +19,6 @@ import typer
 from git import GitCommandError
 
 from buildscripts.backports_required_multiversion import (
-    BACKPORT_REQUIRED_TAG,
     BACKPORTS_FILE,
     BackportsRequired,
     InvalidBackportsFile,
@@ -32,10 +31,6 @@ except ModuleNotFoundError:
     # Under Bazel, bazel_rules_mongo is a separate module whose root is on the import path.
     from utils import evergreen_git
 
-SUITE_TAG_SUFFIX = f"_{BACKPORT_REQUIRED_TAG}"
-SUITE_TAG_RE = re.compile(r"\b([A-Za-z0-9_]+)" + SUITE_TAG_SUFFIX + r"\b")
-SUITE_CONFIG_DIRS = ("buildscripts/resmokeconfig", "buildscripts/modules")
-MODULES_DIR = "src/mongo/db/modules/"
 TICKET_MENTION_RE = re.compile(r"(?<![A-Za-z0-9_-])[A-Z][A-Z0-9]*-[1-9][0-9]*(?![0-9])")
 MASTER = "master"
 
@@ -53,54 +48,13 @@ To fix it, do one of the following:
 """
 
 
-def find_valid_suite_keys(repo_root: Path) -> frozenset[str]:
-    """Return the suite keys whose `<key>_backport_required_multiversion` tag a suite excludes."""
-    keys = set()
-    for config_dir in SUITE_CONFIG_DIRS:
-        for path in (repo_root / config_dir).rglob("*.yml"):
-            keys.update(SUITE_TAG_RE.findall(path.read_text(encoding="utf-8")))
-    return frozenset(keys)
-
-
-def _test_file_exists(repo_root: Path, test_file: str) -> bool:
-    if (repo_root / test_file).is_file():
-        return True
-    if test_file.startswith(MODULES_DIR):
-        # A module that is not checked out cannot be validated, so don't report its tests.
-        module = test_file[len(MODULES_DIR) :].split("/", 1)[0]
-        return not (repo_root / MODULES_DIR / module).is_dir()
-    return False
-
-
-def check_keys_against_tree(
-    backports: BackportsRequired, repo_root: Path, valid_suite_keys: frozenset[str]
-) -> list[str]:
-    """Return a message for every listed test file or suite key that this branch lacks."""
-    errors = []
-    for name, section in backports.sections.items():
-        for suite in section.suites:
-            if suite not in valid_suite_keys:
-                errors.append(
-                    f"{name}.suites.{suite}: no suite excludes the tag "
-                    f"'{suite}{SUITE_TAG_SUFFIX}', so these entries have no effect. Known "
-                    f"suite keys: {', '.join(sorted(valid_suite_keys)) or '(none)'}."
-                )
-    errors.extend(
-        f"{where}: {entry}: test_file does not exist."
-        for where, entries in backports.lists()
-        for entry in entries
-        if not _test_file_exists(repo_root, entry.test_file)
-    )
-    return errors
-
-
-def check_file(text: str, repo_root: Path) -> list[str]:
+def check_file(text: str) -> list[str]:
     """Return a message for every problem in the file's contents on this branch."""
     try:
-        backports = parse_text(text)
+        parse_text(text)
     except InvalidBackportsFile as err:
         return err.errors
-    return check_keys_against_tree(backports, repo_root, find_valid_suite_keys(repo_root))
+    return []
 
 
 def _git(repo_root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -205,7 +159,7 @@ def main(
 ) -> None:
     repo_root = _repo_root()
     text = (repo_root / BACKPORTS_FILE).read_text(encoding="utf-8")
-    file_errors = check_file(text, repo_root)
+    file_errors = check_file(text)
 
     added_entry_errors = []
     if is_release_branch():
