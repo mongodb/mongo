@@ -494,8 +494,6 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
 
     int seenFastCountOps = 0;
     for (const auto& innerEntry : innerOperations) {
-        // TODO SERVER-123384: Add explicit validation for the timestamp store writes.
-        //
         // Timestamp-store ops are written alongside metadata ops in the same applyOps; skip them
         // here since they aren't part of the per-collection metadata being validated.
         ObservedApplyOp observed;
