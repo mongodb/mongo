@@ -122,12 +122,7 @@ class MongoShellProgramSkipExtensionsSignatureVerificationTestCase(unittest.Test
     skip from a mistakenly missing key-path injection."""
 
     def setUp(self):
-        # configure_resmoke installs the DEFAULTS as module-level attributes at resmoke startup.
-        # Tests must install them explicitly. Some defaults are raw argparse types (e.g. lists) that
-        # configure_resmoke normalizes via _merge_set_params. Mirror the normalized "unset" values
-        # for the attributes mongo_shell_program consumes.
-        for key, value in config.DEFAULTS.items():
-            setattr(config, key.upper(), value)
+        # Provide normalized "unset" values for the settings mongo_shell_program needs.
         for attr in (
             "MONGOD_SET_PARAMETERS",
             "MONGOS_SET_PARAMETERS",
@@ -138,7 +133,10 @@ class MongoShellProgramSkipExtensionsSignatureVerificationTestCase(unittest.Test
             "IFR_FEATURE_FLAGS",
             "CONFIG_FUZZER_ENCRYPTION_OPTS",
         ):
-            setattr(config, attr, None)
+            self.enterContext(mock.patch.object(config, attr, None))
+        # These attributes are installed only when configure_resmoke runs.
+        for attr in ("LOG_FORMAT", "LOG_LEVEL", "MOCHA_GREP"):
+            self.enterContext(mock.patch.object(config, attr, None, create=True))
 
     def _shell_eval_string(self):
         with mock.patch.object(programs, "get_binary_version", return_value="8.0.0"):
@@ -152,13 +150,14 @@ class MongoShellProgramSkipExtensionsSignatureVerificationTestCase(unittest.Test
         return proc.args[proc.args.index("--eval") + 1]
 
     def test_marker_set_when_skipping(self):
-        config.SKIP_EXTENSIONS_SIGNATURE_VERIFICATION = True
-        self.assertIn(
-            'TestData["skipExtensionsSignatureVerification"] = true', self._shell_eval_string()
-        )
+        with mock.patch.object(config, "SKIP_EXTENSIONS_SIGNATURE_VERIFICATION", True):
+            self.assertIn(
+                'TestData["skipExtensionsSignatureVerification"] = true', self._shell_eval_string()
+            )
 
     def test_marker_absent_by_default(self):
-        self.assertNotIn("skipExtensionsSignatureVerification", self._shell_eval_string())
+        with mock.patch.object(config, "SKIP_EXTENSIONS_SIGNATURE_VERIFICATION", False):
+            self.assertNotIn("skipExtensionsSignatureVerification", self._shell_eval_string())
 
 
 if __name__ == "__main__":
