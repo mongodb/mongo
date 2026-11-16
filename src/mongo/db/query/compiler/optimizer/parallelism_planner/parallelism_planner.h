@@ -29,6 +29,8 @@ namespace mongo::parallelism_planner {
  * index hints were applied to the query.
  *
  * Additional restrictions apply depending on the specific query shape and access path.
+ *
+ * When a gate fails, the reason is recorded within the returned QuerySolution.
  */
 std::unique_ptr<QuerySolution> addParallelPlan(const CanonicalQuery& cq,
                                                const MultipleCollectionAccessor& collections,

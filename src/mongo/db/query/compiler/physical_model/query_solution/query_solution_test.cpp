@@ -199,7 +199,7 @@ TEST(QuerySolutionTest, BatchedFetchConversionPreservesBaseFieldsAndMovesChild) 
     FetchNode fetch{std::move(child), nss};
     fetch.filter = std::move(filter);
     fetch.hitScanLimit = true;
-    fetch.physicalProps.distribution = DistributionDesc::roundRobin();
+    fetch.setDistribution(DistributionDesc::roundRobin());
 
     BatchedFetchNode batchedFetch{std::move(fetch)};
 
@@ -209,7 +209,7 @@ TEST(QuerySolutionTest, BatchedFetchConversionPreservesBaseFieldsAndMovesChild) 
     ASSERT_EQ(batchedFetch.children[0].get(), originalChild);
     ASSERT_EQ(batchedFetch.filter.get(), originalFilter);
     ASSERT_TRUE(batchedFetch.hitScanLimit);
-    ASSERT_TRUE(batchedFetch.physicalProps.distribution == DistributionDesc::roundRobin());
+    ASSERT_TRUE(batchedFetch.distribution() == DistributionDesc::roundRobin());
 }
 
 TEST(QuerySolutionTest, BatchedFetchClonePreservesAllFields) {
@@ -2807,8 +2807,8 @@ TEST(QuerySolutionTest, SummaryStringBracketsMultipleJoinSubtreesUnderAJoinInput
 
 void assertCloneKeepsPhysicalProps(std::unique_ptr<QuerySolutionNode> node) {
     const auto distribution = DistributionDesc::hashOn({FieldPath("x")});
-    node->physicalProps.distribution = distribution;
-    ASSERT_EQ(node->clone()->physicalProps.distribution, distribution)
+    node->setDistribution(distribution);
+    ASSERT_EQ(node->clone()->distribution(), distribution)
         << "clone() of " << nodeStageTypeToString(node.get()) << " lost its physicalProps";
 }
 

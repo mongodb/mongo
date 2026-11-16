@@ -37,12 +37,12 @@ bool satisfies(const DistributionDesc& produced, const RequiredDistribution& req
         case RequiredDistribution::Type::Any:
             return true;
         case RequiredDistribution::Type::Unpartitioned:
-            return produced.type == DistributionDesc::Type::Unpartitioned;
+            return produced.type == DistributionType::Unpartitioned;
         case RequiredDistribution::Type::Replicated:
-            return produced.type == DistributionDesc::Type::Replicated;
+            return produced.type == DistributionType::Replicated;
         case RequiredDistribution::Type::HashPartitioned:
             // TODO SERVER-138071 Consider relaxing in some cases.
-            return produced.type == DistributionDesc::Type::HashPartitioned &&
+            return produced.type == DistributionType::HashPartitioned &&
                 produced.keys == required.keys;
     }
     MONGO_UNREACHABLE_TASSERT(13623101);
@@ -86,7 +86,6 @@ std::unique_ptr<QuerySolutionNode> insertExchangeFor(std::unique_ptr<QuerySoluti
     }();
 
     auto exchange = std::make_unique<ExchangeNode>(std::move(child), std::move(routing));
-    exchange->physicalProps.distribution = toOutputDistribution(exchange->routing);
     return exchange;
 }
 
@@ -105,7 +104,7 @@ void planDistribution(QuerySolutionNode& node, const ParallelismPlannerContext& 
         // Settle the child's subtree first: whether it satisfies the requirement depends on what
         // it ends up producing, and an exchange inserted below it can change that.
         planDistribution(*child, ctx);
-        if (!satisfies(child->physicalProps.distribution, reqs[i])) {
+        if (!satisfies(child->distribution(), reqs[i])) {
             child = insertExchangeFor(std::move(child), reqs[i]);
         }
     }
@@ -113,7 +112,7 @@ void planDistribution(QuerySolutionNode& node, const ParallelismPlannerContext& 
     // Base case: all children have their distributions settled or this is a leaf node.
     switch (node.getType()) {
         case STAGE_COLLSCAN:
-            node.physicalProps.distribution = DistributionDesc::roundRobin();
+            node.setDistribution(DistributionDesc::roundRobin());
             break;
 
         // An exchange sets its own distribution when it is created, from its own routing. Do not
@@ -125,7 +124,7 @@ void planDistribution(QuerySolutionNode& node, const ParallelismPlannerContext& 
         // their child produces
         case STAGE_MATCH:
         case STAGE_SHARDING_FILTER:
-            node.physicalProps.distribution = node.children[0]->physicalProps.distribution;
+            node.setDistribution(node.children[0]->distribution());
             break;
 
         // Every node type that opts in to isParallelEligible() needs a case above.

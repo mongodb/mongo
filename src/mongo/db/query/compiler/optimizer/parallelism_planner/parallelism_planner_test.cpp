@@ -65,7 +65,7 @@ protected:
         const auto reqs = childRequirements(node);
         ASSERT_EQ(reqs.size(), node.children.size());
         for (size_t i = 0; i < reqs.size(); ++i) {
-            ASSERT_TRUE(satisfies(node.children[i]->physicalProps.distribution, reqs[i]))
+            ASSERT_TRUE(satisfies(node.children[i]->distribution(), reqs[i]))
                 << nodeStageTypeToString(&node) << " child " << i;
             assertEveryEdgeSatisfiesItsRequirement(*node.children[i]);
         }
@@ -98,6 +98,15 @@ protected:
             cq, collections, querySettingsApplied, std::move(solution));
     }
 
+    using Reason = ParallelPlanReason;
+
+    static void assertSerialPlan(const QuerySolution& solution, Reason reason) {
+        ASSERT_FALSE(solution.hasParallelRoot());
+        ASSERT_TRUE(solution.parallelPlanExplain().has_value());
+        ASSERT(solution.parallelPlanExplain()->decision == ParallelPlanDecision::kSerial);
+        ASSERT(solution.parallelPlanExplain()->reason == reason);
+    }
+
     bool isEligible(std::unique_ptr<QuerySolution> solution,
                     std::function<void(FindCommandRequest&)> mutateFind = nullptr,
                     const NamespaceString& nss = kNss) {
@@ -116,11 +125,11 @@ TEST_F(ParallelPlannerTest, CollectionScanIsGatheredAtTheRoot) {
     const auto& gather = static_cast<const ExchangeNode&>(*root);
     ASSERT_TRUE(gather.isGather());
     ASSERT_FALSE(std::get<ExchangeRouting::Gather>(gather.routing.mode).sortPreserving);
-    ASSERT_EQ(gather.physicalProps.distribution.type, DistributionDesc::Type::Unpartitioned);
+    ASSERT_EQ(gather.distribution().type, DistributionType::Unpartitioned);
 
     const auto* collScan = gather.children[0].get();
     ASSERT_EQ(collScan->getType(), STAGE_COLLSCAN);
-    ASSERT_EQ(collScan->physicalProps.distribution.type, DistributionDesc::Type::RoundRobin);
+    ASSERT_EQ(collScan->distribution().type, DistributionType::RoundRobin);
 }
 
 TEST_F(ParallelPlannerTest, PassThroughNodesStayInsideTheParallelSection) {
@@ -132,7 +141,7 @@ TEST_F(ParallelPlannerTest, PassThroughNodesStayInsideTheParallelSection) {
     ASSERT_EQ(root->getType(), STAGE_EXCHANGE);
     const auto* filter = root->children[0].get();
     ASSERT_EQ(filter->getType(), STAGE_MATCH);
-    ASSERT_EQ(filter->physicalProps.distribution.type, DistributionDesc::Type::RoundRobin);
+    ASSERT_EQ(filter->distribution().type, DistributionType::RoundRobin);
     ASSERT_EQ(filter->children[0]->getType(), STAGE_COLLSCAN);
 }
 
@@ -282,6 +291,22 @@ TEST_F(ParallelPlannerTest, AttachesAParallelPlanAndKeepsTheSerialRoot) {
     ASSERT_EQ(solution->hash(), serialHash);
 }
 
+TEST_F(ParallelPlannerTest, OnlyTheParallelPlanIsAnnotatedWithPhysicalProperties) {
+    auto enabled = defaultPQConfig();
+    auto solution = addParallelPlan(solutionWithRoot(matchOver(scan())));
+    ASSERT_TRUE(solution->hasParallelRoot());
+
+    // The serial plan is untouched.
+    ASSERT_FALSE(solution->root()->physicalProps.has_value());
+    ASSERT_FALSE(solution->root()->children[0]->physicalProps.has_value());
+
+    // Every node of the parallel plan has a distribution.
+    for (const QuerySolutionNode* node = solution->parallelRoot(); node;
+         node = node->children.empty() ? nullptr : node->children[0].get()) {
+        ASSERT_TRUE(node->physicalProps.has_value()) << nodeStageTypeToString(node);
+    }
+}
+
 TEST_F(ParallelPlannerTest, DeclinedQueriesComeBackUnchanged) {
     auto serial = collScanSolution();
     const auto serialRoot = serial->root();
@@ -294,12 +319,101 @@ TEST_F(ParallelPlannerTest, DeclinedQueriesComeBackUnchanged) {
 
 TEST_F(ParallelPlannerTest, DeclinesSolutionsExtendedWithAPipeline) {
     auto enabled = defaultPQConfig();
-    // A non-leading $match is pushed down as an extension and is a parallel eligible node.
     auto solution = collScanSolution();
     solution->extendWith(std::make_unique<MatchNode>(
         std::make_unique<SentinelNode>(), std::make_unique<AlwaysTrueMatchExpression>()));
     ASSERT_TRUE(solution->hasExtension());
     ASSERT_FALSE(isEligible(std::move(solution)));
+}
+
+TEST_F(ParallelPlannerTest, ParallelCollScanIsTheDecisionAfterPassingTheHeuristicGates) {
+    auto enabled = defaultPQConfig();
+    auto solution = addParallelPlan(collScanSolution());
+    ASSERT_TRUE(solution->hasParallelRoot());
+    ASSERT_TRUE(solution->parallelPlanExplain().has_value());
+    ASSERT(solution->parallelPlanExplain()->decision == ParallelPlanDecision::kParallel);
+    ASSERT(solution->parallelPlanExplain()->reason == ParallelPlanReason::kPassedHeuristicGates);
+}
+
+TEST_F(ParallelPlannerTest, RecordsWhenParallelQueryIsDisabled) {
+    assertSerialPlan(*addParallelPlan(collScanSolution()), Reason::kQueryKnob);
+}
+
+TEST_F(ParallelPlannerTest, RecordsWhenMaxDegreeOfParallelismIsNotGreaterThanOne) {
+    auto enabled = defaultPQConfig();
+    unittest::ServerParameterGuard serial{"internalQueryMaxDegreeOfParallelism", 1};
+    assertSerialPlan(*addParallelPlan(collScanSolution()), Reason::kQueryKnob);
+}
+
+TEST_F(ParallelPlannerTest, RecordsWhenCollectionIsBelowTheMinimumSize) {
+    auto enabled = defaultPQConfig();
+    unittest::ServerParameterGuard minSize{"internalQueryParallelQueryMinCollectionSizeBytes", 1};
+    assertSerialPlan(*addParallelPlan(collScanSolution()), Reason::kCollectionSize);
+}
+
+TEST_F(ParallelPlannerTest, RecordsWhenCollectionDoesNotExist) {
+    auto enabled = defaultPQConfig();
+    assertSerialPlan(*addParallelPlan(collScanSolution(), nullptr, kMissingNss),
+                     Reason::kCollectionSize);
+}
+
+TEST_F(ParallelPlannerTest, RecordsWhenSolutionHasNoRoot) {
+    auto enabled = defaultPQConfig();
+    assertSerialPlan(*addParallelPlan(std::make_unique<QuerySolution>()), Reason::kUnsupportedNode);
+}
+
+TEST_F(ParallelPlannerTest, RecordsWhenSolutionIsExtendedWithAPipeline) {
+    auto enabled = defaultPQConfig();
+    auto solution = collScanSolution();
+    solution->extendWith(std::make_unique<MatchNode>(
+        std::make_unique<SentinelNode>(), std::make_unique<AlwaysTrueMatchExpression>()));
+    assertSerialPlan(*addParallelPlan(std::move(solution)), Reason::kUnsupportedNode);
+}
+
+TEST_F(ParallelPlannerTest, RecordsWhenAPlanNodeIsNotParallelEligible) {
+    auto enabled = defaultPQConfig();
+    // A limit and a sort are not parallel eligible, so any plan containing one stays serial.
+    assertSerialPlan(*addParallelPlan(solutionWithRoot(std::make_unique<LimitNode>(
+                         scan(), 10, LimitSkipParameterization::Disabled))),
+                     Reason::kUnsupportedNode);
+    assertSerialPlan(*addParallelPlan(solutionWithRoot(
+                         std::make_unique<SortNodeDefault>(scan(),
+                                                           BSON("a" << 1),
+                                                           /*limit=*/0,
+                                                           LimitSkipParameterization::Disabled,
+                                                           /*maxMemoryUsageBytes=*/1024 * 1024))),
+                     Reason::kUnsupportedNode);
+}
+
+TEST_F(ParallelPlannerTest, RecordsWhenAccessPathIsNotParallelEligible) {
+    auto enabled = defaultPQConfig();
+    assertSerialPlan(*addParallelPlan(collScanSolution([](auto& scan) { scan.tailable = true; })),
+                     Reason::kUnsupportedNode);
+    assertSerialPlan(*addParallelPlan(collScanSolution([](auto& scan) { scan.direction = -1; })),
+                     Reason::kUnsupportedNode);
+}
+
+TEST_F(ParallelPlannerTest, RecordsWhenQuerySettingsAreApplied) {
+    auto enabled = defaultPQConfig();
+    querySettingsApplied = true;
+    assertSerialPlan(*addParallelPlan(collScanSolution()), Reason::kRequestedNaturalOrder);
+}
+
+TEST_F(ParallelPlannerTest, RecordsWhenNaturalOrderIsRequested) {
+    auto enabled = defaultPQConfig();
+    assertSerialPlan(*addParallelPlan(collScanSolution(),
+                                      [](auto& find) { find.setHint(BSON("$natural" << 1)); }),
+                     Reason::kRequestedNaturalOrder);
+    assertSerialPlan(*addParallelPlan(collScanSolution(),
+                                      [](auto& find) { find.setSort(BSON("$natural" << 1)); }),
+                     Reason::kRequestedNaturalOrder);
+}
+
+TEST_F(ParallelPlannerTest, ReplacingTheRootClearsTheDeclineReason) {
+    auto solution = addParallelPlan(collScanSolution());
+    ASSERT_TRUE(solution->parallelPlanExplain().has_value());
+    solution->setRoot(std::make_unique<CollectionScanNode>());
+    ASSERT_FALSE(solution->parallelPlanExplain().has_value());
 }
 
 }  // namespace

@@ -403,6 +403,7 @@ void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {
     _root = std::move(root);
     // A parallel alternative was built from the old serial plan.
     _parallelRoot.reset();
+    _parallelPlanExplain.reset();
     _enumeratorExplainInfo.hitScanLimit = _root->getScanLimit();
 
     PlanNodeId lastNodeId = 0;
@@ -418,6 +419,7 @@ void QuerySolution::setParallelRoot(std::unique_ptr<QuerySolutionNode> parallelR
             "A parallel root over a solution extended with a pipeline is not supported",
             !hasExtension());
     _parallelRoot = std::move(parallelRoot);
+    _parallelPlanExplain.reset();
 
     PlanNodeId lastNodeId = 0;
     assignNodeIds(lastNodeId, *_parallelRoot);
@@ -2148,7 +2150,7 @@ void ExchangeNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "routing = " << mongo::toString(routing) << '\n';
     addIndent(ss, indent + 1);
-    *ss << "distribution = " << mongo::toString(physicalProps.distribution) << '\n';
+    *ss << "distribution = " << mongo::toString(distribution()) << '\n';
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
     *ss << "Child:" << '\n';

@@ -37,35 +37,42 @@ bool requestsNaturalOrder(const CanonicalQuery& cq) {
         findCommand.getSort()[query_request_helper::kNaturalSortField];
 }
 
-bool shouldParallelize(const CanonicalQuery& cq,
-                       const MultipleCollectionAccessor& collections,
-                       bool querySettingsApplied,
-                       const QuerySolution& solution) {
+/**
+ * Returns a ParallelPlanReason indicating why the plan should or should not be parallelized.
+ */
+ParallelPlanReason shouldParallelize(const CanonicalQuery& cq,
+                                     const MultipleCollectionAccessor& collections,
+                                     bool querySettingsApplied,
+                                     const QuerySolution& solution) {
     const auto& expCtx = cq.getExpCtx();
     const auto& knobs = expCtx->getQueryKnobConfiguration();
     if (!knobs.isParallelQueryEnabled() || knobs.getMaxDegreeOfParallelism() <= 1) {
-        return false;
+        return ParallelPlanReason::kQueryKnob;
     }
 
     // The parallel plan cannot yet track where a pipeline extension starts. A non-leading $match
     // is pushed down as an extension and would otherwise look eligible.
+    // TODO SERVER-138512 Support for extensions.
     if (!solution.root() || solution.hasExtension() || !isParallelEligible(*solution.root())) {
-        return false;
+        return ParallelPlanReason::kUnsupportedNode;
     }
 
     // A '$natural' hint or sort asks for the scan order that a parallel plan would not preserve.
     // Query settings index hints may do so too (e.g. allowedIndexes: [{$natural: 1}]), so stay
     // serial whenever any were applied.
     if (requestsNaturalOrder(cq) || querySettingsApplied) {
-        return false;
+        return ParallelPlanReason::kRequestedNaturalOrder;
     }
 
     // The catalog gate: only parallelize if the main collection exists and its data size exceeds
     // the minimum threshold.
     const auto& mainCollection = collections.getMainCollection();
-    return mainCollection &&
-        mainCollection->dataSize(cq.getExpCtx()->getOperationContext()) >=
-        knobs.getParallelQueryMinCollectionSizeBytes();
+    if (!mainCollection ||
+        mainCollection->dataSize(cq.getExpCtx()->getOperationContext()) <
+            knobs.getParallelQueryMinCollectionSizeBytes()) {
+        return ParallelPlanReason::kCollectionSize;
+    }
+    return ParallelPlanReason::kPassedHeuristicGates;
 }
 
 std::unique_ptr<QuerySolutionNode> buildParallelPlan(const QuerySolutionNode& serialRoot,
@@ -83,11 +90,11 @@ std::unique_ptr<QuerySolutionNode> buildParallelPlan(const QuerySolutionNode& se
 
     // The root must be unpartitioned, as the final query result should be gathered into a single
     // stream.
-    const auto rootType = root->physicalProps.distribution.type;
+    const auto rootType = root->distribution().type;
     tassert(13623103,
             "a replicated plan root cannot be gathered",
-            rootType != DistributionDesc::Type::Replicated);
-    if (rootType != DistributionDesc::Type::Unpartitioned) {
+            rootType != DistributionType::Replicated);
+    if (rootType != DistributionType::Unpartitioned) {
         root = insertExchangeFor(std::move(root), RequiredDistribution::unpartitioned());
     }
     return root;
@@ -99,13 +106,18 @@ std::unique_ptr<QuerySolution> addParallelPlan(const CanonicalQuery& cq,
                                                const MultipleCollectionAccessor& collections,
                                                bool querySettingsApplied,
                                                std::unique_ptr<QuerySolution>&& solution) {
-    if (!shouldParallelize(cq, collections, querySettingsApplied, *solution)) {
+    const auto reason = shouldParallelize(cq, collections, querySettingsApplied, *solution);
+    if (reason != ParallelPlanReason::kPassedHeuristicGates) {
+        solution->setParallelPlanExplain({ParallelPlanDecision::kSerial, reason});
         return std::move(solution);
     }
     const ParallelismPlannerContext ctx(
         cq.getExpCtx()->getQueryKnobConfiguration().getMaxDegreeOfParallelism());
 
     solution->setParallelRoot(buildParallelPlan(*solution->root(), ctx));
+    // There is no cost model yet to compare the plans, so having passed every gate is the whole
+    // case for the parallel plan.
+    solution->setParallelPlanExplain({ParallelPlanDecision::kParallel, reason});
 
     LOGV2_DEBUG(13623400,
                 3,

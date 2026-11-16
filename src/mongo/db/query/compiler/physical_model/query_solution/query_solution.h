@@ -32,6 +32,7 @@
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/record_id_range_list.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
+#include "mongo/db/query/util/named_enum.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -44,7 +45,6 @@
 #include <memory>
 #include <set>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -323,7 +323,23 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QuerySolutionNode {
         DistributionDesc distribution = DistributionDesc::unpartitioned();
     };
 
-    PhysicalProps physicalProps;
+    // Set by the parallelism planner on the nodes of a parallel plan. Unset on every other node,
+    // including all nodes of a serial plan.
+    boost::optional<PhysicalProps> physicalProps;
+
+    /**
+     * The distribution this node produces. Only valid on a node the parallelism planner annotated.
+     */
+    const DistributionDesc& distribution() const {
+        tassert(13623416,
+                "node has no physical properties: the parallelism planner did not annotate it",
+                physicalProps);
+        return physicalProps->distribution;
+    }
+
+    void setDistribution(DistributionDesc distribution) {
+        physicalProps = PhysicalProps{std::move(distribution)};
+    }
 
     /**
      * Returns a pair consisting of:
@@ -402,6 +418,50 @@ struct QuerySolutionNodeWithSortSet : public QuerySolutionNode {
     }
 
     ProvidedSortSet sortSet;
+};
+
+/**
+ * Why the parallel planner decided on the serial or the parallel plan.
+ *
+ *   - kQueryKnob: parallel query is disabled (internalQueryEnableParallelQuery) or the maximum
+ *     degree of parallelism is at most one (internalQueryMaxDegreeOfParallelism).
+ *   - kCollectionSize: the collection does not exist or is below the minimum size
+ *     (internalQueryParallelQueryMinCollectionSizeBytes).
+ *   - kUnsupportedNode: the plan contains a node or access path that is not parallel eligible.
+ *   - kRequestedNaturalOrder: the query asks for the natural scan order, with a '$natural' hint or
+ *     sort, which a parallel plan would not preserve. Query settings index hints may do so too, so
+ *     any applied query settings report this reason as well.
+ *   - kPassedHeuristicGates: every gate passed, so the parallel plan was built.
+ */
+#define PARALLEL_PLAN_REASON_TABLE(X)                  \
+    X(kQueryKnob, "queryKnob")                         \
+    X(kCollectionSize, "collectionSize")               \
+    X(kUnsupportedNode, "unsupportedNode")             \
+    X(kRequestedNaturalOrder, "requestedNaturalOrder") \
+    X(kPassedHeuristicGates, "passedHeuristicGates")
+
+QUERY_UTIL_NAMED_ENUM_DEFINE(ParallelPlanReason, PARALLEL_PLAN_REASON_TABLE)
+#undef PARALLEL_PLAN_REASON_TABLE
+
+/**
+ * Which plan the parallel planner decided on. This is the winning plan from the planner but not
+ * necessarily the one that executes.
+ *
+ * toStringData() gives the name explain reports for each.
+ */
+#define PARALLEL_PLAN_DECISION_TABLE(X) \
+    X(kSerial, "serial")                \
+    X(kParallel, "parallel")
+
+QUERY_UTIL_NAMED_ENUM_DEFINE(ParallelPlanDecision, PARALLEL_PLAN_DECISION_TABLE)
+#undef PARALLEL_PLAN_DECISION_TABLE
+
+/**
+ * Explain related information from the parallel planner.
+ */
+struct ParallelPlanExplain {
+    ParallelPlanDecision decision;
+    ParallelPlanReason reason;
 };
 
 /**
@@ -489,6 +549,17 @@ public:
      */
     const QuerySolutionNode* parallelRoot() const {
         return _parallelRoot.get();
+    }
+
+    /**
+     * Records explain related information for the parallel planner.
+     */
+    void setParallelPlanExplain(ParallelPlanExplain info) {
+        _parallelPlanExplain = std::move(info);
+    }
+
+    const boost::optional<ParallelPlanExplain>& parallelPlanExplain() const {
+        return _parallelPlanExplain;
     }
 
     /**
@@ -580,6 +651,7 @@ private:
 
     std::unique_ptr<QuerySolutionNode> _root;
     std::unique_ptr<QuerySolutionNode> _parallelRoot;
+    boost::optional<ParallelPlanExplain> _parallelPlanExplain;
     PlanNodeId _unextendedRootId{kEmptyPlanNodeId};
 };
 
@@ -2463,7 +2535,7 @@ struct ExchangeNode : public QuerySolutionNode {
         : QuerySolutionNode(std::move(child)), routing(std::move(routing)) {
         // The routing determines the output distribution, so keep the two consistent from the
         // start.
-        physicalProps.distribution = toOutputDistribution(this->routing);
+        setDistribution(toOutputDistribution(this->routing));
     }
 
     ExchangeNode(const ExchangeNode& other);

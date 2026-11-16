@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/util/named_enum.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -13,24 +14,30 @@
 namespace mongo {
 
 /**
+ * How a node's output is spread across workers.
+ *
+ *   - Unpartitioned: a single stream on a single worker.
+ *   - HashPartitioned: rows divided across workers by hash of 'keys'.
+ *   - RangePartitioned: rows divided across workers by range boundaries on 'keys'.
+ *   - RoundRobin: rows divided cyclically.
+ *   - Replicated: every worker holds a full copy of every row.
+ */
+#define DISTRIBUTION_TYPE_TABLE(X)          \
+    X(Unpartitioned, "unpartitioned")       \
+    X(HashPartitioned, "hashPartitioned")   \
+    X(RangePartitioned, "rangePartitioned") \
+    X(RoundRobin, "roundRobin")             \
+    X(Replicated, "replicated")
+
+QUERY_UTIL_NAMED_ENUM_DEFINE(DistributionType, DISTRIBUTION_TYPE_TABLE)
+#undef DISTRIBUTION_TYPE_TABLE
+
+/**
  * The output distribution of a node. This is a property of the node itself and describes the shape
  * of the output, independent of whatever mechanism produced it.
  */
 struct DistributionDesc {
-    enum class Type {
-        // A single stream on a single worker.
-        Unpartitioned,
-        // Rows divided across workers by hash of 'keys'.
-        HashPartitioned,
-        // Rows divided across workers by range boundaries on 'keys'.
-        RangePartitioned,
-        // Rows divided cyclically.
-        RoundRobin,
-        // Every worker holds a full copy of every row.
-        Replicated,
-    };
-
-    Type type = Type::Unpartitioned;
+    DistributionType type = DistributionType::Unpartitioned;
 
     // Non-empty if and only if type is HashPartitioned or RangePartitioned.
     std::vector<FieldPath> keys;
@@ -38,29 +45,44 @@ struct DistributionDesc {
     // Construct through these rather than aggregate-initializing, so that no (type, keys) pair
     // outside the invariant above is produced.
     static DistributionDesc unpartitioned() {
-        return DistributionDesc{Type::Unpartitioned, {}};
+        return DistributionDesc{DistributionType::Unpartitioned, {}};
     }
 
     static DistributionDesc replicated() {
-        return DistributionDesc{Type::Replicated, {}};
+        return DistributionDesc{DistributionType::Replicated, {}};
     }
 
     static DistributionDesc roundRobin() {
-        return DistributionDesc{Type::RoundRobin, {}};
+        return DistributionDesc{DistributionType::RoundRobin, {}};
     }
 
     static DistributionDesc hashOn(std::vector<FieldPath> keys) {
         tassert(13623104, "hash partitioning requires at least one key", !keys.empty());
-        return DistributionDesc{Type::HashPartitioned, std::move(keys)};
+        return DistributionDesc{DistributionType::HashPartitioned, std::move(keys)};
     }
 
     static DistributionDesc rangeOn(std::vector<FieldPath> keys) {
         tassert(13623105, "range partitioning requires at least one key", !keys.empty());
-        return DistributionDesc{Type::RangePartitioned, std::move(keys)};
+        return DistributionDesc{DistributionType::RangePartitioned, std::move(keys)};
     }
 
     bool operator==(const DistributionDesc& other) const = default;
 };
+
+/**
+ * How an exchange divides rows across workers.
+ *
+ *   - Hash: hash(keys) % dop -> destination worker.
+ *   - Range: range boundaries on 'keys' -> destination worker.
+ *   - RoundRobin: cyclic assignment.
+ */
+#define EXCHANGE_PARTITION_TYPE_TABLE(X) \
+    X(Hash, "hash")                      \
+    X(Range, "range")                    \
+    X(RoundRobin, "roundRobin")
+
+QUERY_UTIL_NAMED_ENUM_DEFINE(ExchangePartitionType, EXCHANGE_PARTITION_TYPE_TABLE)
+#undef EXCHANGE_PARTITION_TYPE_TABLE
 
 /**
  * How an ExchangeNode moves documents between workers. This describes an action the
@@ -78,16 +100,7 @@ struct ExchangeRouting {
 
     // Rows divided across workers.
     struct Partition {
-        enum class Type {
-            // hash(keys) % dop -> destination worker.
-            Hash,
-            // Range boundaries on 'keys' -> destination worker.
-            Range,
-            // Cyclic assignment.
-            RoundRobin,
-        };
-
-        Type type = Type::RoundRobin;
+        ExchangePartitionType type = ExchangePartitionType::RoundRobin;
 
         std::vector<FieldPath> keys;
     };
@@ -103,11 +116,11 @@ struct ExchangeRouting {
     }
 
     static ExchangeRouting hashOn(std::vector<FieldPath> keys) {
-        return ExchangeRouting{Partition{Partition::Type::Hash, std::move(keys)}};
+        return ExchangeRouting{Partition{ExchangePartitionType::Hash, std::move(keys)}};
     }
 
     static ExchangeRouting roundRobin() {
-        return ExchangeRouting{Partition{Partition::Type::RoundRobin, {}}};
+        return ExchangeRouting{Partition{ExchangePartitionType::RoundRobin, {}}};
     }
 };
 
@@ -115,6 +128,13 @@ struct ExchangeRouting {
  * Maps an exchange's routing mechanism to the distribution its output has.
  */
 DistributionDesc toOutputDistribution(const ExchangeRouting& routing);
+
+/**
+ * The name of a routing mechanism: "gather", "broadcast", or the partition type. This names the
+ * mode alone and leaves out a partition's keys, unlike toString() below, which renders the whole
+ * routing.
+ */
+std::string_view routingModeName(const ExchangeRouting& routing);
 
 std::string toString(const DistributionDesc& d);
 std::string toString(const ExchangeRouting& routing);

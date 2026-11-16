@@ -24,6 +24,7 @@
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer_impl.h"
+#include "mongo/db/query/plan_explainer_sbe.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_ranking_decision.h"
@@ -220,6 +221,36 @@ void appendQueryPlannerCommonInfo(PlanExecutor* exec,
 }
 
 /**
+ * Appends 'parallelPlanner' to the queryPlanner section containing information about the planner's
+ * decision and the parallel plan, if one was built.
+ *
+ * The section is only reported while parallel query is enabled, so that explain output is
+ * unchanged for everyone else.
+ * TODO SERVER-139183 Include 'parallelPlanner' unconditionally.
+ */
+void appendParallelPlanner(PlanExecutor* exec, BSONObjBuilder& plannerBob) {
+    const auto* cq = exec->getCanonicalQuery();
+    if (!cq || !cq->getExpCtx()->getQueryKnobConfiguration().isParallelQueryEnabled()) {
+        return;
+    }
+    const auto& explainer = exec->getPlanExplainer();
+    const auto info = explainer.getParallelPlanExplain();
+    if (!info) {
+        return;
+    }
+    BSONObjBuilder bob(plannerBob.subobjStart("parallelPlanner"));
+    bob.append("decision", toStringData(info->decision));
+    bob.append("reason", toStringData(info->reason));
+
+    // TODO SERVER-137042 The parallel plan is serialized in the legacy node shape, even when the
+    // surrounding explain is V3.
+    if (const auto* parallelRoot = explainer.getParallelPlanRoot()) {
+        BSONObjBuilder parallelBob(bob.subobjStart("parallelPlan"));
+        statsToBSON(parallelRoot, &parallelBob, &plannerBob);
+    }
+}
+
+/**
  * Adds the 'queryPlanner' explain section to the BSON object being built by 'out'.
  *
  * This is a helper for generating explain BSON. It is used by explainStages(...).
@@ -253,6 +284,7 @@ void generatePlannerInfo(PlanExecutor* exec,
     }
     auto&& [winningStats, _] = explainer.getWinningPlanStats(plannerPolicy);
     plannerBob.append("winningPlan", winningStats);
+    appendParallelPlanner(exec, plannerBob);
 
     BSONArrayBuilder bab{plannerBob.subarrayStart("rejectedPlans")};
     for (auto&& [rejectedStats, _] :
@@ -539,6 +571,8 @@ void generatePlannerInfoV3(PlanExecutor* exec,
                            explainer.getPlanRankerReason(),
                            explainer.isSbeExplainer(),
                            plannerBob);
+
+    appendParallelPlanner(exec, plannerBob);
 
     BSONArrayBuilder plansBob(plannerBob.subarrayStart("plans"));
     for (auto&& entry : entries) {

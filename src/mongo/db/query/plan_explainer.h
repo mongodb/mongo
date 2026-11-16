@@ -420,6 +420,17 @@ public:
         _enumeratorExplainInfo.merge(other);
     }
 
+    /**
+     * What the parallel planner decided for this query and why, or boost::none if it never ran.
+     */
+    boost::optional<ParallelPlanExplain> getParallelPlanExplain() const {
+        return _solution ? _solution->parallelPlanExplain() : boost::none;
+    }
+
+    const QuerySolutionNode* getParallelPlanRoot() const {
+        return _solution ? _solution->parallelRoot() : nullptr;
+    }
+
     void setQuerySolution(const QuerySolution* qs) {
         _solution = qs;
     }

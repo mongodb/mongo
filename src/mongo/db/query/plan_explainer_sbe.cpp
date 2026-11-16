@@ -290,6 +290,21 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     return {plan.obj(), boost::none};
 }
 /**
+ * Appends the distribution a node produces, e.g. {type: "unpartitioned"}. Only the nodes of a
+ * parallel plan have one.
+ */
+void appendDistribution(const DistributionDesc& distribution, BSONObjBuilder* bob) {
+    BSONObjBuilder distBob(bob->subobjStart("distribution"));
+    distBob.append("type", toStringData(distribution.type));
+    if (!distribution.keys.empty()) {
+        BSONArrayBuilder keys(distBob.subarrayStart("keys"));
+        for (const auto& key : distribution.keys) {
+            keys.append(key.fullPath());
+        }
+    }
+}
+
+/**
  * Serializes 'node' into 'bob' with the output dependent on 'format' and 'explainPolicy':
  * - How the estimates are grouped: fused flat onto the node (kLegacy) versus under a sparse
  *   "statistics.costBased" subobject (kV3). Whether they appear at all is 'explainPolicy' alone,
@@ -328,6 +343,9 @@ void qsnToBson(const QuerySolutionNode* node,
 
     bob->append("stage", nodeStageTypeToString(node));
     bob->appendNumber("planNodeId", static_cast<long long>(node->nodeId()));
+    if (node->physicalProps) {
+        appendDistribution(node->physicalProps->distribution, bob);
+    }
 
     // Stage-specific stats. Structural fields stay flat on the node in both shapes.
     switch (node->getType()) {
@@ -603,6 +621,21 @@ void qsnToBson(const QuerySolutionNode* node,
             bob->appendBool("isSparse", ipn->index.sparse);
             bob->appendBool("isPartial", ipn->index.filterExpr != nullptr);
             bob->append("indexVersion", static_cast<int>(ipn->index.version));
+            break;
+        }
+        case STAGE_EXCHANGE: {
+            const auto& routing = static_cast<const ExchangeNode*>(node)->routing;
+            bob->append("routing", routingModeName(routing));
+            if (const auto* gather = std::get_if<ExchangeRouting::Gather>(&routing.mode)) {
+                bob->appendBool("sortPreserving", gather->sortPreserving);
+            } else if (const auto* partition =
+                           std::get_if<ExchangeRouting::Partition>(&routing.mode);
+                       partition && !partition->keys.empty()) {
+                BSONArrayBuilder keys(bob->subarrayStart("keys"));
+                for (const auto& key : partition->keys) {
+                    keys.append(key.fullPath());
+                }
+            }
             break;
         }
         default:

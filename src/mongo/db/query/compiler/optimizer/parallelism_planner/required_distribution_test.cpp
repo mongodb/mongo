@@ -19,20 +19,20 @@ const ParallelismPlannerContext kParallelCtx{kMaxDoPForTests};
 
 TEST(DistributionDescTest, BroadcastProducesReplicatedDistribution) {
     auto out = toOutputDistribution(ExchangeRouting::broadcast());
-    ASSERT_EQ(out.type, DistributionDesc::Type::Replicated);
+    ASSERT_EQ(out.type, DistributionType::Replicated);
     ASSERT_TRUE(out.keys.empty());
 }
 
 TEST(DistributionDescTest, GatherProducesUnpartitioned) {
     ASSERT_EQ(toOutputDistribution(ExchangeRouting::gather(true /*sortPreserving*/)).type,
-              DistributionDesc::Type::Unpartitioned);
+              DistributionType::Unpartitioned);
     ASSERT_EQ(toOutputDistribution(ExchangeRouting::gather(false /*sortPreserving*/)).type,
-              DistributionDesc::Type::Unpartitioned);
+              DistributionType::Unpartitioned);
 }
 
 TEST(DistributionDescTest, HashProducesHashPartitionedOnSameKeys) {
     auto out = toOutputDistribution(ExchangeRouting::hashOn({FieldPath("a"), FieldPath("b")}));
-    ASSERT_EQ(out.type, DistributionDesc::Type::HashPartitioned);
+    ASSERT_EQ(out.type, DistributionType::HashPartitioned);
     ASSERT_EQ(out.keys.size(), 2u);
     ASSERT_EQ(out.keys[0].fullPath(), "a");
     ASSERT_EQ(out.keys[1].fullPath(), "b");
@@ -59,16 +59,16 @@ DEATH_TEST(ExchangeNodeDeathTest,
 
 TEST(DistributionDescTest, RoundRobinProducesRoundRobinWithNoKeys) {
     auto out = toOutputDistribution(ExchangeRouting::roundRobin());
-    ASSERT_EQ(out.type, DistributionDesc::Type::RoundRobin);
+    ASSERT_EQ(out.type, DistributionType::RoundRobin);
     ASSERT_TRUE(out.keys.empty());
 }
 
 TEST(DistributionDescTest, ToStringNamesTypeAndKeys) {
-    ASSERT_EQ(toString(DistributionDesc::unpartitioned()), "Unpartitioned");
-    ASSERT_EQ(toString(DistributionDesc::replicated()), "Replicated");
-    ASSERT_EQ(toString(DistributionDesc::roundRobin()), "RoundRobin");
+    ASSERT_EQ(toString(DistributionDesc::unpartitioned()), "unpartitioned");
+    ASSERT_EQ(toString(DistributionDesc::replicated()), "replicated");
+    ASSERT_EQ(toString(DistributionDesc::roundRobin()), "roundRobin");
     ASSERT_EQ(toString(DistributionDesc::hashOn({FieldPath("a"), FieldPath("b.c")})),
-              "HashPartitioned[a, b.c]");
+              "hashPartitioned[a, b.c]");
 }
 
 TEST(SatisfiesTest, AnyAcceptsEverything) {
@@ -122,15 +122,14 @@ TEST(ExchangeNodeTest, StageTypeIsExchange) {
 }
 
 TEST(ExchangeNodeTest, OutputDistributionFollowsRoutingFromConstruction) {
-    ASSERT_EQ(ExchangeNode(scan(), ExchangeRouting::gather(false)).physicalProps.distribution,
+    ASSERT_EQ(ExchangeNode(scan(), ExchangeRouting::gather(false)).distribution(),
               DistributionDesc::unpartitioned());
-    ASSERT_EQ(ExchangeNode(scan(), ExchangeRouting::broadcast()).physicalProps.distribution,
+    ASSERT_EQ(ExchangeNode(scan(), ExchangeRouting::broadcast()).distribution(),
               DistributionDesc::replicated());
-    ASSERT_EQ(ExchangeNode(scan(), ExchangeRouting::roundRobin()).physicalProps.distribution,
+    ASSERT_EQ(ExchangeNode(scan(), ExchangeRouting::roundRobin()).distribution(),
               DistributionDesc::roundRobin());
-    ASSERT_EQ(
-        ExchangeNode(scan(), ExchangeRouting::hashOn({FieldPath("a")})).physicalProps.distribution,
-        DistributionDesc::hashOn({FieldPath("a")}));
+    ASSERT_EQ(ExchangeNode(scan(), ExchangeRouting::hashOn({FieldPath("a")})).distribution(),
+              DistributionDesc::hashOn({FieldPath("a")}));
 }
 
 TEST(ExchangeNodeTest, CloneRoundTrips) {
@@ -141,22 +140,22 @@ TEST(ExchangeNodeTest, CloneRoundTrips) {
     const auto* asExch = static_cast<const ExchangeNode*>(copy.get());
     ASSERT_EQ(asExch->getType(), STAGE_EXCHANGE);
     const auto& partition = std::get<ExchangeRouting::Partition>(asExch->routing.mode);
-    ASSERT_EQ(partition.type, ExchangeRouting::Partition::Type::Hash);
+    ASSERT_EQ(partition.type, ExchangePartitionType::Hash);
     ASSERT_EQ(partition.keys[0].fullPath(), "a");
-    ASSERT_EQ(asExch->physicalProps.distribution, exchange->physicalProps.distribution);
+    ASSERT_EQ(asExch->distribution(), exchange->distribution());
     ASSERT_EQ(asExch->children.size(), 1u);
 }
 
 TEST(ExchangeNodeTest, AppendToStringDistinguishesTheThreeRoutingKinds) {
     auto gather = std::make_unique<ExchangeNode>(scan(), ExchangeRouting::gather(false));
-    ASSERT_STRING_CONTAINS(gather->toString(), "Gather");
+    ASSERT_STRING_CONTAINS(gather->toString(), "gather");
 
     auto broadcast = std::make_unique<ExchangeNode>(scan(), ExchangeRouting::broadcast());
-    ASSERT_STRING_CONTAINS(broadcast->toString(), "Broadcast");
+    ASSERT_STRING_CONTAINS(broadcast->toString(), "broadcast");
 
     auto repartition =
         std::make_unique<ExchangeNode>(scan(), ExchangeRouting::hashOn({FieldPath("a")}));
-    ASSERT_STRING_CONTAINS(repartition->toString(), "Hash");
+    ASSERT_STRING_CONTAINS(repartition->toString(), "hash");
     ASSERT_STRING_CONTAINS(repartition->toString(), "a");
 
     // The common properties are indented like any other node's.
@@ -216,23 +215,23 @@ DEATH_TEST_REGEX(PlanDistributionDeathTest, IneligibleNodeIsRejected, "13623108"
 TEST(PlanDistributionTest, ScanIsRoundRobin) {
     auto root = scan();
     planDistribution(*root, kParallelCtx);
-    ASSERT_EQ(root->physicalProps.distribution.type, DistributionDesc::Type::RoundRobin);
+    ASSERT_EQ(root->distribution().type, DistributionType::RoundRobin);
 }
 
 TEST(PlanDistributionTest, NoExchangeInsertedWhenRequirementAlreadySatisfied) {
     auto root = matchOver(scan());
     planDistribution(*root, kParallelCtx);
-    ASSERT_EQ(root->physicalProps.distribution.type, DistributionDesc::Type::RoundRobin);
+    ASSERT_EQ(root->distribution().type, DistributionType::RoundRobin);
     ASSERT_EQ(root->children[0]->getType(), STAGE_COLLSCAN);
 }
 
 TEST(PlanDistributionTest, ExchangeSetsItsOwnDistributionToMatchItsRouting) {
     auto exchange = insertExchangeFor(scan(), RequiredDistribution::hashOn({FieldPath("a")}));
-    ASSERT_EQ(exchange->physicalProps.distribution, DistributionDesc::hashOn({FieldPath("a")}));
+    ASSERT_EQ(exchange->distribution(), DistributionDesc::hashOn({FieldPath("a")}));
     exchange = insertExchangeFor(scan(), RequiredDistribution::replicated());
-    ASSERT_EQ(exchange->physicalProps.distribution, DistributionDesc::replicated());
+    ASSERT_EQ(exchange->distribution(), DistributionDesc::replicated());
     exchange = insertExchangeFor(scan(), RequiredDistribution::unpartitioned());
-    ASSERT_EQ(exchange->physicalProps.distribution, DistributionDesc::unpartitioned());
+    ASSERT_EQ(exchange->distribution(), DistributionDesc::unpartitioned());
 }
 
 TEST(PlanDistributionTest, GatherIsNeverSortPreserving) {

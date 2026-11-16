@@ -30,11 +30,11 @@ DistributionDesc toOutputDistribution(const ExchangeRouting& routing) {
             [](const ExchangeRouting::Broadcast&) { return DistributionDesc::replicated(); },
             [](const ExchangeRouting::Partition& partition) {
                 switch (partition.type) {
-                    case ExchangeRouting::Partition::Type::Hash:
+                    case ExchangePartitionType::Hash:
                         return DistributionDesc::hashOn(partition.keys);
-                    case ExchangeRouting::Partition::Type::Range:
+                    case ExchangePartitionType::Range:
                         return DistributionDesc::rangeOn(partition.keys);
-                    case ExchangeRouting::Partition::Type::RoundRobin:
+                    case ExchangePartitionType::RoundRobin:
                         return DistributionDesc::roundRobin();
                 }
                 MONGO_UNREACHABLE_TASSERT(11700115);
@@ -43,42 +43,41 @@ DistributionDesc toOutputDistribution(const ExchangeRouting& routing) {
         routing.mode);
 }
 
-std::string toString(const ExchangeRouting& routing) {
+std::string_view routingModeName(const ExchangeRouting& routing) {
     return std::visit(
         OverloadedVisitor{
-            [](const ExchangeRouting::Gather& gather) {
-                return fmt::format("Gather(sortPreserving = {})", gather.sortPreserving);
-            },
-            [](const ExchangeRouting::Broadcast&) -> std::string { return "Broadcast"; },
-            [](const ExchangeRouting::Partition& partition) -> std::string {
-                switch (partition.type) {
-                    case ExchangeRouting::Partition::Type::Hash:
-                        return fmt::format("Hash{}", keysToString(partition.keys));
-                    case ExchangeRouting::Partition::Type::Range:
-                        return fmt::format("Range{}", keysToString(partition.keys));
-                    case ExchangeRouting::Partition::Type::RoundRobin:
-                        return "RoundRobin";
-                }
-                MONGO_UNREACHABLE_TASSERT(11700116);
+            // A gather and a broadcast are whole modes rather than a value of some enumerated type,
+            // so these two are the only routing names not already carried by a named enum.
+            [](const ExchangeRouting::Gather&) -> std::string_view { return "gather"; },
+            [](const ExchangeRouting::Broadcast&) -> std::string_view { return "broadcast"; },
+            [](const ExchangeRouting::Partition& partition) -> std::string_view {
+                return toStringData(partition.type);
             },
         },
         routing.mode);
 }
 
+std::string toString(const ExchangeRouting& routing) {
+    const std::string_view name = routingModeName(routing);
+    return std::visit(OverloadedVisitor{
+                          [&](const ExchangeRouting::Gather& gather) {
+                              return fmt::format(
+                                  "{}(sortPreserving = {})", name, gather.sortPreserving);
+                          },
+                          [&](const ExchangeRouting::Broadcast&) { return std::string{name}; },
+                          [&](const ExchangeRouting::Partition& partition) {
+                              return partition.keys.empty()
+                                  ? std::string{name}
+                                  : fmt::format("{}{}", name, keysToString(partition.keys));
+                          },
+                      },
+                      routing.mode);
+}
+
 std::string toString(const DistributionDesc& d) {
-    switch (d.type) {
-        case DistributionDesc::Type::Unpartitioned:
-            return "Unpartitioned";
-        case DistributionDesc::Type::Replicated:
-            return "Replicated";
-        case DistributionDesc::Type::RoundRobin:
-            return "RoundRobin";
-        case DistributionDesc::Type::HashPartitioned:
-            return fmt::format("HashPartitioned{}", keysToString(d.keys));
-        case DistributionDesc::Type::RangePartitioned:
-            return fmt::format("RangePartitioned{}", keysToString(d.keys));
-    }
-    MONGO_UNREACHABLE_TASSERT(11700100);
+    // 'keys' is non-empty for exactly the partitioned types, so it alone decides the decoration.
+    return d.keys.empty() ? std::string{toStringData(d.type)}
+                          : fmt::format("{}{}", toStringData(d.type), keysToString(d.keys));
 }
 
 }  // namespace mongo
