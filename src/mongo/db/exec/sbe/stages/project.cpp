@@ -37,6 +37,27 @@ ProjectStage::ProjectStage(std::unique_ptr<PlanStage> input,
     }
 }
 
+std::vector<std::unique_ptr<PlanStage>> ProjectStage::cloneForParallelExecution(CompileCtx& ctx,
+                                                                                size_t dop) const {
+    std::vector<std::unique_ptr<PlanStage>> clones =
+        _children[0]->cloneForParallelExecution(ctx, dop);
+    if (clones.size() == 0) {
+        return clones;
+    }
+    for (size_t i = 0; i < clones.size(); i++) {
+        SlotExprPairVector projects;
+        for (auto& [k, v] : _projects) {
+            projects.emplace_back(k, v->clone());
+        }
+        clones[i] = std::make_unique<ProjectStage>(std::move(clones[i]),
+                                                   std::move(projects),
+                                                   _commonStats.nodeId,
+                                                   _binding,
+                                                   participateInTrialRunTracking());
+    }
+    return clones;
+}
+
 std::unique_ptr<PlanStage> ProjectStage::clone() const {
     SlotExprPairVector projects;
     for (auto& [k, v] : _projects) {
@@ -77,6 +98,7 @@ value::SlotAccessor* ProjectStage::getAccessor(CompileCtx& ctx, value::SlotId sl
     }
     return _children[0]->getAccessor(ctx, slot);
 }
+
 void ProjectStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 

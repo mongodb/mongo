@@ -36,6 +36,9 @@ public:
 
     std::unique_ptr<PlanStage> clone() const final;
 
+    std::vector<std::unique_ptr<PlanStage>> cloneForParallelExecution(CompileCtx& ctx,
+                                                                      size_t dop) const final;
+
     void prepare(CompileCtx& ctx) final;
 
     value::SlotAccessor* getAccessor(sbe::CompileCtx& ctx, sbe::value::SlotId slot) final;

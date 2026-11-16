@@ -739,6 +739,16 @@ public:
     virtual std::unique_ptr<PlanStage> clone() const = 0;
 
     /**
+     * Creates `dop` clones of the stage, sharing any needed data structure that would allow them to
+     * collectively work to achieve their task. Returns an empty vector if the stage doesn't support
+     * parallel execution.
+     */
+    virtual std::vector<std::unique_ptr<PlanStage>> cloneForParallelExecution(CompileCtx& ctx,
+                                                                              size_t dop) const {
+        return std::vector<std::unique_ptr<PlanStage>>();
+    }
+
+    /**
      * Prepare this SBE PlanStage tree for execution. Must be called once, and must be called
      * prior to open(), getNext(), close(), saveState(), or restoreState(),
      */
@@ -755,7 +765,7 @@ public:
      * The expectation is that a plan stage acquires resources (e.g. memory buffers) during the open
      * call and avoids resource acquisition in getNext().
      *
-     * When reOpen flag is true then the plan stage should reinitizalize already acquired resources
+     * When reOpen flag is true then the plan stage should reinitialize already acquired resources
      * (e.g. re-hash, re-sort, re-seek, etc), but it can avoid reinitializing things that do not
      * contain state and are not destroyed by close(), since close() is not called before a reopen.
      *

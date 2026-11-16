@@ -6,7 +6,11 @@
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
 
-namespace mongo::sbe {
+namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangVirtualScan);
+
+namespace sbe {
 using namespace std::literals::string_view_literals;
 VirtualScanStage::VirtualScanStage(PlanNodeId planNodeId,
                                    value::SlotId out,
@@ -25,6 +29,54 @@ std::unique_ptr<PlanStage> VirtualScanStage::clone() const {
                                               _arr.getOwnedCopy(),
                                               _yieldPolicy,
                                               participateInTrialRunTracking());
+}
+
+std::vector<std::unique_ptr<PlanStage>> VirtualScanStage::cloneForParallelExecution(
+    CompileCtx& ctx, size_t dop) const {
+    if (dop < 2) {
+        return {};
+    }
+    size_t count = 0;
+    for (value::ArrayEnumerator counter(_arr.tag(), _arr.value()); !counter.atEnd();
+         counter.advance()) {
+        ++count;
+    }
+
+    if (count < dop) {
+        return {};
+    }
+
+    // Split the array as evenly as possible: the first 'count % dop' chunks get one extra
+    // element.
+    const size_t baseChunkSize = count / dop;
+    const size_t numLargerChunks = count % dop;
+
+    std::vector<std::unique_ptr<PlanStage>> result;
+    result.reserve(dop);
+
+    value::ArrayEnumerator enumerator(_arr.tag(), _arr.value());
+    for (size_t i = 0; i < dop; ++i) {
+        const size_t chunkSize = baseChunkSize + (i < numLargerChunks ? 1 : 0);
+
+        value::TagValueOwned chunk = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto* chunkArray = value::getArrayView(chunk.value());
+        chunkArray->reserve(chunkSize);
+
+        for (size_t j = 0; j < chunkSize; ++j) {
+            auto view = enumerator.getViewOfValue();
+            chunkArray->push_back_raw(value::copyValue(view.tag, view.value));
+            enumerator.advance();
+        }
+
+        result.emplace_back(std::make_unique<VirtualScanStage>(
+            _commonStats.nodeId,
+            _outField,
+            std::move(chunk),
+            nullptr,  // TODO: SERVER-134367 make PlanYieldPolicy thread safe
+            participateInTrialRunTracking()));
+    }
+
+    return result;
 }
 
 void VirtualScanStage::prepare(CompileCtx& ctx) {
@@ -57,6 +109,10 @@ void VirtualScanStage::open(bool reOpen) {
 
 PlanState VirtualScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
+
+    if (MONGO_unlikely(hangVirtualScan.shouldFail())) {
+        hangVirtualScan.pauseWhileSet(_opCtx);
+    }
 
     checkForInterruptAndYield(_opCtx);
 
@@ -126,4 +182,5 @@ void VirtualScanStage::doSaveState() {
         auto released = std::move(_values.at(_releaseIndex));
     }
 }
-}  // namespace mongo::sbe
+}  // namespace sbe
+}  // namespace mongo

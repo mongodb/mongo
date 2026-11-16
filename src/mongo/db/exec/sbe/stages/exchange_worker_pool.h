@@ -57,9 +57,10 @@ public:
 
     /**
      * Blocks until this worker has no job outstanding, i.e. until whatever was last submit()'d (if
-     * anything) has finished running.
+     * anything) has finished running, or after the timeout has expired. Returns `true` if the
+     * worker is now idle, `false` if the timeout has expired without the worker going idle.
      */
-    void waitIdle();
+    bool waitIdle(Microseconds timeout = Microseconds::max());
 
     ServiceContext::UniqueOperationContext opCtxHolder;
 

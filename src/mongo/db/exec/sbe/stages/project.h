@@ -48,6 +48,8 @@ public:
                  Binding binding = Binding::kParallel,
                  bool participateInTrialRunTracking = true);
 
+    std::vector<std::unique_ptr<PlanStage>> cloneForParallelExecution(CompileCtx& ctx,
+                                                                      size_t dop) const final;
     std::unique_ptr<PlanStage> clone() const final;
 
     void prepare(CompileCtx& ctx) final;

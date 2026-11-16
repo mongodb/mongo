@@ -51,6 +51,28 @@ public:
         tassert(8400101, "Filter must be passed a filter", _filter);
     }
 
+    std::vector<std::unique_ptr<PlanStage>> cloneForParallelExecution(CompileCtx& ctx,
+                                                                      size_t dop) const final {
+        // "Early exit" filters can only run in serial mode, as soon as the filter returns a 'false'
+        // result all the processing must stop immediately.
+        if constexpr (IsEof) {
+            return {};
+        }
+        std::vector<std::unique_ptr<PlanStage>> clones =
+            _children[0]->cloneForParallelExecution(ctx, dop);
+        if (clones.size() == 0) {
+            return clones;
+        }
+        for (size_t i = 0; i < clones.size(); i++) {
+            clones[i] =
+                std::make_unique<FilterStage<IsConst, IsEof>>(std::move(clones[i]),
+                                                              _filter->clone(),
+                                                              _commonStats.nodeId,
+                                                              participateInTrialRunTracking());
+        }
+        return clones;
+    }
+
     std::unique_ptr<PlanStage> clone() const final {
         return std::make_unique<FilterStage<IsConst, IsEof>>(_children[0]->clone(),
                                                              _filter->clone(),

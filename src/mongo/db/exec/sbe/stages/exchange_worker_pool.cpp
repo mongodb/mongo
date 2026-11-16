@@ -71,9 +71,15 @@ void ExchangeWorker::submit(unique_function<void()> newJob) {
     _cv.notify_one();
 }
 
-void ExchangeWorker::waitIdle() {
+bool ExchangeWorker::waitIdle(Microseconds timeout) {
     std::unique_lock lk(_mutex);
-    _cv.wait(lk, [&] { return !_hasJob && !_busy; });
+    if (timeout == Microseconds::max()) {
+        _cv.wait(lk, [&] { return !_hasJob && !_busy; });
+        return true;
+    }
+    bool properExit = false;
+    _cv.wait_for(lk, timeout.toSystemDuration(), [&] { return (properExit = !_hasJob && !_busy); });
+    return properExit;
 }
 
 void ExchangeWorker::threadLoop() {
