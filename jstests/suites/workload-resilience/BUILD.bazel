@@ -26,6 +26,8 @@ resmoke_suite_test(
         "common",
         "concurrency",
         "execution_control_with_prioritization",
+        "infinite_release_critical",
+        "release_critical",
         "repl",
     ],
     target_compatible_with = select({
@@ -46,7 +48,9 @@ resmoke_suite_test(
     shard_count = 6,
     tags = [
         "ci-default",
+        "infinite_release_critical",
         "jscore",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -62,9 +66,11 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "common",
+        "infinite_release_critical",
         "ingress_request_rate_limited",
         "multi_shard",
         "multi_stmt",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -83,7 +89,9 @@ resmoke_suite_test(
         "common",
         "execution_control_with_prioritization",
         "incompatible_debug_mode",
+        "infinite_release_critical",
         "large",
+        "release_critical",
         "replica_sets",
         "san",
     ],
@@ -100,7 +108,9 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "ci-default",
+        "infinite_release_critical",
         "ingress_request_rate_limited",
+        "release_critical",
         "replica_sets",
     ],
     deps = [
@@ -120,6 +130,7 @@ resmoke_suite_test(
         "execution_control_with_prioritization",
         "incompatible_debug_mode",
         "large",
+        "non_deterministic",
         "replica_sets",
         "san",
     ],
@@ -137,7 +148,9 @@ resmoke_suite_test(
         "ci-default",
         "common",
         "execution_control_with_prioritization",
+        "infinite_release_critical",
         "jscore",
+        "release_critical",
         "sharding",
     ],
     target_compatible_with = select({
@@ -159,6 +172,7 @@ resmoke_suite_test(
         "ci-default",
         "execution_control_with_prioritization",
         "jscore",
+        "non_deterministic",
         "sharding",
     ],
     target_compatible_with = select({
@@ -182,8 +196,10 @@ resmoke_suite_test(
     shard_count = 40,
     tags = [
         "ci-all-variants",
+        "infinite_release_critical",
         "ingress_request_rate_limited",
         "jscore",
+        "release_critical",
         "sharding",
     ],
     target_compatible_with = select({
@@ -209,8 +225,10 @@ resmoke_suite_test(
     tags = [
         "ci-all-variants",
         "common",
+        "infinite_release_critical",
         "ingress_request_rate_limited",
         "jscore",
+        "release_critical",
         "sharding",
     ],
     deps = [
@@ -227,8 +245,10 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "ci-all-variants",
+        "infinite_release_critical",
         "ingress_request_rate_limited",
         "jscore",
+        "release_critical",
         "sharding",
     ],
     target_compatible_with = select({
@@ -252,8 +272,10 @@ resmoke_suite_test(
         "common",
         "concurrency",
         "incompatible_debug_mode",
+        "infinite_release_critical",
         "ingress_request_rate_limited",
         "read_concern_maj",
+        "release_critical",
         "sharded",
     ],
     target_compatible_with = select({
@@ -281,6 +303,8 @@ resmoke_suite_test(
         "ci-default",
         "common",
         "execution_control_with_prioritization",
+        "infinite_release_critical",
+        "release_critical",
         "sharding",
     ],
     target_compatible_with = select({
@@ -307,6 +331,8 @@ resmoke_suite_test(
         "ci-default",
         "execution_control_with_prioritization",
         "incompatible_debug_mode",
+        "infinite_release_critical",
+        "release_critical",
         "replica_sets",
         "san",
     ],
@@ -357,7 +383,9 @@ resmoke_suite_test(
         "concurrency",
         "execution_control_with_prioritization",
         "incompatible_debug_mode",
+        "infinite_release_critical",
         "read_concern_maj",
+        "release_critical",
         "sharded",
     ],
     target_compatible_with = select({
