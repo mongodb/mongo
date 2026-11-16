@@ -849,6 +849,7 @@ BENCHMARK_SUITE_TEST_LISTS = [
     "bazel-bin/install/install-second_half_bm_test_list.txt",
     "bazel-bin/install/install-storage_bm_test_list.txt",
     "bazel-bin/install/install-sharding_bm_test_list.txt",
+    "bazel-bin/install/install-eot_bm_test_list.txt",
     "bazel-bin/install/install-sep_bm_test_list.txt",
 ]
 # External files or executables, used as suite selectors, that are created during the build and

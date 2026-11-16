@@ -1345,6 +1345,37 @@ mongo_cc_unit_test(
     deps = [":db_s_config_server_test_deps"],
 )
 
+mongo_cc_library(
+    name = "end_of_transaction_metadata_bm_util",
+    srcs = ["end_of_transaction_metadata_bm_util.cpp"],
+    hdrs = ["end_of_transaction_metadata_bm_util.h"],
+    deps = [
+        ":transaction_coordinator",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "end_of_transaction_metadata_bm_util_test",
+    srcs = ["end_of_transaction_metadata_bm_util_test.cpp"],
+    tags = ["mongo_unittest_second_group"],
+    deps = [":end_of_transaction_metadata_bm_util"],
+)
+
+mongo_cc_benchmark(
+    name = "end_of_transaction_metadata_bm",
+    srcs = ["end_of_transaction_metadata_bm.cpp"],
+    tags = ["eot_bm"],
+    deps = [
+        ":end_of_transaction_metadata_bm_util",
+        ":transaction_coordinator",
+        "//src/mongo/db:end_of_transaction_parameter",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
 mongo_cc_benchmark(
     name = "migration_chunk_cloner_source_bm",
     srcs = [
