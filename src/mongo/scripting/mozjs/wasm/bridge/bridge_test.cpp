@@ -2163,6 +2163,24 @@ TEST_F(WasmMozJSBridgeTest, SetGlobalValueDoesNotInvokeScriptSetter) {
     ASSERT_EQ(ret2["__value"].numberInt(), 5);
 }
 
+// invoke-function arguments are wrapped without an owned copy, over a buffer the bindings free
+// when the export returns, so a retained wrapper must be rejected on *any* later access,
+// including a host read of a global before the next invocation.
+//
+TEST_F(WasmMozJSBridgeTest, RetainedArgWrapperIsRejectedAfterItsInvocationReturns) {
+    // Retain the lazy wrapper over the argument buffer without resolving it: reading a field
+    // here would populate the JS object while the buffer is still mapped.
+    auto init = createFunction("function(doc) { globalThis.__saved = doc; return 0; }");
+    ASSERT_NE(init, 0u);
+
+    invokeFunction(init, BSON("0" << BSON("x" << 42)));
+
+    // The argument buffer is freed here, as the export returns.
+    ASSERT_THROWS_WITH_CHECK(getGlobal("__saved"), DBException, [](const DBException& ex) {
+        ASSERT_STRING_CONTAINS(ex.reason(), "Attempt to access an invalidated BSON Object");
+    });
+}
+
 // ---------------------------------------------------------------------------
 // `emit` in-WASM boundary
 // ---------------------------------------------------------------------------
