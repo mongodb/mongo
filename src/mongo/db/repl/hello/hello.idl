@@ -305,10 +305,11 @@ commands:
                 stability: unstable
             backpressure:
                 description:
-                    "Client backpressure protocol version. Accepts a boolean or number; when
-                    boolean, true corresponds to protocol version 1 and false means no
-                    backpressure. Absent or 0 means no backpressure; numeric 1..256 are
-                    explicit versions; higher or invalid values map to other."
+                    'Client backpressure protocol version. Accepts a boolean or a non-negative
+                    decimal string; when boolean, true corresponds to protocol version 1 and
+                    false means no backpressure. Absent or "0" means no backpressure;
+                    "1".."256" are explicit versions; other types or invalid values map
+                    to other.'
                 type: IDLAnyType
                 optional: true
                 stability: stable

@@ -179,6 +179,7 @@ TEST_F(BackpressureConnectionMetricsIntegrationTest,
 
     connectWithHelloFields(BSON("backpressure" << true));
     connectWithHelloFields(BSON("backpressure" << 2));
+    connectWithHelloFields(BSON("backpressure" << "2"));
     connectWithHelloFields(BSON("backpressure" << "invalid"));
     connectWithHelloFields(BSON("backpressure" << (kMaxExplicitBackpressureVersion + 5)));
 
@@ -186,8 +187,8 @@ TEST_F(BackpressureConnectionMetricsIntegrationTest,
     ASSERT_EQ(totalCount("1"), beforeVersionOneTotal + 1);
     ASSERT_EQ(currentCount("2"), beforeVersionTwoCurrent + 1);
     ASSERT_EQ(totalCount("2"), beforeVersionTwoTotal + 1);
-    ASSERT_EQ(currentCount(kBackpressureOtherVersionLabel), beforeOtherCurrent + 2);
-    ASSERT_EQ(totalCount(kBackpressureOtherVersionLabel), beforeOtherTotal + 2);
+    ASSERT_EQ(currentCount(kBackpressureOtherVersionLabel), beforeOtherCurrent + 3);
+    ASSERT_EQ(totalCount(kBackpressureOtherVersionLabel), beforeOtherTotal + 3);
 
     disconnectTestClients();
 
@@ -203,7 +204,7 @@ TEST_F(BackpressureConnectionMetricsIntegrationTest,
     ASSERT_EQ(currentCount("2"), beforeVersionTwoCurrent);
     ASSERT_EQ(totalCount("2"), beforeVersionTwoTotal + 1);
     ASSERT_EQ(currentCount(kBackpressureOtherVersionLabel), beforeOtherCurrent);
-    ASSERT_EQ(totalCount(kBackpressureOtherVersionLabel), beforeOtherTotal + 2);
+    ASSERT_EQ(totalCount(kBackpressureOtherVersionLabel), beforeOtherTotal + 3);
 
     // Absent backpressure → NoBackpressure. Do not assert activeCount here: that bucket is
     // shared with fixture/resmoke clients that connect and disconnect asynchronously, so

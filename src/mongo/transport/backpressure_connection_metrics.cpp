@@ -3,13 +3,13 @@
 
 #include "mongo/transport/backpressure_connection_metrics.h"
 
+#include "mongo/base/parse_number.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/decorable.h"
 
 #include <array>
-#include <cmath>
 #include <string>
 #include <string_view>
 
@@ -29,6 +29,20 @@ int32_t clampBackpressureVersion(int32_t version) {
     return version;
 }
 
+bool isUnsignedDecimalDigits(std::string_view s) {
+    if (s.empty()) {
+        return false;
+    }
+    for (char c : s) {
+        if (c < '0' || c > '9') {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Hello "backpressure": absent/false -> NoBackpressure; true -> 1; string "0"/"1"..256 -> version.
+// Unsigned decimal strings only (no signs/whitespace); BSON numbers and other types -> Other.
 int32_t normalizeBackpressureVersion(const BSONElement& elem) {
     if (elem.eoo()) {
         return kNoBackpressureVersion;
@@ -36,25 +50,20 @@ int32_t normalizeBackpressureVersion(const BSONElement& elem) {
     switch (elem.type()) {
         case BSONType::boolean:
             return elem.boolean() ? 1 : kNoBackpressureVersion;
-        case BSONType::numberDouble:
-            if (std::isnan(elem.numberDouble()) || !std::isfinite(elem.numberDouble())) {
+        case BSONType::string: {
+            const auto s = elem.valueStringData();
+            if (!isUnsignedDecimalDigits(s)) {
                 return kOtherBackpressureVersion;
             }
-            break;
-        case BSONType::numberDecimal:
-            if (elem.numberDecimal().isNaN()) {
+            int parsed = 0;
+            if (!NumberParser{}.base(10)(s, &parsed).isOK()) {
                 return kOtherBackpressureVersion;
             }
-            break;
-        case BSONType::numberInt:
-        case BSONType::numberLong:
-            break;
+            return clampBackpressureVersion(parsed);
+        }
         default:
             return kOtherBackpressureVersion;
     }
-
-    const auto v = elem.safeNumberInt();
-    return clampBackpressureVersion(v);
 }
 
 }  // namespace
@@ -150,43 +159,28 @@ BackpressureConnectionMetrics& BackpressureConnectionMetrics::operator+=(
 }
 
 void BackpressureConnectionMetrics::serialize(BSONObjBuilder* builder) const {
-    bool hasCurrent = false;
-    bool hasTotalCreated = false;
-    for (std::size_t i = 0; i < kBackpressureVersionBucketCount; ++i) {
-        if (_counts[i].load() != 0) {
-            hasCurrent = true;
-        }
-        if (_totalCreated[i].load() != 0) {
-            hasTotalCreated = true;
-        }
-    }
-
-    if (hasCurrent) {
-        BSONObjBuilder activeBuilder(builder->subobjStart("activeCount"));
-        for (std::size_t i = 0; i < kBackpressureVersionBucketCount; ++i) {
-            const auto current = _counts[i].load();
-            if (current != 0) {
-                const auto version = (i == kOtherBackpressureVersionBucketIndex)
-                    ? kOtherBackpressureVersion
-                    : static_cast<Version>(i);
-                activeBuilder.append(backpressureVersionLabel(version),
-                                     static_cast<long long>(current));
-            }
-        }
-    }
-
-    if (hasTotalCreated) {
-        BSONObjBuilder totalBuilder(builder->subobjStart("totalCount"));
+    // Always emit both subobjects. Keep keys with totalCreated > 0, including zeros.
+    auto appendSeen = [&](BSONObjBuilder& sub, bool useActive) {
         for (std::size_t i = 0; i < kBackpressureVersionBucketCount; ++i) {
             const auto created = _totalCreated[i].load();
-            if (created != 0) {
-                const auto version = (i == kOtherBackpressureVersionBucketIndex)
-                    ? kOtherBackpressureVersion
-                    : static_cast<Version>(i);
-                totalBuilder.append(backpressureVersionLabel(version),
-                                    static_cast<long long>(created));
+            if (created == 0) {
+                continue;
             }
+            const auto version = (i == kOtherBackpressureVersionBucketIndex)
+                ? kOtherBackpressureVersion
+                : static_cast<Version>(i);
+            const auto val = useActive ? _counts[i].load() : created;
+            sub.append(backpressureVersionLabel(version), static_cast<long long>(val));
         }
+    };
+
+    {
+        BSONObjBuilder activeBuilder(builder->subobjStart("activeCount"));
+        appendSeen(activeBuilder, true);
+    }
+    {
+        BSONObjBuilder totalBuilder(builder->subobjStart("totalCount"));
+        appendSeen(totalBuilder, false);
     }
 }
 

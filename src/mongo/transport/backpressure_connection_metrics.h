@@ -31,7 +31,7 @@ class SessionManager;
  */
 [[MONGO_MOD_PUBLIC]] inline constexpr int32_t kMaxExplicitBackpressureVersion = 256;
 
-/** Client explicitly reports no backpressure support (absent, false, or 0). */
+/** No backpressure: absent hello field, false, or string "0". BSON numbers are Other. */
 [[MONGO_MOD_PUBLIC]] inline constexpr int32_t kNoBackpressureVersion = 0;
 
 /**
@@ -94,7 +94,8 @@ public:
     BackpressureConnectionMetrics& operator+=(const BackpressureConnectionMetrics& other);
 
     /**
-     * Appends per-version activeCount and totalCount objects.
+     * Appends activeCount and totalCount sub-objects (each {} if unused). Within each sub-object,
+     * appends one count field per version label with totalCreated > 0 (active count may be 0).
      */
     void serialize(BSONObjBuilder* builder) const;
 
@@ -132,7 +133,7 @@ public:
     /** Records version once and increments metrics; later calls ignored. */
     void setVersion(BackpressureConnectionMetrics::Version version);
 
-    /** Parses hello "backpressure" and records the normalized version once. */
+    /** Parses hello "backpressure" (bool or unsigned decimal string) once. */
     void setVersionFromHelloField(const BSONElement& backpressureField);
 
     BackpressureConnectionMetrics::Version version() const {

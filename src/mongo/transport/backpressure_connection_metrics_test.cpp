@@ -74,18 +74,18 @@ TEST_F(BackpressureConnectionMetricsTest, BoolFalseIsNoBackpressure) {
     ASSERT_EQ(normalizedVersion(obj["backpressure"]), kNoBackpressureVersion);
 }
 
-TEST_F(BackpressureConnectionMetricsTest, PositiveIntIsItself) {
+TEST_F(BackpressureConnectionMetricsTest, NumberIsOther) {
     BSONObj obj = BSON("backpressure" << 2);
-    ASSERT_EQ(normalizedVersion(obj["backpressure"]), 2);
+    ASSERT_EQ(normalizedVersion(obj["backpressure"]), kOtherBackpressureVersion);
 }
 
-TEST_F(BackpressureConnectionMetricsTest, MaxExplicitVersionIsItself) {
-    BSONObj obj = BSON("backpressure" << kMaxExplicitBackpressureVersion);
+TEST_F(BackpressureConnectionMetricsTest, MaxExplicitNumericStringIsItself) {
+    BSONObj obj = BSON("backpressure" << std::to_string(kMaxExplicitBackpressureVersion));
     ASSERT_EQ(normalizedVersion(obj["backpressure"]), kMaxExplicitBackpressureVersion);
 }
 
-TEST_F(BackpressureConnectionMetricsTest, AboveMaxExplicitBecomesOther) {
-    BSONObj obj = BSON("backpressure" << (kMaxExplicitBackpressureVersion + 1));
+TEST_F(BackpressureConnectionMetricsTest, AboveMaxExplicitStringBecomesOther) {
+    BSONObj obj = BSON("backpressure" << std::to_string(kMaxExplicitBackpressureVersion + 1));
     ASSERT_EQ(normalizedVersion(obj["backpressure"]), kOtherBackpressureVersion);
 }
 
@@ -94,9 +94,9 @@ TEST_F(BackpressureConnectionMetricsTest, LargeIntBecomesOther) {
     ASSERT_EQ(normalizedVersion(obj["backpressure"]), kOtherBackpressureVersion);
 }
 
-TEST_F(BackpressureConnectionMetricsTest, ZeroIntIsNoBackpressure) {
+TEST_F(BackpressureConnectionMetricsTest, ZeroIntIsOther) {
     BSONObj obj = BSON("backpressure" << 0);
-    ASSERT_EQ(normalizedVersion(obj["backpressure"]), kNoBackpressureVersion);
+    ASSERT_EQ(normalizedVersion(obj["backpressure"]), kOtherBackpressureVersion);
 }
 
 TEST_F(BackpressureConnectionMetricsTest, NegativeIntIsOther) {
@@ -107,6 +107,35 @@ TEST_F(BackpressureConnectionMetricsTest, NegativeIntIsOther) {
 TEST_F(BackpressureConnectionMetricsTest, NonNumericTypeIsOther) {
     BSONObj obj = BSON("backpressure" << "string");
     ASSERT_EQ(normalizedVersion(obj["backpressure"]), kOtherBackpressureVersion);
+}
+
+TEST_F(BackpressureConnectionMetricsTest, NumericStringIsParsedAsVersion) {
+    BSONObj obj = BSON("backpressure" << "2");
+    ASSERT_EQ(normalizedVersion(obj["backpressure"]), 2);
+}
+
+TEST_F(BackpressureConnectionMetricsTest, NumericStringAboveMaxIsOther) {
+    BSONObj obj = BSON("backpressure" << "257");
+    ASSERT_EQ(normalizedVersion(obj["backpressure"]), kOtherBackpressureVersion);
+}
+
+TEST_F(BackpressureConnectionMetricsTest, NumericStringZeroIsNoBackpressure) {
+    BSONObj obj = BSON("backpressure" << "0");
+    ASSERT_EQ(normalizedVersion(obj["backpressure"]), kNoBackpressureVersion);
+}
+
+TEST_F(BackpressureConnectionMetricsTest, NumericStringIsDecimalNotOctalOrHex) {
+    BSONObj octal = BSON("backpressure" << "010");
+    ASSERT_EQ(normalizedVersion(octal["backpressure"]), 10);
+    BSONObj hex = BSON("backpressure" << "0x2");
+    ASSERT_EQ(normalizedVersion(hex["backpressure"]), kOtherBackpressureVersion);
+}
+
+TEST_F(BackpressureConnectionMetricsTest, SignedOrNonDigitStringIsOther) {
+    BSONObj neg = BSON("backpressure" << "-1");
+    ASSERT_EQ(normalizedVersion(neg["backpressure"]), kOtherBackpressureVersion);
+    BSONObj plus = BSON("backpressure" << "+2");
+    ASSERT_EQ(normalizedVersion(plus["backpressure"]), kOtherBackpressureVersion);
 }
 
 TEST_F(BackpressureConnectionMetricsTest, DoubleNaNIsOther) {
@@ -152,6 +181,32 @@ TEST_F(BackpressureConnectionMetricsTest, DecrementMatchesIncrement) {
     ASSERT_EQ(metrics().count(5), 1);
     metrics().decrement(5);
     ASSERT_EQ(metrics().count(5), 0);
+}
+
+TEST_F(BackpressureConnectionMetricsTest, SerializeKeepsZeroActiveCountAfterDecrement) {
+    metrics().increment(1);
+    metrics().decrement(1);
+    ASSERT_EQ(metrics().count(1), 0);
+    ASSERT_EQ(metrics().totalCreated(1), 1);
+
+    BSONObjBuilder bob;
+    metrics().serialize(&bob);
+    auto obj = bob.obj();
+    ASSERT_TRUE(obj["activeCount"].Obj().hasField("1"));
+    ASSERT_EQ(obj["activeCount"].Obj()["1"].numberLong(), 0);
+    ASSERT_EQ(obj["totalCount"].Obj()["1"].numberLong(), 1);
+    ASSERT_FALSE(obj["activeCount"].Obj().hasField("2"));
+}
+
+TEST_F(BackpressureConnectionMetricsTest, SerializeAlwaysEmitsActiveAndTotalCountSubobjs) {
+    BSONObjBuilder bob;
+    metrics().serialize(&bob);
+    auto obj = bob.obj();
+    ASSERT_EQ(obj.nFields(), 2);
+    ASSERT_TRUE(obj.hasField("activeCount"));
+    ASSERT_TRUE(obj.hasField("totalCount"));
+    ASSERT_EQ(obj["activeCount"].Obj().nFields(), 0);
+    ASSERT_EQ(obj["totalCount"].Obj().nFields(), 0);
 }
 
 TEST_F(BackpressureConnectionMetricsTest, SerializeProducesActiveAndTotalCountByVersion) {
@@ -276,7 +331,10 @@ TEST_F(BackpressureConnectionMetricsTest, UnsetSessionDestructionIsNoop) {
     ASSERT_DOES_NOT_THROW(transportLayer->deleteSession(session->id()));
     BSONObjBuilder bob;
     metrics().serialize(&bob);
-    ASSERT_EQ(bob.obj().nFields(), 0);
+    auto obj = bob.obj();
+    ASSERT_EQ(obj.nFields(), 2);
+    ASSERT_EQ(obj["activeCount"].Obj().nFields(), 0);
+    ASSERT_EQ(obj["totalCount"].Obj().nFields(), 0);
 }
 
 TEST_F(BackpressureConnectionMetricsTest, ConcurrentSetVersionIncrementsOnce) {
