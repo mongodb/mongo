@@ -3,10 +3,10 @@
  * Provides common infrastructure for setting up sharding tests, managing cluster time,
  * and running FSM-based change stream verification tests.
  */
-import {CollectionTestModel} from "jstests/libs/util/change_stream/change_stream_collection_test_model.js";
+import {ShardedCollectionTestModel as CollectionTestModel} from "jstests/libs/util/change_stream/change_stream_sharding_test_model.js";
 import {ShardingCommandGenerator} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator.js";
 import {ShardingCommandGeneratorParams} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator_params.js";
-import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
+import {State} from "jstests/libs/util/change_stream/change_stream_sharding_state.js";
 import {CreateDatabaseCommand} from "jstests/libs/util/change_stream/change_stream_commands.js";
 import {Writer} from "jstests/libs/util/change_stream/change_stream_writer.js";
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";

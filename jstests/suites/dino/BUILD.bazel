@@ -1077,8 +1077,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_streams_sharding_command_generator",
-    config = "//buildscripts/resmokeconfig:suites/change_streams_sharding_command_generator.yml",
+    name = "change_streams_command_generator",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_command_generator.yml",
     shard_count = 2,
     tags = [
         "change_streams",

@@ -12,12 +12,12 @@
  *   uses_change_streams,
  * ]
  */
-import {Action} from "jstests/libs/util/change_stream/change_stream_action.js";
+import {ShardingAction as Action} from "jstests/libs/util/change_stream/change_stream_sharding_action.js";
 import {PrefixReadTestCase} from "jstests/libs/util/change_stream/change_stream_verifier.js";
-import {CollectionTestModel} from "jstests/libs/util/change_stream/change_stream_collection_test_model.js";
+import {ShardedCollectionTestModel as CollectionTestModel} from "jstests/libs/util/change_stream/change_stream_sharding_test_model.js";
 import {ShardingCommandGenerator} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator.js";
 import {ShardingCommandGeneratorParams} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator_params.js";
-import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
+import {State} from "jstests/libs/util/change_stream/change_stream_sharding_state.js";
 import {Writer} from "jstests/libs/util/change_stream/change_stream_writer.js";
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
 import {ChangeEventMatcher} from "jstests/libs/util/change_stream/change_stream_event.js";
@@ -197,8 +197,8 @@ describe("ShardingCommandGenerator", function () {
 
         // Collect all unique actions from the FSM model.
         const allActionsInFsm = new Set();
-        for (const state of model.states) {
-            for (const action of model.collectionStateToActionsMap(state).keys()) {
+        for (const state of model.getStates()) {
+            for (const action of model.stateToActionsMap(state).keys()) {
                 allActionsInFsm.add(action);
             }
         }

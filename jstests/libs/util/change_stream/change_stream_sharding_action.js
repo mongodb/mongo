@@ -1,7 +1,9 @@
 /**
- * Enum-like class for actions that can be performed on database/collection states.
+ * Enum-like class for the SHARDING model's actions (database/collection placement and
+ * DDL operations). The transaction model has its own parallel enum (TxnAction in
+ * change_stream_txn_test_model.js) so each model's action set stays scoped to itself.
  */
-class Action {
+class ShardingAction {
     static INSERT_DOC = 0;
     static CREATE_DATABASE = 1;
     static CREATE_SHARDED_COLLECTION_RANGE = 2;
@@ -25,62 +27,50 @@ class Action {
 
     static getName(actionId) {
         switch (actionId) {
-            case Action.INSERT_DOC:
+            case ShardingAction.INSERT_DOC:
                 return "insert doc";
-            case Action.CREATE_DATABASE:
+            case ShardingAction.CREATE_DATABASE:
                 return "create database";
-            case Action.CREATE_SHARDED_COLLECTION_RANGE:
+            case ShardingAction.CREATE_SHARDED_COLLECTION_RANGE:
                 return "create sharded collection (range)";
-            case Action.CREATE_SHARDED_COLLECTION_HASHED:
+            case ShardingAction.CREATE_SHARDED_COLLECTION_HASHED:
                 return "create sharded collection (hashed)";
-            case Action.CREATE_UNSPLITTABLE_COLLECTION:
+            case ShardingAction.CREATE_UNSPLITTABLE_COLLECTION:
                 return "create unsplittable collection";
-            case Action.CREATE_UNTRACKED_COLLECTION:
+            case ShardingAction.CREATE_UNTRACKED_COLLECTION:
                 return "create untracked collection";
-            case Action.DROP_COLLECTION:
+            case ShardingAction.DROP_COLLECTION:
                 return "drop collection";
-            case Action.DROP_DATABASE:
+            case ShardingAction.DROP_DATABASE:
                 return "drop database";
-            case Action.RENAME_TO_NON_EXISTENT_SAME_DB:
+            case ShardingAction.RENAME_TO_NON_EXISTENT_SAME_DB:
                 return "rename to non-existent collection same database";
-            case Action.RENAME_TO_EXISTENT_SAME_DB:
+            case ShardingAction.RENAME_TO_EXISTENT_SAME_DB:
                 return "rename to existent collection same database";
-            case Action.RENAME_TO_NON_EXISTENT_DIFFERENT_DB:
+            case ShardingAction.RENAME_TO_NON_EXISTENT_DIFFERENT_DB:
                 return "rename to non-existent collection different database";
-            case Action.RENAME_TO_EXISTENT_DIFFERENT_DB:
+            case ShardingAction.RENAME_TO_EXISTENT_DIFFERENT_DB:
                 return "rename to existent collection different database";
-            case Action.SHARD_COLLECTION_RANGE:
+            case ShardingAction.SHARD_COLLECTION_RANGE:
                 return "shard collection (range)";
-            case Action.SHARD_COLLECTION_HASHED:
+            case ShardingAction.SHARD_COLLECTION_HASHED:
                 return "shard collection (hashed)";
-            case Action.UNSHARD_COLLECTION:
+            case ShardingAction.UNSHARD_COLLECTION:
                 return "unshard collection";
-            case Action.RESHARD_COLLECTION_TO_RANGE:
+            case ShardingAction.RESHARD_COLLECTION_TO_RANGE:
                 return "reshard collection (range)";
-            case Action.RESHARD_COLLECTION_TO_HASHED:
+            case ShardingAction.RESHARD_COLLECTION_TO_HASHED:
                 return "reshard collection (hashed)";
-            case Action.MOVE_PRIMARY:
+            case ShardingAction.MOVE_PRIMARY:
                 return "move primary";
-            case Action.MOVE_COLLECTION:
+            case ShardingAction.MOVE_COLLECTION:
                 return "move collection";
-            case Action.MOVE_CHUNK:
+            case ShardingAction.MOVE_CHUNK:
                 return "move chunk";
             default:
                 throw new Error(`Invalid action ID: ${actionId}`);
         }
     }
-
-    /**
-     * Get all action IDs.
-     * @returns {Array<number>} Array of all action IDs.
-     */
-    static getAllActionIds() {
-        // Static class fields are not enumerable, so Object.values() won't work.
-        // Use getOwnPropertyNames and filter for numeric values.
-        return Object.getOwnPropertyNames(Action)
-            .map((name) => Action[name])
-            .filter((value) => typeof value === "number");
-    }
 }
 
-export {Action};
+export {ShardingAction};

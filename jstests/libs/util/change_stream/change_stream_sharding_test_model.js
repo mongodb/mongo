@@ -15,39 +15,38 @@
  *    independently.
  * ========================================================================================
  */
-import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
-import {Action} from "jstests/libs/util/change_stream/change_stream_action.js";
+import {State} from "jstests/libs/util/change_stream/change_stream_sharding_state.js";
+import {GraphModel} from "jstests/libs/util/change_stream/change_stream_fsm_command_generator.js";
+import {ShardingAction as Action} from "jstests/libs/util/change_stream/change_stream_sharding_action.js";
 
-class CollectionTestModel {
+class ShardedCollectionTestModel extends GraphModel {
     /**
      * @param {number} startState - One of State.DATABASE_ABSENT or
      *   State.DATABASE_PRESENT_COLLECTION_ABSENT. The graph is configured for the
      *   chosen start state so the FSM generator can exercise all reachable actions.
      */
     constructor(startState) {
+        super();
         assert(
             startState === State.DATABASE_ABSENT ||
                 startState === State.DATABASE_PRESENT_COLLECTION_ABSENT,
             `Unsupported start state: ${startState}`,
         );
-        this.states = new Set();
-        this.transitions = new Map();
         this.startState = startState;
-
-        if (startState === State.DATABASE_ABSENT) {
-            this._configureDbAbsent();
-        } else {
-            this._configureDbPresentNoDrops();
-        }
+        this._buildGraph();
     }
 
     getStartState() {
         return this.startState;
     }
 
-    collectionStateToActionsMap(state) {
-        assert(this.states.has(state), `State ${state} does not exist in the state machine`);
-        return this.transitions.get(state);
+    /** The graph differs by the configured start state: which states are reachable. */
+    _buildGraph() {
+        if (this.getStartState() === State.DATABASE_ABSENT) {
+            this._configureDbAbsent();
+        } else {
+            this._configureDbPresentNoDrops();
+        }
     }
 
     /**
@@ -62,9 +61,6 @@ class CollectionTestModel {
      * collection-present states (returning to DATABASE_ABSENT for full lifecycle testing).
      */
     _configureDbAbsent() {
-        this._initializeState(State.DATABASE_ABSENT);
-        this._initializeCollectionStates();
-
         this._setActions(State.DATABASE_ABSENT, [
             [Action.INSERT_DOC, State.COLLECTION_PRESENT_UNTRACKED],
             [Action.CREATE_DATABASE, State.DATABASE_PRESENT_COLLECTION_ABSENT],
@@ -86,21 +82,11 @@ class CollectionTestModel {
      * Cross-DB rename is excluded: coverage is provided by "db absent" mode.
      */
     _configureDbPresentNoDrops() {
-        this._initializeCollectionStates();
-
         this._configureDbPresentCollectionAbsent();
         this._configureCollectionPresentStates(
             /* includeDropDatabase */ false,
             /* includeCrossDbRename */ false,
         );
-    }
-
-    _initializeCollectionStates() {
-        this._initializeState(State.DATABASE_PRESENT_COLLECTION_ABSENT);
-        this._initializeState(State.COLLECTION_PRESENT_SHARDED_RANGE);
-        this._initializeState(State.COLLECTION_PRESENT_SHARDED_HASHED);
-        this._initializeState(State.COLLECTION_PRESENT_UNSPLITTABLE);
-        this._initializeState(State.COLLECTION_PRESENT_UNTRACKED);
     }
 
     _configureDbPresentCollectionAbsent() {
@@ -203,18 +189,11 @@ class CollectionTestModel {
         ]);
     }
 
-    _initializeState(state) {
-        this.states.add(state);
-        this.transitions.set(state, new Map());
-    }
-
     _setActions(fromState, transitions) {
         for (const [action, toState] of transitions) {
-            assert(this.states.has(fromState), `State ${fromState} does not exist`);
-            assert(this.states.has(toState), `State ${toState} does not exist`);
-            this.transitions.get(fromState).set(action, toState);
+            this._addEdge(fromState, action, toState);
         }
     }
 }
 
-export {CollectionTestModel};
+export {ShardedCollectionTestModel};

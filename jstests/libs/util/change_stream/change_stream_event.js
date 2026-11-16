@@ -29,6 +29,19 @@ function filterToExpectedKeys(event, expected) {
  * To use custom filtering, set ChangeEventMatcher.eventModifier before creating matchers:
  *   ChangeEventMatcher.eventModifier = myCustomFilter;
  */
+/**
+ * CommittedTxn: the expected-domain envelope a CommitTxnCommand returns from
+ * getChangeEvents(). It is NOT an event and carries no operationType — it is the
+ * grouping for the txn's expected events: `events` are the txn's in-scope statement
+ * events (statement order) followed by the endOfTransaction expected event when the
+ * txn's covered scopes include the watched scope. The matcher layer unwinds it.
+ */
+class CommittedTxn {
+    constructor(events) {
+        this.events = events;
+    }
+}
+
 class ChangeEventMatcher {
     /**
      * Static event modifier function. Override for custom filtering.
@@ -65,4 +78,4 @@ class ChangeEventMatcher {
     }
 }
 
-export {ChangeEventMatcher, filterToExpectedKeys};
+export {ChangeEventMatcher, CommittedTxn, filterToExpectedKeys};

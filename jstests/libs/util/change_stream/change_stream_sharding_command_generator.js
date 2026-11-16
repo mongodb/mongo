@@ -4,8 +4,8 @@
  * Requires an explicit seed to ensure deterministic behavior.
  */
 import {FsmCommandGenerator} from "jstests/libs/util/change_stream/change_stream_fsm_command_generator.js";
-import {Action} from "jstests/libs/util/change_stream/change_stream_action.js";
-import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
+import {ShardingAction as Action} from "jstests/libs/util/change_stream/change_stream_sharding_action.js";
+import {State} from "jstests/libs/util/change_stream/change_stream_sharding_state.js";
 import {ShardingCommandGeneratorParams} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator_params.js";
 import {
     InsertDocCommand,

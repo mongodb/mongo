@@ -5,6 +5,55 @@
  * Uses the jstest shell's Random implementation for reproducibility.
  * Requires an explicit seed to ensure deterministic behavior.
  */
+/**
+ * GraphModel: a state graph — states, action-labeled transitions, and a start
+ * state — that FsmCommandGenerator traverses. This is the full walk-facing
+ * contract; models implement the topology specifics by declaring startState and
+ * building their edges in _buildGraph() AT CONSTRUCTION TIME.
+ *
+ * Invariant: every state has at least one outgoing edge (no terminal states) —
+ * this is what makes getStates() derivable from the transitions map.
+ *
+ * Two faces:
+ * - interface (consumed by the walk): getStartState, getStates, stateToActionsMap
+ * - build helpers (used by subclasses' _buildGraph): _addEdge
+ */
+class GraphModel {
+    constructor() {
+        this.transitions = new Map();
+    }
+
+    getStartState() {
+        throw new Error("getStartState() must be implemented by subclasses");
+    }
+
+    getStates() {
+        const states = [...this.transitions.keys()];
+        assert(
+            states.length > 0,
+            "The graph is not built — the model must build it at construction",
+        );
+        return states;
+    }
+
+    stateToActionsMap(state) {
+        const map = this.transitions.get(state);
+        assert(map !== undefined, `State ${state} does not exist in the graph`);
+        return map;
+    }
+
+    _addEdge(from, action, to) {
+        if (!this.transitions.has(from)) {
+            this.transitions.set(from, new Map()); // declaring edges declares the states
+        }
+        this.transitions.get(from).set(action, to);
+    }
+
+    _buildGraph() {
+        throw new Error("_buildGraph() must be implemented by subclasses");
+    }
+}
+
 class FsmCommandGenerator {
     constructor(seed) {
         assert(seed !== null && seed !== undefined, "Seed must be explicitly provided");
@@ -123,7 +172,7 @@ class FsmCommandGenerator {
      */
     _precomputeAllShortestPaths(testModel) {
         const allPaths = new Map();
-        for (const state of testModel.states) {
+        for (const state of testModel.getStates()) {
             allPaths.set(state, this._computeShortestPathsFromState(testModel, state));
         }
         return allPaths;
@@ -142,7 +191,7 @@ class FsmCommandGenerator {
 
             paths.set(state, {distance, path: [...path]});
 
-            const actionsMap = testModel.collectionStateToActionsMap(state);
+            const actionsMap = testModel.stateToActionsMap(state);
             for (const action of actionsMap.keys()) {
                 const nextState = actionsMap.get(action);
 
@@ -165,8 +214,8 @@ class FsmCommandGenerator {
      */
     _initializeUnvisitedActions(testModel) {
         const unvisitedActions = new Map();
-        for (const state of testModel.states) {
-            const actions = new Set(testModel.collectionStateToActionsMap(state).keys());
+        for (const state of testModel.getStates()) {
+            const actions = new Set(testModel.stateToActionsMap(state).keys());
             if (actions.size > 0) {
                 unvisitedActions.set(state, actions);
             }
@@ -183,7 +232,7 @@ class FsmCommandGenerator {
         const unvisitedActionsForState = unvisitedActions.get(state);
         if (!unvisitedActionsForState || unvisitedActionsForState.size === 0) return null;
 
-        const actionsMap = testModel.collectionStateToActionsMap(state);
+        const actionsMap = testModel.stateToActionsMap(state);
         const candidateActions = Array.from(unvisitedActionsForState).filter((a) =>
             isSelfLoop ? actionsMap.get(a) === state : actionsMap.get(a) !== state,
         );
@@ -246,4 +295,4 @@ class FsmCommandGenerator {
     }
 }
 
-export {FsmCommandGenerator};
+export {FsmCommandGenerator, GraphModel};

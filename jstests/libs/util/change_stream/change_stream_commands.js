@@ -34,8 +34,11 @@
  * ================================================================================
  */
 
+import {CommittedTxn} from "jstests/libs/util/change_stream/change_stream_event.js";
 import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
+
+const kEndOfTransactionOperationType = "endOfTransaction";
 
 /**
  * Sharding type constants.
@@ -93,10 +96,32 @@ class Command {
      * Runs the command logic. Subclasses must override this.
      * Transient DDL errors are handled by the runCommand override
      * (implicitly_retry_on_migration_in_progress_fsm.js) loaded by the suite.
+     * The optional `session` parameter carries the writer's shell Session for
+     * transaction commands; non-txn commands ignore it.
      * @param {Object} connection - The MongoDB connection.
+     * @param {Object} [session=null] - The writer's shell Session, for txn commands.
      */
-    execute(connection) {
+    execute(connection, session = null) {
         throw new Error("execute() method must be implemented by subclasses");
+    }
+
+    /**
+     * Collection acquisition, session-aware: inside a transaction the collection must
+     * come from the SESSION's database handle so statements join the session's txn.
+     */
+    _getCollection(connection, session) {
+        const db =
+            session !== null ? session.getDatabase(this.dbName) : connection.getDB(this.dbName);
+        return db.getCollection(this.collName);
+    }
+
+    /**
+     * Whether this command must run inside the writer's session. Only transaction
+     * commands do — autocommit writes stay ordinary (no lsid on the oplog entry, no
+     * retryable-write path). The Writer consults this instead of type-checking.
+     */
+    needsSession() {
+        return false;
     }
 
     /**
@@ -138,6 +163,12 @@ class Command {
             cls,
             `Unknown command type: ${spec.type}. Did you forget to add it to _registerAll()?`,
         );
+        // Subclasses with nested command objects override fromSpec — dispatch to them
+        // (a subclass WITHOUT an override inherits this very function, so the flat
+        // Object.assign path applies to it).
+        if (cls.fromSpec !== Command.fromSpec) {
+            return cls.fromSpec(spec);
+        }
         const cmd = Object.create(cls.prototype);
         Object.assign(cmd, spec);
         return cmd;
@@ -186,8 +217,10 @@ class InsertDocCommand extends Command {
         }
     }
 
-    execute(connection) {
-        const coll = connection.getDB(this.dbName).getCollection(this.collName);
+    execute(connection, session = null) {
+        // Session-aware collection acquisition (base helper): inside a txn the
+        // collection comes from the session's database handle.
+        const coll = this._getCollection(connection, session);
         InsertDocCommand.insertDocuments(coll, this.documents);
     }
 
@@ -1432,6 +1465,187 @@ function _registerAll(...classes) {
     }
 }
 
+/**
+ * TxnContext: outcome gating for txn statement event prediction (constants-object
+ * enum, codebase idiom). `kCommitted` is the default — non-txn callers never pass it.
+ */
+const TxnContext = {
+    kInProgress: "inProgress",
+    kCommitted: "committed",
+    kAborted: "aborted",
+};
+
+/**
+ * Starts a shell-side transaction on the writer's session. There is no server-side
+ * startTransaction command — this is shell bookkeeping (txnNumber increment, txn-state
+ * validation), explicit as its own command so the command trace reads
+ * BeginTxn → TxnOp → TxnOp → CommitTxn.
+ */
+class BeginTxnCommand extends Command {
+    // No toSpec/fromSpec override: no fields beyond the base defaults, so the flat
+    // registry round-trip applies. Overrides exist only for nested command objects
+    // (TxnOpCommand.inner, CommitTxnCommand.commandsInTxn).
+    execute(connection, session = null) {
+        assert(session !== null, "BeginTxnCommand requires the writer's session");
+        session.startTransaction({readConcern: {level: "majority"}});
+    }
+
+    needsSession() {
+        return true;
+    }
+
+    toString() {
+        return "BeginTxnCommand";
+    }
+
+    getChangeEvents(watchMode) {
+        return [];
+    }
+}
+
+/**
+ * One transaction statement: a composite wrapper around a txnable command (today only
+ * InsertDocCommand). Executes through the session (mongos routing, no placement
+ * bypass). Carries no session fields and no target-shard field — placement is
+ * derivable at build time from the fixture map / presplit arithmetic.
+ */
+class TxnOpCommand extends Command {
+    constructor({inner}) {
+        super({});
+        assert(inner instanceof InsertDocCommand, "Only InsertDocCommand is txnable today");
+        this.inner = inner;
+    }
+
+    execute(connection, session = null) {
+        assert(session !== null, "TxnOpCommand requires the writer's session");
+        // Pure forwarding: the inner command is session-aware via the base
+        // _getCollection helper — the wrapper adds nothing but the outcome gate.
+        this.inner.execute(connection, session);
+    }
+
+    needsSession() {
+        return true;
+    }
+
+    toString() {
+        return `TxnOpCommand(${this.inner})`;
+    }
+
+    getChangeEvents(watchMode, txnContext = TxnContext.kInProgress) {
+        // Outcome-gated, and default-in-progress: in the flat walk list the op predicts
+        // NOTHING on its own — a txn's events flow exclusively through its commit's
+        // CommittedTxn envelope, which aggregates by passing kCommitted explicitly.
+        if (txnContext !== TxnContext.kCommitted) {
+            return [];
+        }
+        return this.inner.getChangeEvents(watchMode);
+    }
+
+    toSpec() {
+        return {type: this.constructor.name, inner: this.inner.toSpec()};
+    }
+
+    static fromSpec(spec) {
+        const cmd = Object.create(TxnOpCommand.prototype);
+        cmd.inner = Command.fromSpec(spec.inner);
+        return cmd;
+    }
+}
+
+/**
+ * Closes the transaction: execute() only commits — the txn's statement commands ride
+ * the session as separate flat walk items (the Writer executes each on its own, for
+ * per-command logging and failure attribution). commandsInTxn exists for the PREDICTION
+ * side: getChangeEvents() aggregates their predictions into a single CommittedTxn
+ * envelope whose own emission is the endOfTransaction event only, included iff the txn
+ * wrote something visible at the watched scope (the scope-visibility rule).
+ */
+class CommitTxnCommand extends Command {
+    // includeEot: the VARIANT-level gating (feature flag + allowEndOfTransaction server
+    // parameter), known at generation time — when the gate is off the server would not
+    // emit an EOT for this txn at all, so the prediction omits it. The READER-level
+    // option (showEndOfTransaction) is NOT baked — the same data feeds readers with
+    // different options — that disposition stays in the builder.
+    constructor({commandsInTxn, includeEot = true}) {
+        super({});
+        assert.gt(commandsInTxn.length, 0, "CommitTxnCommand requires at least one txn statement");
+        this.commandsInTxn = commandsInTxn;
+        this.includeEot = includeEot;
+    }
+
+    execute(connection, session = null) {
+        assert(session !== null, "CommitTxnCommand requires the writer's session");
+        // The txn's statement commands rode the same session as earlier flat walk
+        // items; this command only closes the txn.
+        // _forTesting variant: the shell's plain commitTransaction() returns no usable
+        // result; the _forTesting wrapper returns the raw command response (the idiom
+        // every change-stream txn test uses).
+        assert.commandWorked(session.commitTransaction_forTesting());
+    }
+
+    needsSession() {
+        return true;
+    }
+
+    toString() {
+        return `CommitTxnCommand(${this.commandsInTxn.length} ops)`;
+    }
+
+    getChangeEvents(watchMode) {
+        const stmtEvents = this.commandsInTxn.flatMap((cmd) =>
+            cmd.getChangeEvents(watchMode, TxnContext.kCommitted),
+        );
+
+        // Scope-visibility rule: EOT iff the txn wrote something visible at this
+        // scope AND the variant gating allows emission.
+        if (stmtEvents.length === 0) {
+            return [];
+        }
+
+        const eotEvent = {operationType: kEndOfTransactionOperationType};
+        const totalEvents = !this.includeEot ? stmtEvents : [...stmtEvents, eotEvent];
+        return [new CommittedTxn(totalEvents)];
+    }
+
+    toSpec() {
+        return {
+            type: this.constructor.name,
+            includeEot: this.includeEot,
+            commandsInTxn: this.commandsInTxn.map((cmd) => cmd.toSpec()),
+        };
+    }
+
+    static fromSpec(spec) {
+        const cmd = Object.create(CommitTxnCommand.prototype);
+        cmd.includeEot = spec.includeEot;
+        cmd.commandsInTxn = spec.commandsInTxn.map((childSpec) => Command.fromSpec(childSpec));
+        return cmd;
+    }
+}
+
+/**
+ * Aborts the transaction. Emits nothing (aborted txns produce no change events).
+ */
+class AbortTxnCommand extends Command {
+    // No toSpec/fromSpec override — same reasoning as BeginTxnCommand.
+    execute(connection, session = null) {
+        assert(session !== null, "AbortTxnCommand requires the writer's session");
+        assert.commandWorked(session.abortTransaction_forTesting());
+    }
+
+    needsSession() {
+        return true;
+    }
+
+    toString() {
+        return "AbortTxnCommand";
+    }
+
+    getChangeEvents(watchMode) {
+        return [];
+    }
+}
+
 _registerAll(
     InsertDocCommand,
     CreateDatabaseCommand,
@@ -1453,11 +1667,21 @@ _registerAll(
     MoveChunkCommand,
     FCVDowngradeCommand,
     FCVUpgradeCommand,
+    BeginTxnCommand,
+    TxnOpCommand,
+    CommitTxnCommand,
+    AbortTxnCommand,
 );
 
 export {
     Command,
     InsertDocCommand,
+    TxnContext,
+    CommittedTxn,
+    BeginTxnCommand,
+    TxnOpCommand,
+    CommitTxnCommand,
+    AbortTxnCommand,
     CreateDatabaseCommand,
     CreateIndexCommand,
     DropIndexCommand,
@@ -1479,4 +1703,5 @@ export {
     FCVUpgradeCommand,
     ShardingType,
     getShardKeySpec,
+    kEndOfTransactionOperationType,
 };

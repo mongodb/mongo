@@ -4,6 +4,7 @@
  * Commands are passed as BSON specs (from Command.toSpec()) and reconstructed
  * in the thread via Command.fromSpec(). Callers synchronize via Connector.waitForDone().
  */
+import {withSession} from "jstests/libs/query/change_stream_util.js";
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
 import {Command} from "jstests/libs/util/change_stream/change_stream_commands.js";
 import {Thread} from "jstests/libs/parallelTester.js";
@@ -16,12 +17,18 @@ class Writer {
      * @param {string} instanceName - Writer instance name for Connector signaling.
      * @param {Array} commands - Command objects (converted to specs before crossing thread boundary).
      * @param {number} seed - Random seed for reproducibility.
+     * @param {Object} [options] - Optional settings.
+     * @param {boolean} [options.holdSession] - When true, the thread holds ONE shell
+     *     Session for the whole run: transaction commands ride it
+     *     (cmd.execute(conn, session)), everything else stays sessionless (autocommit).
      */
-    static run(conn, instanceName, commands, seed) {
+
+    static run(conn, instanceName, commands, seed, {holdSession} = {}) {
         const config = {
             instanceName,
             commandSpecs: commands.map((cmd) => cmd.toSpec()),
             seed,
+            holdSession,
         };
         const host = conn.host;
         const thread = new Thread(
@@ -76,27 +83,37 @@ class Writer {
     static _execute(conn, config) {
         Random.setRandomSeed(config.seed);
 
-        for (let i = 0; i < config.commandSpecs.length; i++) {
-            const spec = config.commandSpecs[i];
-            const cmd = Command.fromSpec(spec);
-            jsTest.log.info(`Writer [${config.instanceName}]: cmd[${i}] ${cmd}`);
-            try {
-                cmd.execute(conn);
-            } catch (e) {
-                jsTest.log.error(`Writer [${config.instanceName}]: cmd[${i}] ${cmd} FAILED`, {
-                    error: e.toString(),
-                    spec: spec,
-                    totalCommands: config.commandSpecs.length,
-                    seed: config.seed,
-                });
-                throw e;
+        const runCommands = (session) => {
+            for (let i = 0; i < config.commandSpecs.length; i++) {
+                const spec = config.commandSpecs[i];
+                const cmd = Command.fromSpec(spec);
+                jsTest.log.info(`Writer [${config.instanceName}]: cmd[${i}] ${cmd}`);
+                try {
+                    // Autocommit commands must NOT ride the session (ordinary writes);
+                    // txn commands join the writer's session.
+                    cmd.execute(conn, cmd.needsSession() ? session : null);
+                } catch (e) {
+                    jsTest.log.error(`Writer [${config.instanceName}]: cmd[${i}] ${cmd} FAILED`, {
+                        error: e.toString(),
+                        spec: spec,
+                        totalCommands: config.commandSpecs.length,
+                        seed: config.seed,
+                    });
+                    throw e;
+                }
+                Connector.heartbeat(conn, config.instanceName);
             }
-            Connector.heartbeat(conn, config.instanceName);
-        }
+            jsTest.log.info(
+                `Writer [${config.instanceName}]: all ${config.commandSpecs.length} commands completed`,
+            );
+        };
 
-        jsTest.log.info(
-            `Writer [${config.instanceName}]: all ${config.commandSpecs.length} commands completed`,
-        );
+        // Sessionless runs keep the Writer's original autocommit behavior — only txn
+        // walks need a session.
+        if (!config.holdSession) {
+            return runCommands(null);
+        }
+        return withSession(conn, runCommands);
     }
 }
 

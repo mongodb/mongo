@@ -27,7 +27,7 @@ import {
     verifyComparison,
     resolveWatchConfig,
 } from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
-import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
+import {State} from "jstests/libs/util/change_stream/change_stream_sharding_state.js";
 import {describe, it, afterEach} from "jstests/libs/mochalite.js";
 
 // TODO: SERVER-138724 Add back in once duplicate events tolerated
