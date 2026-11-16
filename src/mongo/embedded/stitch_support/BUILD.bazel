@@ -93,14 +93,16 @@ mongo_cc_library(
     copts = [
         "-Isrc/mongo/embedded",
     ],
-    local_defines = [
-        "STITCH_SUPPORT_COMPILING",
-    ] + select({
+    # Static test consumers must use direct symbols rather than DLL imports.
+    defines = select({
         "//bazel/config:linkstatic_enabled": [
             "STITCH_SUPPORT_STATIC",
         ],
         "//conditions:default": [],
     }),
+    local_defines = [
+        "STITCH_SUPPORT_COMPILING",
+    ],
     non_transitive_dyn_linkopts = select({
         "@platforms//os:linux": [
             "-Wl,--version-script=$(location :libstitch_support.version_script.lds)",
