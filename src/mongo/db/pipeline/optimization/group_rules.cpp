@@ -16,9 +16,7 @@ bool mayRunInSbe(PipelineRewriteContext& ctx) {
     const auto& knobs = ctx.getExpCtx().getQueryKnobConfiguration();
     return !knobs.isForceClassicEngineEnabled() && !knobs.getSbeDisableGroupPushdownForOp() &&
         isGroupSbeCompatible(
-            group,
-            getMinRequiredSbeCompatibility(knobs.getInternalQueryFrameworkControlForOp(),
-                                           feature_flags::gFeatureFlagSbeFull.isEnabled()));
+            group, getMinRequiredSbeCompatibility(knobs.getInternalQueryFrameworkControlForOp()));
 }
 
 bool annotateNonArrayIdFields(PipelineRewriteContext& ctx) {

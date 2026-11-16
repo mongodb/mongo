@@ -556,8 +556,8 @@ bool findSbeCompatibleStagesForPushdown(
     }
 
     const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled();
-    const SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
-        queryKnob.getInternalQueryFrameworkControlForOp(), sbeFullEnabled);
+    const SbeCompatibility minRequiredCompatibility =
+        getMinRequiredSbeCompatibility(queryKnob.getInternalQueryFrameworkControlForOp());
 
     auto meetsRequirements = [&minRequiredCompatibility](SbeCompatibility stageCompatibility) {
         return stageCompatibility >= minRequiredCompatibility;

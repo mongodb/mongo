@@ -10,11 +10,10 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
-                                                bool sbeFullEnabled) {
-    if (sbeFullEnabled) {
-        return SbeCompatibility::requiresTrySbe;
-    } else if (currentQueryKnobFramework == QueryFrameworkControlEnum::kTrySbeEngine) {
+SbeCompatibility getMinRequiredSbeCompatibility(
+    QueryFrameworkControlEnum currentQueryKnobFramework) {
+    if (feature_flags::gFeatureFlagSbeFull.isEnabled() ||
+        currentQueryKnobFramework == QueryFrameworkControlEnum::kTrySbeEngine) {
         return SbeCompatibility::requiresTrySbe;
     }
     return SbeCompatibility::noRequirements;

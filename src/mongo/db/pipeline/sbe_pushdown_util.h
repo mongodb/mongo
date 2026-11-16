@@ -14,8 +14,8 @@ class DocumentSourceGroupBase;
  * 'requiresTrySbe'; otherwise, if query framework control knob is 'trySbeEngine', set
  * compatibility to 'requiresTrySbe'; otherwise set it to 'noRequirements'.
  */
-SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
-                                                bool sbeFullEnabled);
+SbeCompatibility getMinRequiredSbeCompatibility(
+    QueryFrameworkControlEnum currentQueryKnobFramework);
 
 bool isGroupSbeCompatible(const DocumentSourceGroupBase& group,
                           SbeCompatibility minRequiredCompatibility);

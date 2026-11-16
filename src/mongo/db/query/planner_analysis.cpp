@@ -938,9 +938,8 @@ bool isPartialFilterCompatibleWithLookupPushdown(boost::intrusive_ptr<Expression
     tassert(11651501, "Match expression should be parsable.", swMatchExp.isOK());
 
     const auto& queryKnob = expCtx->getQueryKnobConfiguration();
-    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled();
-    const SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
-        queryKnob.getInternalQueryFrameworkControlForOp(), sbeFullEnabled);
+    const SbeCompatibility minRequiredCompatibility =
+        getMinRequiredSbeCompatibility(queryKnob.getInternalQueryFrameworkControlForOp());
     if (matchExpCtx->getSbeCompatibility() < minRequiredCompatibility) {
         return false;
     }
