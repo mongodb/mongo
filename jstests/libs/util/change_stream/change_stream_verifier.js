@@ -338,7 +338,8 @@ function assertMatcherDone(conn, matcher, events, ctx, readerInstanceName) {
     const perStreamLines = perStreamBreakdown
         .map(
             (s, i) =>
-                `stream ${i}: ${s.matched}/${s.total} matched${s.done ? "" : ` (stuck, waiting for ${s.nextExpected})`}`,
+                `stream ${i}: ${s.matched}/${s.total} matched` +
+                `${s.done ? "" : ` (stuck, waiting for ${s.nextExpected})`}`,
         )
         .join("\n");
 

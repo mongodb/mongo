@@ -18,7 +18,9 @@ function formatEventTypeAndNs(operationType, ns) {
  */
 class SingleChangeStreamMatcher {
     /**
-     * @param {Array<ChangeEventMatcher>} eventMatchers - Ordered list of expected events
+     * @param {Array} eventMatchers - Ordered list of matchers (ChangeEventMatcher |
+     *     TxnChangeEventMatcher); a TxnChangeEventMatcher consumes a whole txn's event
+     *     set, order-free inside.
      */
     constructor(eventMatchers) {
         this.matchers = eventMatchers;
@@ -26,35 +28,60 @@ class SingleChangeStreamMatcher {
         this.skipped = [];
     }
 
-    matches(event, cursorClosed) {
-        if (
-            this.index < this.matchers.length &&
-            this.matchers[this.index].matches(event, cursorClosed)
-        ) {
+    // A finished matcher becomes transparent: the stream advances past it. The
+    // advancement happens EAGERLY here and nowhere else, so a done matcher never
+    // sits at the stream's front.
+    _onSuccessfulMatch(matcher, event) {
+        if (matcher.isDone()) {
             this.index++;
-            return true;
         }
-        return false;
+    }
+
+    matches(event, cursorClosed) {
+        if (this.isDone()) {
+            return false;
+        }
+
+        const matcher = this.matchers[this.index];
+        if (!matcher.matches(event, cursorClosed)) {
+            return false;
+        }
+        this._onSuccessfulMatch(matcher, event);
+        return true;
     }
 
     /**
      * Match event against expected, skipping unmatched expected events.
      * Only modifies state on success — safe to call speculatively from
      * MultipleChangeStreamMatcher without save/restore.
+     * An unfinished txn matcher at the scan front is position-locked: it alone may
+     * match this event, never be skipped over.
      */
     matchesOrSkip(event, cursorClosed) {
         for (let i = this.index; i < this.matchers.length; i++) {
-            if (this.matchers[i].matches(event, cursorClosed)) {
-                while (this.index < i) {
-                    this.skipped.push({
-                        index: this.index,
-                        type: this.matchers[this.index].event.operationType,
-                    });
-                    this.index++;
+            const matcher = this.matchers[i];
+            if (!matcher.skippable()) {
+                // Position-locked: an ACTIVE txn matcher alone may match this event —
+                // the stream never skips over a partially-matched txn.
+                if (!matcher.matches(event, cursorClosed)) {
+                    return false;
                 }
-                this.index = i + 1;
+                this._onSuccessfulMatch(matcher, event);
                 return true;
             }
+
+            if (!matcher.matches(event, cursorClosed)) {
+                continue;
+            }
+            while (this.index < i) {
+                this.skipped.push({
+                    index: this.index,
+                    type: this.matchers[this.index].toString(),
+                });
+                this.index++;
+            }
+            this._onSuccessfulMatch(matcher, event);
+            return true;
         }
         return false;
     }
@@ -64,7 +91,11 @@ class SingleChangeStreamMatcher {
     }
 
     getMatchedCount() {
-        return this.index;
+        return this.matchers.reduce((acc, eventMatcher) => acc + eventMatcher.getMatchedCount(), 0);
+    }
+
+    getTotalCount() {
+        return this.matchers.reduce((acc, eventMatcher) => acc + eventMatcher.getTotalCount(), 0);
     }
 
     /**
@@ -73,7 +104,7 @@ class SingleChangeStreamMatcher {
      * indistinguishable from their operation-type sequences alone.
      */
     getExpectedEventSummaries() {
-        return [this.matchers.map((m) => formatEventTypeAndNs(m.event.operationType, m.event.ns))];
+        return [this.matchers.map((m) => m.toString())];
     }
 
     /**
@@ -81,24 +112,21 @@ class SingleChangeStreamMatcher {
      * one it's waiting for, for debugging output.
      */
     getPerStreamBreakdown() {
+        const total = this.matchers.reduce((n, m) => n + m.getTotalCount(), 0);
         return [
             {
-                matched: this.index,
-                total: this.matchers.length,
+                matched: this.getMatchedCount(),
+                total,
                 done: this.isDone(),
+                // The last element that consumed anything — an in-progress txn
+                // matcher has matched events without advancing index, so the scan is
+                // by consumed state, not by index position.
                 lastMatched:
-                    this.index > 0
-                        ? formatEventTypeAndNs(
-                              this.matchers[this.index - 1].event.operationType,
-                              this.matchers[this.index - 1].event.ns,
-                          )
-                        : null,
-                nextExpected: this.isDone()
-                    ? null
-                    : formatEventTypeAndNs(
-                          this.matchers[this.index].event.operationType,
-                          this.matchers[this.index].event.ns,
-                      ),
+                    [...this.matchers]
+                        .reverse()
+                        .find((m) => m.getMatchedCount() > 0)
+                        ?.toString() ?? null,
+                nextExpected: this.isDone() ? null : this.matchers[this.index].toString(),
             },
         ];
     }
