@@ -10,11 +10,34 @@ imports:
     - "mongo/db/basic_types.idl"
 
 structs:
+    TopologyVersionStrict:
+        mod_visibility: public
+        description:
+            "Strict variant of TopologyVersion used in hello command requests. Requests are
+            user-typed, so unknown fields are rejected; the reply-side TopologyVersion must
+            stay non-strict since replies are parsed by potentially older binaries."
+        fields:
+            processId:
+                type: objectid
+                description:
+                    "An id maintained in memory by the server. It is reinitialized by the
+                    server using the standard ObjectId logic each time this server process
+                    starts."
+                stability: stable
+            counter:
+                type: long
+                description:
+                    "State change counter, maintained in memory by the server. It begins
+                    at 0 when the server starts, and it is incremented whenever there is a
+                    significant topology change."
+                stability: stable
+
     TopologyVersion:
         mod_visibility: public
         description:
             "Clients and servers exchange topologyVersions to determine the relative
             freshness of topology information in concurrent messages."
+        strict: false
         fields:
             processId:
                 type: objectid

@@ -401,7 +401,7 @@ enums:
 structs:
     OkReply:
         description: "Shared by commands that reply with just {ok: 1} and no additional information"
-        strict: true
+        strict: false
         is_command_reply: true
 
     ErrorReply:

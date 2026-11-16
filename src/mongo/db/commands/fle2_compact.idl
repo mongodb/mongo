@@ -12,7 +12,7 @@ imports:
 structs:
     CompactStructuredEncryptionDataCommandReply:
         description: "Reply from the {compactStructuredEncryptionData: ...} command"
-        strict: true
+        strict: false
         mod_visibility: private
         is_command_reply: true
         fields:

@@ -11,7 +11,7 @@ imports:
 structs:
     CleanupStructuredEncryptionDataCommandReply:
         description: "Reply from the {cleanupStructuredEncryptionData: ...} command"
-        strict: true
+        strict: false
         mod_visibility: private
         is_command_reply: true
         fields:

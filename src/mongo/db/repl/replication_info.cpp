@@ -524,7 +524,13 @@ public:
 
         // If a client is following the awaitable hello protocol, maxAwaitTimeMS should be
         // present if and only if topologyVersion is present in the request.
-        auto clientTopologyVersion = cmd.getTopologyVersion();
+        // The request's topologyVersion is parsed with the strict TopologyVersionStrict;
+        // convert to the shared non-strict TopologyVersion used by the awaitable hello protocol.
+        boost::optional<TopologyVersion> clientTopologyVersion = boost::none;
+        if (auto requestTopologyVersion = cmd.getTopologyVersion()) {
+            clientTopologyVersion = TopologyVersion(requestTopologyVersion->getProcessId(),
+                                                    requestTopologyVersion->getCounter());
+        }
         auto maxAwaitTimeMS = cmd.getMaxAwaitTimeMS();
         auto curOp = CurOp::get(opCtx);
         boost::optional<ScopeGuard<std::function<void()>>> timerGuard;

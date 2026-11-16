@@ -10,6 +10,7 @@ imports:
 structs:
     lockInfoElement:
         description: "Information for each lock in 'lockInfo'"
+        strict: false
         is_command_reply: true
         fields:
             resourceId:
@@ -24,6 +25,7 @@ structs:
 
     LockInfoReply:
         description: "Reply for the 'lockInfo' command."
+        strict: false
         is_command_reply: true
         fields:
             lockInfo:

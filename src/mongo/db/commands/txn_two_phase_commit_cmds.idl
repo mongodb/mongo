@@ -18,6 +18,7 @@ structs:
 
     PrepareReply:
         description: "Reply to prepareTransactionCommand"
+        strict: false
         is_command_reply: true
         fields:
             prepareTimestamp:

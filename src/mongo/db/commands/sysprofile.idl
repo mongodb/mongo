@@ -21,6 +21,7 @@ enums:
 structs:
     SysProfileCommandRely:
         description: "The sysprofile command's reply."
+        strict: false
         is_command_reply: true
         fields:
             pid:

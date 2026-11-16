@@ -737,6 +737,262 @@ class TestBinder(testcase.IDLTestcase):
             """)
         )
 
+    def test_strict_reply_struct_negative(self):
+        # type: () -> None
+        """Negative tests for reply structs with strict: true (SERVER-130246)."""
+
+        test_preamble = self.common_types + indent_text(
+            1,
+            textwrap.dedent("""
+            int:
+                description: foo
+                cpp_type: std::int32_t
+                bson_serialization_type: int
+                deserializer: mongo::BSONElement::_numberInt
+                is_view: false
+        """),
+        )
+
+        # A struct with is_command_reply: true may not set strict: true.
+        self.assert_bind_fail(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                reply:
+                    description: foo
+                    is_command_reply: true
+                    strict: true
+                    fields:
+                        foo: string
+            """),
+            idl.errors.ERROR_ID_STRICT_REPLY_NOT_ALLOWED,
+        )
+
+        # A struct with is_command_reply: true may not rely on the default strictness either.
+        self.assert_bind_fail(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                reply:
+                    description: foo
+                    is_command_reply: true
+                    fields:
+                        foo: string
+            """),
+            idl.errors.ERROR_ID_STRICT_REPLY_NOT_ALLOWED,
+        )
+
+        # A struct used as a command reply_type may not be strict.
+        self.assert_bind_fail(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                reply:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: string
+            commands:
+                foo:
+                    description: foo
+                    command_name: foo
+                    namespace: ignored
+                    api_version: ""
+                    reply_type: reply
+            """),
+            idl.errors.ERROR_ID_STRICT_REPLY_NOT_ALLOWED,
+        )
+
+        # A generic reply field list may not be strict.
+        self.assert_bind_fail(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                generic_reply:
+                    description: foo
+                    is_generic_cmd_list: reply
+                    strict: true
+                    fields:
+                        foo: string
+            """),
+            idl.errors.ERROR_ID_STRICT_REPLY_NOT_ALLOWED,
+        )
+
+        # Non-reply structs may still be strict.
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                foo:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: string
+            """)
+        )
+
+        # Reply structs with strict: false bind fine.
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                reply:
+                    description: foo
+                    is_command_reply: true
+                    strict: false
+                    fields:
+                        foo: string
+            commands:
+                foo:
+                    description: foo
+                    command_name: foo
+                    namespace: ignored
+                    api_version: ""
+                    reply_type: reply
+            """)
+        )
+
+        # A strict struct nested inside a reply struct (via a struct-typed field) is rejected.
+        self.assert_bind_fail(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                nested:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: string
+                reply:
+                    description: foo
+                    is_command_reply: true
+                    strict: false
+                    fields:
+                        nested_field:
+                            type: nested
+            """),
+            idl.errors.ERROR_ID_STRICT_REPLY_NOT_ALLOWED,
+        )
+
+        # A strict struct nested inside a reply struct via an array of structs is rejected.
+        self.assert_bind_fail(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                nested:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: string
+                reply:
+                    description: foo
+                    is_command_reply: true
+                    strict: false
+                    fields:
+                        nested_field:
+                            type: array<nested>
+            """),
+            idl.errors.ERROR_ID_STRICT_REPLY_NOT_ALLOWED,
+        )
+
+        # A strict struct nested inside a reply struct via a variant of structs is rejected.
+        self.assert_bind_fail(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                nested:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: string
+                reply:
+                    description: foo
+                    is_command_reply: true
+                    strict: false
+                    fields:
+                        nested_field:
+                            type:
+                                variant:
+                                - nested
+                                - string
+            """),
+            idl.errors.ERROR_ID_STRICT_REPLY_NOT_ALLOWED,
+        )
+
+        # A strict struct nested inside a reply via a variant of arrays of structs is rejected.
+        self.assert_bind_fail(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                nested:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: string
+                reply:
+                    description: foo
+                    is_command_reply: true
+                    strict: false
+                    fields:
+                        nested_field:
+                            type:
+                                variant:
+                                - array<nested>
+                                - string
+            """),
+            idl.errors.ERROR_ID_STRICT_REPLY_NOT_ALLOWED,
+        )
+
+        # A strict struct nested two levels deep is still rejected.
+        self.assert_bind_fail(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                inner:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: string
+                middle:
+                    description: foo
+                    strict: false
+                    fields:
+                        inner_field:
+                            type: inner
+                reply:
+                    description: foo
+                    is_command_reply: true
+                    strict: false
+                    fields:
+                        middle_field:
+                            type: middle
+            """),
+            idl.errors.ERROR_ID_STRICT_REPLY_NOT_ALLOWED,
+        )
+
+        # A strict struct is not rejected when it is only reachable from a non-reply struct.
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
+            structs:
+                nested:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: string
+                request:
+                    description: foo
+                    fields:
+                        nested_field:
+                            type: nested
+                reply:
+                    description: foo
+                    is_command_reply: true
+                    strict: false
+                    fields:
+                        foo: string
+            """)
+        )
+
     def test_variant_positive(self):
         # type: () -> None
         """Positive variant test cases."""
@@ -1840,6 +2096,7 @@ class TestBinder(testcase.IDLTestcase):
         structs:
             reply:
                 description: foo
+                strict: false
                 fields:
                     foo: string
         """)
@@ -3094,6 +3351,7 @@ class TestBinder(testcase.IDLTestcase):
         structs:
             reply:
                 description: foo
+                strict: false
                 fields:
                     foo: string
         """)
@@ -3207,6 +3465,7 @@ class TestBinder(testcase.IDLTestcase):
         structs:
             reply:
                 description: foo
+                strict: false
                 fields:
                     foo: string
         """)

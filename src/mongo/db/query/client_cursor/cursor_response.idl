@@ -263,6 +263,7 @@ structs:
 
     ResponseCursorBase:
         description: "Common fields of initial and subsequent cursor responses."
+        strict: false
         fields:
             id:
                 cpp_name: "cursorId"
@@ -304,6 +305,7 @@ structs:
 
     InitialResponseCursor:
         description: "A struct representing an initial response cursor."
+        strict: false
         inline_chained_structs: true
         chained_structs:
             ResponseCursorBase: ResponseCursorBase
@@ -320,6 +322,7 @@ structs:
 
     MultiResponseInitialResponseCursor:
         description: "A struct representing an initial response cursor if multiple cursors are returned."
+        strict: false
         inline_chained_structs: true
         chained_structs:
             ResponseCursorBase: ResponseCursorBase
@@ -342,6 +345,7 @@ structs:
 
     MultiResponseCursor:
         description: "A struct representing a cursor object inside an array of cursors"
+        strict: false
         fields:
             cursor:
                 description: "The actual cursor object."
@@ -354,6 +358,7 @@ structs:
     CursorInitialReply:
         description: "A struct representing a initial cursor reply."
         cpp_validator_func: "validateIDLParsedCursorResponse"
+        strict: false
         is_command_reply: true
         fields:
             cursor:
@@ -385,6 +390,7 @@ structs:
 
     GetMoreResponseCursor:
         description: "A struct representing a subsequent response cursor."
+        strict: false
         inline_chained_structs: true
         chained_structs:
             ResponseCursorBase: ResponseCursorBase
@@ -401,6 +407,7 @@ structs:
 
     CursorGetMoreReply:
         description: "A struct representing a getMore cursor reply."
+        strict: false
         is_command_reply: true
         fields:
             cursor:
