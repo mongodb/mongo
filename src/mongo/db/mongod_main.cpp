@@ -1166,6 +1166,30 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     transport::ServiceExecutor::startupAll(serviceContext);
 
+    auto readyFuture = replCoord->getReadyToAcceptClientConnectionsFuture();
+    if (!readyFuture.isReady()) {
+        LOGV2(13585000, "Waiting until ready to serve clients before starting the listener");
+        MONGO_IDLE_THREAD_BLOCK;
+        readyFuture.wait();
+    }
+    if (auto ready = readyFuture.getNoThrow(); !ready.isOK()) {
+        if (globalInShutdownDeprecated()) {
+            LOGV2(13585003,
+                  "Not starting the listener as shutdown is in progress",
+                  "error"_attr = ready);
+            logStartupStats = {};
+            // Shutdown has already started before initialization is complete. Wait for the
+            // shutdown task to complete and return.
+            MONGO_IDLE_THREAD_BLOCK;
+            return waitForShutdown();
+        }
+        LOGV2_ERROR(13585001,
+                    "Not starting the listener because the node will not become ready to "
+                    "serve clients",
+                    "error"_attr = ready);
+        return ExitCode::netError;
+    }
+
     {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                        TimedSectionId::startUpTransportLayer,

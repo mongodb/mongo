@@ -1307,6 +1307,16 @@ public:
     }
 
     /**
+     * Returns a future that becomes ready once this node can serve clients.
+     * mongod doesn't accept client connections until then.
+     * An error means the node won't become ready, e.g. because it's shutting down.
+     * The default implementation returns an already-ready future.
+     */
+    virtual SharedSemiFuture<void> getReadyToAcceptClientConnectionsFuture() {
+        return SemiFuture<void>::makeReady().share();
+    }
+
+    /**
      * Returns true if the node undergoes initial sync or rollback.
      */
     virtual bool isInInitialSyncOrRollback() const;
