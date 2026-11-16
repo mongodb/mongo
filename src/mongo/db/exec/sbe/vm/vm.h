@@ -578,6 +578,11 @@ private:
     value::TagValueMaybeOwned builtinSetDifferenceArray(ArityType arity);
     value::TagValueMaybeOwned builtinSetEqualsArray(ArityType arity);
     value::TagValueMaybeOwned builtinSetIsSubsetArray(ArityType arity);
+    /**
+     * Moves the operands of an array-result set builtin, which follow its collator argument, off
+     * the stack. Returns boost::none if any operand is not an array.
+     */
+    boost::optional<std::vector<value::TagValueMaybeOwned>> moveSetOperands(ArityType arity);
 
     value::TagValueMaybeOwned builtinSetUnionCapped(ArityType arity);
     value::TagValueMaybeOwned builtinCollSetUnionCapped(ArityType arity);

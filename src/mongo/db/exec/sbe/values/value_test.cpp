@@ -302,6 +302,12 @@ TEST_F(SbeValueTest, ArrayMoveIsDestructive) {
     ASSERT_EQ(arr1.size(), 0);  // NOLINT(bugprone-use-after-move)
 }
 
+TEST_F(SbeValueTest, ArrayFactoryMakesEmptyOwnedArray) {
+    auto array = value::TagValueOwned::array();
+    ASSERT_EQ(array.tag(), value::TypeTags::Array);
+    ASSERT_EQ(value::getArrayView(array.value())->size(), 0);
+}
+
 TEST_F(SbeValueTest, ArrayTakeValuesTransfersOwnership) {
     value::Array array;
     auto string = value::TagValueOwned::fromRaw(value::makeBigString("an allocating string"));

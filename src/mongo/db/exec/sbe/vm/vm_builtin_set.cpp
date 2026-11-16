@@ -30,29 +30,38 @@ void insertUnionElement(value::Array& result,
             memoryBytes <= limit);
     result.push_back(getOwned());
 }
+
+// Returns the collator argument of an array-result set builtin, which may be Nothing.
+const CollatorInterface* getSetCollator(value::TagValueView coll) {
+    tassert(13889300,
+            "Expected a collator or Nothing for an array-result set builtin",
+            coll.tag == value::TypeTags::collator || coll.tag == value::TypeTags::Nothing);
+    return coll.tag == value::TypeTags::collator ? value::getCollatorView(coll.value) : nullptr;
+}
 }  // namespace
 
-value::TagValueMaybeOwned ByteCode::builtinSetUnionArray(ArityType arity) {
-    const CollatorInterface* collator = nullptr;
-    auto coll = viewFromStack(0);
-    tassert(13889300,
-            "Expected a collator or Nothing for setUnionArray",
-            coll.tag == value::TypeTags::collator || coll.tag == value::TypeTags::Nothing);
-    if (coll.tag == value::TypeTags::collator) {
-        collator = value::getCollatorView(coll.value);
-    }
-
-    // Arguments may be views (for example, field paths or constants). Keep owned inputs and
+boost::optional<std::vector<value::TagValueMaybeOwned>> ByteCode::moveSetOperands(ArityType arity) {
+    // Operands may be views (for example, field paths or constants). Keep owned inputs and
     // their extracted elements alive until construction of the result is complete.
     std::vector<value::TagValueMaybeOwned> inputs;
     inputs.reserve(arity - 1);
     for (size_t arg = 1; arg < arity; ++arg) {
         if (!value::isArray(viewFromStack(arg).tag)) {
-            return value::TagValueMaybeOwned::nothing();
+            return boost::none;
         }
         inputs.push_back(moveMaybeOwnedFromStack(arg));
     }
-    auto result = value::TagValueOwned::fromRaw(value::makeNewArray());
+    return inputs;
+}
+
+value::TagValueMaybeOwned ByteCode::builtinSetUnionArray(ArityType arity) {
+    const CollatorInterface* collator = getSetCollator(viewFromStack(0));
+    auto maybeInputs = moveSetOperands(arity);
+    if (!maybeInputs) {
+        return value::TagValueMaybeOwned::nothing();
+    }
+    auto& inputs = *maybeInputs;
+    auto result = value::TagValueOwned::array();
     auto array = value::getArrayView(result.value());
     // The hash table stores views into the values owned by the arrays and doesn't copy anything:
     //   hash table --> value <-- owning array
@@ -83,7 +92,73 @@ value::TagValueMaybeOwned ByteCode::builtinSetUnionArray(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSetIntersectionArray(ArityType arity) {
-    MONGO_UNREACHABLE_TASSERT(13890501);
+    const CollatorInterface* collator = getSetCollator(viewFromStack(0));
+    auto maybeInputs = moveSetOperands(arity);
+    if (!maybeInputs) {
+        return value::TagValueMaybeOwned::nothing();
+    }
+    auto& inputs = *maybeInputs;
+    auto result = value::TagValueOwned::array();
+    if (inputs.empty()) {
+        return std::move(result);
+    }
+
+    // Candidates are the distinct elements of the first input, in order, with the number of inputs
+    // that contain them. The hash table maps views of the elements to their candidates and doesn't
+    // copy anything. The result takes its values from the first input, so only that input's owned
+    // values are transferred.
+    struct Candidate {
+        value::TagValueView element;
+        // The index in 'ownedElements', or none when the first input is a view.
+        boost::optional<size_t> ownedIndex;
+        size_t count;
+    };
+    std::vector<Candidate> candidates;
+    value::ValueMapType<size_t> positions(0, value::ValueHash(collator), value::ValueEq(collator));
+    std::vector<value::TagValueOwned> ownedElements;
+    auto& first = inputs[0];
+    auto addCandidate = [&](value::TagValueView element, boost::optional<size_t> ownedIndex) {
+        if (positions.insert(element, candidates.size()).second) {
+            candidates.push_back({element, ownedIndex, 1});
+        }
+    };
+    if (first.owned() && first.tag() == value::TypeTags::Array) {
+        ownedElements = value::getArrayView(first.value())->takeValues();
+        for (size_t i = 0; i < ownedElements.size(); ++i) {
+            addCandidate(ownedElements[i].view(), i);
+        }
+    } else {
+        value::arrayForEach(first.tag(), first.value(), [&](auto tag, auto val) {
+            addCandidate({tag, val}, boost::none);
+        });
+    }
+
+    for (size_t arg = 1; arg < inputs.size(); ++arg) {
+        // An element counts at most once per input, and only if every earlier input contains it.
+        bool anyMatch = false;
+        value::arrayForEach(inputs[arg].tag(), inputs[arg].value(), [&](auto tag, auto val) {
+            if (auto it = positions.find({tag, val}); it != positions.end()) {
+                auto& candidate = candidates[it->second];
+                if (candidate.count == arg) {
+                    ++candidate.count;
+                    anyMatch = true;
+                }
+            }
+        });
+        if (!anyMatch) {
+            // We can short circuit since the intersection is empty.
+            return std::move(result);
+        }
+    }
+
+    auto array = value::getArrayView(result.value());
+    for (const auto& candidate : candidates) {
+        if (candidate.count == inputs.size()) {
+            array->push_back(candidate.ownedIndex ? std::move(ownedElements[*candidate.ownedIndex])
+                                                  : candidate.element.copy());
+        }
+    }
+    return std::move(result);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSetDifferenceArray(ArityType arity) {

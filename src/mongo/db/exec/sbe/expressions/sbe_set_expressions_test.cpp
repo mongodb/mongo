@@ -15,12 +15,16 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <tuple>
 #include <utility>
 
 namespace mongo::sbe {
+
+// The array-result set builtins covered by the shared tests below.
+constexpr std::array kArrayResultSetFns{EFn::kSetUnionArray, EFn::kSetIntersectionArray};
 
 class SBEBuiltinSetOpTest : public EExpressionTestFixture {
 protected:
@@ -41,6 +45,26 @@ protected:
             resultSet.tag(), resultSet.value(), expectedArray.first, expectedArray.second);
     }
 
+    // Compiles and runs 'expr', then compares the result with 'expected', ignoring element order.
+    void runAndAssertExpression(const EExpression& expr, const BSONArray& expected) {
+        auto compiledExpr = compileExpression(expr);
+        value::TagValueOwned expectedSet = value::TagValueOwned::fromRaw(makeArraySet(expected));
+        runAndAssertExpression(compiledExpr.get(), {expectedSet.tag(), expectedSet.value()});
+    }
+
+    void runAndAssertNothing(const EExpression& expr) {
+        auto compiledExpr = compileExpression(expr);
+        runAndAssertNothing(compiledExpr.get());
+    }
+
+    static std::unique_ptr<EExpression> noCollator() {
+        return makeC(value::TypeTags::Nothing, 0);
+    }
+
+    static std::unique_ptr<EExpression> arrayC(const BSONArray& array) {
+        return makeC(makeArray(array));
+    }
+
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
         value::TagValueOwned result =
             value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
@@ -58,24 +82,39 @@ protected:
     }
 };
 
-/** Runs the $setUnion tests against both the legacy builtin and setUnionArray. */
-class SBEBuiltinUnionTest : public SBEBuiltinSetOpTest, public testing::WithParamInterface<bool> {
+/**
+ * Runs the shared tests against both the legacy builtins and the array-result builtins.
+ */
+class SBEBuiltinArrayResultTest : public SBEBuiltinSetOpTest,
+                                  public testing::WithParamInterface<bool> {
 protected:
     std::unique_ptr<EExpression> makeUnion(std::unique_ptr<EExpression> lhs,
                                            std::unique_ptr<EExpression> rhs) {
+        return makeSetOp(EFn::kSetUnion, EFn::kSetUnionArray, std::move(lhs), std::move(rhs));
+    }
+
+    std::unique_ptr<EExpression> makeIntersection(std::unique_ptr<EExpression> lhs,
+                                                  std::unique_ptr<EExpression> rhs) {
+        return makeSetOp(
+            EFn::kSetIntersection, EFn::kSetIntersectionArray, std::move(lhs), std::move(rhs));
+    }
+
+private:
+    std::unique_ptr<EExpression> makeSetOp(EFn legacyFn,
+                                           EFn arrayFn,
+                                           std::unique_ptr<EExpression> lhs,
+                                           std::unique_ptr<EExpression> rhs) {
         if (GetParam()) {
-            return makeFunction(EFn::kSetUnionArray,
-                                makeC(value::TypeTags::Nothing, 0),
-                                std::move(lhs),
-                                std::move(rhs));
+            return makeFunction(
+                arrayFn, makeC(value::TypeTags::Nothing, 0), std::move(lhs), std::move(rhs));
         }
-        return makeFunction(EFn::kSetUnion, std::move(lhs), std::move(rhs));
+        return makeFunction(legacyFn, std::move(lhs), std::move(rhs));
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(LegacyAndArrayResult, SBEBuiltinUnionTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(LegacyAndArrayResult, SBEBuiltinArrayResultTest, testing::Bool());
 
-TEST_P(SBEBuiltinUnionTest, ComputesSetUnion) {
+TEST_P(SBEBuiltinArrayResultTest, ComputesSetUnion) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
@@ -99,7 +138,7 @@ TEST_P(SBEBuiltinUnionTest, ComputesSetUnion) {
     runAndAssertExpression(compiledExpr.get(), {unionResult1.tag(), unionResult1.value()});
 }
 
-TEST_P(SBEBuiltinUnionTest, ReturnsNothingSetUnion) {
+TEST_P(SBEBuiltinArrayResultTest, ReturnsNothingSetUnion) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
@@ -140,12 +179,11 @@ TEST_F(SBEBuiltinSetOpTest, AggSetUnion) {
     runAndAssertNothing(compiledExpr.get());
 }
 
-TEST_F(SBEBuiltinSetOpTest, ComputesSetIntersection) {
+TEST_P(SBEBuiltinArrayResultTest, ComputesSetIntersection) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setIntersectionExpr =
-        makeFunction(EFn::kSetIntersection, makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setIntersectionExpr = makeIntersection(makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIntersectionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -167,13 +205,12 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetIntersection) {
                            {intersectionResult1.tag(), intersectionResult1.value()});
 }
 
-TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIntersection) {
+TEST_P(SBEBuiltinArrayResultTest, ReturnsNothingSetIntersection) {
     value::OwnedValueAccessor slotAccessor1;
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setIntersectionExpr =
-        makeFunction(EFn::kSetIntersection, makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setIntersectionExpr = makeIntersection(makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setIntersectionExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -336,7 +373,7 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIsSubset) {
     runAndAssertNothing(compiledExpr.get());
 }
 
-TEST_P(SBEBuiltinUnionTest, SetUnionWithinLimitSucceeds) {
+TEST_P(SBEBuiltinArrayResultTest, SetUnionWithinLimitSucceeds) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
@@ -365,7 +402,7 @@ TEST_P(SBEBuiltinUnionTest, SetUnionWithinLimitSucceeds) {
     ASSERT_EQUALS(value::getArraySize(resTag, resVal), 10u);
 }
 
-TEST_P(SBEBuiltinUnionTest, SetUnionExceedsMemoryLimit) {
+TEST_P(SBEBuiltinArrayResultTest, SetUnionExceedsMemoryLimit) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
@@ -391,91 +428,116 @@ TEST_P(SBEBuiltinUnionTest, SetUnionExceedsMemoryLimit) {
                        ErrorCodes::ExceededMemoryLimit);
 }
 
-TEST_F(SBEBuiltinSetOpTest, SetUnionArrayZeroOperands) {
-    auto setUnionExpr = makeFunction(EFn::kSetUnionArray, makeC(value::TypeTags::Nothing, 0));
-    auto compiledExpr = compileExpression(*setUnionExpr);
-
-    value::TagValueOwned unionResult = value::TagValueOwned::fromRaw(value::makeNewArraySet());
-    runAndAssertExpression(compiledExpr.get(), {unionResult.tag(), unionResult.value()});
+TEST_F(SBEBuiltinSetOpTest, ArrayResultZeroOperands) {
+    for (auto fn : kArrayResultSetFns) {
+        runAndAssertExpression(*makeFunction(fn, noCollator()), BSONArray());
+    }
 }
 
-TEST_F(SBEBuiltinSetOpTest, SetUnionArrayAcceptsPreparedSetsAndBsonArrays) {
-    auto bson = BSON_ARRAY(3 << 4 << 1.0);
-    auto setUnionExpr =
-        makeFunction(EFn::kSetUnionArray,
-                     makeC(value::TypeTags::Nothing, 0),
-                     makeC(makeArraySet(BSON_ARRAY(1 << 2))),
-                     makeC(value::copyValue(value::TypeTags::bsonArray,
-                                            value::bitcastFrom<const char*>(bson.objdata()))));
-    auto compiledExpr = compileExpression(*setUnionExpr);
-
-    value::TagValueOwned unionResult =
-        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 2 << 3 << 4)));
-    runAndAssertExpression(compiledExpr.get(), {unionResult.tag(), unionResult.value()});
+TEST_F(SBEBuiltinSetOpTest, ArrayResultAcceptsPreparedSetsAndBsonArrays) {
+    auto bson = BSON_ARRAY(3.0 << 2 << 4);
+    for (const auto& [fn, expected] : {std::pair{EFn::kSetUnionArray, BSON_ARRAY(1 << 2 << 3 << 4)},
+                                       std::pair{EFn::kSetIntersectionArray, BSON_ARRAY(2 << 3)}}) {
+        auto expr =
+            makeFunction(fn,
+                         noCollator(),
+                         makeC(makeArraySet(BSON_ARRAY(1 << 2 << 3))),
+                         makeC(value::copyValue(value::TypeTags::bsonArray,
+                                                value::bitcastFrom<const char*>(bson.objdata()))));
+        runAndAssertExpression(*expr, expected);
+    }
 }
 
-TEST_F(SBEBuiltinSetOpTest, SetUnionArrayCollationKeepsFirstRepresentative) {
+TEST_F(SBEBuiltinSetOpTest, ArrayResultCollationKeepsFirstRepresentative) {
     CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
-    auto setUnionExpr =
-        makeFunction(EFn::kSetUnionArray,
-                     makeC(value::TypeTags::collator,
-                           value::bitcastFrom<CollatorInterface*>(collator.clone().release())),
-                     makeC(makeArray(BSON_ARRAY("B" << "a" << "A"))),
-                     makeC(makeArray(BSON_ARRAY("b" << "C"))));
-    auto compiledExpr = compileExpression(*setUnionExpr);
+    for (const auto& [fn, expected] :
+         {std::pair{EFn::kSetUnionArray, BSON_ARRAY("B" << "a" << "d" << "C")},
+          std::pair{EFn::kSetIntersectionArray, BSON_ARRAY("B" << "a")}}) {
+        auto expr =
+            makeFunction(fn,
+                         makeC(value::TypeTags::collator,
+                               value::bitcastFrom<CollatorInterface*>(collator.clone().release())),
+                         arrayC(BSON_ARRAY("B" << "a" << "A" << "d")),
+                         arrayC(BSON_ARRAY("b" << "C" << "A")));
+        runAndAssertExpression(*expr, expected);
+    }
+}
 
-    value::TagValueOwned unionResult =
-        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY("B" << "a" << "C")));
-    runAndAssertExpression(compiledExpr.get(), {unionResult.tag(), unionResult.value()});
+TEST_F(SBEBuiltinSetOpTest, ArrayResultTransfersOwnedValuesAndCopiesViews) {
+    // Both operations return the first operand when the second operand is equal to it.
+    const auto input = BSON_ARRAY("an allocating string" << BSON("x" << 1) << BSON_ARRAY(1 << 2));
+    for (auto fn : kArrayResultSetFns) {
+        for (bool owned : {false, true}) {
+            value::OwnedValueAccessor slotAccessor;
+            std::unique_ptr<EExpression> arg = makeVariable(bindAccessor(&slotAccessor));
+            if (owned) {
+                arg = makeFunction(EFn::kMakeOwn, std::move(arg));
+            }
+            auto expr = makeFunction(fn, noCollator(), std::move(arg), arrayC(input));
+            auto compiledExpr = compileExpression(*expr);
+
+            auto [arrTag, arrVal] = makeArray(input);
+            slotAccessor.reset(arrTag, arrVal);
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+            if (!owned) {
+                for (size_t i = 0; i < 3; ++i) {
+                    ASSERT_NE(value::getArrayView(result.value())->getAt(i).value,
+                              value::getArrayView(arrVal)->getAt(i).value);
+                }
+            }
+
+            // The result must stay valid after the input is released.
+            slotAccessor.reset();
+            value::TagValueOwned expected = value::TagValueOwned::fromRaw(makeArray(input));
+            ASSERT_SBE_VALUE_EQ(result.view(), expected.view());
+        }
+    }
 }
 
 TEST_F(SBEBuiltinSetOpTest, SetUnionArrayDuplicatePayloadsOnlyCountOnce) {
     auto str = std::string(1024, 'x');
-    auto setUnionExpr = makeFunction(EFn::kSetUnionArray,
-                                     makeC(value::TypeTags::Nothing, 0),
-                                     makeC(makeArray(BSON_ARRAY(str << str << str))));
-    auto compiledExpr = compileExpression(*setUnionExpr);
-
     unittest::ServerParameterGuard limit{"internalQueryMaxSingleExpressionMemoryUsageBytes", 2048};
-    value::TagValueOwned unionResult = value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(str)));
-    runAndAssertExpression(compiledExpr.get(), {unionResult.tag(), unionResult.value()});
+    runAndAssertExpression(
+        *makeFunction(EFn::kSetUnionArray, noCollator(), arrayC(BSON_ARRAY(str << str << str))),
+        BSON_ARRAY(str));
 }
 
-TEST_F(SBEBuiltinSetOpTest, SetUnionArrayTransfersOwnedValuesAndCopiesViews) {
-    const auto input = BSON_ARRAY("an allocating string" << BSON("x" << 1) << BSON_ARRAY(1 << 2));
-    for (bool owned : {false, true}) {
-        value::OwnedValueAccessor slotAccessor;
-        std::unique_ptr<EExpression> arg = makeVariable(bindAccessor(&slotAccessor));
-        if (owned) {
-            arg = makeFunction(EFn::kMakeOwn, std::move(arg));
-        }
-        auto setUnionExpr =
-            makeFunction(EFn::kSetUnionArray, makeC(value::TypeTags::Nothing, 0), std::move(arg));
-        auto compiledExpr = compileExpression(*setUnionExpr);
+TEST_F(SBEBuiltinSetOpTest, SetIntersectionArrayManyOperands) {
+    auto intersect = [&](const BSONArray& first, const BSONArray& second, const BSONArray& third) {
+        return makeFunction(
+            EFn::kSetIntersectionArray, noCollator(), arrayC(first), arrayC(second), arrayC(third));
+    };
 
-        auto [arrTag, arrVal] = makeArray(input);
-        slotAccessor.reset(arrTag, arrVal);
-        value::TagValueOwned result =
-            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
-        if (!owned) {
-            for (size_t i = 0; i < 3; ++i) {
-                ASSERT_NE(value::getArrayView(result.value())->getAt(i).value,
-                          value::getArrayView(arrVal)->getAt(i).value);
-            }
-        }
+    runAndAssertExpression(*intersect(BSON_ARRAY(1 << 2 << 2 << 3 << 4),
+                                      BSON_ARRAY(3 << 2 << 3 << 5),
+                                      BSON_ARRAY(9 << 3 << 2)),
+                           BSON_ARRAY(2 << 3));
+    // A duplicate in one operand doesn't count as a match in another operand.
+    runAndAssertExpression(*intersect(BSON_ARRAY(1 << 2), BSON_ARRAY(1 << 1 << 2), BSON_ARRAY(2)),
+                           BSON_ARRAY(2));
+    runAndAssertExpression(*intersect(BSON_ARRAY(1 << 2), BSON_ARRAY(3), BSON_ARRAY(1 << 2)),
+                           BSONArray());
+}
 
-        // The result must stay valid after the input is released.
-        slotAccessor.reset();
-        value::TagValueOwned expected = value::TagValueOwned::fromRaw(makeArray(input));
-        ASSERT_SBE_VALUE_EQ(result.view(), expected.view());
-    }
+TEST_F(SBEBuiltinSetOpTest, SetIntersectionArrayReturnsNothingAfterEmptyIntersection) {
+    runAndAssertNothing(
+        *makeFunction(EFn::kSetIntersectionArray,
+                      noCollator(),
+                      arrayC(BSON_ARRAY(1)),
+                      arrayC(BSON_ARRAY(2)),
+                      makeC(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(5))));
 }
 
 class SBEBuiltinSetOpDeathTest : public SBEBuiltinSetOpTest {};
 
 DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetUnionArrayInvalidCollator, "13889300") {
-    auto setUnionExpr = makeFunction(
-        EFn::kSetUnionArray, makeC(value::TypeTags::Null, 0), makeC(value::makeNewArray()));
-    runExpression(*setUnionExpr);
+    runExpression(
+        *makeFunction(EFn::kSetUnionArray, makeC(value::TypeTags::Null, 0), arrayC(BSONArray())));
+}
+
+DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetIntersectionArrayInvalidCollator, "13889300") {
+    runExpression(*makeFunction(
+        EFn::kSetIntersectionArray, makeC(value::TypeTags::Null, 0), arrayC(BSONArray())));
 }
 }  // namespace mongo::sbe

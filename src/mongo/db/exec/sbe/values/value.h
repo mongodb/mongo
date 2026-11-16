@@ -542,6 +542,7 @@ public:
     static TagValueOwned numberDouble(double v) noexcept;
     static TagValueOwned date(int64_t v) noexcept;
     static TagValueOwned timestamp(uint64_t v) noexcept;
+    static TagValueOwned array();
 
     TagValueOwned() = delete;
 
@@ -1485,8 +1486,9 @@ public:
     }
 
     /**
-     * Transfers all elements into RAII holders without copying payloads, leaving an empty array.
-     * The caller must have exclusive access to this array.
+     * Transfers all elements into RAII holders without copying payloads, leaving an empty array
+     * that no longer holds its original buffer. The caller must have exclusive access to this
+     * array.
      */
     std::vector<TagValueOwned> takeValues() {
         std::vector<TagValueOwned> result;
@@ -1495,7 +1497,8 @@ public:
         for (auto value : _vals) {
             result.push_back(TagValueOwned::fromRaw(value));
         }
-        _vals.clear();
+        // This guarantees the underlying buffer is cleared.
+        decltype(_vals)().swap(_vals);
         return result;
     }
 
@@ -2075,6 +2078,10 @@ inline std::pair<TypeTags, Value> makeNewBsonSymbol(std::string_view input) {
 inline std::pair<TypeTags, Value> makeNewArray() {
     auto a = new Array;
     return {TypeTags::Array, reinterpret_cast<Value>(a)};
+}
+
+inline TagValueOwned TagValueOwned::array() {
+    return fromRaw(makeNewArray());
 }
 
 inline std::pair<TypeTags, Value> makeNewArraySet(const CollatorInterface* collator = nullptr) {
