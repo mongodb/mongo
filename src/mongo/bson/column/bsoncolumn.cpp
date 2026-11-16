@@ -762,42 +762,6 @@ size_t BSONColumn::size() const {
     return std::distance(begin(), end());
 }
 
-bool BSONColumn::contains_forTest(BSONType elementType) const {
-    const char* byteIter = _binary.data();
-    const char* columnEnd = _binary.data() + _binary.size();
-
-    uint8_t control;
-    while (byteIter != columnEnd) {
-        control = static_cast<uint8_t>(*byteIter);
-        if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
-            if (control == stdx::to_underlying(elementType)) {
-                return true;
-            } else if (control == stdx::to_underlying(BSONType::eoo)) {
-                // reached end of column
-                return false;
-            }
-
-            BSONElement literalElem(
-                std::span{byteIter, columnEnd}, 1, BSONElement::TrustedInitTag{});
-            byteIter += literalElem.size();
-        } else if (bsoncolumn::isInterleavedStartControlByte(*byteIter)) {
-            uasserted(ErrorCodes::InvalidBSONColumn,
-                      "Interleaved mode not yet supported for BSONColumn::contains_forTest.");
-        } else { /* Simple-8b Delta Block */
-            uint8_t numBlocks = bsoncolumn::numSimple8bBlocksForControlByte(control);
-            int simple8bBlockSize = sizeof(uint64_t) * numBlocks;
-            uassert(ErrorCodes::InvalidBSONColumn,
-                    "Simple8b block would overflow buffer",
-                    byteIter + simple8bBlockSize < columnEnd);
-
-            // skip simple8b control blocks
-            byteIter += simple8bBlockSize;
-        }
-    }
-
-    return false;
-}
-
 boost::intrusive_ptr<BSONElementStorage> BSONColumn::release() {
     auto previous = _allocator;
     _allocator = new BSONElementStorage();

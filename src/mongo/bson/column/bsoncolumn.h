@@ -298,11 +298,6 @@ public:
      */
     size_t size() const;
 
-    // Scans the compressed BSON Column format to efficiently determine if the
-    // column contains an element of type `elementType`.
-    // Because it is marked const, it always iterates over the entire column.
-    bool contains_forTest(BSONType elementType) const;
-
     /**
      * Releases memory that has been used to materialize BSONElements for this BSONColumn.
      *
