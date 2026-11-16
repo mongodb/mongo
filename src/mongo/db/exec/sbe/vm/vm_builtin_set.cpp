@@ -31,6 +31,38 @@ void insertUnionElement(value::Array& result,
     result.push_back(getOwned());
 }
 
+value::ValueSetType valueToShallowSetHelper(value::TypeTags tag,
+                                            value::Value value,
+                                            const CollatorInterface* collator);
+
+// Returns the distinct values of 'lhs' that are not in 'rhsValues', in 'lhs' order.
+value::TagValueOwned arrayDifference(value::TagValueMaybeOwned& lhs,
+                                     const value::ValueSetType& rhsValues,
+                                     const CollatorInterface* collator) {
+    auto result = value::TagValueOwned::array();
+    auto array = value::getArrayView(result.value());
+    // 'added' holds views of the values already in the result. Moving an owned value into the
+    // result doesn't move its payload, so these views stay valid.
+    value::ValueSetType added(0, value::ValueHash(collator), value::ValueEq(collator));
+    auto insert = [&](value::TagValueView element, auto&& getOwned) {
+        if (!rhsValues.contains(element) && added.insert(element).second) {
+            array->push_back(getOwned());
+        }
+    };
+    if (lhs.owned() && lhs.tag() == value::TypeTags::Array) {
+        auto ownedElements = value::getArrayView(lhs.value())->takeValues();
+        for (auto& element : ownedElements) {
+            insert(element.view(), [&] { return std::move(element); });
+        }
+    } else {
+        value::arrayForEach(lhs.tag(), lhs.value(), [&](auto tag, auto val) {
+            value::TagValueView element{tag, val};
+            insert(element, [&] { return element.copy(); });
+        });
+    }
+    return result;
+}
+
 // Returns the collator argument of an array-result set builtin, which may be Nothing.
 const CollatorInterface* getSetCollator(value::TagValueView coll) {
     tassert(13889300,
@@ -162,7 +194,25 @@ value::TagValueMaybeOwned ByteCode::builtinSetIntersectionArray(ArityType arity)
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSetDifferenceArray(ArityType arity) {
-    MONGO_UNREACHABLE_TASSERT(13890502);
+    // Compiling setDifferenceArray already checks that it has three arguments: the collator and
+    // the two arrays.
+    tassert(13889301, "Unexpected arity value", arity == 3);
+    const CollatorInterface* collator = getSetCollator(viewFromStack(0));
+    auto maybeInputs = moveSetOperands(arity);
+    if (!maybeInputs) {
+        return value::TagValueMaybeOwned::nothing();
+    }
+    auto& lhs = (*maybeInputs)[0];
+    auto& rhs = (*maybeInputs)[1];
+
+    // Reuse the hash table of a prepared ArraySet if it uses the same collator. Otherwise, build
+    // a temporary table of views into the right-hand side.
+    if (rhs.tag() == value::TypeTags::ArraySet &&
+        value::getArraySetView(rhs.value())->getCollator() == collator) {
+        return arrayDifference(lhs, value::getArraySetView(rhs.value())->values(), collator);
+    }
+    return arrayDifference(
+        lhs, valueToShallowSetHelper(rhs.tag(), rhs.value(), collator), collator);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSetEqualsArray(ArityType arity) {

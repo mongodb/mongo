@@ -24,7 +24,11 @@
 namespace mongo::sbe {
 
 // The array-result set builtins covered by the shared tests below.
-constexpr std::array kArrayResultSetFns{EFn::kSetUnionArray, EFn::kSetIntersectionArray};
+constexpr std::array kArrayResultSetFns{
+    EFn::kSetUnionArray, EFn::kSetIntersectionArray, EFn::kSetDifferenceArray};
+
+// The array-result set builtins that accept any number of operands.
+constexpr std::array kVariadicArrayResultSetFns{EFn::kSetUnionArray, EFn::kSetIntersectionArray};
 
 class SBEBuiltinSetOpTest : public EExpressionTestFixture {
 protected:
@@ -97,6 +101,12 @@ protected:
                                                   std::unique_ptr<EExpression> rhs) {
         return makeSetOp(
             EFn::kSetIntersection, EFn::kSetIntersectionArray, std::move(lhs), std::move(rhs));
+    }
+
+    std::unique_ptr<EExpression> makeDifference(std::unique_ptr<EExpression> lhs,
+                                                std::unique_ptr<EExpression> rhs) {
+        return makeSetOp(
+            EFn::kSetDifference, EFn::kSetDifferenceArray, std::move(lhs), std::move(rhs));
     }
 
 private:
@@ -219,13 +229,12 @@ TEST_P(SBEBuiltinArrayResultTest, ReturnsNothingSetIntersection) {
     runAndAssertNothing(compiledExpr.get());
 }
 
-TEST_F(SBEBuiltinSetOpTest, ComputesSetDifference) {
+TEST_P(SBEBuiltinArrayResultTest, ComputesSetDifference) {
     value::OwnedValueAccessor slotAccessor1;
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setDiffExpr =
-        makeFunction(EFn::kSetDifference, makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setDiffExpr = makeDifference(makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setDiffExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -251,18 +260,22 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetDifference) {
     runAndAssertExpression(compiledExpr.get(), {diffResult1.tag(), diffResult1.value()});
 }
 
-TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetDifference) {
+TEST_P(SBEBuiltinArrayResultTest, ReturnsNothingSetDifference) {
     value::OwnedValueAccessor slotAccessor1;
     value::OwnedValueAccessor slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setDiffExpr =
-        makeFunction(EFn::kSetDifference, makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setDiffExpr = makeDifference(makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setDiffExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
     slotAccessor1.reset(arrTag1, arrVal1);
     slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(125));
+    runAndAssertNothing(compiledExpr.get());
+
+    slotAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(125));
+    auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(1 << 2));
+    slotAccessor2.reset(arrTag2, arrVal2);
     runAndAssertNothing(compiledExpr.get());
 }
 
@@ -429,7 +442,7 @@ TEST_P(SBEBuiltinArrayResultTest, SetUnionExceedsMemoryLimit) {
 }
 
 TEST_F(SBEBuiltinSetOpTest, ArrayResultZeroOperands) {
-    for (auto fn : kArrayResultSetFns) {
+    for (auto fn : kVariadicArrayResultSetFns) {
         runAndAssertExpression(*makeFunction(fn, noCollator()), BSONArray());
     }
 }
@@ -437,7 +450,8 @@ TEST_F(SBEBuiltinSetOpTest, ArrayResultZeroOperands) {
 TEST_F(SBEBuiltinSetOpTest, ArrayResultAcceptsPreparedSetsAndBsonArrays) {
     auto bson = BSON_ARRAY(3.0 << 2 << 4);
     for (const auto& [fn, expected] : {std::pair{EFn::kSetUnionArray, BSON_ARRAY(1 << 2 << 3 << 4)},
-                                       std::pair{EFn::kSetIntersectionArray, BSON_ARRAY(2 << 3)}}) {
+                                       std::pair{EFn::kSetIntersectionArray, BSON_ARRAY(2 << 3)},
+                                       std::pair{EFn::kSetDifferenceArray, BSON_ARRAY(1)}}) {
         auto expr =
             makeFunction(fn,
                          noCollator(),
@@ -452,28 +466,31 @@ TEST_F(SBEBuiltinSetOpTest, ArrayResultCollationKeepsFirstRepresentative) {
     CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
     for (const auto& [fn, expected] :
          {std::pair{EFn::kSetUnionArray, BSON_ARRAY("B" << "a" << "d" << "C")},
-          std::pair{EFn::kSetIntersectionArray, BSON_ARRAY("B" << "a")}}) {
+          std::pair{EFn::kSetIntersectionArray, BSON_ARRAY("B" << "a")},
+          std::pair{EFn::kSetDifferenceArray, BSON_ARRAY("d")}}) {
         auto expr =
             makeFunction(fn,
                          makeC(value::TypeTags::collator,
                                value::bitcastFrom<CollatorInterface*>(collator.clone().release())),
-                         arrayC(BSON_ARRAY("B" << "a" << "A" << "d")),
+                         arrayC(BSON_ARRAY("B" << "a" << "A" << "d" << "D")),
                          arrayC(BSON_ARRAY("b" << "C" << "A")));
         runAndAssertExpression(*expr, expected);
     }
 }
 
 TEST_F(SBEBuiltinSetOpTest, ArrayResultTransfersOwnedValuesAndCopiesViews) {
-    // Both operations return the first operand when the second operand is equal to it.
+    // Each operation returns the first operand: union and intersection when the second operand is
+    // equal to it, and difference when the second operand is empty.
     const auto input = BSON_ARRAY("an allocating string" << BSON("x" << 1) << BSON_ARRAY(1 << 2));
     for (auto fn : kArrayResultSetFns) {
+        auto second = fn == EFn::kSetDifferenceArray ? BSONArray() : input;
         for (bool owned : {false, true}) {
             value::OwnedValueAccessor slotAccessor;
             std::unique_ptr<EExpression> arg = makeVariable(bindAccessor(&slotAccessor));
             if (owned) {
                 arg = makeFunction(EFn::kMakeOwn, std::move(arg));
             }
-            auto expr = makeFunction(fn, noCollator(), std::move(arg), arrayC(input));
+            auto expr = makeFunction(fn, noCollator(), std::move(arg), arrayC(second));
             auto compiledExpr = compileExpression(*expr);
 
             auto [arrTag, arrVal] = makeArray(input);
@@ -529,6 +546,43 @@ TEST_F(SBEBuiltinSetOpTest, SetIntersectionArrayReturnsNothingAfterEmptyIntersec
                       makeC(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(5))));
 }
 
+TEST_F(SBEBuiltinSetOpTest, SetDifferenceArrayUsesPreparedRhsOnlyWithSameCollator) {
+    runAndAssertExpression(*makeFunction(EFn::kSetDifferenceArray,
+                                         noCollator(),
+                                         arrayC(BSON_ARRAY(1 << 2 << 3 << 4 << 1)),
+                                         makeC(makeArraySet(BSON_ARRAY(2 << 4)))),
+                           BSON_ARRAY(1 << 3));
+
+    CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
+    value::ViewOfValueAccessor collatorAccessor;
+    collatorAccessor.reset(value::TypeTags::collator,
+                           value::bitcastFrom<CollatorInterface*>(&collator));
+    auto collatorSlot = bindAccessor(&collatorAccessor);
+
+    // A prepared set with the same collator.
+    runAndAssertExpression(
+        *makeFunction(EFn::kSetDifferenceArray,
+                      makeVariable(collatorSlot),
+                      arrayC(BSON_ARRAY("A" << "b")),
+                      makeC(makeArraySetWithCollator(BSON_ARRAY("a"), &collator))),
+        BSON_ARRAY("b"));
+
+    // A prepared set without a collator must not be used to look up collated values.
+    runAndAssertExpression(*makeFunction(EFn::kSetDifferenceArray,
+                                         makeVariable(collatorSlot),
+                                         arrayC(BSON_ARRAY("A" << "b")),
+                                         makeC(makeArraySet(BSON_ARRAY("a")))),
+                           BSON_ARRAY("b"));
+
+    // A prepared set with a collator must not be used to look up values without one.
+    runAndAssertExpression(
+        *makeFunction(EFn::kSetDifferenceArray,
+                      noCollator(),
+                      arrayC(BSON_ARRAY("A" << "b")),
+                      makeC(makeArraySetWithCollator(BSON_ARRAY("a"), &collator))),
+        BSON_ARRAY("A" << "b"));
+}
+
 class SBEBuiltinSetOpDeathTest : public SBEBuiltinSetOpTest {};
 
 DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetUnionArrayInvalidCollator, "13889300") {
@@ -539,5 +593,12 @@ DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetUnionArrayInvalidCollator, "1388
 DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetIntersectionArrayInvalidCollator, "13889300") {
     runExpression(*makeFunction(
         EFn::kSetIntersectionArray, makeC(value::TypeTags::Null, 0), arrayC(BSONArray())));
+}
+
+DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetDifferenceArrayInvalidCollator, "13889300") {
+    runExpression(*makeFunction(EFn::kSetDifferenceArray,
+                                makeC(value::TypeTags::Null, 0),
+                                arrayC(BSONArray()),
+                                arrayC(BSONArray())));
 }
 }  // namespace mongo::sbe
