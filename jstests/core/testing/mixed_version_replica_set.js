@@ -32,12 +32,30 @@ if (testingReplication && TestData && TestData.mixedBinVersions) {
         if (!nodeAtLatestVersion && TestData.multiversionBinVersion === "last-patch") {
             // For last-patch we can't compute the exact version: the master branch isn't updated
             // when a patch release is cut. So we only assert the node is not running the latest
-            // *build*: areBinVersionsTheSame() would conflate a last-patch binary built from a
-            // release candidate (e.g. the DSC release 9.1.0-rc1021) with mainline latest (9.1.0).
-            assert(
-                !MongoRunner.isSameBuild(actualVersion, latestBinVersion),
-                "last-patch node unexpectedly at latest version",
-                {actualVersion, latestBinVersion},
+            // *build*. A DSC release and mainline can report the same version (e.g. 9.1.0), so
+            // compare Git revisions instead. For all-old replica sets, use the latest shell's
+            // build information as the reference.
+            const latestNodeIndex = TestData.mixedBinVersions.indexOf("new");
+            const latestBuildInfo =
+                latestNodeIndex === -1
+                    ? buildInfo()
+                    : assert.commandWorked(
+                          new Mongo(members[latestNodeIndex]["name"]).adminCommand({buildInfo: 1}),
+                      );
+            assert(latestBuildInfo.gitVersion, "Latest build has no Git revision", {
+                latestBuildInfo,
+            });
+            const actualBuildInfo = assert.commandWorked(admin.runCommand({buildInfo: 1}));
+            assert.neq(
+                latestBuildInfo.gitVersion,
+                actualBuildInfo.gitVersion,
+                "last-patch node unexpectedly running the latest Git revision",
+                {
+                    actualVersion,
+                    latestBinVersion,
+                    actualGitVersion: actualBuildInfo.gitVersion,
+                    latestGitVersion: latestBuildInfo.gitVersion,
+                },
             );
         } else {
             const expectedVersion = nodeAtLatestVersion
