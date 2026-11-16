@@ -51,10 +51,13 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
                                                  const LiteParserOptions& options) {
-            return std::make_unique<LiteParsed>(spec);
+            return std::make_unique<LiteParsed>(spec, nss.tenantId());
         }
 
-        LiteParsed(const BSONElement& spec) : LiteParsedDocumentSourceDefault(spec) {}
+        LiteParsed(const BSONElement& spec, const boost::optional<TenantId>& tenantId)
+            : LiteParsedDocumentSourceDefault(spec),
+              _privileges({Privilege(ResourcePattern::forClusterResource(tenantId),
+                                     ActionType::querySettings)}) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
@@ -62,7 +65,7 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            return {};
+            return _privileges;
         }
 
         bool isInitialSource() const final {
@@ -72,6 +75,9 @@ public:
         std::unique_ptr<StageParams> getStageParams() const final {
             return std::make_unique<InternalListQuerySettingsStageParams>(_originalBson);
         }
+
+    private:
+        const PrivilegeVector _privileges;
     };
 
     static StageConstraints constraints() {
