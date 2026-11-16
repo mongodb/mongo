@@ -5,11 +5,11 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/multi_key_path_tracker.h"
-#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/clang_checked/checked_mutex.h"
+#include "mongo/db/repl/clang_checked/mutex.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/serial_processor.h"
 #include "mongo/platform/atomic.h"
-#include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
@@ -24,15 +24,21 @@
 namespace mongo::repl {
 
 /**
- * A fixed set of persistent worker threads, each consuming its own queue of work items. Work
+ * A set of persistent worker threads, each consuming its own queue of work items. Work
  * items enqueued to the same worker index are consumed serially, in FIFO order, by a single
  * thread; distinct workers consume independently. Each worker is backed by a single-threaded
  * SerialProcessor. _startWorkers gives every worker thread an internally authorized Client that
- * stepdown cannot kill.
+ * stepdown cannot kill. The set can be resized with resizeWorkers(); every time the dispatcher
+ * recieves a batch, it resizes the set to the current `replWriterThreadCount`.
  *
  * The worker threads start at construction and run until shutdownAndJoin(), which consumes every
  * previously enqueued work item before joining the threads. Once a shutdown has been attempted,
  * new work is rejected.
+ *
+ * Note: The pool has no internal synchronization mechanisms. The public methods here *must* be
+ * called exclusively from the dispatch thread to avoid data races. (The `_metricsCollector` only
+ * reads from the `_workers` deque, and its lifetime is directly managed by the pool itself so that
+ * it never holds pointers to freed memory.)
  */
 class [[MONGO_MOD_PUBLIC]] PipelinedApplierWorkerPool {
 public:
@@ -76,8 +82,17 @@ public:
     void shutdownAndJoin();
 
     size_t numWorkers() const {
+        clang_checked::lock_guard lk{_mutex};
         return _numWorkers;
     }
+
+    /**
+     * Drains every worker, then replaces the worker set with `newSize` fresh workers. Callers must
+     * prevent concurrent enqueueing. The queue-depth collector is stopped while the workers are
+     * replaced and restarted afterward. The new workers start with zeroed counters.
+     * Returns the previous number of workers.
+     */
+    size_t resizeWorkers(size_t newSize);
 
     /**
      * Appends one subdocument per worker with its aggregate scheduled and executed work item
@@ -99,8 +114,9 @@ private:
     [[nodiscard]] static PeriodicJobAnchor _makeMetricsCollector(const std::deque<Worker>& workers);
 
     Atomic<bool> _isShutdown{false};
-    const size_t _numWorkers;
-    // The set of workers is fixed for the object's lifetime.
+    mutable clang_checked::CheckedMutex<std::mutex> _mutex;
+    size_t _numWorkers MONGO_LOCKING_GUARDED_BY(_mutex);
+    ConsumeFn _consumeFn;
     std::deque<Worker> _workers;
     PeriodicJobAnchor _metricsCollector;
 };

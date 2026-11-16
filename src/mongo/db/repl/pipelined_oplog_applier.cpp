@@ -15,6 +15,7 @@
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/pipelined_applier_otel_metrics.h"
+#include "mongo/db/repl/repl_worker_pool_thread_count.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -288,6 +289,7 @@ void PipelinedOplogApplier::_dispatchBatch(OperationContext* opCtx, std::vector<
 void PipelinedOplogApplier::_dispatchBatchToWorkers(OperationContext* opCtx,
                                                     std::vector<OplogEntry> ops) {
     using WorkItem = PipelinedApplierWorkerPool::WorkItem;
+    _workerPool.resizeWorkers(getThreadCountForReplWorkerPool());
     const size_t numWorkers = _workerPool.numWorkers();
     invariant(!ops.empty());
 

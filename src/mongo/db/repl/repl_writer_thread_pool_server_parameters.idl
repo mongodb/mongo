@@ -17,7 +17,7 @@ server_parameters:
     replWriterThreadCount:
         description: The number of threads in the thread pool used to apply the oplog
         set_at: [startup, runtime]
-        cpp_vartype: int
+        cpp_vartype: Atomic<int>
         cpp_varname: replWriterThreadCount
         on_update: onUpdateReplWriterThreadCount
         default: 16

@@ -1230,6 +1230,8 @@ protected:
     void setUp() override {
         OplogApplierImplTest::setUp();
         PipelinedApplyOtelMetrics::initialize();
+        // Keep the writer thread count equal to kNumWorkers so per-batch resizing is a no-op.
+        setServerParameter("replWriterThreadCount", static_cast<int>(kNumWorkers));
         // Synthetic optimes bypass the oplog writer, so allDurable can move backwards during apply.
         // Disable the mock's automatic committed-snapshot updates while still recording
         // lastApplied.
@@ -2032,6 +2034,54 @@ TEST_F(PipelinedOplogApplierRunTest,
     assertPublished(freeOp);
     assertCollectionContainsExactly(kNss, {BSON("_id" << heldId), BSON("_id" << freeId)});
     finishApplier();
+}
+
+// A resize must drain in-flight work before the next batch is dispatched. The insert is held on
+// worker 3 of the 4-worker pool; the next insert runs after the resize to 3 workers and must not
+// run until the held insert has finished.
+TEST_F(PipelinedOplogApplierRunTest, ResizeDrainsInFlightWorkBeforeDispatchingNextBatch) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    setServerParameter("replBatchLimitOperations", 1);
+    constexpr size_t kNewNumWorkers = 3;
+    ASSERT_EQ(kNumWorkers, 4);
+
+    const int heldId = idRoutedTo(kNumWorkers - 1);
+    const int nextId = heldId + 1;
+    auto& gate = watchWriteOf(heldId, /*hold=*/true);
+    pushToBuffer({insertOp(kNss, BSON("_id" << heldId))});
+    startApplier();
+    waitForGate(gate);
+
+    const auto getInserts = [&]() {
+        const auto writes = writesTo(kNss);
+        std::vector<ObservedWrite> out;
+        std::copy_if(writes.begin(), writes.end(), std::back_inserter(out), [&](const auto& write) {
+            return write.kind == WriteKind::kInsert;
+        });
+        return out;
+    };
+    // The held insert was written by worker 3 of the 4-worker pool.
+    const auto heldInserts = getInserts();
+    ASSERT_EQ(heldInserts.size(), 1);
+    ASSERT_EQ(heldInserts[0].workerIdx, kNumWorkers - 1);
+
+    // The next batch dispatch resizes the pool, which must wait for the held insert.
+    setServerParameter("replWriterThreadCount", static_cast<int>(kNewNumWorkers));
+    pushToBuffer({insertOp(kNss, BSON("_id" << nextId))});
+
+    // Without the drain, the next insert would be written by its new worker right away.
+    sleepFor(Milliseconds(500));
+    ASSERT_EQ(getInserts().size(), 1);
+
+    gate.release.set();
+    finishApplier();
+
+    // The next insert ran once, on a worker of the 3-worker pool, after the held insert finished.
+    const auto inserts = getInserts();
+    ASSERT_EQ(inserts.size(), 2);
+    ASSERT_EQ(inserts[0].workerIdx, kNumWorkers - 1);
+    ASSERT_LT(inserts[1].workerIdx, kNewNumWorkers);
+    assertCollectionContainsExactly(kNss, {BSON("_id" << heldId), BSON("_id" << nextId)});
 }
 
 // A pre-images ranged truncate may not be applied while a batch whose entries write inside its

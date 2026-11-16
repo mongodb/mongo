@@ -342,6 +342,79 @@ TEST_F(PipelinedApplierWorkerPoolTest, WaitForIdleWaitsForEveryWorkerAndKeepsPoo
     }
 }
 
+TEST_F(PipelinedApplierWorkerPoolTest, ResizeWorkersGrowsAndShrinksPoolAndReturnsDelta) {
+    auto pool = makePool(/*numWorkers=*/2);
+    std::vector<std::vector<Timestamp>> enqueued(4);
+    enqueued[0].push_back(enqueueItem(*pool, 0));
+    ASSERT_EQ(pool->resizeWorkers(4), 2);
+    ASSERT_EQ(pool->numWorkers(), 4);
+
+    for (size_t w = 0; w < 4; ++w) {
+        enqueued[w].push_back(enqueueItem(*pool, w));
+    }
+    ASSERT_EQ(pool->resizeWorkers(2), 4);
+    ASSERT_EQ(pool->numWorkers(), 2);
+
+    enqueued[0].push_back(enqueueItem(*pool, 0));
+    enqueued[1].push_back(enqueueItem(*pool, 1));
+    pool->shutdownAndJoin();
+
+    for (size_t w = 0; w < 4; ++w) {
+        assertConsumedInOrder(w, enqueued[w]);
+    }
+    ASSERT_EQ(consumedCount(), 7);
+
+    BSONObjBuilder bob;
+    pool->report(bob);
+    auto report = bob.obj();
+    ASSERT_TRUE(report.hasField("worker0"));
+    ASSERT_TRUE(report.hasField("worker1"));
+    ASSERT_FALSE(report.hasField("worker2"));
+}
+
+TEST_F(PipelinedApplierWorkerPoolTest, ResizeWorkersToCurrentSizeIsNoOp) {
+    auto pool = makePool(/*numWorkers=*/3);
+    enqueueItem(*pool, 0);
+    pool->waitForIdle();
+
+    ASSERT_EQ(pool->resizeWorkers(3), 3);
+    ASSERT_EQ(pool->numWorkers(), 3);
+
+    // The workers were not restarted, so their counters from before the call are preserved.
+    BSONObjBuilder bob;
+    pool->report(bob);
+    auto report = bob.obj();
+    ASSERT_EQ(report["worker0"]["scheduled"].numberLong(), 1);
+    ASSERT_EQ(report["worker0"]["executed"].numberLong(), 1);
+    pool->shutdownAndJoin();
+}
+
+TEST_F(PipelinedApplierWorkerPoolTest, ResizeWorkersWaitsForBusyWorkersToDrain) {
+    auto opCtx = makeOperationContext();
+    auto pool = makePool(/*numWorkers=*/3);
+    Notification<void> entered;
+    Notification<void> returned;
+    unittest::JoinThread resizer;
+    {
+        ScopedBlockedWorkers _{this};
+        enqueueItem(*pool, 0);
+        enqueueItem(*pool, 1);
+
+        resizer = unittest::JoinThread{[&] {
+            entered.set();
+            pool->resizeWorkers(2);
+            returned.set();
+        }};
+
+        ASSERT_TRUE(entered.waitFor(opCtx.get(), Seconds(10)));
+        ASSERT_FALSE(returned.waitFor(opCtx.get(), Milliseconds(500)));
+        ASSERT_TRUE(resizer.joinable());
+    }
+
+    returned.get();
+    ASSERT_EQ(pool->numWorkers(), 2);
+}
+
 TEST_F(PipelinedApplierWorkerPoolTest, EnqueueAfterShutdownThrows) {
     auto pool = makePool(/*numWorkers=*/2);
     enqueueItem(*pool, 0);

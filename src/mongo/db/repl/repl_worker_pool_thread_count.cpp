@@ -24,7 +24,7 @@ size_t getMinThreadCountForReplWorkerPool() {
 }
 
 size_t getThreadCountForReplWorkerPool() {
-    return std::min(static_cast<size_t>(replWriterThreadCount),
+    return std::min(static_cast<size_t>(replWriterThreadCount.load()),
                     static_cast<size_t>(4 * ProcessInfo::getNumAvailableCores()));
 }
 

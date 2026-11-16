@@ -37,7 +37,7 @@ protected:
 
     void setMaxThreadCount(int newValue) {
         ASSERT_OK(validateUpdateReplWriterThreadCount(newValue));
-        replWriterThreadCount = newValue;
+        replWriterThreadCount.store(newValue);
         ASSERT_OK(onUpdateReplWriterThreadCount(newValue));
         ASSERT_EQ(std::min(newValue, _threadCountCap), getThreadCountForReplWorkerPool());
     }
@@ -101,7 +101,7 @@ TEST_F(ReplWorkerPoolThreadCountParamsTest, SetConcurrentSuccess) {
         ASSERT_EQ(newMinValue, getMinThreadCountForReplWorkerPool());
 
         // Finish setting the max
-        replWriterThreadCount = newMaxValue;
+        replWriterThreadCount.store(newMaxValue);
         // This will release the lock
         ASSERT_OK(onUpdateReplWriterThreadCount(newMaxValue));
         ASSERT_EQ(newMaxValue, getThreadCountForReplWorkerPool());
@@ -136,7 +136,7 @@ TEST_F(ReplWorkerPoolThreadCountParamsTest, SetConcurrentFailure) {
     });
 
     // Finish setting the max
-    replWriterThreadCount = newMaxValue;
+    replWriterThreadCount.store(newMaxValue);
     // This will release the lock
     ASSERT_OK(onUpdateReplWriterThreadCount(newMaxValue));
     ASSERT_EQ(newMaxValue, getThreadCountForReplWorkerPool());

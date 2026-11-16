@@ -177,7 +177,7 @@ public:
             std::make_unique<MongoDSessionCatalog>(
                 std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
-        repl::replWriterThreadCount = numThreads;  // Repl worker thread count
+        repl::replWriterThreadCount.store(numThreads);  // Repl worker thread count
         repl::replWriterMinThreadCount = numThreads;
 
         _oplogWriterPool = repl::makeReplWorkerPool();

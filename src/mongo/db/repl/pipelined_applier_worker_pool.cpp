@@ -7,8 +7,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/repl/clang_checked/mutex.h"
 #include "mongo/db/repl/pipelined_applier_otel_metrics.h"
-#include "mongo/db/repl/pipelined_oplog_applier.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -59,7 +59,8 @@ PeriodicJobAnchor PipelinedApplierWorkerPool::_makeMetricsCollector(
         "PipelinedApplierWorkerPool queue depth metrics",
         // Capturing `workers` by reference is safe because `_metricsCollector` is declared after
         // `_workers` in the class, so the periodic job will be created after and destroyed before
-        // the deque.
+        // the deque. resizeWorkers() also stops the job before replacing `_workers`, so the
+        // reference never outlives the deque it was created from.
         [&workers](auto*) {
             if (workers.empty()) {
                 return;
@@ -88,7 +89,8 @@ PeriodicJobAnchor PipelinedApplierWorkerPool::_makeMetricsCollector(
 
 PipelinedApplierWorkerPool::PipelinedApplierWorkerPool(size_t numWorkers, ConsumeFn consumeFn)
     : _numWorkers(numWorkers),
-      _workers(_startWorkers(numWorkers, std::move(consumeFn))),
+      _consumeFn(std::move(consumeFn)),
+      _workers(_startWorkers(numWorkers, _consumeFn)),
       _metricsCollector(_makeMetricsCollector(_workers)) {
     if (_metricsCollector.isValid()) {
         _metricsCollector.start();
@@ -104,7 +106,7 @@ void PipelinedApplierWorkerPool::enqueue(size_t workerIdx, WorkItem item) {
     iassert(ErrorCodes::ShutdownInProgress,
             "Pipelined oplog applier workers are shutting down",
             !_isShutdown.load());
-    invariant(workerIdx < _numWorkers);
+    invariant(workerIdx < numWorkers());
     PipelinedApplyOtelMetrics::addOpsQueued(item.ops.size());
     auto& worker = _workers[workerIdx];
     // Counted before scheduling so a report never shows more items executed than scheduled.
@@ -124,8 +126,9 @@ void PipelinedApplierWorkerPool::shutdownAndJoin() {
     if (MONGO_unlikely(_isShutdown.swap(true))) {
         return;
     }
-    LOGV2(
-        13315501, "Shutting down pipelined oplog applier workers", "numWorkers"_attr = _numWorkers);
+    LOGV2(13315501,
+          "Shutting down pipelined oplog applier workers",
+          "numWorkers"_attr = numWorkers());
     // Wait for each worker thread to consume everything before signaling shutdown.
     // SerialProcessor::shutdown() forces the processor's worker to stop consuming, joins the
     // thread, and returns whatever was left in the worker's queue. Waiting for idle first ensures
@@ -140,8 +143,32 @@ void PipelinedApplierWorkerPool::shutdownAndJoin() {
     LOGV2(13315502, "Pipelined oplog applier workers shut down");
 }
 
+size_t PipelinedApplierWorkerPool::resizeWorkers(size_t newSize) {
+    clang_checked::lock_guard lk{_mutex};
+    auto prevSize = _numWorkers;
+    if (newSize == prevSize) {
+        return prevSize;
+    }
+    waitForIdle();
+    if (_metricsCollector.isValid()) {
+        _metricsCollector.stop();
+    }
+    for (auto& worker : _workers) {
+        auto dropped = worker.processor->shutdown();
+        invariant(dropped.empty());
+        worker.processor.reset();
+    };
+    _workers = _startWorkers(newSize, _consumeFn);
+    _metricsCollector = _makeMetricsCollector(_workers);
+    if (_metricsCollector.isValid()) {
+        _metricsCollector.start();
+    }
+    _numWorkers = newSize;
+    return prevSize;
+}
+
 void PipelinedApplierWorkerPool::report(BSONObjBuilder& bob) const {
-    for (size_t i = 0; i < _numWorkers; ++i) {
+    for (size_t i = 0; i < numWorkers(); ++i) {
         BSONObjBuilder sub(bob.subobjStart(fmt::format("worker{}", i)));
         sub.append("scheduled", static_cast<long long>(_workers[i].scheduled.loadRelaxed()));
         sub.append("executed", static_cast<long long>(_workers[i].executed.loadRelaxed()));
