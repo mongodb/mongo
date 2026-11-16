@@ -383,7 +383,7 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshReplacesMatchingSample) {
     }
 }
 
-TEST_F(SamplingEstimatorTest, SampleManagerFirstRefreshWritesGenerationTwo) {
+TEST_F(SamplingEstimatorTest, SampleManagerFirstRefreshWritesGenerationOne) {
     // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(_kTestNss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
@@ -393,9 +393,9 @@ TEST_F(SamplingEstimatorTest, SampleManagerFirstRefreshWritesGenerationTwo) {
         NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
     const auto summary = refreshRandomSample(operationContext(), _kTestNss, /*sampleSize=*/2);
     ASSERT_OK(summary);
-    ASSERT_EQ(summary.getValue().genId, 2u);
+    ASSERT_EQ(summary.getValue().genId, 1u);
     ASSERT_EQ(samplesCollIds(operationContext(), samplesNss),
-              std::set<std::string>{makePersistentSampleId(uuid, /*pageNo=*/0, /*genId=*/2)});
+              std::set<std::string>{makePersistentSampleId(uuid, /*pageNo=*/0, /*genId=*/1)});
 }
 
 TEST_F(SamplingEstimatorTest, SampleManagerRefreshWritesTheNextGenerationAndDeletesThePreviousOne) {
@@ -406,7 +406,7 @@ TEST_F(SamplingEstimatorTest, SampleManagerRefreshWritesTheNextGenerationAndDele
         acquireCollectionForSampling(operationContext(), _kTestNss).getCollectionPtr()->uuid();
     const auto samplesNss =
         NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName);
-    for (uint64_t expectedGenId = 2; expectedGenId <= 4; ++expectedGenId) {
+    for (uint64_t expectedGenId = 1; expectedGenId <= 3; ++expectedGenId) {
         const auto summary = refreshRandomSample(operationContext(), _kTestNss, /*sampleSize=*/2);
         ASSERT_OK(summary);
         ASSERT_EQ(summary.getValue().genId, expectedGenId);
