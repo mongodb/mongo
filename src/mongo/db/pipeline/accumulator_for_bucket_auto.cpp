@@ -136,8 +136,9 @@ public:
     }
 
     void reset() final {
-        _memUsageTracker.set(sizeof(*this));
+        _fieldPositions.clear();
         _output.reset();
+        _memUsageTracker.set(sizeof(*this));
     }
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx) {
@@ -477,8 +478,14 @@ void AccumulatorMergeObjectsForBucketAuto::processInternal(const Value& compound
         auto largestPositionIter = _fieldPositions.find(inputFieldName);
         if (largestPositionIter == _fieldPositions.cend() ||
             largestPositionIter->second.value() < inputPosition) {
-            // Remember this new position, and track memory usage.
-            const auto memUsage = sizeof(inputPosition) + input.getApproximateSize();
+            // Remember this new position, and track memory usage. The token charges for the value
+            // held in _output for this field, the field name (stored in both _output and
+            // _fieldPositions), and a flat per-entry constant for the _fieldPositions entry. Other
+            // container overhead, such as _output's per-field metadata and buffer slack, is not
+            // modeled.
+            const auto memUsage = sizeof(inputPosition) + inputFieldValue.getApproximateSize() +
+                2 * inputFieldName.size() +
+                sizeof(std::pair<std::string, SimpleMemoryUsageTokenWith<long long>>);
             _fieldPositions.emplace(
                 inputFieldName,
                 SimpleMemoryUsageTokenWith<long long>{
