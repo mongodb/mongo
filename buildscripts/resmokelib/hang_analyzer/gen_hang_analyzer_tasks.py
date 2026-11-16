@@ -33,6 +33,7 @@ RANDOM_STRING_LENGTH = 5
 LOCAL_BIN_DIR = os.path.join("dist-test", "bin")
 GATHERED_BIN_DIR = os.path.join("dist-tests", "bin")
 MULTIVERSION_BIN_DIR = os.path.normpath("/data/multiversion")
+CORE_ANALYSIS_ASSIGNMENT_TAG = "assigned_to_jira_team_devprod_test_infrastructure"
 
 
 class CoreInfo(NamedTuple):
@@ -181,6 +182,8 @@ class CoreAnalysisTaskGenerator(ABC):
         for variant in output_dict["buildvariants"]:
             for task in variant["tasks"]:
                 task["depends_on"] = deps_list
+        for task_def in output_dict.get("tasks", []):
+            task_def["tags"] = [CORE_ANALYSIS_ASSIGNMENT_TAG]
 
         return output_dict
 
