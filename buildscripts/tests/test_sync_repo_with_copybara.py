@@ -4615,6 +4615,311 @@ class TestTestReleaseTagPublishing(CopybaraTestCase):
         mock_rmtree.assert_called_once_with(destination_repo_dir, ignore_errors=True)
 
 
+class TestCopybaraSlackNotifications(CopybaraTestCase):
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_evergreen_api")
+    def test_failure_messages_notify_automation_and_copybara_channels(self, mock_get_api):
+        sync_repo_with_copybara.send_failure_message_to_slack(
+            {"task_id": "failed-task"}, "migration failed"
+        )
+        calls = mock_get_api.return_value.send_slack_message.call_args_list
+        self.assertEqual(
+            [invocation.kwargs["target"] for invocation in calls],
+            ["#devprod-build-automation", "#devprod-server-copybara"],
+        )
+        self.assertEqual(calls[0].kwargs["msg"], calls[1].kwargs["msg"])
+        self.assertIn("migration failed", calls[1].kwargs["msg"])
+        self.assertIn("https://spruce.mongodb.com/task/failed-task", calls[1].kwargs["msg"])
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_evergreen_api")
+    def test_failure_message_attempts_copybara_channel_when_automation_send_fails(
+        self, mock_get_api
+    ):
+        mock_get_api.return_value.send_slack_message.side_effect = [
+            RuntimeError("unavailable"),
+            None,
+        ]
+        with redirect_stdout(io.StringIO()), self.assertRaisesRegex(RuntimeError, "unavailable"):
+            sync_repo_with_copybara.send_failure_message_to_slack({}, "migration failed")
+        self.assertEqual(
+            [
+                invocation.kwargs["target"]
+                for invocation in mock_get_api.return_value.send_slack_message.call_args_list
+            ],
+            ["#devprod-build-automation", "#devprod-server-copybara"],
+        )
+
+
+class TestBlockedBranches(CopybaraTestCase):
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_evergreen_api")
+    def test_unblocked_branches_do_not_notify(self, mock_get_api):
+        for expansions in ({}, {"copybara_blocked_branches": ""}):
+            with self.subTest(expansions=expansions):
+                self.assertEqual(
+                    sync_repo_with_copybara.skip_blocked_branches(["master", "v8.2"], expansions),
+                    ["master", "v8.2"],
+                )
+        mock_get_api.assert_not_called()
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_evergreen_api")
+    def test_exact_branch_names_are_blocked_and_notify_channel_by_default(self, mock_get_api):
+        expansions = {
+            "copybara_blocked_branches": " v8.2, master, v8.2, ,",
+            "task_id": "blocked-task",
+        }
+        self.assertEqual(
+            sync_repo_with_copybara.skip_blocked_branches(
+                ["master", "v8.2", "v8.2-hotfix", "v8.3"], expansions
+            ),
+            ["v8.2-hotfix", "v8.3"],
+        )
+        calls = mock_get_api.return_value.send_slack_message.call_args_list
+        self.assertEqual(
+            [invocation.kwargs["target"] for invocation in calls],
+            ["#devprod-build-triager", "#devprod-server-copybara"],
+        )
+        kwargs = calls[0].kwargs
+        self.assertEqual(kwargs["msg"], calls[1].kwargs["msg"])
+        self.assertIn("master, v8.2", kwargs["msg"])
+        self.assertIn("https://spruce.mongodb.com/task/blocked-task", kwargs["msg"])
+        self.assertIn("copybara_blocked_branches", kwargs["msg"])
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_evergreen_api")
+    def test_release_tag_cannot_bypass_block_on_its_public_branch(self, mock_get_api):
+        self.assertEqual(
+            sync_repo_with_copybara.skip_blocked_branches(
+                ["r8.2.12", "r8.2.12-hotfix", "r8.2.13"],
+                {"copybara_blocked_branches": "v8.2.12,v8.2.12-hotfix"},
+            ),
+            ["r8.2.13"],
+        )
+        self.assertEqual(mock_get_api.return_value.send_slack_message.call_count, 2)
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_evergreen_api")
+    def test_notifies_each_configured_recipient_in_order_without_duplicates(self, mock_get_api):
+        sync_repo_with_copybara.skip_blocked_branches(
+            ["master"],
+            {
+                "copybara_blocked_branches": "master",
+                "copybara_blocked_branch_slack_users": (
+                    " U015DB374TZ, #devprod-build-triager, #devprod-server-copybara,"
+                    " U015DB374TZ, #devprod-server-copybara, ,"
+                ),
+            },
+        )
+        self.assertEqual(
+            [
+                invocation.kwargs["target"]
+                for invocation in mock_get_api.return_value.send_slack_message.call_args_list
+            ],
+            ["U015DB374TZ", "#devprod-build-triager", "#devprod-server-copybara"],
+        )
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_evergreen_api")
+    def test_notification_failure_still_skips_and_attempts_remaining_recipients(self, mock_get_api):
+        mock_get_api.return_value.send_slack_message.side_effect = [
+            RuntimeError("unavailable"),
+            None,
+            None,
+        ]
+        with redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(
+                sync_repo_with_copybara.skip_blocked_branches(
+                    ["master"],
+                    {
+                        "copybara_blocked_branches": "master",
+                        "copybara_blocked_branch_slack_users": "U015DB374TZ,USECOND",
+                    },
+                ),
+                [],
+            )
+        self.assertEqual(mock_get_api.return_value.send_slack_message.call_count, 3)
+        self.assertEqual(
+            mock_get_api.return_value.send_slack_message.call_args.kwargs["target"],
+            "#devprod-server-copybara",
+        )
+        self.assertIn("WARNING", output.getvalue())
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_evergreen_api")
+    def test_api_initialization_failure_still_skips(self, mock_get_api):
+        mock_get_api.side_effect = RuntimeError("unavailable")
+        with redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(
+                sync_repo_with_copybara.skip_blocked_branches(
+                    ["master"], {"copybara_blocked_branches": "master"}
+                ),
+                [],
+            )
+        self.assertIn("WARNING", output.getvalue())
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_evergreen_api")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_copybara_tokens")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.ensure_copybara_checkout_and_image")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.read_config_file")
+    def test_main_returns_success_before_sync_setup_when_all_requests_are_blocked(
+        self, mock_read_config, mock_image, mock_tokens, mock_get_api
+    ):
+        mock_read_config.return_value = {
+            "project": sync_repo_with_copybara.EXPECTED_EVERGREEN_PROJECT,
+            "copybara_blocked_branches": "master,v8.2.12",
+        }
+        argv = ["sync_repo_with_copybara.py", "--workflow=prod", "--branches=master,r8.2.12"]
+        with patch.object(sys, "argv", argv):
+            self.assertIsNone(sync_repo_with_copybara.main())
+        mock_tokens.assert_not_called()
+        mock_image.assert_not_called()
+        self.assertEqual(mock_get_api.return_value.send_slack_message.call_count, 2)
+
+    def test_main_skips_synthetic_test_tag_blocked_by_tag_or_public_branch_name(self):
+        module = "buildscripts.copybara.sync_repo_with_copybara"
+        release_tag = "r0.0.0-copybara-test-tag-patch123"
+        public_branch = "v0.0.0-copybara-test-tag-patch123"
+        for blocked_name in (release_tag, public_branch):
+            for block_master in (False, True):
+                with (
+                    self.subTest(blocked_name=blocked_name, block_master=block_master),
+                    repo_temp_directory() as tmpdir,
+                    patch(f"{module}.read_config_file") as mock_read_config,
+                    patch(f"{module}.get_copybara_tokens") as mock_tokens,
+                    patch(f"{module}.get_local_copybara_config_bundle") as mock_bundle,
+                    patch(f"{module}.ensure_generated_copybara_evergreen_is_current"),
+                    patch(f"{module}.ensure_copybara_checkout_and_image") as mock_image,
+                    patch(f"{module}.create_mongodb_bot_gitconfig"),
+                    patch(f"{module}.get_test_workflow_base_revision", return_value="base-sha"),
+                    patch(f"{module}.resolve_test_workflow_baseline") as mock_baseline,
+                    patch(f"{module}.prepare_branch_sync") as mock_prepare,
+                    patch(f"{module}.push_test_branches") as mock_push,
+                    patch(f"{module}.run_branch_commit_sync") as mock_sync,
+                    patch(f"{module}.publish_test_release_tag") as mock_publish,
+                    patch(f"{module}.get_evergreen_api") as mock_get_api,
+                    patch.object(
+                        sys,
+                        "argv",
+                        [
+                            "sync_repo_with_copybara.py",
+                            "--workflow=test",
+                            "--branches=master",
+                            "--test-sync-tag",
+                        ],
+                    ),
+                ):
+                    mock_read_config.return_value = {
+                        "project": sync_repo_with_copybara.EXPECTED_EVERGREEN_PROJECT,
+                        "version_id": "patch123",
+                        "copybara_blocked_branches": blocked_name
+                        + (",master" if block_master else ""),
+                    }
+                    mock_tokens.return_value = {
+                        sync_repo_with_copybara.SOURCE_REPO_URL: "source-token",
+                        sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_URL: "public-token",
+                        sync_repo_with_copybara.TEST_REPO_URL: "test-token",
+                    }
+                    base_config_path = Path(tmpdir) / "copy.bara.sky"
+                    write_base_copybara_config(base_config_path)
+                    mock_bundle.return_value = sync_repo_with_copybara.CopybaraConfigBundle(
+                        config_sha="local",
+                        bundle_dir=Path(tmpdir),
+                        base_config_path=base_config_path,
+                        path_rules_path=Path(tmpdir) / "copybara_path_rules.json",
+                        path_rules_module_path=Path(tmpdir) / "copybara_path_rules.bara.sky",
+                        branch_to_fragment={"master": Path(tmpdir) / "master.sky"},
+                    )
+                    mock_prepare.side_effect = lambda **kwargs: MagicMock(
+                        branch=kwargs["branch"], release_tag=kwargs["release_tag"]
+                    )
+                    mock_sync.side_effect = lambda sync, tokens: (
+                        sync_repo_with_copybara.BranchCommitSyncResult(branch=sync.branch)
+                    )
+
+                    self.assertIsNone(sync_repo_with_copybara.main())
+
+                    mock_publish.assert_not_called()
+                    self.assertEqual(mock_get_api.return_value.send_slack_message.call_count, 2)
+                    self.assertIn(
+                        release_tag,
+                        mock_get_api.return_value.send_slack_message.call_args.kwargs["msg"],
+                    )
+                    if block_master:
+                        mock_image.assert_not_called()
+                        mock_prepare.assert_not_called()
+                        mock_push.assert_not_called()
+                        mock_sync.assert_not_called()
+                        mock_baseline.assert_not_called()
+                    else:
+                        mock_prepare.assert_called_once()
+                        self.assertEqual(mock_prepare.call_args.kwargs["branch"], "master")
+                        mock_sync.assert_called_once()
+                        mock_push.assert_called_once()
+                        self.assertEqual(len(mock_push.call_args.kwargs["prepared_syncs"]), 1)
+
+    def test_main_syncs_only_allowed_branches_for_explicit_default_and_test_requests(self):
+        module = "buildscripts.copybara.sync_repo_with_copybara"
+        cases = [
+            ["--workflow=prod", "--prod-destination=test", "--branches=master,v8.2"],
+            ["--workflow=prod", "--prod-destination=test"],
+            ["--workflow=test", "--branches=master,v8.2"],
+            ["--workflow=test"],
+        ]
+        for args in cases:
+            with (
+                self.subTest(args=args),
+                patch(f"{module}.read_config_file") as mock_read_config,
+                patch(f"{module}.get_copybara_tokens") as mock_tokens,
+                patch(f"{module}.get_local_copybara_config_bundle") as mock_bundle,
+                patch(f"{module}.get_configured_copybara_urls") as mock_urls,
+                patch(f"{module}.ensure_generated_copybara_evergreen_is_current"),
+                patch(f"{module}.ensure_copybara_checkout_and_image"),
+                patch(f"{module}.create_mongodb_bot_gitconfig"),
+                patch(f"{module}.get_remote_branch_head", return_value="source-sha") as mock_head,
+                patch(f"{module}.get_sync_branch_target_ref", return_value=None),
+                patch(f"{module}.get_test_workflow_base_revision", return_value="base-sha"),
+                patch(f"{module}.get_test_workflow_source_branch_override", return_value=None),
+                patch(f"{module}.resolve_test_workflow_requested_branches") as mock_requests,
+                patch(f"{module}.resolve_test_workflow_baseline") as mock_baseline,
+                patch(f"{module}.prepare_branch_sync") as mock_prepare,
+                patch(f"{module}.push_test_branches"),
+                patch(f"{module}.run_branch_commit_sync") as mock_sync,
+                patch(f"{module}.get_evergreen_api") as mock_get_api,
+                patch.object(sys, "argv", ["sync_repo_with_copybara.py", *args]),
+            ):
+                mock_read_config.return_value = {
+                    "project": sync_repo_with_copybara.EXPECTED_EVERGREEN_PROJECT,
+                    "copybara_blocked_branches": "v8.2",
+                }
+                mock_tokens.return_value = {
+                    sync_repo_with_copybara.SOURCE_REPO_URL: "source-token",
+                    sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_URL: "public-token",
+                    sync_repo_with_copybara.TEST_REPO_URL: "test-token",
+                }
+                mock_bundle.return_value.branch_to_fragment = {
+                    "master": Path("master.sky"),
+                    "v8.2": Path("v8_2.sky"),
+                }
+                mock_urls.return_value = sync_repo_with_copybara.ConfiguredCopybaraUrls(
+                    source_url=sync_repo_with_copybara.SOURCE_REPO_URL,
+                    prod_url=sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_URL,
+                    test_url=sync_repo_with_copybara.TEST_REPO_URL,
+                )
+                # A test base-branch override selects v8.2 even without --branches.
+                mock_requests.return_value = ("master,v8.2", "v8.2")
+                mock_prepare.return_value = MagicMock(branch="master", release_tag=None)
+                mock_sync.return_value = sync_repo_with_copybara.BranchCommitSyncResult(
+                    branch="master", discovered_commits=0, migrated_commits=0
+                )
+
+                sync_repo_with_copybara.main()
+
+                mock_prepare.assert_called_once()
+                self.assertEqual(mock_prepare.call_args.kwargs["branch"], "master")
+                mock_sync.assert_called_once()
+                self.assertEqual(mock_get_api.return_value.send_slack_message.call_count, 2)
+                if args[0] == "--workflow=test":
+                    mock_baseline.assert_called_once()
+                    self.assertEqual(mock_baseline.call_args.kwargs["branch"], "master")
+                else:
+                    mock_head.assert_called_once()
+                    self.assertEqual(mock_head.call_args.args[1], "master")
+
+
 class TestMainWorkflow(CopybaraTestCase):
     @patch(
         "buildscripts.copybara.sync_repo_with_copybara.ensure_generated_copybara_evergreen_is_current"
