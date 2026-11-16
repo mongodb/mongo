@@ -580,6 +580,41 @@ TEST(TypeCheckerTest, NotOnNonBooleanCanReturnNothing) {
             .typesMask);
 }
 
+// Binding the empty set is ignored. A variable that was bound keeps its previous signature, and a
+// variable that was not bound stays unbound.
+TEST(TypeCheckerTest, BindIgnoresEmptyTypeSignature) {
+    TypeChecker typeChecker;
+    typeChecker.bind("unbound", TypeSignature::kNoType);
+    ASSERT_FALSE(typeChecker.getInferredType("unbound").has_value());
+
+    typeChecker.bind("var", TypeSignature::kNothingType);
+    typeChecker.bind("var", TypeSignature::kNoType);
+    ASSERT_EQ(*typeChecker.getInferredType("var"), TypeSignature::kNothingType);
+}
+
+// Binding the empty set used to make 'x' look like it could never be Nothing, so the fillEmpty()
+// was wrongly removed.
+TEST(TypeCheckerTest, FillEmptyOnEmptyBoundVariableIsKept) {
+    TypeChecker checker;
+    checker.bind(ProjectionName{"x"}, TypeSignature::kNoType);
+    auto tree = make<BinaryOp>(
+        Operations::FillEmpty, make<Variable>(ProjectionName{"x"}), Constant::str("bar"));
+    checker.typeCheck(tree);
+
+    ASSERT(tree.is<BinaryOp>());
+    ASSERT_EQ(tree.cast<BinaryOp>()->op(), Operations::FillEmpty);
+}
+
+// A Switch folds its branches starting from kNoType. The result must still never be empty.
+TEST(TypeCheckerTest, SwitchNeverInfersEmptySignature) {
+    auto tree = make<Switch>(
+        std::vector<std::pair<ABT, ABT>>{{Constant::boolean(true), Constant::int32(1)}},
+        Constant::int32(2));
+    auto signature = TypeChecker{}.typeCheck(tree);
+
+    ASSERT_EQ(signature, getTypeSignature(sbe::value::TypeTags::NumberInt32));
+}
+
 // The FunctionCall(std::string_view, ABTVector) constructor must resolve the string name to its EFn
 // value at construction time so that fn() returns the enum and name() returns the canonical string.
 TEST(TypeCheckerTest, FunctionCallStringConstructorResolvesEFn) {

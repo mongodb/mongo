@@ -27,15 +27,13 @@ namespace mongo::stage_builder {
  *                             kNoType                       bottom, the empty set
  *
  * The top, 'kAnyType', means nothing is known about the value, so it is the only safe assumption
- * to make about an expression whose type has not been inferred.
+ * to make about an expression whose type has not been inferred. A default-constructed signature is
+ * 'kAnyType' for this reason.
  *
  * The bottom, 'kNoType', means the expression never produces a value at all because evaluating it
  * does not return. It is different from 'kNothingType', which describes an expression that does
  * return, producing the value Nothing. An expression that returns a value always has at least one
  * type in its signature.
- *
- * TODO SERVER-123894: Make 'kAnyType' the default-constructed value. The default is currently
- * 'kNoType', which claims the expression never returns rather than that nothing is known about it.
  */
 struct TypeSignature {
     using MaskType = uint64_t;
@@ -102,8 +100,9 @@ struct TypeSignature {
 
     std::string debugString() const;
 
-    // Simple bitmask using one bit for each enum in the TypeTags definition.
-    MaskType typesMask = 0;
+    // Simple bitmask using one bit for each enum in the TypeTags definition. Defaults to every
+    // type, which is 'kAnyType'.
+    MaskType typesMask = kAnyTypeMask;
 };
 
 // An alternative to 'boost::optional<TypeSignature>' that is more compact.

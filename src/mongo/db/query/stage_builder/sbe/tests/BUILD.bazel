@@ -51,6 +51,7 @@ mongo_cc_unit_test(
         "sbe_stage_blueprint_test.cpp",
         "shard_filter_test.cpp",
         "type_checker_test.cpp",
+        "type_signature_test.cpp",
         "value_lifetime_test.cpp",
         "vectorizer_test.cpp",
         "//src/mongo/db/query/stage_builder:classic_stage_builder_test.cpp",

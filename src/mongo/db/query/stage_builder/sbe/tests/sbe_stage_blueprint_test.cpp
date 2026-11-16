@@ -8,6 +8,7 @@
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_lowering.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
+#include "mongo/db/query/stage_builder/sbe/type_signature.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
@@ -211,6 +212,25 @@ TEST_F(SbBlueprintLoweringTest, SbBuilderRetainsBlueprintUntilLowered) {
     ASSERT_STRING_CONTAINS(str, "[5] unique");
     ASSERT_STRING_CONTAINS(str, "[5] unwind");
     ASSERT_STRING_CONTAINS(str, "[5] coscan 1");
+}
+
+// makeBlockToRow() gives each unpacked slot the block slot's signature minus the block and cell
+// types. If nothing is left, the unpacked slot must be kAnyScalarType rather than the empty set.
+// Any other types in the signature are kept as they are.
+TEST_F(SbBlueprintLoweringTest, MakeBlockToRowWidensOnlyEmptyScalarSignatures) {
+    SbBuilder b{*_state, 1};
+    auto int32Type = getTypeSignature(sbe::value::TypeTags::NumberInt32);
+    SbSlotVector blockSlots{SbSlot{_state->slotId(), TypeSignature::kBlockType},
+                            SbSlot{_state->slotId(), TypeSignature::kCellType},
+                            SbSlot{_state->slotId(), TypeSignature::kBlockType.include(int32Type)}};
+
+    auto [_, unpackedSlots] =
+        b.makeBlockToRow(b.makeCoScan(), blockSlots, SbSlot{_state->slotId()});
+
+    ASSERT_EQ(unpackedSlots.size(), 3u);
+    ASSERT_EQ(*unpackedSlots[0].getTypeSignature(), TypeSignature::kAnyScalarType);
+    ASSERT_EQ(*unpackedSlots[1].getTypeSignature(), TypeSignature::kAnyScalarType);
+    ASSERT_EQ(*unpackedSlots[2].getTypeSignature(), int32Type);
 }
 
 TEST_F(SbBlueprintLoweringTest, DisableTrialRunTrackingAppliesToLoweredStage) {

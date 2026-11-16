@@ -1032,6 +1032,11 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeBlockToRow(SbStage stage,
         boost::optional<TypeSignature> typeSig = blockSlots[i].getTypeSignature();
         if (typeSig) {
             typeSig = typeSig->exclude(TypeSignature::kBlockType).exclude(TypeSignature::kCellType);
+            // If the block slot named no types other than block and cell, all we know about the
+            // unpacked value is that it is some scalar.
+            if (typeSig->isEmpty()) {
+                typeSig = TypeSignature::kAnyScalarType;
+            }
         }
 
         unpackedSlots.emplace_back(SbSlot{_state.slotId(), typeSig});

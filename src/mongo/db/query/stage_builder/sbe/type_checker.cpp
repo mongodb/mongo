@@ -32,7 +32,12 @@ TypeChecker::TypeChecker(const TypeChecker& parent) {
 
 TypeSignature TypeChecker::typeCheck(abt::ABT& node) {
     invariant(_bindings.size() == 1);
-    return node.visit(*this, false);
+    TypeSignature result = node.visit(*this, false);
+    tassert(11238901,
+            "Type checking inferred an empty type signature, but an expression that returns a "
+            "value must have at least one possible type.",
+            !result.isEmpty());
+    return result;
 }
 
 boost::optional<TypeSignature> TypeChecker::getInferredType(abt::ProjectionName variable) {
@@ -48,6 +53,13 @@ boost::optional<TypeSignature> TypeChecker::getInferredType(abt::ProjectionName 
 }
 
 void TypeChecker::bind(abt::ProjectionName variable, TypeSignature type) {
+    // An empty signature claims the variable never holds a value. That happens when a narrowing can
+    // never hold, so the code it guards never runs, or when a signature lost its type information.
+    // Either way, keep the previous binding or leave the variable unbound, which is conservative
+    // and always correct.
+    if (type.isEmpty()) {
+        return;
+    }
     // Verify that the new type for the variable is compatible with the information deducted until
     // now.
     auto curType = getInferredType(variable);
