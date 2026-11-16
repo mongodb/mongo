@@ -75,7 +75,8 @@ void SpillableDocumentMapImpl::spillToDisk() {
 }
 
 void SpillableDocumentMapImpl::initDiskMap() {
-    _memTracker.assertCanSpill(_expCtx->getAllowDiskUse(), "SPILLABLE_DOCUMENT_MAP");
+    _memTracker.assertCanSpill(
+        _expCtx->getAllowDiskUse(), "SPILLABLE_DOCUMENT_MAP", _expCtx->getInRouter());
 
     _diskMap = _expCtx->getMongoProcessInterface()->createSpillTable(_expCtx, KeyFormat::String);
     _diskMapSize = 0;

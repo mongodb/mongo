@@ -307,7 +307,8 @@ void NearStage::updateSpillingStats() {
 }
 
 void NearStage::spill() {
-    _memoryTracker.assertCanSpill(expCtx()->getAllowDiskUse(), _commonStats.stageTypeStr);
+    _memoryTracker.assertCanSpill(
+        expCtx()->getAllowDiskUse(), _commonStats.stageTypeStr, expCtx()->getInRouter());
     const uint64_t bufferBytesBefore = _resultBuffer.stats().memUsage();
     _resultBuffer.forceSpill();
     _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -

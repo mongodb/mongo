@@ -152,8 +152,9 @@ public:
     /**
      * Checks that the caller can spill to disk if necessary.
      * Throws QueryExceededMemoryLimitNoDiskUseAllowed if spilling to disk is not allowed.
+     * 'inRouter' tailors the error message to where the command runs (router or shard).
      */
-    void assertCanSpill(bool canSpill, std::string_view name = {}) const;
+    void assertCanSpill(bool canSpill, std::string_view name, bool inRouter) const;
 
     /**
      * Returns a new SimpleMemoryUsageTracker. The copy constructor for this class is purposefully
@@ -384,7 +385,7 @@ public:
         return _allowDiskUse;
     }
 
-    void assertCanSpill(std::string_view name) const;
+    void assertCanSpill(std::string_view name, bool inRouter) const;
 
     int64_t maxAllowedMemoryUsageBytes(OperationContext* opCtx) const {
         return _baseTracker.maxAllowedMemoryUsageBytes(opCtx);

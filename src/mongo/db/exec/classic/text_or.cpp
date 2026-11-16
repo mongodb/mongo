@@ -421,7 +421,7 @@ void TextOrStage::doForceSpill() {
 }
 
 void TextOrStage::initSorter() {
-    _memoryTracker.assertCanSpill(expCtx()->getAllowDiskUse(), "TEXT_OR");
+    _memoryTracker.assertCanSpill(expCtx()->getAllowDiskUse(), "TEXT_OR", expCtx()->getInRouter());
 
     // We disable automatic spilling inside Sorter because we manually spill after adding the whole
     // batch to the _sorter.

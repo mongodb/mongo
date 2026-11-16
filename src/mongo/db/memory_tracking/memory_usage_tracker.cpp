@@ -201,8 +201,8 @@ int64_t MemoryUsageTracker::peakTrackedMemoryBytes(std::string_view name) const 
     return it == _functionMemoryTracker.end() ? 0 : it->second.peakTrackedMemoryBytes();
 }
 
-void MemoryUsageTracker::assertCanSpill(std::string_view name) const {
-    _baseTracker.assertCanSpill(_allowDiskUse, name);
+void MemoryUsageTracker::assertCanSpill(std::string_view name, bool inRouter) const {
+    _baseTracker.assertCanSpill(_allowDiskUse, name, inRouter);
 }
 
 MemoryUsageTracker MemoryUsageTracker::makeFreshMemoryUsageTracker() const {
@@ -272,7 +272,9 @@ void SimpleMemoryUsageTracker::uassertedMemoryLimitExceeded(OperationContext* op
     uasserted(ErrorCodes::ExceededMemoryLimit, errmsg);
 }
 
-void SimpleMemoryUsageTracker::assertCanSpill(bool canSpill, std::string_view name) const {
+void SimpleMemoryUsageTracker::assertCanSpill(bool canSpill,
+                                              std::string_view name,
+                                              bool inRouter) const {
     if (canSpill) {
         return;
     }
@@ -283,7 +285,12 @@ void SimpleMemoryUsageTracker::assertCanSpill(bool canSpill, std::string_view na
     if (!name.empty()) {
         msg << " for " << name;
     }
-    msg << ", but didn't allow external spilling; pass allowDiskUse:true to opt in";
+    if (inRouter) {
+        msg << ", but mongos cannot spill to disk and ignores allowDiskUseByDefault; pass "
+               "allowDiskUse:true to run the merge on a shard";
+    } else {
+        msg << ", but didn't allow external spilling; pass allowDiskUse:true to opt in";
+    }
 
     std::string errmsg = msg;
     operationsFailedDueToMemoryLimit.add(1);

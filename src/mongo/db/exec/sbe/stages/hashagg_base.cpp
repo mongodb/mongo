@@ -159,7 +159,9 @@ void HashAggBaseStage<Derived>::spill() {
         return;
     }
 
-    _memoryTracker.value().assertCanSpill(_allowDiskUse, _commonStats.stageType);
+    // SBE never runs on the router.
+    _memoryTracker.value().assertCanSpill(
+        _allowDiskUse, _commonStats.stageType, /*inRouter=*/false);
 
     // Ensure there is sufficient disk space for spilling
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(

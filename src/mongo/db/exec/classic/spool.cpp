@@ -64,7 +64,7 @@ std::unique_ptr<PlanStageStats> SpoolStage::getStats() {
 }
 
 void SpoolStage::spill() {
-    _memTracker.assertCanSpill("spool");
+    _memTracker.assertCanSpill("spool", expCtx()->getInRouter());
     uassert(7443700,
             "Exceeded disk use limit for spool",
             _specificStats.spillingStats.getSpilledDataStorageSize() <

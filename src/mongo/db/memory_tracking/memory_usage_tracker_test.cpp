@@ -442,7 +442,7 @@ TEST_F(MemoryUsageTrackerTest, WithinMemoryLimitOnMemoryUsageTracker) {
     // the op-wide tracker. The forwarder should pick up the op-wide breach too.
     SimpleMemoryUsageTracker opTracker{MemoryUsageLimit{100}};
     MemoryUsageTracker stageTracker{&opTracker,
-                                    false /* allowDiskUse */,
+                                    /*allowDiskUse=*/false,
                                     MemoryUsageLimit{10 * 1024} /* maxMemoryUsageBytes */};
     SimpleMemoryUsageTracker& funcTracker = stageTracker["fn"];
 
@@ -1231,6 +1231,46 @@ TEST(SimpleMemoryUsageTrackerTest, FreshTrackerStartsAtZeroInBothFigures) {
     ASSERT_EQ(fresh.inUseUniqueMemoryBytes(), 0);
     ASSERT_EQ(fresh.peakTrackedMemoryBytes(), 0);
     original.add(-100, -40);
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertCanSpillDoesNotThrowWhenSpillingAllowed) {
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024}};
+    ASSERT_DOES_NOT_THROW(tracker.assertCanSpill(true, "$group", /*inRouter=*/false));
+    ASSERT_DOES_NOT_THROW(tracker.assertCanSpill(true, "$group", /*inRouter=*/true));
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertCanSpillShardMessageAdvisesAllowDiskUse) {
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024}};
+    ASSERT_THROWS_CODE_AND_WHAT(
+        tracker.assertCanSpill(false, "$group", /*inRouter=*/false),
+        DBException,
+        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+        "Exceeded memory limit for $group, but didn't allow external spilling; pass "
+        "allowDiskUse:true to opt in");
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertCanSpillRouterMessageExplainsMongosCannotSpill) {
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024}};
+    ASSERT_THROWS_CODE_AND_WHAT(
+        tracker.assertCanSpill(false, "$group", /*inRouter=*/true),
+        DBException,
+        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+        "Exceeded memory limit for $group, but mongos cannot spill to disk and ignores "
+        "allowDiskUseByDefault; pass allowDiskUse:true to run the merge on a shard");
+}
+
+TEST(MemoryUsageTrackerAssertCanSpillTest, ForwardsInRouterFlag) {
+    MemoryUsageTracker tracker{/*allowDiskUse=*/false, MemoryUsageLimit{1024}};
+    ASSERT_THROWS_WHAT(tracker.assertCanSpill("$group", /*inRouter=*/false),
+                       DBException,
+                       "Exceeded memory limit for $group, but didn't allow external spilling; pass "
+                       "allowDiskUse:true to opt in");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        tracker.assertCanSpill("$group", /*inRouter=*/true),
+        DBException,
+        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+        "Exceeded memory limit for $group, but mongos cannot spill to disk and ignores "
+        "allowDiskUseByDefault; pass allowDiskUse:true to run the merge on a shard");
 }
 
 }  // namespace

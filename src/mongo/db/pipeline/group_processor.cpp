@@ -198,7 +198,7 @@ void GroupProcessor::spill() {
         return;
     }
 
-    _memoryTracker.assertCanSpill("$group");
+    _memoryTracker.assertCanSpill("$group", _expCtx->getInRouter());
 
     // Ensure there is sufficient disk space for spilling
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(

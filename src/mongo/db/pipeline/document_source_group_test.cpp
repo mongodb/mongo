@@ -282,9 +282,12 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
                                                     expCtx);
     auto groupStage = exec::agg::buildStageAndStitch(group, mock);
 
-    ASSERT_THROWS_CODE(groupStage->getNext(),
-                       AssertionException,
-                       ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
+    ASSERT_THROWS_CODE_AND_WHAT(
+        groupStage->getNext(),
+        AssertionException,
+        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+        "Exceeded memory limit for $group, but mongos cannot spill to disk and ignores "
+        "allowDiskUseByDefault; pass allowDiskUse:true to run the merge on a shard");
 }
 
 TEST_F(DocumentSourceGroupTest, ShouldBeAbleToForceSpillAfterReturningResults) {
@@ -362,10 +365,12 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     // The first getNext() should pause.
     ASSERT_TRUE(groupStage->getNext().isPaused());
 
-    // The next should realize it's used too much memory.
-    ASSERT_THROWS_CODE(groupStage->getNext(),
-                       AssertionException,
-                       ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
+    ASSERT_THROWS_CODE_AND_WHAT(
+        groupStage->getNext(),
+        AssertionException,
+        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+        "Exceeded memory limit for $group, but mongos cannot spill to disk and ignores "
+        "allowDiskUseByDefault; pass allowDiskUse:true to run the merge on a shard");
 }
 
 using DocumentSourceGroupTestDeathTest = DocumentSourceGroupTest;

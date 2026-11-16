@@ -38,7 +38,8 @@ void SpillableDeque::addDocument(Document input) {
     _memCache.emplace_back(MemoryUsageToken{input.getApproximateSize(), &_memTracker},
                            std::move(input));
     if (!_memTracker.withinMemoryLimit(_expCtx->getOperationContext())) {
-        _memTracker.assertCanSpill(_expCtx->getAllowDiskUse(), "SPILLABLE_DEQUE");
+        _memTracker.assertCanSpill(
+            _expCtx->getAllowDiskUse(), "SPILLABLE_DEQUE", _expCtx->getInRouter());
         spillToDisk();
     }
     ++_nextIndex;
