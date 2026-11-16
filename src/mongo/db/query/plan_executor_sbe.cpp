@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <string_view>
 #include <tuple>
+#include <variant>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -229,15 +230,23 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
     checkFailPointPlanExecAlwaysFails(nss());
 
     if (!_stash.empty()) {
-        auto&& [doc, recordId] = _stash.front();
+        auto&& [result, recordId] = _stash.front();
         if constexpr (isBson) {
+            if (auto* obj = std::get_if<BSONObj>(&result)) {
+                *out = std::move(*obj);
+            } else {
+                *out = std::get<Document>(result).toBson<BSONObj::LargeSizeTrait>();
+            }
             // Stashed objects may be overlarge (e.g. the SBE trial executor relaxes the
             // size restriction and stores the returned objects on the stash), so we validate
             // the size of those objects before returning them to the user.
-            *out = std::move(doc);
             uassertStatusOK(out->validateBSONObjSize(BSONObj::DefaultSizeTrait::MaxSize));
         } else {
-            *out = Document{doc};
+            if (auto* doc = std::get_if<Document>(&result)) {
+                *out = std::move(*doc);
+            } else {
+                *out = Document{std::get<BSONObj>(result)};
+            }
         }
         if (dlOut && recordId) {
             *dlOut = std::move(*recordId);
@@ -415,8 +424,16 @@ template sbe::PlanState fetchNextImpl<Document>(sbe::PlanStage* root,
                                                 RecordId* dlOut,
                                                 bool returnOwnedBson);
 
-// NOTE: We intentionally do not expose overload for the 'Document' type. The only interface to get
-// result from plan in 'Document' type is to call 'PlanExecutorSBE::getNextDocument()'.
+sbe::PlanState fetchNext(sbe::PlanStage* root,
+                         sbe::ResultMaterializer* materializer,
+                         sbe::value::SlotAccessor* recordIdSlot,
+                         Document* out,
+                         RecordId* dlOut) {
+    // Documents are always owned, so 'returnOwnedBson' has no effect.
+    return fetchNextImpl<Document>(
+        root, materializer, recordIdSlot, out, dlOut, /*returnOwnedBson=*/true);
+}
+
 template <typename BSONTraits>
 sbe::PlanState fetchNext(sbe::PlanStage* root,
                          sbe::ResultMaterializer* materializer,

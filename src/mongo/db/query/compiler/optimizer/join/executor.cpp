@@ -884,6 +884,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // TODO(SERVER-136925): consider taking min(limit, joinPlanCacheTrialWindow), as the classic
     // multi-planner does.
     const size_t maxTrialResults = static_cast<size_t>(qkc.getJoinPlanCacheTrialWindow());
+    // The suffix stages that were not pushed down to SBE read the plan's results as Documents.
+    const bool hasDocumentSourceSuffix = model.getSuffix() && model.getSuffix()->peekFront();
     auto [candidate, baseline] = runJoinTrial(opCtx,
                                               mca,
                                               baseNodeCQ,
@@ -891,7 +893,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                               std::move(reordered.soln),
                                               std::move(planStagesAndData),
                                               makeBaselineTracker(),
-                                              maxTrialResults);
+                                              maxTrialResults,
+                                              hasDocumentSourceSuffix);
 
     tryInsertIntoJoinPlanCache(
         opCtx,

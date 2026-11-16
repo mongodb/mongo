@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/result_materializer.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -15,6 +16,9 @@
 
 #include <memory>
 #include <utility>
+#include <variant>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe::plan_ranker {
 
@@ -30,9 +34,14 @@ struct CandidatePlanData {
     bool open = false;
 };
 
-using CandidatePlan =
-    mongo::plan_ranker::BaseCandidatePlan<std::unique_ptr<mongo::sbe::PlanStage>,
-                                          std::pair<BSONObj, boost::optional<RecordId>>,
-                                          CandidatePlanData>;
+/**
+ * A result that a plan produced before its consumer asked for it, with its record id if the plan
+ * produces one. The result is held in the format the consumer is expected to read it in: BSON for
+ * PlanExecutor::getNext() and a Document for PlanExecutor::getNextDocument().
+ */
+using StashedResult = std::pair<std::variant<BSONObj, Document>, boost::optional<RecordId>>;
+
+using CandidatePlan = mongo::plan_ranker::
+    BaseCandidatePlan<std::unique_ptr<mongo::sbe::PlanStage>, StashedResult, CandidatePlanData>;
 
 }  // namespace mongo::sbe::plan_ranker

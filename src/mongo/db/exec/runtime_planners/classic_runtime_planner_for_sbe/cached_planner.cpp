@@ -123,6 +123,7 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
                               *plannerData.cq,
                               plannerData.sbeYieldPolicy.get(),
                               indexExistenceChecker,
+                              /*stashDocuments=*/plannerData.hasDocumentSourceSuffix,
                               static_cast<size_t>(plannerData.cq->getExpCtx()
                                                       ->getQueryKnobConfiguration()
                                                       .getSbePlanEvaluationMaxMemoryBytes())}

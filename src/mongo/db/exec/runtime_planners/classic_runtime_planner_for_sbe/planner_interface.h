@@ -30,7 +30,8 @@ struct PlannerDataForSBE final : public PlannerData {
         std::shared_ptr<QueryPlannerParams> plannerParams,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         boost::optional<size_t> cachedPlanHash,
-        std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy)
+        std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
+        bool hasDocumentSourceSuffix)
         : PlannerData(opCtx,
                       cq,
                       std::move(workingSet),
@@ -38,12 +39,14 @@ struct PlannerDataForSBE final : public PlannerData {
                       std::move(plannerParams),
                       yieldPolicy,
                       cachedPlanHash),
-          sbeYieldPolicy(std::move(sbeYieldPolicy)) {}
+          sbeYieldPolicy(std::move(sbeYieldPolicy)),
+          hasDocumentSourceSuffix(hasDocumentSourceSuffix) {}
 
     PlannerDataForSBE(PlannerData plannerData,
                       const MultipleCollectionAccessor& collections,
                       std::shared_ptr<QueryPlannerParams> plannerParams,
-                      std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy)
+                      std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
+                      bool hasDocumentSourceSuffix)
         : PlannerDataForSBE(plannerData.opCtx,
                             plannerData.cq,
                             std::move(plannerData.workingSet),
@@ -51,10 +54,15 @@ struct PlannerDataForSBE final : public PlannerData {
                             std::move(plannerParams),
                             plannerData.yieldPolicy,
                             plannerData.cachedPlanHash,
-                            std::move(sbeYieldPolicy)) {}
+                            std::move(sbeYieldPolicy),
+                            hasDocumentSourceSuffix) {}
 
     std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
     boost::optional<size_t> cachedPlanSolutionHash = boost::none;
+
+    // True if DocumentSources follow the SBE plan, in which case its results are read as Documents
+    // and not as BSON.
+    const bool hasDocumentSourceSuffix;
 };
 
 class PlannerBase : public PlannerInterface {

@@ -200,17 +200,18 @@ private:
     // the scan from. '_seekRecordId' is the RecordId value, initialized from the slot at runtime.
     boost::optional<sbe::value::SlotId> _resumeRecordIdSlot;
 
-    // NOTE: '_stash' stores documents as BSON. Currently, one of the '_stash' is usages is to store
-    // documents received from the plan during multiplanning. This means that the documents
-    // generated during multiplanning cannot exceed maximum BSON size. $group and $lookup CAN
-    // produce documents larger than maximum BSON size. But $group and $lookup never participate in
-    // multiplanning. This is why maximum BSON size limitation in '_stash' is not an issue for such
-    // operators.
+    // Results to return before fetching more from the plan. One usage of '_stash' is to store the
+    // results that the plan produced during its trial run. The trial stores them as BSON or as
+    // Documents, depending on which of getNext() and getNextDocument() it expects them to be read
+    // with. A result stashed in the other format is converted when it is returned. Documents are
+    // not limited to the maximum BSON size, which matters when the plan is followed by a
+    // non-pushed down aggregation pipeline: $group and $lookup CAN produce documents larger than
+    // the maximum BSON size.
     // Another usage of '_stash' is when the 'find' command cannot fit the last returned document
     // into the result batch. But in this case each document is already requried to fit into the
     // maximum BSON size, because all results are encoded into BSON before returning to client. So
     // using BSON in '_stash' does not introduce any additional limitations.
-    std::deque<std::pair<BSONObj, boost::optional<RecordId>>> _stash;
+    std::deque<sbe::plan_ranker::StashedResult> _stash;
 
     // If _killStatus has a non-OK value, then we have been killed and the value represents the
     // reason for the kill.
@@ -252,4 +253,14 @@ sbe::PlanState fetchNext(sbe::PlanStage* root,
                          BSONObj* out,
                          RecordId* dlOut,
                          bool returnOwnedBson);
+
+/**
+ * Same as above, but builds the fetched document as a Document, without going through BSON. The
+ * Document is always owned and is not limited to the maximum BSON size.
+ */
+sbe::PlanState fetchNext(sbe::PlanStage* root,
+                         sbe::ResultMaterializer* materializer,
+                         sbe::value::SlotAccessor* recordIdSlot,
+                         Document* out,
+                         RecordId* dlOut);
 }  // namespace mongo

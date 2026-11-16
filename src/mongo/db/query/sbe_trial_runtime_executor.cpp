@@ -6,6 +6,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/query/plan_executor_sbe.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/record_id.h"
@@ -13,6 +14,9 @@
 
 #include <deque>
 #include <tuple>
+#include <variant>
+
+#include <boost/optional/optional.hpp>
 
 
 namespace mongo::sbe {
@@ -27,17 +31,25 @@ bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candida
             candidate->data.open = true;
         }
 
-        BSONObj obj;
+        std::variant<BSONObj, Document> result;
         RecordId recordId;
+        auto* recordIdOut = recordIdSlot ? &recordId : nullptr;
 
-        // SBE plan might be followed by an non-pushed down aggregation pipeline. In that case we
-        // allow intermediate document to be large.
-        auto state = fetchNext<BSONObj::LargeSizeTrait>(candidate->root.get(),
-                                                        materializer,
-                                                        recordIdSlot,
-                                                        &obj,
-                                                        recordIdSlot ? &recordId : nullptr,
-                                                        true /* must return owned BSON */);
+        PlanState state;
+        if (_stashDocuments) {
+            state = fetchNext(candidate->root.get(),
+                              materializer,
+                              recordIdSlot,
+                              &result.emplace<Document>(),
+                              recordIdOut);
+        } else {
+            state = fetchNext<BSONObj::LargeSizeTrait>(candidate->root.get(),
+                                                       materializer,
+                                                       recordIdSlot,
+                                                       &std::get<BSONObj>(result),
+                                                       recordIdOut,
+                                                       true /* must return owned BSON */);
+        }
         if (state == PlanState::IS_EOF) {
             candidate->root->close();
             candidate->stopCondition = MultiPlannerStopCondition::kEof;
@@ -45,9 +57,14 @@ bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candida
         }
 
         invariant(state == PlanState::ADVANCED);
-        invariant(obj.isOwned());
-        _stashSizeBytes += obj.objsize();
-        candidate->results.push_back({std::move(obj), {recordIdSlot != nullptr, recordId}});
+        if (auto* obj = std::get_if<BSONObj>(&result)) {
+            tassert(13911800, "Trial run must stash owned BSON", obj->isOwned());
+            _stashSizeBytes += obj->objsize();
+        } else {
+            _stashSizeBytes += std::get<Document>(result).getApproximateSize();
+        }
+        candidate->results.emplace_back(
+            std::move(result), boost::optional<RecordId>{recordIdSlot != nullptr, recordId});
 
         // Distinguish between reaching a full batch and hitting the stash size limit.
         if (candidate->results.size() >= maxNumResults ||

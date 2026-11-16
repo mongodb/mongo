@@ -237,7 +237,8 @@ JoinTrialResult runJoinTrial(
     std::unique_ptr<QuerySolution> soln,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> planStagesAndData,
     std::unique_ptr<TrialRunTracker> tracker,
-    size_t maxNumResults) {
+    size_t maxNumResults,
+    bool hasDocumentSourceSuffix) {
     sbe::plan_ranker::CandidatePlan candidate{
         .solution = std::move(soln),
         .root = std::move(planStagesAndData.first),
@@ -257,6 +258,7 @@ JoinTrialResult runJoinTrial(
         baseCQ,
         yieldPolicy,
         indexExistenceChecker,
+        /*stashDocuments=*/hasDocumentSourceSuffix,
         static_cast<size_t>(
             baseCQ.getExpCtx()->getQueryKnobConfiguration().getSbePlanEvaluationMaxMemoryBytes())};
 

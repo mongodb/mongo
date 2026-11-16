@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/classic_runtime_planner_for_sbe_test_util.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -22,6 +24,11 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/unittest/server_parameter_guard.h"
+
+#include <variant>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::classic_runtime_planner_for_sbe {
 namespace {
@@ -32,6 +39,7 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("tes
 
 const BSONObj kFindFilter = fromjson("{a: {$gte: 0}, b: {$gte: 0}}");
 const BSONObj kAddFieldsSpec = fromjson(R"({sum: {$add: ["$a", "$b"]}})");
+const BSONObj kGroupSpec = fromjson(R"({$group: {_id: "$b", total: {$sum: "$a"}}})");
 
 /**
  * Fixture for the classic runtime planner for SBE. As a test query, it uses an aggregation
@@ -60,23 +68,14 @@ protected:
     }
 
     /**
-     * Creates a pair of CanonicalQuery & PlannerData for the following pipeline: [
-     *   {$match: 'findFilter'}},
-     *   {$addFields: 'addFieldsSpec'}}
-     * ]
-     * Defaults to kFindFilter and kAddFieldsSpec for 'findFilter' and 'addFieldsSpec' respectively
-     * if arguments are not supplied. If addFieldsSpec is empty, $addFields stage won't be added.
+     * Creates a pair of CanonicalQuery & PlannerData for the pipeline
+     * [{$match: 'findFilter'}, ...'pipeline'], where 'pipeline' is pushed down to SBE.
      */
-    auto createPlannerData(BSONObj findFilter = kFindFilter,
-                           BSONObj addFieldsSpec = kAddFieldsSpec) {
+    auto createPlannerDataForPipeline(std::vector<boost::intrusive_ptr<DocumentSource>> pipeline,
+                                      BSONObj findFilter = kFindFilter) {
         auto findCommand = std::make_unique<FindCommandRequest>(kNss);
         findCommand->setFilter(findFilter);
 
-        std::vector<boost::intrusive_ptr<DocumentSource>> pipeline;
-        if (!addFieldsSpec.isEmpty()) {
-            pipeline.emplace_back(make_intrusive<DocumentSourceInternalProjection>(
-                expCtx, kAddFieldsSpec, InternalProjectionPolicyEnum::kAddFields));
-        }
         auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = expCtx,
             .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)},
@@ -94,14 +93,42 @@ protected:
         return std::make_pair(std::move(cq), std::move(plannerData));
     }
 
+    /**
+     * Creates a pair of CanonicalQuery & PlannerData for the following pipeline: [
+     *   {$match: 'findFilter'}},
+     *   {$addFields: 'addFieldsSpec'}}
+     * ]
+     * Defaults to kFindFilter and kAddFieldsSpec for 'findFilter' and 'addFieldsSpec' respectively
+     * if arguments are not supplied. If addFieldsSpec is empty, $addFields stage won't be added.
+     */
+    auto createPlannerData(BSONObj findFilter = kFindFilter,
+                           BSONObj addFieldsSpec = kAddFieldsSpec) {
+        std::vector<boost::intrusive_ptr<DocumentSource>> pipeline;
+        if (!addFieldsSpec.isEmpty()) {
+            pipeline.emplace_back(make_intrusive<DocumentSourceInternalProjection>(
+                expCtx, kAddFieldsSpec, InternalProjectionPolicyEnum::kAddFields));
+        }
+        return createPlannerDataForPipeline(std::move(pipeline), findFilter);
+    }
+
+    /**
+     * Returns the 'expectedDocCount' documents that 'exec' produces before EOF. They are read with
+     * getNextDocument() if 'readDocuments' is set, and with getNext() otherwise.
+     */
     std::vector<BSONObj> getResultDocumentsAndAssertExecState(size_t expectedDocCount,
-                                                              PlanExecutor* exec) {
+                                                              PlanExecutor* exec,
+                                                              bool readDocuments = false) {
         std::vector<BSONObj> result;
         result.reserve(expectedDocCount);
         for (size_t i = 0; i < expectedDocCount; ++i) {
             BSONObj out;
-            auto state = exec->getNext(&out, nullptr);
-            ASSERT_EQ(PlanExecutor::ExecState::ADVANCED, state);
+            if (readDocuments) {
+                Document doc;
+                ASSERT_EQ(PlanExecutor::ExecState::ADVANCED, exec->getNextDocument(doc));
+                out = doc.toBson();
+            } else {
+                ASSERT_EQ(PlanExecutor::ExecState::ADVANCED, exec->getNext(&out, nullptr));
+            }
             result.push_back(out.getOwned());
         }
         Document doc;
@@ -115,9 +142,11 @@ protected:
      * 2. Each returned document have a field "sum" with an integer value, equal to corresponding
      *    element in expectedSums.
      */
-    void assertPlanExecutorReturnsCorrectSums(std::vector<int> expectedSums, PlanExecutor* exec) {
+    void assertPlanExecutorReturnsCorrectSums(std::vector<int> expectedSums,
+                                              PlanExecutor* exec,
+                                              bool readDocuments = false) {
         size_t docCount = expectedSums.size();
-        auto result = getResultDocumentsAndAssertExecState(docCount, exec);
+        auto result = getResultDocumentsAndAssertExecState(docCount, exec, readDocuments);
         for (size_t i = 0; i < docCount; ++i) {
             ASSERT_EQ(expectedSums[i], result[i].getField("sum").Int());
         }
@@ -181,11 +210,14 @@ protected:
      *
      * The 'numReads' argument is used to override the 'numReads' value stored in the cache entry,
      * as this will always be 0 when a VirtualScan plan is used.
+     *
+     * 'hasDocumentSourceSuffix' tells the planner whether DocumentSources follow the SBE plan.
      */
     std::pair<PlanCacheKey, std::unique_ptr<PlannerGeneratorFromClassicCacheEntry>>
     makePlannerGeneratorFromClassicCache(const CanonicalQuery* cq,
                                          PlannerData plannerData,
-                                         NumReads numReads) {
+                                         NumReads numReads,
+                                         bool hasDocumentSourceSuffix = false) {
         auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(
             *cq, plannerData.collections.getMainCollectionAcquisition());
 
@@ -204,13 +236,54 @@ protected:
             plannerData.plannerParams->secondaryCollectionsInfo);
 
         auto plannerParams = plannerData.plannerParams;
-        PlannerDataForSBE plannerDataForSbe{
-            std::move(plannerData), *_collections, std::move(plannerParams), makeYieldPolicy()};
+        PlannerDataForSBE plannerDataForSbe{std::move(plannerData),
+                                            *_collections,
+                                            std::move(plannerParams),
+                                            makeYieldPolicy(),
+                                            hasDocumentSourceSuffix};
         plannerDataForSbe.cachedPlanSolutionHash = cacheEntry->cachedPlan->solutionHash;
 
         return {planCacheKey,
                 std::make_unique<PlannerGeneratorFromClassicCacheEntry>(
                     std::move(plannerDataForSbe), std::move(querySolution), numReads.value)};
+    }
+
+    /**
+     * Runs the trial of the plan cached for 'cq' and returns the executor that resumes the plan.
+     * Asserts that the trial stashed 'expectedStashSize' results (at least one if boost::none), as
+     * Documents if 'hasDocumentSourceSuffix' and as BSON otherwise.
+     */
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutorFromCachedPlan(
+        std::unique_ptr<CanonicalQuery> cq,
+        PlannerData plannerData,
+        bool hasDocumentSourceSuffix,
+        boost::optional<size_t> expectedStashSize = boost::none) {
+        auto [classicCacheKey, plannerGenerator] = makePlannerGeneratorFromClassicCache(
+            cq.get(), std::move(plannerData), NumReads{10000}, hasDocumentSourceSuffix);
+        auto rankingResult = plannerGenerator->makePlanner()->extractPlanRankingResult();
+
+        ASSERT(rankingResult.execState);
+        const auto* execState = rankingResult.execState->peekExecState<SbeExecState>();
+        ASSERT(execState);
+        const auto& stash = execState->sbeCandidate.results;
+        if (expectedStashSize) {
+            ASSERT_EQ(stash.size(), *expectedStashSize);
+        } else {
+            ASSERT_FALSE(stash.empty());
+        }
+        for (const auto& [result, recordId] : stash) {
+            ASSERT_EQ(std::holds_alternative<Document>(result), hasDocumentSourceSuffix);
+        }
+
+        // Lowering expects the stages pushed down to the CanonicalQuery to come from a Pipeline.
+        auto pipeline = Pipeline::create(
+            DocumentSourceContainer(cq->cqPipeline().begin(), cq->cqPipeline().end()), expCtx);
+        return deferred_exec::lowerPlanRankingResult(std::move(cq),
+                                                     std::move(rankingResult),
+                                                     operationContext(),
+                                                     collections(),
+                                                     PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                     pipeline.get());
     }
 
 
@@ -388,6 +461,81 @@ TEST_F(DeferredEngineChoiceRuntimePlannerTest, ClassicCachedPlannerReplansOnHitt
                           plan_cache_util::CacheMode::AlwaysCache);
             }));
         ASSERT_TRUE(getClassicPlanCache().getCacheEntryIfActive(classicCacheKey));
+    }
+}
+
+// The trial of a cached plan stashes its results as Documents when a pipeline follows the SBE plan,
+// and as BSON otherwise. The executor returns the stashed results through both getNext() and
+// getNextDocument(), whichever format they were stashed in.
+TEST_F(DeferredEngineChoiceRuntimePlannerTest, CachedPlannerStashesTrialResultsInReadFormat) {
+    acquireCollectionForRead();
+
+    // Ensures that cache entries are available immediately.
+    bool previousQueryKnobValue = internalQueryCacheDisableInactiveEntries.swap(true);
+    ON_BLOCK_EXIT([&] { internalQueryCacheDisableInactiveEntries.store(previousQueryKnobValue); });
+
+    auto [cq, plannerData] = createPlannerData();
+    auto [solutions, expectedSums] =
+        createVirtualScanQuerySolutionsForDefaultFilter(/*resultDocCount=*/200, plannerData.cq);
+    {  // The multi-planner writes the winning plan to the classic cache.
+        deferred_exec::MultiPlanner planner{std::move(plannerData),
+                                            std::move(solutions),
+                                            /*addingCBRChosenPlanToPlanCache=*/false,
+                                            /*maybeExplainData=*/boost::none,
+                                            PlanSelectionStrategy::kMultiPlanner};
+    }
+
+    for (bool hasDocumentSourceSuffix : {false, true}) {
+        for (bool readDocuments : {false, true}) {
+            auto [cq, plannerData] = createPlannerData();
+            auto exec = makeExecutorFromCachedPlan(
+                std::move(cq), std::move(plannerData), hasDocumentSourceSuffix);
+            assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get(), readDocuments);
+        }
+    }
+}
+
+// Same as above, but for a $group plan whose results the executor builds from the plan's slots
+// instead of the plan materializing them.
+TEST_F(DeferredEngineChoiceRuntimePlannerTest, CachedPlannerStashesGroupTrialResultsInReadFormat) {
+    unittest::ServerParameterGuard efficientBoundaryMaterialization{
+        "featureFlagSbeEfficientBoundaryMaterialization", true};
+    acquireCollectionForRead();
+
+    // Ensures that cache entries are available immediately.
+    bool previousQueryKnobValue = internalQueryCacheDisableInactiveEntries.swap(true);
+    ON_BLOCK_EXIT([&] { internalQueryCacheDisableInactiveEntries.store(previousQueryKnobValue); });
+
+    auto createGroupPlannerData = [&] {
+        return createPlannerDataForPipeline(
+            {DocumentSourceGroup::createFromBson(kGroupSpec.firstElement(), expCtx)});
+    };
+
+    auto [cq, plannerData] = createGroupPlannerData();
+    auto [solutions, expectedSums] =
+        createVirtualScanQuerySolutionsForDefaultFilter(/*resultDocCount=*/200, plannerData.cq);
+    {  // The multi-planner writes the winning plan to the classic cache.
+        deferred_exec::MultiPlanner planner{std::move(plannerData),
+                                            std::move(solutions),
+                                            /*addingCBRChosenPlanToPlanCache=*/false,
+                                            /*maybeExplainData=*/boost::none,
+                                            PlanSelectionStrategy::kMultiPlanner};
+    }
+
+    // The winning plan returns {a: i, b: 1} for i in [1, 200], which is a single group.
+    const auto expectedGroup = BSON("_id" << 1 << "total" << 20100);
+    for (bool hasDocumentSourceSuffix : {false, true}) {
+        for (bool readDocuments : {false, true}) {
+            auto [cq, plannerData] = createGroupPlannerData();
+            // The $group returns its first result once the trial has read all of its input.
+            auto exec = makeExecutorFromCachedPlan(std::move(cq),
+                                                   std::move(plannerData),
+                                                   hasDocumentSourceSuffix,
+                                                   /*expectedStashSize=*/1);
+            auto results = getResultDocumentsAndAssertExecState(
+                /*expectedDocCount=*/1, exec.get(), readDocuments);
+            ASSERT_BSONOBJ_EQ(results[0], expectedGroup);
+        }
     }
 }
 

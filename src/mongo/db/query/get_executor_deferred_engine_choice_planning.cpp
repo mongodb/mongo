@@ -11,6 +11,7 @@
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
@@ -96,13 +97,17 @@ std::unique_ptr<PlannerInterface> buildCachedPlan(
         auto plannerData = makePlannerData(boost::none);
         auto sbeYieldPolicy = PlanYieldPolicySBE::make(
             plannerData.opCtx, plannerData.yieldPolicy, collections, cq->nss());
+        // The stages pushed down to SBE are only removed from the front of 'pipeline' when the
+        // plan is lowered, so any stage past them remains a DocumentSource.
+        const bool hasDocumentSourceSuffix = pipeline && pipeline->size() > cq->cqPipeline().size();
         return makePlannerForClassicCacheEntry(classic_runtime_planner_for_sbe::PlannerDataForSBE(
                                                    std::move(plannerData),
                                                    collections,
                                                    // To be shared between all instances of this
                                                    // type and the prepare helper creating them.
                                                    plannerParams,
-                                                   std::move(sbeYieldPolicy)),
+                                                   std::move(sbeYieldPolicy),
+                                                   hasDocumentSourceSuffix),
                                                std::move(querySolution),
                                                cachedSolution->cachedPlan->solutionHash,
                                                cachedSolution->decisionReads());

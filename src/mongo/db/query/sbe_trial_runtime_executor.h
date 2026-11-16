@@ -17,6 +17,11 @@ namespace mongo::sbe {
 /**
  * TrialRuntimeExecutor provides a method to perform a trial run for the candidate plan by executing
  * each plan and collecting execution stats.
+ *
+ * The results of the trial are stashed for the plan's executor to return. Pass true for
+ * 'stashDocuments' when they will be read with PlanExecutor::getNextDocument(), which is the case
+ * when DocumentSources follow the plan. They are then built as Documents, as the executor builds
+ * them after the trial, instead of as BSON that the executor has to convert.
  */
 class TrialRuntimeExecutor {
 public:
@@ -25,9 +30,11 @@ public:
                          const CanonicalQuery& cq,
                          PlanYieldPolicySBE* yieldPolicy,
                          const AllIndicesRequiredChecker& indexExistenceChecker,
+                         bool stashDocuments,
                          size_t stashSizeMaxBytes = std::numeric_limits<size_t>::max())
 
-        : _stashSizeMaxBytes(stashSizeMaxBytes),
+        : _stashDocuments(stashDocuments),
+          _stashSizeMaxBytes(stashSizeMaxBytes),
           _opCtx(opCtx),
           _collections(collections),
           _cq(cq),
@@ -77,6 +84,7 @@ public:
 
 private:
     size_t _stashSizeBytes = 0;
+    const bool _stashDocuments;
     const size_t _stashSizeMaxBytes;
 
     // The following data members are not owned.

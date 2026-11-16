@@ -84,6 +84,7 @@ struct JoinTrialResult {
 /**
  * Prepares an SBE plan, and runs it as a trial of up to 'maxNumResults' documents with 'tracker'
  * attached, buffering the results into the returned candidate and returning its baseline alongside.
+ * The results are buffered as Documents if DocumentSources follow the plan, and as BSON otherwise.
  * Throws if the plan fails during the trial.
  */
 JoinTrialResult runJoinTrial(
@@ -94,7 +95,8 @@ JoinTrialResult runJoinTrial(
     std::unique_ptr<QuerySolution> soln,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> planStagesAndData,
     std::unique_ptr<TrialRunTracker> tracker,
-    size_t maxNumResults);
+    size_t maxNumResults,
+    bool hasDocumentSourceSuffix);
 
 /** Whether a plan that ran its baseline trial can be inserted into the join plan cache. */
 JoinPlanCacheInsertResult checkCanInsertIntoJoinPlanCache(bool collectionsUnchanged,
