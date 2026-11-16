@@ -209,7 +209,7 @@ boost::optional<Document> QueryStatsStage::_nextKeyHashDocument(
     auto& queryStatsStore = getQueryStatsStore(getContext()->getOperationContext());
 
     while (!locations.empty()) {
-        const auto& [partitionId, storeKey] = locations.front();
+        const auto [partitionId, storeKey] = locations.front();
         locations.pop_front();
 
         // Copy the entry out under the partition lock, then materialize it off-lock.

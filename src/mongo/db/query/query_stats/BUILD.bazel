@@ -274,6 +274,45 @@ mongo_cc_benchmark(
     ],
 )
 
+mongo_cc_library(
+    name = "query_stats_bm_util",
+    hdrs = [
+        "query_stats_bm_util.h",
+    ],
+    deps = [
+        ":key",
+        ":query_stats",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline/optimization:pipeline_optimization",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "match_pushdown_bm",
+    srcs = [
+        "match_pushdown_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":query_stats_bm_util",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline/optimization:pipeline_optimization",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "query_stats_store_insert_bm",
+    srcs = [
+        "query_stats_store_insert_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":query_stats_bm_util",
+    ],
+)
+
 mongo_cc_benchmark(
     name = "top_k_sort_optimization_bm",
     srcs = [
@@ -282,6 +321,8 @@ mongo_cc_benchmark(
     tags = ["query_bm"],
     deps = [
         ":query_stats",
+        ":query_stats_bm_util",
+        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/query:command_shapes",
         "//src/mongo/db/query:query_fcv_environment_for_test",

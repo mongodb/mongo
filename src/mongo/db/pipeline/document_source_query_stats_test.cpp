@@ -392,6 +392,31 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupResolvesAcrossPartit
     ASSERT_EQ(results[1].second, results[2].second);
 }
 
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupSpansMultipleDequeNodes) {
+    // The resolved locations live in a std::deque, and 'pop_front()' deallocates a node once it is
+    // emptied. This many locations span several nodes, so the scan must copy each location out
+    // before popping it rather than read a reference into the freed node.
+    constexpr size_t kNumLocations = 64;
+    auto& queryStatsStore = setUpQueryStatsStore();
+
+    std::vector<std::string> locations;
+    locations.reserve(kNumLocations);
+    for (size_t i = 0; i < kNumLocations; ++i) {
+        BSONObjBuilder filter;
+        filter.append("field" + std::to_string(i), static_cast<int>(i));
+        locations.push_back(putIndexedEntry(queryStatsStore, i, filter.obj()));
+    }
+
+    auto stage = buildKeyHashLookupStage(locations);
+
+    StringSet seen;
+    for (auto result = stage->getNext(); !result.isEOF(); result = stage->getNext()) {
+        ASSERT_TRUE(result.isAdvanced());
+        seen.insert(result.getDocument()["keyHash"].getString());
+    }
+    ASSERT_EQ(seen.size(), kNumLocations);
+}
+
 TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupReportsEachEntryOnce) {
     auto& queryStatsStore = setUpQueryStatsStore();
     const auto keyHashA = putIndexedEntry(queryStatsStore, 0, BSON("a" << 5));
