@@ -109,7 +109,7 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
                 shard_role_details::getRecoveryUnit(opCtx)->setNoEvictionAfterCommitOrRollback();
 
 
-                int64_t killsTarget = gCachePressureAbortSessionKillLimitPerBatch;
+                int64_t killsTarget = gCachePressureAbortSessionKillLimitPerBatch.load();
                 while (killsTarget > 0) {
                     if (!underCachePressure(opCtx)) {
                         break;
@@ -120,7 +120,7 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
                     int64_t numTimeOuts = 0;
                     killOldestTransaction(
                         opCtx,
-                        Milliseconds(gCachePressureAbortCheckoutTimeoutMilliseconds),
+                        Milliseconds(gCachePressureAbortCheckoutTimeoutMilliseconds.load()),
                         &numKills,
                         &numSkips,
                         &numTimeOuts);

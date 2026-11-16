@@ -43,7 +43,7 @@ server_parameters:
         description: >-
             The maximum number of milliseconds for a session to checkout when aborting oldest transactions.
         set_at: [startup, runtime]
-        cpp_vartype: int
+        cpp_vartype: Atomic<int>
         cpp_varname: gCachePressureAbortCheckoutTimeoutMilliseconds
         default: 100
         redact: false
@@ -52,7 +52,7 @@ server_parameters:
             The maximum number of sessions that will be killed at a time when aborting oldest transactions.
             A value of zero effectively disables evicting the oldest transaction.
         set_at: [startup, runtime]
-        cpp_vartype: int
+        cpp_vartype: Atomic<int>
         cpp_varname: gCachePressureAbortSessionKillLimitPerBatch
         default: 20
         validator: {gte: 0}
