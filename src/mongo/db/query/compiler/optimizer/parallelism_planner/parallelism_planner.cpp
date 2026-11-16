@@ -67,7 +67,10 @@ ParallelPlanReason shouldParallelize(const CanonicalQuery& cq,
     // The catalog gate: only parallelize if the main collection exists and its data size exceeds
     // the minimum threshold.
     const auto& mainCollection = collections.getMainCollection();
-    if (!mainCollection ||
+    if (!mainCollection) {
+        return ParallelPlanReason::kCollectionSize;
+    }
+    if (!knobs.isBypassParallelGatesEnabled() &&
         mainCollection->dataSize(cq.getExpCtx()->getOperationContext()) <
             knobs.getParallelQueryMinCollectionSizeBytes()) {
         return ParallelPlanReason::kCollectionSize;

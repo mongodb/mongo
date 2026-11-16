@@ -270,6 +270,36 @@ TEST_F(ParallelPlannerTest, AcceptsCollectionsAtOrAboveTheMinimumSize) {
     ASSERT_TRUE(isEligible(collScanSolution()));
 }
 
+TEST_F(ParallelPlannerTest, BypassParallelGatesSkipsTheMinimumSize) {
+    auto enabled = defaultPQConfig();
+    // The collection is empty, so it is below any non-zero minimum size.
+    QueryKnobGuardForTest minSize{
+        operationContext(), "internalQueryParallelQueryMinCollectionSizeBytes", 1};
+    ASSERT_FALSE(isEligible(collScanSolution()));
+
+    QueryKnobGuardForTest bypass{operationContext(), "internalQueryBypassParallelGates", true};
+    ASSERT_TRUE(isEligible(collScanSolution()));
+}
+
+TEST_F(ParallelPlannerTest, BypassParallelGatesKeepsOtherGate) {
+    auto enabled = defaultPQConfig();
+    QueryKnobGuardForTest bypass{operationContext(), "internalQueryBypassParallelGates", true};
+
+    ASSERT_FALSE(isEligible(solutionWithRoot(ineligibleOver(scan()))));
+    ASSERT_FALSE(
+        isEligible(collScanSolution(), [](auto& find) { find.setHint(BSON("$natural" << 1)); }));
+    ASSERT_FALSE(isEligible(collScanSolution(), nullptr, kMissingNss));
+    {
+        QueryKnobGuardForTest serial{operationContext(), "internalQueryMaxDegreeOfParallelism", 1};
+        ASSERT_FALSE(isEligible(collScanSolution()));
+    }
+    {
+        QueryKnobGuardForTest enableOff{
+            operationContext(), "internalQueryEnableParallelQuery", false};
+        ASSERT_FALSE(isEligible(collScanSolution()));
+    }
+}
+
 TEST_F(ParallelPlannerTest, DeclinesMissingCollections) {
     auto enabled = defaultPQConfig();
     ASSERT_FALSE(isEligible(collScanSolution(), nullptr, kMissingNss));
