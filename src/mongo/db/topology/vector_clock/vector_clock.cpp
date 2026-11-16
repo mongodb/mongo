@@ -336,7 +336,17 @@ public:
                           "Cannot accept logicalTime: " + signedTime.getTime().toString() +
                               ". May not be a part of a sharded cluster");
             } else {
-                uassertStatusOK(logicalTimeValidator->validate(opCtx, signedTime));
+                auto status = logicalTimeValidator->validate(opCtx, signedTime);
+                // A node whose key refresher has never succeeded cannot tell valid gossip apart
+                // from invalid gossip (e.g. it restarted while majority reads were unavailable,
+                // so every refresh fails). Drop the gossip rather than failing the client's
+                // whole command over optional metadata the node cannot process. A node that has
+                // keys still rejects gossip signed by an unknown key, as before.
+                if (status == ErrorCodes::KeyNotFound &&
+                    !logicalTimeValidator->shouldGossipLogicalTime()) {
+                    return {};
+                }
+                uassertStatusOK(status);
             }
         }
 
