@@ -401,6 +401,25 @@ insertDocs(20);
 }
 
 // =============================================================================
+// sampleSize parameter is rejected in sample mode
+// =============================================================================
+
+cleanup();
+insertDocs(20);
+{
+    assert.commandFailedWithCode(
+        db.runCommand({analyze: collName, mode: "sample", sampleSize: 10}),
+        ErrorCodes.InvalidOptions,
+        'analyze with mode: "sample" and sampleSize should fail with InvalidOptions',
+    );
+    assert.eq(
+        0,
+        samplesColl.countDocuments({}),
+        "no sample should be persisted when analyze is rejected",
+    );
+}
+
+// =============================================================================
 // timeseries collection
 // =============================================================================
 

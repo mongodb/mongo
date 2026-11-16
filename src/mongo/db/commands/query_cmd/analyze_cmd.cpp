@@ -458,6 +458,9 @@ public:
 
             switch (mode) {
                 case AnalyzeModeEnum::kSample:
+                    uassert(ErrorCodes::InvalidOptions,
+                            "sampleSize is not supported with sample mode",
+                            !cmd.getSampleSize());
                     runSampleMode(opCtx, nss);
                     break;
                 case AnalyzeModeEnum::kFieldStats:
