@@ -252,7 +252,7 @@ ClientCursorPin registerCursor(const AggExState& aggExState,
     // in a $lookup/$unionWith sub-pipeline is not detected here. Make detection recurse into
     // sub-pipelines and add tests for the nested batchSize: 0 case.
     cursorParams.mayHoldMongotTaskExecutor =
-        aggExState.getOriginalLiteParsedPipeline().hasMongotStage() ||
+        aggExState.getExecutionLiteParsedPipeline().hasMongotStage() ||
         CurOp::get(opCtx)->debug().mongotCursorId.has_value();
 
     // The global cursor manager does not deliver invalidations or kill notifications; the

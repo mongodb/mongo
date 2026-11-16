@@ -108,6 +108,14 @@ public:
         return _aggReqDerivatives->liteParsedPipeline;
     }
 
+    /**
+     * Returns the lite-parsed pipeline that will actually execute (for a view, the expanded
+     * pipeline).
+     */
+    const LiteParsedPipeline& getExecutionLiteParsedPipeline() const {
+        return _aggReqDerivatives->liteParsedPipeline;
+    }
+
     const NamespaceString& getExecutionNss() const {
         return _executionNss;
     }
