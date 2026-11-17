@@ -128,7 +128,6 @@ const RESUME_SUCCEEDED_METRIC = "mongodb.serverStatus.indexBuilds.resume.succeed
 const RESUME_FAILED_METRIC = "mongodb.serverStatus.indexBuilds.resume.failed";
 
 // Server-side phase strings emitted as the `phase` attribute on index_builds.resume.succeeded.
-const RESUME_PHASE_INITIALIZED = "initialized";
 const RESUME_PHASE_SCAN = "collection scan";
 const RESUME_PHASE_LOAD = "bulk load";
 const RESUME_PHASE_DRAIN = "drain writes";
@@ -138,7 +137,7 @@ const RESUME_PHASE_DRAIN = "drain writes";
 // "middle"/"end" should always reflect the current phase.
 const EXPECTED_RESUME_PHASES = {
     [PdibPhase.SCAN]: {
-        [PdibPosition.BEGINNING]: [RESUME_PHASE_INITIALIZED, RESUME_PHASE_SCAN],
+        [PdibPosition.BEGINNING]: [RESUME_PHASE_SCAN],
         [PdibPosition.MIDDLE]: [RESUME_PHASE_SCAN],
         [PdibPosition.END]: [RESUME_PHASE_SCAN],
     },
@@ -1137,7 +1136,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      *
      * The build is paused at `hangBeforeBuildingIndex`, at which point it has replicated
      * `startIndexBuild` but has not yet written any metadata about its state. On step-up, the new
-     * primary synthesizes an "initialized" state and resumes the build from that point.
+     * primary synthesizes scan-phase state with no saved progress and persists the resume state.
      *
      * @param {ReplSetTest} rst - Must have been constructed via `setUp()`; use `setUp({nodes: 3})`
      *     for the restart failover modes.
@@ -1251,19 +1250,18 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             buildUUID,
         );
 
-        // The resume state was synthesized from an empty index build table (log 12500501 is only
-        // emitted by synthesizeResumeIndexInfo), and the build restarted at the initialized phase.
+        // Empty-table recovery synthesizes scan state.
         checkLog.containsJson(newPrimary, 12500501, {
             buildUUID: function (uuid) {
                 return uuid && uuid.uuid && uuid.uuid["$uuid"] === buildUUID;
             },
-            phase: RESUME_PHASE_INITIALIZED,
+            phase: RESUME_PHASE_SCAN,
         });
         checkLog.containsJson(newPrimary, 12500800, {
             buildUUID: function (uuid) {
                 return uuid && uuid.uuid && uuid.uuid["$uuid"] === buildUUID;
             },
-            phase: RESUME_PHASE_INITIALIZED,
+            phase: RESUME_PHASE_SCAN,
         });
 
         PrimaryDrivenResumableIndexBuildTest._verifyResumedBuild(rst, {
@@ -1271,7 +1269,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             collName,
             indexNames,
             beforeMetrics,
-            expectedPhases: [RESUME_PHASE_INITIALIZED],
+            expectedPhases: [RESUME_PHASE_SCAN],
             postIndexBuildInserts,
         });
     }
@@ -2245,6 +2243,14 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         return nextPrimaryNode;
     }
 
+    static _usesPlannedHandoff(failoverMode) {
+        return (
+            TestData.doesNotSupportGracefulUnplannedStepdown &&
+            !TestData.doesNotSupportGracefulPlannedStepdown &&
+            failoverMode === PdibFailoverMode.NO_RESTART
+        );
+    }
+
     /**
      * Triggers a failover according to `failoverMode`.
      *
@@ -2259,17 +2265,14 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      * @returns {Mongo} The new primary (may be a fresh connection if a restart was involved).
      */
     static _failover(rst, oldPrimary, nextPrimaryNode, failoverMode) {
+        if (PrimaryDrivenResumableIndexBuildTest._usesPlannedHandoff(failoverMode)) {
+            return PrimaryDrivenResumableIndexBuildTest._failOverWithStepDown(
+                rst,
+                oldPrimary,
+                nextPrimaryNode,
+            );
+        }
         if (TestData.doesNotSupportGracefulUnplannedStepdown) {
-            if (
-                failoverMode === PdibFailoverMode.NO_RESTART &&
-                !TestData.doesNotSupportGracefulPlannedStepdown
-            ) {
-                return PrimaryDrivenResumableIndexBuildTest._failOverWithStepDown(
-                    rst,
-                    oldPrimary,
-                    nextPrimaryNode,
-                );
-            }
             return PrimaryDrivenResumableIndexBuildTest._failOverWithCheckpointInstall(
                 rst,
                 oldPrimary,

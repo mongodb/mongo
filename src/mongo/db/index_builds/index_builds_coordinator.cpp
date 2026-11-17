@@ -2514,13 +2514,7 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
 
                 invariant(pdibEnabled);
                 if (!index_builds::build_attempts::primary_driven::checkWithinAttemptLimit(
-                        opCtx,
-                        build.dbName,
-                        buildUUID,
-                        build.collectionUUID,
-                        *build.indexBuildIdent,
-                        resumeInfo,
-                        plannedHandoff)) {
+                        opCtx, build.dbName, *build.indexBuildIdent, resumeInfo, plannedHandoff)) {
                     indexBuildsSSS.exceededAttemptLimit.addAndFetch(1);
                     abortCause = {ErrorCodes::IndexBuildAborted,
                                   "Index build exceeded maxIndexBuildAttemptsAfterUncleanShutdown"};

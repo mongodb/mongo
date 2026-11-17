@@ -348,8 +348,9 @@ On step-up, the coordinator
 of primary-driven index builds that were active on the previous primary. For each build, it
 [reads the state of the build](https://github.com/mongodb/mongo/blob/eeaf2c6378e38ac3dc71faf5fbe0bf1d27fe9e48/src/mongo/db/index_builds/primary_driven/util.cpp#L305-L346)
 and attempts to resume it. If the table has no records yet (the build was interrupted before the
-first spill or drain), an initial-phase resume state is synthesized instead of reading one back. If
-resuming fails for any reason, the build is aborted instead.
+first spill or drain), a scan phase resume state with no scan position or sorter ranges is
+synthesized instead of reading one back. If resuming fails for any reason, the build is aborted
+instead.
 
 Since every write during a primary-driven index build, including side writes, is explicitly
 replicated through the oplog, a document write to a collection with `n` indexes being built produces

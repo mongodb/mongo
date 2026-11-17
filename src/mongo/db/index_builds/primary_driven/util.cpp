@@ -346,10 +346,10 @@ ResumeIndexInfo resumeInfo(OperationContext* opCtx,
 
     if (!hasRecords) {
         // If we don't have a persisted resume state but we did have the index build in the
-        // registry, synthesize an initial phase resume state so that index builds that are
+        // registry, synthesize a scan phase resume state so that index builds that are
         // interrupted prior to persisting their resume state can be handled properly.
         return index_builds::synthesizeResumeIndexInfo(
-            buildUUID, IndexBuildPhaseEnum::kInitialized, collectionUUID, indexes);
+            buildUUID, IndexBuildPhaseEnum::kCollectionScan, collectionUUID, indexes);
     }
 
     auto resumeIndexInfo = index_builds::readAndParseResumeIndexInfo(

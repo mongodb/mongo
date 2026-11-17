@@ -77,8 +77,6 @@ namespace primary_driven {
  */
 bool checkWithinAttemptLimit(OperationContext* opCtx,
                              const DatabaseName& dbName,
-                             const UUID& buildUUID,
-                             const UUID& collectionUUID,
                              const std::string& ident,
                              ResumeIndexInfo& resumeInfo,
                              bool plannedHandoff);

@@ -21,6 +21,7 @@ import {
 const dbName = jsTestName();
 const kLimit = 2;
 const kScanFp = "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion";
+const kInitializedFp = "hangAfterInitializingIndexBuild";
 
 // Unclean failovers take the primary down before the election, so a third node keeps a majority.
 const rst = PrimaryDrivenResumableIndexBuildTest.setUp({testName: jsTestName(), nodes: 3});
@@ -49,16 +50,12 @@ function startHungBuild(coll, stopId) {
     return {buildUUID: extractUUIDFromObject(indexMap["a_1"].buildUUID), awaitBuild};
 }
 
-// Kills the hung primary and steps up a secondary whose resumed scan hangs at '_id: nextStopId'.
-// Returns the new primary and its fail point.
-function crashAndResume(primary, nextStopId) {
+// Kills the primary and returns the new primary and its configured fail point.
+function crashAndResume(primary, failPointName, data = {}) {
     const fps = new Map(
         rst
             .getSecondaries()
-            .map((node) => [
-                node.host,
-                configureFailPoint(node, kScanFp, {fieldsToMatch: {_id: nextStopId}}),
-            ]),
+            .map((node) => [node.host, configureFailPoint(node, failPointName, data)]),
     );
     const newPrimary = PrimaryDrivenResumableIndexBuildTest._failover(
         rst,
@@ -69,9 +66,9 @@ function crashAndResume(primary, nextStopId) {
     return {newPrimary, fp: fps.get(newPrimary.host)};
 }
 
-function offEverywhere() {
+function offEverywhere(failPointName) {
     for (const node of rst.nodes) {
-        assert.commandWorked(node.adminCommand({configureFailPoint: kScanFp, mode: "off"}));
+        assert.commandWorked(node.adminCommand({configureFailPoint: failPointName, mode: "off"}));
     }
 }
 
@@ -114,16 +111,16 @@ describe("primary-driven index build resume limit", function () {
         // kLimit + 1 resumes run before the next one is over the limit.
         for (let resume = 0; resume <= kLimit; resume++) {
             // Reaching the same document again means this new primary resumed the build.
-            const {newPrimary, fp} = crashAndResume(primary, 50);
+            const {newPrimary, fp} = crashAndResume(primary, kScanFp, {fieldsToMatch: {_id: 50}});
             fp.wait();
             rst.awaitReplication();
             primary = newPrimary;
         }
 
-        const {newPrimary} = crashAndResume(primary, 50);
+        const {newPrimary} = crashAndResume(primary, kScanFp, {fieldsToMatch: {_id: 50}});
         assertBuildAborted(newPrimary, "noProgress", buildUUID);
 
-        offEverywhere();
+        offEverywhere(kScanFp);
         awaitBuild({checkExitSuccess: false});
         assert(newPrimary.getDB(dbName).noProgress.drop());
     });
@@ -143,7 +140,9 @@ describe("primary-driven index build resume limit", function () {
         const {buildUUID, awaitBuild} = startHungBuild(coll, stops[0]);
         let primary = rst.getPrimary();
         for (const nextStop of stops.slice(1)) {
-            const {newPrimary, fp} = crashAndResume(primary, nextStop);
+            const {newPrimary, fp} = crashAndResume(primary, kScanFp, {
+                fieldsToMatch: {_id: nextStop},
+            });
             fp.wait();
             rst.awaitReplication();
             primary = newPrimary;
@@ -152,7 +151,7 @@ describe("primary-driven index build resume limit", function () {
             assert.eq(0, exceededAttemptLimit(node), {host: node.host});
         }
 
-        offEverywhere();
+        offEverywhere(kScanFp);
         const oplog = primary.getDB("local").getCollection("oplog.rs");
         assert.soon(() =>
             oplog.findOne({
@@ -183,7 +182,7 @@ describe("primary-driven index build resume limit", function () {
         let primary = rst.getPrimary();
         // Accumulate unplanned resumes without progress.
         for (let resume = 0; resume <= kLimit; resume++) {
-            const {newPrimary, fp} = crashAndResume(primary, 50);
+            const {newPrimary, fp} = crashAndResume(primary, kScanFp, {fieldsToMatch: {_id: 50}});
             fp.wait();
             rst.awaitReplication();
             primary = newPrimary;
@@ -204,10 +203,44 @@ describe("primary-driven index build resume limit", function () {
         }
 
         // Perform one more unplanned handoff, which aborts the build.
-        const {newPrimary} = crashAndResume(primary, 50);
+        const {newPrimary} = crashAndResume(primary, kScanFp, {fieldsToMatch: {_id: 50}});
         assertBuildAborted(newPrimary, "handoff", buildUUID);
-        offEverywhere();
+        offEverywhere(kScanFp);
         awaitBuild({checkExitSuccess: false});
         assert(newPrimary.getDB(dbName).handoff.drop());
+    });
+
+    it("aborts a multi-index build interrupted before persisting resume state", function () {
+        let primary = rst.getPrimary();
+        const coll = primary.getDB(dbName).initialized;
+        assert.commandWorked(coll.insert({_id: 0, a: 1, b: 2}));
+        rst.awaitReplication();
+
+        // This pause is before the initialized to scan phase change persists the first resume state.
+        const fp = configureFailPoint(primary, kInitializedFp);
+        const awaitBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), [
+            {a: 1},
+            {b: 1},
+        ]);
+        fp.wait();
+        const indexMap = IndexBuildTest.assertIndexesSoon(coll, 3, ["_id_"], ["a_1", "b_1"], {
+            includeBuildUUIDs: true,
+        });
+        const buildUUID = extractUUIDFromObject(indexMap["a_1"].buildUUID);
+        rst.awaitReplication();
+
+        for (let resume = 0; resume <= kLimit; resume++) {
+            const result = crashAndResume(primary, kInitializedFp);
+            result.fp.wait();
+            rst.awaitReplication();
+            primary = result.newPrimary;
+        }
+
+        const {newPrimary} = crashAndResume(primary, kInitializedFp);
+        assertBuildAborted(newPrimary, "initialized", buildUUID);
+
+        offEverywhere(kInitializedFp);
+        awaitBuild({checkExitSuccess: false});
+        assert(newPrimary.getDB(dbName).initialized.drop());
     });
 });

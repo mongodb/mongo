@@ -605,7 +605,7 @@ TEST_F(UtilTest, ResumeInfoSynthesizesMissingRecord) {
     auto resumeState =
         resumeInfo(operationContext(), collUUID, buildUUID, indexes, validResumableIndexBuildIdent);
     EXPECT_EQ(buildUUID, resumeState.getBuildUUID());
-    EXPECT_EQ(IndexBuildPhaseEnum::kInitialized, resumeState.getPhase());
+    EXPECT_EQ(IndexBuildPhaseEnum::kCollectionScan, resumeState.getPhase());
     EXPECT_EQ(collUUID, resumeState.getCollectionUUID());
     for (size_t i = 0; i < indexes.size(); ++i) {
         EXPECT_EQ(*indexes[i].sideWritesIdent, resumeState.getIndexes()[i].getSideWritesTable());

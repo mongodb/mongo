@@ -215,13 +215,21 @@ protected:
         CatalogTestFixture::tearDown();
     }
 
-    ResumeIndexInfo setUpRegisteredBuild(boost::optional<int> count) {
-        ResumeIndexInfo info;
-        info.setBuildUUID(UUID::gen());
-        info.setPhase(IndexBuildPhaseEnum::kCollectionScan);
-        info.setCollectionUUID(UUID::gen());
-        info.setResumesWithoutProgress(count);
-        info.setIndexes({});
+    ResumeIndexInfo setUpRegisteredBuild(size_t indexCount) {
+        std::vector<IndexBuildInfo> indexes;
+        for (size_t i = 0; i < indexCount; ++i) {
+            const auto field = "field_" + std::to_string(i);
+            const auto suffix = std::to_string(i);
+            indexes.emplace_back(
+                BSON("v" << 2 << "key" << BSON(field << 1) << "name" << (field + "_1")),
+                "index-" + suffix);
+            indexes.back().setInternalIdents("internal-sorter-" + suffix,
+                                             "internal-sideWrites-" + suffix,
+                                             "internal-skippedRecords-" + suffix,
+                                             "internal-constraintViolations-" + suffix);
+        }
+        auto info = index_builds::synthesizeResumeIndexInfo(
+            UUID::gen(), IndexBuildPhaseEnum::kCollectionScan, UUID::gen(), indexes);
 
         CollectionOptions options;
         options.uuid = info.getCollectionUUID();
@@ -230,27 +238,27 @@ protected:
             .add(info.getBuildUUID(),
                  kNss.dbName(),
                  info.getCollectionUUID(),
-                 {},
+                 indexes,
                  ident::generateNewIndexBuildIdent(info.getBuildUUID()));
         return info;
     }
 
-    std::unique_ptr<RecordStore> makeResumeTable(const std::string& ident,
-                                                 boost::optional<BSONObj> metadata) {
+    std::unique_ptr<RecordStore> makeResumeTable(const std::string& ident) {
         auto opCtx = operationContext();
         Lock::GlobalLock lk(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         auto table = getServiceContext()->getStorageEngine()->makeInternalRecordStore(
             opCtx, ident, KeyFormat::Long);
-        if (metadata) {
-            ASSERT_OK(table->insertRecord(opCtx,
-                                          *shard_role_details::getRecoveryUnit(opCtx),
-                                          metadata->objdata(),
-                                          metadata->objsize(),
-                                          Timestamp()));
-        }
         wuow.commit();
         return table;
+    }
+
+    ResumeIndexInfo readResumeInfo(const std::string& ident) {
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+        auto info = index_builds::readAndParseResumeIndexInfo(
+            getServiceContext()->getStorageEngine(), operationContext(), ident);
+        ASSERT_TRUE(info);
+        return *info;
     }
 
     unittest::ServerParameterGuard _limit{"maxIndexBuildAttemptsAfterUncleanShutdown", kLimit};
@@ -258,51 +266,56 @@ protected:
     unittest::ServerParameterGuard _primaryDriven{"featureFlagPrimaryDrivenIndexBuilds", true};
 };
 
-TEST_F(PrimaryDrivenIndexBuildAttemptsTest, CheckRewritesMetadataRecord) {
+TEST_F(PrimaryDrivenIndexBuildAttemptsTest, CheckPersistsCountWithoutChangingResumeProgress) {
     auto opCtx = operationContext();
-    auto info = setUpRegisteredBuild(boost::none);
+    auto info = setUpRegisteredBuild(3);
     auto ident = ident::generateNewIndexBuildIdent(info.getBuildUUID());
-    auto table = makeResumeTable(ident, info.getMetadata().toBSON());
+    auto table = makeResumeTable(ident);
+    auto expected = info;
 
-    // The first resume records 0; resuming again without progress increments the stored count.
-    for (const int count : {0, 1}) {
+    // Reload each attempt to verify the resume state and count survive another resume.
+    for (int count = 0; count <= kLimit; ++count) {
         SCOPED_TRACE(count);
-        ASSERT_TRUE(checkWithinAttemptLimit(opCtx,
-                                            kNss.dbName(),
-                                            info.getBuildUUID(),
-                                            info.getCollectionUUID(),
-                                            ident,
-                                            info,
-                                            false));
-        EXPECT_EQ(count, info.getResumesWithoutProgress());
-
-        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-        auto cursor = table->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
-        auto record = cursor->next();
-        ASSERT_TRUE(record);
-        EXPECT_EQ(RecordId(index_builds::primary_driven::metadataKey), record->id);
-        auto written = IndexBuildMetadata::parse(record->data.toBson(),
-                                                 IDLParserContext("IndexBuildMetadata"));
-        EXPECT_EQ(info.getBuildUUID(), written.getBuildUUID());
-        EXPECT_EQ(info.getCollectionUUID(), written.getCollectionUUID());
-        EXPECT_EQ(IndexBuildPhaseEnum::kCollectionScan, written.getPhase());
-        EXPECT_EQ(count, written.getResumesWithoutProgress());
-        info.setMetadata(written);
+        EXPECT_TRUE(
+            checkWithinAttemptLimit(opCtx, kNss.dbName(), ident, info, /*plannedHandoff*/ false));
+        expected.setResumesWithoutProgress(count);
+        EXPECT_THAT(info.toBSON(), unittest::match::BSONObjEQ(expected.toBSON()));
+        info = readResumeInfo(ident);
+        EXPECT_THAT(info.toBSON(), unittest::match::BSONObjEQ(expected.toBSON()));
     }
+
+    EXPECT_FALSE(
+        checkWithinAttemptLimit(opCtx, kNss.dbName(), ident, info, /*plannedHandoff*/ false));
+    EXPECT_THAT(readResumeInfo(ident).toBSON(), unittest::match::BSONObjEQ(expected.toBSON()));
 }
 
-TEST_F(PrimaryDrivenIndexBuildAttemptsTest, CheckSkipsMissingMetadataRecord) {
+TEST_F(PrimaryDrivenIndexBuildAttemptsTest, CheckPlannedHandoffPreservesCount) {
     auto opCtx = operationContext();
-    auto info = setUpRegisteredBuild(boost::none);
-    auto ident = ident::generateNewIndexBuildIdent(info.getBuildUUID());
-    auto table = makeResumeTable(ident, boost::none);
+    auto info = setUpRegisteredBuild(2);
+    const auto ident = ident::generateNewIndexBuildIdent(info.getBuildUUID());
+    auto table = makeResumeTable(ident);
 
-    EXPECT_TRUE(checkWithinAttemptLimit(
-        opCtx, kNss.dbName(), info.getBuildUUID(), info.getCollectionUUID(), ident, info, false));
-    EXPECT_FALSE(info.getResumesWithoutProgress());
+    // Cover initial state insertion and the existing-state no-op without establishing a count.
+    const auto initialState = info.toBSON();
+    for (int handoff = 0; handoff < 2; ++handoff) {
+        SCOPED_TRACE(handoff);
+        EXPECT_TRUE(
+            checkWithinAttemptLimit(opCtx, kNss.dbName(), ident, info, /*plannedHandoff*/ true));
+        EXPECT_THAT(info.toBSON(), unittest::match::BSONObjEQ(initialState));
+        EXPECT_THAT(readResumeInfo(ident).toBSON(), unittest::match::BSONObjEQ(initialState));
+    }
 
-    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-    EXPECT_FALSE(table->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx))->next());
+    // Use a nonzero count to detect accidental resets.
+    EXPECT_TRUE(
+        checkWithinAttemptLimit(opCtx, kNss.dbName(), ident, info, /*plannedHandoff*/ false));
+    EXPECT_TRUE(
+        checkWithinAttemptLimit(opCtx, kNss.dbName(), ident, info, /*plannedHandoff*/ false));
+    EXPECT_EQ(1, info.getResumesWithoutProgress());
+    const auto expected = info;
+    EXPECT_TRUE(
+        checkWithinAttemptLimit(opCtx, kNss.dbName(), ident, info, /*plannedHandoff*/ true));
+    EXPECT_THAT(info.toBSON(), unittest::match::BSONObjEQ(expected.toBSON()));
+    EXPECT_THAT(readResumeInfo(ident).toBSON(), unittest::match::BSONObjEQ(expected.toBSON()));
 }
 
 }  // namespace
