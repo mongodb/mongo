@@ -409,4 +409,84 @@ describe("$lookup result cache", function () {
                 tojson(actual),
         );
     });
+
+    describe("with an absorbed $unwind", function () {
+        beforeEach(function () {
+            assert.commandWorked(
+                this.db.local.insertMany([
+                    {_id: 0, local_k: 0},
+                    {_id: 1, local_k: 1},
+                    {_id: 2, local_k: 0},
+                    {_id: 3, local_k: 2},
+                ]),
+            );
+            assert.commandWorked(
+                this.db.foreign.insertMany([
+                    {_id: 0, k: 0},
+                    {_id: 1, k: 0},
+                    {_id: 2, k: 1},
+                ]),
+            );
+        });
+
+        it("returns correct results for repeated localField values", function () {
+            const actual = this.db.local
+                .aggregate([
+                    {$lookup: {from: "foreign", localField: "local_k", foreignField: "k", as: "f"}},
+                    {$unwind: "$f"},
+                    {$project: {f: "$f._id"}},
+                ])
+                .toArray();
+            const expected = [
+                {_id: 0, f: 0},
+                {_id: 0, f: 1},
+                {_id: 1, f: 2},
+                {_id: 2, f: 0},
+                {_id: 2, f: 1},
+            ];
+            assert(resultsEq(expected, actual), "wrong $lookup results", {expected, actual});
+        });
+
+        it("returns correct results with includeArrayIndex and preserveNullAndEmptyArrays", function () {
+            const actual = this.db.local
+                .aggregate([
+                    {$lookup: {from: "foreign", localField: "local_k", foreignField: "k", as: "f"}},
+                    {
+                        $unwind: {
+                            path: "$f",
+                            includeArrayIndex: "idx",
+                            preserveNullAndEmptyArrays: true,
+                        },
+                    },
+                    {$project: {f: "$f._id", idx: 1}},
+                ])
+                .toArray();
+            const expected = [
+                {_id: 0, f: 0, idx: NumberLong(0)},
+                {_id: 0, f: 1, idx: NumberLong(1)},
+                {_id: 1, f: 2, idx: NumberLong(0)},
+                {_id: 2, f: 0, idx: NumberLong(0)},
+                {_id: 2, f: 1, idx: NumberLong(1)},
+                {_id: 3, idx: null},
+            ];
+            assert(resultsEq(expected, actual), "wrong $lookup results", {expected, actual});
+        });
+
+        it("returns correct results with an absorbed $match on the unwound field", function () {
+            const actual = this.db.local
+                .aggregate([
+                    {$lookup: {from: "foreign", localField: "local_k", foreignField: "k", as: "f"}},
+                    {$unwind: "$f"},
+                    {$match: {"f._id": {$gte: 1}}},
+                    {$project: {f: "$f._id"}},
+                ])
+                .toArray();
+            const expected = [
+                {_id: 0, f: 1},
+                {_id: 1, f: 2},
+                {_id: 2, f: 1},
+            ];
+            assert(resultsEq(expected, actual), "wrong $lookup results", {expected, actual});
+        });
+    });
 });
