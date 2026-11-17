@@ -14,8 +14,8 @@ struct DonorPreTransitionInput {
 };
 
 struct DonorPostTransitionInput {
+    const DonorShardContext& before;
     const DonorShardContext& proposed;
-    const DonorShardContext& inMemory;
     const DonorShardContext& durable;
 };
 

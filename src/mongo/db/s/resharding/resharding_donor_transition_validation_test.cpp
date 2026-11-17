@@ -62,11 +62,11 @@ ConstraintResult validate(const DonorShardContext& before, const DonorShardConte
     return validateDonorPreTransition({.before = before, .proposed = after});
 }
 
-ConstraintResult validateInstalled(const DonorShardContext& proposed,
-                                   const DonorShardContext& inMemory,
+ConstraintResult validateInstalled(const DonorShardContext& before,
+                                   const DonorShardContext& proposed,
                                    const DonorShardContext& durable) {
     return validateDonorPostTransition(
-        {.proposed = proposed, .inMemory = inMemory, .durable = durable});
+        {.before = before, .proposed = proposed, .durable = durable});
 }
 
 void assertViolated(const std::vector<std::string>& expected,
@@ -222,25 +222,26 @@ TEST(ReshardingDonorTransitionValidationTest, ReportsAllViolationsTogether) {
 }
 
 TEST(ReshardingDonorTransitionValidationTest, AcceptsInstalledAndDurableContexts) {
+    const auto before = progressing(kDonatingInitialData);
     const auto proposed = progressing(kDonatingOplogEntries);
-    ASSERT_OK(validateInstalled(proposed, proposed, proposed).status);
+    ASSERT_OK(validateInstalled(before, proposed, proposed).status);
+}
+
+TEST(ReshardingDonorTransitionValidationTest, RejectsInstalledContextsForDisallowedEdge) {
+    const auto before = progressing(kDonatingInitialData);
+    const auto proposed = progressing(kPreparingToBlockWrites);
+    assertViolated({"isAllowedEdge"},
+                   validateInstalled(before, proposed, proposed),
+                   ErrorCodes::ReshardingPostconditionFailure);
 }
 
 TEST(ReshardingDonorTransitionValidationTest, RejectsMismatchingDurableContext) {
+    const auto before = progressing(kDonatingInitialData);
     const auto proposed = progressing(kDonatingOplogEntries);
     auto durable = proposed;
     durable.setBytesToClone(999);
     assertViolated({"durableMatchesProposed"},
-                   validateInstalled(proposed, proposed, durable),
-                   ErrorCodes::ReshardingPostconditionFailure);
-}
-
-TEST(ReshardingDonorTransitionValidationTest, RejectsMismatchingInMemoryContext) {
-    const auto proposed = progressing(kDonatingOplogEntries);
-    auto inMemory = proposed;
-    inMemory.setDocumentsToClone(999);
-    assertViolated({"inMemoryMatchesProposed"},
-                   validateInstalled(proposed, inMemory, proposed),
+                   validateInstalled(before, proposed, durable),
                    ErrorCodes::ReshardingPostconditionFailure);
 }
 
@@ -248,9 +249,9 @@ TEST(ReshardingDonorTransitionValidationTest, RejectsContextsThatStillShowThePre
     const auto before = progressing(kDonatingInitialData);
     const auto proposed = withState(before, kDonatingOplogEntries);
 
-    // Both contexts agree with each other, but neither agrees with the proposed state.
-    assertViolated({"durableMatchesProposed", "inMemoryMatchesProposed"},
-                   validateInstalled(proposed, before, before),
+    // The durable context still shows the previous state.
+    assertViolated({"durableMatchesProposed"},
+                   validateInstalled(before, proposed, before),
                    ErrorCodes::ReshardingPostconditionFailure);
 }
 

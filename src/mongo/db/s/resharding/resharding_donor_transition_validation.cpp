@@ -88,11 +88,6 @@ const DonorPostConstraint kDurableMatchesProposed{
         return checkBsonMatches("durable", in.durable.toBSON(), in.proposed.toBSON());
     }};
 
-const DonorPostConstraint kInMemoryMatchesProposed{
-    "inMemoryMatchesProposed", [](const DonorPostTransitionInput& in) -> Status {
-        return checkBsonMatches("in-memory", in.inMemory.toBSON(), in.proposed.toBSON());
-    }};
-
 TransitionCheck<DonorPreTransitionInput> preCheck(const DonorPreTransitionInput& in) {
     return makePreTransitionCheck(in, in.before.getState(), in.proposed.getState());
 }
@@ -124,28 +119,42 @@ ConstraintResult validateEnteringDone(const DonorPreTransitionInput& in) {
         .result();
 }
 
+TransitionCheck<DonorPostTransitionInput> postCheck(const DonorPostTransitionInput& in) {
+    return makePostTransitionCheck(in, in.before.getState(), in.proposed.getState());
+}
+
+ConstraintResult validatePostInstalled(const DonorPostTransitionInput& in) {
+    return postCheck(in).require(kDurableMatchesProposed).result();
+}
+
 using DonorTransitionEdge = std::pair<DonorStateEnum, DonorStateEnum>;
 using DonorPreTransitionValidator = ConstraintResult (*)(const DonorPreTransitionInput&);
+using DonorPostTransitionValidator = ConstraintResult (*)(const DonorPostTransitionInput&);
 
-const std::map<DonorTransitionEdge, DonorPreTransitionValidator>& donorTransitionValidators() {
-    static StaticImmortal validators = std::map<DonorTransitionEdge, DonorPreTransitionValidator>{
+struct DonorTransitionValidators {
+    DonorPreTransitionValidator pre;
+    DonorPostTransitionValidator post = &validatePostInstalled;
+};
+
+const std::map<DonorTransitionEdge, DonorTransitionValidators>& donorTransitionValidators() {
+    static StaticImmortal validators = std::map<DonorTransitionEdge, DonorTransitionValidators>{
         // Forward edges.
-        {{kPreparingToDonate, kDonatingInitialData}, &validateEnteringDonatingInitialData},
-        {{kDonatingInitialData, kDonatingOplogEntries}, &validateForward},
-        {{kDonatingOplogEntries, kPreparingToBlockWrites}, &validateForward},
-        {{kPreparingToBlockWrites, kBlockingWrites}, &validateForward},
+        {{kPreparingToDonate, kDonatingInitialData}, {&validateEnteringDonatingInitialData}},
+        {{kDonatingInitialData, kDonatingOplogEntries}, {&validateForward}},
+        {{kDonatingOplogEntries, kPreparingToBlockWrites}, {&validateForward}},
+        {{kPreparingToBlockWrites, kBlockingWrites}, {&validateForward}},
         // kError edges.
-        {{kPreparingToDonate, kError}, &validateEnteringError},
-        {{kDonatingInitialData, kError}, &validateEnteringError},
-        {{kDonatingOplogEntries, kError}, &validateEnteringError},
-        {{kPreparingToBlockWrites, kError}, &validateEnteringError},
+        {{kPreparingToDonate, kError}, {&validateEnteringError}},
+        {{kDonatingInitialData, kError}, {&validateEnteringError}},
+        {{kDonatingOplogEntries, kError}, {&validateEnteringError}},
+        {{kPreparingToBlockWrites, kError}, {&validateEnteringError}},
         // kDone edges.
-        {{kPreparingToDonate, kDone}, &validateEnteringDone},
-        {{kDonatingInitialData, kDone}, &validateEnteringDone},
-        {{kDonatingOplogEntries, kDone}, &validateEnteringDone},
-        {{kPreparingToBlockWrites, kDone}, &validateEnteringDone},
-        {{kError, kDone}, &validateEnteringDone},
-        {{kBlockingWrites, kDone}, &validateEnteringDone},
+        {{kPreparingToDonate, kDone}, {&validateEnteringDone}},
+        {{kDonatingInitialData, kDone}, {&validateEnteringDone}},
+        {{kDonatingOplogEntries, kDone}, {&validateEnteringDone}},
+        {{kPreparingToBlockWrites, kDone}, {&validateEnteringDone}},
+        {{kError, kDone}, {&validateEnteringDone}},
+        {{kBlockingWrites, kDone}, {&validateEnteringDone}},
     };
     return *validators;
 }
@@ -158,18 +167,18 @@ ConstraintResult validateDonorPreTransition(const DonorPreTransitionInput& input
     if (it == validators.end()) {
         return notAllowedTransition(input.before.getState(), input.proposed.getState());
     }
-    return it->second(input);
+    return it->second.pre(input);
 }
 
 ConstraintResult validateDonorPostTransition(const DonorPostTransitionInput& input) {
-    return TransitionCheck<DonorPostTransitionInput>(
-               std::string{str::stream()
-                           << "transition to " << idl::serialize(input.proposed.getState())},
-               input,
-               ErrorCodes::ReshardingPostconditionFailure)
-        .require(kDurableMatchesProposed)
-        .require(kInMemoryMatchesProposed)
-        .result();
+    const auto& validators = donorTransitionValidators();
+    const auto it = validators.find({input.before.getState(), input.proposed.getState()});
+    if (it == validators.end()) {
+        return notAllowedTransition(input.before.getState(),
+                                    input.proposed.getState(),
+                                    ErrorCodes::ReshardingPostconditionFailure);
+    }
+    return it->second.post(input);
 }
 
 }  // namespace mongo

@@ -104,11 +104,17 @@ TransitionCheck<Input> makePreTransitionCheck(const Input& in, StateEnum from, S
     return {describeTransitionEdge(from, to), in, ErrorCodes::ReshardingPreconditionFailure};
 }
 
+template <typename Input, typename StateEnum>
+TransitionCheck<Input> makePostTransitionCheck(const Input& in, StateEnum from, StateEnum to) {
+    return {describeTransitionEdge(from, to), in, ErrorCodes::ReshardingPostconditionFailure};
+}
+
 template <typename StateEnum>
-ConstraintResult notAllowedTransition(StateEnum from, StateEnum to) {
-    return {Status{ErrorCodes::ReshardingPreconditionFailure,
-                   describeTransitionEdge(from, to) + " is not allowed"},
-            {"isAllowedEdge"}};
+ConstraintResult notAllowedTransition(
+    StateEnum from,
+    StateEnum to,
+    ErrorCodes::Error code = ErrorCodes::ReshardingPreconditionFailure) {
+    return {Status{code, describeTransitionEdge(from, to) + " is not allowed"}, {"isAllowedEdge"}};
 }
 
 }  // namespace mongo

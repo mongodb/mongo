@@ -159,14 +159,14 @@ Timestamp generateMinFetchTimestamp(OperationContext* opCtx, const NamespaceStri
 }
 
 /**
- * Returns whether it is possible for the donor to be in 'state' when resharding will indefinitely
- * abort.
+ * Returns whether the donor is able to enter the error flow. False in kError, where the abort is
+ * already ongoing, and in kDone, where the donor has already finished.
  */
-bool inPotentialAbortScenario(const DonorStateEnum& state) {
+bool ableToEnterErrorFlow(const DonorStateEnum& state) {
     // Regardless of whether resharding will abort or commit, the donor will eventually reach state
     // kDone. Additionally, if the donor is in state kError, it is guaranteed that the coordinator
     // will eventually begin the abort process.
-    return state == DonorStateEnum::kError || state == DonorStateEnum::kDone;
+    return state != DonorStateEnum::kError && state != DonorStateEnum::kDone;
 }
 
 class ExternalStateImpl : public ReshardingDonorService::DonorStateMachineExternalState {
@@ -776,7 +776,7 @@ void ReshardingDonorService::DonorStateMachine::
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     const auto donorCtx = _donorCtx.get();
     if (donorCtx.getState() > DonorStateEnum::kPreparingToDonate) {
-        if (!inPotentialAbortScenario(donorCtx.getState())) {
+        if (ableToEnterErrorFlow(donorCtx.getState())) {
             // The invariants won't hold if an unrecoverable error is encountered before the donor
             // makes enough progress to transition to kDonatingInitialData and then a failover
             // occurs.
@@ -1314,7 +1314,7 @@ ReshardingDonorService::DonorStateMachine::_readDurableDonorContext(OperationCon
 }
 
 void ReshardingDonorService::DonorStateMachine::_validatePostTransition(
-    OperationContext* opCtx, const DonorShardContext& proposed) {
+    OperationContext* opCtx, const DonorShardContext& before, const DonorShardContext& proposed) {
     boost::optional<DonorShardContext> durable;
     try {
         durable = _readDurableDonorContext(opCtx);
@@ -1332,8 +1332,8 @@ void ReshardingDonorService::DonorStateMachine::_validatePostTransition(
         return;
     }
 
-    const auto result = validateDonorPostTransition(
-        {.proposed = proposed, .inMemory = _donorCtx.get(), .durable = *durable});
+    const auto result =
+        validateDonorPostTransition({.before = before, .proposed = proposed, .durable = *durable});
     tassertNoThrow(result.status);
 }
 
@@ -1389,7 +1389,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
                "reshardingUUID"_attr = _metadata.getReshardingUUID());
 
     if (validateTransitions) {
-        _validatePostTransition(opCtx.get(), expectedAfter);
+        _validatePostTransition(opCtx.get(), before, expectedAfter);
     }
 }
 

@@ -516,6 +516,10 @@ private:
     unittest::ServerParameterGuard _batchSize{
         "reshardingVerificationChangeStreamsEventsBatchSizeLimit", 1};
 
+    // Run every donor state transition with validation enabled.
+    unittest::ServerParameterGuard _validations{"featureFlagReshardingPrePostConditionsValidations",
+                                                true};
+
 protected:
     // The clone timestamp is set per test case after creating the source collection.
     Timestamp cloneTimestamp;
@@ -551,8 +555,6 @@ TEST_F(ReshardingDonorServiceTest, CanTransitionThroughEachStateToCompletion) {
 }
 
 TEST_F(ReshardingDonorServiceTest, FailedDoneValidationStillReleasesCriticalSection) {
-    unittest::ServerParameterGuard validations{"featureFlagReshardingPrePostConditionsValidations",
-                                               true};
     TestOptions testOptions{.isAlsoRecipient = false, .performVerification = false};
 
     auto doc = makeStateDocument(testOptions);
@@ -579,8 +581,6 @@ TEST_F(ReshardingDonorServiceTest, FailedDoneValidationStillReleasesCriticalSect
 }
 
 TEST_F(ReshardingDonorServiceTest, FailedErrorValidationStillRecordsAbortReason) {
-    unittest::ServerParameterGuard validations{"featureFlagReshardingPrePostConditionsValidations",
-                                               true};
     externalState()->throwUnrecoverableErrorIn(DonorStateEnum::kDonatingInitialData,
                                                kUpdateCoordinatorDocument);
 
@@ -1656,8 +1656,6 @@ TEST_F(ReshardingDonorServiceTestWithWCE,
 }
 
 TEST_F(ReshardingDonorServiceTest, PostValidationReadsMajorityCommittedState) {
-    unittest::ServerParameterGuard validations{"featureFlagReshardingPrePostConditionsValidations",
-                                               true};
     TestOptions testOptions{.isAlsoRecipient = false, .performVerification = false};
 
     auto doc = makeStateDocument(testOptions);

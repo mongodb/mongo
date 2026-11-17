@@ -319,9 +319,13 @@ private:
     // is missing.
     boost::optional<DonorShardContext> _readDurableDonorContext(OperationContext* opCtx) const;
 
-    // Checks that the proposed context got installed in memory and durably. Reports violations as
-    // tripwire assertions without throwing.
-    void _validatePostTransition(OperationContext* opCtx, const DonorShardContext& proposed);
+    /**
+     * Checks that the proposed context got installed in memory and durably. Reports violations as
+     * tripwire assertions without throwing.
+     */
+    void _validatePostTransition(OperationContext* opCtx,
+                                 const DonorShardContext& before,
+                                 const DonorShardContext& proposed);
 
     BSONObj _makeQueryForCoordinatorUpdate(const ShardId& shardId, DonorStateEnum newState);
 
