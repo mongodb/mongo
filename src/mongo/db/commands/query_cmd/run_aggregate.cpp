@@ -1494,13 +1494,8 @@ Status runAggregateOnShardedView(std::unique_ptr<ResolvedViewAggExState> resolve
  *
  * On success, fills out 'result' with the command response.
  */
-namespace {
-/**
- * Resolves foreign views by contacting the database primary shard via _shardsvrResolveView. Checks
- * whether or not it is valid (originating from non-primary shard, sharding is enabled, etc.) to
- * make the foreign views RPC before issuing the request, so it is safe to call from any
- * role/topology.
- */
+}  // namespace
+
 ResolvedNamespaceMap resolveForeignViewsOnPrimary(AggExState& aggExState) {
     ResolvedNamespaceMap closure;
     const auto& ifrContext = aggExState.getIfrContext();
@@ -1527,6 +1522,10 @@ ResolvedNamespaceMap resolveForeignViewsOnPrimary(AggExState& aggExState) {
 
     for (const auto& involvedNss : aggExState.getInvolvedNamespaces()) {
         if (involvedNss == mainNss) {
+            continue;
+        }
+        // Avoid sending resolve namespaces to the config server.
+        if (involvedNss.isConfigDB() || involvedNss.isLocalDB()) {
             continue;
         }
         // Short circuit if we can resolve this namespace locally.
@@ -1596,7 +1595,8 @@ ResolvedNamespaceMap resolveForeignViewsOnPrimary(AggExState& aggExState) {
     }
     return closure;
 }
-}  // namespace
+
+namespace {
 
 Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderInterface* result) {
     // Perform the validation checks on the request and its derivatives before proceeding.

@@ -14,6 +14,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/util/retry.h"
 #include "mongo/db/shard_role/shard_catalog/external_data_source_scope_guard.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
@@ -21,6 +22,8 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
+
+class AggExState;
 
 /**
  * Executes the aggregation 'request' over the specified namespace 'nss' using context 'opCtx'.
@@ -50,6 +53,14 @@ Status runAggregate(
  */
 bool shouldPropagateIfrKickbackToRouter(OperationContext* opCtx,
                                         const AggregateCommandRequest& request);
+
+/**
+ * Resolves foreign views by contacting the database primary shard via _shardsvrResolveView. Checks
+ * whether or not it is valid (originating from non-primary shard, sharding is enabled, etc.) to
+ * make the foreign views RPC before issuing the request, so it is safe to call from any
+ * role/topology.
+ */
+ResolvedNamespaceMap resolveForeignViewsOnPrimary(AggExState& aggExState);
 
 /**
  * Runs 'fn', which executes 'request' as an aggregation that the calling command derived locally,

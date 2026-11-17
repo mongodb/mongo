@@ -6,9 +6,11 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/commands/query_cmd/run_aggregate.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache_mock.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
@@ -293,6 +295,33 @@ protected:
                                    << BSONObj{});
         std::vector<BSONObj> pipeline{documentsStage};
         _request = std::make_unique<AggregateCommandRequest>(nss, pipeline);
+        _lpp = std::make_unique<LiteParsedPipeline>(*_request);
+
+        return std::make_unique<AggExState>(opCtx,
+                                            *_request,
+                                            *_lpp,
+                                            _cmdObj,
+                                            _privileges,
+                                            _externalSources,
+                                            /*verbosity=*/boost::none,
+                                            _ifrContext);
+    }
+
+    /**
+     * Create an AggExState for an aggregation over the shard catalog collections collection with a
+     * $lookup into the chunks collection, as the collection metadata synchronizer issues.
+     */
+    std::unique_ptr<AggExState> createConfigCatalogAggExState() {
+        auto opCtx = operationContext();
+
+        const auto& mainNss = NamespaceString::kConfigShardCatalogCollectionsNamespace;
+        const auto& chunksNss = NamespaceString::kConfigShardCatalogChunksNamespace;
+
+        BSONObj lookup = BSON("$lookup" << BSON("from" << chunksNss.coll() << "as" << "chunks"
+                                                       << "pipeline" << BSONArray()));
+        _cmdObj = BSON("aggregate" << mainNss.coll() << "pipeline" << BSON_ARRAY(lookup) << "cursor"
+                                   << BSONObj{});
+        _request = std::make_unique<AggregateCommandRequest>(mainNss, std::vector<BSONObj>{lookup});
         _lpp = std::make_unique<LiteParsedPipeline>(*_request);
 
         return std::make_unique<AggExState>(opCtx,
@@ -978,6 +1007,27 @@ TEST_F(
 
     // Do allow opening a change stream on a timeseries collection if rawData is set to true.
     ASSERT_DOES_NOT_THROW(aggExState->createAggCatalogState());
+}
+
+TEST_F(AggregationExecutionStateTest, ResolveForeignViewsOnPrimarySkipsConfigDbForeignNamespaces) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagExtensionsInsideHybridSearch",
+                                                         true);
+
+    // Point the mock catalog cache's 'config' database primary at the config server's shard and
+    // make its targeter fail, so that a remote resolution attempt fails fast instead of blocking
+    // on the mock network.
+    const ShardId configShardId = shardRegistry()->getConfigShard()->getId();
+    getCatalogCacheMock()->setDatabaseReturnValue(
+        DatabaseName::kConfig,
+        CatalogCacheMock::makeDatabaseInfo(DatabaseName::kConfig, configShardId, getDbVersion()));
+    configTargeterMock()->setFindHostReturnValue(
+        {ErrorCodes::InternalError, "foreign view resolution must not target any remote host"});
+
+    // The config server hosts a different 'config' database from the shard-local one, so it must
+    // not be asked about the shard catalog namespaces.
+    auto aggExState = createConfigCatalogAggExState();
+    auto closure = resolveForeignViewsOnPrimary(*aggExState);
+    ASSERT_TRUE(closure.empty());
 }
 
 }  // namespace
