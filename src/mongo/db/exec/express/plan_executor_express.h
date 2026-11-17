@@ -6,6 +6,7 @@
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -76,9 +77,10 @@ inline BSONObj getQueryFilterMaybeUnwrapEq(const BSONObj& query) {
     // 'isExactMatchOnId' here since we know we haven't reached this code via the eligibility
     // check on the CanonicalQuery's MatchExpression (since there was no CanonicalQuery created
     // for this path). Therefore, we know the incoming query is either exactly of the shape
-    // {_id: <value>} or {_id: {$eq: <value>}}.
-    if (const auto idValue = query["_id"]; idValue.isABSONObj() && idValue.Obj().hasField("$eq")) {
-        return idValue.Obj()["$eq"].wrap("_id");
+    // {_id: <value>} or {_id: {$eq: <value>}}. Any other object-valued _id is a literal value and
+    // must not be unwrapped.
+    if (const auto unwrapped = tryUnwrapIdEq(query["_id"])) {
+        return unwrapped->wrap("_id");
     }
     return query;
 }

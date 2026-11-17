@@ -125,15 +125,16 @@ void produceDocumentForUpsert(OperationContext* opCtx,
             opCtx, *cq->getPrimaryMatchExpression(), immutablePaths, doc));
     } else {
         fassert(17354, isSimpleIdQuery(request->getQuery()));
-        // IDHACK path allows for queries of the shape {_id: 123} and {_id: {$eq: 123}}. Neither
-        // case will have generated a CanonicalQuery earlier, so we have to figure out which value
-        // should be in the created document here, since we cannot insert a document that looks like
-        // {_id: {$eq: 123}}.
+        // IDHACK path allows for queries of the shape {_id: 123} and {_id: {$eq: 123}}, where the
+        // value may also be a literal object. Neither case will have generated a CanonicalQuery
+        // earlier, so we have to figure out which value should be in the created document here,
+        // since we cannot insert a document that looks like {_id: {$eq: 123}}. Any object-valued
+        // _id other than exactly {$eq: <value>} is a literal and must not be unwrapped.
         const BSONElement& idVal = request->getQuery()[idFieldName];
-        if (idVal.isABSONObj() && idVal.Obj().hasField("$eq")) {
+        if (const auto unwrapped = tryUnwrapIdEq(idVal)) {
             // We append an element of the shape {_id: 123}.
             mutablebson::Element newElement =
-                doc.makeElementWithNewFieldName(idFieldName, idVal["$eq"]);
+                doc.makeElementWithNewFieldName(idFieldName, *unwrapped);
             fassert(9248800, newElement.ok());
             fassert(9248803, doc.root().pushBack(newElement));
         } else {

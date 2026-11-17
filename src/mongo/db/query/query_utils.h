@@ -15,6 +15,8 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 /**
  * Returns 'true' if 'sortPattern' contains any sort pattern parts that share a common prefix, false
@@ -31,6 +33,17 @@ bool isMatchIdHackEligible(MatchExpression* me);
  * Returns true if 'query' describes an exact-match query on _id.
  */
 [[MONGO_MOD_NEEDS_REPLACEMENT]] bool isSimpleIdQuery(const BSONObj& query);
+
+/**
+ * Returns <value> if 'idValue' is exactly {$eq: <value>}, otherwise returns boost::none.
+ */
+inline boost::optional<BSONElement> tryUnwrapIdEq(const BSONElement& idValue) {
+    if (idValue.isABSONObj() && idValue.Obj().nFields() == 1 &&
+        idValue.Obj().firstElementFieldNameStringData() == "$eq") {
+        return idValue.Obj().firstElement();
+    }
+    return boost::none;
+}
 
 /**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan,
