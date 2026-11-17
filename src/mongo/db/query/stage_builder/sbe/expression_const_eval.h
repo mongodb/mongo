@@ -12,7 +12,10 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <utility>
 #include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 class CollatorInterface;
@@ -26,7 +29,12 @@ namespace mongo::stage_builder {
  */
 class ExpressionConstEval {
 public:
-    ExpressionConstEval(const CollatorInterface* collator) : _collator(collator) {}
+    /**
+     * 'collatorVar' names the variable holding the query collator 'collator', if there is one.
+     */
+    ExpressionConstEval(const CollatorInterface* collator,
+                        boost::optional<abt::ProjectionName> collatorVar = boost::none)
+        : _collator(collator), _collatorVar(std::move(collatorVar)) {}
 
     template <typename T, typename... Ts>
     void transport(abt::ABT&, const T&, Ts&&...) {}
@@ -63,8 +71,14 @@ private:
 
     void swapAndUpdate(abt::ABT& n, abt::ABT newN);
 
+    // Converts the constant array arguments starting at 'firstArg' to ArraySets.
+    void prepareSetConstants(std::vector<abt::ABT>& args,
+                             size_t firstArg,
+                             const CollatorInterface* collator);
+
     abt::DefinitionsMap _variableDefinitions;
     const CollatorInterface* _collator;
+    boost::optional<abt::ProjectionName> _collatorVar;
 
     abt::ProjectionNameSet _singleRef;
     abt::opt::unordered_map<abt::ProjectionName, size_t, abt::ProjectionName::Hasher> _varRefs;

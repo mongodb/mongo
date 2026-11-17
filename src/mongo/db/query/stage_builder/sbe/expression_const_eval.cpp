@@ -14,6 +14,23 @@
 #include <utility>
 
 namespace mongo::stage_builder {
+void ExpressionConstEval::prepareSetConstants(std::vector<abt::ABT>& args,
+                                              size_t firstArg,
+                                              const CollatorInterface* collator) {
+    using sbe::value::TypeTags;
+    for (size_t idx = firstArg; idx < args.size(); ++idx) {
+        auto constant = args[idx].cast<abt::Constant>();
+        if (!constant) {
+            continue;
+        }
+        auto [tag, val] = constant->get();
+        if (sbe::value::tagIn(tag, TypeTags::Array, TypeTags::ArrayMultiSet, TypeTags::bsonArray)) {
+            auto [setTag, setVal] = sbe::value::makeNewArraySet(tag, val, collator);
+            swapAndUpdate(args[idx], abt::make<abt::Constant>(setTag, setVal));
+        }
+    }
+}
+
 void ExpressionConstEval::optimize(abt::ABT& n) {
     invariant(_varRefs.empty());
     invariant(_singleRef.empty());
@@ -573,24 +590,28 @@ void ExpressionConstEval::transport(abt::ABT& n,
             const bool collationAware = op.fn() == sbe::EFn::kCollSetIsSubset ||
                 op.fn() == sbe::EFn::kCollSetDifference || op.fn() == sbe::EFn::kCollSetEquals;
             const CollatorInterface* setCollator = collationAware ? _collator : nullptr;
-            // Convert any argument of type Array to an ArraySet.
-            for (size_t idx = 0; idx < args.size(); idx++) {
-                if (args[idx].is<abt::Constant>()) {
-                    auto [tag, val] = args[idx].cast<abt::Constant>()->get();
-                    switch (tag) {
-                        case sbe::value::TypeTags::Array:
-                        case sbe::value::TypeTags::ArrayMultiSet:
-                        case sbe::value::TypeTags::bsonArray: {
-                            auto [setTag, setVal] =
-                                sbe::value::makeNewArraySet(tag, val, setCollator);
-                            swapAndUpdate(args[idx], abt::make<abt::Constant>(setTag, setVal));
-                            break;
-                        }
-                        default:
-                            break;
-                    }
-                }
+            prepareSetConstants(args, 0, setCollator);
+            break;
+        }
+        case sbe::EFn::kSetDifferenceArray:
+        case sbe::EFn::kSetEqualsArray:
+        case sbe::EFn::kSetIsSubsetArray: {
+            if (args.size() < 3) {
+                break;
             }
+            // The collator argument is Nothing for binary comparison or the query collator. For
+            // anything else we can't tell which collator it evaluates to, so leave it alone.
+            auto constant = args[0].cast<abt::Constant>();
+            auto variable = args[0].cast<abt::Variable>();
+            const bool binary = constant && constant->get().tag == sbe::value::TypeTags::Nothing;
+            const bool queryCollator =
+                variable && _collatorVar && variable->name() == *_collatorVar;
+            if (!binary && !queryCollator) {
+                break;
+            }
+            // Difference and subset only probe the RHS, keeping the LHS in its original order.
+            const size_t firstArg = op.fn() == sbe::EFn::kSetEqualsArray ? 1 : 2;
+            prepareSetConstants(args, firstArg, binary ? nullptr : _collator);
             break;
         }
         default:

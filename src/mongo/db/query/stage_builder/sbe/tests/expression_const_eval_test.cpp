@@ -83,6 +83,15 @@ Constant* constEval(ABT& tree, const CollatorInterface* collator = nullptr) {
     return result;
 }
 
+ABT makeStringArray(std::initializer_list<std::string_view> strings) {
+    auto [tag, val] = sbe::value::makeNewArray();
+    auto array = sbe::value::getArrayView(val);
+    for (auto str : strings) {
+        array->push_back_raw(sbe::value::makeNewString(str));
+    }
+    return make<Constant>(tag, val);
+}
+
 TEST(SbeStageBuilderConstEvalTest, ConstEval) {
     // 1 + 2
     ABT tree = _binary("Add", "1"_cint64, "2"_cint64)._n;
@@ -595,6 +604,74 @@ TEST(ConstEvalTest, CollSetFunctionsBuildCollatedSets) {
         auto [setTag, setVal] = abt.cast<FunctionCall>()->nodes()[1].cast<Constant>()->get();
         ASSERT_EQ(setTag, TypeTags::ArraySet) << fnName;
         ASSERT_EQ(sbe::value::getArraySetView(setVal)->size(), 1) << fnName;
+    }
+}
+
+TEST(ConstEvalTest, ArraySetFunctionsPrepareConstants) {
+    using sbe::EFn;
+    const CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
+
+    // Constant folds fn(collatorArg, ["a", "A"], ["a", "A"]).
+    auto optimize = [&](EFn fn, ABT collatorArg) {
+        auto tree = make<FunctionCall>(fn,
+                                       makeSeq(std::move(collatorArg),
+                                               makeStringArray({"a", "A"}),
+                                               makeStringArray({"a", "A"})));
+        ExpressionConstEval{&collator, ProjectionName{"collator"}}.optimize(tree);
+        return tree;
+    };
+    auto assertArray = [](const ABT& tree, size_t idx) {
+        auto tag = tree.cast<FunctionCall>()->nodes()[idx].cast<Constant>()->get().tag;
+        ASSERT_EQ(tag, TypeTags::Array);
+    };
+    // Prepared sets must only reference the query-owned collator, which outlives the ABT.
+    auto assertSet = [](const ABT& tree, size_t idx, const CollatorInterface* expectedCollator) {
+        auto [tag, val] = tree.cast<FunctionCall>()->nodes()[idx].cast<Constant>()->get();
+        ASSERT_EQ(tag, TypeTags::ArraySet);
+        ASSERT_EQ(sbe::value::getArraySetView(val)->getCollator(), expectedCollator);
+    };
+
+    // Difference and subset only prepare the RHS, keeping the LHS in its original order. Nothing
+    // means binary comparison.
+    for (auto fn : {EFn::kSetDifferenceArray, EFn::kSetIsSubsetArray}) {
+        auto binary = optimize(fn, Constant::nothing());
+        assertArray(binary, 1);
+        assertSet(binary, 2, nullptr);
+
+        auto collated = optimize(fn, make<Variable>("collator"));
+        assertArray(collated, 1);
+        assertSet(collated, 2, &collator);
+    }
+
+    // Equals prepares every operand.
+    auto binary = optimize(EFn::kSetEqualsArray, Constant::nothing());
+    assertSet(binary, 1, nullptr);
+    assertSet(binary, 2, nullptr);
+
+    auto collated = optimize(EFn::kSetEqualsArray, make<Variable>("collator"));
+    assertSet(collated, 1, &collator);
+    assertSet(collated, 2, &collator);
+
+    // Like the legacy builtins, union and intersection don't use prepared sets.
+    for (auto fn : {EFn::kSetUnionArray, EFn::kSetIntersectionArray}) {
+        auto tree = optimize(fn, make<Variable>("collator"));
+        assertArray(tree, 1);
+        assertArray(tree, 2);
+    }
+
+    // We can't tell which collator any other expression evaluates to, so leave the operands
+    // alone. This includes constant collators, which the ABT owns.
+    for (auto fn : {EFn::kSetDifferenceArray, EFn::kSetEqualsArray, EFn::kSetIsSubsetArray}) {
+        auto otherVar = optimize(fn, make<Variable>("other"));
+        assertArray(otherVar, 1);
+        assertArray(otherVar, 2);
+
+        auto constant = optimize(fn,
+                                 make<Constant>(TypeTags::collator,
+                                                sbe::value::bitcastFrom<CollatorInterface*>(
+                                                    collator.clone().release())));
+        assertArray(constant, 1);
+        assertArray(constant, 2);
     }
 }
 

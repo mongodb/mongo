@@ -101,6 +101,7 @@ TypeSignature constantFold(abt::ABT& abt, StageBuilderState& state, const Variab
     auto prefixId = PrefixId::create(/*useDescriptiveVarNames=*/false);
 
     const CollatorInterface* collator = nullptr;
+    boost::optional<abt::ProjectionName> collatorVar;
     boost::optional<SlotId> collatorSlot = state.getCollatorSlot();
     if (collatorSlot) {
         auto [collatorTag, collatorValue] = runtimeEnv.getAccessor(*collatorSlot)->getViewOfValue();
@@ -108,6 +109,7 @@ TypeSignature constantFold(abt::ABT& abt, StageBuilderState& state, const Variab
                 "Not a collator in collatorSlot",
                 collatorTag == sbe::value::TypeTags::collator);
         collator = sbe::value::bitcastTo<const CollatorInterface*>(collatorValue);
+        collatorVar = SbVar::makeProjectionName(*collatorSlot);
     }
 
     TypeSignature signature = TypeSignature::kAnyScalarType;
@@ -115,7 +117,7 @@ TypeSignature constantFold(abt::ABT& abt, StageBuilderState& state, const Variab
     do {
         // Run the constant folding to eliminate lambda applications as they are not directly
         // supported by the SBE VM.
-        ExpressionConstEval constEval{collator};
+        ExpressionConstEval constEval{collator, collatorVar};
 
         constEval.optimize(abt);
 
