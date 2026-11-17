@@ -379,12 +379,21 @@ TEST_F(BatchedFetchConversionTest, DoesNotReportIneligibleAccessPathsWithEitherF
         runQueryHint(BSON("a" << 1), BSON("a" << 1));
         check(*solns[0], false);
         ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
-        // Even a consume-all pipeline cannot override an explicit index-provided sort or limit.
+        // Even a consume-all pipeline cannot override an explicit index-provided sort, limit,
+        // or skip.
         params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
         runQuerySortHint(BSON("a" << BSON("$gte" << 1)), BSON("a" << 1), BSON("a" << 1));
         check(*solns[0], false);
         ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
         runQuerySortProjSkipLimitHint(BSON("a" << 1), BSONObj(), BSONObj(), 0, 1, BSON("a" << 1));
+        check(*solns[0], false);
+        ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
+        runQuerySortProjSkipLimitHint(BSON("a" << 1), BSONObj(), BSONObj(), 1, 0, BSON("a" << 1));
+        check(*solns[0], false);
+        ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
+        // An absorbed limit still disqualifies a top-k sort, including when there is a skip.
+        runQuerySortProjSkipLimitHint(
+            BSON("a" << 1), BSON("b" << 1), BSONObj(), 1, 1, BSON("a" << 1));
         check(*solns[0], false);
         ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
         // A blocking sort is insufficient when the index scan has a residual filter.
@@ -407,18 +416,24 @@ TEST_F(BatchedFetchConversionTest, DoesNotReportMultikeyAccessPathsWithEitherFla
     }
 }
 
-TEST_F(BatchedFetchConversionTest, FindLimitBeforePipelineBlockerDoesNotQualify) {
+TEST_F(BatchedFetchConversionTest, ConsumeAllDoesNotAllowFindLimitConversion) {
     params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
     addIndex(BSON("a" << 1));
     runQuerySortProjSkipLimitHint(BSON("a" << 1), BSONObj(), BSONObj(), 0, 1, BSON("a" << 1));
     check(*solns[0], false);
+    ASSERT(solns[0]->hasNode(STAGE_LIMIT));
+    ASSERT_FALSE(solns[0]->eligibleForBatchedIndexScanFetch);
+    ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
 }
 
-TEST_F(BatchedFetchConversionTest, FindSkipBeforePipelineBlockerDoesNotQualify) {
+TEST_F(BatchedFetchConversionTest, ConsumeAllDoesNotAllowFindSkipConversion) {
     params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
     addIndex(BSON("a" << 1));
     runQuerySortProjSkipLimitHint(BSON("a" << 1), BSONObj(), BSONObj(), 1, 0, BSON("a" << 1));
     check(*solns[0], false);
+    ASSERT(solns[0]->hasNode(STAGE_SKIP));
+    ASSERT_FALSE(solns[0]->eligibleForBatchedIndexScanFetch);
+    ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
 }
 
 TEST_F(BatchedFetchConversionTest, TopKSortDoesNotConvert) {
@@ -443,9 +458,9 @@ TEST_F(BatchedFetchConversionTest, ConsumeAllDoesNotAllowTopKSortConversion) {
 
 TEST_F(BatchedFetchConversionTest, TopKDefaultSortDoesNotConvert) {
     addIndex(BSON("a" << 1));
-    runQueryAsCommand(
-        fromjson("{find: 'testns', filter: {a: 1}, sort: {b: 1}, limit: 1, hint: {a: 1}, "
-                 "showRecordId: true}"));
+    // Needing the record id precludes the simple sort, so the planner emits a default top-k sort.
+    forceRecordId = true;
+    runQuerySortProjSkipLimitHint(BSON("a" << 1), BSON("b" << 1), BSONObj(), 0, 1, BSON("a" << 1));
     ASSERT_EQ(solns.size(), 1);
     const auto* sort = solns[0]->root()->getFirstNodeByType(STAGE_SORT_DEFAULT).first;
     ASSERT(sort);
@@ -458,15 +473,46 @@ TEST_F(BatchedFetchConversionTest, TopKSortWithSkipDoesNotConvert) {
     runQuerySortProjSkipLimitHint(BSON("a" << 1), BSON("b" << 1), BSONObj(), 1, 1, BSON("a" << 1));
     ASSERT_EQ(solns.size(), 1);
     ASSERT(solns[0]->hasNode(STAGE_SKIP));
+    ASSERT_FALSE(solns[0]->hasNode(STAGE_LIMIT));
+    const auto* sort = solns[0]->root()->getFirstNodeByType(STAGE_SORT_SIMPLE).first;
+    ASSERT(sort);
+    ASSERT_EQ(static_cast<const SortNode*>(sort)->limit, 2U);
     check(*solns[0], false);
+    ASSERT_FALSE(solns[0]->eligibleForBatchedIndexScanFetch);
 }
 
-TEST_F(BatchedFetchConversionTest, SkipAboveBlockingSortDoesNotQualify) {
+TEST_F(BatchedFetchConversionTest, SkipAboveBlockingSortQualifiesWithEitherFlagValue) {
     addIndex(BSON("a" << 1));
+    for (bool enabled : {false, true}) {
+        unittest::ServerParameterGuard flag("featureFlagBatchedIndexScanFetch", enabled);
+        IncrementalFeatureRolloutContext::set(opCtx.get(),
+                                              std::make_shared<IncrementalFeatureRolloutContext>());
+        runQuerySortProjSkipLimitHint(
+            BSON("a" << 1), BSON("b" << 1), BSONObj(), 1, 0, BSON("a" << 1));
+        ASSERT_EQ(solns.size(), 1);
+        const auto* root = solns[0]->root();
+        ASSERT_EQ(root->getType(), STAGE_SKIP);
+        ASSERT_EQ(root->children[0]->getType(), STAGE_SORT_SIMPLE);
+        ASSERT_EQ(static_cast<const SortNode*>(root->children[0].get())->limit, 0U);
+        check(*solns[0], enabled);
+        ASSERT_TRUE(solns[0]->eligibleForBatchedIndexScanFetch);
+        ASSERT_EQ(eligibleAccessPaths(*solns[0]), 1);
+    }
+}
+
+TEST_F(BatchedFetchConversionTest, SkipAboveDefaultBlockingSortQualifies) {
+    addIndex(BSON("a" << 1));
+    // Needing the record id precludes the simple sort, so the planner emits a default blocking
+    // sort for the skip to sit above.
+    forceRecordId = true;
     runQuerySortProjSkipLimitHint(BSON("a" << 1), BSON("b" << 1), BSONObj(), 1, 0, BSON("a" << 1));
-    ASSERT(solns[0]->hasNode(STAGE_SKIP));
-    ASSERT(solns[0]->hasNode(STAGE_SORT_DEFAULT) || solns[0]->hasNode(STAGE_SORT_SIMPLE));
-    check(*solns[0], false);
+    ASSERT_EQ(solns.size(), 1);
+    const auto* root = solns[0]->root();
+    ASSERT_EQ(root->getType(), STAGE_SKIP);
+    ASSERT_EQ(root->children[0]->getType(), STAGE_SORT_DEFAULT);
+    ASSERT_EQ(static_cast<const SortNode*>(root->children[0].get())->limit, 0U);
+    check(*solns[0], true);
+    ASSERT_TRUE(solns[0]->eligibleForBatchedIndexScanFetch);
 }
 
 TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {

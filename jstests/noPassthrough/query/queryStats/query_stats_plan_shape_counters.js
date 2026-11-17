@@ -28,7 +28,8 @@ function runPlanShapeCounterTest(coll) {
     const statsConn = coll.getDB().getMongo();
     const isSharded = FixtureHelpers.isMongos(coll.getDB());
 
-    assert.commandWorked(coll.insert([{a: 1}, {a: 2}, {a: 3}]));
+    const docs = [{a: 1}, {a: 2}, {a: 3}];
+    assert.commandWorked(coll.insert(docs));
 
     function getPlanShapeCounters(collName = coll.getName()) {
         const stats = getQueryStats(statsConn, {collName});
@@ -276,6 +277,46 @@ function runPlanShapeCounterTest(coll) {
                       },
                   },
         );
+    }
+
+    // Skip above an unlimited blocking sort still reports batching eligibility. Without the
+    // blocking sort, skip and limit do not qualify. Only test this on the standalone, since the
+    // sharded fixture's SHARDING_FILTER prevents a direct FETCH-IXSCAN pair.
+    if (!isSharded) {
+        for (const {sort, skip, limit, eligible} of [
+            {sort: {b: 1}, skip: 1, limit: 0, eligible: true},
+            {sort: {}, skip: 1, limit: 0, eligible: false},
+            {sort: {}, skip: 0, limit: 1, eligible: false},
+        ]) {
+            reset();
+            assert.commandWorked(coll.createIndex({a: 1}));
+            assert.eq(
+                limit || docs.length - skip,
+                coll
+                    .find({a: {$gte: 1}})
+                    .hint({a: 1})
+                    .sort(sort)
+                    .skip(skip)
+                    .limit(limit)
+                    .itcount(),
+            );
+            assertCounters({
+                patterns: eligible ? {ixscanFetchSort: 1} : {ixscanFetch: 1},
+                nodes: {
+                    ixscanNoFilter: 1,
+                    fetchNoFilter: 1,
+                    ...(eligible ? {sortSimpleNoLimit: 1} : {}),
+                    ...(skip ? {skipSmall: 1} : {}),
+                    ...(limit ? {limitSmall: 1} : {}),
+                },
+                accessPaths: {
+                    ixscanFetch: 1,
+                    btreeIxscan: 1,
+                    boundsBoundedRange: 1,
+                    ...(eligible ? {batchedIndexScanFetchEligible: 1} : {}),
+                },
+            });
+        }
     }
 
     // A bare IXSCAN (returnKey) matches no tracked plan shape, so the patterns category is

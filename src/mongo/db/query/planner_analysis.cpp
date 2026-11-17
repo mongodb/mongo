@@ -81,8 +81,10 @@ bool analyzeBatchedFetchEligibility(std::unique_ptr<QuerySolutionNode>& root,
         consumerIgnoresOrder = static_cast<const SortNode*>(root.get())->limit == 0;
     } else if (type != STAGE_FETCH && type != STAGE_IXSCAN && type != STAGE_SHARDING_FILTER &&
                !isProjectionStageType(type)) {
-        // In particular, merge sorts and sorted intersections require ordered inputs.
-        // Do not propagate eligibility through unfamiliar or multi-input stages.
+        // In particular, skip and limit make results depend on input order, while merge sorts
+        // and sorted intersections require ordered inputs. A blocking sort below these stages
+        // can establish eligibility again. Do not propagate eligibility through unfamiliar or
+        // multi-input stages.
         consumerIgnoresOrder = false;
     }
     if (type == STAGE_FETCH) {
@@ -117,12 +119,9 @@ bool analyzeBatchedFetchEligibility(std::unique_ptr<QuerySolutionNode>& root,
 bool attemptConvertToBatchedFetch(const CanonicalQuery& query,
                                   const QueryPlannerParams& params,
                                   std::unique_ptr<QuerySolutionNode>& root) {
-    // Count and distinct plans retain ordinary FETCH nodes for specialized scan rewrites. Skip and
-    // limit nodes can make the results depend on fetch order even when there is a blocking stage
-    // elsewhere in the tree.
+    // Count and distinct plans retain ordinary FETCH nodes for specialized scan rewrites.
     // TODO SERVER-137225: Remove isCountLike() check.
-    if (query.isCountLike() || query.getDistinct() || root->hasNode(STAGE_SKIP) ||
-        root->hasNode(STAGE_LIMIT)) {
+    if (query.isCountLike() || query.getDistinct()) {
         return false;
     }
 
