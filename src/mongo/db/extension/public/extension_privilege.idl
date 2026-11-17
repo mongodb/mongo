@@ -15,13 +15,16 @@ imports:
 
 enums:
     MongoExtensionPrivilegeResourcePattern:
-        description: What resource the privilege applies to.
+        description: >-
+            What resource the privilege applies to. This enum is append-only: never remove or
+            rename a value.
         type: string
         values:
             kNamespace: "namespace"
+            kDatabase: "database"
     MongoExtensionPrivilegeAction:
         description: >-
-            Actions an extension may require on a specific namespace. Each value maps to a
+            Actions an extension may require on the target resource. Each value maps to a
             server-defined ActionType. This enum is append-only: never remove or rename a value.
         type: string
         values:

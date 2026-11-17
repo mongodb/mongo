@@ -71,6 +71,6 @@ structs:
             requiredPrivileges:
                 description: >-
                     Privileges the client must hold to invoke this command. Each entry names action
-                    types on a resource pattern (currently the command's target namespace). An empty
-                    array means the command requires no additional privileges.
+                    types on a resource pattern. An empty array means the command requires no
+                    additional privileges.
                 type: array<MongoExtensionRequiredPrivilege>

@@ -871,6 +871,32 @@ public:
     }
 };
 
+class DatabaseRequiredPrivilegesAggStageAstNode : public sdk::AggStageAstNode {
+public:
+    static constexpr std::string_view kName = "$databasePrivilege";
+
+    DatabaseRequiredPrivilegesAggStageAstNode() : sdk::AggStageAstNode(kName) {}
+
+    BSONObj getProperties() const override {
+        return BSON("requiredPrivileges" << BSON_ARRAY(BSON(
+                        "resourcePattern" << "database"
+                                          << "actions" << BSON_ARRAY(BSON("action" << "find")))));
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> promote(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
+        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
+    }
+
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<DatabaseRequiredPrivilegesAggStageAstNode>();
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<DatabaseRequiredPrivilegesAggStageAstNode>();
+    }
+};
+
 class MultipleChildrenRequiredPrivilegesAggStageParseNode : public sdk::AggStageParseNode {
 public:
     static constexpr std::string_view kName = "$multipleChildrenRequiredPrivileges";
@@ -1398,6 +1424,29 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     ASSERT_EQ(actions.getActionsAsStringDatas().size(), 2);
     ASSERT_TRUE(actions.contains(ActionType::find));
     ASSERT_TRUE(actions.contains(ActionType::indexStats));
+
+    ASSERT_TRUE(lp.requiresAuthzChecks());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       DatabaseRequiredPrivilegesAstNodeProducesDatabasePrivilege) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNodeAdapter(DatabaseRequiredPrivilegesAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtensionOptimizable::LiteParsedExpanded lp(
+        std::string(DatabaseRequiredPrivilegesAggStageAstNode::kName), std::move(handle), _nss);
+
+    auto privileges = lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
+    ASSERT_EQ(privileges.size(), 1);
+
+    const auto& privilege = privileges.front();
+    ASSERT_TRUE(privilege.getResourcePattern().isDatabasePattern());
+    ASSERT_EQ(privilege.getResourcePattern().dbNameToMatch(), _nss.dbName());
+
+    const auto& actions = privilege.getActions();
+    ASSERT_EQ(actions.getActionsAsStringDatas().size(), 1);
+    ASSERT_TRUE(actions.contains(ActionType::find));
 
     ASSERT_TRUE(lp.requiresAuthzChecks());
 }

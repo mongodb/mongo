@@ -322,19 +322,26 @@ public:
 
             if (const auto& requiredPrivileges = _properties.getRequiredPrivileges()) {
                 for (const auto& rp : *requiredPrivileges) {
-                    tassert(
-                        ErrorCodes::ExtensionError,
-                        "Only 'namespace' resourcePattern is supported for extension privileges",
-                        rp.getResourcePattern() ==
-                            MongoExtensionPrivilegeResourcePatternEnum::kNamespace);
-
                     ActionSet actions;
                     for (const auto& entry : rp.getActions()) {
                         actions.addAction(static_properties_util::toActionType(entry.getAction()));
                     }
 
-                    Privilege::addPrivilegeToPrivilegeVector(
-                        &privileges, Privilege{ResourcePattern::forExactNamespace(_nss), actions});
+                    switch (rp.getResourcePattern()) {
+                        case MongoExtensionPrivilegeResourcePatternEnum::kNamespace:
+                            Privilege::addPrivilegeToPrivilegeVector(
+                                &privileges,
+                                Privilege{ResourcePattern::forExactNamespace(_nss), actions});
+                            break;
+                        case MongoExtensionPrivilegeResourcePatternEnum::kDatabase:
+                            Privilege::addPrivilegeToPrivilegeVector(
+                                &privileges,
+                                Privilege{ResourcePattern::forDatabaseName(_nss.dbName()),
+                                          actions});
+                            break;
+                        default:
+                            MONGO_UNREACHABLE_TASSERT(13843900);
+                    }
                 }
             }
 

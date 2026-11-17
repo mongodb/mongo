@@ -366,7 +366,7 @@ TEST_F(AggStageTest, BadRequiresInputDocSourceTypeAggStageAstNodeFails) {
 TEST_F(AggStageTest, InvalidResourcePatternRequiredPrivilegesAggStageAstNodeFails) {
     auto invalidResourcePatternRequiredPrivileges =
         BSON("requiredPrivileges" << BSON_ARRAY(
-                 BSON("resourcePattern" << "database"
+                 BSON("resourcePattern" << "invalid"
                                         << "actions" << BSON_ARRAY(BSON("action" << "find")))));
     auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
         std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(

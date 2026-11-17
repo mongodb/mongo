@@ -18,6 +18,8 @@ using MongoExtensionCommandClusterRoleEnum::kShard;
 using MongoExtensionCommandReadWriteTypeEnum::kCommand;
 using MongoExtensionCommandReadWriteTypeEnum::kWrite;
 using MongoExtensionPrivilegeActionEnum::kCreateSearchIndexes;
+using MongoExtensionPrivilegeActionEnum::kListSearchIndexes;
+using MongoExtensionPrivilegeResourcePatternEnum::kDatabase;
 using MongoExtensionPrivilegeResourcePatternEnum::kNamespace;
 
 TEST(ExtensionCommandStaticPropertiesTest, DefaultsAreApplied) {
@@ -108,6 +110,30 @@ TEST(ExtensionCommandStaticPropertiesTest, RequiredPrivilegesParseAndRoundTrip) 
     ASSERT_EQ(privileges[0].getResourcePattern(), kNamespace);
     ASSERT_EQ(privileges[0].getActions().size(), 1u);
     ASSERT_EQ(privileges[0].getActions()[0].getAction(), kCreateSearchIndexes);
+
+    ASSERT_BSONOBJ_EQ(doc, properties.toBSON());
+}
+
+TEST(ExtensionCommandStaticPropertiesTest, DatabaseResourcePatternParsesAndRoundTrips) {
+    // Fields are written in IDL declaration order so the serialized form compares equal.
+    const auto doc = BSON(
+        "clusterRole" << "both"
+                      << "readWriteType" << "command"
+                      << "allowedOnSecondary" << "never"
+                      << "adminOnly" << false << "supportsWriteConcern" << false
+                      << "isSubjectToIngressAdmissionControl" << false << "requiredPrivileges"
+                      << BSON_ARRAY(BSON("resourcePattern"
+                                         << "database"
+                                         << "actions"
+                                         << BSON_ARRAY(BSON("action" << "listSearchIndexes")))));
+
+    const auto properties = MongoExtensionCommandStaticProperties::parse(doc);
+
+    const auto& privileges = properties.getRequiredPrivileges();
+    ASSERT_EQ(privileges.size(), 1u);
+    ASSERT_EQ(privileges[0].getResourcePattern(), kDatabase);
+    ASSERT_EQ(privileges[0].getActions().size(), 1u);
+    ASSERT_EQ(privileges[0].getActions()[0].getAction(), kListSearchIndexes);
 
     ASSERT_BSONOBJ_EQ(doc, properties.toBSON());
 }
