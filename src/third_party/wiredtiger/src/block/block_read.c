@@ -132,7 +132,7 @@ __wt_block_read_off_blind(
     *sizep = 0;
     *checksump = 0;
 
-    if (block->in_memory) {
+    if (F_ISSET(block, WT_BLOCK_IN_MEMORY)) {
         WT_ASSERT(session, block->fh == NULL);
         WT_RET_MSG(session, EINVAL, "%s: no backing file", block->name);
     }
@@ -167,7 +167,7 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
     uint64_t time_start, time_stop;
     bool full_checksum_mismatch;
 
-    if (block->in_memory) {
+    if (F_ISSET(block, WT_BLOCK_IN_MEMORY)) {
         WT_ASSERT(session, block->fh == NULL);
         WT_RET_MSG(session, EINVAL, "%s: no backing file", block->name);
     }
@@ -272,7 +272,7 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
     /* Panic if a checksum fails during an ordinary read. */
     F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
 
-    if (block->verify || WT_SESSION_READ_CORRUPT_OK(session))
+    if (FLD_ISSET(block->verify_flags, WT_BLOCK_VERIFY) || WT_SESSION_READ_CORRUPT_OK(session))
         return (WT_ERROR);
 
     __wti_block_extlist_dump_all(session, block);

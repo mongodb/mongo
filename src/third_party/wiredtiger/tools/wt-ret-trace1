@@ -88,7 +88,7 @@ chdir chomp $root and die "Can't chdir to top level: <$root>: $!";
 
 my $ret_arg0 = "__wt_illegal_value|__wt_errno";
 my $ret_arg1 = "return|WT_ERR|WT_ERR_ERROR_OK|WT_ERR_NOTFOUND_OK|WT_RET|WT_RET_TRACK|WT_RET_ERROR_OK|WT_RET_BUSY_OK|WT_RET_NOTFOUND_OK|WT_TRET|WT_TRET_ERROR_OK|WT_TRET_NOTFOUND_OK|__err_cell_corrupt|__err_cell_corrupt_or_eof";
-my $ret_arg2 = "WT_ERR_MSG|WT_ERR_TEST|WT_RET_TEST|WT_ERR_PANIC|WT_RET_VRFY_RETVAL|WT_RET_MSG|WT_PREFETCH_ASSERT|API_END_RET|WT_RET_PANIC|__wt_set_return|__blkcache_read_corrupt|__wt_err|__wt_err_func|__wt_panic|__wt_panic_func";
+my $ret_arg2 = "WT_ERR_MSG|WT_ERR_TEST|WT_RET_TEST|WT_ERR_PANIC|WT_RET_VRFY_RETVAL|WT_RET_MSG|WT_PREFETCH_ASSERT|API_END_RET|WT_RET_PANIC|__wt_set_return|__bm_read_corrupt|__wt_err|__wt_err_func|__wt_panic|__wt_panic_func";
 my $ret_arg3 = "WT_BLOCK_RET|__config_err";
 my $ret_arg4 = "WT_RET_ASSERT|WT_RET_PANIC_ASSERT|WT_ERR_ASSERT";
 

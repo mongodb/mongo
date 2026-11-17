@@ -6,7 +6,7 @@
 
 * The module names are pre-configured as a list of subdirectories under `src/`, with some exclusions like `include`, `checksum`, `os*`, etc. These exclusions are because these directories don’t really contain modular code. If the module name, as deduced by any method, is not in this list, there is no associated module, and the content is exempt from modularity checks.
 
-* Modules can have aliases, for example, `block_cache` refers to `blkcache`, or `connection` is the same as `conn`.
+* Modules can have aliases, for example, `block_mgr` refers to `bm`, or `connection` is the same as `conn`.
 
 ## Modules Content and Visibility Rules
 

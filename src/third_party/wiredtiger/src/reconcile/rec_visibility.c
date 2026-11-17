@@ -55,9 +55,10 @@ __rec_update_save(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins, WT
     } else
         WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT) || upd_memsize == 0);
 
-    if (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) && !r->newer_updates_than_last_rec_used &&
+    if (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&
+      !FLD_ISSET(r->state_flags, WTI_REC_NEWER_UPDATES_THAN_LAST_REC_USED) &&
       __rec_selected_key_changed(session, supd))
-        r->newer_updates_than_last_rec_used = true;
+        FLD_SET(r->state_flags, WTI_REC_NEWER_UPDATES_THAN_LAST_REC_USED);
 
     return (0);
 }
@@ -1180,7 +1181,7 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
             found_last_upd_to_keep = upd_select->upd != NULL;
             __rec_upd_select_track_modify_base(upd_select, upd);
             /* Mark we are making progress for eviction so eviction doesn't stall. */
-            r->update_used = true;
+            FLD_SET(r->state_flags, WTI_REC_UPDATE_USED);
             break;
         }
 
@@ -1648,7 +1649,7 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
         WT_ASSERT_ALWAYS(session, upd == NULL,
           "__wt_rec_upd_select has selected an update when none are present on the update chain");
         if (first_upd != NULL)
-            r->has_upd_chain_all_aborted = true;
+            FLD_SET(r->state_flags, WTI_REC_HAS_UPD_CHAIN_ALL_ABORTED);
         return (0);
     }
 
@@ -1664,14 +1665,14 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
 
     /* If an update was selected, record that we're making progress. */
     if (upd != NULL)
-        r->update_used = true;
+        FLD_SET(r->state_flags, WTI_REC_UPDATE_USED);
 
     if (upd != NULL)
         WT_RET(__rec_fill_tw_from_upd_select(session, page, vpack, upd_select, write_prepare, r));
 
     /* Mark the page dirty after reconciliation. */
     if (has_newer_updates)
-        r->leave_dirty = true;
+        FLD_SET(r->state_flags, WTI_REC_LEAVE_DIRTY);
 
     onpage_upd = upd_select->upd != NULL && upd_select->upd->type == WT_UPDATE_TOMBSTONE ?
       NULL :
@@ -1757,7 +1758,7 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
 
     /* Track whether we need to do update restore eviction. */
     if (supd_restore)
-        r->cache_write_restore_invisible = true;
+        FLD_SET(r->state_flags, WTI_REC_CACHE_WRITE_RESTORE_INVISIBLE);
 
     /*
      * Paranoia: check that we didn't choose an update that has since been rolled back.

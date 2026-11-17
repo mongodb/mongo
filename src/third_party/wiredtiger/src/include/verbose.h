@@ -23,7 +23,6 @@ struct __wt_verbose_message_info {
     "WT_VERB_ALL", \
     "WT_VERB_API", \
     "WT_VERB_BACKUP", \
-    "WT_VERB_BLKCACHE", \
     "WT_VERB_BLOCK", \
     "WT_VERB_CACHE_TOP", \
     "WT_VERB_CHECKPOINT", \

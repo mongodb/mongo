@@ -111,7 +111,7 @@ struct merge_empty_value_fixture {
 
         WT_BTREE *btree = S2BT(session);
         btree->collator = nullptr;
-        btree->prefix_compression = false;
+        F_CLR(btree, WT_BTREE_PREFIX_COMPRESSION);
         btree->block_header_write_size = WT_BLOCK_HEADER_SIZE;
         btree->base_write_gen = 1;
         bm.block_header_read_size = stub_block_header_read;

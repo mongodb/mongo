@@ -70,9 +70,6 @@
  */
 #cmakedefine HAVE_UNITTEST_ASSERTS 1
 
-/* Define to 1 if the user has explicitly enabled memkind builds. */
-#cmakedefine ENABLE_MEMKIND 1
-
 /* Define to 1 if the user has set enable antithesis. */
 #cmakedefine ENABLE_ANTITHESIS 1
 

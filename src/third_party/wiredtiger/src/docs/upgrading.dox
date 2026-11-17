@@ -12,6 +12,17 @@ will continue to open successfully as long as chunk cache is not enabled. The \c
 metadata file, if present, will be automatically removed on startup.
 </dd>
 
+<dt>Block cache has been removed</dt>
+<dd>
+The block cache has been removed. Setting <code>block_cache=(enabled=true)</code> in the
+::wiredtiger_open configuration string, the \c WiredTiger.config file, the \c WIREDTIGER_CONFIG
+environment variable or WT_CONNECTION::reconfigure fails with \c ENOTSUP. Any other
+\c block_cache setting is ignored and a warning is logged. Existing databases whose
+\c WiredTiger.basecfg file contains block cache settings still open; the settings are ignored
+with a warning and are no longer written to new \c WiredTiger.basecfg files. The \c block_cache
+verbose category has been removed; <code>verbose=[block_cache]</code> now fails with \c EINVAL.
+</dd>
+
 <dt>Fixed-length column-store is removed</dt>
 <dd>
 The storage format fixed-length column-store is no longer supported. This means that if you have a

@@ -163,7 +163,7 @@ __wti_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
      * The required maximum and minimum cannot be set via reconfigure and they are meaningless on a
      * newly created database. We're done in those cases.
      */
-    if (reconfig || conn->is_new ||
+    if (reconfig || F_ISSET(conn, WT_CONN_IS_NEW) ||
       (!__wt_version_defined(min_compat) && !__wt_version_defined(max_compat)))
         goto done;
 
@@ -460,6 +460,12 @@ __wti_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
     }
 
     /*
+     * Only the new configuration is checked: the saved configuration always contains the block
+     * cache category, and checking it would warn on every reconfigure.
+     */
+    WT_ERR(__wti_block_cache_user_config_check(session, cfg[1], NULL));
+
+    /*
      * Reconfigure the system.
      *
      * The compatibility version check is special: upgrade / downgrade cannot be done with
@@ -469,7 +475,7 @@ __wti_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
      */
     WT_WITH_CHECKPOINT_LOCK(session, ret = __wti_conn_compat_config(session, cfg, true));
     WT_ERR(ret);
-    WT_ERR(__wt_blkcache_setup(session, cfg, true));
+
     WT_ERR(__wti_conn_optrack_setup(session, cfg, true));
     WT_ERR(__wti_conn_page_history_config(session, cfg, true));
     WT_ERR(__wti_conn_statistics_config(session, cfg));

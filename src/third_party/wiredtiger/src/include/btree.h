@@ -150,10 +150,10 @@ struct __wt_btree {
     const char *hs_checkpoint_name; /* History store checkpoint name. */
 
     WT_BTREE_TYPE type; /* Type */
+    uint8_t bitcnt;     /* Fixed-length field size in bits */
 
     const char *key_format;   /* Key format */
     const char *value_format; /* Value format */
-    uint8_t bitcnt;           /* Fixed-length field size in bits */
 
     WT_COLLATOR *collator; /* Row-store comparator */
     int collator_owned;    /* The collator needs to be freed */
@@ -165,8 +165,8 @@ struct __wt_btree {
     uint32_t maxleafpage;           /* Leaf page max size */
     uint32_t maxleafkey;            /* Leaf page max key size */
     uint32_t maxleafvalue;          /* Leaf page max value size */
-    uint64_t maxmempage;            /* In-memory page max size */
     uint32_t maxmempage_image;      /* In-memory page image max size */
+    uint64_t maxmempage;            /* In-memory page max size */
     uint64_t splitmempage;          /* In-memory split trigger size */
 
     WT_BTREE_CHECKSUM checksum; /* Checksum configuration */
@@ -175,9 +175,8 @@ struct __wt_btree {
      * Reconciliation...
      */
     u_int dictionary;             /* Dictionary slots */
-    bool internal_key_truncate;   /* Internal key truncate */
-    bool prefix_compression;      /* Prefix compression */
     u_int prefix_compression_min; /* Prefix compression min */
+    int split_pct;                /* Split page percent */
 
     /* FIXME-WT-15633: Combine `prune_timestamp` and `checkpoint_timestamp` into one variable */
     wt_shared wt_timestamp_t prune_timestamp; /* Ingest table GC collection timestamp */
@@ -193,17 +192,13 @@ struct __wt_btree {
     u_int split_deepen_min_child; /* Minimum entries to deepen tree */
 #define WT_SPLIT_DEEPEN_PER_CHILD_DEF 100
     u_int split_deepen_per_child; /* Entries per child when deepened */
-    int split_pct;                /* Split page percent */
 
-    WT_COMPRESSOR *compressor;    /* Page compressor */
-                                  /*
-                                   * When doing compression, the pre-compression in-memory byte size
-                                   * is optionally adjusted based on previous compression results.
-                                   * It's an 8B value because it's updated without a lock.
-                                   */
-    bool leafpage_compadjust;     /* Run-time compression adjustment */
+    WT_COMPRESSOR *compressor; /* Page compressor */
+    /*
+     * When doing compression, the pre-compression in-memory byte size is optionally adjusted based
+     * on previous compression results. It's an 8B value because it's updated without a lock.
+     */
     uint64_t maxleafpage_precomp; /* Leaf page pre-compression size */
-    bool intlpage_compadjust;     /* Run-time compression adjustment */
     uint64_t maxintlpage_precomp; /* Internal page pre-compression size */
 
     WT_KEYED_ENCRYPTOR *kencryptor; /* Page encryptor */
@@ -222,7 +217,7 @@ struct __wt_btree {
     wt_shared uint8_t original; /* Newly created: bulk-load possible
                          (want a bool but needs atomic cas) */
 
-    bool hs_entries; /* Has entries in the history store table */
+    wt_shared bool hs_entries; /* Has entries in the history store table */
 
     WT_BM *bm;                     /* Block manager reference */
     u_int block_header_write_size; /* The size of a block header when writing a new page */
@@ -367,8 +362,8 @@ struct __wt_btree {
     u_int evict_walk_saved;                    /* Saved walk skips for checkpoints */
     u_int evict_walk_skips;                    /* Number of walks skipped */
     wt_shared int32_t evict_disabled;          /* Eviction disabled count */
-    bool evict_disabled_open;                  /* Eviction disabled on open */
-    bool evict_walk_dominating;                /* Current walk overrode the walk period */
+    wt_shared bool evict_disabled_open;        /* Eviction disabled on open */
+    wt_shared bool evict_walk_dominating;      /* Current walk overrode the walk period */
     wt_shared volatile uint32_t evict_busy;    /* Count of threads in eviction */
     wt_shared volatile uint32_t prefetch_busy; /* Count of threads in prefetch */
     WT_EVICT_WALK_TYPE evict_start_type;
@@ -385,17 +380,21 @@ struct __wt_btree {
  * explanation.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 12 */
-#define WT_BTREE_BULK 0x001000u            /* Bulk-load handle */
-#define WT_BTREE_CLOSED 0x002000u          /* Handle closed */
-#define WT_BTREE_DISAGGREGATED 0x004000u   /* In disaggregated storage */
-#define WT_BTREE_GARBAGE_COLLECT 0x008000u /* Content becomes obsolete automatically */
-#define WT_BTREE_IGNORE_CACHE 0x010000u    /* Cache-resident object */
-#define WT_BTREE_IN_MEMORY 0x020000u       /* Cache-resident object */
-#define WT_BTREE_LOGGED 0x040000u          /* Commit-level durability without timestamps */
-#define WT_BTREE_NO_EVICT 0x080000u        /* Cache-resident object. Never run eviction on it. */
-#define WT_BTREE_SALVAGE 0x100000u         /* Handle is for salvage */
-#define WT_BTREE_VERIFY 0x200000u          /* Handle is for verify */
-                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+#define WT_BTREE_BULK 0x0001000u                  /* Bulk-load handle */
+#define WT_BTREE_CLOSED 0x0002000u                /* Handle closed */
+#define WT_BTREE_DISAGGREGATED 0x0004000u         /* In disaggregated storage */
+#define WT_BTREE_GARBAGE_COLLECT 0x0008000u       /* Content becomes obsolete automatically */
+#define WT_BTREE_IGNORE_CACHE 0x0010000u          /* Cache-resident object */
+#define WT_BTREE_INTERNAL_KEY_TRUNCATE 0x0020000u /* Internal key truncate */
+#define WT_BTREE_INTL_COMPADJUST 0x0040000u       /* Internal page compression adjustment */
+#define WT_BTREE_IN_MEMORY 0x0080000u             /* Cache-resident object */
+#define WT_BTREE_LEAF_COMPADJUST 0x0100000u       /* Leaf page compression adjustment */
+#define WT_BTREE_LOGGED 0x0200000u                /* Commit-level durability without timestamps */
+#define WT_BTREE_NO_EVICT 0x0400000u /* Cache-resident object. Never run eviction on it. */
+#define WT_BTREE_PREFIX_COMPRESSION 0x0800000u /* Prefix compression */
+#define WT_BTREE_SALVAGE 0x1000000u            /* Handle is for salvage */
+#define WT_BTREE_VERIFY 0x2000000u             /* Handle is for verify */
+                                               /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     /*
      * These flags are only modified while the data handle is held exclusively, that is, at open, at
      * close, or by an operation that has locked out all other users of the handle. Anything that

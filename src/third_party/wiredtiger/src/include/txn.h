@@ -450,22 +450,6 @@ struct __wt_txn {
     wt_timestamp_t first_commit_timestamp;
 
     /*
-     * True if the step-down timestamp was set when this transaction began. Used to redirect the
-     * transaction's writes to the ingest constituent (or mirrored to both stable and ingest when
-     * write mirroring is enabled), to include ingest in its reads, and to detect straddlers.
-     */
-    bool stepdown_ts_set;
-    /*
-     * The disaggregated role observed when the snapshot was established; the role-change generation
-     * it was established under is published in the session's generation slot. A snapshot
-     * established under one role must not bind a layered table's stable content under another. A
-     * bind compares both: the role catches a transition racing the bind without needing a lock (the
-     * dispatch and the comparison use one read of one variable), and the generation catches a role
-     * that changed away and back.
-     */
-    bool disagg_role_leader;
-
-    /*
      * Timestamps used for reading via a checkpoint cursor instead of txn_shared->read_timestamp and
      * the current oldest/pinned timestamp, respectively.
      */
@@ -477,6 +461,14 @@ struct __wt_txn {
     WT_TXN_OP *mod;
     size_t mod_alloc;
     uint32_t mod_count;
+    uint16_t modify_block_count;
+
+    /*
+     * Set from the checkpoint's log prepare until its log stop or cleanup. This outlives the
+     * checkpoint transaction, which clears the transaction flags when it is released, so it cannot
+     * be one of them.
+     */
+    bool full_ckpt;
 #ifdef HAVE_DIAGNOSTIC
     u_int prepare_count;
 #endif
@@ -493,9 +485,7 @@ struct __wt_txn {
 
     /* Checkpoint status. */
     WT_LSN ckpt_lsn;
-    uint32_t ckpt_nsnapshot;
     WT_ITEM *ckpt_snapshot;
-    bool full_ckpt;
 
     /* Timeout */
     uint64_t operation_timeout_us;
@@ -505,31 +495,45 @@ struct __wt_txn {
  *	The transaction has been published to the durable queue. Setting this
  *	flag lets us know that, on release, we need to mark the transaction for
  *	clearing.
+ *
+ * The step-down flag is set if the step-down timestamp was set when this transaction began. Used
+ * to redirect the transaction's writes to the ingest constituent (or mirrored to both stable and
+ * ingest when write mirroring is enabled), to include ingest in its reads, and to detect
+ * straddlers.
+ *
+ * The disaggregated role flag is set if the role observed when the snapshot was established was
+ * leader; the role-change generation it was established under is published in the session's
+ * generation slot. A snapshot established under one role must not bind a layered table's stable
+ * content under another. A bind compares both: the role catches a transition racing the bind
+ * without needing a lock (the dispatch and the comparison use one read of one variable), and the
+ * generation catches a role that changed away and back.
  */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TXN_AUTOCOMMIT 0x00001u
-#define WT_TXN_ERROR 0x00002u
-#define WT_TXN_HAS_SNAPSHOT 0x00004u
-#define WT_TXN_IGNORE_CACHE_SIZE 0x00008u
-#define WT_TXN_IGNORE_PREPARE 0x00010u
-#define WT_TXN_IS_CHECKPOINT 0x00020u
-#define WT_TXN_PREPARE 0x00040u
-#define WT_TXN_PREPARE_IGNORE_API_CHECK 0x00080u
-#define WT_TXN_READONLY 0x00100u
-#define WT_TXN_REFRESH_SNAPSHOT 0x00200u
-#define WT_TXN_RUNNING 0x00400u
-#define WT_TXN_SHARED_TS_DURABLE 0x00800u
-#define WT_TXN_SHARED_TS_READ 0x01000u
-#define WT_TXN_SYNC_SET 0x02000u
-#define WT_TXN_TS_NOT_SET 0x04000u
-#define WT_TXN_TS_ROUND_PREPARED 0x08000u
-#define WT_TXN_TS_ROUND_READ 0x10000u
-#define WT_TXN_UPDATE 0x20000u
+#define WT_TXN_DISAGG_ROLE_LEADER 0x00002u
+#define WT_TXN_ERROR 0x00004u
+#define WT_TXN_HAS_SNAPSHOT 0x00008u
+#define WT_TXN_IGNORE_CACHE_SIZE 0x00010u
+#define WT_TXN_IGNORE_PREPARE 0x00020u
+#define WT_TXN_IS_CHECKPOINT 0x00040u
+#define WT_TXN_PREPARE 0x00080u
+#define WT_TXN_PREPARE_IGNORE_API_CHECK 0x00100u
+#define WT_TXN_READONLY 0x00200u
+#define WT_TXN_REFRESH_SNAPSHOT 0x00400u
+#define WT_TXN_RUNNING 0x00800u
+#define WT_TXN_SHARED_TS_DURABLE 0x01000u
+#define WT_TXN_SHARED_TS_READ 0x02000u
+#define WT_TXN_STEPDOWN_TS_SET 0x04000u
+#define WT_TXN_SYNC_SET 0x08000u
+#define WT_TXN_TS_NOT_SET 0x10000u
+#define WT_TXN_TS_ROUND_PREPARED 0x20000u
+#define WT_TXN_TS_ROUND_READ 0x40000u
+#define WT_TXN_UPDATE 0x80000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags;
 
-    uint16_t modify_block_count;
+    uint32_t ckpt_nsnapshot;
 
     /*
      * Zero or more bytes of value (the payload) immediately follows the WT_TXN structure. We use a

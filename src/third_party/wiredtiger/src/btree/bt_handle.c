@@ -264,7 +264,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     lr_fh_meta.allocsize = btree->allocsize;
 
     /* Connect to the underlying block manager. */
-    WT_ERR(__wt_blkcache_open(session, dhandle_name, dhandle->cfg, forced_salvage, false,
+    WT_ERR(__wt_bm_open(session, dhandle_name, dhandle->cfg, forced_salvage, false,
       btree->allocsize, &lr_fh_meta, &btree->bm));
 
     bm = btree->bm;
@@ -722,10 +722,12 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     switch (btree->type) {
     case BTREE_ROW:
         WT_RET(__wt_config_gets(session, cfg, "internal_key_truncate", &cval));
-        btree->internal_key_truncate = cval.val != 0;
+        if (cval.val != 0)
+            F_SET(btree, WT_BTREE_INTERNAL_KEY_TRUNCATE);
 
         WT_RET(__wt_config_gets(session, cfg, "prefix_compression", &cval));
-        btree->prefix_compression = cval.val != 0;
+        if (cval.val != 0)
+            F_SET(btree, WT_BTREE_PREFIX_COMPRESSION);
         WT_RET(__wt_config_gets(session, cfg, "prefix_compression_min", &cval));
         btree->prefix_compression_min = (u_int)cval.val;
     /* FALLTHROUGH */
@@ -744,9 +746,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
      * downward (but we're almost certainly correct, the maximum in-memory images allowed are only
      * 4x the maximum page size, and compression always gives us more than 4x).
      */
-    btree->intlpage_compadjust = false;
     btree->maxintlpage_precomp = btree->maxintlpage;
-    btree->leafpage_compadjust = false;
     btree->maxleafpage_precomp = btree->maxleafpage;
     if (btree->compressor != NULL && btree->compressor->compress != NULL) {
         /*
@@ -758,11 +758,11 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
          * in-memory page image, the bytes taken for compression can't grow past the base value.
          */
         if (btree->maxintlpage >= 16 * 1024 && btree->maxmempage_image > btree->maxintlpage) {
-            btree->intlpage_compadjust = true;
+            F_SET(btree, WT_BTREE_INTL_COMPADJUST);
             btree->maxintlpage_precomp = btree->maxmempage_image;
         }
         if (btree->maxleafpage >= 16 * 1024 && btree->maxmempage_image > btree->maxleafpage) {
-            btree->leafpage_compadjust = true;
+            F_SET(btree, WT_BTREE_LEAF_COMPADJUST);
             btree->maxleafpage_precomp = btree->maxmempage_image;
         }
     }
@@ -941,7 +941,7 @@ __wti_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
     WT_ERR(bm->addr_string(bm, session, tmp, addr, addr_size));
 
     F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
-    if ((ret = __wt_blkcache_read(session, &dsk, &block_meta, addr, addr_size)) == 0)
+    if ((ret = __wt_bm_read_page(session, &dsk, &block_meta, addr, addr_size)) == 0)
         ret = __wt_verify_dsk(session, tmp->data, &dsk);
     /*
      * Flag any failed read or verification: if we're in startup, it may be fatal.
@@ -1135,7 +1135,7 @@ __btree_preload(WT_SESSION_IMPL *session)
              * FIXME-WT-14612: If we want to use prefetch with disaggregated storage we will need to
              * supply block metadata.
              */
-            WT_ERR(__wt_blkcache_read(session, tmp, NULL, addr.addr, addr.size));
+            WT_ERR(__wt_bm_read_page(session, tmp, NULL, addr.addr, addr.size));
             ++block_preload;
         }
     WT_INTL_FOREACH_END;

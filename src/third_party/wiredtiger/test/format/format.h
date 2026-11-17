@@ -171,6 +171,11 @@ typedef struct {
     const char *track; /* Tag for tracking operation progress */
 } SAP;
 
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define TIMESTAMP_OLDEST 0x1u
+#define TIMESTAMP_STABLE 0x2u
+/* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+
 typedef enum { ROW, VAR } table_type;
 typedef struct {
     u_int id;              /* table ID */
@@ -551,6 +556,7 @@ void timestamp_init(void);
 wt_timestamp_t timestamp_minimum_committed(void);
 uint64_t next_timestamp(WT_SESSION *);
 void timestamp_once(WT_SESSION *, bool, bool);
+void timestamp_once_internal(WT_SESSION *, bool, bool, uint32_t);
 void timestamp_sync_threads_commit_ts(void);
 void replay_adjust_key(TINFO *, uint64_t);
 wt_timestamp_t replay_commit_ts(TINFO *);

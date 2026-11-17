@@ -161,7 +161,6 @@ struct __wti_delete_hs_upd {
 struct __wti_reconcile {
     WT_REF *ref; /* Page being reconciled */
     WT_PAGE *page;
-    uint32_t flags; /* Caller's configuration */
 
     /* Track the pinned id for the reconciliation if without a snapshot. */
     uint64_t rec_start_pinned_id;
@@ -189,55 +188,7 @@ struct __wti_reconcile {
     wt_timestamp_t max_ts;
 
     /* Track the total time in msecs spent in block writes */
-    uint64_t blkcache_write_time;
-
-    /*
-     * When we do not find any update to be written for the whole page, we would like to mark
-     * eviction failed in the case of update-restore unless all the updates for a key are found
-     * aborted. There is no progress made by eviction in such a case, the page size stays the same
-     * and considering it a success could force the page through eviction repeatedly.
-     */
-    bool update_used;
-
-    /* Track if there is any update chain with its updates all aborted. */
-    bool has_upd_chain_all_aborted;
-
-    /* Track if we write anything that is newer than the previous reconciliation. */
-    bool newer_updates_than_last_rec_used;
-
-    /*
-     * When we can't mark the page clean after reconciliation (for example, checkpoint or eviction
-     * found some uncommitted updates), there's a leave-dirty flag.
-     */
-    bool leave_dirty;
-
-    /*
-     * Track if reconciliation has seen any overflow items. If a leaf page with no overflow items is
-     * written, the parent page's address cell is set to the leaf-no-overflow type. This means we
-     * can delete the leaf page without reading it because we don't have to discard any overflow
-     * items it might reference.
-     *
-     * The test is per-page reconciliation, that is, once we see an overflow item on the page, all
-     * subsequent leaf pages written for the page will not be leaf-no-overflow type, regardless of
-     * whether or not they contain overflow items. In other words, leaf-no-overflow is not
-     * guaranteed to be set on every page that doesn't contain an overflow item, only that if it is
-     * set, the page contains no overflow items. XXX This was originally done because raw
-     * compression couldn't do better, now that raw compression has been removed, we should do
-     * better.
-     */
-    bool ovfl_items;
-
-    /*
-     * Track if reconciliation of a row-store leaf page has seen empty (zero length) values. We
-     * don't write out anything for empty values, so if there are empty values on a page, we have to
-     * make two passes over the page when it's read to figure out how many keys it has, expensive in
-     * the common case of no empty values and (entries / 2) keys. Likewise, a page with only empty
-     * values is another common data set, and keys on that page will be equal to the number of
-     * entries. In both cases, set a flag in the page's on-disk header.
-     *
-     * The test is per-page reconciliation as described above for the overflow-item test.
-     */
-    bool all_empty_value, any_empty_value;
+    uint64_t page_write_time;
 
     /*
      * Reconciliation gets tricky if we have to split a page, which happens when the disk image we
@@ -253,6 +204,7 @@ struct __wti_reconcile {
      */
     uint32_t split_size;     /* Split page size */
     uint32_t min_split_size; /* Minimum split page size */
+    uint32_t flags;          /* Caller's configuration */
 
     /*
      * We maintain two split chunks in the memory during reconciliation to be written out as pages.
@@ -320,18 +272,6 @@ struct __wti_reconcile {
     uint32_t bytes_prefix_compression_delta;
     uint32_t bytes_prefix_compression_full;
 
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WTI_REC_TIME_NEWEST_START_DURABLE_TS 0x01u
-#define WTI_REC_TIME_NEWEST_STOP_DURABLE_TS 0x02u
-#define WTI_REC_TIME_NEWEST_STOP_TS 0x04u
-#define WTI_REC_TIME_NEWEST_STOP_TXN 0x08u
-#define WTI_REC_TIME_NEWEST_TXN 0x10u
-#define WTI_REC_TIME_OLDEST_START_TS 0x20u
-#define WTI_REC_TIME_PREPARE 0x40u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
-    uint16_t ts_usage_flags;
-    uint16_t delta_ts_usage_flags;
-
     /*
      * Saved update list, supporting WT_REC_HS configurations. While reviewing updates for each
      * page, we save WT_UPDATE lists here, and then move them to per-block areas as the blocks are
@@ -350,12 +290,12 @@ struct __wti_reconcile {
      * after we have built the disk image.
      */
     WTI_DELETE_HS_UPD *delete_hs_upd; /* Updates to delete from history store */
-    uint32_t delete_hs_upd_next;
     size_t delete_hs_upd_allocated;
 
     /* List of pages we've written so far. */
     WT_MULTI *multi;
     uint32_t multi_next;
+    uint32_t delete_hs_upd_next;
     size_t multi_allocated;
 
     /*
@@ -364,14 +304,6 @@ struct __wti_reconcile {
      */
     WT_ITEM *wrapup_checkpoint;
     WT_PAGE_BLOCK_META wrapup_checkpoint_block_meta;
-    bool wrapup_checkpoint_compressed;
-
-    /*
-     * We don't need to keep the 0th key around on internal pages, the search code ignores them as
-     * nothing can sort less by definition. There's some trickiness here, see the code for comments
-     * on how these fields work.
-     */
-    bool cell_zero; /* Row-store internal page 0th key */
 
     WTI_REC_DICTIONARY **dictionary;         /* Dictionary */
     u_int dictionary_next, dictionary_slots; /* Next, max entries */
@@ -385,17 +317,71 @@ struct __wti_reconcile {
 
     uint8_t key_pfx_last; /* Last prefix compression */
 
-    bool key_pfx_compress;      /* If can prefix-compress next key */
-    bool key_pfx_compress_conf; /* If prefix compression configured */
-    bool key_sfx_compress;      /* If can suffix-compress next key */
-    bool key_sfx_compress_conf; /* If suffix compression configured */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WTI_REC_TIME_NEWEST_START_DURABLE_TS 0x01u
+#define WTI_REC_TIME_NEWEST_STOP_DURABLE_TS 0x02u
+#define WTI_REC_TIME_NEWEST_STOP_TS 0x04u
+#define WTI_REC_TIME_NEWEST_STOP_TXN 0x08u
+#define WTI_REC_TIME_NEWEST_TXN 0x10u
+#define WTI_REC_TIME_OLDEST_START_TS 0x20u
+#define WTI_REC_TIME_PREPARE 0x40u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
+    uint8_t ts_usage_flags;
+    uint8_t delta_ts_usage_flags;
 
-    bool is_bulk_load; /* If it's a bulk load */
+/*
+ * Reconciliation state flags:
+ *
+ * UPDATE_USED: when no update is found to be written for the whole page, update-restore eviction is
+ * failed unless all the updates for a key were aborted; considering it a success could force the
+ * page through eviction repeatedly.
+ *
+ * LEAVE_DIRTY: the page can't be marked clean after reconciliation, for example checkpoint or
+ * eviction found some uncommitted updates.
+ *
+ * OVFL_ITEMS: if a leaf page with no overflow items is written, the parent's address cell is set to
+ * the leaf-no-overflow type so the leaf can be deleted without reading it. The test is per-page
+ * reconciliation: once an overflow item is seen, all subsequent leaf pages written for the page
+ * lose the leaf-no-overflow type, whether or not they contain overflow items.
+ *
+ * ALL_EMPTY_VALUE, ANY_EMPTY_VALUE: empty (zero length) values aren't written, so the page's
+ * on-disk header records whether all or any values are empty, avoiding a pass over the page to
+ * count keys on read. Per-page reconciliation, as for OVFL_ITEMS.
+ *
+ * CELL_ZERO: the 0th key isn't kept on internal pages, the search code ignores it as nothing can
+ * sort less by definition. See the code for how this works.
+ *
+ * REC_PAGE_CELL_WITH_*: track reconciliation calls for pages with cells containing time window
+ * values and prepared transactions.
+ *
+ * HS_CLEAR_ON_TOMBSTONE: removing a key due to a tombstone with a "none" durable timestamp also
+ * removes the key's history store contents, using the cached history store cursor.
+ */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WTI_REC_ALL_EMPTY_VALUE 0x00001u
+#define WTI_REC_ANY_EMPTY_VALUE 0x00002u
+#define WTI_REC_CACHE_WRITE_HS 0x00004u                /* Used the history store table */
+#define WTI_REC_CACHE_WRITE_RESTORE_INVISIBLE 0x00008u /* Restored an invisible update */
+#define WTI_REC_CELL_ZERO 0x00010u                     /* Row-store internal page 0th key */
+#define WTI_REC_HAS_UPD_CHAIN_ALL_ABORTED 0x00020u     /* Update chain with all aborted */
+#define WTI_REC_HS_CLEAR_ON_TOMBSTONE 0x00040u
+#define WTI_REC_IS_BULK_LOAD 0x00080u          /* Bulk load */
+#define WTI_REC_KEY_PFX_COMPRESS 0x00100u      /* Can prefix-compress next key */
+#define WTI_REC_KEY_PFX_COMPRESS_CONF 0x00200u /* Prefix compression configured */
+#define WTI_REC_KEY_SFX_COMPRESS 0x00400u      /* Can suffix-compress next key */
+#define WTI_REC_KEY_SFX_COMPRESS_CONF 0x00800u /* Suffix compression configured */
+#define WTI_REC_LEAVE_DIRTY 0x01000u
+#define WTI_REC_NEWER_UPDATES_THAN_LAST_REC_USED 0x02000u /* Wrote newer updates */
+#define WTI_REC_OVFL_ITEMS 0x04000u
+#define WTI_REC_REC_PAGE_CELL_WITH_PREPARED_TXN 0x08000u
+#define WTI_REC_REC_PAGE_CELL_WITH_TS 0x10000u
+#define WTI_REC_REC_PAGE_CELL_WITH_TXN_ID 0x20000u
+#define WTI_REC_UPDATE_USED 0x40000u
+#define WTI_REC_WRAPUP_CHECKPOINT_COMPRESSED 0x80000u /* Wrapped-up checkpoint image compressed */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    uint32_t state_flags;
 
     WT_SALVAGE_COOKIE *salvage; /* If it's a salvage operation */
-
-    bool cache_write_hs;                /* Used the history store table */
-    bool cache_write_restore_invisible; /* Used update/restoration because of invisible update */
 
     WT_REF_STATE tested_ref_state; /* Debugging information */
 
@@ -406,20 +392,6 @@ struct __wti_reconcile {
      */
     WT_CURSOR_BTREE update_modify_cbt;
 
-    /*
-     * Variables to track reconciliation calls for pages containing cells with time window values
-     * and prepared transactions.
-     */
-    bool rec_page_cell_with_ts;
-    bool rec_page_cell_with_txn_id;
-    bool rec_page_cell_with_prepared_txn;
-
-    /*
-     * When removing a key due to a tombstone with a durable timestamp of "none", we also remove the
-     * history store contents associated with that key. Keep the pertinent state here: a flag to say
-     * whether this is appropriate, and a cached history store cursor for doing it.
-     */
-    bool hs_clear_on_tombstone;
     WT_CURSOR *hs_cursor;
 };
 

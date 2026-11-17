@@ -157,7 +157,7 @@ __block_open_file(WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *conn, WT_BLOCK *
      */
     if (readonly) {
         LF_SET(WT_FS_OPEN_READONLY);
-        block->readonly = true;
+        F_SET(block, WT_BLOCK_READONLY);
     }
     WT_RET(__wt_open(session, filename, WT_FS_OPEN_FILE_TYPE_DATA, flags, &block->fh));
 
@@ -257,7 +257,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
     WT_ERR(__wt_spin_init(session, &block->live_lock, "block manager"));
 
     if (__wt_config_gets(session, cfg, "in_memory", &cval) == 0 && cval.val != 0)
-        block->in_memory = true;
+        F_SET(block, WT_BLOCK_IN_MEMORY);
     else
         WT_ERR(__block_open_file(session, conn, block, filename, cfg, forced_salvage, readonly,
           fixed, allocsize, lr_fh_meta));

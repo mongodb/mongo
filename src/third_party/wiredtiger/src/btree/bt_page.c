@@ -440,7 +440,7 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
                 --base_state.entries;
         }
         /* After the first iteration, we prefix compress keys if this is configured.*/
-        disk_s.key_pfx_compress = btree->prefix_compression;
+        disk_s.key_pfx_compress = F_ISSET(btree, WT_BTREE_PREFIX_COMPRESSION);
     }
 
     /* Finalize header once after all appends. */

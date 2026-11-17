@@ -67,8 +67,8 @@ validate_block(std::shared_ptr<mock_session> session, WT_BLOCK *block, config_pa
     CHECK(block->objectid == WT_TIERED_OBJECTID_NONE);
     CHECK(block->compact_session_id == WT_SESSION_ID_INVALID);
     CHECK(block->ref == expected_ref);
-    CHECK(block->readonly == readonly);
-    CHECK(block->created_during_backup == false);
+    CHECK(F_ISSET(block, WT_BLOCK_READONLY) == readonly);
+    CHECK(!block->created_during_backup);
     CHECK(block->extend_len == 0);
 
     // Test block file handle members.
@@ -101,7 +101,7 @@ validate_free_block(std::shared_ptr<mock_session> session, WT_BLOCK *block, conf
     } else {
         REQUIRE(block != nullptr);
         validate_block(session, block, cp, expected_ref, name, readonly);
-        block->sync_on_checkpoint = false;
+        F_CLR(block, WT_BLOCK_SYNC_ON_CHECKPOINT);
     }
 
     // Connection block lock should not be locked after the function completes.
@@ -272,7 +272,7 @@ TEST_CASE("Block manager: __wt_block_open and __wti_bm_close_block", "[block_fil
                   WT_TIERED_OBJECTID_NONE, cp.get_config_array(), false, false, false, 0, nullptr,
                   &block)) == 0);
         validate_block(session, block, cp, 1, file_path, false);
-        block->sync_on_checkpoint = true;
+        F_SET(block, WT_BLOCK_SYNC_ON_CHECKPOINT);
 
         REQUIRE(__wti_bm_close_block(session->get_wt_session_impl(), block) == 0);
         validate_free_block(session, block, cp, 0, file_path);

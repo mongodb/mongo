@@ -124,8 +124,9 @@ struct __wt_cursor_btree {
      * stack (the stack of skiplist entries leading to the insert point). The search functions also
      * return the relationship of the search key to the found key.
      */
-    WT_REF *ref;   /* Current page */
-    uint32_t slot; /* WT_COL/WT_ROW 0-based slot */
+    WT_REF *ref;                 /* Current page */
+    uint32_t slot;               /* WT_COL/WT_ROW 0-based slot */
+    uint32_t page_deleted_count; /* Deleted items on the page */
 
     WT_INSERT_HEAD *ins_head; /* Insert chain head */
     WT_INSERT *ins;           /* Current insert node */
@@ -134,8 +135,6 @@ struct __wt_cursor_btree {
 
     /* Next item(s) found during search */
     WT_INSERT *next_stack[WT_SKIP_MAXDEPTH];
-
-    uint32_t page_deleted_count; /* Deleted items on the page */
 
     uint64_t recno; /* Record number */
 
@@ -180,6 +179,12 @@ struct __wt_cursor_btree {
      * means WT_INSERT lists are odd-numbered slots, and WT_ROW array slots are even-numbered slots.
      */
     uint32_t row_iteration_slot; /* Row-store iteration slot */
+
+    /*
+     * We have to restart cursor next/prev after a prepare conflict. Keep the state of the cursor
+     * separately so we can restart at exactly the right point.
+     */
+    enum { WT_CBT_RETRY_NOTSET = 0, WT_CBT_RETRY_INSERT, WT_CBT_RETRY_PAGE } iter_retry;
 
     /*
      * Variable-length column-store values are run-length encoded and may be overflow values. To
@@ -240,14 +245,6 @@ struct __wt_cursor_btree {
     uint64_t checkpoint_write_gen;
     uint64_t checkpoint_id;
 
-    uint8_t append_tree; /* Cursor appended to the tree */
-
-    /*
-     * We have to restart cursor next/prev after a prepare conflict. Keep the state of the cursor
-     * separately so we can restart at exactly the right point.
-     */
-    enum { WT_CBT_RETRY_NOTSET = 0, WT_CBT_RETRY_INSERT, WT_CBT_RETRY_PAGE } iter_retry;
-
     /*
      * The random number state is used for random cursor operations. The random number can be seeded
      * by the user or is randomly set based on the time and thread ID.
@@ -261,22 +258,23 @@ struct __wt_cursor_btree {
 
     /* Record where the last key is when we see it to help debugging out of order issues. */
     WT_REF *lastref;    /* The page where the last key is */
-    uint32_t lastslot;  /* WT_COL/WT_ROW 0-based slot */
     WT_INSERT *lastins; /* The last insert list */
+    uint32_t lastslot;  /* WT_COL/WT_ROW 0-based slot */
 #endif
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CBT_ACTIVE 0x001u             /* Active in the tree */
-#define WT_CBT_CACHEABLE_RLE_CELL 0x002u /* Col-store: value in RLE cell valid for its keys */
-#define WT_CBT_ITERATE_APPEND 0x004u     /* Col-store: iterating append list */
-#define WT_CBT_ITERATE_NEXT 0x008u       /* Next iteration configuration */
-#define WT_CBT_ITERATE_PREV 0x010u       /* Prev iteration configuration */
-#define WT_CBT_ITERATE_RETRY_NEXT 0x020u /* Prepare conflict by next. */
-#define WT_CBT_ITERATE_RETRY_PREV 0x040u /* Prepare conflict by prev. */
-#define WT_CBT_READ_ONCE 0x080u          /* Page in with WT_READ_WONT_NEED */
-#define WT_CBT_SEARCH_SMALLEST 0x100u    /* Row-store: small-key insert list */
-#define WT_CBT_SIZE_STAT 0x200u          /* Accumulate size summary during traversal */
-#define WT_CBT_VAR_ONPAGE_MATCH 0x400u   /* Var-store: on-page recno match */
+#define WT_CBT_APPEND_TREE 0x002u        /* Cursor has appended to the tree */
+#define WT_CBT_CACHEABLE_RLE_CELL 0x004u /* Col-store: value in RLE cell valid for its keys */
+#define WT_CBT_ITERATE_APPEND 0x008u     /* Col-store: iterating append list */
+#define WT_CBT_ITERATE_NEXT 0x010u       /* Next iteration configuration */
+#define WT_CBT_ITERATE_PREV 0x020u       /* Prev iteration configuration */
+#define WT_CBT_ITERATE_RETRY_NEXT 0x040u /* Prepare conflict by next. */
+#define WT_CBT_ITERATE_RETRY_PREV 0x080u /* Prepare conflict by prev. */
+#define WT_CBT_READ_ONCE 0x100u          /* Page in with WT_READ_WONT_NEED */
+#define WT_CBT_SEARCH_SMALLEST 0x200u    /* Row-store: small-key insert list */
+#define WT_CBT_SIZE_STAT 0x400u          /* Accumulate size summary during traversal */
+#define WT_CBT_VAR_ONPAGE_MATCH 0x800u   /* Var-store: on-page recno match */
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 #define WT_CBT_POSITION_MASK /* Flags associated with position */                      \

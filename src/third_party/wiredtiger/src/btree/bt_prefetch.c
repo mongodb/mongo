@@ -57,7 +57,7 @@ __wti_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
 
     session->pf.prefetch_skipped_with_parent = 0;
 
-    /* Load and decompress a set of pages into the block cache. */
+    /* Load and decompress a set of pages into the cache. */
     WT_INTL_FOREACH_BEGIN (session, (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home), next_ref) {
         /* Don't let the pre-fetch queue get overwhelmed. */
         if (__wt_tsan_suppress_load_uint64(&conn->prefetch.queue_count) > WT_MAX_PREFETCH_QUEUE ||

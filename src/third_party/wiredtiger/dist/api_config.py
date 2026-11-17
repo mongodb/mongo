@@ -557,9 +557,9 @@ for name, method in sorted(api_data_def.methods.items()):
     if config:
         confchk_name = 'confchk_' + name.replace('.', '_')
         tfile.write(
-            confchk_name + ', ' + str(len(config)) + ', ' + confchk_name + '_jump')
+            confchk_name + ', ' + confchk_name + '_jump, ' + str(len(config)))
     else:
-        tfile.write('NULL, 0, NULL')
+        tfile.write('NULL, NULL, 0')
 
     tfile.write(', ' + str(slot))
     if compilable:
@@ -571,7 +571,7 @@ for name, method in sorted(api_data_def.methods.items()):
     tfile.write('\n\t},')
 
 # Write a NULL as a terminator for iteration.
-tfile.write('\n\t{ NULL, NULL, NULL, 0, NULL, 0, WT_CONF_SIZING_NONE, false }')
+tfile.write('\n\t{ NULL, NULL, NULL, NULL, 0, 0, WT_CONF_SIZING_NONE, false }')
 tfile.write('\n};\n')
 
 # Write the routine that connects the WT_CONNECTION_IMPL structure to the list

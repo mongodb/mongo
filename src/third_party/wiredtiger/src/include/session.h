@@ -133,16 +133,15 @@ struct __wt_session_impl {
     void *format_private_arg;
 
     u_int active; /* Non-zero if the session is in-use */
+    uint32_t id;  /* UID, offset in session array */
 
     /* FIXME-WT-16787 Consider removing the session name field. */
     const char *name;   /* Name */
     const char *lastop; /* Last operation */
-    uint32_t id;        /* UID, offset in session array */
 
     uint64_t cache_wait_us;        /* Wait time for cache for current operation */
     uint64_t operation_start_us;   /* Operation start */
     uint64_t operation_timeout_us; /* Maximum operation period before rollback */
-    u_int api_call_counter;        /* Depth of api calls */
 
     wt_shared WT_DATA_HANDLE *dhandle; /* Current data handle */
     WT_DHANDLE_CLEAR_LOG dhandle_clear_log;
@@ -163,23 +162,20 @@ struct __wt_session_impl {
     u_int ncursors;                  /* Count of active file cursors. */
     uint32_t cursor_sweep_countdown; /* Countdown to cursor sweep */
     uint32_t cursor_sweep_position;  /* Position in cursor_cache for sweep */
+    u_int api_call_counter;          /* Depth of api calls */
     uint64_t last_cursor_big_sweep;  /* Last big sweep for dead cursors */
     uint64_t last_cursor_sweep;      /* Last regular sweep for dead cursors */
     u_int sweep_warning_5min;        /* Whether the session was without sweep for 5 min. */
     u_int sweep_warning_60min;       /* Whether the session was without sweep for 60 min. */
 
-#ifdef HAVE_DIAGNOSTIC
-    bool cursor_open_timer_running; /* Flag used to track timer across nested calls. */
-#endif
-
     WT_CURSOR_BACKUP *bkp_cursor; /* Hot backup cursor */
 
     WT_COMPACT_STATE *compact; /* Compaction information */
     enum { WT_COMPACT_NONE = 0, WT_COMPACT_RUNNING, WT_COMPACT_SUCCESS } compact_state;
+    u_int hs_cursor_counter; /* Number of open history store cursors */
 
     WT_IMPORT_LIST *import_list; /* List of metadata entries to import from file. */
 
-    u_int hs_cursor_counter;   /* Number of open history store cursors */
     uint64_t hs_checkpoint_id; /* The checkpoint ID of the last opened HS cursor */
 
     WT_CURSOR *meta_cursor;  /* Metadata file */
@@ -190,15 +186,20 @@ struct __wt_session_impl {
     int meta_track_nest;     /* Nesting level of meta transaction */
 #define WT_META_TRACKING(session) ((session)->meta_track_next != NULL)
 
+    uint8_t current_rwticket; /* Current rwlock ticket */
+    bool syncing;             /* Sync support */
+#ifdef HAVE_DIAGNOSTIC
+    bool cursor_open_timer_running; /* Flag used to track timer across nested calls. */
+    uint8_t dump_raw;               /* Configure debugging page dump */
+#endif
+
     /* Renamed files of committed drops, removed once the drop's locks are gone. */
     TAILQ_HEAD(__wt_drop_pending_qh, __wt_drop_pending) drop_pending;
 
     /* Current rwlock for callback. */
     WT_RWLOCK *current_rwlock;
-    uint8_t current_rwticket;
 
     WT_ITEM **scratch;        /* Temporary memory for any function */
-    u_int scratch_alloc;      /* Currently allocated */
     size_t scratch_cached;    /* Scratch bytes cached */
     WT_SPINLOCK scratch_lock; /* Scratch buffer lock */
 #ifdef HAVE_DIAGNOSTIC
@@ -259,6 +260,7 @@ struct __wt_session_impl {
      */
     WT_DATA_HANDLE **op_handle; /* Handle list */
     u_int op_handle_next;       /* Next empty slot */
+    u_int scratch_alloc;        /* Currently allocated scratch buffers */
     size_t op_handle_allocated; /* Bytes allocated */
 
     void *reconcile; /* Reconciliation support */
@@ -267,17 +269,10 @@ struct __wt_session_impl {
     /* Salvage support. */
     void *salvage_track;
 
-    /* Sync support. */
-    bool syncing;
-
     /* Sessions have an associated statistics bucket based on its ID. */
     u_int stat_conn_bucket;     /* Statistics connection bucket offset */
     u_int stat_dsrc_bucket;     /* Statistics data source bucket offset */
     uint64_t cache_max_wait_us; /* Maximum time an operation waits for space in cache */
-
-#ifdef HAVE_DIAGNOSTIC
-    uint8_t dump_raw; /* Configure debugging page dump */
-#endif
 
 #ifdef HAVE_UNITTEST_ASSERTS
     /*
@@ -378,6 +373,7 @@ struct __wt_session_impl {
      * cannot race a closing session's non-atomic clear; cursor teardown returns it to zero first.
      */
     wt_shared uint32_t open_cursor_count;
+    u_int optrackbuf_ptr; /* Operation tracking buffer position */
 
     /*
      * Hash tables are allocated lazily as sessions are used to keep the size of this structure from
@@ -438,7 +434,6 @@ struct __wt_session_impl {
      * Operation tracking.
      */
     WT_OPTRACK_RECORD *optrack_buf;
-    u_int optrackbuf_ptr;
     uint64_t optrack_offset;
     WT_FH *optrack_fh;
 

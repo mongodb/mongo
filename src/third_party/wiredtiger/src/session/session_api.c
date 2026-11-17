@@ -1909,11 +1909,22 @@ err:
 static int
 __session_verify_dispatch(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
-    if (uri == NULL)
-        return (__session_verify_all(session, cfg));
+    WT_CONFIG_ITEM cval;
 
-    return (__wt_schema_worker(
-      session, uri, __wt_verify, NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
+    /* A specific URI verifies that object. */
+    if (uri != NULL)
+        return (__wt_schema_worker(
+          session, uri, __wt_verify, NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
+
+    /*
+     * With verify_internals set, run only the database-wide checks and return, without verifying
+     * any table. Otherwise verify every table; the checks never run implicitly.
+     */
+    WT_RET(__wt_config_gets(session, cfg, "verify_internals", &cval));
+    if (cval.val != 0)
+        return (__wt_verify_metadata_consistency(session));
+    else
+        return (__session_verify_all(session, cfg));
 }
 
 /*
@@ -2061,7 +2072,8 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
      * is set. This check is the guarantee: under the step-down lock it always observes a set
      * timestamp, so no straddler commits after the timestamp is in place.
      */
-    if (txn->mod_count != 0 && !txn->stepdown_ts_set && __wt_conn_is_disagg(session)) {
+    if (txn->mod_count != 0 && !F_ISSET(txn, WT_TXN_STEPDOWN_TS_SET) &&
+      __wt_conn_is_disagg(session)) {
         __wt_readlock(session, &S2C(session)->txn_global.step_down_lock);
         ret = __wt_txn_stepdown_straddler_check(session, true);
         __wt_readunlock(session, &S2C(session)->txn_global.step_down_lock);

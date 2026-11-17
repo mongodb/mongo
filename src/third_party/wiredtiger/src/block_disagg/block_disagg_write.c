@@ -209,7 +209,7 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
 
     /*
      * We have two sets of flags for encrypt/compress! Set the block manager encrypt/compress flags
-     * - the block manager/block cache layer will eventually do all encrypt/compress and it will use
+     * - the block manager layer will eventually do all encrypt/compress and it will use
      * a unified set of flags for encrypt/compress, (only in the block header). But we can only do
      * that when the block header is always at the beginning of the data.
      */
@@ -229,7 +229,7 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
      * Ensure that we don't accidentally write a block with flags that should not be written out to
      * stable storage, even though we just constructed the flags above. The "modified" flag should
      * never be set during normal write path, as it indicates an offline modification outside of the
-     * regular write path, e.g., by the victim block cache.
+     * regular write path, e.g., by the victim cache.
      */
     WT_ASSERT_ALWAYS(session, !F_ISSET(blk, WT_BLOCK_DISAGG_MODIFIED),
       "the modified flag must not be set on a block written through the regular write path");

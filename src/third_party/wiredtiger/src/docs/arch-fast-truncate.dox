@@ -238,7 +238,7 @@ If the deletion is not visible to the thread doing the reconciliation, then we n
 refer to the original on-disk page <i>without</i> the deletion information.
 This is accomplished by sending back \c WT_CHILD_ORIGINAL.
 This also requires leaving the parent page dirty.
-For checkpoints, \c r->leave_dirty is set; for eviction, that doesn't work, but there's
+For checkpoints, \c WTI_REC_LEAVE_DIRTY is set in \c r->state_flags; for eviction, that doesn't work, but there's
 also not much to be gained by evicting the page under these circumstances so instead we
 just fail.
 

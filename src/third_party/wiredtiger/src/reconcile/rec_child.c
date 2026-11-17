@@ -119,7 +119,7 @@ __rec_child_deleted(
         if (F_ISSET(r, WT_REC_CLEAN_AFTER_REC | WT_REC_EVICT))
             return (__wt_set_return(session, EBUSY));
         cmsp->state = WTI_CHILD_ORIGINAL;
-        r->leave_dirty = true;
+        FLD_SET(r->state_flags, WTI_REC_LEAVE_DIRTY);
         return (0);
     }
 
@@ -152,7 +152,7 @@ __rec_child_deleted(
         WT_ASSERT(session, !visible_all);
 
         cmsp->state = WTI_CHILD_ORIGINAL;
-        r->leave_dirty = true;
+        FLD_SET(r->state_flags, WTI_REC_LEAVE_DIRTY);
         return (0);
     }
 

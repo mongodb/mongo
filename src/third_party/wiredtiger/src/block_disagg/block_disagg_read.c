@@ -190,7 +190,7 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
     if (S2BT(session)->storage_tier == WT_BTREE_STORAGE_TIER_COLD)
         F_SET(&get_args, WT_PAGE_LOG_COLD);
 
-    /* A checkpoint cursor reads historical page versions, so bypass any block cache. */
+    /* A checkpoint cursor reads historical page versions, so bypass the block cache. */
     if (WT_DHANDLE_IS_CHECKPOINT(S2BT(session)->dhandle))
         F_SET(&get_args, WT_PAGE_LOG_CACHE_BYPASS);
 

@@ -118,10 +118,9 @@ struct __wt_size {
  */
 typedef struct {
     WT_EXT *ext_cache;   /* List of WT_EXT handles */
+    WT_SIZE *sz_cache;   /* List of WT_SIZE handles */
     u_int ext_cache_cnt; /* Count */
-
-    WT_SIZE *sz_cache;  /* List of WT_SIZE handles */
-    u_int sz_cache_cnt; /* Count */
+    u_int sz_cache_cnt;  /* Count */
 } WT_BLOCK_MGR_SESSION;
 
 /*
@@ -289,18 +288,39 @@ struct __wt_block {
     wt_off_t extend_size; /* File extended size */
     wt_off_t extend_len;  /* File extend chunk size */
 
-    bool created_during_backup; /* Created during incremental backup */
-    bool sync_on_checkpoint;    /* fsync the handle after the next checkpoint */
-    bool remote;                /* Handle references non-local object */
-    bool readonly;              /* Underlying file was opened only for reading */
     /*
-     * For regular file systems, in_memory indicates that the file was created with the in_memory
-     * configuration, as a result there isn't a backing file. This differs somewhat from when the
-     * connection is opened as in_memory, this boolean would remain false. The distinction is that
-     * connection-level in_memory replaces the file system with an in_memory variant and the backing
-     * file is synthetic, but a file descriptor still exists.
+     * Small fields written by different threads stay in separate bytes, so no two writers share a
+     * memory location. The open-time flags are written before the handle is shared, apart from the
+     * sync flag which is cleared when the handle is closed. The verify flags are written only by
+     * the thread verifying the file.
      */
-    bool in_memory;
+    bool created_during_backup; /* Created during incremental backup */
+    bool live_open;             /* Live system is open */
+    bool compact_estimated;     /* If compaction work has been estimated */
+
+/*
+ * The in-memory flag means the file was created with the in_memory configuration, so there isn't a
+ * backing file. It stays clear when only the connection is opened as in-memory: connection-level
+ * in-memory replaces the file system with an in-memory variant and the backing file is synthetic,
+ * but a file descriptor still exists.
+ *
+ * FIXME-WT-19094 Nothing outside unit tests sets the sync-on-checkpoint flag, so it may be
+ * removable.
+ */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_BLOCK_IN_MEMORY 0x1u          /* File has no backing file */
+#define WT_BLOCK_READONLY 0x2u           /* Underlying file was opened only for reading */
+#define WT_BLOCK_SYNC_ON_CHECKPOINT 0x4u /* fsync the handle after the next checkpoint */
+                                         /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
+    uint8_t flags;
+
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_BLOCK_DUMP_TREE_SHAPE 0x1u /* Print out tree shape */
+#define WT_BLOCK_VERIFY 0x2u          /* Performing verification */
+#define WT_BLOCK_VERIFY_LAYOUT 0x4u   /* Print out file layout information */
+#define WT_BLOCK_VERIFY_STRICT 0x8u   /* Fail hard on any error */
+                                      /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
+    uint8_t verify_flags;
 
     /* Configuration information, set when the file is opened. */
     wt_shared uint32_t allocfirst; /* Allocation is first-fit */
@@ -310,6 +330,12 @@ struct __wt_block {
     size_t os_cache_dirty_max;
 
     u_int block_header; /* Header length */
+    enum {              /* Live checkpoint status */
+        WT_CKPT_NONE = 0,
+        WT_CKPT_INPROGRESS,
+        WT_CKPT_PANIC_ON_FAILURE,
+        WT_CKPT_SALVAGE
+    } ckpt_state;
 
     /*
      * There is only a single checkpoint in a file that can be written; stored here, only accessed
@@ -317,19 +343,12 @@ struct __wt_block {
      */
     WT_SPINLOCK live_lock; /* Live checkpoint lock */
     WT_BLOCK_CKPT live;    /* Live checkpoint */
-    bool live_open;        /* Live system is open */
-    enum {                 /* Live checkpoint status */
-        WT_CKPT_NONE = 0,
-        WT_CKPT_INPROGRESS,
-        WT_CKPT_PANIC_ON_FAILURE,
-        WT_CKPT_SALVAGE
-    } ckpt_state;
 
     WT_CKPT *final_ckpt; /* Final live checkpoint write */
 
     /* Compaction support */
-    bool compact_estimated;                    /* If compaction work has been estimated */
     int compact_pct_tenths;                    /* Percent to compact */
+    uint32_t compact_session_id;               /* Session compacting */
     uint64_t compact_bytes_reviewed;           /* Bytes reviewed */
     uint64_t compact_bytes_rewritten;          /* Bytes rewritten */
     uint64_t compact_bytes_rewritten_expected; /* The expected number of bytes to rewrite */
@@ -340,24 +359,17 @@ struct __wt_block {
     uint64_t compact_pages_skipped;            /* Pages skipped */
     uint64_t compact_prev_pages_rewritten;     /* Pages rewritten during the previous iteration */
     wt_off_t compact_prev_size;                /* File size at the start of a compaction pass */
-    uint32_t compact_session_id;               /* Session compacting */
 
     /* Salvage support */
     wt_off_t slvg_off; /* Salvage file offset */
 
     /* Verification support */
-    bool verify;             /* If performing verification */
-    bool verify_layout;      /* Print out file layout information */
-    bool dump_tree_shape;    /* Print out tree shape */
-    bool verify_strict;      /* Fail hard on any error */
-    wt_off_t verify_size;    /* Checkpoint's file size */
-    WT_EXTLIST verify_alloc; /* Verification allocation list */
-    uint64_t frags;          /* Maximum frags in the file */
-    uint8_t *fragfile;       /* Per-file frag tracking list */
-    uint8_t *fragckpt;       /* Per-checkpoint frag tracking list */
-
-    /* Multi-file support */
     wt_shared uint32_t read_count; /* Count of active read requests using this block handle */
+    wt_off_t verify_size;          /* Checkpoint's file size */
+    WT_EXTLIST verify_alloc;       /* Verification allocation list */
+    uint64_t frags;                /* Maximum frags in the file */
+    uint8_t *fragfile;             /* Per-file frag tracking list */
+    uint8_t *fragckpt;             /* Per-checkpoint frag tracking list */
 };
 
 /*

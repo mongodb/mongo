@@ -58,10 +58,6 @@ class BackupStat(Stat):
     def __init__(self, name, desc, flags='', otel_type='otel_none'):
         Stat.__init__(self, name, BackupStat.prefix, desc, flags, otel_type)
 
-class BlockCacheStat(Stat):
-    prefix = 'block-cache'
-    def __init__(self, name, desc, flags='', otel_type='otel_none'):
-        Stat.__init__(self, name, BlockCacheStat.prefix, desc, flags, otel_type)
 class BlockDisaggStat(Stat):
     prefix = 'block-disagg'
     def __init__(self, name, desc, flags='', otel_type='otel_none'):
@@ -243,32 +239,6 @@ conn_stats = [
     BackupStat('backup_granularity', 'backup granularity size'),
     BackupStat('backup_incremental', 'incremental backup enabled', 'no_clear,no_scale'),
     BackupStat('backup_start', 'opening the backup cursor in progress', 'no_clear,no_scale'),
-
-    ##########################################
-    # Block cache statistics
-    ##########################################
-    BlockCacheStat('block_cache_blocks', 'total blocks'),
-    BlockCacheStat('block_cache_blocks_evicted', 'evicted blocks'),
-    BlockCacheStat('block_cache_blocks_insert_read', 'total blocks inserted on read path'),
-    BlockCacheStat('block_cache_blocks_insert_write', 'total blocks inserted on write path'),
-    BlockCacheStat('block_cache_blocks_removed', 'removed blocks'),
-    BlockCacheStat('block_cache_blocks_removed_blocked', 'time sleeping to remove block (usecs)'),
-    BlockCacheStat('block_cache_blocks_update', 'cached blocks updated'),
-    BlockCacheStat('block_cache_bypass_chkpt', 'number of put bypasses on checkpoint I/O'),
-    BlockCacheStat('block_cache_bypass_filesize', 'file size causing bypass'),
-    BlockCacheStat('block_cache_bypass_get', 'number of bypasses on get'),
-    BlockCacheStat('block_cache_bypass_overhead_put', 'number of bypasses due to overhead on put'),
-    BlockCacheStat('block_cache_bypass_put', 'number of bypasses on put because file is too small'),
-    BlockCacheStat('block_cache_bypass_writealloc', 'number of bypasses because no-write-allocate setting was on'),
-    BlockCacheStat('block_cache_bytes', 'total bytes'),
-    BlockCacheStat('block_cache_bytes_insert_read', 'total bytes inserted on read path'),
-    BlockCacheStat('block_cache_bytes_insert_write', 'total bytes inserted on write path'),
-    BlockCacheStat('block_cache_bytes_update', 'cached bytes updated'),
-    BlockCacheStat('block_cache_eviction_passes', 'number of eviction passes'),
-    BlockCacheStat('block_cache_hits', 'number of hits'),
-    BlockCacheStat('block_cache_lookups', 'lookups'),
-    BlockCacheStat('block_cache_misses', 'number of misses'),
-    BlockCacheStat('block_cache_not_evicted_overhead', 'number of blocks not evicted due to overhead'),
 
     ##########################################
     # Block manager statistics
@@ -579,7 +549,7 @@ conn_stats = [
     CheckpointStat('checkpoint_prep_running', 'prepare currently running', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_prep_total', 'prepare total time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_presync', 'number of handles visited after writes complete'),
-    CheckpointStat('checkpoint_rec_blkcache_write', 'total time (msecs) writing pages to stable storage during checkpoint reconciliation'),
+    CheckpointStat('checkpoint_rec_stable_write', 'total time (msecs) writing pages to stable storage during checkpoint reconciliation'),
     CheckpointStat('checkpoint_scrub_max', 'scrub max time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_scrub_min', 'scrub min time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_scrub_recent', 'scrub most recent time (msecs)', 'no_clear,no_scale'),

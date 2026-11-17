@@ -55,7 +55,7 @@ __rec_save_disk_image(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI *mult
      * Best-effort save: skip the image if the page will be left dirty. The swap eviction path
      * requires WT_PAGE_CLEAN, so a dirty page's image would never be used.
      */
-    if (r->leave_dirty) {
+    if (FLD_ISSET(r->state_flags, WTI_REC_LEAVE_DIRTY)) {
         WT_STAT_CONN_DSRC_INCR(session, cache_write_restore_scrub_skipped_dirty);
         return (false);
     }
@@ -274,18 +274,18 @@ __reconcile_post_wrapup(
     WT_STAT_DSRC_INCR(session, rec_pages);
     if (LF_ISSET(WT_REC_EVICT))
         WT_STAT_CONN_DSRC_INCR(session, rec_pages_eviction);
-    if (r->cache_write_hs)
+    if (FLD_ISSET(r->state_flags, WTI_REC_CACHE_WRITE_HS))
         WT_STAT_CONN_DSRC_INCR(session, cache_write_hs);
-    if (r->cache_write_restore_invisible)
+    if (FLD_ISSET(r->state_flags, WTI_REC_CACHE_WRITE_RESTORE_INVISIBLE))
         WT_STAT_CONN_DSRC_INCR(session, cache_write_restore_invisible);
     else if (F_ISSET(r, WT_REC_SAVE_IMAGE_ALWAYS | WT_REC_SAVE_IMAGE_CLEAN))
         WT_STAT_CONN_DSRC_INCR(session, cache_write_restore_scrub);
     if (!WT_IS_HS(btree->dhandle)) {
-        if (r->rec_page_cell_with_txn_id)
+        if (FLD_ISSET(r->state_flags, WTI_REC_REC_PAGE_CELL_WITH_TXN_ID))
             WT_STAT_CONN_INCR(session, rec_pages_with_txn);
-        if (r->rec_page_cell_with_ts)
+        if (FLD_ISSET(r->state_flags, WTI_REC_REC_PAGE_CELL_WITH_TS))
             WT_STAT_CONN_INCR(session, rec_pages_with_ts);
-        if (r->rec_page_cell_with_prepared_txn)
+        if (FLD_ISSET(r->state_flags, WTI_REC_REC_PAGE_CELL_WITH_PREPARED_TXN))
             WT_STAT_CONN_INCR(session, rec_pages_with_prepare);
     }
     if (r->multi_next > btree->rec_multiblock_max)
@@ -421,7 +421,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     timeline->image_build_finish = __wt_clock(session);
 
     if (F_ISSET(r, WT_REC_CHECKPOINT))
-        WT_STAT_CONN_SET(session, checkpoint_rec_blkcache_write, r->blkcache_write_time);
+        WT_STAT_CONN_SET(session, checkpoint_rec_stable_write, r->page_write_time);
 
     /*
      * If we failed, don't bail out yet; we still need to update stats and tidy up.
@@ -442,7 +442,9 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
       F_ISSET(r, WT_REC_EVICT) && F_ISSET(r, WT_REC_CALL_URGENT) && !WT_PAGE_IS_INTERNAL(page);
 
     const bool no_progress = r->multi_next == 1 && !F_ISSET_ATOMIC_16(page, WT_PAGE_INMEM_SPLIT) &&
-      !r->update_used && r->cache_write_restore_invisible && !r->has_upd_chain_all_aborted &&
+      !FLD_ISSET(r->state_flags, WTI_REC_UPDATE_USED) &&
+      FLD_ISSET(r->state_flags, WTI_REC_CACHE_WRITE_RESTORE_INVISIBLE) &&
+      !FLD_ISSET(r->state_flags, WTI_REC_HAS_UPD_CHAIN_ALL_ABORTED) &&
       r->keys_removed_from_disk_image_count == 0;
 
     if (ret == 0 && tree_evictable && forced_leaf_eviction && no_progress) {
@@ -641,7 +643,7 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     /*
      * Set the page's status based on whether or not we cleaned the page.
      */
-    if (r->leave_dirty) {
+    if (FLD_ISSET(r->state_flags, WTI_REC_LEAVE_DIRTY)) {
         /*
          * The page remains dirty.
          *
@@ -898,29 +900,29 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     r->max_txn = WT_TXN_NONE;
     r->max_ts = WT_TS_NONE;
 
-    /* Track time spent writing to the block cache during checkpoints. */
-    r->blkcache_write_time = 0;
+    /* Track time spent writing pages during checkpoints. */
+    r->page_write_time = 0;
 
     /* Track if updates were used and/or uncommitted. */
-    r->update_used = false;
+    FLD_CLR(r->state_flags, WTI_REC_UPDATE_USED);
 
     /* Track if there is any update chain with its updates all aborted. */
-    r->has_upd_chain_all_aborted = false;
+    FLD_CLR(r->state_flags, WTI_REC_HAS_UPD_CHAIN_ALL_ABORTED);
 
     r->keys_removed_from_disk_image_count = 0;
 
     /* Track if we write anything that is newer than in the previous reconciliation. */
-    r->newer_updates_than_last_rec_used = false;
+    FLD_CLR(r->state_flags, WTI_REC_NEWER_UPDATES_THAN_LAST_REC_USED);
 
     /* Track if the page can be marked clean. */
-    r->leave_dirty = false;
+    FLD_CLR(r->state_flags, WTI_REC_LEAVE_DIRTY);
 
     /* Track overflow items. */
-    r->ovfl_items = false;
+    FLD_CLR(r->state_flags, WTI_REC_OVFL_ITEMS);
 
     /* Track empty values. */
-    r->all_empty_value = true;
-    r->any_empty_value = false;
+    FLD_SET(r->state_flags, WTI_REC_ALL_EMPTY_VALUE);
+    FLD_CLR(r->state_flags, WTI_REC_ANY_EMPTY_VALUE);
 
     /* The list of saved updates is reused. */
     r->supd_next = 0;
@@ -936,7 +938,7 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     r->multi_allocated = 0;
 
     r->wrapup_checkpoint = NULL;
-    r->wrapup_checkpoint_compressed = false;
+    FLD_CLR(r->state_flags, WTI_REC_WRAPUP_CHECKPOINT_COMPRESSED);
     WT_CLEAR(r->wrapup_checkpoint_block_meta);
 
     /*
@@ -955,9 +957,9 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     /*
      * Prefix compression discards repeated prefix bytes from row-store leaf page keys.
      */
-    r->key_pfx_compress_conf = false;
-    if (btree->prefix_compression && page->type == WT_PAGE_ROW_LEAF)
-        r->key_pfx_compress_conf = true;
+    FLD_CLR(r->state_flags, WTI_REC_KEY_PFX_COMPRESS_CONF);
+    if (F_ISSET(btree, WT_BTREE_PREFIX_COMPRESSION) && page->type == WT_PAGE_ROW_LEAF)
+        FLD_SET(r->state_flags, WTI_REC_KEY_PFX_COMPRESS_CONF);
 
     /*
      * Suffix compression shortens internal page keys by discarding trailing bytes that aren't
@@ -968,15 +970,15 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
      * collators, we can add a setting to the collator, configured when the collator is added, that
      * turns on suffix compression.
      */
-    r->key_sfx_compress_conf = false;
-    if (btree->collator == NULL && btree->internal_key_truncate)
-        r->key_sfx_compress_conf = true;
+    FLD_CLR(r->state_flags, WTI_REC_KEY_SFX_COMPRESS_CONF);
+    if (btree->collator == NULL && F_ISSET(btree, WT_BTREE_INTERNAL_KEY_TRUNCATE))
+        FLD_SET(r->state_flags, WTI_REC_KEY_SFX_COMPRESS_CONF);
 
-    r->is_bulk_load = false;
+    FLD_CLR(r->state_flags, WTI_REC_IS_BULK_LOAD);
 
     r->salvage = salvage;
 
-    r->cache_write_hs = r->cache_write_restore_invisible = false;
+    FLD_CLR(r->state_flags, WTI_REC_CACHE_WRITE_HS | WTI_REC_CACHE_WRITE_RESTORE_INVISIBLE);
 
     /*
      * The fake cursor used to figure out modified update values points to the enclosing WT_REF as a
@@ -987,9 +989,9 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     r->update_modify_cbt.upd_value = &r->update_modify_cbt._upd_value;
 
     /* Clear stats related data. */
-    r->rec_page_cell_with_ts = false;
-    r->rec_page_cell_with_txn_id = false;
-    r->rec_page_cell_with_prepared_txn = false;
+    FLD_CLR(r->state_flags,
+      WTI_REC_REC_PAGE_CELL_WITH_TS | WTI_REC_REC_PAGE_CELL_WITH_TXN_ID |
+        WTI_REC_REC_PAGE_CELL_WITH_PREPARED_TXN);
 
     /*
      * When removing a key due to a tombstone with a durable timestamp of "none", also remove the
@@ -1003,9 +1005,11 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
      * they shouldn't open new dhandles. In those cases we won't ever need to blow away history
      * store content, so we can skip this.
      */
-    r->hs_clear_on_tombstone = F_ISSET(r, WT_REC_HS) &&
-      !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES) && !WT_IS_HS(btree->dhandle) &&
-      !WT_IS_ANY_METADATA(btree->dhandle);
+    if (F_ISSET(r, WT_REC_HS) && !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES) &&
+      !WT_IS_HS(btree->dhandle) && !WT_IS_ANY_METADATA(btree->dhandle))
+        FLD_SET(r->state_flags, WTI_REC_HS_CLEAR_ON_TOMBSTONE);
+    else
+        FLD_CLR(r->state_flags, WTI_REC_HS_CLEAR_ON_TOMBSTONE);
 
 /*
  * If we allocated the reconciliation structure and there was an error, clean up. If our caller
@@ -1187,11 +1191,11 @@ __rec_write(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *block_me
     if (WT_REC_CKPT_TRACK_TIME(r))
         _write_start = __wt_clock(session);
 
-    WT_RET(__wt_blkcache_write(session, buf, block_meta, buf->size, addr, addr_sizep,
+    WT_RET(__wt_bm_write_page(session, buf, block_meta, buf->size, addr, addr_sizep,
       compressed_sizep, checkpoint, checkpoint_io, compressed));
 
     if (WT_REC_CKPT_TRACK_TIME(r))
-        r->blkcache_write_time += WT_CLOCKDIFF_MS(__wt_clock(session), _write_start);
+        r->page_write_time += WT_CLOCKDIFF_MS(__wt_clock(session), _write_start);
 
     return (0);
 }
@@ -1388,7 +1392,7 @@ __wti_rec_split_init(
     r->first_free = WT_PAGE_HEADER_WRITE_BYTE(btree, r->cur_ptr->image.mem);
 
     /* New page, compression off. */
-    r->key_pfx_compress = r->key_sfx_compress = false;
+    FLD_CLR(r->state_flags, WTI_REC_KEY_PFX_COMPRESS | WTI_REC_KEY_SFX_COMPRESS);
 
     /* Set the first chunk's key. */
     chunk = r->cur_ptr;
@@ -1473,7 +1477,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_ITEM *key
      * in-memory key against which to compare, and don't try to do suffix compression. The code for
      * that case turns suffix compression off for the next key, we don't have to deal with it here.
      */
-    if (type != WT_PAGE_ROW_LEAF || !r->key_sfx_compress)
+    if (type != WT_PAGE_ROW_LEAF || !FLD_ISSET(r->state_flags, WTI_REC_KEY_SFX_COMPRESS))
         return (__wt_buf_set(session, key, r->cur->data, r->cur->size));
 
     btree = S2BT(session);
@@ -1486,7 +1490,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_ITEM *key
      * key.
      */
     max = r->last;
-    if (r->cache_write_restore_invisible)
+    if (FLD_ISSET(r->state_flags, WTI_REC_CACHE_WRITE_RESTORE_INVISIBLE))
         for (i = r->supd_next; i > 0; --i) {
             supd = &r->supd[i - 1];
             if (supd->ins == NULL)
@@ -1624,7 +1628,7 @@ __rec_split(WT_SESSION_IMPL *session, WTI_RECONCILE *r, size_t next_len)
      * each boundary, switching the previous and current check references. The exception is when
      * doing a bulk load.
      */
-    if (r->is_bulk_load)
+    if (FLD_ISSET(r->state_flags, WTI_REC_IS_BULK_LOAD))
         WT_RET(__rec_split_write(session, r, r->cur_ptr, false));
     else {
         if (r->prev_ptr != NULL)
@@ -2056,9 +2060,9 @@ __rec_split_write_header(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHU
     dsk->flags = 0;
     /* Set the all/none zero-length value flags. */
     if (page->type == WT_PAGE_ROW_LEAF) {
-        if (chunk->entries != 0 && r->all_empty_value)
+        if (chunk->entries != 0 && FLD_ISSET(r->state_flags, WTI_REC_ALL_EMPTY_VALUE))
             F_SET(dsk, WT_PAGE_EMPTY_V_ALL);
-        if (chunk->entries != 0 && !r->any_empty_value)
+        if (chunk->entries != 0 && !FLD_ISSET(r->state_flags, WTI_REC_ANY_EMPTY_VALUE))
             F_SET(dsk, WT_PAGE_EMPTY_V_NONE);
     }
 
@@ -2197,7 +2201,7 @@ __rec_build_delta_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *full_image, WTI
     WT_ERR(__wt_scr_alloc(session, 0, &custom_value));
 
     /* Disable prefix compression until the first key is written. */
-    r->key_pfx_compress = false;
+    FLD_CLR(r->state_flags, WTI_REC_KEY_PFX_COMPRESS);
     r->key_pfx_last = 0;
 
     for (i = 0, supd = multi->supd; i < multi->supd_entries; ++i, ++supd) {
@@ -2384,10 +2388,10 @@ __rec_write_delta(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
     /* Get the checkpoint ID. */
     if (WT_REC_CKPT_TRACK_TIME(r))
         _write_start = __wt_clock(session);
-    WT_RET(__wt_blkcache_write(session, &r->delta, multi->block_meta, chunk->image.size, addr,
+    WT_RET(__wt_bm_write_page(session, &r->delta, multi->block_meta, chunk->image.size, addr,
       addr_sizep, compressed_sizep, false, F_ISSET(r, WT_REC_CHECKPOINT), false));
     if (WT_REC_CKPT_TRACK_TIME(r))
-        r->blkcache_write_time += WT_CLOCKDIFF_MS(__wt_clock(session), _write_start);
+        r->page_write_time += WT_CLOCKDIFF_MS(__wt_clock(session), _write_start);
 
     /* Turn off compression adjustment for delta. */
     *compressed_sizep = 0;
@@ -2662,7 +2666,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
 #endif
 
     /* Fail 1% of the time when reconciling a page during a bulk load. */
-    if (r->is_bulk_load && !F_ISSET(r, WT_REC_EVICT_CALL_CLOSING) &&
+    if (FLD_ISSET(r->state_flags, WTI_REC_IS_BULK_LOAD) && !F_ISSET(r, WT_REC_EVICT_CALL_CLOSING) &&
       __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_REC_SPLIT_WRITE, 100))
         return (EBUSY);
 
@@ -2686,7 +2690,8 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
     switch (page->type) {
     case WT_PAGE_COL_VAR:
     case WT_PAGE_ROW_LEAF:
-        multi->addr.type = r->ovfl_items ? WT_ADDR_LEAF : WT_ADDR_LEAF_NO;
+        multi->addr.type =
+          FLD_ISSET(r->state_flags, WTI_REC_OVFL_ITEMS) ? WT_ADDR_LEAF : WT_ADDR_LEAF_NO;
         break;
     case WT_PAGE_COL_INT:
     case WT_PAGE_ROW_INT:
@@ -2806,7 +2811,8 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
                  */
                 if (last_block && r->multi_next == 1 &&
                   page->disagg_info->block_meta.page_id != WT_BLOCK_INVALID_PAGE_ID &&
-                  WT_REC_RESULT_SINGLE_PAGE(session, r) && !r->newer_updates_than_last_rec_used &&
+                  WT_REC_RESULT_SINGLE_PAGE(session, r) &&
+                  !FLD_ISSET(r->state_flags, WTI_REC_NEWER_UPDATES_THAN_LAST_REC_USED) &&
                   !F_ISSET_ATOMIC_16(r->page, WT_PAGE_INMEM_SPLIT)) {
                     WT_ASSERT(session, !__rec_proxy_cell_orphaned(session, r));
                     WT_RET(__rec_copy_prev_addr(session, r));
@@ -2834,8 +2840,8 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
          */
         if (last_block && r->multi_next == 1 && block_meta->page_id != WT_BLOCK_INVALID_PAGE_ID &&
           WT_REC_RESULT_SINGLE_PAGE((session), (r)) && !__rec_proxy_cell_orphaned(session, r)) {
-            if (!r->newer_updates_than_last_rec_used && !WT_PAGE_IS_INTERNAL(page) &&
-              !F_ISSET_ATOMIC_16(r->page, WT_PAGE_INMEM_SPLIT))
+            if (!FLD_ISSET(r->state_flags, WTI_REC_NEWER_UPDATES_THAN_LAST_REC_USED) &&
+              !WT_PAGE_IS_INTERNAL(page) && !F_ISSET_ATOMIC_16(r->page, WT_PAGE_INMEM_SPLIT))
                 skip_write = true;
             else if (delta_enabled) {
                 if (block_meta->delta_count < conn->page_delta.max_consecutive_delta) {
@@ -2911,10 +2917,12 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
     multi->addr.block_cookie_size = (uint8_t)addr_size;
 
     /* Adjust the pre-compression page size based on compression results. */
-    if (WT_PAGE_IS_INTERNAL(page) && compressed_size != 0 && btree->intlpage_compadjust)
+    if (WT_PAGE_IS_INTERNAL(page) && compressed_size != 0 &&
+      F_ISSET(btree, WT_BTREE_INTL_COMPADJUST))
         __rec_compression_adjust(
           session, btree->maxintlpage, compressed_size, last_block, &btree->maxintlpage_precomp);
-    if (!WT_PAGE_IS_INTERNAL(page) && compressed_size != 0 && btree->leafpage_compadjust)
+    if (!WT_PAGE_IS_INTERNAL(page) && compressed_size != 0 &&
+      F_ISSET(btree, WT_BTREE_LEAF_COMPADJUST))
         __rec_compression_adjust(
           session, btree->maxleafpage, compressed_size, last_block, &btree->maxleafpage_precomp);
 
@@ -2997,7 +3005,7 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 
     WT_RET(__rec_init(session, cbulk->ref, 0, NULL, &cbulk->reconcile));
     r = cbulk->reconcile;
-    r->is_bulk_load = true;
+    FLD_SET(r->state_flags, WTI_REC_IS_BULK_LOAD);
 
     recno = btree->type == BTREE_ROW ? WT_RECNO_OOB : 1;
 
@@ -3485,7 +3493,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_RECONCILE_TIME
             }
             WT_ASSERT_ALWAYS(session,
               F_ISSET(r, WT_REC_IN_MEMORY) ||
-                (F_ISSET(r, WT_REC_EVICT) && r->leave_dirty && r->multi->supd_entries != 0),
+                (F_ISSET(r, WT_REC_EVICT) && FLD_ISSET(r->state_flags, WTI_REC_LEAVE_DIRTY) &&
+                  r->multi->supd_entries != 0),
               "Attempting a 1-for-1 page swap when there are still updates to write");
             goto split;
         }
@@ -3521,9 +3530,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_RECONCILE_TIME
             }
         } else {
             __wt_checkpoint_tree_reconcile_update(session, &r->multi->addr.ta);
-            WT_RET(
-              __rec_write(session, r->wrapup_checkpoint, &r->wrapup_checkpoint_block_meta, NULL,
-                NULL, NULL, true, F_ISSET(r, WT_REC_CHECKPOINT), r->wrapup_checkpoint_compressed));
+            WT_RET(__rec_write(session, r->wrapup_checkpoint, &r->wrapup_checkpoint_block_meta,
+              NULL, NULL, NULL, true, F_ISSET(r, WT_REC_CHECKPOINT),
+              FLD_ISSET(r->state_flags, WTI_REC_WRAPUP_CHECKPOINT_COMPRESSED)));
             if (page->disagg_info != NULL)
                 page->disagg_info->block_meta = r->wrapup_checkpoint_block_meta;
             WT_TIME_AGGREGATE_MERGE_OBSOLETE_VISIBLE(session, &stop_ta, &r->multi->addr.ta);
@@ -3801,7 +3810,7 @@ __wti_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV
     page = r->page;
 
     /* Track if page has overflow items. */
-    r->ovfl_items = true;
+    FLD_SET(r->state_flags, WTI_REC_OVFL_ITEMS);
 
     /*
      * Disaggregated trees are not allowed to create overflow keys or values. In diagnostic builds,
@@ -3841,7 +3850,7 @@ __wti_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV
          * Track the overflow record (unless it's a bulk load, which by definition won't ever reuse
          * a record.
          */
-        if (!r->is_bulk_load)
+        if (!FLD_ISSET(r->state_flags, WTI_REC_IS_BULK_LOAD))
             WT_ERR(__wti_ovfl_reuse_add(session, page, addr, size, kv->buf.data, kv->buf.size));
     }
 

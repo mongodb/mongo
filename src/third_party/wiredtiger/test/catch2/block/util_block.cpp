@@ -126,11 +126,11 @@ setup_bm(std::shared_ptr<mock_session> &session, WT_BM *bm, const std::string &f
     session->setup_block_manager_file_operations();
 
     /*
-     * Manually set all the methods in WT_BM. The __wt_blkcache_open() function also initializes the
-     * block manager methods, however the function exists within the WiredTiger block cache and is
-     * a layer above the block manager module. This violates the testing layer concept as we would
-     * be technically testing a whole another module. Therefore we chosen to manually setup the
-     * block manager instead
+     * Manually set all the methods in WT_BM. The block manager's open function also initializes the
+     * block manager methods, however it opens the underlying file as well, which reaches beyond
+     * the block manager module. This violates the testing layer concept as we would be technically
+     * testing a whole another module. Therefore we chosen to manually setup the block manager
+     * instead
      * .
      */
     memset(reinterpret_cast<void *>(bm), 0, sizeof(WT_BM));

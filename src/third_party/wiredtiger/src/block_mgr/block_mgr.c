@@ -18,7 +18,7 @@ __wti_bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
     WT_CONNECTION_IMPL *conn;
     uint64_t bucket, hash;
 
-    __wt_verbose(session, WT_VERB_BLKCACHE, "block close: %s", block->name);
+    __wt_verbose(session, WT_VERB_BLOCK, "block close: %s", block->name);
 
     conn = S2C(session);
     __wt_spin_lock(session, &conn->block_lock);
@@ -37,9 +37,9 @@ __wti_bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
     WT_ASSERT(
       session, block->ckpt_state == WT_CKPT_NONE || block->ckpt_state == WT_CKPT_PANIC_ON_FAILURE);
 
-    if (block->sync_on_checkpoint) {
+    if (F_ISSET(block, WT_BLOCK_SYNC_ON_CHECKPOINT)) {
         WT_RET(__wt_fsync(session, block->fh, true));
-        block->sync_on_checkpoint = false;
+        F_CLR(block, WT_BLOCK_SYNC_ON_CHECKPOINT);
     }
 
     /* If fsync fails WT panics so failure to reach __wt_block_close() is irrelevant. */
@@ -174,7 +174,7 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, s
          * Read-only objects are optionally mapped into memory instead of being read into cache
          * buffers.
          */
-        WT_RET(__wti_blkcache_map(session, bm->block, &bm->map, &bm->maplen, &bm->mapped_cookie));
+        WT_RET(__wti_bm_map(session, bm->block, &bm->map, &bm->maplen, &bm->mapped_cookie));
 
         /*
          * If this handle is for a checkpoint, that is, read-only, there isn't a lot you can do with
@@ -240,7 +240,7 @@ __bm_checkpoint_unload(WT_BM *bm, WT_SESSION_IMPL *session)
 
     /* Unmap any mapped segment. */
     if (bm->map != NULL)
-        WT_TRET(__wti_blkcache_unmap(session, bm->block, bm->map, bm->maplen, &bm->mapped_cookie));
+        WT_TRET(__wti_bm_unmap(session, bm->block, bm->map, bm->maplen, &bm->mapped_cookie));
 
     /* Unload the checkpoint. */
     WT_TRET(__wt_block_checkpoint_unload(session, bm->block, !bm->is_live));
@@ -412,13 +412,6 @@ static int
 __bm_free(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size, bool is_root)
 {
     WT_UNUSED(is_root);
-    WT_BLKCACHE *blkcache;
-
-    blkcache = &S2C(session)->blkcache;
-
-    /* Evict the freed block from the block cache */
-    if (blkcache->type != WT_BLKCACHE_UNCONFIGURED)
-        __wt_blkcache_remove(session, addr, addr_size);
 
     /* We should never get here for salvage. */
     WT_ASSERT(session, session->salvage_track == NULL);
@@ -762,6 +755,44 @@ __wti_bm_method_set(WT_BM *bm, bool readonly)
         bm->write = __bm_write_readonly;
         bm->write_size = __bm_write_size_readonly;
     }
+}
+
+/*
+ * __wt_bm_open --
+ *     Open a file.
+ */
+int
+__wt_bm_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], bool forced_salvage,
+  bool readonly, uint32_t allocsize, WT_LIVE_RESTORE_FH_META *lr_fh_meta, WT_BM **bmp)
+{
+    WT_BM *bm;
+    WT_DECL_RET;
+
+    *bmp = NULL;
+
+    __wt_verbose(session, WT_VERB_BLOCK, "block manager open: %s", uri);
+
+    if (__wt_block_disagg_manager_owns_object(session, uri))
+        return (__wt_block_disagg_manager_open(session, uri, cfg, forced_salvage, readonly, bmp));
+
+    WT_RET(__wt_calloc_one(session, &bm));
+    __wti_bm_method_set(bm, false);
+
+    if (WT_PREFIX_MATCH(uri, "file:")) {
+        uri += strlen("file:");
+        WT_ERR(__wt_block_open(session, uri, WT_TIERED_OBJECTID_NONE, cfg, forced_salvage, readonly,
+          false, allocsize, lr_fh_meta, &bm->block));
+    } else {
+        /* Leftover tiered URIs must not map onto a file. */
+        WT_ERR(__wt_object_unsupported(session, uri));
+    }
+
+    *bmp = bm;
+    return (0);
+
+err:
+    __wt_free(session, bm);
+    return (ret);
 }
 
 /*

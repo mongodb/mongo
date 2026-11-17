@@ -452,9 +452,9 @@ __evict_update_work(WT_SESSION_IMPL *session, bool *eviction_needed)
 
     dirty_target = __wti_evict_dirty_target(evict);
     dirty_trigger = __wt_atomic_load_double_relaxed(&evict->eviction_dirty_trigger);
-    target = evict->eviction_target;
-    trigger = evict->eviction_trigger;
-    updates_target = evict->eviction_updates_target;
+    target = __wt_atomic_load_double_relaxed(&evict->eviction_target);
+    trigger = __wt_atomic_load_double_relaxed(&evict->eviction_trigger);
+    updates_target = __wt_atomic_load_double_relaxed(&evict->eviction_updates_target);
     updates_trigger = __wt_atomic_load_double_relaxed(&evict->eviction_updates_trigger);
 
     /* Build up the new state. */

@@ -314,7 +314,7 @@ __evict_btree_dominating_cache(WT_SESSION_IMPL *session, WT_BTREE *btree, uint32
 
     if (LF_ISSET(WT_EVICT_CACHE_CLEAN) &&
       __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load_uint64_relaxed(&btree->bytes_inmem)) >
-        (uint64_t)(0.5 * evict->eviction_target *
+        (uint64_t)(0.5 * __wt_atomic_load_double_relaxed(&evict->eviction_target) *
           (bytes_max + __wt_atomic_load_uint64_relaxed(&cache->bytes_shared_dsk_duplicate))) /
           100)
         return (true);
@@ -331,7 +331,9 @@ __evict_btree_dominating_cache(WT_SESSION_IMPL *session, WT_BTREE *btree, uint32
     if (LF_ISSET(WT_EVICT_CACHE_UPDATES) &&
       __wt_cache_bytes_plus_overhead(
         cache, __wt_atomic_load_uint64_relaxed(&btree->bytes_updates)) >
-        (uint64_t)(0.5 * evict->eviction_updates_target * bytes_max) / 100)
+        (uint64_t)(0.5 * __wt_atomic_load_double_relaxed(&evict->eviction_updates_target) *
+          bytes_max) /
+          100)
         return (true);
 
     return (false);

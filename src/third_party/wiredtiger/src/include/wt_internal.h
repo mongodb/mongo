@@ -77,12 +77,6 @@ struct __wt_background_compact_stat;
 typedef struct __wt_background_compact_stat WT_BACKGROUND_COMPACT_STAT;
 struct __wt_backup_target;
 typedef struct __wt_backup_target WT_BACKUP_TARGET;
-struct __wt_blkcache;
-typedef struct __wt_blkcache WT_BLKCACHE;
-struct __wt_blkcache_delta;
-typedef struct __wt_blkcache_delta WT_BLKCACHE_DELTA;
-struct __wt_blkcache_item;
-typedef struct __wt_blkcache_item WT_BLKCACHE_ITEM;
 struct __wt_blkincr;
 typedef struct __wt_blkincr WT_BLKINCR;
 struct __wt_block;
@@ -621,7 +615,6 @@ typedef uint64_t wt_timestamp_t;
 #include "api.h"
 #include "bitstring.h"
 #include "block.h"
-#include "block_cache.h"
 #include "btmem.h"
 #include "cache_top.h" /* required by btree.h */
 #include "btree.h"

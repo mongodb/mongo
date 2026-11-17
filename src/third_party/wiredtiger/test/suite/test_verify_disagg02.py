@@ -82,11 +82,15 @@ class test_verify_disagg02(wttest.WiredTigerTestCase):
         raw_cursor.insert()
         raw_cursor.close()
 
-        # Verify the layered table. Our check detects the duplicate btree ID.
+        # Per-object verifies never scan the metadata; a plain verify sails through despite the
+        # duplicate.
+        session_follow.verify(self.uri)
+
+        # A NULL URI with verify_internals skips the per-table verification and only runs the check
+        # for duplicate IDs.
         self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: session_follow.verify(self.uri), '/WT_ERROR/')
+            lambda: session_follow.verify(None, 'verify_internals=true'), '/WT_ERROR/')
         self.ignoreStderrPatternIfExists('metadata corruption')
-        self.ignoreStderrPatternIfExists('stable table verification failed')
 
         # Remove the fake entry so teardown verification passes.
         raw_cursor = session_follow.open_cursor('file:WiredTiger.wt', None, None)
@@ -119,6 +123,15 @@ class test_verify_disagg02(wttest.WiredTigerTestCase):
         sh_cursor['file:dup_entry.wt_stable'] = victim_config
         sh_cursor.close()
 
+        # A plain verify no longer scans the metadata; the duplicate is only detected through the
+        # database-wide checks.
+        self.session.verify(self.uri)
+
+        # A NULL URI with verify_internals verifies nothing but the database-wide checks.
         with self.expectedStderrPattern('metadata corruption.*dup_entry'):
-            self.assertRaisesException(wiredtiger.WiredTigerError, lambda: self.session.verify(self.uri), '/WT_ERROR/')
-        self.ignoreStderrPatternIfExists('stable table verification failed')
+            self.assertRaisesException(wiredtiger.WiredTigerError,
+                lambda: self.session.verify(None, 'verify_internals=true'), '/WT_ERROR/')
+
+        # A plain NULL URI verifies all tables without running the check, so the duplicate is
+        # not detected.
+        self.session.verify(None)

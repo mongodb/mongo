@@ -239,8 +239,10 @@ __txn_snapshot_record_disagg(WT_SESSION_IMPL *session)
      * is bumped, so a snapshot that records the new role also observes the new generation and
      * cannot validate against the era it just left.
      */
-    session->txn->disagg_role_leader =
-      __wt_atomic_load_bool_acquire(&conn->layered_table_manager.leader);
+    if (__wt_atomic_load_bool_acquire(&conn->layered_table_manager.leader))
+        F_SET(session->txn, WT_TXN_DISAGG_ROLE_LEADER);
+    else
+        F_CLR(session->txn, WT_TXN_DISAGG_ROLE_LEADER);
 
     /*
      * Only an untimestamped follower snapshot pins a checkpoint: its stable binds compare against
@@ -259,7 +261,8 @@ __txn_snapshot_record_disagg(WT_SESSION_IMPL *session)
      * with a delivery's generation advance: a delivery either observes the pin published here, or
      * the validation after the build observes the delivery and retries.
      */
-    if (!F_ISSET(session->txn, WT_TXN_SHARED_TS_READ) && !session->txn->disagg_role_leader)
+    if (!F_ISSET(session->txn, WT_TXN_SHARED_TS_READ) &&
+      !F_ISSET(session->txn, WT_TXN_DISAGG_ROLE_LEADER))
         __wt_session_gen_enter(session, WT_GEN_DISAGG_CKPT);
 }
 
@@ -277,9 +280,9 @@ __txn_snapshot_validate_disagg(WT_SESSION_IMPL *session)
 {
     if (__wt_gen(session, WT_GEN_DISAGG_ROLE) != __wt_session_gen(session, WT_GEN_DISAGG_ROLE) ||
       __wt_atomic_load_bool_acquire(&S2C(session)->layered_table_manager.leader) !=
-        session->txn->disagg_role_leader)
+        F_ISSET(session->txn, WT_TXN_DISAGG_ROLE_LEADER))
         return (false);
-    if (session->txn->disagg_role_leader)
+    if (F_ISSET(session->txn, WT_TXN_DISAGG_ROLE_LEADER))
         return (true);
     /* A timestamped reader pins no checkpoint, leaving nothing further to validate. */
     if (__wt_session_gen(session, WT_GEN_DISAGG_CKPT) == 0)

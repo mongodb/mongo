@@ -418,7 +418,7 @@ __wt_cell_pack_leaf_kv(WT_SESSION_IMPL *session, bool empty_value, const void *k
      * Remember the full key for the next prefix compression comparison. The first prefix bytes
      * already match what's stored in last_key, so only copy the suffix.
      */
-    if (btree->prefix_compression) {
+    if (F_ISSET(btree, WT_BTREE_PREFIX_COMPRESSION)) {
         WT_RET(__wt_buf_grow(session, s->last_key, key_size));
         memcpy((uint8_t *)s->last_key->mem + pfx, (const uint8_t *)key_data + pfx, key_size - pfx);
         s->last_key->data = s->last_key->mem;

@@ -131,6 +131,16 @@ timestamp_init(void)
 void
 timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
 {
+    timestamp_once_internal(session, allow_lag, final, TIMESTAMP_STABLE | TIMESTAMP_OLDEST);
+}
+
+/*
+ * timestamp_once_internal --
+ *     Update the selected timestamps once.
+ */
+void
+timestamp_once_internal(WT_SESSION *session, bool allow_lag, bool final, uint32_t flags)
+{
     static const char *oldest_timestamp_str = "oldest_timestamp=";
     static const char *stable_timestamp_str = "stable_timestamp=";
     WT_CONNECTION *conn;
@@ -140,6 +150,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
     /* Ensure timestamps are used. */
     testutil_assert(g.transaction_timestamps_config);
     testutil_assert(session != NULL);
+    testutil_assert(LF_ISSET(TIMESTAMP_OLDEST | TIMESTAMP_STABLE));
 
     conn = g.wts_conn;
 
@@ -185,15 +196,21 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
             oldest_timestamp = WT_MAX(stable_timestamp - lag, g.oldest_timestamp);
     }
 
+    if (LF_ISSET(TIMESTAMP_OLDEST) && !LF_ISSET(TIMESTAMP_STABLE))
+        oldest_timestamp = WT_MIN(oldest_timestamp, g.stable_timestamp);
+
     testutil_snprintf(buf, sizeof(buf), "%s%" PRIx64 ",%s%" PRIx64, oldest_timestamp_str,
-      oldest_timestamp, stable_timestamp_str, stable_timestamp);
+      LF_ISSET(TIMESTAMP_OLDEST) ? oldest_timestamp : g.oldest_timestamp, stable_timestamp_str,
+      LF_ISSET(TIMESTAMP_STABLE) ? stable_timestamp : g.stable_timestamp);
 
     lock_writelock(session, &g.prepare_commit_lock);
     testutil_check(conn->set_timestamp(conn, buf));
     lock_writeunlock(session, &g.prepare_commit_lock);
 
-    g.oldest_timestamp = oldest_timestamp;
-    g.stable_timestamp = stable_timestamp;
+    if (LF_ISSET(TIMESTAMP_OLDEST))
+        g.oldest_timestamp = oldest_timestamp;
+    if (LF_ISSET(TIMESTAMP_STABLE))
+        g.stable_timestamp = stable_timestamp;
 
     if (FLD_ISSET(g.trace_flags, TRACE_TIMESTAMP))
         trace_msg(session, "set ts oldest=%" PRIu64 ", stable=%" PRIu64, g.oldest_timestamp,

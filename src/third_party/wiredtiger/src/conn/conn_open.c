@@ -121,9 +121,6 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     /* Shut down metadata tracking. */
     WT_TRET(__wt_meta_track_destroy(session));
 
-    /* Shut down the block cache */
-    __wt_blkcache_destroy(session);
-
     /* Shut down layered table manager - this should be done after closing out data handles. */
     WT_TRET(__wti_layered_table_manager_destroy(session));
 

@@ -479,7 +479,7 @@ __clayered_enter_flags(
      * largest_key always consults ingest, regardless of role or transaction: it ignores visibility
      * by contract.
      */
-    if (role == WTI_CLAYERED_ROLE_FOLLOWER || session->txn->stepdown_ts_set ||
+    if (role == WTI_CLAYERED_ROLE_FOLLOWER || F_ISSET(session->txn, WT_TXN_STEPDOWN_TS_SET) ||
       __wt_atomic_load_bool_relaxed(&((WT_LAYERED_TABLE *)clayered->dhandle)->step_down_created) ||
       mode == WTI_CLAYERED_MODE_LARGEST_KEY)
         LF_SET(CLAYERED_ENTER_OPEN_INGEST);
@@ -517,7 +517,7 @@ __clayered_write_target_for_op(WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP *op
 
     WT_ASSERT(CUR2S(clayered), role == WTI_CLAYERED_ROLE_LEADER && op->stable != NULL);
 
-    if (!CUR2S(clayered)->txn->stepdown_ts_set)
+    if (!F_ISSET(CUR2S(clayered)->txn, WT_TXN_STEPDOWN_TS_SET))
         return (WTI_CLAYERED_WRITE_STABLE);
 
     WT_ASSERT(CUR2S(clayered), op->ingest != NULL);
@@ -591,7 +591,7 @@ __clayered_assert_role_change(
       __wt_gen(session, WT_GEN_DISAGG_ROLE) - __wt_session_gen(session, WT_GEN_DISAGG_ROLE) <= 1);
 
     /* A snapshot established on a follower must not be used on a leader: a step-up span. */
-    WT_ASSERT(session, txn->disagg_role_leader || role != WTI_CLAYERED_ROLE_LEADER);
+    WT_ASSERT(session, F_ISSET(txn, WT_TXN_DISAGG_ROLE_LEADER) || role != WTI_CLAYERED_ROLE_LEADER);
 }
 
 /*
@@ -812,7 +812,7 @@ __clayered_stable_bind_check_role_change(WT_SESSION_IMPL *session, bool leader)
 {
     WT_ASSERT(session, __clayered_stable_bind_check_needed(session));
 
-    if (leader == session->txn->disagg_role_leader &&
+    if (leader == F_ISSET(session->txn, WT_TXN_DISAGG_ROLE_LEADER) &&
       __wt_session_gen(session, WT_GEN_DISAGG_ROLE) == __wt_gen(session, WT_GEN_DISAGG_ROLE))
         return (0);
 
@@ -3327,7 +3327,7 @@ __clayered_modify_check(WTI_CLAYERED_OP *op, const WT_ITEM *key)
      * When step-down writes are mirrored to stable there is no need to probe, and this function
      * exits early from the previous write_target check.
      */
-    bool stepdown_ts_set = session->txn->stepdown_ts_set;
+    bool stepdown_ts_set = F_ISSET(session->txn, WT_TXN_STEPDOWN_TS_SET);
 
     /* Otherwise every snapshot-visible update is current; there is nothing to check. */
     if (!has_read_ts && !stepdown_ts_set)

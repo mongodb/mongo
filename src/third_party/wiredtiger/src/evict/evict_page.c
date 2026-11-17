@@ -354,8 +354,7 @@ __evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
      * abandon the put. We deliberately don't propagate it - this is optional cache population, not
      * an operation worth failing.
      */
-    if ((ret = __wt_blkcache_compress(session, &buf_orig, false, &cache_buf, NULL, &compressed)) !=
-      0) {
+    if ((ret = __wt_bm_compress(session, &buf_orig, false, &cache_buf, NULL, &compressed)) != 0) {
         __wt_err(session, ret,
           "victim cache: failed to compress block before caching, caching uncompressed");
         ret = 0;
@@ -379,7 +378,7 @@ __evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
 
     /*
      * Determine if full data checksum is needed based on btree config. This follows the same logic
-     * as __wt_blkcache_write.
+     * as __wt_bm_write_page.
      */
     switch (S2BT(session)->checksum) {
     case CKSUM_ON:

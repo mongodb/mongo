@@ -114,13 +114,13 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint
      * object. In-memory block handles don't have a backing file thus size is zero.
      */
     if (addr == NULL || addr_size == 0)
-        ci->file_size = block->in_memory ? 0 : block->allocsize;
+        ci->file_size = F_ISSET(block, WT_BLOCK_IN_MEMORY) ? 0 : block->allocsize;
     else {
         /* Crack the checkpoint cookie. */
         WT_ERR(__wti_block_ckpt_unpack(session, block, addr, addr_size, ci));
 
         /* Verify sets up next. */
-        if (block->verify) {
+        if (FLD_ISSET(block->verify_flags, WT_BLOCK_VERIFY)) {
             WT_ASSERT(session, block->objectid == 0 && ci->root_objectid == 0);
             WT_ERR(__wti_verify_ckpt_load(session, block, ci));
         }
@@ -168,7 +168,7 @@ err:
          * early enough that the checkpoint information isn't correct, bad things would happen. The
          * only allocated memory was in the service of verify, clean that up.
          */
-        if (block->verify)
+        if (FLD_ISSET(block->verify_flags, WT_BLOCK_VERIFY))
             WT_TRET(__wti_verify_ckpt_unload(session, block, true));
     }
 
@@ -189,7 +189,7 @@ __wt_block_checkpoint_unload(WT_SESSION_IMPL *session, WT_BLOCK *block, bool che
     WT_DECL_RET;
 
     /* Verify cleanup. */
-    if (block->verify)
+    if (FLD_ISSET(block->verify_flags, WT_BLOCK_VERIFY))
         WT_TRET(__wti_verify_ckpt_unload(session, block, false));
 
     /*

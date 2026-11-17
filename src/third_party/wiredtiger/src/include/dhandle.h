@@ -167,7 +167,6 @@ struct __wt_data_handle {
      */
     wt_shared uint32_t references;   /* References to this handle */
     wt_shared int32_t session_inuse; /* Sessions using this handle */
-    uint32_t excl_ref;               /* Refs of handle by excl_session */
     wt_shared uint64_t timeofdeath;  /* Use count went to 0 */
     WT_SESSION_IMPL *excl_session;   /* Session with exclusive use, if any */
 
@@ -175,11 +174,10 @@ struct __wt_data_handle {
     void *handle;         /* Generic handle */
 
     wt_shared enum wt_dhandle_type type;
+    uint32_t excl_ref; /* Refs of handle by excl_session */
 
 #define WT_DHANDLE_BTREE(dhandle) \
     (__wt_atomic_load_enum_relaxed(&(dhandle)->type) == WT_DHANDLE_TYPE_BTREE)
-
-    bool compact_skip; /* If the handle failed to compact */
 
     /*
      * Data handles can be closed without holding the schema lock; threads walk the list of open
@@ -224,7 +222,8 @@ struct __wt_data_handle {
      * Checkpoint pickup and step-down set it while another thread may concurrently read it, so it
      * must be atomic.
      */
-    wt_shared bool outdated; /* Handle's metadata has been superseded */
+    wt_shared bool outdated;     /* Handle's metadata has been superseded */
+    wt_shared bool compact_skip; /* If the handle failed to compact */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_DHANDLE_TS_ASSERT_READ_ALWAYS 0x1u /* Assert read always checking. */

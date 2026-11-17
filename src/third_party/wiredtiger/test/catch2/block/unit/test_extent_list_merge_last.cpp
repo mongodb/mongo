@@ -51,7 +51,7 @@ TEST_CASE("Extent Lists: merge swap must not leave a stale last pointer", "[exte
     WT_SESSION_IMPL *session = mock_session->get_wt_session_impl();
 
     WT_BLOCK block = {};
-    block.verify = true;
+    FLD_SET(block.verify_flags, WT_BLOCK_VERIFY);
 
     WT_EXTLIST src = {}, dst = {};
 

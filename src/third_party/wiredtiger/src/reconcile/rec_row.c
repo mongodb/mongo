@@ -40,14 +40,20 @@ __rec_key_state_update(WTI_RECONCILE *r, bool ovfl_key)
      * prefix and suffix compression.
      */
     if (ovfl_key)
-        r->key_sfx_compress = false;
+        FLD_CLR(r->state_flags, WTI_REC_KEY_SFX_COMPRESS);
     else {
         a = r->cur;
         r->cur = r->last;
         r->last = a;
 
-        r->key_pfx_compress = r->key_pfx_compress_conf;
-        r->key_sfx_compress = r->key_sfx_compress_conf;
+        if (FLD_ISSET(r->state_flags, WTI_REC_KEY_PFX_COMPRESS_CONF))
+            FLD_SET(r->state_flags, WTI_REC_KEY_PFX_COMPRESS);
+        else
+            FLD_CLR(r->state_flags, WTI_REC_KEY_PFX_COMPRESS);
+        if (FLD_ISSET(r->state_flags, WTI_REC_KEY_SFX_COMPRESS_CONF))
+            FLD_SET(r->state_flags, WTI_REC_KEY_SFX_COMPRESS);
+        else
+            FLD_CLR(r->state_flags, WTI_REC_KEY_SFX_COMPRESS);
     }
 }
 
@@ -111,7 +117,7 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session, WTI_RECONCILE *r, const void
          * current key, which means the keys must differ and we just need to compare up to the
          * shorter one of the two keys.
          */
-        if (r->key_pfx_compress) {
+        if (FLD_ISSET(r->state_flags, WTI_REC_KEY_PFX_COMPRESS)) {
             __wt_cell_compress_prefix_key(
               r->last, data, size, r->key_pfx_last, btree->prefix_compression_min, &pfx);
 
@@ -186,8 +192,8 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
          * Turn off prefix compression until a full key written to the new page, and (unless already
          * working with an overflow key), rebuild the key without compression.
          */
-        if (r->key_pfx_compress_conf) {
-            r->key_pfx_compress = false;
+        if (FLD_ISSET(r->state_flags, WTI_REC_KEY_PFX_COMPRESS_CONF)) {
+            FLD_CLR(r->state_flags, WTI_REC_KEY_PFX_COMPRESS);
             r->key_pfx_last = 0;
             if (!ovfl_key)
                 WT_ERR(__rec_cell_build_leaf_key(session, r, NULL, 0, false, &ovfl_key));
@@ -204,9 +210,9 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
     /* Copy the key/value pair onto the page. */
     __wti_rec_image_copy(session, r, key);
     if (val->len == 0)
-        r->any_empty_value = true;
+        FLD_SET(r->state_flags, WTI_REC_ANY_EMPTY_VALUE);
     else {
-        r->all_empty_value = false;
+        FLD_CLR(r->state_flags, WTI_REC_ALL_EMPTY_VALUE);
         if (btree->dictionary)
             WT_ERR(__wti_rec_dict_replace(session, r, &tw, 0, val));
         __wti_rec_image_copy(session, r, val);
@@ -251,7 +257,7 @@ __rec_pack_delta_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV 
     WT_TIME_AGGREGATE_INIT(&local_ta);
 
     /* Ensure that we never build a delta for the first key. */
-    WT_ASSERT(session, !r->cell_zero);
+    WT_ASSERT(session, !FLD_ISSET(r->state_flags, WTI_REC_CELL_ZERO));
 
 #define WT_CELL_ADDR_DEL_VISIBLE_ALL_LEN (2)
 
@@ -461,15 +467,15 @@ __rec_row_merge(
         if (i == 0) {
             if (*build_deltap) {
                 __wt_ref_key_home(ref, &old_key, &old_key_size);
-                WT_RET(
-                  __rec_cell_build_int_key(session, r, old_key, r->cell_zero ? 1 : old_key_size));
+                WT_RET(__rec_cell_build_int_key(session, r, old_key,
+                  FLD_ISSET(r->state_flags, WTI_REC_CELL_ZERO) ? 1 : old_key_size));
             } else
                 WT_RET(__rec_cell_build_int_key(session, r, WT_IKEY_DATA(multi->key.ikey),
-                  r->cell_zero ? 1 : multi->key.ikey->size));
+                  FLD_ISSET(r->state_flags, WTI_REC_CELL_ZERO) ? 1 : multi->key.ikey->size));
         } else
             WT_RET(__rec_cell_build_int_key(
               session, r, WT_IKEY_DATA(multi->key.ikey), multi->key.ikey->size));
-        r->cell_zero = false;
+        FLD_CLR(r->state_flags, WTI_REC_CELL_ZERO);
 
         addr = &multi->addr;
         __wti_rec_cell_build_addr(session, r, addr, NULL, WT_RECNO_OOB, NULL, false);
@@ -567,7 +573,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
      * it simplifies various things in other parts of the code (we don't have to special case
      * transforming the page from its disk image to its in-memory version, for example).
      */
-    r->cell_zero = true;
+    FLD_SET(r->state_flags, WTI_REC_CELL_ZERO);
 
     /* For each entry in the in-memory page... */
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
@@ -587,7 +593,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
          */
         if (build_delta &&
           (r->multi_next > 0 || F_ISSET(ref, WT_REF_FLAG_REC_MULTIPLE) ||
-            (r->cell_zero && prev_dirty)))
+            (FLD_ISSET(r->state_flags, WTI_REC_CELL_ZERO) && prev_dirty)))
             __rec_stop_build_delta_int(r, &build_delta);
 
         retain_onpage = false;
@@ -634,7 +640,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
             if (WT_DELTA_INT_ENABLED(btree, S2C(session))) {
                 /* If there are concurrent changes to the first child, abort delta creation. */
                 if (__wt_atomic_load_uint8_v_acquire(&ref->dirty_state) == WT_REF_DIRTY &&
-                  build_delta && r->cell_zero)
+                  build_delta && FLD_ISSET(r->state_flags, WTI_REC_CELL_ZERO))
                     __rec_stop_build_delta_int(r, &build_delta);
             }
 
@@ -660,7 +666,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
                 if (WT_DELTA_INT_ENABLED(btree, S2C(session))) {
                     /* If there are concurrent changes to the first child, abort delta creation. */
                     if (__wt_atomic_load_uint8_v_acquire(&ref->dirty_state) == WT_REF_DIRTY &&
-                      build_delta && r->cell_zero)
+                      build_delta && FLD_ISSET(r->state_flags, WTI_REC_CELL_ZERO))
                         __rec_stop_build_delta_int(r, &build_delta);
                 }
 
@@ -668,7 +674,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
                 WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_MULTIBLOCK:
-                cell_zero_tmp = r->cell_zero;
+                cell_zero_tmp = FLD_ISSET(r->state_flags, WTI_REC_CELL_ZERO);
                 WT_ERR(__rec_row_merge(session, r, ref, prev_dirty, &build_delta));
 
                 /*
@@ -782,7 +788,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 
         /* Build key cell. Truncate any 0th key, internal pages don't need 0th keys. */
         __wt_ref_key(page, ref, &p, &size);
-        if (r->cell_zero)
+        if (FLD_ISSET(r->state_flags, WTI_REC_CELL_ZERO))
             size = 1;
         WT_ERR(__rec_cell_build_int_key(session, r, p, size));
 
@@ -815,11 +821,11 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
         if (WT_DELTA_INT_ENABLED(btree, S2C(session))) {
             /* If there are concurrent changes to the first child, abort delta creation. */
             if (__wt_atomic_load_uint8_v_acquire(&ref->dirty_state) == WT_REF_DIRTY &&
-              build_delta && r->cell_zero)
+              build_delta && FLD_ISSET(r->state_flags, WTI_REC_CELL_ZERO))
                 __rec_stop_build_delta_int(r, &build_delta);
         }
 
-        r->cell_zero = false;
+        FLD_CLR(r->state_flags, WTI_REC_CELL_ZERO);
     }
     WT_INTL_FOREACH_END;
 
@@ -917,7 +923,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins
             /*
              * Turn off prefix and suffix compression until a full key is written into the new page.
              */
-            r->key_pfx_compress = r->key_sfx_compress = false;
+            FLD_CLR(r->state_flags, WTI_REC_KEY_PFX_COMPRESS | WTI_REC_KEY_SFX_COMPRESS);
             r->key_pfx_last = 0;
             continue;
         }
@@ -964,7 +970,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins
          * When a tombstone without a timestamp is written to disk, remove any historical versions
          * that are greater in the history store for this key.
          */
-        if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone) {
+        if (upd_select.no_ts_tombstone &&
+          FLD_ISSET(r->state_flags, WTI_REC_HS_CLEAR_ON_TOMBSTONE)) {
             tmpkey->data = WT_INSERT_KEY(ins);
             tmpkey->size = WT_INSERT_KEY_SIZE(ins);
             WT_ERR(__wti_rec_hs_clear_on_tombstone(
@@ -984,8 +991,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins
              * Turn off prefix compression until a full key written to the new page, and (unless
              * already working with an overflow key), rebuild the key without compression.
              */
-            if (r->key_pfx_compress_conf) {
-                r->key_pfx_compress = false;
+            if (FLD_ISSET(r->state_flags, WTI_REC_KEY_PFX_COMPRESS_CONF)) {
+                FLD_CLR(r->state_flags, WTI_REC_KEY_PFX_COMPRESS);
                 r->key_pfx_last = 0;
                 if (!ovfl_key)
                     WT_ERR(__rec_cell_build_leaf_key(session, r, NULL, 0, false, &ovfl_key));
@@ -997,9 +1004,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins
         /* Copy the key/value pair onto the page. */
         __wti_rec_image_copy(session, r, key);
         if (val->len == 0 && __rec_row_zero_len(session, &tw))
-            r->any_empty_value = true;
+            FLD_SET(r->state_flags, WTI_REC_ANY_EMPTY_VALUE);
         else {
-            r->all_empty_value = false;
+            FLD_CLR(r->state_flags, WTI_REC_ALL_EMPTY_VALUE);
             if (btree->dictionary)
                 WT_ERR(__wti_rec_dict_replace(session, r, &tw, 0, val));
             __wti_rec_image_copy(session, r, val);
@@ -1205,7 +1212,7 @@ __wti_rec_row_leaf(
                  * cleared transaction ids.
                  */
                 if (F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW)) {
-                    r->ovfl_items = true;
+                    FLD_SET(r->state_flags, WTI_REC_OVFL_ITEMS);
 
                     val->buf.data = vpack->data;
                     val->buf.size = vpack->size;
@@ -1226,7 +1233,7 @@ __wti_rec_row_leaf(
 
                 /* Track if page has overflow items. */
                 if (F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW))
-                    r->ovfl_items = true;
+                    FLD_SET(r->state_flags, WTI_REC_OVFL_ITEMS);
             }
         } else {
             /*
@@ -1287,7 +1294,8 @@ __wti_rec_row_leaf(
              * When a tombstone without a timestamp is written to disk, remove any historical
              * versions that are greater in the history store for this key.
              */
-            if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone) {
+            if (upd_select.no_ts_tombstone &&
+              FLD_ISSET(r->state_flags, WTI_REC_HS_CLEAR_ON_TOMBSTONE)) {
                 WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
                 WT_ERR(__wti_rec_hs_clear_on_tombstone(session, r, WT_RECNO_OOB, tmpkey,
                   upd->type == WT_UPDATE_TOMBSTONE ? false : true));
@@ -1316,7 +1324,7 @@ __wti_rec_row_leaf(
             lastkey->size = 0;
 
             /* Track if page has overflow items. */
-            r->ovfl_items = true;
+            FLD_SET(r->state_flags, WTI_REC_OVFL_ITEMS);
         } else {
             /*
              * Get the key from the page or an instantiated key, or inline building the key from a
@@ -1377,8 +1385,8 @@ slow:
              * Turn off prefix compression until a full key written to the new page, and (unless
              * already working with an overflow key), rebuild the key without compression.
              */
-            if (r->key_pfx_compress_conf) {
-                r->key_pfx_compress = false;
+            if (FLD_ISSET(r->state_flags, WTI_REC_KEY_PFX_COMPRESS_CONF)) {
+                FLD_CLR(r->state_flags, WTI_REC_KEY_PFX_COMPRESS);
                 r->key_pfx_last = 0;
                 if (!ovfl_key)
                     WT_ERR(__rec_cell_build_leaf_key(session, r, NULL, 0, false, &ovfl_key));
@@ -1390,9 +1398,9 @@ slow:
         /* Copy the key/value pair onto the page. */
         __wti_rec_image_copy(session, r, key);
         if (val->len == 0 && __rec_row_zero_len(session, twp))
-            r->any_empty_value = true;
+            FLD_SET(r->state_flags, WTI_REC_ANY_EMPTY_VALUE);
         else {
-            r->all_empty_value = false;
+            FLD_CLR(r->state_flags, WTI_REC_ALL_EMPTY_VALUE);
             if (dictionary && btree->dictionary)
                 WT_ERR(__wti_rec_dict_replace(session, r, twp, 0, val));
             __wti_rec_image_copy(session, r, val);

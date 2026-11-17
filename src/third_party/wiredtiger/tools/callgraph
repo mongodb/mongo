@@ -339,7 +339,7 @@ if (!@ARGV) {
 
 our $ret_arg0 = "__wt_illegal_value|__wt_errno";
 our $ret_arg1 = "WT_ERR|WT_ERR_ERROR_OK|WT_ERR_NOTFOUND_OK|WT_RET|WT_RET_TRACK|WT_RET_ERROR_OK|WT_RET_BUSY_OK|WT_RET_NOTFOUND_OK|WT_TRET|WT_TRET_ERROR_OK|WT_TRET_NOTFOUND_OK|__err_cell_corrupt|__err_cell_corrupt_or_eof";
-our $ret_arg2 = "WT_ERR_MSG|WT_ERR_TEST|WT_RET_TEST|WT_ERR_PANIC|WT_RET_VRFY_RETVAL|WT_RET_MSG|WT_PREFETCH_ASSERT|API_END_RET|__wt_set_return|__blkcache_read_corrupt|__wt_err_func|__wt_panic|__wt_panic_func|__wt_panic_func";
+our $ret_arg2 = "WT_ERR_MSG|WT_ERR_TEST|WT_RET_TEST|WT_ERR_PANIC|WT_RET_VRFY_RETVAL|WT_RET_MSG|WT_PREFETCH_ASSERT|API_END_RET|__wt_set_return|__bm_read_corrupt|__wt_err_func|__wt_panic|__wt_panic_func|__wt_panic_func";
 our $ret_arg3 = "__config_err";
 our $ret_arg4 = "WT_RET_ASSERT|WT_RET_PANIC_ASSERT";
 our ($pathFrom, $pathTo, $exclude, $prune, $grow, $printBackwards, $maxDepthToScan, $searchPath, $printLen, $rankdir, $minmaxrank, $fmt, $mode, $walkByBreadth, $continue, $refs, $strict, $grep, $indentStr, $hlends);
@@ -633,7 +633,7 @@ our (%modules, %moduleDirs, %moduleAliasesFile, %moduleAliasesSrc);
 
 %modules = (
   block => {},
-  block_cache => {sourceAliases=>["blkcache", "bm"]},
+  block_mgr => {sourceAliases=>["bm"]},
   block_disagg => {},
   btree => {fileAliases=>["btmem", "btree_cmp", "dhandle", "modify", "ref", "serial"]},
   call_log => {},

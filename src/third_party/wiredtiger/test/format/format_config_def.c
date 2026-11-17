@@ -28,16 +28,6 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"backup.live_restore_threads", "number of live restore worker threads", 0x0, 0, 12, 12,
     V_GLOBAL_BACKUP_LIVE_RESTORE_THREADS},
 
-  {"block_cache", "enable the block cache", C_BOOL, 10, 0, 0, V_GLOBAL_BLOCK_CACHE},
-
-  {"block_cache.cache_on_checkpoint", "block cache: cache checkpoint writes", C_BOOL, 30, 0, 0,
-    V_GLOBAL_BLOCK_CACHE_CACHE_ON_CHECKPOINT},
-
-  {"block_cache.cache_on_writes", "block cache: populate the cache on writes", C_BOOL, 60, 0, 0,
-    V_GLOBAL_BLOCK_CACHE_CACHE_ON_WRITES},
-
-  {"block_cache.size", "block cache size (MB)", 0x0, 1, 100, 100 * 1024, V_GLOBAL_BLOCK_CACHE_SIZE},
-
   {"btree.compression", "data compression (off | lz4 | snappy | zlib | zstd)",
     C_IGNORE | C_STRING | C_TABLE, 0, 0, 0, V_TABLE_BTREE_COMPRESSION},
 

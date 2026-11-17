@@ -443,8 +443,9 @@ __wt_evict_clean_pressure(WT_SESSION_IMPL *session)
     /* Eviction should be done if we hit the eviction clean trigger or come close to hitting it. */
     if (__wt_evict_clean_needed(session, &pct_full))
         return (true);
-    if (pct_full > evict->eviction_target &&
-      pct_full >= WT_EVICT_PRESSURE_THRESHOLD * evict->eviction_trigger)
+    if (pct_full > __wt_atomic_load_double_relaxed(&evict->eviction_target) &&
+      pct_full >=
+        WT_EVICT_PRESSURE_THRESHOLD * __wt_atomic_load_double_relaxed(&evict->eviction_trigger))
         return (true);
     return (false);
 }
@@ -478,7 +479,8 @@ __wt_evict_clean_needed(WT_SESSION_IMPL *session, double *pct_fullp)
     if (pct_fullp != NULL)
         *pct_fullp = ((100.0 * bytes_inuse) / bytes_max);
 
-    return (bytes_inuse > (S2C(session)->evict->eviction_trigger * bytes_max) / 100);
+    return (bytes_inuse >
+      (__wt_atomic_load_double_relaxed(&S2C(session)->evict->eviction_trigger) * bytes_max) / 100);
 }
 
 /*
@@ -653,7 +655,9 @@ __wt_evict_needed(
           (!__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader) ||
             F_ISSET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP) ||
             __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE)) {
-            double cache_full = (evict->eviction_target + evict->eviction_trigger) / 2;
+            double cache_full = (__wt_atomic_load_double_relaxed(&evict->eviction_target) +
+                                  __wt_atomic_load_double_relaxed(&evict->eviction_trigger)) /
+              2;
             if (pct_updates > cache_full)
                 __wt_verbose_debug1(
                   session, WT_VERB_EVICTION, "cache is full of updates: %f percent", pct_updates);
@@ -666,7 +670,8 @@ __wt_evict_needed(
                 WT_STAT_CONN_DSRC_INCR(session, cache_eviction_app_threads_skip_updates_dirty_page);
 
             if (pct_fullp != NULL)
-                *pct_fullp = 100.0 - (evict->eviction_trigger - pct_full);
+                *pct_fullp =
+                  100.0 - (__wt_atomic_load_double_relaxed(&evict->eviction_trigger) - pct_full);
             return (clean_needed);
         }
     }
@@ -677,9 +682,9 @@ __wt_evict_needed(
      */
     dirty_trigger = __wt_atomic_load_double_relaxed(&evict->eviction_dirty_trigger);
     if (pct_fullp != NULL)
-        *pct_fullp =
-          __wti_evict_threshold_pct(pct_full, pct_dirty, pct_updates, evict->eviction_trigger,
-            dirty_trigger, __wt_atomic_load_double_relaxed(&evict->eviction_updates_trigger));
+        *pct_fullp = __wti_evict_threshold_pct(pct_full, pct_dirty, pct_updates,
+          __wt_atomic_load_double_relaxed(&evict->eviction_trigger), dirty_trigger,
+          __wt_atomic_load_double_relaxed(&evict->eviction_updates_trigger));
 
     /*
      * Only check the dirty trigger when the session is not busy.
@@ -990,7 +995,7 @@ __wt_evict_app_assist_worker_check(WT_SESSION_IMPL *session, bool busy, bool rea
     if (F_ISSET_ATOMIC_32(
           &(conn->cache->cache_eviction_controls), WT_CACHE_EVICT_INCREMENTAL_APP) &&
       !__wt_evict_clean_needed(session, &pct_full)) {
-        if (pct_full <= evict->eviction_target &&
+        if (pct_full <= __wt_atomic_load_double_relaxed(&evict->eviction_target) &&
           ((__wt_atomic_load_uint32_relaxed(&evict->evict_aggressive_score)) <= (session->id % 20)))
             return (0);
     }

@@ -18,7 +18,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
     wt_off_t len;
     uint32_t allocsize;
 
-    if (block->in_memory) {
+    if (F_ISSET(block, WT_BLOCK_IN_MEMORY)) {
         WT_ASSERT(session, block->fh == NULL);
         WT_RET_MSG(session, EINVAL, "%s: no backing file", block->name);
     }
@@ -69,7 +69,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 int
 __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-    if (block->in_memory)
+    if (F_ISSET(block, WT_BLOCK_IN_MEMORY))
         return (0);
 
     /* Salvage performs a checkpoint but doesn't start or resolve it. */

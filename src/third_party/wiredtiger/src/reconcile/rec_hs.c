@@ -1155,7 +1155,7 @@ err:
  * __wti_rec_hs_insert_updates --
  *     Copy one set of saved updates into the database's history store table if they haven't been
  *     moved there. Whether the function fails or succeeds, if there is a successful write to
- *     history, cache_write_hs is set to true.
+ *     history, the history store write flag is set.
  */
 int
 __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI *multi)
@@ -1177,7 +1177,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
     bool error_on_ts_ordering;
 
     conn = S2C(session);
-    r->cache_write_hs = false;
+    FLD_CLR(r->state_flags, WTI_REC_CACHE_WRITE_HS);
     btree = S2BT(session);
     ref = r->ref;
     error_on_ts_ordering = F_ISSET(r, WT_REC_CHECKPOINT_RUNNING) ||
@@ -1301,9 +1301,9 @@ err:
     if (ret == 0 && (stats.insert_cnt > 0 || stats.hs_stats_updated))
         __rec_hs_verbose_cache_stats(session, btree);
 
-    /* cache_write_hs is set to true as there was at least one successful write to history. */
+    /* The history store write flag is set as there was at least one successful write to history. */
     if (stats.insert_cnt > 0 || stats.hs_stats_updated)
-        r->cache_write_hs = true;
+        FLD_SET(r->state_flags, WTI_REC_CACHE_WRITE_HS);
 
     __wt_scr_free(session, &key);
     __wt_update_vector_free(&updates);

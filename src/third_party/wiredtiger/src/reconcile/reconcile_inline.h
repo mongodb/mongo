@@ -158,7 +158,7 @@ __rec_page_time_stats(WT_SESSION_IMPL *session, WTI_RECONCILE *r, bool is_delta)
 {
     uint32_t count_durable_start_ts, count_start_ts, count_start_txn, count_durable_stop_ts,
       count_stop_ts, count_stop_txn, count_prepare;
-    uint16_t ts_usage_flags;
+    uint8_t ts_usage_flags;
     if (is_delta) {
         count_durable_start_ts = r->count_delta_durable_start_ts;
         count_start_ts = r->count_delta_start_ts;
@@ -203,21 +203,21 @@ __rec_page_time_stats(WT_SESSION_IMPL *session, WTI_RECONCILE *r, bool is_delta)
               session, rec_time_window_bytes_ts, count_durable_start_ts * sizeof(wt_timestamp_t));
             WT_STAT_CONN_DSRC_INCRV(
               session, rec_time_window_durable_start_ts, count_durable_start_ts);
-            r->rec_page_cell_with_ts = true;
+            FLD_SET(r->state_flags, WTI_REC_REC_PAGE_CELL_WITH_TS);
         }
         if (count_start_ts != 0) {
             WT_STAT_CONN_DSRC_INCRV(
               session, rec_time_window_bytes_ts, count_start_ts * sizeof(wt_timestamp_t));
             WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_start_ts, count_start_ts);
             WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_start_ts);
-            r->rec_page_cell_with_ts = true;
+            FLD_SET(r->state_flags, WTI_REC_REC_PAGE_CELL_WITH_TS);
         }
         if (count_start_txn != 0) {
             WT_STAT_CONN_DSRC_INCRV(
               session, rec_time_window_bytes_txn, count_start_txn * sizeof(uint64_t));
             WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_start_txn, count_start_txn);
             WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_start_txn);
-            r->rec_page_cell_with_txn_id = true;
+            FLD_SET(r->state_flags, WTI_REC_REC_PAGE_CELL_WITH_TXN_ID);
         }
         if (count_durable_stop_ts != 0) {
             WT_STAT_CONN_DSRC_INCRV(
@@ -225,26 +225,26 @@ __rec_page_time_stats(WT_SESSION_IMPL *session, WTI_RECONCILE *r, bool is_delta)
             WT_STAT_CONN_DSRC_INCRV(
               session, rec_time_window_durable_stop_ts, count_durable_stop_ts);
             WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_durable_stop_ts);
-            r->rec_page_cell_with_ts = true;
+            FLD_SET(r->state_flags, WTI_REC_REC_PAGE_CELL_WITH_TS);
         }
         if (count_stop_ts != 0) {
             WT_STAT_CONN_DSRC_INCRV(
               session, rec_time_window_bytes_ts, count_stop_ts * sizeof(wt_timestamp_t));
             WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_stop_ts, count_stop_ts);
             WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_stop_ts);
-            r->rec_page_cell_with_ts = true;
+            FLD_SET(r->state_flags, WTI_REC_REC_PAGE_CELL_WITH_TS);
         }
         if (count_stop_txn != 0) {
             WT_STAT_CONN_DSRC_INCRV(
               session, rec_time_window_bytes_txn, count_stop_txn * sizeof(uint64_t));
             WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_stop_txn, count_stop_txn);
             WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_stop_txn);
-            r->rec_page_cell_with_txn_id = true;
+            FLD_SET(r->state_flags, WTI_REC_REC_PAGE_CELL_WITH_TXN_ID);
         }
         if (count_prepare != 0) {
             WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_prepared, count_prepare);
             WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_prepared);
-            r->rec_page_cell_with_prepared_txn = true;
+            FLD_SET(r->state_flags, WTI_REC_REC_PAGE_CELL_WITH_PREPARED_TXN);
         }
     }
 }

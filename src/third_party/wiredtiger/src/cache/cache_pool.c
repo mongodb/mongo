@@ -718,7 +718,8 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
              * connection, which is likely to lead to lower throughput and potentially a negative
              * feedback loop in the balance algorithm.
              */
-            smallest = (uint64_t)((100 * __wt_cache_bytes_inuse(cache)) / evict->eviction_trigger);
+            smallest = (uint64_t)((100 * __wt_cache_bytes_inuse(cache)) /
+              __wt_atomic_load_double_relaxed(&evict->eviction_trigger));
             if (entry->cache_size > smallest)
                 adjustment = WT_MIN(cp->chunk, (entry->cache_size - smallest) / 2);
             adjustment = WT_MIN(adjustment, entry->cache_size - reserved);
@@ -734,7 +735,8 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
              *  - the pool is less than half distributed
              */
         } else if (!pool_full && (cache->cp_quota == 0 || entry->cache_size < cache->cp_quota) &&
-          __wt_cache_bytes_inuse(cache) >= (entry->cache_size * evict->eviction_target) / 100 &&
+          __wt_cache_bytes_inuse(cache) >=
+            (entry->cache_size * __wt_atomic_load_double_relaxed(&evict->eviction_target)) / 100 &&
           (pressure > bump_threshold || cp->currently_used < cp->size * 0.5)) {
             grow = true;
             adjustment = WT_MIN(WT_MIN(cp->chunk, cp->size - cp->currently_used),

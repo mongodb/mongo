@@ -526,7 +526,7 @@ __size_stat_overflow(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_
     const WT_PAGE_HEADER *dsk;
 
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
-    WT_ERR(__wt_blkcache_read(session, tmp, NULL, addr, addr_size));
+    WT_ERR(__wt_bm_read_page(session, tmp, NULL, addr, addr_size));
 
     dsk = tmp->data;
     if (dsk->type != WT_PAGE_OVFL)

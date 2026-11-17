@@ -534,7 +534,7 @@ record_loop:
                      * items we use.
                      */
                     if (ovfl_used) {
-                        r->ovfl_items = true; /* Track if page has overflow items. */
+                        FLD_SET(r->state_flags, WTI_REC_OVFL_ITEMS); /* Track overflow items. */
                         ovfl_state = OVFL_USED;
                     }
                     continue;
@@ -595,7 +595,8 @@ record_loop:
                  * When a tombstone without a timestamp is written to disk, remove any historical
                  * versions that are greater in the history store for this key.
                  */
-                if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone)
+                if (upd_select.no_ts_tombstone &&
+                  FLD_ISSET(r->state_flags, WTI_REC_HS_CLEAR_ON_TOMBSTONE))
                     WT_ERR(__wti_rec_hs_clear_on_tombstone(session, r, src_recno, NULL,
                       upd->type == WT_UPDATE_TOMBSTONE ? false : true));
             }
@@ -741,7 +742,8 @@ compare:
                  * When a tombstone without a timestamp is written to disk, remove any historical
                  * versions that are greater in the history store for this key.
                  */
-                if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone)
+                if (upd_select.no_ts_tombstone &&
+                  FLD_ISSET(r->state_flags, WTI_REC_HS_CLEAR_ON_TOMBSTONE))
                     WT_ERR(__wti_rec_hs_clear_on_tombstone(session, r, src_recno, NULL,
                       upd->type == WT_UPDATE_TOMBSTONE ? false : true));
             }
@@ -832,7 +834,8 @@ next:
      *       entries at all (not just one with no or only aborted updates) gets marked dirty somehow
      *       and reconciled; this is apparently possible in some circumstances.
      */
-    if (!wrote_real_values && salvage == NULL && r->leave_dirty == false && r->entries > 0) {
+    if (!wrote_real_values && salvage == NULL && !FLD_ISSET(r->state_flags, WTI_REC_LEAVE_DIRTY) &&
+      r->entries > 0) {
         WT_ASSERT(session, r->entries == 1);
         r->entries = 0;
         WT_STAT_CONN_DSRC_INCR(session, rec_vlcs_emptied_pages);

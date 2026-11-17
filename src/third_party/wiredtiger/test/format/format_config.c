@@ -698,7 +698,6 @@ config_backward_compatible(void)
     }
 
     BC_CHECK("disk.mmap_all", DISK_MMAP_ALL);
-    BC_CHECK("block_cache", BLOCK_CACHE);
     BC_CHECK("disagg.victim_cache", DISAGG_VICTIM_CACHE);
     BC_CHECK("disagg.victim_cache.size", DISAGG_VICTIM_CACHE_SIZE);
     BC_CHECK("stress.hs_checkpoint_delay", STRESS_HS_CHECKPOINT_DELAY);
@@ -804,10 +803,6 @@ config_cache(void)
         else
             GV(CACHE) = GV(CACHE_MAXIMUM);
     }
-
-    /* Give any block cache 20% of the total cache size, over and above the cache. */
-    if (GV(BLOCK_CACHE) != 0)
-        GV(BLOCK_CACHE_SIZE) = (GV(CACHE) + 4) / 5;
 
 dirty_eviction_config:
     /* Adjust the dirty eviction settings to reduce test driven cache stuck failures. */
@@ -1028,8 +1023,6 @@ config_in_memory(void)
         return;
     if (config_explicit(NULL, "backup"))
         return;
-    if (config_explicit(NULL, "block_cache"))
-        return;
     if (config_explicit(NULL, "btree.compression"))
         return;
     if (config_explicit(NULL, "checkpoint"))
@@ -1084,8 +1077,6 @@ config_in_memory_reset(void)
         config_off(NULL, "background_compact");
     if (!config_explicit(NULL, "backup"))
         config_off(NULL, "backup");
-    if (!config_explicit(NULL, "block_cache"))
-        config_off(NULL, "block_cache");
     if (!config_explicit(NULL, "checkpoint"))
         config_off(NULL, "checkpoint");
     if (!config_explicit(NULL, "import"))

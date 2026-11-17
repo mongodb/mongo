@@ -516,7 +516,7 @@ __wt_row_search(WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, bool insert, WT_REF *le
      * Track if the descent is to the right-side of the tree, used to set the cursor's append
      * history.
      */
-    append_check = insert && cbt->append_tree;
+    append_check = insert && F_ISSET(cbt, WT_CBT_APPEND_TREE);
     descend_right = true;
 
     /*
@@ -750,7 +750,7 @@ leaf_only:
      * tree, we want to mark them all as appending, even if this test doesn't work.
      */
     if (insert && descend_right) {
-        cbt->append_tree = 1;
+        F_SET(cbt, WT_CBT_APPEND_TREE);
 
         if (page->entries == 0) {
             cbt->slot = WT_ROW_SLOT(page, page->pg_row);

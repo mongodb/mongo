@@ -5,10 +5,6 @@
  backup=1
  backup.incremental=off
  backup.incr_granularity=8649
- block_cache=0
- block_cache.cache_on_checkpoint=1
- block_cache.cache_on_writes=0
- block_cache.size=34
  cache=230
  cache.evict_max=1
  cache.minimum=20

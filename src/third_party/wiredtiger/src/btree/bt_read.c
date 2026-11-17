@@ -342,7 +342,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     }
 
     /* There's an address, read the backing disk page and build an in-memory version of the page. */
-    WT_ERR(__wt_blkcache_read_multi(session, &tmp, &count, &block_meta, addr.addr, addr.size));
+    WT_ERR(__wt_bm_read_multi(session, &tmp, &count, &block_meta, addr.addr, addr.size));
 
     WT_ASSERT(session, tmp != NULL && count > 0);
 

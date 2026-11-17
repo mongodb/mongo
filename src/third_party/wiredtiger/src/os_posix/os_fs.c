@@ -929,7 +929,7 @@ directory_open:
     pfh->mmap_flags = LF_ISSET(WT_FS_OPEN_READONLY) ? MAP_PRIVATE : MAP_SHARED;
     if (LF_ISSET(WT_FS_OPEN_FORCE_MMAP))
         pfh->mmap_file_mappable = true;
-    if (conn->mmap_all) {
+    if (F_ISSET(conn, WT_CONN_MMAP_ALL)) {
         /*
          * We are going to use mmap for I/O. So let's mmap the file on opening. If mmap fails, we
          * will just mark the file as not mappable (inside the mapping function) and will use system
