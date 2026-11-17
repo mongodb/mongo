@@ -212,7 +212,6 @@ Vectorizer::Tree Vectorizer::vectorizeLogicalOp(abt::Operations opType,
 
         return {abt::make<abt::NaryOp>(opType, std::move(operands)), typeSignature, {}};
     }
-    return {{}, TypeSignature::kAnyScalarType, {}};
 }
 
 template <typename Lhs, typename Rhs>
