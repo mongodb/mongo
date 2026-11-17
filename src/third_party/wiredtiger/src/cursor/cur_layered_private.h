@@ -40,10 +40,9 @@ struct __wti_cursor_layered {
 
     uint64_t next_random_seed;
     u_int next_random_sample_size;
-
+    uint32_t txn_mod_count;              /* Transaction modification count on last access */
     uint64_t snapshot_gen;               /* Snapshot generation on last access */
     uint64_t read_timestamp;             /* Read timestamp on last access */
-    uint32_t txn_mod_count;              /* Transaction modification count on last access */
     uint64_t stable_checkpoint_meta_lsn; /* Checkpoint LSN stable cursor is on */
     WTI_CLAYERED_ROLE last_role;         /* Last-observed leader/follower role (change-detection) */
 

@@ -209,25 +209,31 @@ __txn_logrec_init(WT_SESSION_IMPL *session)
     size_t header_size;
     uint32_t rectype;
     const char *fmt;
+    bool claimed_prepare;
 
     txn = session->txn;
     rectype = WT_LOGREC_COMMIT;
     fmt = WT_UNCHECKED_STRING(Iq);
 
+    /* Diagnostic logging must preserve the absence of an ID for claimed prepared transactions. */
+    claimed_prepare = FLD_ISSET(S2C(session)->debug.flags, WT_CONN_DEBUG_TABLE_LOGGING) &&
+      F_ISSET(txn, WT_TXN_PREPARE) &&
+      F_ISSET(&txn->time_point, WT_TXN_TIME_POINT_HAS_PREPARED_ID) &&
+      txn->time_point.id == WT_TXN_NONE;
+
     if (txn->txn_log.logrec != NULL) {
-        WT_ASSERT(session, F_ISSET(&txn->time_point, WT_TXN_TIME_POINT_HAS_ID));
+        WT_ASSERT(session, F_ISSET(&txn->time_point, WT_TXN_TIME_POINT_HAS_ID) || claimed_prepare);
         return (0);
     }
 
     /*
-     * The only way we should ever get in here without a txn id is if we are recording diagnostic
-     * information. In that case, allocate an id.
+     * Allocate an ID for diagnostic records unless the transaction was claimed after recovery.
      */
     if (FLD_ISSET(S2C(session)->debug.flags, WT_CONN_DEBUG_TABLE_LOGGING) &&
-      txn->time_point.id == WT_TXN_NONE)
+      txn->time_point.id == WT_TXN_NONE && !claimed_prepare)
         WT_RET(__wt_txn_id_check(session));
     else
-        WT_ASSERT(session, txn->time_point.id != WT_TXN_NONE);
+        WT_ASSERT(session, txn->time_point.id != WT_TXN_NONE || claimed_prepare);
 
     WT_RET(__wt_struct_size(session, &header_size, fmt, rectype, txn->time_point.id));
     WT_RET(__wt_logrec_alloc(session, header_size, &logrec));

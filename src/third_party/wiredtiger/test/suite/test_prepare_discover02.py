@@ -27,8 +27,9 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # Test that pending prepared transaction artifacts can be discovered after recovery
-# and committed
+# and committed or rolled back.
 
+import json
 import wiredtiger
 from suite_subprocess import suite_subprocess
 import wttest
@@ -46,10 +47,17 @@ class test_prepare_discover02(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Transaction end types
     txn_end = [
-        ('txn_commit', dict(txn_commit=True)),
+        ('txn_commit', dict(txn_commit=True, separate_timestamps=False)),
+        ('txn_commit_separate', dict(txn_commit=True, separate_timestamps=True)),
+        ('txn_rollback', dict(txn_commit=False, separate_timestamps=False)),
     ]
 
-    scenarios = make_scenarios(types, txn_end)
+    logging = [
+        ('logging_off', dict(table_logging=False)),
+        ('logging_on', dict(table_logging=True)),
+    ]
+
+    scenarios = make_scenarios(types, txn_end, logging)
 
     def test_prepare_discover02(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
@@ -80,7 +88,9 @@ class test_prepare_discover02(wttest.WiredTigerTestCase, suite_subprocess):
         self.backup(backup_dir, session2)
 
         # Opening backup database
-        conn2 = self.wiredtiger_open(backup_dir, self.conn_config)
+        recovery_config = self.conn_config + ',log=(enabled=true,remove=false)' + \
+            ',debug_mode=(table_logging=' + str(self.table_logging).lower() + ')'
+        conn2 = self.wiredtiger_open(backup_dir, recovery_config)
 
         c2s1 = conn2.open_session()
 
@@ -94,10 +104,33 @@ class test_prepare_discover02(wttest.WiredTigerTestCase, suite_subprocess):
             count += 1
             prepared_id = prepared_discover_cursor.get_key()
             self.assertEqual(prepared_id, 123)
-            c2s2.begin_transaction("claim_prepared_id=" + self.timestamp_str(prepared_id))
-            c2s2.commit_transaction("commit_timestamp=" + self.timestamp_str(200)+",durable_timestamp=" + self.timestamp_str(210))
+            c2s2.begin_transaction('claim_prepared_id=' + self.prepared_id_str(prepared_id))
+            if self.txn_commit:
+                commit_config = 'commit_timestamp=' + self.timestamp_str(200)
+                durable_config = 'durable_timestamp=' + self.timestamp_str(210)
+                if self.separate_timestamps:
+                    c2s2.timestamp_transaction(commit_config)
+                    c2s2.timestamp_transaction(durable_config)
+                    c2s2.commit_transaction()
+                else:
+                    c2s2.commit_transaction(commit_config + ',' + durable_config)
+            else:
+                c2s2.rollback_transaction('rollback_timestamp=' + self.timestamp_str(200))
         self.assertEqual(count, 1)
         prepared_discover_cursor.close()
+
+        log_cursor = c2s1.open_cursor('log:')
+        logged_operations = 0
+        while log_cursor.next() == 0:
+            txnid, rectype, _, _, _, _ = log_cursor.get_value()
+            if rectype == wiredtiger.WT_LOGREC_COMMIT and txnid == 0 and \
+                log_cursor.get_key()[2] > 0:
+                logged_operations += 1
+        log_cursor.close()
+        if self.table_logging and self.txn_commit:
+            self.assertGreater(logged_operations, 0)
+        else:
+            self.assertEqual(logged_operations, 0)
 
         # Read cursor
         c2s3 = conn2.open_session()
@@ -113,17 +146,34 @@ class test_prepare_discover02(wttest.WiredTigerTestCase, suite_subprocess):
             read_cursor.set_key(i)
             self.assertEqual(read_cursor.search(), wiredtiger.WT_NOTFOUND)
         c2s3.rollback_transaction()
+        read_cursor.close()
 
-        # check the read cursor can read all keys after timestamp 200
+        # Check whether the recovered prepared inserts are visible at timestamp 200.
         c2s3.begin_transaction(f'read_timestamp={self.timestamp_str(200)}')
         read_cursor = c2s3.open_cursor(self.uri, None, None)
         for i in range(1, 3):
-            read_cursor.set_key(1)
+            read_cursor.set_key(i)
             self.assertEqual(read_cursor.search(), 0)
             self.assertEqual(read_cursor.get_value(), "commit ts=60")
 
         for i in range(3, 6):
-            read_cursor.set_key(3)
-            self.assertEqual(read_cursor.search(), 0)
-            self.assertEqual(read_cursor.get_value(), "prepare ts=100")
+            read_cursor.set_key(i)
+            if self.txn_commit:
+                self.assertEqual(read_cursor.search(), 0)
+                self.assertEqual(read_cursor.get_value(), "prepare ts=100")
+            else:
+                self.assertEqual(read_cursor.search(), wiredtiger.WT_NOTFOUND)
         c2s3.rollback_transaction()
+        read_cursor.close()
+
+        conn2.close()
+        if self.table_logging and self.txn_commit:
+            self.runWt(['-h', backup_dir, 'printlog'], outfilename='printlog.out', closeconn=False)
+            with open('printlog.out') as f:
+                records = json.load(f)
+            timestamps = [op for record in records
+                if record['type'] == 'commit' and record['txnid'] == 0
+                for op in record['ops'] if op['optype'] == 'txn_timestamp']
+            self.assertEqual(len(timestamps), logged_operations)
+            self.assertTrue(any(op['prepare_ts'] == 100 and op['commit_ts'] == 200 and
+                op['durable_ts'] == 210 for op in timestamps))

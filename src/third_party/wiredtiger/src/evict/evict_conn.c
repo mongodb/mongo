@@ -284,20 +284,25 @@ __wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
       &cache->cache_eviction_controls.cache_tolerance_for_app_eviction,
       (((uint8_t)cval.val / 10) * 10));
 
-    /* FIXME-WT-19007: the options below are only ever set, so reconfigure cannot turn them off. */
+    /* The boolean options are set or cleared on every reconfigure, so they can be turned off. */
     WT_RET(__wt_config_gets(session, cfg, "eviction.incremental_app_eviction", &cval));
     if (cval.val != 0)
         F_SET_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_EVICT_INCREMENTAL_APP);
+    else
+        F_CLR_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_EVICT_INCREMENTAL_APP);
 
     WT_RET(__wt_config_gets(session, cfg, "eviction.prefer_scrub_eviction", &cval));
     if (cval.val != 0)
         F_SET_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_PREFER_SCRUB_EVICTION);
+    else
+        F_CLR_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_PREFER_SCRUB_EVICTION);
 
     WT_RET(__wt_config_gets(session, cfg, "eviction.skip_update_obsolete_check", &cval));
     if (cval.val != 0)
         F_SET_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_SKIP_UPDATE_OBSOLETE_CHECK);
+    else
+        F_CLR_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_SKIP_UPDATE_OBSOLETE_CHECK);
 
-    /* The options below are set or cleared on every reconfigure, so they can be turned off. */
     WT_RET(__wt_config_gets(session, cfg, "eviction.bounded_wake", &cval));
     if (cval.val != 0)
         F_SET_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_BOUNDED_WAKE);

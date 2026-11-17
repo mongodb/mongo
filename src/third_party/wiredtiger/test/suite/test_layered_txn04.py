@@ -198,3 +198,105 @@ class test_layered_txn04(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCa
                 cursor.close()
             for session in sessions:
                 session.close()
+
+    def test_follower_prepared_rollback_must_follow_adopted_checkpoint(self):
+        self.setup_leader(keys=range_inclusive(1, self.nitems))
+        self.leader_checkpoint(10)
+
+        conn_follow, session_follow = self.open_follower()
+        with closing(conn_follow), closing(session_follow):
+            self.disagg_wait_for_adoption(conn_follow)
+
+            # Keep the follower's stable timestamp behind the checkpoint it adopts below, so the
+            # stable timestamp check alone accepts every rollback timestamp in these cases.
+            conn_follow.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+
+            # Each case resolves its own prepared transaction, since a rejected timestamp leaves
+            # a prepared transaction that can only be rolled back.
+            cases = [(api, rollback_ts) for api in ('timestamp', 'timestamp_uint')
+                     for rollback_ts in (40, 50, 51)]
+            sessions = [conn_follow.open_session() for _ in cases]
+            cursors = [session.open_cursor(self.uri) for session in sessions]
+            for i, (session, cursor) in enumerate(zip(sessions, cursors)):
+                session.begin_transaction()
+                cursor[self.key(self.nitems + 1 + i)] = 'prepared'
+                session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
+
+            # The checkpoint moves past the prepared transactions before they resolve.
+            self.leader_checkpoint(50)
+            self.disagg_advance_checkpoint_and_wait(conn_follow)
+
+            # Collect every failure before failing, so each prepared transaction is resolved
+            # whichever case fails. A rollback_transaction call whose timestamp is rejected panics
+            # while prepared, so the timestamp is set first and the rollback takes none.
+            failures = []
+            expected_error = '/rollback timestamp .* must be after the last checkpoint timestamp .*/'
+            for session, (api, rollback_ts) in zip(sessions, cases):
+                if api == 'timestamp':
+                    set_timestamp = lambda: session.timestamp_transaction(
+                        'rollback_timestamp=' + self.timestamp_str(rollback_ts))
+                else:
+                    set_timestamp = lambda: session.timestamp_transaction_uint(
+                        wiredtiger.WT_TS_TXN_TYPE_ROLLBACK, rollback_ts)
+                try:
+                    if rollback_ts <= 50:
+                        self.assertRaisesWithMessage(
+                            wiredtiger.WiredTigerError, set_timestamp, expected_error)
+                    else:
+                        set_timestamp()
+                except (AssertionError, wiredtiger.WiredTigerError) as e:
+                    failures.append(f'{api} rollback_timestamp={rollback_ts}: {e}')
+                session.rollback_transaction()
+            if failures:
+                self.fail('\n'.join(failures))
+
+            for cursor in cursors:
+                cursor.close()
+            for session in sessions:
+                session.close()
+
+    def test_follower_rollback_after_stable_ahead_of_checkpoint(self):
+        self.setup_leader(keys=range_inclusive(1, self.nitems))
+        self.leader_checkpoint(10)
+
+        conn_follow, session_follow = self.open_follower()
+        with closing(conn_follow), closing(session_follow):
+            self.disagg_wait_for_adoption(conn_follow)
+            conn_follow.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+
+            # Timestamp 40 fails both the stable and the checkpoint requirement, 55 only the
+            # stable one, and 61 neither.
+            rollback_timestamps = (40, 55, 61)
+            sessions = [conn_follow.open_session() for _ in rollback_timestamps]
+            cursors = [session.open_cursor(self.uri) for session in sessions]
+            for i, (session, cursor) in enumerate(zip(sessions, cursors)):
+                session.begin_transaction()
+                cursor[self.key(self.nitems + 1 + i)] = 'prepared'
+                session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
+
+            # The follower's stable timestamp moves past the adopted checkpoint timestamp.
+            self.leader_checkpoint(50)
+            self.disagg_advance_checkpoint_and_wait(conn_follow)
+            conn_follow.set_timestamp('stable_timestamp=' + self.timestamp_str(60))
+
+            failures = []
+            expected_error = '/rollback timestamp .* is not newer than the stable timestamp .*/'
+            for session, rollback_ts in zip(sessions, rollback_timestamps):
+                set_timestamp = lambda: session.timestamp_transaction(
+                    'rollback_timestamp=' + self.timestamp_str(rollback_ts))
+                try:
+                    if rollback_ts <= 60:
+                        self.assertRaisesWithMessage(
+                            wiredtiger.WiredTigerError, set_timestamp, expected_error)
+                    else:
+                        set_timestamp()
+                except (AssertionError, wiredtiger.WiredTigerError) as e:
+                    failures.append(f'rollback_timestamp={rollback_ts}: {e}')
+                session.rollback_transaction()
+            if failures:
+                self.fail('\n'.join(failures))
+
+            for cursor in cursors:
+                cursor.close()
+            for session in sessions:
+                session.close()

@@ -1332,6 +1332,7 @@ __txn_set_rollback_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t rollback_t
           __wt_timestamp_to_string(rollback_ts, ts_string[0]),
           __wt_timestamp_to_string(stable_ts, ts_string[1]));
     }
+    WT_RET(__txn_check_follower_checkpoint_ts(session, "rollback", rollback_ts));
     txn->time_point.rollback_timestamp = rollback_ts;
     F_SET(&txn->time_point, WT_TXN_TIME_POINT_HAS_TS_ROLLBACK);
 
