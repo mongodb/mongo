@@ -242,8 +242,11 @@ local z_size_t gz_write(gz_statep state, voidpc buf, z_size_t len) {
             n -= state->strm.avail_in;
             state->x.pos += n;
             len -= n;
-            if (ret == -1)
-                return state->again ? put - len : 0;
+            if (ret == -1) {
+                state->strm.avail_in = 0;
+                state->strm.next_in = state->in;
+                 return state->again ? put - len : 0;
+            }
         } while (len);
     }
 
