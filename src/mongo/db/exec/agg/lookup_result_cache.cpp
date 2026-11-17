@@ -57,19 +57,22 @@ void LookupResultCache::put(const Value& key, const Value& results, size_t appro
     if (entrySize > _maxEntrySizeBytes || _maxEntries == 0 || !isEnabled()) {
         return;
     }
+    dassert(_memoryTracker);
+    admit(key, results, SimpleMemoryUsageToken(entrySize, _memoryTracker));
+}
 
-    // put() is only ever called after get() has already reported a miss for 'key', so it
+void LookupResultCache::admit(Value key, Value results, SimpleMemoryUsageToken memoryToken) {
+    // Entries are only ever admitted after get() has already reported a miss for 'key', so it
     // should never already be present in the map.
     dassert(_map.find(key) == _map.end());
-    dassert(_memoryTracker);
 
     while (_entries.size() >= _maxEntries && !_entries.empty()) {
         evictLru();
     }
 
-    _entries.push_front(Entry{key, results, SimpleMemoryUsageToken(entrySize, _memoryTracker)});
-    _map[key] = _entries.begin();
-    _totalSizeBytes += entrySize;
+    _totalSizeBytes += static_cast<size_t>(memoryToken.getCurrentMemoryUsageBytes());
+    _entries.push_front(Entry{std::move(key), std::move(results), std::move(memoryToken)});
+    _map[_entries.front().key] = _entries.begin();
 }
 
 void LookupResultCache::evictLru() {

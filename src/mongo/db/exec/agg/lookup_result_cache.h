@@ -168,6 +168,10 @@ private:
     };
     using EntryList = std::list<Entry>;
 
+    // Inserts an entry whose size has already been checked against the per-entry cap, evicting
+    // as needed to stay within '_maxEntries'.
+    void admit(Value key, Value results, SimpleMemoryUsageToken memoryToken);
+
     void evictLru();
 
     // Evaluated once, when the warmup window closes: if the observed hit rate is below the
