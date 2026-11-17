@@ -10,6 +10,12 @@
  * Those tests flip it on at runtime, check that the commands that were rejected are then accepted,
  * and flip it back off.
  *
+ * The message filter plugin loaded by the '_mfp' variants blocks commands carrying
+ * readConcern.afterOpTime, so the server never gets the chance to reply 'Unauthorized' or to
+ * honor the escape hatch. The subtests that exercise pre-auth connections cannot observe the
+ * server's behavior and are skipped when the plugin is loaded.
+ * TODO(SERVER-139480): re-enable these tests when this functionality is removed from MFP.
+ *
  * @tags: [requires_sharding]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
@@ -17,6 +23,15 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kPwd = "pwd";
+
+// Resmoke only sets this parameter when the message filter plugin is loaded (the '_mfp' variants).
+const isMessageFilterPluginLoaded = Boolean(
+    TestData.setParameters && TestData.setParameters.messageFilterPluginPath,
+);
+// 'it' for the subtests that run commands on a pre-auth connection: the plugin rejects those
+// messages before the server can answer, so they are skipped rather than failed when it is loaded.
+const itPreAuth = isMessageFilterPluginLoaded ? it.skip : it;
+
 const kDbName = "after_op_time_requires_internal";
 const kCollName = "coll";
 const kRootUser = "rootUser";
@@ -164,9 +179,12 @@ describe("readConcern.afterOpTime on mongod", function () {
         assertAfterOpTimeRejected(connectAs(this.primary.host, kRootUser), this.afterOpTime);
     });
 
-    it("is rejected for an unauthenticated connection, even for commands needing no auth", function () {
-        assertUnauthenticatedPingRejected(this.primary.host, this.afterOpTime);
-    });
+    itPreAuth(
+        "is rejected for an unauthenticated connection, even for commands needing no auth",
+        function () {
+            assertUnauthenticatedPingRejected(this.primary.host, this.afterOpTime);
+        },
+    );
 
     it("is accepted for a user with internal", function () {
         for (const {name, dbName, cmd} of kCommands.filter(
@@ -198,12 +216,15 @@ describe("readConcern.afterOpTime on mongod", function () {
             assertAfterOpTimeAccepted(this.rootConn, this.afterOpTime);
         });
 
-        it("is accepted for an unauthenticated connection, even for commands needing no auth", function () {
-            const adminDB = connectAs(this.primary.host).getDB("admin");
-            assert.commandWorked(
-                adminDB.runCommand({ping: 1, readConcern: {afterOpTime: this.afterOpTime}}),
-            );
-        });
+        itPreAuth(
+            "is accepted for an unauthenticated connection, even for commands needing no auth",
+            function () {
+                const adminDB = connectAs(this.primary.host).getDB("admin");
+                assert.commandWorked(
+                    adminDB.runCommand({ping: 1, readConcern: {afterOpTime: this.afterOpTime}}),
+                );
+            },
+        );
 
         it("is counted as accepted rather than rejected", function () {
             const before = getAfterOpTimeCounters(this.internalConn);
@@ -266,9 +287,12 @@ describe("readConcern.afterOpTime on mongos", function () {
         assertAfterOpTimeRejected(connectAs(this.st.s.host, kRootUser), kOpTimeForRouter);
     });
 
-    it("is rejected for an unauthenticated connection, even for commands needing no auth", function () {
-        assertUnauthenticatedPingRejected(this.st.s.host, kOpTimeForRouter);
-    });
+    itPreAuth(
+        "is rejected for an unauthenticated connection, even for commands needing no auth",
+        function () {
+            assertUnauthenticatedPingRejected(this.st.s.host, kOpTimeForRouter);
+        },
+    );
 
     it("is counted in the router's serverStatus", function () {
         // The counters are updated on the router too, so the section has to be registered for the
@@ -321,11 +345,14 @@ describe("readConcern.afterOpTime on mongos", function () {
             assertAfterOpTimeAccepted(this.rootConn, kOpTimeForRouter);
         });
 
-        it("is accepted for an unauthenticated connection, even for commands needing no auth", function () {
-            const adminDB = connectAs(this.st.s.host).getDB("admin");
-            assert.commandWorked(
-                adminDB.runCommand({ping: 1, readConcern: {afterOpTime: kOpTimeForRouter}}),
-            );
-        });
+        itPreAuth(
+            "is accepted for an unauthenticated connection, even for commands needing no auth",
+            function () {
+                const adminDB = connectAs(this.st.s.host).getDB("admin");
+                assert.commandWorked(
+                    adminDB.runCommand({ping: 1, readConcern: {afterOpTime: kOpTimeForRouter}}),
+                );
+            },
+        );
     });
 });
