@@ -65,15 +65,15 @@ struct QueryMemoryLoadSheddingState {
 };
 const auto getProcessState = ServiceContext::declareDecoration<QueryMemoryLoadSheddingState>();
 
-// Per-operation load-shedding bookkeeping. Scoped to the query's QueryLifespan (not the
+// Per-query load-shedding bookkeeping for the op's own interrupt checks (eligibility) and for idle
+// cursors (eligibility and dt baseline). Scoped to the query's QueryLifespan (not the
 // OperationContext) so it is set once on the originating command and survives that query's getMores
-// and idle periods.
+// and idle periods. The queued-operation sweep must not read it: the lifespan slot is rewritten by
+// the op's thread without the ClientLock, so the sweep uses RequestShedState below instead.
 struct LoadSheddingOpState {
-    // Opt-in eligibility (see is/markOperationQueryMemorySheddingEligible). Defaults false.
-    // Atomic because the queued-operation sweep reads it from the monitor thread. Relaxed access is
-    // sufficient because the flag is one-way, so a stale read only delays shedding candidacy.
-    // Writes are protected separately by the write-intent lock check in isShedCandidate(), not by
-    // this flag.
+    // Opt-in eligibility (see is/markOperationQueryMemorySheddingEligible). Defaults false. The
+    // flag is one-way. Writes are protected separately by the write-intent lock check in
+    // isShedCandidate(), not by this flag.
     bool isEligible() const {
         return _eligible.loadRelaxed();
     }
@@ -82,9 +82,8 @@ struct LoadSheddingOpState {
     }
 
     // Wall-clock time of the previous shed evaluation, used to compute dt. Initialized by the
-    // first shedding check. Atomic due to r/w access on both the op's interrupt checks and the
-    // queued-operation sweep. Relaxed access is sufficient -- timing inaccuracies just skew the
-    // shed probability.
+    // first shedding check. Relaxed access is sufficient -- timing inaccuracies just skew the shed
+    // probability.
     Date_t lastEvalTime() const {
         return Date_t::fromMillisSinceEpoch(_lastEvalTimeMillis.loadRelaxed());
     }
@@ -97,6 +96,32 @@ private:
     AtomicWord<long long> _lastEvalTimeMillis{0};
 };
 const auto getOpState = QueryLifespan::declareOpCtxDecoration<LoadSheddingOpState>();
+
+// Shed state for one request, read by both the op's interrupt checks and the queued-operation
+// sweep. It is an OperationContext decoration rather than a QueryLifespan one because the sweep
+// runs on the monitor thread and must not read the lifespan slot, which the op's thread rewrites
+// without the ClientLock. The dt baseline is shared so each interval is charged once as an op moves
+// between running and queued. The eligibility flag is a copy of the lifespan's, set by
+// markOperationQueryMemorySheddingEligible.
+struct RequestShedState {
+    bool isEligible() const {
+        return _eligible.loadRelaxed();
+    }
+    void markEligible() {
+        _eligible.storeRelaxed(true);
+    }
+    Date_t lastEvalTime() const {
+        return Date_t::fromMillisSinceEpoch(_lastEvalTimeMillis.loadRelaxed());
+    }
+    void setLastEvalTime(Date_t t) {
+        _lastEvalTimeMillis.storeRelaxed(t.toMillisSinceEpoch());
+    }
+
+private:
+    AtomicWord<bool> _eligible{false};
+    AtomicWord<long long> _lastEvalTimeMillis{0};
+};
+const auto getRequestState = OperationContext::declareDecoration<RequestShedState>();
 
 const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
     "InitQueryMemoryLoadShedding", [](ServiceContext* ctx) {
@@ -209,8 +234,9 @@ PressureSnapshot samplePressure(const QueryMemoryLoadSheddingState& processState
 // The probabilistic shedding decision -- dt bookkeeping plus the PRNG draw. Assumes the caller
 // has established that shedding is enabled, that 'pressure' is above the low mark, and that
 // 'opTrackedBytes' is positive.
+template <typename Baseline>
 bool rollForShed(const PressureSnapshot& pressure,
-                 LoadSheddingOpState& opState,
+                 Baseline& opState,
                  int64_t opTrackedBytes,
                  Date_t now,
                  PseudoRandom& prng) {
@@ -251,11 +277,9 @@ bool rollForShed(const PressureSnapshot& pressure,
     return prng.trueWithProbability(p);
 }
 
-bool isShedCandidate(OperationContext* opCtx,
-                     const LoadSheddingOpState& opState,
-                     int64_t opTrackedBytes) {
+bool isShedCandidate(OperationContext* opCtx, bool eligible, int64_t opTrackedBytes) {
     // Operations opt in to load shedding via markOperationQueryMemorySheddingEligible.
-    if (!opState.isEligible()) {
+    if (!eligible) {
         return false;
     }
     // An operation with no tracked memory has zero shed probability and is never a shedding target
@@ -390,7 +414,7 @@ double shedProbability(int64_t rssBytes,
 }
 
 Date_t lastEvalTimeForTest(OperationContext* opCtx) {
-    return getOpState(opCtx).lastEvalTime();
+    return getRequestState(opCtx).lastEvalTime();
 }
 }  // namespace query_memory_load_shedding_detail
 
@@ -400,6 +424,7 @@ bool isOperationQueryMemorySheddingEligible(OperationContext* opCtx) {
 
 void markOperationQueryMemorySheddingEligible(OperationContext* opCtx) {
     getOpState(opCtx).markEligible();
+    getRequestState(opCtx).markEligible();
 }
 
 Status queryMemoryCheckLoadShedding(OperationContext* opCtx) {
@@ -413,7 +438,7 @@ Status queryMemoryCheckLoadShedding(OperationContext* opCtx) {
         return Status::OK();
     }
 
-    LoadSheddingOpState& opState = getOpState(opCtx);
+    RequestShedState& baseline = getRequestState(opCtx);
     auto& processState = getProcessState(opCtx->getServiceContext());
     const PressureSnapshot pressure = samplePressure(processState);
 
@@ -422,19 +447,19 @@ Status queryMemoryCheckLoadShedding(OperationContext* opCtx) {
     // (Date_t{}) to record that we don't have a dt baseline yet. We'll only shed after the second
     // check that passes this conditional.
     if (!pressure.aboveLowMark()) {
-        opState.setLastEvalTime(Date_t{});
+        baseline.setLastEvalTime(Date_t{});
         return Status::OK();
     }
 
     const int64_t opTrackedBytes = tracker->inUseTrackedMemoryBytes();
-    if (!isShedCandidate(opCtx, opState, opTrackedBytes)) {
+    if (!isShedCandidate(opCtx, getOpState(opCtx).isEligible(), opTrackedBytes)) {
         return Status::OK();
     }
 
     // The operation is now eligible (enabled, memory-tracked, non-exempt, over the low mark, with
     // tracked memory), so try probabilistic shedding.
     const Date_t now = opCtx->getServiceContext()->getFastClockSource()->now();
-    if (!rollForShed(pressure, opState, opTrackedBytes, now, opCtx->getClient()->getPrng())) {
+    if (!rollForShed(pressure, baseline, opTrackedBytes, now, opCtx->getClient()->getPrng())) {
         return Status::OK();
     }
 
@@ -498,15 +523,12 @@ size_t sweepQueuedOperationsForMemoryPressure(ServiceContext* serviceContext, Ps
         if (!isQueuedReader(opCtx)) {
             continue;
         }
-        // Eligibility state lives on the QueryLifespan; never create one from another thread.
-        if (!QueryLifespan::getIfExists(opCtx)) {
-            continue;
-        }
-        LoadSheddingOpState& opState = getOpState(opCtx);
+        // Never touch the op's QueryLifespan slot from this thread; see RequestShedState.
+        RequestShedState& opState = getRequestState(opCtx);
         // Tracked bytes as last published to CurOp (atomic; updated by the op's own thread each
         // time its trackers cross a reporting chunk boundary).
         const int64_t opTrackedBytes = CurOp::get(opCtx)->getInUseTrackedMemoryBytes();
-        if (!isShedCandidate(opCtx, opState, opTrackedBytes)) {
+        if (!isShedCandidate(opCtx, opState.isEligible(), opTrackedBytes)) {
             continue;
         }
         ++candidates;

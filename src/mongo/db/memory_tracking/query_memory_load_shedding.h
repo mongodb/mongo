@@ -54,10 +54,16 @@ namespace mongo {
 /**
  * Opt-in load-shedding eligibility. A user-facing read command marks its operation eligible at the
  * top of run(); only marked operations are ever shed. The flag is scoped to the query's
- * QueryLifespan, so it is set once on the originating command and persists across that query's
- * getMores (and while its cursor is idle) without being re-marked per request. Defaults false.
+ * QueryLifespan, so it persists across that query's getMores (and while its cursor is idle).
+ * Defaults false. Must be called on the operation's own thread.
  */
 [[MONGO_MOD_PUBLIC]] bool isOperationQueryMemorySheddingEligible(OperationContext* opCtx);
+
+/**
+ * Marks the operation eligible. Must be called on the operation's own thread, and again by every
+ * getMore: it also sets a flag on the OperationContext, which is what the queued-operation sweep
+ * reads.
+ */
 [[MONGO_MOD_PUBLIC]] void markOperationQueryMemorySheddingEligible(OperationContext* opCtx);
 
 /**

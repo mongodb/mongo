@@ -18,6 +18,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -790,6 +791,179 @@ TEST_F(QueryMemoryLoadSheddingQueuedSweepTest, SkipsQueuedWriters) {
             << "pass " << pass;
     }
     ASSERT_EQ(writer.opCtx->getKillStatus(), ErrorCodes::OK);
+}
+
+// The sweep runs on the monitor thread, while the op's own thread rewrites its QueryLifespan slot
+// without the ClientLock (getMore setup). The sweep must therefore take its decision without
+// reading that slot.
+class QueryMemoryLoadSheddingSweepSlotTest : public QueryMemoryLoadSheddingQueuedSweepTest {
+public:
+    // Parks 'opCtx' in the read-ticket queue on its own thread; kills and joins on destruction.
+    class ParkedReader {
+    public:
+        explicit ParkedReader(OperationContext* opCtx)
+            : _opCtx(opCtx), _thread([opCtx] {
+                  try {
+                      Lock::GlobalRead lk(opCtx);
+                  } catch (const DBException&) {
+                  }
+              }) {
+            waitUntilQueued(opCtx);
+        }
+        ~ParkedReader() {
+            _opCtx->markKilled(ErrorCodes::Interrupted);
+            _thread.join();
+        }
+
+    private:
+        OperationContext* _opCtx;
+        stdx::thread _thread;
+    };
+
+    void setUp() override {
+        QueryMemoryLoadSheddingQueuedSweepTest::setUp();
+        _savedLow = gQueryMemoryLoadSheddingLowMarkPercent.load();
+        _savedHigh = gQueryMemoryLoadSheddingHighMarkPercent.load();
+        gQueryMemoryLoadSheddingLowMarkPercent.store(50);
+        gQueryMemoryLoadSheddingHighMarkPercent.store(60);
+        setPressureOverride(90);
+    }
+
+    void tearDown() override {
+        globalFailPointRegistry().find("queryMemoryPressureOverride")->setMode(FailPoint::off);
+        gQueryMemoryLoadSheddingLowMarkPercent.store(_savedLow);
+        gQueryMemoryLoadSheddingHighMarkPercent.store(_savedHigh);
+        QueryMemoryLoadSheddingQueuedSweepTest::tearDown();
+    }
+
+    static void trackBytes(OperationContext* opCtx, int64_t bytes) {
+        auto owned = std::make_unique<OperationMemoryUsageTracker>(opCtx);
+        owned->add(bytes);
+        OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(owned));
+        CurOp::get(opCtx)->setMemoryTrackingStats(bytes, bytes);
+    }
+
+private:
+    std::int32_t _savedLow = 0;
+    std::int32_t _savedHigh = 0;
+};
+
+// An operation that never had a lifespan must not get one from the sweep.
+TEST_F(QueryMemoryLoadSheddingSweepSlotTest, SweepDoesNotCreateLifespanForVictim) {
+    auto holder = makeClientAndOp("ticket holder");
+    Lock::GlobalRead holderLock(holder.opCtx.get());
+    auto victim = makeClientAndOp("victim");
+    trackBytes(victim.opCtx.get(), 1 << 20);
+    ParkedReader parked(victim.opCtx.get());
+
+    ASSERT_EQ(QueryLifespan::getIfExists(victim.opCtx.get()), nullptr);
+    for (int pass = 0; pass < 3; ++pass) {
+        advanceClock();
+        sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng());
+    }
+    ASSERT_EQ(QueryLifespan::getIfExists(victim.opCtx.get()), nullptr);
+}
+
+// The sweep's decision comes from state the op published for the sweep, not from whichever lifespan
+// is currently in the op's slot: a victim marked eligible stays a candidate while its slot holds an
+// unrelated, ineligible lifespan.
+TEST_F(QueryMemoryLoadSheddingSweepSlotTest, SweepDecisionIgnoresCurrentLifespanSlot) {
+    auto holder = makeClientAndOp("ticket holder");
+    Lock::GlobalRead holderLock(holder.opCtx.get());
+    auto victim = makeClientAndOp("victim");
+    makeEligibleHolding(victim.opCtx.get(), 1 << 20);
+
+    auto donor = makeClientAndOp("donor");
+    auto donorHandle = QueryLifespan::get(donor.opCtx.get()).handle();
+    QueryLifespan::AlternativeQueryRegion region(victim.opCtx.get(), donorHandle);
+    ASSERT_FALSE(isOperationQueryMemorySheddingEligible(victim.opCtx.get()));
+    ParkedReader parked(victim.opCtx.get());
+
+    ASSERT_EQ(sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng()), 1);
+}
+
+// Sweeps while the victim's own thread swaps its slot with no lock. Under dbg_tsan any sweep read
+// of the slot is reported as a data race; the clock never advances so the victim is never shed and
+// every sweep reads its state.
+TEST_F(QueryMemoryLoadSheddingSweepSlotTest, SweepDoesNotRaceWithSlotSwaps) {
+    auto holder = makeClientAndOp("ticket holder");
+    Lock::GlobalRead holderLock(holder.opCtx.get());
+    auto victim = makeClientAndOp("victim");
+    makeEligibleHolding(victim.opCtx.get(), 1 << 20);
+    ParkedReader parked(victim.opCtx.get());
+
+    constexpr size_t kNumHandles = 4;
+    std::vector<ClientAndOp> donors;
+    std::vector<QueryLifespan::Handle> handles;
+    for (size_t i = 0; i < kNumHandles; ++i) {
+        donors.push_back(makeClientAndOp("donor" + std::to_string(i)));
+        handles.push_back(QueryLifespan::get(donors.back().opCtx.get()).handle());
+    }
+
+    // The swapper keeps swapping until the sweeps below finish, so every sweep overlaps a swap.
+    Atomic<bool> swapping{false};
+    Atomic<bool> stop{false};
+    stdx::thread owner([&] {
+        for (size_t i = 0; !stop.load(); ++i) {
+            QueryLifespan::AlternativeQueryRegion region(victim.opCtx.get(),
+                                                         handles[i % kNumHandles]);
+            swapping.store(true);
+        }
+    });
+    while (!swapping.load()) {
+        sleepmillis(1);
+    }
+    constexpr int kSweeps = 20'000;
+    int64_t candidates = 0;
+    for (int i = 0; i < kSweeps; ++i) {
+        candidates += sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng());
+    }
+    stop.store(true);
+    owner.join();
+    ASSERT_EQ(candidates, kSweeps);
+    ASSERT_EQ(victim.opCtx->getKillStatus(), ErrorCodes::OK);
+}
+
+// An operation that moves between queued and running keeps one dt baseline: the time the sweep
+// already charged while it was queued is not charged again by the op's own checks after it resumes.
+TEST_F(QueryMemoryLoadSheddingSweepSlotTest, QueuedSweepAndRunningCheckShareOneBaseline) {
+    auto holder = makeClientAndOp("ticket holder");
+    Lock::GlobalRead holderLock(holder.opCtx.get());
+    auto victim = makeClientAndOp("victim");
+    makeEligibleHolding(victim.opCtx.get(), 1 << 20);
+    ParkedReader parked(victim.opCtx.get());
+
+    ASSERT_EQ(query_memory_load_shedding_detail::lastEvalTimeForTest(victim.opCtx.get()), Date_t{});
+    const Date_t primedAt = getServiceContext()->getFastClockSource()->now();
+    ASSERT_EQ(sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng()), 1);
+    // What the op's own checks will start from when it resumes.
+    ASSERT_EQ(query_memory_load_shedding_detail::lastEvalTimeForTest(victim.opCtx.get()), primedAt);
+}
+
+// The sweep primes each queued operation on first sight and only rolls from the next sweep on. An
+// operation that queues later is primed on its own, even while an older one is being shed.
+TEST_F(QueryMemoryLoadSheddingSweepSlotTest, FirstSightOfQueuedOperationOnlyPrimes) {
+    auto holder = makeClientAndOp("ticket holder");
+    Lock::GlobalRead holderLock(holder.opCtx.get());
+
+    auto first = makeClientAndOp("first");
+    makeEligibleHolding(first.opCtx.get(), 1 << 20);
+    ParkedReader firstParked(first.opCtx.get());
+    ASSERT_EQ(sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng()), 1);
+    ASSERT_EQ(first.opCtx->getKillStatus(), ErrorCodes::OK);
+
+    auto second = makeClientAndOp("second");
+    makeEligibleHolding(second.opCtx.get(), 1 << 20);
+    ParkedReader secondParked(second.opCtx.get());
+
+    advanceClock();
+    ASSERT_EQ(sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng()), 2);
+    ASSERT_EQ(first.opCtx->getKillStatus(), ErrorCodes::QueryMemoryLimitExceeded);
+    ASSERT_EQ(second.opCtx->getKillStatus(), ErrorCodes::OK);
+
+    advanceClock();
+    sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng());
+    ASSERT_EQ(second.opCtx->getKillStatus(), ErrorCodes::QueryMemoryLimitExceeded);
 }
 
 // Drives the idle-query path -- the decision the idle-cursor sweep makes for a query sitting
