@@ -757,6 +757,8 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
 
     _checkForAllIdIndexes(opCtx);
 
+    index_builds::build_attempts::two_phase::trackSizeThroughRecovery(opCtx);
+
     // Run the recovery process.
     _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
     _listener->onRecoverFromOplog();

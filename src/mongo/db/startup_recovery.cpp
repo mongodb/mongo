@@ -815,6 +815,14 @@ void startupRecovery(OperationContext* opCtx,
             index_builds::build_attempts::two_phase::incrementAttempts(opCtx);
         }
     }
+
+    // If the index build attempts collection exists, track size changes to it through oplog replay.
+    // Normally this is skipped because the size storer already stores what the size will be at the
+    // end of replay (due to being an unreplicated table that doesn't get rolled back), but if a
+    // commit/abort is rolled back restarting the index build will write a document that is deleted
+    // by oplog replay and we need to count that delete. The collection may exist even when we
+    // wouldn't create it due to --recoverFromOplogAsStandalone.
+    index_builds::build_attempts::two_phase::trackSizeThroughRecovery(opCtx);
 }
 
 // Returns true if the oplog collection exists. Will always return false if the cached pointer to

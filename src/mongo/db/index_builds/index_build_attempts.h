@@ -53,6 +53,12 @@ void removeEntries(OperationContext* opCtx, const std::vector<UUID>& buildUUIDs)
  */
 boost::optional<int> read(OperationContext* opCtx, const UUID& buildUUID);
 
+/**
+ * If it exists, marks the collection's record store so that its size is tracked during replication
+ * recovery.
+ */
+void trackSizeThroughRecovery(OperationContext* opCtx);
+
 }  // namespace two_phase
 
 }  // namespace mongo::index_builds::build_attempts

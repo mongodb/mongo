@@ -280,6 +280,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
+        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/mongo/db/storage:journal_flusher",
     ],

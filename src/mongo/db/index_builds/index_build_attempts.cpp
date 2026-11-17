@@ -12,9 +12,11 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/server_recovery.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -131,6 +133,15 @@ void incrementAttempts(OperationContext* opCtx) {
     // present in the last stable checkpoint.
     uassertStatusOK(repl::StorageInterface::get(opCtx)->updateDocuments(
         opCtx, kNss, BSONObj(), {BSON("$inc" << BSON(kAttemptsField << 1)), Timestamp()}));
+}
+
+void trackSizeThroughRecovery(OperationContext* opCtx) {
+    const auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, kNss);
+    if (!collection) {
+        return;
+    }
+    sizeRecoveryState(opCtx->getServiceContext())
+        .markCollectionAsAlwaysNeedsSizeAdjustment(collection->getRecordStore()->getIdent());
 }
 
 void removeEntry(OperationContext* opCtx, const UUID& buildUUID) {

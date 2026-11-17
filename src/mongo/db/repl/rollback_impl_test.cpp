@@ -13,6 +13,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
+#include "mongo/db/index_builds/index_build_attempts.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/record_id.h"
@@ -27,6 +28,7 @@
 #include "mongo/db/repl/rollback_test_fixture.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -34,6 +36,7 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
@@ -902,6 +905,30 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverFromOplog) {
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
 
     // Make sure oplog recovery was executed.
+    ASSERT(_recoveredFromOplog);
+}
+
+TEST_F(RollbackImplTest, RollbackTracksIndexBuildAttemptsSizeThroughRecoverFromOplog) {
+    ASSERT_TRUE(index_builds::build_attempts::two_phase::createCollection(_opCtx.get()));
+    const auto ident =
+        CollectionCatalog::get(_opCtx.get())
+            ->lookupCollectionByNamespace(_opCtx.get(), NamespaceString::kLocalIndexBuildsNamespace)
+            ->getRecordStore()
+            ->getIdent();
+
+    auto op = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({op});
+    ASSERT_OK(_insertOplogEntry(op.first));
+    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    _onRecoverFromOplogFn = [&]() {
+        _recoveredFromOplog = true;
+        ASSERT_TRUE(sizeRecoveryState(_opCtx->getServiceContext())
+                        .collectionAlwaysNeedsSizeAdjustment(ident));
+    };
+
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
     ASSERT(_recoveredFromOplog);
 }
 

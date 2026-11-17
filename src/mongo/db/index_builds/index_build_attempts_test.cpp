@@ -6,8 +6,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/platform/atomic.h"
@@ -160,6 +162,23 @@ TEST_F(IndexBuildAttemptsTest, RemoveEntryDeletesCountWithCallersCommit) {
         wuow.commit();
     }
     EXPECT_EQ(boost::none, read(operationContext(), buildUUID));
+}
+
+TEST_F(IndexBuildAttemptsTest, RecoveryDeleteUpdatesNumRecords) {
+    // The ledger isn't rolled back to the stable timestamp, so deletes replayed during recovery
+    // remove documents that are counted in the size storer.
+    const auto buildUUID = UUID::gen();
+    EXPECT_TRUE(checkWithinAttemptLimit(operationContext(), buildUUID));
+    trackSizeThroughRecovery(operationContext());
+    {
+        InReplicationRecovery inReplicationRecovery(getServiceContext());
+        WriteUnitOfWork wuow(operationContext());
+        removeEntry(operationContext(), buildUUID);
+        wuow.commit();
+    }
+    const auto collection = CollectionCatalog::get(operationContext())
+                                ->lookupCollectionByNamespace(operationContext(), kNss);
+    EXPECT_EQ(0, collection->numRecords(operationContext()));
 }
 
 }  // namespace
