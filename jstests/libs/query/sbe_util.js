@@ -203,6 +203,24 @@ export function checkSbeAccumulatorExpressionsEnabled(theDB) {
 }
 
 /**
+ * Check if featureFlagSbeStreamingGroup is enabled in the cluster.
+ *
+ * Quits test if there is no primary node and we are running in a mixed configuration.
+ */
+export function checkSbeStreamingGroupEnabled(theDB) {
+    if (theDB !== null) {
+        return discoverNodesAndCheck(theDB, (conn) => {
+            return FeatureFlagUtil.isPresentAndEnabled(conn, "SbeStreamingGroup");
+        });
+    } else {
+        return (
+            TestData.setParameters.featureFlagSbeStreamingGroup &&
+            TestData.setParameters.featureFlagSbeStreamingGroup === "true"
+        );
+    }
+}
+
+/**
  * Check if featureFlagSbeUnwind is enabled in the cluster.
  *
  * Quits test if there is no primary node and we are running in a mixed configuration.

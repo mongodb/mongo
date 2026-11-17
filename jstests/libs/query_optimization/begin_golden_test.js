@@ -2,6 +2,7 @@ import {getPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 import {
     checkSbeAccumulatorExpressionsEnabled,
     checkSbeStatus,
+    checkSbeStreamingGroupEnabled,
     checkSbeUnwindEnabled,
     checkJoinOptimizationStatus,
 } from "jstests/libs/query/sbe_util.js";
@@ -87,6 +88,15 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
                 outputName +
                 ", cannot determine which one to use. ",
         );
+    } else if (
+        sbeExpectedExists &&
+        sbeStatus !== "sbeDisabled" &&
+        fileExists(relativePathToExpectedOutput + "/sbeStreamingGroup/" + outputName) &&
+        checkSbeStreamingGroupEnabled(typeof db === "undefined" ? null : db)
+    ) {
+        // Outputs that differ when a streaming $group is used live in a 'sbeStreamingGroup'
+        // subdirectory, used when the feature flag is enabled.
+        relativePathToExpectedOutput += "/sbeStreamingGroup";
     } else if (sbeExpectedExists) {
         relativePathToExpectedOutput += "/" + sbeStatus;
         // SBE outputs that differ when $unwind is pushed down to SBE live in a

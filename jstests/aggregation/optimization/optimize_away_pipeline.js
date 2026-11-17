@@ -29,12 +29,14 @@ import {
 import {
     checkSbeFullyEnabled,
     checkSbeRestrictedOrFullyEnabled,
+    checkSbeStreamingGroupEnabled,
     checkSbeTransformStagesEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 const sbeFullyEnabled = checkSbeFullyEnabled(db);
 const sbeRestricted = checkSbeRestrictedOrFullyEnabled(db);
 const sbeTransformStagesEnabled = checkSbeTransformStagesEnabled(db);
+const sbeStreamingGroupEnabled = checkSbeStreamingGroupEnabled(db);
 
 const coll = db.optimize_away_pipeline;
 coll.drop();
@@ -539,9 +541,15 @@ assertPipelineIfSbeEnabled(
 pipeline = [{$sort: {x: 1}}, {$limit: 2}, {$group: {_id: "$x"}}];
 assertPipelineIfSbeEnabled(
     function () {
+        // Streaming group will be chosen if enabled, since the pipeline is sorted on 'x'.
         return assertPipelineDoesNotUseAggregation({
             pipeline: pipeline,
-            expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT", "GROUP"],
+            expectedStages: [
+                "IXSCAN",
+                "PROJECTION_COVERED",
+                "LIMIT",
+                sbeStreamingGroupEnabled ? "STREAMING_GROUP" : "GROUP",
+            ],
         });
     },
     function () {

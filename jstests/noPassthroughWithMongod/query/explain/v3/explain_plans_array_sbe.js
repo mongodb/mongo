@@ -162,7 +162,11 @@ describe("V3 queryPlanner.plans array on the SBE engine", function () {
 
             // The pushed-down $group was never ranked, so it is not in the ranked tree.
             const ranked = stageNames(plans[0].planStages);
-            assert(!ranked.includes("GROUP"), "$group must not appear in the ranked tree", context);
+            assert(
+                !ranked.includes("GROUP") && !ranked.includes("STREAMING_GROUP"),
+                "$group must not appear in the ranked tree",
+                context,
+            );
 
             assert(
                 plans[0].hasOwnProperty("executedPlanStages"),
@@ -170,7 +174,11 @@ describe("V3 queryPlanner.plans array on the SBE engine", function () {
                 context,
             );
             const executed = stageNames(plans[0].executedPlanStages);
-            assert(executed.includes("GROUP"), "$group must appear in the executed tree", context);
+            assert(
+                executed.includes("GROUP") || executed.includes("STREAMING_GROUP"),
+                "$group must appear in the executed tree",
+                context,
+            );
 
             // Only the winner: the plans after it were ranked and rejected, so none of them ran.
             for (let i = 1; i < plans.length; ++i) {
