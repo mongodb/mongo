@@ -40,7 +40,7 @@ Atomic<bool> shouldLogScopedDebugInfoInAssertUtil{true};
 
 namespace {
 Atomic<bool> gScopedDebugInfoStackEnabled{true};
-Atomic<bool> gStackTraceOnTassertFailure_ForTest{true};
+Atomic<bool> gLogErrorBlockOnTassertFailure_ForTest{true};
 
 void logScopedDebugInfo() {
     if (!shouldLogScopedDebugInfoInAssertUtil.load()) {
@@ -91,8 +91,8 @@ bool getScopedDebugInfoStackEnabled() {
     return gScopedDebugInfoStackEnabled.loadRelaxed();
 }
 
-void setStackTraceOnTassertFailure_ForTest(bool enabled) {
-    gStackTraceOnTassertFailure_ForTest.store(enabled);
+void setLogErrorBlockOnTassertFailure_ForTest(bool enabled) {
+    gLogErrorBlockOnTassertFailure_ForTest.store(enabled);
 }
 
 AssertionCount assertionCount;
@@ -361,7 +361,7 @@ void tassertNoThrowFailed(const Status& status, SourceLocation loc) {
     bumpAssertion(AssertionKind::kTripwire);
     LOGV2_ERROR(
         TRIPWIRE_ASSERTION_ID, "Tripwire assertion", "error"_attr = status, "location"_attr = loc);
-    if (gStackTraceOnTassertFailure_ForTest.loadRelaxed()) {
+    if (gLogErrorBlockOnTassertFailure_ForTest.loadRelaxed()) {
         logErrorBlock();
     }
     breakpoint();

@@ -309,6 +309,10 @@ public:
     BSONSpatialSafetyFuzzTestBase() {
         // Ignore the debugger trap (which fails the fuzz test) used by some assertions.
         std::signal(SIGTRAP, SIG_IGN);
+
+        // Malformed input is expected to trip tasserts constantly, so skip the logged
+        // error block when that happens.
+        setLogErrorBlockOnTassertFailure_ForTest(false);
     }
 
     // Copies raw bytes into a SharedBuffer.

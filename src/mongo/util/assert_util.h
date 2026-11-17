@@ -44,7 +44,7 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
 [[MONGO_MOD_PRIVATE]] void setScopedDebugInfoStackEnabled(bool newVal);
 [[MONGO_MOD_PRIVATE]] bool getScopedDebugInfoStackEnabled();
 
-void setStackTraceOnTassertFailure_ForTest(bool enabled);
+void setLogErrorBlockOnTassertFailure_ForTest(bool enabled);
 
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] AssertionCount {
 public:
