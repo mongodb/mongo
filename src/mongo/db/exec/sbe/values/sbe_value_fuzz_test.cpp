@@ -13,37 +13,13 @@
 namespace mongo::sbe {
 namespace {
 
-value::TagValueOwned toTagValueOwned(const ScalarSpec& spec) {
-    return std::visit(
-        [](auto&& v) -> value::TagValueOwned {
-            using T = std::decay_t<decltype(v)>;
-            if constexpr (std::is_same_v<T, NullSpec>)
-                return value::TagValueOwned::null();
-            else if constexpr (std::is_same_v<T, NothingSpec>)
-                return value::TagValueOwned::nothing();
-            else if constexpr (std::is_same_v<T, bool>)
-                return value::TagValueOwned::boolean(v);
-            else if constexpr (std::is_same_v<T, int32_t>)
-                return value::TagValueOwned::numberInt32(v);
-            else if constexpr (std::is_same_v<T, int64_t>)
-                return value::TagValueOwned::numberInt64(v);
-            else if constexpr (std::is_same_v<T, double>)
-                return value::TagValueOwned::numberDouble(v);
-            else if constexpr (std::is_same_v<T, Decimal128>)
-                return value::TagValueOwned::fromRaw(value::makeCopyDecimal(v));
-            else if constexpr (std::is_same_v<T, std::string>)
-                return value::TagValueOwned::fromRaw(value::makeNewString(v));
-        },
-        spec);
-}
-
 /*
  * Fuzz property: For any pair of scalars, the copies remain valid after the originals are released,
  * and compareValue returns an ordering unless one of the operands is Nothing.
  */
 void FuzzScalarCopyReleaseCompare(ScalarSpec specA, ScalarSpec specB) {
-    auto a = toTagValueOwned(specA);
-    auto b = toTagValueOwned(specB);
+    auto a = renderScalarValue(specA);
+    auto b = renderScalarValue(specB);
 
     auto aCopy = a.copy();
     auto bCopy = b.copy();
@@ -67,9 +43,14 @@ FUZZ_TEST(SBEValueFuzz, FuzzScalarCopyReleaseCompare)
  */
 void FuzzDocumentValueRoundTrip(DocumentSpec spec) {
     BSONObj doc = renderDocument(spec, 0);
+    auto object = renderObjectValue(doc);
+    value::ObjectEnumerator fields(object.tag(), object.value());
 
     for (auto&& elem : doc) {
-        value::TagValueOwned v = bson::convertToOwned(elem);
+        ASSERT_FALSE(fields.atEnd());
+        ASSERT_EQ(fields.getFieldName(), elem.fieldNameStringData());
+        const auto field = fields.getViewOfValue();
+        auto v = value::TagValueOwned::fromRaw(value::copyValue(field.tag, field.value));
         auto cp = v.copy();
         // Release the original to verify the copy stays valid.
         v = value::TagValueOwned::nothing();
@@ -80,7 +61,9 @@ void FuzzDocumentValueRoundTrip(DocumentSpec spec) {
 
         ASSERT_EQ(cmp.tag(), value::TypeTags::NumberInt32);
         ASSERT_EQ(cmp.value(), 0);
+        fields.advance();
     }
+    ASSERT_TRUE(fields.atEnd());
 }
 FUZZ_TEST(SBEValueFuzz, FuzzDocumentValueRoundTrip).WithDomains(documentNodesDomain());
 

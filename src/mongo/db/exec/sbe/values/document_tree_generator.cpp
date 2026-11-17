@@ -3,6 +3,9 @@
 
 #include "mongo/db/exec/sbe/values/document_tree_generator.h"
 
+#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/util/overloaded_visitor.h"
+
 #include <algorithm>
 #include <string>
 
@@ -119,6 +122,55 @@ BSONObj renderDocument(const DocumentSpec& spec, long long id) {
     b.appendNumber("_id", id);
     b.appendElements(renderDocumentFields(spec));
     return b.obj();
+}
+
+value::TagValueOwned renderScalarValue(const ScalarSpec& spec) {
+    using value::TagValueOwned;
+    return std::visit(
+        OverloadedVisitor{
+            [](bool v) { return TagValueOwned::boolean(v); },
+            [](int32_t v) { return TagValueOwned::numberInt32(v); },
+            [](int64_t v) { return TagValueOwned::numberInt64(v); },
+            [](double v) { return TagValueOwned::numberDouble(v); },
+            [](Decimal128 v) { return TagValueOwned::fromRaw(value::makeCopyDecimal(v)); },
+            [](const std::string& v) { return TagValueOwned::fromRaw(value::makeNewString(v)); },
+            [](NullSpec) { return TagValueOwned::null(); },
+            [](NothingSpec) {
+                return TagValueOwned::nothing();
+            }},
+        spec);
+}
+
+value::TagValueOwned renderBsonObjectValue(const BSONObj& document) {
+    return value::TagValueOwned::fromRaw(value::copyValue(
+        value::TypeTags::bsonObject, value::bitcastFrom<const char*>(document.objdata())));
+}
+
+value::TagValueOwned renderObjectValue(const BSONObj& document) {
+    auto object = value::TagValueOwned::fromRaw(value::makeNewObject());
+    auto* view = value::getObjectView(object.value());
+    for (const auto& element : document) {
+        view->push_back(element.fieldNameStringData(), bson::convertToOwned(element));
+    }
+    return object;
+}
+
+value::TagValueOwned renderArrayValue(const BSONObj& document) {
+    auto array = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto* view = value::getArrayView(array.value());
+    for (const auto& element : document) {
+        view->push_back(bson::convertToOwned(element));
+    }
+    return array;
+}
+
+value::TagValueOwned renderArraySetValue(const BSONObj& document) {
+    auto set = value::TagValueOwned::fromRaw(value::makeNewArraySet());
+    auto* view = value::getArraySetView(set.value());
+    for (const auto& element : document) {
+        view->push_back(bson::convertToOwned(element));
+    }
+    return set;
 }
 
 }  // namespace mongo::sbe

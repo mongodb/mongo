@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/decimal128.h"
 
 #include <cstddef>
@@ -79,6 +80,21 @@ BSONObj renderDocument(const DocumentSpec& spec, long long id);
  * Renders the spec into the fields of its nested document, without the "_id" field.
  */
 BSONObj renderDocumentFields(const DocumentSpec& spec);
+
+// Render a scalar as an owned SBE value, preserving its type and Nothing state.
+value::TagValueOwned renderScalarValue(const ScalarSpec& spec);
+
+// Copy a document into an owned BSON object value.
+value::TagValueOwned renderBsonObjectValue(const BSONObj& document);
+
+// Copy a document into an owned SBE object, preserving field order.
+value::TagValueOwned renderObjectValue(const BSONObj& document);
+
+// Render a document's field values as an owned SBE array in field order. Names are ignored.
+value::TagValueOwned renderArrayValue(const BSONObj& document);
+
+// Render a document's field values as an owned ArraySet. Equal values are deduplicated.
+value::TagValueOwned renderArraySetValue(const BSONObj& document);
 
 // These functions are here so that ADL works properly in order to print the fuzzer-generated
 // documents as JSON whenever the fuzzer finds a failure.

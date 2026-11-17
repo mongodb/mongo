@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_fuzztest", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -83,5 +83,17 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/stage_builder/sbe:abt_unit_test_utils",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog_mock",
         "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
+mongo_cc_fuzztest(
+    name = "sbe_makeobj_fuzz_test",
+    srcs = ["sbe_makeobj_fuzz_test.cpp"],
+    deps = [
+        "//src/mongo/db/exec/sbe:query_sbe",
+        "//src/mongo/db/exec/sbe:query_sbe_makeobj_spec",
+        "//src/mongo/db/exec/sbe/values:document_tree_generator",
+        "//src/mongo/db/query/stage_builder/sbe:query_sbe_abt",
+        "//src/mongo/db/query/stage_builder/sbe:stage_builder",
     ],
 )
