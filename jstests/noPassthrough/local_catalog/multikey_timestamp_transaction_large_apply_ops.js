@@ -193,14 +193,17 @@ function getPrecedingOplogTimestamp(node, ts, description) {
 
 function stopSecondaryReplicationAfterBarrier(primary, secondary, label) {
     if (isDisagg(primary)) {
-        // DSC receives oplog entries through the log service rather than the fetcher. Pause the
-        // secondary's applier so it stays behind while the primary completes the transaction.
-        const pauseOplogApplicationFailPoint = configureFailPoint(
-            secondary,
-            "pauseOplogApplication",
+        // DSC receives oplog entries through the log service rather than the oplog fetcher. Pause
+        // the standby read loop to block further fetching, letting entries accumulate upstream
+        // while the primary completes the transaction. To trigger the failpoint, we need new traffic
+        // to wake an idle reader. Therefore, we should first configure the failpoint, perform a write,
+        // and finally wait.
+        const standbyReadLoopFailPoint = configureFailPoint(secondary, "hangInStandbyReadLoop");
+        assert.commandWorked(
+            primary.getDB(dbName).replication_barrier.insert({_id: label}, {writeConcern: {w: 1}}),
         );
-        pauseOplogApplicationFailPoint.wait();
-        return pauseOplogApplicationFailPoint;
+        standbyReadLoopFailPoint.wait();
+        return standbyReadLoopFailPoint;
     }
 
     const stopReplProducerFailPoint = configureFailPoint(secondary, "stopReplProducer");
