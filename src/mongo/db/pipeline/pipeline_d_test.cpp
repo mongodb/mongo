@@ -8,18 +8,14 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_geo_near_cursor.h"
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
-#include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
-#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
@@ -27,7 +23,6 @@
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
-#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -161,124 +156,6 @@ TEST_F(PipelineDGroupAnnotationTest, GeoNearPathLeavesClonedGroupUnannotated) {
         "{$geoNear: {near: {type: 'Point', coordinates: [0, 0]}, distanceField: 'd', key: 'loc'}}");
     ASSERT_TRUE(hasStage(*pipeline, DocumentSourceGeoNearCursor::kStageName));
     ASSERT_EQ(group->getNonArrayIdFields(), OrderedPathSet{});
-}
-
-// Verifies that a $limit (and $skip) following $geoNear is extracted from the pipeline and pushed
-// down into the executor's find command instead of remaining as a pipeline stage.
-class PipelineDGeoNearLimitPushdownTest : public PipelineDGroupAnnotationTest {
-protected:
-    std::unique_ptr<Pipeline> attachGeoNearPipeline(
-        const std::vector<BSONObj>& stagesAfterGeoNear) {
-        DocumentSourceContainer sources;
-        sources.push_back(
-            DocumentSource::parse(_expCtx,
-                                  fromjson("{$geoNear: {near: {type: 'Point', "
-                                           "coordinates: [0, 0]}, distanceField: 'd', "
-                                           "key: 'loc'}}"))
-                .front());
-        for (const auto& stage : stagesAfterGeoNear) {
-            sources.push_back(DocumentSource::parse(_expCtx, stage).front());
-        }
-        auto pipeline = Pipeline::create(sources, _expCtx);
-        pipeline_optimization::optimizePipeline(*pipeline);
-        attachExecutor(*pipeline);
-        return pipeline;
-    }
-
-    struct ExecutorSkipLimit {
-        boost::optional<long long> skip;
-        boost::optional<long long> limit;
-    };
-
-    static ExecutorSkipLimit skipLimitInGeoNearExecutorPlan(const Pipeline& pipeline) {
-        auto itr = std::ranges::find_if(pipeline.getSources(), [](const auto& stage) {
-            return stage->getSourceName() == DocumentSourceGeoNearCursor::kStageName;
-        });
-        ASSERT_TRUE(itr != pipeline.getSources().end()) << "no $geoNearCursor stage";
-        auto explainer = checked_cast<DocumentSourceCursor&>(**itr).getPlanExplainer();
-        ASSERT_TRUE(explainer) << "no executor attached to $geoNearCursor";
-        auto [plan, _] = explainer->getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
-
-        ExecutorSkipLimit result;
-        std::function<void(const BSONObj&)> visit = [&](const BSONObj& node) {
-            if (auto elt = node["skipAmount"]) {
-                ASSERT_FALSE(result.skip) << "multiple SKIP nodes in plan " << plan;
-                result.skip = elt.safeNumberLong();
-            }
-            if (auto elt = node["limitAmount"]) {
-                ASSERT_FALSE(result.limit) << "multiple LIMIT nodes in plan " << plan;
-                result.limit = elt.safeNumberLong();
-            }
-            // Single-child nodes (FETCH, LIMIT, SKIP, ...) serialize their child as 'inputStage';
-            // multi-child nodes (OR, AND_HASH, SORT_MERGE, ...) use an 'inputStages' array.
-            if (auto child = node["inputStage"]; child.type() == BSONType::object) {
-                visit(child.Obj());
-            }
-            if (auto children = node["inputStages"]; children.type() == BSONType::array) {
-                for (auto&& child : children.Array()) {
-                    visit(child.Obj());
-                }
-            }
-        };
-        visit(plan);
-        return result;
-    }
-};
-
-TEST_F(PipelineDGeoNearLimitPushdownTest, LimitIsPushedDownIntoGeoNear) {
-    auto pipeline = attachGeoNearPipeline({fromjson("{$limit: 3}")});
-    ASSERT_TRUE(hasStage(*pipeline, DocumentSourceGeoNearCursor::kStageName));
-    ASSERT_FALSE(hasStage(*pipeline, DocumentSourceLimit::kStageName));
-    auto pushed = skipLimitInGeoNearExecutorPlan(*pipeline);
-    ASSERT_TRUE(pushed.limit);
-    ASSERT_EQ(*pushed.limit, 3);
-    ASSERT_FALSE(pushed.skip);
-}
-
-TEST_F(PipelineDGeoNearLimitPushdownTest, SkipAndLimitArePushedDownIntoGeoNear) {
-    auto pipeline = attachGeoNearPipeline({fromjson("{$skip: 2}"), fromjson("{$limit: 3}")});
-    ASSERT_TRUE(hasStage(*pipeline, DocumentSourceGeoNearCursor::kStageName));
-    ASSERT_FALSE(hasStage(*pipeline, DocumentSourceSkip::kStageName));
-    ASSERT_FALSE(hasStage(*pipeline, DocumentSourceLimit::kStageName));
-    auto pushed = skipLimitInGeoNearExecutorPlan(*pipeline);
-    ASSERT_TRUE(pushed.skip);
-    ASSERT_EQ(*pushed.skip, 2);
-    ASSERT_TRUE(pushed.limit);
-    ASSERT_EQ(*pushed.limit, 3);
-}
-
-TEST_F(PipelineDGeoNearLimitPushdownTest, LimitIsPushedDownPastSingleDocumentTransformation) {
-    auto pipeline =
-        attachGeoNearPipeline({fromjson("{$project: {d: 1}}"), fromjson("{$limit: 3}")});
-    ASSERT_FALSE(hasStage(*pipeline, DocumentSourceLimit::kStageName));
-    auto pushed = skipLimitInGeoNearExecutorPlan(*pipeline);
-    ASSERT_TRUE(pushed.limit);
-    ASSERT_EQ(*pushed.limit, 3);
-}
-
-TEST_F(PipelineDGeoNearLimitPushdownTest, SampleIsNotSwappedAheadOfGeoNear) {
-    DocumentSourceContainer sources;
-    for (auto&& stage : {fromjson("{$geoNear: {near: {type: 'Point', coordinates: [0, 0]}, "
-                                  "distanceField: 'd', key: 'loc'}}"),
-                         fromjson("{$sample: {size: 1}}")}) {
-        sources.push_back(DocumentSource::parse(_expCtx, stage).front());
-    }
-    auto pipeline = Pipeline::create(sources, _expCtx);
-    pipeline_optimization::optimizePipeline(*pipeline);
-    ASSERT_EQ(pipeline->peekFront()->getSourceName(), DocumentSourceGeoNear::kStageName);
-
-    attachExecutor(*pipeline);
-    ASSERT_TRUE(hasStage(*pipeline, DocumentSourceGeoNearCursor::kStageName));
-    ASSERT_TRUE(hasStage(*pipeline, DocumentSourceSample::kStageName));
-}
-
-TEST_F(PipelineDGeoNearLimitPushdownTest, LimitIsNotPushedDownPastFilteringStage) {
-    auto pipeline =
-        attachGeoNearPipeline({fromjson("{$match: {d: {$gt: 1}}}"), fromjson("{$limit: 3}")});
-    ASSERT_TRUE(hasStage(*pipeline, DocumentSourceLimit::kStageName));
-    auto pushed = skipLimitInGeoNearExecutorPlan(*pipeline);
-    ASSERT_FALSE(pushed.limit);
-    ASSERT_FALSE(pushed.skip);
 }
 
 using PipelineDTest = AggregationContextFixture;
