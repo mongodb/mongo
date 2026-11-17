@@ -28,11 +28,7 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getAllNodeExplains, getPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {
-    checkSbeStatus,
-    kFeatureFlagSbeFullEnabled,
-    kSbeDisabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeStatus, kSbeDisabled} from "jstests/libs/query/sbe_util.js";
 
 /*
  * The 'internalMaxGroupAccumulatorsInSbe' query knob is 25 by default. Check that nothing in the
@@ -94,20 +90,12 @@ function testGroupWithNAccumulators({coll, n, expectedLimit}) {
      * explain plan, indicating the planner's intention to compile the group operation in SBE.
      *
      * When SBE is allowed, we expect to see the GROUP stage iff the number of accumulators n is no
-     * more than the SBE eligibility limit or the accumulator limit is overridden by
-     * featureFlagSbeFull.
+     * more than the SBE eligibility limit, even when featureFlagSbeFull is enabled.
      *
-     * Converseely, we do not expect to see a GROUP stage when the number of accumulators exceeds
+     * Conversely, we do not expect to see a GROUP stage when the number of accumulators exceeds
      * the limit or when SBE is explicitly disabled.
      */
-    const expectedGroupNodes =
-        sbeStatus === kSbeDisabled
-            ? 0
-            : sbeStatus === kFeatureFlagSbeFullEnabled
-              ? 1
-              : n <= expectedLimit
-                ? 1
-                : 0;
+    const expectedGroupNodes = sbeStatus !== kSbeDisabled && n <= expectedLimit ? 1 : 0;
 
     jsTest.log.info("Testing $group with n accumulators: ", {
         collection: coll.getName(),

@@ -555,7 +555,6 @@ bool findSbeCompatibleStagesForPushdown(
         isTimeseriesCollection = mainColl->isTimeseriesCollection();
     }
 
-    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled();
     const SbeCompatibility minRequiredCompatibility =
         getMinRequiredSbeCompatibility(queryKnob.getInternalQueryFrameworkControlForOp());
 
@@ -616,13 +615,12 @@ bool findSbeCompatibleStagesForPushdown(
 
     // A $group stage with a large number of accumulators may be bottlenecked by the time it takes
     // to evaluate accumulator inputs and compute the aggregated results. For now, we prefer Classic
-    // when there are a lot of accumulators, unless 'featureFlagSbeFull' is in force.
+    // when there are a lot of accumulators, including when 'featureFlagSbeFull' is in force.
     //
     // This policy change is gated by a feature flag so that it can be deployed using the IFR
     // process.
     size_t maxGroupAccumulators = std::numeric_limits<size_t>::max();
-    if (!sbeFullEnabled &&
-        cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+    if (cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
             feature_flags::gFeatureFlagSbeAccumulators)) {
         maxGroupAccumulators = queryKnob.getMaxGroupAccumulatorsInSbe();
     }
