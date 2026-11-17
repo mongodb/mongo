@@ -3,6 +3,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function awaitReplication(rst) {
@@ -47,6 +48,7 @@ describe("direct shard connections with replica-set administration commands", fu
             shardAdminDB.runCommand({createUser: "admin", pwd: "x", roles: ["root"]}),
         );
         assert(shardAdminDB.auth("admin", "x"), "Authentication failed");
+        this.isDisagg = isDisagg(shardAdminDB.getMongo());
         assert.commandWorked(
             shardAdminDB.runCommand({
                 setParameter: 1,
@@ -99,24 +101,31 @@ describe("direct shard connections with replica-set administration commands", fu
         this.st.stop();
     });
 
-    it("allows replSetStepDown and replSetStepUp", function () {
-        const secondaryConn = setupConn(this.st.rs0.getSecondary(), "user", "y");
-        assert.commandWorked(secondaryConn.adminCommand({replSetStepUp: 1}));
-        authutil.asCluster(this.st.rs0.nodes, "jstests/libs/key1", () => {
-            this.st.rs0.awaitNodesAgreeOnPrimary();
-            this.st.rs0.awaitSecondaryNodes();
-        });
+    it("allows replSetStepUp and replSetStepDown", function () {
+        let primaryConn;
+        if (this.isDisagg) {
+            jsTest.log.info("Skipping replSetStepUp: DSC shuts down the former primary");
+            primaryConn = setupConn(this.st.rs0.getPrimary(), "user", "y");
+        } else {
+            const secondaryConn = setupConn(this.st.rs0.getSecondary(), "user", "y");
+            assert.commandWorked(secondaryConn.adminCommand({replSetStepUp: 1}));
+            authutil.asCluster(this.st.rs0.nodes, "jstests/libs/key1", () => {
+                this.st.rs0.awaitNodesAgreeOnPrimary();
+                this.st.rs0.awaitSecondaryNodes();
+            });
+            primaryConn = secondaryConn;
+        }
 
         assert.soonNoExcept(() => {
             // {replSetStepDown: 0} defaults to 60 seconds rather than 0, so specify 1 here and unfreeze
             // the node later in the test if it will be stepped up to primary.
-            return secondaryConn.adminCommand({replSetStepDown: 1, force: true}).ok;
-        }, `failed attempt to step down node ${secondaryConn.host}`);
+            return primaryConn.adminCommand({replSetStepDown: 1, force: true}).ok;
+        }, `failed attempt to step down node ${primaryConn.host}`);
         authutil.asCluster(this.st.rs0.nodes, "jstests/libs/key1", () => {
             this.st.rs0.awaitNodesAgreeOnPrimary();
             this.st.rs0.awaitSecondaryNodes();
         });
-        secondaryConn.close();
+        primaryConn.close();
     });
 
     it("allows replSetFreeze", function () {
@@ -127,6 +136,10 @@ describe("direct shard connections with replica-set administration commands", fu
     });
 
     it("allows replSetMaintenance", function () {
+        if (this.isDisagg) {
+            jsTest.log.info("Skipping replSetMaintenance: maintenance mode is unsupported in DSC");
+            return;
+        }
         const secondaryConn = setupConn(this.st.rs0.getSecondary(), "user", "y");
         assert.commandWorked(secondaryConn.adminCommand({replSetMaintenance: 1}));
         assert.commandWorked(secondaryConn.adminCommand({replSetMaintenance: 0}));
@@ -144,6 +157,12 @@ describe("direct shard connections with replica-set administration commands", fu
     });
 
     it("allows replSetAbortPrimaryCatchUp", function () {
+        if (this.isDisagg) {
+            jsTest.log.info(
+                "Skipping replSetAbortPrimaryCatchUp: primary catch-up abort is unsupported in DSC",
+            );
+            return;
+        }
         const primary = this.st.rs0.getPrimary();
         const secondary1 = this.st.rs0.getSecondaries()[0];
         const secondary2 = this.st.rs0.getSecondaries()[1];
