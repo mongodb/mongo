@@ -126,19 +126,21 @@ describe("$LU pushdown", function () {
     });
 
     // These shapes scan the local collection (COLLSCAN) and join on an unindexed foreign
-    // field, so pushdown requires both the collscan access path and the nested-loop
-    // join strategy feature flags to be enabled.
+    // field, so pushdown requires the collscan access path, the nested-loop join strategy
+    // and the efficient boundary materialization feature flags to be enabled.
     function canPushdownCollscanNestedLoopJoin() {
         return (
             FeatureFlagUtil.isEnabled(db, "SbeEqLookupUnwindLocalCollscan") &&
-            FeatureFlagUtil.isEnabled(db, "SbeEqLookupUnwindNestedLoopJoin")
+            FeatureFlagUtil.isEnabled(db, "SbeEqLookupUnwindNestedLoopJoin") &&
+            FeatureFlagUtil.isEnabled(db, "SbeEfficientBoundaryMaterialization")
         );
     }
 
     it("Should pushdown lookup-unwind", function () {
         if (!canPushdownCollscanNestedLoopJoin()) {
             jsTest.log.info(
-                "Skipping: lookup-unwind pushdown requires SbeEqLookupUnwindLocalCollscan and SbeEqLookupUnwindNestedLoopJoin to be enabled.",
+                "Skipping: lookup-unwind pushdown requires SbeEqLookupUnwindLocalCollscan, " +
+                    "SbeEqLookupUnwindNestedLoopJoin and SbeEfficientBoundaryMaterialization to be enabled.",
             );
             return;
         }
@@ -164,7 +166,8 @@ describe("$LU pushdown", function () {
     it("Should pushdown when preserveNullAndEmptyArrays is set to true", function () {
         if (!canPushdownCollscanNestedLoopJoin()) {
             jsTest.log.info(
-                "Skipping: lookup-unwind pushdown requires SbeEqLookupUnwindLocalCollscan and SbeEqLookupUnwindNestedLoopJoin to be enabled.",
+                "Skipping: lookup-unwind pushdown requires SbeEqLookupUnwindLocalCollscan, " +
+                    "SbeEqLookupUnwindNestedLoopJoin and SbeEfficientBoundaryMaterialization to be enabled.",
             );
             return;
         }

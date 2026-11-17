@@ -60,6 +60,7 @@ assertLuUsage(
     {
         featureFlagSbeEqLookupUnwindHashJoin: true,
         featureFlagSbeEqLookupUnwindLocalCollscan: true,
+        featureFlagSbeEfficientBoundaryMaterialization: true,
     },
     "sbe",
 );

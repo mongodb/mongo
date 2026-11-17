@@ -200,6 +200,8 @@ protected:
         "featureFlagSbeEqLookupUnwindLocalIxscanFetch", true};
     unittest::ServerParameterGuard _localComplexParamGuard{
         "featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans", true};
+    unittest::ServerParameterGuard _efficientMaterializationParamGuard{
+        "featureFlagSbeEfficientBoundaryMaterialization", true};
 };
 
 // Test selection of IXSCAN + FETCH + LU plans.
@@ -805,6 +807,39 @@ TEST_F(EngineSelectionPlanFixture, LuMustSitOnDataAccessPlan) {
         auto result = engineSelectionForPlan(solution.get(), dan, ctx);
         ASSERT_EQ(result.engine, EngineChoice::kSbe);
         ASSERT_EQ(result.planPushdownRoot, lookupPtr);
+    }
+}
+
+// An LU is only pushed down when featureFlagSbeEfficientBoundaryMaterialization is on.
+TEST_F(EngineSelectionPlanFixture, LuGatedByEfficientMaterializationFlag) {
+    for (bool flagOn : {true, false}) {
+        unittest::ServerParameterGuard flag{"featureFlagSbeEfficientBoundaryMaterialization",
+                                            flagOn};
+        auto dataAccess = std::make_unique<CollectionScanNode>(nss);
+        const auto* dan = dataAccess.get();
+        auto solution = makePlan(
+            makeLuNodeWithStrategy(std::move(dataAccess), EqLookupNode::LookupStrategy::kHashJoin));
+        IncrementalFeatureRolloutContext ctx;
+        auto result = engineSelectionForPlan(solution.get(), dan, ctx);
+        ASSERT_EQ(result.engine, flagOn ? EngineChoice::kSbe : EngineChoice::kClassic) << flagOn;
+    }
+}
+
+// A $group is pushed down regardless of featureFlagSbeEfficientBoundaryMaterialization.
+TEST_F(EngineSelectionPlanFixture, GroupNotGatedByEfficientMaterializationFlag) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    for (bool flagOn : {true, false}) {
+        unittest::ServerParameterGuard flag{"featureFlagSbeEfficientBoundaryMaterialization",
+                                            flagOn};
+        auto dataAccess = std::make_unique<CollectionScanNode>(nss);
+        const auto* dan = dataAccess.get();
+        auto solution = makePlan(makeSimpleGroupNode(std::move(dataAccess), expCtx));
+        IncrementalFeatureRolloutContext ctx;
+        auto result = engineSelectionForPlan(solution.get(), dan, ctx);
+        ASSERT_EQ(result.engine, EngineChoice::kSbe) << flagOn;
     }
 }
 

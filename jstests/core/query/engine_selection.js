@@ -41,7 +41,11 @@ const ffSbeEqLookupUnwindHashJoin = FeatureFlagUtil.isPresentAndEnabled(
     db,
     "SbeEqLookupUnwindHashJoin",
 );
-const lookupUnwindPushesDown = ffSbeEqLookupUnwindHashJoin;
+const ffSbeEfficientBoundaryMaterialization = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "SbeEfficientBoundaryMaterialization",
+);
+const lookupUnwindPushesDown = ffSbeEqLookupUnwindHashJoin && ffSbeEfficientBoundaryMaterialization;
 const sbeFullyEnabled = ffSbeFull || trySbeEngineSet;
 
 const coll = db.coll;

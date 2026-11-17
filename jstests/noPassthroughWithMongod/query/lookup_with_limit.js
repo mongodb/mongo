@@ -20,7 +20,9 @@ const isFeatureFlagSbeFullEnabled =
 const isSbeEnabled = checkSbeFullyEnabled(db);
 const isSbeGroupLookupOnly = checkSbeRestrictedOrFullyEnabled(db);
 const isLookupUnwindPushdownEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(db, "SbeEqLookupUnwindHashJoin") && !forceClassicEngineSet;
+    FeatureFlagUtil.isPresentAndEnabled(db, "SbeEqLookupUnwindHashJoin") &&
+    FeatureFlagUtil.isPresentAndEnabled(db, "SbeEfficientBoundaryMaterialization") &&
+    !forceClassicEngineSet;
 const isSbeTransformStagesEnabled =
     FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages") && !forceClassicEngineSet;
 

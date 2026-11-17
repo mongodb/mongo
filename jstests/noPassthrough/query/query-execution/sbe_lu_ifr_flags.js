@@ -101,12 +101,14 @@ const ALL_FLAGS = [
     STRATEGY_DINLJ,
 ];
 
+const BOUNDARY_MATERIALIZATION = "featureFlagSbeEfficientBoundaryMaterialization";
+
 function setFlags(flagValues) {
     assert.commandWorked(db.adminCommand({setParameter: 1, ...flagValues}));
 }
 
 function enableAllFlags() {
-    const params = {};
+    const params = {[BOUNDARY_MATERIALIZATION]: true};
     for (const flag of ALL_FLAGS) {
         params[flag] = true;
     }
@@ -314,7 +316,8 @@ function expectedEngine(flagValues, testCase) {
     // A flag value not present in flagValues means it is on (default: true for rollout flags).
     const strategyOn = flagValues[testCase.strategyFlag] !== false;
     const accessOn = flagValues[testCase.accessFlag] !== false;
-    return strategyOn && accessOn ? "sbe" : "classic";
+    const materializationOn = flagValues[BOUNDARY_MATERIALIZATION] !== false;
+    return strategyOn && accessOn && materializationOn ? "sbe" : "classic";
 }
 
 function runAndVerify(flagValues, label) {
@@ -368,6 +371,19 @@ describe("LU IFR flags - each flag disables exactly the expected combinations", 
             }
         });
     }
+});
+
+describe("LU IFR flags - boundary materialization flag gates every LU", function () {
+    it(`disabling ${BOUNDARY_MATERIALIZATION} keeps every LU test case in classic`, function () {
+        enableAllFlags();
+        try {
+            setFlags({[BOUNDARY_MATERIALIZATION]: false});
+            runAndVerify({[BOUNDARY_MATERIALIZATION]: false}, "materialization-off");
+        } finally {
+            enableAllFlags();
+        }
+        runAndVerify({}, "materialization-on");
+    });
 });
 
 describe("LU IFR flags - access-plan flags only gate LU nodes", function () {

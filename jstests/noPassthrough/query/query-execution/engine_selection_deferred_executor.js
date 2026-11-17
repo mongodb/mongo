@@ -25,16 +25,20 @@ if (checkSbeCompletelyDisabled(db) || checkSbeFullyEnabled(db)) {
     quit();
 }
 
-// featureFlagSbeEqLookupUnwindHashJoin is an IFR rollout flag that controls whether $lookup-$unwind runs
-// in SBE for hash joins. disableUnreleasedIFRFlags disables it even though this test doesn't set it explicitly,
-// which would cause the query to fall back to classic despite featureFlagGetExecutorDeferredEngineChoice
-// being on.
+// featureFlagSbeEqLookupUnwindHashJoin and featureFlagSbeEfficientBoundaryMaterialization are IFR rollout
+// flags that must both be on for a hash join $lookup-$unwind to run in SBE. disableUnreleasedIFRFlags
+// disables them even though this test doesn't set them explicitly, which would cause the query to fall
+// back to classic despite featureFlagGetExecutorDeferredEngineChoice being on.
 const lookupUnwindHashJoinEnabled = assert.commandWorked(
     db.adminCommand({getParameter: 1, featureFlagSbeEqLookupUnwindHashJoin: 1}),
 ).featureFlagSbeEqLookupUnwindHashJoin.value;
-if (!lookupUnwindHashJoinEnabled) {
+const efficientBoundaryMaterializationEnabled = assert.commandWorked(
+    db.adminCommand({getParameter: 1, featureFlagSbeEfficientBoundaryMaterialization: 1}),
+).featureFlagSbeEfficientBoundaryMaterialization.value;
+if (!lookupUnwindHashJoinEnabled || !efficientBoundaryMaterializationEnabled) {
     jsTest.log(
-        "Exiting early because featureFlagSbeEqLookupUnwindHashJoin is disabled " +
+        "Exiting early because featureFlagSbeEqLookupUnwindHashJoin or " +
+            "featureFlagSbeEfficientBoundaryMaterialization is disabled " +
             "(e.g. by disableUnreleasedIFRFlags).",
     );
     MongoRunner.stopMongod(conn);

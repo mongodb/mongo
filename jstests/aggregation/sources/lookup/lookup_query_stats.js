@@ -44,6 +44,10 @@ const eqLookupUnwindDynamicIndexedLoopJoinEnabled = FeatureFlagUtil.isPresentAnd
     db,
     "SbeEqLookupUnwindDynamicIndexedLoopJoin",
 );
+const efficientBoundaryMaterializationEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "SbeEfficientBoundaryMaterialization",
+);
 const testDB = db.getSiblingDB("lookup_query_stats");
 testDB.dropDatabase();
 
@@ -316,7 +320,9 @@ let createIndexForCollection = function (collection, fieldName) {
 let testQueryExecutorStatsWithCollectionScan = function (params) {
     if (
         params.withUnwind &&
-        (!eqLookupUnwindCollscanEnabled || !eqLookupUnwindNestedLoopJoinEnabled)
+        (!eqLookupUnwindCollscanEnabled ||
+            !eqLookupUnwindNestedLoopJoinEnabled ||
+            !efficientBoundaryMaterializationEnabled)
     ) {
         return;
     }
@@ -428,7 +434,9 @@ let testQueryExecutorStatsWithHashLookup = function (params) {
 let testQueryExecutorStatsWithIndexScan = function (params) {
     if (
         params.withUnwind &&
-        (!eqLookupUnwindCollscanEnabled || !eqLookupUnwindIndexedLoopJoinEnabled)
+        (!eqLookupUnwindCollscanEnabled ||
+            !eqLookupUnwindIndexedLoopJoinEnabled ||
+            !efficientBoundaryMaterializationEnabled)
     ) {
         return;
     }
@@ -500,7 +508,9 @@ let testQueryExecutorStatsWithIndexScan = function (params) {
 let testQueryExecutorStatsWithDynamicIndexedLoopJoin = function (params) {
     if (
         params.withUnwind &&
-        (!eqLookupUnwindCollscanEnabled || !eqLookupUnwindDynamicIndexedLoopJoinEnabled)
+        (!eqLookupUnwindCollscanEnabled ||
+            !eqLookupUnwindDynamicIndexedLoopJoinEnabled ||
+            !efficientBoundaryMaterializationEnabled)
     ) {
         return;
     }

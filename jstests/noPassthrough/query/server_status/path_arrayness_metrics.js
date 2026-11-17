@@ -177,11 +177,13 @@ describe("pathArrayness metrics", function () {
     it("increments leadingFilterSimplified for a $match + $lookup + $unwind on indexed non-array paths", function () {
         if (
             !FeatureFlagUtil.isEnabled(db, "SbeEqLookupUnwindLocalIxscanFetch") ||
-            !FeatureFlagUtil.isEnabled(db, "SbeEqLookupUnwindHashJoin")
+            !FeatureFlagUtil.isEnabled(db, "SbeEqLookupUnwindHashJoin") ||
+            !FeatureFlagUtil.isEnabled(db, "SbeEfficientBoundaryMaterialization")
         ) {
             jsTest.log.info(
-                "Skipping: featureFlagSbeEqLookupUnwindLocalIxscanFetch or " +
-                    "featureFlagSbeEqLookupUnwindHashJoin is not enabled.",
+                "Skipping: featureFlagSbeEqLookupUnwindLocalIxscanFetch, " +
+                    "featureFlagSbeEqLookupUnwindHashJoin, or " +
+                    "featureFlagSbeEfficientBoundaryMaterialization is not enabled.",
             );
             return;
         }

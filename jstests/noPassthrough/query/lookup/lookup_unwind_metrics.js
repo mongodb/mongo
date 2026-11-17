@@ -72,8 +72,11 @@ const counterToFeatureFlag = {
 };
 
 function requiredFlagsEnabled(expectedCounters) {
-    return expectedCounters.every((counter) =>
-        FeatureFlagUtil.isPresentAndEnabled(db, counterToFeatureFlag[counter]),
+    return (
+        FeatureFlagUtil.isPresentAndEnabled(db, "SbeEfficientBoundaryMaterialization") &&
+        expectedCounters.every((counter) =>
+            FeatureFlagUtil.isPresentAndEnabled(db, counterToFeatureFlag[counter]),
+        )
     );
 }
 

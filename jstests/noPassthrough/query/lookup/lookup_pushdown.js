@@ -37,10 +37,9 @@ const viewName = "view_lookup_pushdown";
 let db = conn.getDB(name);
 const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 const sbeRestricted = checkSbeRestricted(db);
-const sbeEqLookupUnwindPushdownEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    db,
-    "SbeEqLookupUnwindHashJoin",
-);
+const sbeEqLookupUnwindPushdownEnabled =
+    FeatureFlagUtil.isPresentAndEnabled(db, "SbeEqLookupUnwindHashJoin") &&
+    FeatureFlagUtil.isPresentAndEnabled(db, "SbeEfficientBoundaryMaterialization");
 
 if (!sbeEnabled) {
     jsTest.log.info("Skipping test because SBE is disabled");

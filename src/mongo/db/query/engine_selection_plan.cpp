@@ -162,10 +162,13 @@ private:
     //  - The "as" path is a top-level field and the $unwind has no 'includeArrayIndex', so that
     //    the LU's only change to the local document is setting one top-level field.
     //  - The flag of the join strategy is on.
+    //  - The efficient result materializer flag is on, so the executor builds the LU's result.
     bool _canPushDownLu(const EqLookupNode& node) const {
         return _containsLuPattern && node.children[0].get() == _dataAccessNode &&
             node.joinField.getPathLength() == 1 && !node.unwindSpec->indexPath &&
-            _isStrategyEnabled(node.lookupStrategy);
+            _isStrategyEnabled(node.lookupStrategy) &&
+            _ifrContext.getSavedFlagValue(
+                feature_flags::gFeatureFlagSbeEfficientBoundaryMaterialization);
     }
 
     // Returns true if the IFR flag for the given LU join strategy is enabled, meaning the strategy
