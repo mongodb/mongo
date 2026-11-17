@@ -104,14 +104,15 @@ protected:
         const std::string plan = sbe::DebugPrinter().print(*stage, debugPrintInfo);
         ASSERT_EQ(plan.find("streaming_group ") != std::string::npos, expectStreamingStage) << plan;
 
-        auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
-        ASSERT_EQ(resultAccessors.size(), 1u);
+        ASSERT_EQ(resultSlots.size(), 1u);
+        prepareTree(&data.env.ctx, stage.get());
+        auto materializer =
+            stage_builder::bindResultMaterializer(stage.get(), data.env.ctx, *data.staticData);
 
         std::vector<BSONObj> actual;
         for (auto st = stage->getNext(); st == sbe::PlanState::ADVANCED; st = stage->getNext()) {
-            auto [tag, val] = resultAccessors[0]->getViewOfValue();
-            ASSERT_TRUE(tag == sbe::value::TypeTags::bsonObject);
-            actual.push_back(BSONObj(sbe::value::bitcastTo<const char*>(val)).getOwned());
+            actual.push_back(materializer.toBson(false /* mustOwn */).getOwned());
+            ASSERT_BSONOBJ_EQ(actual.back(), materializer.toDocument().toBson());
         }
 
         ASSERT_EQ(actual.size(), expected.size());
@@ -269,6 +270,90 @@ TEST_F(SbeStageBuilderTest, StreamingGroupFallsBackWithTooManyGroupByKeys) {
 }
 
 TEST_F(SbeStageBuilderTest, StreamingGroupEmptyInput) {
+    assertStreamingGroupResults({}, fromjson("{_id: '$a', n: {$sum: 1}}"), {});
+}
+
+TEST_F(SbeStageBuilderTest, StreamingGroupEfficientBoundaryMaterializationPlan) {
+    unittest::ServerParameterGuard streamingFlag("featureFlagSbeStreamingGroup", true);
+    for (bool efficient : {false, true}) {
+        unittest::ServerParameterGuard materializationFlag(
+            "featureFlagSbeEfficientBoundaryMaterialization", efficient);
+        auto querySolution = makeStreamingGroupSolution(
+            {fromjson("{a: 1, b: 2}")},
+            fromjson("{_id: '$a', avg: {$avg: '$b'}, mx: {$max: '$b'}, p: {$push: '$b'}}"));
+        auto [resultSlots, stage, data, _] =
+            buildPlanStage(std::move(querySolution), false, makeAlwaysPassShardFiltererInterface());
+
+        sbe::DebugPrintInfo debugPrintInfo{};
+        const std::string plan = sbe::DebugPrinter().print(*stage, debugPrintInfo);
+        ASSERT_NE(plan.find("streaming_group "), std::string::npos) << plan;
+        ASSERT_EQ(plan.find("newBsonObj(") == std::string::npos, efficient) << plan;
+
+        const auto& changes = data.staticData->resultChanges;
+        ASSERT_EQ(changes.has_value(), efficient) << data.debugString();
+        if (efficient) {
+            ASSERT_TRUE(changes->closed);
+            const std::vector<std::string> fields{"_id", "avg", "mx", "p"};
+            ASSERT_EQ(changes->fields.size(), fields.size());
+            for (size_t i = 0; i < fields.size(); ++i) {
+                ASSERT_EQ(changes->fields[i].name, fields[i]);
+                ASSERT_TRUE(changes->fields[i].action == sbe::ResultFieldAction::kAdd);
+                ASSERT_TRUE(changes->fields[i].slot.has_value());
+                ASSERT_NE(*changes->fields[i].slot, *data.staticData->resultSlot);
+            }
+        }
+    }
+}
+
+TEST_F(SbeStageBuilderTest, StreamingGroupEfficientBoundaryMaterializationSingleKey) {
+    unittest::ServerParameterGuard streamingFlag("featureFlagSbeStreamingGroup", true);
+    unittest::ServerParameterGuard materializationFlag(
+        "featureFlagSbeEfficientBoundaryMaterialization", true);
+    // A scalar key coalesces missing and null into the same group, including in the output _id.
+    assertStreamingGroupResults(
+        {fromjson("{b: 2}"),
+         fromjson("{a: null, b: 4}"),
+         fromjson("{b: 6}"),
+         fromjson("{a: 1, b: 3}"),
+         fromjson("{a: 1, b: 7}"),
+         fromjson("{a: 2, b: 5}")},
+        fromjson("{_id: '$a', avg: {$avg: '$b'}, mx: {$max: '$b'}, p: {$push: '$b'}}"),
+        {fromjson("{_id: null, avg: 4.0, mx: 6, p: [2, 4, 6]}"),
+         fromjson("{_id: 1, avg: 5.0, mx: 7, p: [3, 7]}"),
+         fromjson("{_id: 2, avg: 5.0, mx: 5, p: [5]}")});
+}
+
+TEST_F(SbeStageBuilderTest, StreamingGroupEfficientBoundaryMaterializationCompoundKey) {
+    unittest::ServerParameterGuard streamingFlag("featureFlagSbeStreamingGroup", true);
+    unittest::ServerParameterGuard materializationFlag(
+        "featureFlagSbeEfficientBoundaryMaterialization", true);
+    // The cluster-key project coalesces null and missing, but the output _id must not. It must
+    // rebuild the compound object from the group-by output slots, omitting only missing fields.
+    assertStreamingGroupResults(
+        {fromjson("{a: 1, b: null, c: 2}"),
+         fromjson("{a: 1, c: 3}"),
+         fromjson("{a: 1, b: null, c: 6}"),
+         fromjson("{a: 1, c: 9}"),
+         fromjson("{a: 1, b: 2, c: 5}"),
+         fromjson("{a: 2, c: 7}"),
+         fromjson("{b: null, c: 8}"),
+         fromjson("{c: 11}"),
+         fromjson("{b: null, c: 10}"),
+         fromjson("{c: 13}")},
+        fromjson(
+            "{_id: {x: '$a', y: '$b'}, avg: {$avg: '$c'}, mx: {$max: '$c'}, p: {$push: '$c'}}"),
+        {fromjson("{_id: {x: 1, y: null}, avg: 4.0, mx: 6, p: [2, 6]}"),
+         fromjson("{_id: {x: 1}, avg: 6.0, mx: 9, p: [3, 9]}"),
+         fromjson("{_id: {x: 1, y: 2}, avg: 5.0, mx: 5, p: [5]}"),
+         fromjson("{_id: {x: 2}, avg: 7.0, mx: 7, p: [7]}"),
+         fromjson("{_id: {y: null}, avg: 9.0, mx: 10, p: [8, 10]}"),
+         fromjson("{_id: {}, avg: 12.0, mx: 13, p: [11, 13]}")});
+}
+
+TEST_F(SbeStageBuilderTest, StreamingGroupEfficientBoundaryMaterializationEmptyInput) {
+    unittest::ServerParameterGuard streamingFlag("featureFlagSbeStreamingGroup", true);
+    unittest::ServerParameterGuard materializationFlag(
+        "featureFlagSbeEfficientBoundaryMaterialization", true);
     assertStreamingGroupResults({}, fromjson("{_id: '$a', n: {$sum: 1}}"), {});
 }
 
