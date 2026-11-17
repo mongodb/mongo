@@ -68,8 +68,10 @@ mongo_cc_library(
         ":mcv_sketch_gen_lib",
         ":ndv_sketch_gen_lib",
         "//src/mongo/db:common",
+        "//src/mongo/db:sbe_values",
         "//src/mongo/db:server_base",
         "//src/mongo/db/pipeline:field_path",
+        "//src/mongo/db/query/compiler/stats:stats_gen",
     ],
 )
 
