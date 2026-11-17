@@ -64,6 +64,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/debug_util.h"
@@ -1249,10 +1250,16 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexScan(
             "Expected IndexScanNode to produce 'returnKey' slot",
             reqs.has(kReturnKey) || !ixn->addKeyMetadata);
 
-    const auto generateIndexScanFunc =
-        ixn->iets.empty() ? generateIndexScan : generateIndexScanWithDynamicBounds;
-    auto&& [scanStage, scanOutputs] =
-        generateIndexScanFunc(_state, getCollection(ixn->nss), ixn, reqs);
+    const auto& collection = getCollection(ixn->nss);
+    // TODO SERVER-139289: Support batched index scans on time-series collections.
+    // TODO SERVER-139290: Support batched index scans on generic clustered collections.
+    const bool batched = reqs.getIsBatchedFetchInput() && reqs.getCanProcessBlockValues() &&
+        ixn->allowBatching && !collection->isClustered() && !ixn->filter && !ixn->shouldDedup &&
+        canGenerateBatchedIndexScan(ixn);
+    const auto generateIndexScanFunc = batched
+        ? generateBatchedIndexScan
+        : (ixn->iets.empty() ? generateIndexScan : generateIndexScanWithDynamicBounds);
+    auto&& [scanStage, scanOutputs] = generateIndexScanFunc(_state, collection, ixn, reqs);
 
     auto stage = std::move(scanStage);
     auto outputs = std::move(scanOutputs);
@@ -1363,6 +1370,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
     SbBuilder b(_state, root->nodeId());
 
     auto fn = static_cast<const FetchNode*>(root);
+    const auto& collection = getCollection(fn->nss);
 
     // The child must produce a kRecordId slot, as well as all the kMeta and kSortKey slots required
     // by the parent of this FetchNode except for 'resultSlot'. Note that the child does _not_ need
@@ -1407,15 +1415,28 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
         childReqs.set(kPrefetchedResult);
     }
 
+    // Unordered fetch accepts both scalar RecordIds and blocks. Let the child builder decide
+    // whether it can batch, independently of the fetch's eligibility. Unordered fetch cannot
+    // forward child slots or consume prefetched documents.
+    // TODO SERVER-139289: Support batched fetches on time-series collections.
+    // TODO SERVER-139290: Support batched fetches on generic clustered collections.
+    const bool batched = root->getType() == STAGE_BATCHED_FETCH && !forwardingReqs.size() &&
+        !collection->isClustered() && !mayHaveFetchOrCollScanDescendants;
+    if (batched) {
+        childReqs.clear(kSnapshotId).clear(kIndexIdent).clear(kIndexKey).clear(kIndexKeyPattern);
+    }
+    childReqs.setCanProcessBlockValues(batched).setIsBatchedFetchInput(batched);
+
     auto [stage, outputs] = build(child, childReqs);
 
     uassert(4822880, "RecordId slot is not defined", outputs.has(kRecordId));
     uassert(
         4953600, "ReturnKey slot is not defined", !reqs.has(kReturnKey) || outputs.has(kReturnKey));
-    uassert(5290701, "Snapshot id slot is not defined", outputs.has(kSnapshotId));
-    uassert(7566701, "Index ident slot is not defined", outputs.has(kIndexIdent));
-    uassert(5290711, "Index key slot is not defined", outputs.has(kIndexKey));
-    uassert(5113713, "Index key pattern slot is not defined", outputs.has(kIndexKeyPattern));
+    uassert(5290701, "Snapshot id slot is not defined", batched || outputs.has(kSnapshotId));
+    uassert(7566701, "Index ident slot is not defined", batched || outputs.has(kIndexIdent));
+    uassert(5290711, "Index key slot is not defined", batched || outputs.has(kIndexKey));
+    uassert(
+        5113713, "Index key pattern slot is not defined", batched || outputs.has(kIndexKeyPattern));
     uassert(9081801,
             "Prefetched result slot is not defined",
             !mayHaveFetchOrCollScanDescendants || outputs.has(kPrefetchedResult));
@@ -1438,29 +1459,45 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
     auto relevantSlots = getSlotsToForward(_state, forwardingReqs, outputs);
 
     auto recordIdSlot = outputs.get(kRecordId);
-    auto snapshotIdSlot = outputs.get(kSnapshotId);
-    auto indexIndexSlot = outputs.get(kIndexIdent);
-    auto indexKeySlot = outputs.get(kIndexKey);
-    auto indexKeyPatternSlot = outputs.get(kIndexKeyPattern);
     auto prefetchedResultSlot = mayHaveFetchOrCollScanDescendants
         ? boost::make_optional(outputs.get(kPrefetchedResult))
         : boost::none;
 
-    auto [outStage, resultSlot, ridSlot, fieldSlots] =
-        makeLoopJoinForFetch(std::move(stage),
-                             fields,
-                             recordIdSlot,
-                             snapshotIdSlot,
-                             indexIndexSlot,
-                             indexKeySlot,
-                             indexKeyPatternSlot,
-                             prefetchedResultSlot,
-                             getCollection(fn->nss),
-                             _state,
-                             root->nodeId(),
-                             std::move(relevantSlots));
-
-    stage = std::move(outStage);
+    SbSlot resultSlot;
+    SbSlot ridSlot;
+    SbSlotVector fieldSlots;
+    if (!batched) {
+        auto [fetchStage, fetchResultSlot, fetchRidSlot, fetchFieldSlots] =
+            makeLoopJoinForFetch(std::move(stage),
+                                 fields,
+                                 recordIdSlot,
+                                 outputs.get(kSnapshotId),
+                                 outputs.get(kIndexIdent),
+                                 outputs.get(kIndexKey),
+                                 outputs.get(kIndexKeyPattern),
+                                 prefetchedResultSlot,
+                                 collection,
+                                 _state,
+                                 root->nodeId(),
+                                 std::move(relevantSlots));
+        stage = std::move(fetchStage);
+        resultSlot = fetchResultSlot;
+        ridSlot = fetchRidSlot;
+        fieldSlots = std::move(fetchFieldSlots);
+    } else {
+        tassert(13780808, "Batched fetch cannot forward child slots", relevantSlots.empty());
+        auto result = b.makeBatchedFetch(
+            std::move(stage),
+            collection->uuid(),
+            collection->ns().dbName(),
+            recordIdSlot,
+            fields,
+            _state.expCtx->getQueryKnobConfiguration().getSbeBatchedFetchBatchSize());
+        stage = std::move(result.stage);
+        resultSlot = result.recordSlot;
+        ridSlot = result.recordIdSlot;
+        fieldSlots = std::move(result.scanFieldSlots);
+    }
 
     outputs.setResultObj(resultSlot);
 
@@ -3851,6 +3888,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
         {STAGE_VIRTUAL_SCAN, &SlotBasedStageBuilder::buildVirtualScan},
         {STAGE_IXSCAN, &SlotBasedStageBuilder::buildIndexScan},
         {STAGE_FETCH, &SlotBasedStageBuilder::buildFetch},
+        {STAGE_BATCHED_FETCH, &SlotBasedStageBuilder::buildFetch},
         {STAGE_LIMIT, &SlotBasedStageBuilder::buildLimit},
         {STAGE_MATCH, &SlotBasedStageBuilder::buildMatch},
         {STAGE_UNWIND, &SlotBasedStageBuilder::buildUnwind},

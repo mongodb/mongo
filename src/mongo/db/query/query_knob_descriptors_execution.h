@@ -41,6 +41,14 @@
          kInternalQuerySpillingMinAvailableDiskSpaceBytesName,                            \
          internalQuerySpillingMinAvailableDiskSpaceBytes,                                 \
          getInternalQuerySpillingMinAvailableDiskSpaceBytes)                              \
+    KNOB(kSbeBatchedIndexScanBatchSize,                                                   \
+         kInternalQuerySbeBatchedIndexScanBatchSizeName,                                  \
+         internalQuerySbeBatchedIndexScanBatchSize,                                       \
+         getSbeBatchedIndexScanBatchSize)                                                 \
+    KNOB(kSbeBatchedFetchBatchSize,                                                       \
+         kInternalQuerySbeBatchedFetchBatchSizeName,                                      \
+         internalQuerySbeBatchedFetchBatchSize,                                           \
+         getSbeBatchedFetchBatchSize)                                                     \
     KNOB(kSbeBlueprintRewriteMaxFirings,                                                  \
          kInternalQuerySbeBlueprintRewriteMaxFiringsName,                                 \
          internalQuerySbeBlueprintRewriteMaxFirings,                                      \

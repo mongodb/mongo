@@ -554,16 +554,33 @@ std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScanImpl(
     // Scan the index in the range {'lowKeySlot', 'highKeySlot'} (subject to inclusive or
     // exclusive boundaries), and produce a single field recordIdSlot that can be used to
     // position into the collection.
-    auto [stage, recordIdSlot, indexKeySlots, indexInfoSlots] =
-        b.makeSimpleIndexScan(collection->uuid(),
-                              collection->ns().dbName(),
-                              indexName,
-                              keyPattern,
-                              forward,
-                              std::move(lowKeyExpr),
-                              std::move(highKeyExpr),
-                              indexKeysToInclude,
-                              indexInfoTypeMask);
+    SbStage stage;
+    SbSlot recordIdSlot;
+    SbSlotVector indexKeySlots;
+    SbIndexInfoSlots indexInfoSlots;
+    if (forward && reqs.getIsBatchedFetchInput()) {
+        tassert(13780807,
+                "Batched index scans cannot produce index keys or index metadata",
+                indexKeysToInclude.none() && indexInfoTypeMask == SbIndexInfoType::kNoInfo);
+        std::tie(stage, recordIdSlot) = b.makeBatchedIndexScan(
+            collection->uuid(),
+            collection->ns().dbName(),
+            indexName,
+            std::move(lowKeyExpr),
+            std::move(highKeyExpr),
+            state.expCtx->getQueryKnobConfiguration().getSbeBatchedIndexScanBatchSize());
+    } else {
+        std::tie(stage, recordIdSlot, indexKeySlots, indexInfoSlots) =
+            b.makeSimpleIndexScan(collection->uuid(),
+                                  collection->ns().dbName(),
+                                  indexName,
+                                  keyPattern,
+                                  forward,
+                                  std::move(lowKeyExpr),
+                                  std::move(highKeyExpr),
+                                  indexKeysToInclude,
+                                  indexInfoTypeMask);
+    }
 
     auto outputs = buildPlanStageSlots(state, reqs, indexName, recordIdSlot, indexInfoSlots);
 
@@ -901,6 +918,84 @@ std::pair<SbStage, PlanStageSlots> generateIndexScan(StageBuilderState& state,
 
     return setResultAndAdditionalFieldSlots(
         std::move(stage), std::move(outputs), keyPattern, reqs, state, nodeId);
+}
+
+bool canGenerateBatchedIndexScan(const IndexScanNode* ixn) {
+    if (ixn->direction != 1) {
+        return false;
+    }
+    if (!ixn->iets.empty()) {
+        return canGenerateSingleIntervalIndexScan(ixn->iets) != IntervalsRequired::MultiInterval;
+    }
+    BSONObj lowKey, highKey;
+    bool lowInclusive, highInclusive;
+    return ixn->bounds.isSimpleRange ||
+        IndexBoundsBuilder::isSingleInterval(
+               ixn->bounds, &lowKey, &lowInclusive, &highKey, &highInclusive);
+}
+
+std::pair<SbStage, PlanStageSlots> generateBatchedIndexScan(StageBuilderState& state,
+                                                            const CollectionPtr& collection,
+                                                            const IndexScanNode* ixn,
+                                                            const PlanStageReqs& reqs) {
+    // This leaf must feed a batched fetch directly, without scalar stages or block-to-row.
+    tassert(13780806,
+            "Batched index scans must feed a batched fetch that can process block values",
+            reqs.getIsBatchedFetchInput() && reqs.getCanProcessBlockValues());
+    tassert(13780805,
+            "Batched index scans cannot produce result or return-key slots",
+            !reqs.hasResult() && !reqs.has(PlanStageSlots::kReturnKey));
+    tassert(13780804,
+            "Batched index scans cannot filter or deduplicate index entries",
+            !ixn->filter && !ixn->shouldDedup);
+    tassert(13780803,
+            "Batched index scans require a forward scan with single-interval bounds",
+            canGenerateBatchedIndexScan(ixn));
+    const auto& keyPattern = ixn->index.keyPattern;
+    const auto& indexName = ixn->index.identifier.catalogName;
+    auto entry = collection->getIndexCatalog()->findIndexByIdent(
+        state.opCtx, ixn->index.indexCatalogEntryStorage->getIdent());
+    uassert(ErrorCodes::QueryPlanKilled,
+            str::stream() << "failed to find index in catalog named: " << indexName,
+            entry);
+    auto sdi = entry->accessMethod()->asSortedData()->getSortedDataInterface();
+    boost::optional<key_string::Value> lowKey, highKey;
+    if (ixn->iets.empty()) {
+        auto intervals = makeIntervalsFromIndexBounds(
+            ixn->bounds, ixn->direction == 1, sdi->getKeyStringVersion(), sdi->getOrdering());
+        tassert(13780802,
+                "Batched index scan bounds must produce exactly one interval",
+                intervals.size() == 1);
+        lowKey = std::move(intervals[0].first);
+        highKey = std::move(intervals[0].second);
+    }
+    const bool isPointInterval =
+        ixn->iets.empty() ? *lowKey == *highKey : ietsArePointInterval(ixn->iets);
+    auto [stage, outputs, boundsSlots] =
+        generateSingleIntervalIndexScanAndSlotsImpl(state,
+                                                    collection,
+                                                    indexName,
+                                                    keyPattern,
+                                                    ixn->direction == 1,
+                                                    std::move(lowKey),
+                                                    std::move(highKey),
+                                                    reqs,
+                                                    ixn->nodeId(),
+                                                    isPointInterval);
+    if (!ixn->iets.empty()) {
+        tassert(13780801,
+                "Parameterized batched index scans require low and high bound slots",
+                boundsSlots);
+        state.data->indexBoundsEvaluationInfos.emplace_back(IndexBoundsEvaluationInfo{
+            ixn->index,
+            sdi->getKeyStringVersion(),
+            sdi->getOrdering(),
+            ixn->direction,
+            ixn->iets,
+            {ParameterizedIndexScanSlots::SingleIntervalPlan{boundsSlots->first.getId(),
+                                                             boundsSlots->second.getId()}}});
+    }
+    return {std::move(stage), std::move(outputs)};
 }
 
 IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,

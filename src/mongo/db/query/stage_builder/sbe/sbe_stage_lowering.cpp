@@ -5,6 +5,7 @@
 
 #include "mongo/db/exec/sbe/stages/agg_project.h"
 #include "mongo/db/exec/sbe/stages/and_hash.h"
+#include "mongo/db/exec/sbe/stages/batched_simple_ix_scan.h"
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
 #include "mongo/db/exec/sbe/stages/block_to_row.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
@@ -30,6 +31,7 @@
 #include "mongo/db/exec/sbe/stages/ts_bucket_to_cell_block.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
+#include "mongo/db/exec/sbe/stages/unordered_fetch.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/exec/sbe/stages/virtual_scan.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
@@ -275,6 +277,23 @@ struct Lowerer {
             node.nodeId);
     }
 
+    std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintBatchedIndexScan node) {
+        // The batched index scan operator currently supports only forward cursors.
+        tassert(13780800, "Batched index scans only support forward cursors", node.info->forward);
+        return sbe::makeS<sbe::BatchedSimpleIndexScanStage>(
+            std::move(node.info->collectionUuid),
+            std::move(node.info->dbName),
+            node.info->indexName,
+            node.maxIndexKeyBatchCount,
+            node.info->recordIdSlot,
+            lowerSlotId(node.info->indexInfoSlots.snapshotIdSlot),
+            lowerSlotId(node.info->indexInfoSlots.indexIdentSlot),
+            le(node.info->lowKeyExpr),
+            le(node.info->highKeyExpr),
+            _state.yieldPolicy,
+            node.nodeId);
+    }
+
     // ----------------------------------------------------------------
     // Unary stages
     // ----------------------------------------------------------------
@@ -516,6 +535,21 @@ struct Lowerer {
                                            _state.yieldPolicy,
                                            node.nodeId,
                                            /*participateInTrialRunTracking=*/true);
+    }
+
+    std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintBatchedFetch node) {
+        auto child = lower(node.info->child);
+        return sbe::makeS<sbe::UnorderedFetchStage>(std::move(child),
+                                                    std::move(node.info->collectionUuid),
+                                                    std::move(node.info->dbName),
+                                                    node.info->seekSlot,
+                                                    node.info->recordSlot,
+                                                    node.info->recordIdSlot,
+                                                    std::move(node.info->scanFieldNames),
+                                                    std::move(node.info->scanFieldSlots),
+                                                    node.maxRecordIdBatchCount,
+                                                    _state.yieldPolicy,
+                                                    node.nodeId);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintExtractFieldPaths node) {

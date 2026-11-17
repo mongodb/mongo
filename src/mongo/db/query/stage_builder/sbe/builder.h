@@ -504,6 +504,10 @@ public:
         // values.
         bool canProcessBlockValues{false};
 
+        // The immediate child of a BatchedFetch may produce RecordId blocks if it supports
+        // batching. General block-processing support does not permit a batched index scan.
+        bool isBatchedFetchInput{false};
+
         // When the pipeline has a limit stage this will be set to true. The flag is used by the
         // sort stage to improve the performance of queries that have both sort and limit.
         bool hasLimit{false};
@@ -541,6 +545,7 @@ public:
         // The flag to signal that block processing is supported must be be explicitly set to true
         // by the code handling each block-enabled stage.
         copy.setCanProcessBlockValues(false);
+        copy.setIsBatchedFetchInput(false);
         return copy;
     }
 
@@ -750,6 +755,15 @@ public:
 
     PlanStageReqs& setCanProcessBlockValues(bool b) {
         _data->canProcessBlockValues = b;
+        return *this;
+    }
+
+    bool getIsBatchedFetchInput() const {
+        return _data->isBatchedFetchInput;
+    }
+
+    PlanStageReqs& setIsBatchedFetchInput(bool b) {
+        _data->isBatchedFetchInput = b;
         return *this;
     }
 

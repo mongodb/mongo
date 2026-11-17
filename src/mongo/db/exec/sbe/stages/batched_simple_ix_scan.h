@@ -47,10 +47,10 @@ namespace mongo::sbe {
  * Debug string representation:
  *
  *   batched_ixscan maxIndexKeyBatchCount recordIdSlot? snapshotIdSlot? indexIdentSlot?
- *                  collectionUuid indexName forward
+ *                  collectionUuid indexName
  *
  *   batched_ixseek lowKey highKey maxIndexKeyBatchCount recordIdSlot? snapshotIdSlot?
- *                  indexIdentSlot? collectionUuid indexName forward
+ *                  indexIdentSlot? collectionUuid indexName
  */
 class BatchedSimpleIndexScanStage final : public IndexScanStageBase {
 public:

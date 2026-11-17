@@ -407,6 +407,16 @@ public:
         sbe::IndexKeysInclusionSet indexKeysToInclude = sbe::IndexKeysInclusionSet{},
         SbIndexInfoType indexInfoTypeMask = SbIndexInfoType::kNoInfo);
 
+    // Returns the forward-only stage and its RecordId output slot: a scalar RecordId when
+    // maxIndexKeyBatchCount == 1, or an Int64RecordIdBlock otherwise. No index keys or bitmap are
+    // produced.
+    std::pair<SbStage, SbSlot> makeBatchedIndexScan(UUID collectionUuid,
+                                                    DatabaseName dbName,
+                                                    std::string_view indexName,
+                                                    SbExpr lowKeyExpr,
+                                                    SbExpr highKeyExpr,
+                                                    size_t maxIndexKeyBatchCount);
+
     std::pair<SbStage, SbSlot> makeVirtualScan(sbe::value::TagValueOwned input);
 
     SbStage makeCoScan(boost::optional<int64_t> numRows = boost::none);
@@ -730,6 +740,13 @@ public:
                                SbSlot seekSlot,
                                std::vector<std::string> scanFieldNames,
                                const SbIndexInfoSlots& indexInfoSlots);
+
+    FetchBuildResult makeBatchedFetch(SbStage child,
+                                      UUID collectionUuid,
+                                      DatabaseName dbName,
+                                      SbSlot seekSlot,
+                                      std::vector<std::string> scanFieldNames,
+                                      size_t maxRecordIdBatchCount);
 
     SbStage makeExtractFieldPaths(SbStage child,
                                   std::vector<sbe::PathSlot> inputs,

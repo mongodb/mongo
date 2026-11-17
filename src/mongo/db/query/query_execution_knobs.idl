@@ -472,6 +472,37 @@ server_parameters:
             gt: 0
         redact: false
 
+    internalQuerySbeBatchedIndexScanBatchSize:
+        description: >-
+            Maximum number of RecordIds produced in a batch by an SBE batched index scan.
+            Captured when constructing a batched index scan plan.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySbeBatchedIndexScanBatchSize"
+        cpp_vartype: Atomic<int>
+        default: 128
+        validator:
+            gt: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeBatchedIndexScanBatchSize
+
+    internalQuerySbeBatchedFetchBatchSize:
+        description: >-
+            Maximum number of RecordIds buffered in a batch by an SBE unordered fetch.
+            Captured when constructing a batched fetch plan.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySbeBatchedFetchBatchSize"
+        cpp_vartype: Atomic<int>
+        default: 1000000
+        validator:
+            gt: 0
+            lte: 1000000
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeBatchedFetchBatchSize
+
     internalQuerySbeBlueprintRewriteMaxFirings:
         description: >-
             The most rewrite rule firings for one SBE stage builder blueprint. A rewrite that

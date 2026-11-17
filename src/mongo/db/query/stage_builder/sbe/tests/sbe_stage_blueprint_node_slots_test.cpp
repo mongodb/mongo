@@ -190,6 +190,22 @@ void checkGenericIndexScan(SlotMembershipChecker& c) {
             {boundsSlot});
 }
 
+void checkBatchedIndexScan(SlotMembershipChecker& c) {
+    auto recordId = c.slot();
+    auto [lowKey, lowKeySlot] = c.expr();
+    auto [highKey, highKeySlot] = c.expr();
+    auto indexInfo = SbIndexInfoSlots{.indexIdentSlot = c.sbSlot(), .snapshotIdSlot = c.sbSlot()};
+    c.check(SbBlueprintBatchedIndexScan{.info = std::make_unique<SbBlueprintSimpleIndexScanInfo>(
+                                            SbBlueprintSimpleIndexScanInfo{
+                                                .collectionUuid = UUID::gen(),
+                                                .lowKeyExpr = std::move(lowKey),
+                                                .highKeyExpr = std::move(highKey),
+                                                .recordIdSlot = recordId,
+                                                .indexInfoSlots = indexInfo})},
+            concat({recordId}, slotsOf(indexInfo)),
+            {lowKeySlot, highKeySlot});
+}
+
 void checkFilter(SlotMembershipChecker& c) {
     auto [cond, condSlot] = c.expr();
     c.check(SbBlueprintFilter{.condition = std::move(cond)}, {}, {condSlot});
@@ -577,6 +593,21 @@ void checkFetch(SlotMembershipChecker& c) {
             concat({seek}, slotsOf(indexInfo)));
 }
 
+void checkBatchedFetch(SlotMembershipChecker& c) {
+    auto seek = c.slot();
+    auto record = c.slot();
+    auto recordId = c.slot();
+    auto field = c.slot();
+    c.check(SbBlueprintBatchedFetch{.info = std::make_unique<SbBlueprintFetchInfo>(
+                                        SbBlueprintFetchInfo{.collectionUuid = UUID::gen(),
+                                                             .seekSlot = seek,
+                                                             .recordSlot = record,
+                                                             .recordIdSlot = recordId,
+                                                             .scanFieldSlots = {field}})},
+            {record, recordId, field},
+            {seek});
+}
+
 void checkExtractFieldPaths(SlotMembershipChecker& c) {
     auto in = c.slot();
     auto out = c.slot();
@@ -595,6 +626,7 @@ TEST(SbBlueprintNodeSlotMembership, EverySlotMemberIsReported) {
     checkMultiRangeScan(c);
     checkSimpleIndexScan(c);
     checkGenericIndexScan(c);
+    checkBatchedIndexScan(c);
     checkFilter(c);
     checkProject(c);
     checkLimitSkip(c);
@@ -619,6 +651,7 @@ TEST(SbBlueprintNodeSlotMembership, EverySlotMemberIsReported) {
     checkHashLookup(c);
     checkHashLookupUnwind(c);
     checkFetch(c);
+    checkBatchedFetch(c);
     checkExtractFieldPaths(c);
 
     // SbBlueprintLowered is a tombstone with no slots, so it has no case.

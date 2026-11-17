@@ -413,6 +413,34 @@ struct SbBlueprintGenericIndexScan {
     }
 };
 
+/**
+ * BatchedSimpleIndexScanStage: simple bounds, with a RecordId output slot containing a scalar
+ * RecordId when maxIndexKeyBatchCount == 1, or an Int64RecordIdBlock otherwise.
+ */
+struct SbBlueprintBatchedIndexScan {
+    PlanNodeId nodeId{kEmptyPlanNodeId};
+    std::unique_ptr<SbBlueprintSimpleIndexScanInfo> info;
+    size_t maxIndexKeyBatchCount;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
+
+    template <typename F>
+    void visitChildren(F&& fn) {
+        info->visitChildren(fn);
+    }
+
+    template <typename F>
+    void visitExprs(F&& fn) {
+        info->visitExprs(fn);
+    }
+};
+
 // ============================================================
 // Blueprints with children
 // ============================================================
@@ -1453,6 +1481,34 @@ struct SbBlueprintFetch {
 };
 
 /**
+ * UnorderedFetchStage: consumes blocks or scalars from a batched index scan and produces scalar
+ * documents. Child slots are not forwarded, since the fetch may reorder rows.
+ */
+struct SbBlueprintBatchedFetch {
+    PlanNodeId nodeId{kEmptyPlanNodeId};
+    std::unique_ptr<SbBlueprintFetchInfo> info;
+    size_t maxRecordIdBatchCount;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
+
+    template <typename F>
+    void visitChildren(F&& fn) {
+        info->visitChildren(fn);
+    }
+
+    template <typename F>
+    void visitExprs(F&& fn) {
+        info->visitExprs(fn);
+    }
+};
+
+/**
  * ExtractFieldPathsStage. 'inputs' and 'outputs' are (path, slotId) pairs.
  */
 struct SbBlueprintExtractFieldPaths {
@@ -1519,6 +1575,7 @@ using SbBlueprintNode = std::variant<SbBlueprintLowered,
                                      SbBlueprintMultiRangeScan,
                                      SbBlueprintSimpleIndexScan,
                                      SbBlueprintGenericIndexScan,
+                                     SbBlueprintBatchedIndexScan,
                                      SbBlueprintFilter,
                                      SbBlueprintProject,
                                      SbBlueprintLimitSkip,
@@ -1542,6 +1599,7 @@ using SbBlueprintNode = std::variant<SbBlueprintLowered,
                                      SbBlueprintHashLookup,
                                      SbBlueprintHashLookupUnwind,
                                      SbBlueprintFetch,
+                                     SbBlueprintBatchedFetch,
                                      SbBlueprintExtractFieldPaths>;
 
 /**

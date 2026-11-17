@@ -38,7 +38,8 @@ constexpr bool kIsLeaf = kIsOneOf<Node,
                                   SbBlueprintScan,
                                   SbBlueprintMultiRangeScan,
                                   SbBlueprintSimpleIndexScan,
-                                  SbBlueprintGenericIndexScan>;
+                                  SbBlueprintGenericIndexScan,
+                                  SbBlueprintBatchedIndexScan>;
 
 /**
  * Returns the struct that holds the fields of 'n'. A large node type keeps them in a separately

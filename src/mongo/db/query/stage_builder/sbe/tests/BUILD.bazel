@@ -33,6 +33,7 @@ mongo_cc_unit_test(
     srcs = [
         "and_hash_test.cpp",
         "and_sorted_test.cpp",
+        "batched_scan_test.cpp",
         "expression_const_eval_test.cpp",
         "field_effects_test.cpp",
         "field_set_test.cpp",

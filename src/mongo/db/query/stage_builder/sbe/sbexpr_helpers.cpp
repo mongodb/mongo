@@ -589,6 +589,34 @@ std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> SbBuilder::makeGener
     return {std::move(stage), recordIdSlot, std::move(indexKeySlots), std::move(indexInfoSlots)};
 }
 
+std::pair<SbStage, SbSlot> SbBuilder::makeBatchedIndexScan(UUID collectionUuid,
+                                                           DatabaseName dbName,
+                                                           std::string_view indexName,
+                                                           SbExpr lowKeyExpr,
+                                                           SbExpr highKeyExpr,
+                                                           size_t maxIndexKeyBatchCount) {
+    // Int64RecordIdBlock deblocks to RecordId values, not NumberInt64 values.
+    auto signature = getTypeSignature(sbe::value::TypeTags::RecordId);
+    if (maxIndexKeyBatchCount > 1) {
+        signature = signature.include(TypeSignature::kBlockType);
+    }
+    auto recordIdSlot = SbSlot{_state.slotId(), signature};
+    auto stage = addBlueprint(
+        _state,
+        SbBlueprintBatchedIndexScan{
+            .nodeId = _nodeId,
+            .info = std::make_unique<SbBlueprintSimpleIndexScanInfo>(
+                SbBlueprintSimpleIndexScanInfo{.collectionUuid = std::move(collectionUuid),
+                                               .dbName = std::move(dbName),
+                                               .indexName = std::string{indexName},
+                                               .forward = true,
+                                               .lowKeyExpr = std::move(lowKeyExpr),
+                                               .highKeyExpr = std::move(highKeyExpr),
+                                               .recordIdSlot = recordIdSlot.getId()}),
+            .maxIndexKeyBatchCount = maxIndexKeyBatchCount});
+    return {std::move(stage), recordIdSlot};
+}
+
 std::pair<SbStage, SbSlot> SbBuilder::makeVirtualScan(sbe::value::TagValueOwned input) {
     auto outSlotId = _state.slotId();
     auto outSlot = SbSlot{outSlotId};
@@ -1319,6 +1347,34 @@ SbBuilder::FetchBuildResult SbBuilder::makeFetch(SbStage child,
                                                   .recordIdSlot = recordIdSlot.getId(),
                                                   .scanFieldSlots = lower(scanFieldSlots)})});
     return FetchBuildResult{std::move(stage), resultSlot, recordIdSlot, std::move(scanFieldSlots)};
+}
+
+SbBuilder::FetchBuildResult SbBuilder::makeBatchedFetch(SbStage child,
+                                                        UUID collectionUuid,
+                                                        DatabaseName dbName,
+                                                        SbSlot seekSlot,
+                                                        std::vector<std::string> scanFieldNames,
+                                                        size_t maxRecordIdBatchCount) {
+    auto resultSlot = SbSlot{_state.slotId(), TypeSignature::kObjectType};
+    auto recordIdSlot = SbSlot{_state.slotId(), getTypeSignature(sbe::value::TypeTags::RecordId)};
+    SbSlotVector scanFieldSlots;
+    for (size_t i = 0; i < scanFieldNames.size(); ++i) {
+        scanFieldSlots.emplace_back(_state.slotId());
+    }
+    auto stage = addBlueprint(
+        _state,
+        SbBlueprintBatchedFetch{.nodeId = _nodeId,
+                                .info = std::make_unique<SbBlueprintFetchInfo>(SbBlueprintFetchInfo{
+                                    .child = child.release(),
+                                    .collectionUuid = std::move(collectionUuid),
+                                    .dbName = std::move(dbName),
+                                    .seekSlot = seekSlot.getId(),
+                                    .scanFieldNames = std::move(scanFieldNames),
+                                    .recordSlot = resultSlot.getId(),
+                                    .recordIdSlot = recordIdSlot.getId(),
+                                    .scanFieldSlots = lower(scanFieldSlots)}),
+                                .maxRecordIdBatchCount = maxRecordIdBatchCount});
+    return {std::move(stage), resultSlot, recordIdSlot, std::move(scanFieldSlots)};
 }
 
 SbIndexInfoSlots SbBuilder::allocateIndexInfoSlots(SbIndexInfoType indexInfoTypeMask,

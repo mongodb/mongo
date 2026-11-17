@@ -153,7 +153,7 @@ void GoldenSbeStageBuilderTestFixture::createCollection(const std::vector<BSONOb
     ASSERT_FALSE(_collInitialized) << "collection has been initialized";
     _collInitialized = true;
     // Create collection and index
-    ASSERT_OK(storageInterface()->createCollection(operationContext(), _nss, CollectionOptions()));
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), _nss, options));
     if (indexKeyPattern) {
         ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
             operationContext(),
@@ -161,7 +161,9 @@ void GoldenSbeStageBuilderTestFixture::createCollection(const std::vector<BSONOb
             {BSON("v" << 2 << "name" << DBClientBase::genIndexName(*indexKeyPattern) << "key"
                       << *indexKeyPattern)}));
     }
-    insertDocuments(_nss, docs);
+    if (!docs.empty()) {
+        insertDocuments(_nss, docs);
+    }
 }
 
 void GoldenSbeStageBuilderTestFixture::createSecondaryCollection(

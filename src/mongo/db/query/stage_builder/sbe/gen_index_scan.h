@@ -47,6 +47,20 @@ std::pair<SbStage, PlanStageSlots> generateIndexScan(StageBuilderState& state,
                                                      const PlanStageReqs& reqs);
 
 /**
+ * Builds a batched index scan with static or parameterized single-interval bounds as the child of
+ * a batched fetch. The caller must verify that the collection is not time-series and uses integer
+ * RecordIds. Index filtering, deduplication and index-key outputs are not supported here;
+ * those plans must use scalar scan/fetch stages instead.
+ */
+std::pair<SbStage, PlanStageSlots> generateBatchedIndexScan(StageBuilderState& state,
+                                                            const CollectionPtr& collection,
+                                                            const IndexScanNode* ixn,
+                                                            const PlanStageReqs& reqs);
+
+// Whether the scan is forward and its static or parameterized bounds can always use a simple scan.
+bool canGenerateBatchedIndexScan(const IndexScanNode* ixn);
+
+/**
  * Constructs the most simple version of an index scan from the single interval index bounds.
  * 'isPointInterval' indicates if the single interval is a point interval.
  *
