@@ -17,6 +17,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/multi_index_block_gen.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_builds/primary_driven_index_build_knobs_gen.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
@@ -116,8 +117,6 @@ auto& bytesScannedCounter = otel::metrics::MetricsService::instance().createInt6
             .dottedPath = "indexBuilds.bytesScanned", .role = ClusterRole::None}});
 
 constexpr int32_t kMetricUpdateIntervalDocCount = 1000;
-
-constexpr int64_t indexBuildMetadataKey = 1;
 
 size_t getEachIndexBuildMaxMemoryUsageBytes(boost::optional<size_t> maxMemoryUsageBytes,
                                             size_t numIndexSpecs) {
@@ -418,6 +417,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     _indexes.reserve(indexes.size());
 
     _wasResumed = resumeInfo.has_value();
+    _resumeCountPending = _wasResumed && resumeInfo->getResumesWithoutProgress().has_value();
     if (resumeInfo) {
         _setPhase(resumeInfo->getPhase());
     }
@@ -1901,17 +1901,28 @@ void MultiIndexBlock::_upsertIntoContainer(OperationContext* opCtx,
                       << ", key: " << key << ", details: " << obj.toString()));
 }
 
-void MultiIndexBlock::_writeIndexBuildMetadataToContainer(OperationContext* opCtx) const {
+BSONObj MultiIndexBlock::_upsertIndexBuildMetadata(OperationContext* opCtx) {
+    auto obj = _buildIndexBuildMetadata().toBSON();
+    _upsertIntoContainer(opCtx, index_builds::primary_driven::metadataKey, obj);
+    if (_resumeCountPending) {
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [this](OperationContext*, boost::optional<Timestamp>) { _resumeCountPending = false; });
+    }
+    return obj;
+}
+
+void MultiIndexBlock::_writeIndexBuildMetadataToContainer(OperationContext* opCtx) {
     if (!_isResumable || _containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
         return;
     }
 
-    auto obj = _buildIndexBuildMetadata().toBSON();
-    writeConflictRetry(opCtx, "writeIndexBuildMetadataToContainer", NamespaceString::kEmpty, [&] {
-        WriteUnitOfWork wuow(opCtx);
-        _upsertIntoContainer(opCtx, indexBuildMetadataKey, obj);
-        wuow.commit();
-    });
+    auto obj = writeConflictRetry(
+        opCtx, "writeIndexBuildMetadataToContainer", NamespaceString::kEmpty, [&] {
+            WriteUnitOfWork wuow(opCtx);
+            auto metadata = _upsertIndexBuildMetadata(opCtx);
+            wuow.commit();
+            return metadata;
+        });
 
     LOGV2_DEBUG(12558700,
                 1,
@@ -1921,7 +1932,7 @@ void MultiIndexBlock::_writeIndexBuildMetadataToContainer(OperationContext* opCt
                 "details"_attr = obj);
 }
 
-void MultiIndexBlock::_writeIndexStateInfoToContainer(OperationContext* opCtx, size_t index) const {
+void MultiIndexBlock::_writeIndexStateInfoToContainer(OperationContext* opCtx, size_t index) {
     if (!_isResumable || _containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
         return;
     }
@@ -1932,12 +1943,15 @@ void MultiIndexBlock::_writeIndexStateInfoToContainer(OperationContext* opCtx, s
     });
 }
 
-void MultiIndexBlock::_upsertIndexStateInfo(OperationContext* opCtx, size_t index) const {
+void MultiIndexBlock::_upsertIndexStateInfo(OperationContext* opCtx, size_t index) {
     invariant(index < _indexes.size());
 
     auto obj = _buildIndexStateInfo(_indexes[index]).toBSON();
-    auto key = indexBuildMetadataKey + static_cast<int64_t>(index) + 1;
+    auto key = index_builds::primary_driven::metadataKey + static_cast<int64_t>(index) + 1;
     _upsertIntoContainer(opCtx, key, obj);
+    if (_resumeCountPending) {
+        _upsertIndexBuildMetadata(opCtx);
+    }
 
     LOGV2_DEBUG(12558701,
                 1,
@@ -1948,24 +1962,26 @@ void MultiIndexBlock::_upsertIndexStateInfo(OperationContext* opCtx, size_t inde
                 "details"_attr = obj);
 }
 
-void MultiIndexBlock::_writeAllStateToContainer(OperationContext* opCtx) const {
+void MultiIndexBlock::_writeAllStateToContainer(OperationContext* opCtx) {
     if (!_isResumable || _containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
         return;
     }
 
-    auto metadataObj = _buildIndexBuildMetadata().toBSON();
-    writeConflictRetry(opCtx, "writeAllIndexBuildState", NamespaceString::kEmpty, [&] {
-        // Group all records into a single replicated transaction so secondaries apply the writes
-        // atomically.
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
-        _upsertIntoContainer(opCtx, indexBuildMetadataKey, metadataObj);
-        for (size_t i = 0; i < _indexes.size(); ++i) {
-            _upsertIntoContainer(opCtx,
-                                 indexBuildMetadataKey + static_cast<int64_t>(i) + 1,
-                                 _buildIndexStateInfo(_indexes[i]).toBSON());
-        }
-        wuow.commit();
-    });
+    auto metadataObj =
+        writeConflictRetry(opCtx, "writeAllIndexBuildState", NamespaceString::kEmpty, [&] {
+            // Group all records into a single replicated transaction so secondaries apply the
+            // writes atomically.
+            WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
+            auto metadata = _upsertIndexBuildMetadata(opCtx);
+            for (size_t i = 0; i < _indexes.size(); ++i) {
+                _upsertIntoContainer(opCtx,
+                                     index_builds::primary_driven::metadataKey +
+                                         static_cast<int64_t>(i) + 1,
+                                     _buildIndexStateInfo(_indexes[i]).toBSON());
+            }
+            wuow.commit();
+            return metadata;
+        });
 
     LOGV2_DEBUG(12558702,
                 1,

@@ -11,6 +11,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index_builds/multi_index_block_gen.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_builds/primary_driven_index_build_knobs_gen.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
@@ -29,6 +30,7 @@
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -2445,6 +2447,400 @@ void promoteMockReplCoordToPrimary(ServiceContext* service) {
         dynamic_cast<repl::ReplicationCoordinatorMock*>(repl::ReplicationCoordinator::get(service));
     ASSERT(replCoord);
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+}
+
+// Tests that a resumed primary-driven build clears its resume count when it persists resume state,
+// and keeps it otherwise.
+class ResumedPdibResumeCountTest : public MultiIndexBlockTest {
+protected:
+    void setUp() override {
+        MultiIndexBlockTest::setUp();
+        static_cast<repl::ReplicationCoordinatorMock*>(
+            repl::ReplicationCoordinator::get(getServiceContext()))
+            ->alwaysAllowWrites(true);
+    }
+
+    void configure(MultiIndexBlock& indexer) {
+        indexer.setBuildUUID(_buildUUID);
+        indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+        indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+        indexer.setIsResumable(true);
+    }
+
+    IndexBuildInfo makeIndexBuildInfo() {
+        return IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                         << "a_1"
+                                         << "v"
+                                         << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                              "index-1",
+                              *getServiceContext()->getStorageEngine());
+    }
+
+    CollectionAcquisition acquireForWrite(LockMode mode) {
+        return acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(getNSS(),
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kWrite),
+            mode);
+    }
+
+    CollectionAcquisition acquireExclusive() {
+        return acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest::fromOpCtx(
+                operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+            MODE_X);
+    }
+
+    // Inserts documents whose indexed value is 'valueBytes' long. The default overflows a 1 MB
+    // sorter budget within a few documents.
+    void insertDocs(CollectionWriter& coll, int begin, int end, size_t valueBytes = 64 * 1024) {
+        WriteUnitOfWork wuow(operationContext());
+        std::string val(valueBytes, 'a');
+        for (auto i = begin; i < end; ++i) {
+            ASSERT_OK(
+                Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
+        }
+        wuow.commit();
+    }
+
+    std::string ident() const {
+        return ident::generateNewIndexBuildIdent(_buildUUID);
+    }
+
+    ResumeIndexInfo readResumeInfo() {
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+        auto info = index_builds::readAndParseResumeIndexInfo(
+            getServiceContext()->getStorageEngine(), operationContext(), ident());
+        ASSERT_TRUE(info);
+        return *info;
+    }
+
+    // Runs 'run' on a first build of 'indexBuildInfo', then drops its in-memory state the way a
+    // step-down does and returns its persisted resume info.
+    template <typename Fn>
+    ResumeIndexInfo runFirstBuild(CollectionWriter& coll,
+                                  const IndexBuildInfo& indexBuildInfo,
+                                  Fn&& run) {
+        auto& indexer = *getIndexer();
+        configure(indexer);
+        ASSERT_OK(indexer.init(operationContext(),
+                               coll,
+                               {indexBuildInfo},
+                               MultiIndexBlock::kNoopOnInitFn,
+                               MultiIndexBlock::InitMode::SteadyState,
+                               boost::none));
+        run(indexer);
+        auto info = readResumeInfo();
+        indexer.markAsCleanedUp();
+        return info;
+    }
+
+    // Writes 'resumesWithoutProgress' into the metadata record and returns the resume info a
+    // resumed build starts from.
+    ResumeIndexInfo markResumed(ResumeIndexInfo info, int resumesWithoutProgress) {
+        info.setResumesWithoutProgress(resumesWithoutProgress);
+        auto obj = info.getMetadata().toBSON();
+        LazyRecordStore table(
+            operationContext(), ident(), LazyRecordStore::CreateMode::openExisting);
+        auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                              table.getTableOrThrow().getContainer())
+                              .get();
+        auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+        Lock::GlobalLock lk(operationContext(), MODE_IX);
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(container_write::update(operationContext(),
+                                          ru,
+                                          container,
+                                          index_builds::primary_driven::metadataKey,
+                                          {obj.objdata(), static_cast<size_t>(obj.objsize())}));
+        wuow.commit();
+        return info;
+    }
+
+    void initResumed(MultiIndexBlock& resumed,
+                     CollectionWriter& coll,
+                     const IndexBuildInfo& indexBuildInfo,
+                     const ResumeIndexInfo& resumeInfo) {
+        configure(resumed);
+        ASSERT_OK(resumed.init(operationContext(),
+                               coll,
+                               {indexBuildInfo},
+                               MultiIndexBlock::kNoopOnInitFn,
+                               MultiIndexBlock::InitMode::SteadyState,
+                               resumeInfo));
+    }
+
+    void drain(MultiIndexBlock& indexer) {
+        ASSERT_OK(indexer.drainBackgroundWrites(operationContext(),
+                                                RecoveryUnit::ReadSource::kNoTimestamp,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
+    }
+
+    boost::optional<int> storedResumesWithoutProgress() {
+        return readResumeInfo().getResumesWithoutProgress();
+    }
+
+    // Whether 'observer' saw the metadata record rewritten without the count while in 'phase'.
+    bool clearedInPhase(const ResumeStateContainerInsertObserver& observer,
+                        IndexBuildPhaseEnum phase) {
+        for (const auto& op : observer.updates) {
+            if (op.ident != ident() || !std::holds_alternative<int64_t>(op.key) ||
+                std::get<int64_t>(op.key) != index_builds::primary_driven::metadataKey) {
+                continue;
+            }
+            auto metadata = IndexBuildMetadata::parse(BSONObj(op.value.data()),
+                                                      IDLParserContext("IndexBuildMetadata"));
+            if (metadata.getPhase() == phase && !metadata.getResumesWithoutProgress()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // TODO (SERVER-116165): Remove.
+    unittest::ServerParameterGuard _ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard _ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard _ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                true};
+    UUID _buildUUID = UUID::gen();
+};
+
+TEST_F(ResumedPdibResumeCountTest, ScanProgressClearsResumeCount) {
+    // A spill during a resumed scan clears the resume count.
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+    auto acq = acquireExclusive();
+    CollectionWriter coll(operationContext(), &acq);
+    auto indexBuildInfo = makeIndexBuildInfo();
+
+    insertDocs(coll, 0, 20);
+    auto info = runFirstBuild(coll, indexBuildInfo, [&](MultiIndexBlock& indexer) {
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+    });
+    // Resume mid-scan, with more documents left to scan than fit in memory.
+    info.setPhase(IndexBuildPhaseEnum::kCollectionScan);
+    insertDocs(coll, 20, 40);
+    // A first resume records 0, which progress will clear.
+    auto resumeInfo = markResumed(info, 0);
+
+    auto& observer = installResumeStateContainerObserver(operationContext());
+    MultiIndexBlock resumed;
+    initResumed(resumed, coll, indexBuildInfo, resumeInfo);
+    ASSERT_OK(resumed.insertAllDocumentsInCollection(operationContext(), getNSS(), RecordId(20)));
+
+    EXPECT_TRUE(clearedInPhase(observer, IndexBuildPhaseEnum::kCollectionScan));
+    resumed.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(ResumedPdibResumeCountTest, ScanWithoutResumeStateWriteKeepsResumeCount) {
+    // A resumed scan that spills nothing keeps the resume count while it scans.
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+    auto acq = acquireExclusive();
+    CollectionWriter coll(operationContext(), &acq);
+    auto indexBuildInfo = makeIndexBuildInfo();
+
+    insertDocs(coll, 0, 20, /*valueBytes=*/16);
+    auto info = runFirstBuild(coll, indexBuildInfo, [&](MultiIndexBlock& indexer) {
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+    });
+    info.setPhase(IndexBuildPhaseEnum::kCollectionScan);
+    // Few, small documents left to scan, so the resumed scan doesn't fill memory.
+    insertDocs(coll, 20, 22, /*valueBytes=*/16);
+    auto resumeInfo = markResumed(info, 1);
+
+    auto& observer = installResumeStateContainerObserver(operationContext());
+    MultiIndexBlock resumed;
+    initResumed(resumed, coll, indexBuildInfo, resumeInfo);
+    ASSERT_OK(resumed.insertAllDocumentsInCollection(operationContext(), getNSS(), RecordId(20)));
+
+    EXPECT_FALSE(clearedInPhase(observer, IndexBuildPhaseEnum::kCollectionScan));
+    resumed.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(ResumedPdibResumeCountTest, ScanToLoadPhaseChangeClearsResumeCount) {
+    unittest::ServerParameterGuard memLimit{"maxIndexBuildMemoryUsageMegabytes", 1};
+    auto opCtx = operationContext();
+    auto acq = acquireExclusive();
+    CollectionWriter coll(opCtx, &acq);
+    auto indexBuildInfo = makeIndexBuildInfo();
+
+    insertDocs(coll, 0, 20);
+    auto info = runFirstBuild(coll, indexBuildInfo, [&](MultiIndexBlock& indexer) {
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(opCtx, getNSS()));
+    });
+    ASSERT_TRUE(info.getIndexes()[0].getLastSpilledRecordId());
+    ASSERT_EQ(RecordId(20), *info.getIndexes()[0].getLastSpilledRecordId());
+    // Resume at the end of the scan so no new scan checkpoint can clear the resume count first.
+    info.setPhase(IndexBuildPhaseEnum::kCollectionScan);
+    MultiIndexBlock resumed;
+    initResumed(resumed, coll, indexBuildInfo, markResumed(info, 1));
+    ASSERT_EQ(1, storedResumesWithoutProgress());
+
+    auto& observer = installResumeStateContainerObserver(opCtx);
+    ASSERT_OK(resumed.insertAllDocumentsInCollection(opCtx, getNSS(), RecordId(20)));
+
+    EXPECT_EQ(IndexBuildPhaseEnum::kBulkLoad, readResumeInfo().getPhase());
+    EXPECT_FALSE(storedResumesWithoutProgress());
+    EXPECT_FALSE(clearedInPhase(observer, IndexBuildPhaseEnum::kCollectionScan));
+    EXPECT_TRUE(clearedInPhase(observer, IndexBuildPhaseEnum::kBulkLoad));
+    // Only the phase's metadata write should occur, with no per-index checkpoints.
+    EXPECT_EQ(1, observer.countUpdatesForIdent(ident()));
+    resumed.abortIndexBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(ResumedPdibResumeCountTest, LoadProgressClearsResumeCount) {
+    // A periodic load write clears the resume count, before the load phase ends.
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+    auto indexBuildInfo = makeIndexBuildInfo();
+
+    MultiIndexBlock resumed;
+    {
+        auto acq = acquireForWrite(MODE_X);
+        CollectionWriter coll(operationContext(), &acq);
+        insertDocs(coll, 0, 20);
+        auto info = runFirstBuild(coll, indexBuildInfo, [&](MultiIndexBlock& indexer) {
+            // Persist no load position, so the resumed build loads everything again.
+            unittest::ServerParameterGuard loadInterval{
+                "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 1000};
+            ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+        });
+        ASSERT_EQ(IndexBuildPhaseEnum::kBulkLoad, info.getPhase());
+        // Empty the index again, as if the load hadn't reached it, so the resumed load writes keys.
+        index_builds::primary_driven::deleteAllIndexEntries(
+            operationContext(), getNSS().dbName(), coll->uuid(), {indexBuildInfo});
+        initResumed(resumed, coll, indexBuildInfo, markResumed(info, 0));
+    }
+
+    auto& observer = installResumeStateContainerObserver(operationContext());
+    {
+        unittest::ServerParameterGuard loadInterval{
+            "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 1};
+        unittest::ServerParameterGuard batchSize{"primaryDrivenIndexBuildIndexInsertionBatchSize",
+                                                 1};
+        auto acq = acquireForWrite(MODE_IX);
+        ASSERT_OK(resumed.dumpInsertsFromBulk(operationContext(), acq));
+    }
+    EXPECT_FALSE(storedResumesWithoutProgress());
+    // Check that the resume count was only cleared once.
+    EXPECT_EQ(1,
+              std::count_if(observer.updates.begin(), observer.updates.end(), [&](const auto& op) {
+                  return op.ident == ident() && std::holds_alternative<int64_t>(op.key) &&
+                      std::get<int64_t>(op.key) == index_builds::primary_driven::metadataKey;
+              }));
+
+    auto acq = acquireForWrite(MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
+    resumed.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(ResumedPdibResumeCountTest, LoadWithoutResumeStateWriteKeepsResumeCount) {
+    // A resumed load whose keys are all in the index already writes no new resume state and keeps
+    // the resume count.
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+    auto indexBuildInfo = makeIndexBuildInfo();
+
+    MultiIndexBlock resumed;
+    {
+        auto acq = acquireForWrite(MODE_X);
+        CollectionWriter coll(operationContext(), &acq);
+        insertDocs(coll, 0, 20);
+        auto info = runFirstBuild(coll, indexBuildInfo, [&](MultiIndexBlock& indexer) {
+            // Persist no load position, so the resumed build reads every key again.
+            unittest::ServerParameterGuard loadInterval{
+                "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 1000};
+            ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+        });
+        ASSERT_EQ(IndexBuildPhaseEnum::kBulkLoad, info.getPhase());
+        initResumed(resumed, coll, indexBuildInfo, markResumed(info, 1));
+    }
+
+    {
+        unittest::ServerParameterGuard loadInterval{
+            "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 1};
+        auto acq = acquireForWrite(MODE_IX);
+        ASSERT_OK(resumed.dumpInsertsFromBulk(operationContext(), acq));
+    }
+    EXPECT_EQ(1, storedResumesWithoutProgress());
+
+    auto acq = acquireForWrite(MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
+    resumed.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(ResumedPdibResumeCountTest, MultikeyResumeStateWriteClearsResumeCount) {
+    auto opCtx = operationContext();
+    auto acq = acquireExclusive();
+    CollectionWriter coll(opCtx, &acq);
+    auto indexBuildInfo = makeIndexBuildInfo();
+
+    insertDocs(coll, 0, 1);
+    auto info = runFirstBuild(coll, indexBuildInfo, [&](MultiIndexBlock& indexer) {
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(opCtx, getNSS()));
+        drain(indexer);
+    });
+    ASSERT_EQ(IndexBuildPhaseEnum::kDrainWrites, info.getPhase());
+
+    MultiIndexBlock resumed;
+    initResumed(resumed, coll, indexBuildInfo, markResumed(info, 0));
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(
+            Helpers::insert(opCtx, coll.get(), BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2))));
+        wuow.commit();
+    }
+
+    auto entry = coll->getIndexCatalog()->findIndexByName(
+        opCtx, "a_1", IndexCatalog::InclusionPolicy::kUnfinished);
+    ASSERT_TRUE(entry);
+    entry->indexBuildInterceptor()->getSkippedRecordTracker().record(
+        opCtx, coll.get(), RecordId{2});
+
+    // Retrying the skipped record persists multikey resume state. That write should clear the
+    // resume count.
+    ASSERT_OK(resumed.retrySkippedRecords(opCtx, coll.get()));
+    EXPECT_FALSE(storedResumesWithoutProgress());
+    EXPECT_TRUE(readResumeInfo().getIndexes()[0].getIsMultikey());
+    resumed.abortIndexBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(ResumedPdibResumeCountTest, LoadToDrainPhaseChangeClearsResumeCount) {
+    // Moving from load to drain clears the resume count, even when neither phase persists anything
+    // else.
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+    auto indexBuildInfo = makeIndexBuildInfo();
+
+    MultiIndexBlock resumed;
+    {
+        auto acq = acquireForWrite(MODE_X);
+        CollectionWriter coll(operationContext(), &acq);
+        insertDocs(coll, 0, 20);
+        auto info = runFirstBuild(coll, indexBuildInfo, [&](MultiIndexBlock& indexer) {
+            ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+        });
+        ASSERT_EQ(IndexBuildPhaseEnum::kBulkLoad, info.getPhase());
+        initResumed(resumed, coll, indexBuildInfo, markResumed(info, 1));
+    }
+
+    {
+        auto acq = acquireForWrite(MODE_IX);
+        ASSERT_OK(resumed.dumpInsertsFromBulk(operationContext(), acq));
+    }
+    ASSERT_EQ(1, storedResumesWithoutProgress());
+    auto acq = acquireForWrite(MODE_X);
+    drain(resumed);
+    EXPECT_EQ(IndexBuildPhaseEnum::kDrainWrites, readResumeInfo().getPhase());
+    EXPECT_FALSE(storedResumesWithoutProgress());
+
+    CollectionWriter coll(operationContext(), &acq);
+    resumed.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
 // Setup for a primary-driven (kReplicate) build: assigns a build UUID, flips the container-write

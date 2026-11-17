@@ -396,10 +396,16 @@ private:
     void _upsertIntoContainer(OperationContext* opCtx, int64_t key, const BSONObj& obj) const;
 
     /**
+     * Writes build metadata without a resume count in the caller's WriteUnitOfWork. Clears the
+     * pending resume count reset only when that transaction commits. Returns the written metadata.
+     */
+    BSONObj _upsertIndexBuildMetadata(OperationContext* opCtx);
+
+    /**
      * Writes the IndexBuildMetadata to the index build container. No-op when not replicating
      * container writes or not resumable.
      */
-    void _writeIndexBuildMetadataToContainer(OperationContext* opCtx) const;
+    void _writeIndexBuildMetadataToContainer(OperationContext* opCtx);
 
     // Sets the phase and returns the previous one.
     IndexBuildPhaseEnum _setPhase(IndexBuildPhaseEnum phase);
@@ -408,19 +414,19 @@ private:
      * Writes a single IndexStateInfo to the index build container for the given index. No-op when
      * not replicating container writes or not resumable.
      */
-    void _writeIndexStateInfoToContainer(OperationContext* opCtx, size_t index) const;
+    void _writeIndexStateInfoToContainer(OperationContext* opCtx, size_t index);
 
     /**
      * Writes the IndexStateInfo for the given index within the caller's transaction. Callers that
      * are not already in one should use `_writeIndexStateInfoToContainer`.
      */
-    void _upsertIndexStateInfo(OperationContext* opCtx, size_t index) const;
+    void _upsertIndexStateInfo(OperationContext* opCtx, size_t index);
 
     /**
      * Writes the IndexBuildMetadata and the IndexStateInfo for all indexes to the index build
      * container. No-op when not replicating container writes or not resumable.
      */
-    void _writeAllStateToContainer(OperationContext* opCtx) const;
+    void _writeAllStateToContainer(OperationContext* opCtx);
 
     /**
      * Folds multikey paths recovered while draining side writes or retrying skipped records into
@@ -479,6 +485,10 @@ private:
 
     // True if init() was called with a resumeInfo.
     bool _wasResumed = false;
+
+    // Set when this block resumes a build whose metadata record holds a resume count, and cleared
+    // once the block persists progress.
+    bool _resumeCountPending = false;
 
     // Whether any of this builder's indexes have spilled.
     bool _anyIndexSpilled = false;

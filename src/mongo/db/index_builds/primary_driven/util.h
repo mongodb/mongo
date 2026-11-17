@@ -13,6 +13,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,8 @@
 
 [[MONGO_MOD_PUBLIC]];
 namespace mongo::index_builds::primary_driven {
+
+constexpr int64_t metadataKey = 1;
 
 Registry& registry(ServiceContext* svcCtx);
 
