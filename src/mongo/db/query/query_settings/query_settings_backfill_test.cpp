@@ -54,9 +54,10 @@ public:
                                std::shared_ptr<executor::TaskExecutor> executor)
         : query_settings::BackfillCoordinator(std::move(hook)), _executor(std::move(executor)) {}
 
-    State* peekState() {
+    std::unique_ptr<State> peekState() {
         std::lock_guard lk(_mutex);
-        return _state.get();
+        // Cancellation can destroy the state at any time, so copy it while holding the mutex.
+        return std::make_unique<State>(*_state);
     }
 
     MockInsertRepresentativeQueriesFn mockInsertRepresentativeQueriesFn;
@@ -114,7 +115,7 @@ public:
         return QuerySettingsService::get(operationContext());
     }
 
-    BackfillCoordinatorForTest::State* peekCoordinatorState() {
+    std::unique_ptr<BackfillCoordinatorForTest::State> peekCoordinatorState() {
         return dynamic_cast<BackfillCoordinatorForTest*>(_backfiilCoordinator.get())->peekState();
     }
 
