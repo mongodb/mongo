@@ -23,6 +23,7 @@
 #include "mongo/db/s/resharding/resharding_op_observer.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -32,10 +33,13 @@
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/executor/mock_async_rpc.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/uuid.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -73,6 +77,17 @@ public:
     explicit ExternalStateForTest(Options options)
         : ReshardingCoordinatorExternalState(), _options(std::move(options)) {}
 
+    /**
+     * Participants to synthesize for 'reshardingUUID' before its coordinator document has any.
+     */
+    void setParticipants(const UUID& reshardingUUID,
+                         std::vector<ShardId> donorShardIds,
+                         std::vector<ShardId> recipientShardIds) {
+        std::lock_guard lk(_mutex);
+        _participants.insert_or_assign(
+            reshardingUUID, Participants{std::move(donorShardIds), std::move(recipientShardIds)});
+    }
+
     ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
         OperationContext* opCtx,
         const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -90,8 +105,27 @@ public:
                 version.incMinor();
             }
         }
+        // The document has no participants before preparing-to-donate, so synthesize them.
+        const auto participants = [&] {
+            std::lock_guard lk(_mutex);
+            auto it = _participants.find(coordinatorDoc.getReshardingUUID());
+            return it != _participants.end() ? it->second : Participants{};
+        }();
+        auto donorShards = coordinatorDoc.getDonorShards();
+        if (donorShards.empty()) {
+            for (const auto& shardId : participants.donorShardIds) {
+                donorShards.emplace_back(shardId, DonorShardContext{});
+            }
+        }
+        auto recipientShards = coordinatorDoc.getRecipientShards();
+        if (recipientShards.empty()) {
+            for (const auto& shardId : participants.recipientShardIds) {
+                recipientShards.emplace_back(shardId, RecipientShardContext{});
+            }
+        }
+
         return ParticipantShardsAndChunks{
-            coordinatorDoc.getDonorShards(), coordinatorDoc.getRecipientShards(), initialChunks};
+            std::move(donorShards), std::move(recipientShards), initialChunks};
     }
 
     bool searchIndexExistsForCollection(OperationContext* opCtx,
@@ -308,7 +342,12 @@ public:
     }
 
 private:
-    const Options _options;
+    struct Participants {
+        std::vector<ShardId> donorShardIds;
+        std::vector<ShardId> recipientShardIds;
+    };
+
+    Options _options;
 
     std::atomic<int> _causalityBarrierInvokeCount{0};
 
@@ -318,6 +357,7 @@ private:
     std::atomic<int> _verifyClonedCollectionCallCount{0};
 
     std::mutex _mutex;
+    stdx::unordered_map<UUID, Participants, UUID::Hash> _participants;
     stdx::condition_variable _blockInGetDocumentsToCopyCV;
     bool _doKeepBlockingInGetDocumentsToCopy = true;
     stdx::condition_variable _blockedInGetDocumentsToCopyCV;
@@ -392,6 +432,9 @@ public:
         BatonHandle baton,
         boost::optional<UUID> clientOperationKey) final {
         auto cmdName = cmdBSON.firstElementFieldNameStringData();
+        if (cmdName == ShardsvrReshardRecipientClone::kCommandName) {
+            _recipientCloneCommandCount.fetchAndAdd(1);
+        }
         if (!kOsiExemptCommands.count(cmdName)) {
             ASSERT(cmdBSON.hasField("lsid"))
                 << "ReshardingCoordinator RPC '" << cmdName << "' missing lsid (OSI)";
@@ -409,6 +452,10 @@ public:
                                     clientOperationKey);
     }
 
+    int getRecipientCloneCommandCount() const {
+        return _recipientCloneCommandCount.load();
+    }
+
 private:
     // Commands sent by the coordinator that are exempt from carrying OSI.
     // _flushReshardingStateChange is idempotent, so OSI-based deduplication is unnecessary.
@@ -420,6 +467,7 @@ private:
     };
 
     std::unique_ptr<async_rpc::detail::AsyncRPCRunner> _inner;
+    AtomicWord<int> _recipientCloneCommandCount{0};
 };
 
 /**
@@ -525,6 +573,11 @@ public:
 
     ExternalStateForTest* externalState() {
         return _externalState.get();
+    }
+
+    OsiCheckingAsyncRPCRunner* rpcRunner() {
+        return dynamic_cast<OsiCheckingAsyncRPCRunner*>(
+            async_rpc::detail::AsyncRPCRunner::get(getServiceContext()));
     }
 
     std::shared_ptr<ReshardingCoordinator> getCoordinator(

@@ -1349,9 +1349,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
               expectedAfter.getState() == DonorStateEnum::kDone);
 
     const bool validateTransitions =
-        _forwardableOpMetadata && _forwardableOpMetadata->getVersionContext() &&
-        resharding::isEnabledWithPinnedVersion(
-            _forwardableOpMetadata, resharding::gFeatureFlagReshardingPrePostConditionsValidations);
+        resharding::isTransitionValidationEnabled(_forwardableOpMetadata);
 
     if (validateTransitions) {
         const auto preResult =

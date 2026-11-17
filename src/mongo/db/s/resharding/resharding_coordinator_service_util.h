@@ -28,6 +28,13 @@ namespace resharding {
 typedef unique_function<ReshardingCoordinatorDocument(OperationContext*, TxnNumber)>
     PhaseTransitionFn;
 
+/**
+ * Optional hook run inside the decision transaction before any decision writes. 'before' is the
+ * coordinator document as read in that transaction.
+ */
+typedef unique_function<void(OperationContext*, TxnNumber, const ReshardingCoordinatorDocument&)>
+    DecisionPreWriteCheck;
+
 CollectionType createTempReshardingCollectionType(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -42,7 +49,8 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp,
-                                 const std::vector<ShardId>& reshardedCollectionPlacement);
+                                 const std::vector<ShardId>& reshardedCollectionPlacement,
+                                 DecisionPreWriteCheck preWriteCheck);
 
 void updateTagsDocsForTempNss(OperationContext* opCtx,
                               const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -66,7 +74,16 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
     const ReshardingCoordinatorDocument& coordinatorDoc,
     boost::optional<PhaseTransitionFn> phaseTransitionFn = boost::none);
 
-ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+/**
+ * Result of the cleanup transaction. 'before' is the coordinator document as read inside that
+ * transaction, or boost::none if the transaction did not run or the document was already gone.
+ */
+struct CoordinatorCleanupOutcome {
+    boost::optional<ReshardingCoordinatorDocument> before;
+    ReshardingCoordinatorDocument after;
+};
+
+CoordinatorCleanupOutcome removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc,

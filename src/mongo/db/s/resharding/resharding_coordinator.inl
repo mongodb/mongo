@@ -16,6 +16,7 @@
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
+#include "mongo/db/s/resharding/resharding_coordinator_transition_validation.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_runtime_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -74,6 +75,7 @@ extern FailPoint pauseAfterStoppingActiveMigrations;
 extern FailPoint pauseBeforeCTHolderInitialization;
 extern FailPoint pauseAfterEngagingCriticalSection;
 extern FailPoint reshardingPauseBeforeTellingRecipientsToClone;
+extern FailPoint reshardingCoordinatorCorruptDocBeforeValidation;
 
 // These failpoints are declared in all parts, but only defined in part 0.
 #ifdef RESHARDING_COORDINATOR_PART_0
@@ -94,6 +96,7 @@ MONGO_FAIL_POINT_DEFINE(pauseAfterStoppingActiveMigrations);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeCTHolderInitialization);
 MONGO_FAIL_POINT_DEFINE(pauseAfterEngagingCriticalSection);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseBeforeTellingRecipientsToClone);
+MONGO_FAIL_POINT_DEFINE(reshardingCoordinatorCorruptDocBeforeValidation);
 #endif  // RESHARDING_COORDINATOR_PART_0
 
 }  // namespace resharding_coordinator_detail
@@ -653,7 +656,10 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
         })
         .runOn(**executor, _ctHolder->getStepdownToken())
         .onError([this, executor](Status status) {
-            if (status == ErrorCodes::TransactionTooLargeForCache) {
+            // Both errors are raised before the decision is persisted, so the operation has not
+            // passed the point of no return and can still abort.
+            if (status == ErrorCodes::TransactionTooLargeForCache ||
+                status == ErrorCodes::ReshardingPreconditionFailure) {
                 return _onAbortCoordinatorAndParticipants(executor, status);
             }
             return ExecutorFuture<void>(**executor, status);
@@ -821,6 +827,7 @@ ExecutorFuture<void> ReshardingCoordinator::_quiesce(
                     auto opCtx = _makeOperationContext();
                     ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
                     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
+                    _validatePreTransitionIfEnabled(_coordinatorDoc, updatedCoordinatorDoc);
                     resharding::executeMetadataChangesInTxn(
                         opCtx.get(),
                         [&updatedCoordinatorDoc](OperationContext* opCtx, TxnNumber txnNumber) {
@@ -1202,6 +1209,7 @@ void ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
             opCtx.get(), _ctHolder->getStepdownToken());
         ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
         updatedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
+        _validatePreTransitionIfEnabled(_coordinatorDoc, updatedCoordinatorDoc);
         resharding::insertCoordDocAndChangeOrigCollEntry(
             opCtx.get(), _metrics.get(), updatedCoordinatorDoc);
         installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
@@ -1275,13 +1283,14 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
             return updatedDocument;
         };
 
-        resharding::writeParticipantShardsAndTempCollInfo(opCtx.get(),
-                                                          _metrics.get(),
-                                                          _coordinatorDoc,
-                                                          std::move(phaseTransitionFn),
-                                                          std::move(shardsAndChunks.initialChunks),
-                                                          std::move(zones),
-                                                          isUnsplittable);
+        resharding::writeParticipantShardsAndTempCollInfo(
+            opCtx.get(),
+            _metrics.get(),
+            _coordinatorDoc,
+            _withPreTransitionCheck(std::move(phaseTransitionFn)),
+            std::move(shardsAndChunks.initialChunks),
+            std::move(zones),
+            isUnsplittable);
     }
 
     _installCoordinatorDocFromCatalog();
@@ -1997,6 +2006,19 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
         return;
     }
 
+    {
+        // An earlier attempt may have committed the decision without the in-memory state
+        // observing it, e.g. if it failed with a retriable error before reloading the doc. The
+        // operation has then passed the point of no return so reconcile with the durable state.
+        auto opCtx = _makeOperationContext();
+        auto durableDoc =
+            resharding::tryGetCoordinatorDoc(opCtx.get(), _coordinatorDoc.getReshardingUUID());
+        if (durableDoc && durableDoc->getState() >= CoordinatorStateEnum::kCommitting) {
+            installCoordinatorDocOnStateTransition(opCtx.get(), *durableDoc);
+            return;
+        }
+    }
+
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kCommitting);
 
@@ -2035,12 +2057,26 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
             return collectionPlacementAsVector;
         }();
 
+        resharding::DecisionPreWriteCheck preWriteCheck;
+        if (_shouldValidateTransitions()) {
+            preWriteCheck =
+                [this, facts = _gatherTransitionFacts(), &updatedCoordinatorDoc](
+                    OperationContext*, TxnNumber, const ReshardingCoordinatorDocument& before) {
+                    // The decision write leaves participant entries as read here.
+                    auto proposed = updatedCoordinatorDoc;
+                    proposed.setDonorShards(before.getDonorShards());
+                    proposed.setRecipientShards(before.getRecipientShards());
+                    _validatePreTransition(before, proposed, facts);
+                };
+        }
+
         resharding::writeDecisionPersistedState(opCtx.get(),
                                                 _metrics.get(),
                                                 updatedCoordinatorDoc,
                                                 std::move(newCollectionEpoch),
                                                 std::move(newCollectionTimestamp),
-                                                reshardedCollectionPlacement);
+                                                reshardedCollectionPlacement,
+                                                std::move(preWriteCheck));
     }
 
     // Update the in memory state
@@ -2215,27 +2251,79 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
         });
 }
 
-void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
-    CoordinatorStateEnum nextState,
-    ReshardingCoordinatorDocument coordinatorDoc,
-    boost::optional<Timestamp> cloneTimestamp,
-    boost::optional<ReshardingApproxCopySize> approxCopySize,
-    boost::optional<Status> abortReason) {
-    // Build new state doc for coordinator state update
-    ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
-    updatedCoordinatorDoc.setState(nextState);
-    resharding::emplaceApproxBytesToCopyIfExists(updatedCoordinatorDoc, std::move(approxCopySize));
-    resharding::emplaceCloneTimestampIfExists(updatedCoordinatorDoc, std::move(cloneTimestamp));
-    resharding::emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
+bool ReshardingCoordinator::_shouldValidateTransitions() const {
+    return resharding::isTransitionValidationEnabled(_forwardableOpMetadata);
+}
 
+CoordinatorTransitionFacts ReshardingCoordinator::_gatherTransitionFacts() const {
+    CoordinatorTransitionFacts facts;
     {
-        auto opCtx = _makeOperationContext();
-        resharding::writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
-            opCtx.get(), _metrics.get(), updatedCoordinatorDoc, boost::none);
+        std::lock_guard lg(_fulfillmentMutex);
+        auto canEnterCritical = _canEnterCritical.getFuture();
+        facts.canEnterCritical = canEnterCritical.isReady() && canEnterCritical.getNoThrow().isOK();
     }
+    return facts;
+}
 
-    // Update in-memory coordinator doc
-    _installCoordinatorDocFromCatalog();
+void ReshardingCoordinator::_validatePreTransition(const ReshardingCoordinatorDocument& before,
+                                                   const ReshardingCoordinatorDocument& proposed,
+                                                   const CoordinatorTransitionFacts& facts) const {
+    const ReshardingCoordinatorDocument* proposedToValidate = &proposed;
+    boost::optional<ReshardingCoordinatorDocument> corrupted;
+    reshardingCoordinatorCorruptDocBeforeValidation.executeIf(
+        [&](const BSONObj&) {
+            corrupted.emplace(proposed);
+            corrupted->setApproxBytesToCopy(-1);
+            proposedToValidate = &*corrupted;
+        },
+        [&](const BSONObj& data) {
+            return data.getStringField("state") == idl::serialize(proposed.getState());
+        });
+
+    const auto result = validateCoordinatorPreTransition(
+        {.before = before, .proposed = *proposedToValidate, .facts = facts});
+    // Throwing while aborting or exiting would prevent the coordinator from cleaning up, so only
+    // fail the tripwire there. Earlier edges throw before the write commits and so abort.
+    const auto to = proposed.getState();
+    if (to == CoordinatorStateEnum::kAborting || to == CoordinatorStateEnum::kQuiesced ||
+        to == CoordinatorStateEnum::kDone) {
+        tassertNoThrow(result.status);
+    } else {
+        tassert(result.status);
+    }
+}
+
+void ReshardingCoordinator::_validatePreTransitionIfEnabled(
+    const ReshardingCoordinatorDocument& before,
+    const ReshardingCoordinatorDocument& proposed) const {
+    if (_shouldValidateTransitions()) {
+        _validatePreTransition(before, proposed, _gatherTransitionFacts());
+    }
+}
+
+resharding::PhaseTransitionFn ReshardingCoordinator::_withPreTransitionCheck(
+    resharding::PhaseTransitionFn phaseTransitionFn) {
+    if (!_shouldValidateTransitions()) {
+        return phaseTransitionFn;
+    }
+    return [this,
+            phaseTransitionFn = std::move(phaseTransitionFn),
+            facts = _gatherTransitionFacts()](OperationContext* opCtx, TxnNumber txnNumber) {
+        auto before = _coordinatorDao.getDocument(opCtx, txnNumber);
+        auto proposed = phaseTransitionFn(opCtx, txnNumber);
+        _validatePreTransition(before, proposed, facts);
+        return proposed;
+    };
+}
+
+void ReshardingCoordinator::_validateCommittedExit(
+    const boost::optional<ReshardingCoordinatorDocument>& before,
+    const ReshardingCoordinatorDocument& after) const {
+    // TODO (SERVER-138401): add post-transition validation of the exit edge's catalog effects.
+    if (!_shouldValidateTransitions() || !before || before->getState() == after.getState()) {
+        return;
+    }
+    _validatePreTransition(*before, after, _gatherTransitionFacts());
 }
 
 void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
@@ -2243,7 +2331,10 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
     {
         auto opCtx = _makeOperationContext();
         resharding::writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
-            opCtx.get(), _metrics.get(), _coordinatorDoc, std::move(phaseTransitionFn));
+            opCtx.get(),
+            _metrics.get(),
+            _coordinatorDoc,
+            _withPreTransitionCheck(std::move(phaseTransitionFn)));
     }
 
     _installCoordinatorDocFromCatalog();
@@ -2259,15 +2350,14 @@ ExecutorFuture<void> ReshardingCoordinator::_cleanupCoordinator(
             auto opCtx = _makeOperationContext();
             _resumeMigrations(opCtx.get());
             _releaseSession(opCtx.get());
-            auto updatedCoordinatorDoc =
-                resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
-                    opCtx.get(),
-                    _metrics.get(),
-                    resharding::tryGetCoordinatorDoc(opCtx.get(),
-                                                     _coordinatorDoc.getReshardingUUID())
-                        .value_or(_coordinatorDoc),
-                    abortReason);
-            installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
+            // Used for the cleanup before the util's transaction, which rereads the document.
+            auto cleanupInput =
+                resharding::tryGetCoordinatorDoc(opCtx.get(), _coordinatorDoc.getReshardingUUID())
+                    .value_or(_coordinatorDoc);
+            auto outcome = resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+                opCtx.get(), _metrics.get(), cleanupInput, abortReason);
+            _validateCommittedExit(outcome.before, outcome.after);
+            installCoordinatorDocOnStateTransition(opCtx.get(), outcome.after);
         },
         **executor,
         stepdownToken,

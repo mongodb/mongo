@@ -514,7 +514,8 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp,
-                                 const std::vector<ShardId>& reshardedCollectionPlacement) {
+                                 const std::vector<ShardId>& reshardedCollectionPlacement,
+                                 DecisionPreWriteCheck preWriteCheck) {
 
     // No need to bump originalNss version because its epoch will be changed.
     executeMetadataChangesInTxn(
@@ -523,7 +524,27 @@ void writeDecisionPersistedState(OperationContext* opCtx,
          &coordinatorDoc,
          &newCollectionEpoch,
          &newCollectionTimestamp,
-         &reshardedCollectionPlacement](OperationContext* opCtx, TxnNumber txnNumber) {
+         &reshardedCollectionPlacement,
+         &preWriteCheck](OperationContext* opCtx, TxnNumber txnNumber) {
+            if (preWriteCheck) {
+                auto beforeDoc = ShardingCatalogManager::get(opCtx)->findOneConfigDocumentInTxn(
+                    opCtx,
+                    NamespaceString::kConfigReshardingOperationsNamespace,
+                    txnNumber,
+                    BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
+                         << coordinatorDoc.getReshardingUUID()));
+                uassert(
+                    13840200,
+                    str::stream()
+                        << "Could not find the coordinator document for the resharding operation "
+                        << coordinatorDoc.getReshardingUUID().toString(),
+                    beforeDoc);
+                preWriteCheck(opCtx,
+                              txnNumber,
+                              ReshardingCoordinatorDocument::parse(
+                                  *beforeDoc, IDLParserContext("ReshardingCoordinatorDocument")));
+            }
+
             // Update the config.reshardingOperations entry
             writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
 
@@ -709,7 +730,7 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
         });
 }
 
-ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+CoordinatorCleanupOutcome removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -722,21 +743,8 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
     invariant((wasDecisionPersisted && !abortReason) || abortReason);
 
     if (coordinatorDoc.getState() > CoordinatorStateEnum::kQuiesced) {
-        return coordinatorDoc;
+        return {boost::none, coordinatorDoc};
     }
-
-    ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
-    // If a user resharding ID was provided, move the coordinator doc to "quiesced" rather than
-    // "done".
-    if (coordinatorDoc.getUserReshardingUUID()) {
-        updatedCoordinatorDoc.setState(CoordinatorStateEnum::kQuiesced);
-        updatedCoordinatorDoc.setQuiescePeriodEnd(
-            opCtx->fastClockSource().now() +
-            Milliseconds(resharding::gReshardingCoordinatorQuiescePeriodMillis.load()));
-    } else {
-        updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
-    }
-    emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
     const auto tagsQuery = BSON(TagsType::ns(NamespaceStringUtil::serialize(
         coordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault())));
@@ -757,18 +765,47 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
 
         removeChunkAndTagsDocs(opCtx, tagsQuery, coordinatorDoc.getReshardingUUID());
     }
-    runCoordinatorCatalogTxn(opCtx,
-                             updatedCoordinatorDoc.getAuthoritativeMetadataAccessLevel(),
-                             {updatedCoordinatorDoc.getSourceNss()},
-                             [&](OperationContext* opCtx, TxnNumber txnNumber) {
-                                 // Remove entry for this resharding operation from
-                                 // config.reshardingOperations
-                                 writeToCoordinatorStateNss(
-                                     opCtx, metrics, updatedCoordinatorDoc, txnNumber);
-                             });
+    CoordinatorCleanupOutcome outcome;
+    runCoordinatorCatalogTxn(
+        opCtx,
+        coordinatorDoc.getAuthoritativeMetadataAccessLevel(),
+        {coordinatorDoc.getSourceNss()},
+        [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            auto durableDoc = ShardingCatalogManager::get(opCtx)->findOneConfigDocumentInTxn(
+                opCtx,
+                NamespaceString::kConfigReshardingOperationsNamespace,
+                txnNumber,
+                BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
+                     << coordinatorDoc.getReshardingUUID()));
+            outcome.before = durableDoc
+                ? boost::optional<ReshardingCoordinatorDocument>(
+                      ReshardingCoordinatorDocument::parse(
+                          *durableDoc, IDLParserContext("ReshardingCoordinatorDocument")))
+                : boost::none;
 
-    metrics->onStateTransition(coordinatorDoc.getState(), updatedCoordinatorDoc.getState());
-    return updatedCoordinatorDoc;
+            auto updatedCoordinatorDoc = outcome.before.value_or(coordinatorDoc);
+            // If a user resharding ID was provided, move the coordinator doc to "quiesced" rather
+            // than "done".
+            const auto nextState = updatedCoordinatorDoc.getUserReshardingUUID()
+                ? CoordinatorStateEnum::kQuiesced
+                : CoordinatorStateEnum::kDone;
+            updatedCoordinatorDoc.setState(nextState);
+            if (nextState == CoordinatorStateEnum::kQuiesced) {
+                updatedCoordinatorDoc.setQuiescePeriodEnd(
+                    opCtx->fastClockSource().now() +
+                    Milliseconds(resharding::gReshardingCoordinatorQuiescePeriodMillis.load()));
+            }
+            emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
+
+            // Remove entry for this resharding operation from config.reshardingOperations
+            writeToCoordinatorStateNss(opCtx, metrics, updatedCoordinatorDoc, txnNumber);
+
+            outcome.after = std::move(updatedCoordinatorDoc);
+        });
+
+    metrics->onStateTransition(outcome.before.value_or(coordinatorDoc).getState(),
+                               outcome.after.getState());
+    return outcome;
 }
 
 void writeToCoordinatorStateNss(OperationContext* opCtx,

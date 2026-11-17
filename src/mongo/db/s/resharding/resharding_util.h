@@ -709,6 +709,11 @@ bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetada
 size_t getMaxConcurrentReshardings();
 
 /**
+ * Returns true if the resharding transition validators are enabled for this operation.
+ */
+bool isTransitionValidationEnabled(const boost::optional<ForwardableOperationMetadata>& fom);
+
+/**
  * Returns true if 'fcv' matches the FCV snapshotted in 'metadata' when the resharding operation
  * started. Coordinator documents written before the startingFCV field existed are treated as
  * matching kLastLTS and kLastContinuous, since they can only have been created on an older binary.

@@ -74,6 +74,9 @@ public:
     CoordinatorStateEnum getPhase(OperationContext* opCtx,
                                   boost::optional<TxnNumber> txnNumber = boost::none);
 
+    ReshardingCoordinatorDocument getDocument(OperationContext* opCtx,
+                                              boost::optional<TxnNumber> txnNumber = boost::none);
+
     ReshardingCoordinatorDocument transitionToPreparingToDonatePhase(
         OperationContext* opCtx,
         ParticipantShardsAndChunks shardsAndChunks,

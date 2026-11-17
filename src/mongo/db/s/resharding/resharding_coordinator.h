@@ -37,6 +37,7 @@ class ReshardingCoordinatorExternalState;
 class ReshardingCoordinatorObserver;
 class ReshardingMetrics;
 class ServiceContext;
+struct CoordinatorTransitionFacts;
 
 /**
  * Construct to encapsulate cancellation tokens and related semantics on the ReshardingCoordinator.
@@ -534,13 +535,37 @@ private:
      * catalog entries for the original and temporary namespaces in config.collections.
      */
     void _updateCoordinatorDocStateAndCatalogEntries(
-        CoordinatorStateEnum nextState,
-        ReshardingCoordinatorDocument coordinatorDoc,
-        boost::optional<Timestamp> cloneTimestamp = boost::none,
-        boost::optional<ReshardingApproxCopySize> approxCopySize = boost::none,
-        boost::optional<Status> abortReason = boost::none);
+        resharding::PhaseTransitionFn phaseTransitionFn);
 
-    void _updateCoordinatorDocStateAndCatalogEntries(
+    bool _shouldValidateTransitions() const;
+
+    CoordinatorTransitionFacts _gatherTransitionFacts() const;
+
+    /**
+     * Checks that the proposed transition is allowed. Reports violations as tripwire assertions,
+     * throwing only on edges where the failure is routed to an abort.
+     */
+    void _validatePreTransition(const ReshardingCoordinatorDocument& before,
+                                const ReshardingCoordinatorDocument& proposed,
+                                const CoordinatorTransitionFacts& facts) const;
+
+    /**
+     * Runs _validatePreTransition with freshly gathered facts when validations are enabled.
+     */
+    void _validatePreTransitionIfEnabled(const ReshardingCoordinatorDocument& before,
+                                         const ReshardingCoordinatorDocument& proposed) const;
+
+    /**
+     * Validates the exit transition after the cleanup util has committed its own transaction.
+     */
+    void _validateCommittedExit(const boost::optional<ReshardingCoordinatorDocument>& before,
+                                const ReshardingCoordinatorDocument& after) const;
+
+    /**
+     * Wraps a phase transition so its in-transaction result is validated against the document
+     * read in the same transaction, before commit. A no-op when validations are disabled.
+     */
+    resharding::PhaseTransitionFn _withPreTransitionCheck(
         resharding::PhaseTransitionFn phaseTransitionFn);
 
     /**

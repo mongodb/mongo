@@ -662,7 +662,8 @@ protected:
                                     _finalEpoch,
                                     _finalTimestamp,
                                     std::vector<ShardId>(reshardedCollectionPlacement.begin(),
-                                                         reshardedCollectionPlacement.end()));
+                                                         reshardedCollectionPlacement.end()),
+                                    {});
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -696,8 +697,9 @@ protected:
 
     void removeCoordinatorDocAndReshardingFieldsExpectSuccess(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-        auto updatedCoordinatorDoc = removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+        auto outcome = removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
             opCtx, _metrics.get(), coordinatorDoc);
+        auto& updatedCoordinatorDoc = outcome.after;
 
         ASSERT_EQ(updatedCoordinatorDoc.getState(), CoordinatorStateEnum::kDone);
 
@@ -717,8 +719,9 @@ protected:
 
     void quiesceCoordinatorDocAndReshardingFieldsExpectSuccess(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-        auto updatedCoordinatorDoc = removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+        auto outcome = removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
             opCtx, _metrics.get(), coordinatorDoc);
+        auto& updatedCoordinatorDoc = outcome.after;
 
         // Check that the on disk document is same as the in memory document returned above.
         auto expectedCoordinatorDoc = coordinatorDoc;

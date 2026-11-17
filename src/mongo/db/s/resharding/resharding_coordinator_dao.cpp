@@ -119,6 +119,12 @@ CoordinatorStateEnum ReshardingCoordinatorDao::getPhase(OperationContext* opCtx,
     return client->readState(opCtx, _reshardingUUID).getState();
 }
 
+ReshardingCoordinatorDocument ReshardingCoordinatorDao::getDocument(
+    OperationContext* opCtx, boost::optional<TxnNumber> txnNumber) {
+    auto client = _clientFactory->createDaoStorageClient(txnNumber);
+    return client->readState(opCtx, _reshardingUUID);
+}
+
 ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToPreparingToDonatePhase(
     OperationContext* opCtx,
     resharding::ParticipantShardsAndChunks shardsAndChunks,

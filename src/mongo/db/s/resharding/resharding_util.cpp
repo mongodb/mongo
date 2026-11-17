@@ -1140,6 +1140,12 @@ bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetada
                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
+bool isTransitionValidationEnabled(const boost::optional<ForwardableOperationMetadata>& fom) {
+    return fom && fom->getVersionContext() &&
+        isEnabledWithPinnedVersion(fom,
+                                   resharding::gFeatureFlagReshardingPrePostConditionsValidations);
+}
+
 // Each resharding coordinator blocks at least 3 coordinator pool threads, and 1 thread is reserved.
 size_t getMaxConcurrentReshardings() {
     return std::max<size_t>(

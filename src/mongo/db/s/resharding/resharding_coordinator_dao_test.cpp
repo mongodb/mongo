@@ -124,6 +124,14 @@ TEST_F(ReshardingCoordinatorDaoFixture, GetPhase) {
     ASSERT_EQUALS(phase, CoordinatorStateEnum::kApplying);
 }
 
+TEST_F(ReshardingCoordinatorDaoFixture, GetDocument) {
+    _state->document.setState(CoordinatorStateEnum::kCloning);
+    _state->document.setApproxDocumentsToCopy(7);
+    auto doc = _dao->getDocument(_opCtx, TxnNumber{1});
+    ASSERT_EQUALS(doc.getState(), CoordinatorStateEnum::kCloning);
+    ASSERT_EQUALS(*doc.getApproxDocumentsToCopy(), 7);
+}
+
 TEST_F(ReshardingCoordinatorDaoFixture, TransitionToPreparingToDonatePhaseSucceeds) {
     DonorShardContext donorContext;
     donorContext.setState(DonorStateEnum::kUnused);

@@ -27,6 +27,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -111,21 +112,27 @@ public:
         fom.setVersionContext(VersionContext{fcvSnapshot});
         meta.setForwardableOpMetadata(std::move(fom));
 
+        // Participants are created when entering preparing-to-donate, and the clone timestamp when
+        // entering cloning, matching production.
         std::vector<DonorShardEntry> donorShards;
-        std::transform(reshardingOptions.donorShardIds.begin(),
-                       reshardingOptions.donorShardIds.end(),
-                       std::back_inserter(donorShards),
-                       [](auto shardId) { return DonorShardEntry{shardId, {}}; });
-
         std::vector<RecipientShardEntry> recipientShards;
-        std::transform(reshardingOptions.recipientShardIds.begin(),
-                       reshardingOptions.recipientShardIds.end(),
-                       std::back_inserter(recipientShards),
-                       [](auto shardId) { return RecipientShardEntry{shardId, {}}; });
+        if (state >= CoordinatorStateEnum::kPreparingToDonate) {
+            std::transform(reshardingOptions.donorShardIds.begin(),
+                           reshardingOptions.donorShardIds.end(),
+                           std::back_inserter(donorShards),
+                           [](auto shardId) { return DonorShardEntry{shardId, {}}; });
+
+            std::transform(reshardingOptions.recipientShardIds.begin(),
+                           reshardingOptions.recipientShardIds.end(),
+                           std::back_inserter(recipientShards),
+                           [](auto shardId) { return RecipientShardEntry{shardId, {}}; });
+        }
 
         ReshardingCoordinatorDocument doc(state, donorShards, recipientShards);
         doc.setCommonReshardingMetadata(meta);
-        resharding::emplaceCloneTimestampIfExists(doc, _cloneTimestamp);
+        if (state >= CoordinatorStateEnum::kCloning) {
+            resharding::emplaceCloneTimestampIfExists(doc, _cloneTimestamp);
+        }
         doc.setUserReshardingUUID(reshardingOptions.userReshardingUUID);
 
         // Set demo mode to true for testing purposes to avoid the delay before commit monitor
@@ -183,6 +190,11 @@ public:
         auto opCtx = operationContext();
         DBDirectClient client(opCtx);
 
+        // Keep the synthesized participants in sync with the options this coordinator is built
+        // from, so custom shard lists are not silently replaced.
+        externalState()->setParticipants(
+            reshardingUUID, reshardingOptions.donorShardIds, reshardingOptions.recipientShardIds);
+
         auto coordinatorDoc = makeCoordinatorDoc(
             state, reshardingUUID, originalNss, tempNss, newShardKey, reshardingOptions);
 
@@ -202,8 +214,11 @@ public:
         client.insert(NamespaceString::kConfigsvrCollectionsNamespace,
                       originalNssCatalogEntry.toBSON());
 
+        const auto primaryShardId = coordinatorDoc.getDonorShards().empty()
+            ? reshardingOptions.donorShardIds.front()
+            : coordinatorDoc.getDonorShards().front().getId();
         DatabaseType dbDoc(coordinatorDoc.getSourceNss().dbName(),
-                           coordinatorDoc.getDonorShards().front().getId(),
+                           primaryShardId,
                            DatabaseVersion{UUID::gen(), Timestamp(1, 1)});
         client.insert(NamespaceString::kConfigDatabasesNamespace, dbDoc.toBSON());
 
@@ -724,6 +739,10 @@ protected:
         {shardId0, 10},
         {shardId1, 20},
     };
+
+private:
+    unittest::ServerParameterGuard _validations{"featureFlagReshardingPrePostConditionsValidations",
+                                                true};
 };
 
 class ReshardingCoordinatorServiceTest : public ReshardingCoordinatorServiceTestBase {
@@ -918,6 +937,8 @@ TEST_F(ReshardingCoordinatorServiceTest, VerificationRunsWhenFetchDocumentsToCop
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransitionsTokDone) {
     runReshardingToCompletion();
+    // Positive control for the clone command counter used by the failed-cloning test.
+    ASSERT_GT(rpcRunner()->getRecipientCloneCommandCount(), 0);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorTransitionsTokDoneWithInterrupt) {
@@ -1901,6 +1922,200 @@ TEST_F(ReshardingCoordinatorServiceFailFinalVerificationTest, CommitIfNotPerform
                                CoordinatorStateEnum::kBlockingWrites,
                                CoordinatorStateEnum::kCommitting},
                               reshardingOptions);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, FailedCommittingValidationAbortsOperation) {
+    const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
+                                                      CoordinatorStateEnum::kCloning,
+                                                      CoordinatorStateEnum::kApplying,
+                                                      CoordinatorStateEnum::kBlockingWrites,
+                                                      CoordinatorStateEnum::kAborting};
+
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   makeDefaultReshardingOptions());
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+
+    makeDonorsReadyToDonateWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+
+    makeRecipientsFinishedCloningWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kApplying);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kApplying);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
+
+    coordinator->onOkayToEnterCritical();
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
+
+    FailPointEnableBlock failpoint("reshardingCoordinatorCorruptDocBeforeValidation",
+                                   FailPoint::ModeOptions{.mode = FailPoint::nTimes,
+                                                          .val = 1,
+                                                          .extra = BSON("state" << "committing")});
+    unittest::TassertGuard tassertGuard(1);
+
+    makeRecipientsBeInStrictConsistencyWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+
+    ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx),
+                       DBException,
+                       ErrorCodes::ReshardingPreconditionFailure);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, ParticipantAbortBeforeDecisionWriteAbortsOperation) {
+    const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
+                                                      CoordinatorStateEnum::kCloning,
+                                                      CoordinatorStateEnum::kApplying,
+                                                      CoordinatorStateEnum::kBlockingWrites,
+                                                      CoordinatorStateEnum::kAborting};
+
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   makeDefaultReshardingOptions());
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+
+    makeDonorsReadyToDonateWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+
+    makeRecipientsFinishedCloningWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kApplying);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kApplying);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
+
+    coordinator->onOkayToEnterCritical();
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
+
+    auto pauseBeforeDecision =
+        globalFailPointRegistry().find("reshardingPauseCoordinatorBeforeDecisionPersisted");
+    auto timesEntered = pauseBeforeDecision->setMode(FailPoint::alwaysOn);
+    unittest::TassertGuard tassertGuard(1);
+
+    makeRecipientsBeInStrictConsistencyWithAssert(opCtx);
+    pauseBeforeDecision->waitForTimesEntered(timesEntered + 1);
+
+    // Written after the strict-consistency snapshot was taken.
+    Status abortReasonStatus{ErrorCodes::SnapshotUnavailable, "test simulated donor error"};
+    BSONObjBuilder abortReasonBuilder;
+    abortReasonStatus.serialize(&abortReasonBuilder);
+    updateCoordinatorDoc(
+        opCtx,
+        _reshardingUUID,
+        BSON("$set" << BSON(std::string(ReshardingCoordinatorDocument::kDonorShardsFieldName) +
+                                ".$[].mutableState.abortReason"
+                            << abortReasonBuilder.obj())));
+    pauseBeforeDecision->setMode(FailPoint::off);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+
+    ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx),
+                       DBException,
+                       ErrorCodes::ReshardingPreconditionFailure);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, FailedCloningValidationAbortsOperation) {
+    const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
+                                                      CoordinatorStateEnum::kAborting};
+
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   makeDefaultReshardingOptions());
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+
+    FailPointEnableBlock failpoint("reshardingCoordinatorCorruptDocBeforeValidation",
+                                   FailPoint::ModeOptions{.mode = FailPoint::nTimes,
+                                                          .val = 1,
+                                                          .extra = BSON("state" << "cloning")});
+    unittest::TassertGuard tassertGuard(1);
+
+    makeDonorsReadyToDonateWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+
+    ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx),
+                       DBException,
+                       ErrorCodes::ReshardingPreconditionFailure);
+    // The cloning transaction aborted, so recipients were never told to clone.
+    ASSERT_EQ(rpcRunner()->getRecipientCloneCommandCount(), 0);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, FailedAbortingValidationDoesNotBlockCleanup) {
+    const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
+                                                      CoordinatorStateEnum::kCloning};
+
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator();
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+
+    makeDonorsReadyToDonateWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+
+    FailPointEnableBlock failpoint("reshardingCoordinatorCorruptDocBeforeValidation",
+                                   FailPoint::ModeOptions{.mode = FailPoint::nTimes,
+                                                          .val = 1,
+                                                          .extra = BSON("state" << "aborting")});
+    unittest::TassertGuard tassertGuard(1);
+
+    makeRecipientsReturnErrorWithAssert(opCtx);
+
+    // The tripwire on the aborting edge must not replace the original abort error or stop cleanup.
+    ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx),
+                       DBException,
+                       ErrorCodes::SnapshotUnavailable);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest,
