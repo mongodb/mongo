@@ -118,6 +118,34 @@ TEST_F(SessionManagerCommonTest, OnClientConnectAndDisconnectStandardSessions) {
     ASSERT_EQ(sm.getSessionStats().numPrioritySessions, 0);
 }
 
+TEST_F(SessionManagerCommonTest, OnClientConnectAndDisconnectPrivilegedSessions) {
+    TransportLayerMock tl;
+    MockSessionManagerCommon sm(getServiceContext());
+    ASSERT_EQ(sm.getSessionStats().numPrivilegedSessions, 0);
+
+    // A priority-port session is privileged.
+    auto session = std::make_shared<MockPrioritySession>(&tl);
+    auto client = makeClient(session);
+    sm.onClientConnect(client.get());
+    ASSERT_EQ(sm.getSessionStats().numPrivilegedSessions, 1);
+
+    sm.onClientDisconnect(client.get());
+    ASSERT_EQ(sm.getSessionStats().numPrivilegedSessions, 0);
+}
+
+TEST_F(SessionManagerCommonTest, OnClientConnectAndDisconnectNonPrivilegedSessions) {
+    TransportLayerMock tl;
+    MockSessionManagerCommon sm(getServiceContext());
+
+    auto session = MockSession::create(&tl);
+    auto client = makeClient(session);
+    sm.onClientConnect(client.get());
+    ASSERT_EQ(sm.getSessionStats().numPrivilegedSessions, 0);
+
+    sm.onClientDisconnect(client.get());
+    ASSERT_EQ(sm.getSessionStats().numPrivilegedSessions, 0);
+}
+
 TEST_F(SessionManagerCommonTest, ShouldIncludeInConnectionsServerStatusDefaultsToFalse) {
     MockSessionManagerCommon sm(getServiceContext());
     ASSERT_FALSE(sm.shouldIncludeInConnectionsServerStatus());

@@ -300,6 +300,9 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
 
     const bool isPrivilegedSession = isPrivileged(*session);
+    // Store on the session so that the connect/disconnect accounting never re-reads the
+    // runtime-settable maxIncomingConnectionsOverride.
+    session->setIsPrivileged(isPrivilegedSession);
     const bool verbose = !quiet();
 
     auto service = _svcCtx->getService();
@@ -475,6 +478,7 @@ SessionManagerCommon::SessionStats SessionManagerCommon::getSessionStats() const
 
         .numLoadBalancedSessions = _loadBalancedSessions.get(),
         .numPrioritySessions = _prioritySessions.get(),
+        .numPrivilegedSessions = _privilegedSessions.get(),
     };
 }
 
@@ -487,6 +491,9 @@ void SessionManagerCommon::onClientConnect(Client* client) {
     if (session && session->isConnectedToPriorityPort()) {
         _prioritySessions.increment();
     }
+    if (session && session->isPrivileged()) {
+        _privilegedSessions.increment();
+    }
 }
 
 void SessionManagerCommon::onClientDisconnect(Client* client) {
@@ -496,6 +503,9 @@ void SessionManagerCommon::onClientDisconnect(Client* client) {
     }
     if (session && session->isConnectedToPriorityPort()) {
         _prioritySessions.decrement();
+    }
+    if (session && session->isPrivileged()) {
+        _privilegedSessions.decrement();
     }
     if (session) {
         if (getConnectionPurpose(session.get()) != ConnectionPurpose::kReplication) {

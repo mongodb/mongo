@@ -298,7 +298,8 @@ TEST_F(TransportLayerManagerServerStatusTest, FieldCount) {
                                          "awaitingTopologyChanges",
                                          "backpressureVersions",
                                          "loadBalanced",
-                                         "priority"};
+                                         "priority",
+                                         "privileged"};
     const auto actual = section.getFieldNames<std::set<std::string>>();
     std::vector<std::string> diff;
 
@@ -531,6 +532,17 @@ TEST_F(TransportLayerManagerServerStatusTest, Priority) {
     }
 
     ASSERT_EQ(generateSection()["priority"].Int(), 3);
+}
+
+/**
+ * Verifies that privileged is summed across opted-in managers and opted-out managers are
+ * excluded.
+ */
+TEST_F(TransportLayerManagerServerStatusTest, Privileged) {
+    optInSessionManager0->stats.numPrivilegedSessions = 2;
+    optInSessionManager1->stats.numPrivilegedSessions = 1;
+    optOutSessionManager->stats.numPrivilegedSessions = 4;
+    ASSERT_EQ(generateSection()["privileged"].Int(), 3);
 }
 
 }  // namespace

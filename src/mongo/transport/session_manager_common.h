@@ -34,6 +34,7 @@ public:
         int64_t numActiveOperations = 0;
         int64_t numLoadBalancedSessions = 0;
         int64_t numPrioritySessions = 0;
+        int64_t numPrivilegedSessions = 0;
     };
 
     explicit SessionManagerCommon(ServiceContext*);
@@ -114,6 +115,7 @@ protected:
 
     Counter64 _loadBalancedSessions;
     Counter64 _prioritySessions;
+    Counter64 _privilegedSessions;
 
     class Sessions;
     std::unique_ptr<Sessions> _sessions;

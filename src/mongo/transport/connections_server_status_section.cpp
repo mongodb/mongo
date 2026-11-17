@@ -50,6 +50,7 @@ BSONObj Connections::generateSection(OperationContext* opCtx, const BSONElement&
     int64_t totalRateLimiterRejected = 0;
     int64_t totalRateLimiterExempted = 0;
     int64_t totalRateLimiterInterrupted = 0;
+    int64_t totalPrivileged = 0;
     for (auto* sm : managers) {
         auto s = sm->getSessionStats();
         totals.numOpenSessions += s.numOpenSessions;
@@ -61,6 +62,7 @@ BSONObj Connections::generateSection(OperationContext* opCtx, const BSONElement&
         totals.numActiveOperations += s.numActiveOperations;
         totals.numLoadBalancedSessions += s.numLoadBalancedSessions;
         totals.numPrioritySessions += s.numPrioritySessions;
+        totalPrivileged += s.numPrivilegedSessions;
         totalHelloMetrics += sm->helloMetrics;
         totalBackpressureMetrics += sm->backpressureConnectionMetrics;
         totalLimitExempt += sm->serviceExecutorStats.limitExempt.load();
@@ -113,6 +115,7 @@ BSONObj Connections::generateSection(OperationContext* opCtx, const BSONElement&
     if (gFeatureFlagDedicatedPortForPriorityOperations.isEnabled()) {
         bb.append("priority", static_cast<int>(totals.numPrioritySessions));
     }
+    bb.append("privileged", static_cast<int>(totalPrivileged));
 
     return bb.obj();
 }

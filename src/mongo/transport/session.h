@@ -219,6 +219,23 @@ public:
     }
 
     /**
+     * Returns whether the SessionManager classified this session as privileged when it was
+     * started. The classification is fixed at that point and is not re-evaluated, so later changes
+     * to the runtime-settable maxIncomingConnectionsOverride do not affect it.
+     */
+    bool isPrivileged() const {
+        return _isPrivileged;
+    }
+
+    /**
+     * Records the SessionManager's privileged classification. Must be called at most once, by the
+     * SessionManager, before the session is handed to a Client.
+     */
+    void setIsPrivileged(bool isPrivileged) {
+        _isPrivileged = isPrivileged;
+    }
+
+    /**
      * Returns true if the connection is on the proxy unix socket.
      */
     bool isConnectedToProxyUnixSocket() const {
@@ -321,6 +338,12 @@ protected:
      * storms.
      */
     bool _isConnectedToPriorityPort{false};
+
+    /**
+     * Whether the SessionManager classified this session as privileged (exempt from connection
+     * limits) when it was started. See isPrivileged().
+     */
+    bool _isPrivileged{false};
 
     /**
      * Indicates whether this is a proxy unix domain socket connection.

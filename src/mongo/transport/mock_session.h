@@ -200,6 +200,7 @@ class MockPrioritySession : public MockSession {
 public:
     explicit MockPrioritySession(TransportLayer* tl) : MockSession(tl) {
         _isConnectedToPriorityPort = true;
+        _isPrivileged = true;
     }
 };
 
