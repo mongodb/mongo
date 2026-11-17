@@ -1186,9 +1186,7 @@ size_t getTunedMaxBatchSize(OperationContext* opCtx,
 /**
  * Collect query stats metrics on mongod.
  */
-static void collectQueryStats(OperationContext* opCtx,
-                              CurOp& curOp,
-                              const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+static void collectQueryStats(OperationContext* opCtx, CurOp& curOp) {
     // Only collect query stats if a QueryStats key was generated during registration, which
     // indicates that query stats was enabled and this operation was sampled for query stats.
     // metricsRequested is set when a remote caller (e.g. mongos) has requested per-op execution
@@ -1200,7 +1198,7 @@ static void collectQueryStats(OperationContext* opCtx,
         curOp.setEndOfOpMetrics(0 /* no documents returned */);
     }
     if (key) {
-        collectQueryStatsMongod(opCtx, expCtx, std::move(key));
+        collectQueryStatsMongod(opCtx, std::move(key));
     }
 }
 
@@ -1400,7 +1398,7 @@ WriteResult performInserts(
     tassert(11052014, "Expected empty batch", batch.empty());
 
     if (source != OperationSource::kTimeseriesInsert) {
-        collectQueryStats(opCtx, curOp, nullptr);
+        collectQueryStats(opCtx, curOp);
     }
 
     return out;
@@ -1473,7 +1471,7 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
         *containsDotsAndDollarsField = true;
     }
 
-    collectQueryStats(opCtx, curOp, canonicalUpdate.expCtx());
+    collectQueryStats(opCtx, curOp);
 
     return result;
 }
@@ -2180,7 +2178,7 @@ static SingleWriteResult performSingleDeleteOp(
         curOp.debug().execStats = std::move(stats);
     }
 
-    collectQueryStats(opCtx, curOp, canonicalDelete.expCtx());
+    collectQueryStats(opCtx, curOp);
 
     SingleWriteResult result;
     result.setN(nDeleted);

@@ -274,7 +274,6 @@ ClientCursorPin registerCursor(const AggExState& aggExState,
  * or the given executor (otherwise) and collects them in the query stats store.
  */
 void collectQueryStats(const AggExState& aggExState,
-                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        mongo::PlanExecutor* maybeExec,
                        ClientCursorPin* maybePinnedCursor) {
     invariant(maybeExec || maybePinnedCursor);
@@ -298,7 +297,7 @@ void collectQueryStats(const AggExState& aggExState,
     if (maybePinnedCursor) {
         collectQueryStatsMongod(opCtx, *maybePinnedCursor);
     } else {
-        collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().getQueryStatsInfo().key));
+        collectQueryStatsMongod(opCtx, std::move(curOp->debug().getQueryStatsInfo().key));
     }
 }
 
@@ -306,11 +305,10 @@ void collectQueryStats(const AggExState& aggExState,
  * Builds the reply for a pipeline over a sharded collection that contains an exchange stage.
  */
 void handleMultipleCursorsForExchange(const AggExState& aggExState,
-                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       std::vector<ClientCursorPin>& pinnedCursors,
                                       rpc::ReplyBuilderInterface* result) {
     invariant(pinnedCursors.size() > 1);
-    collectQueryStats(aggExState, expCtx, nullptr, &pinnedCursors[0]);
+    collectQueryStats(aggExState, nullptr, &pinnedCursors[0]);
 
     long long batchSize = aggExState.getRequest().getCursor().getBatchSize().value_or(
         aggregation_request_helper::kDefaultBatchSize);
@@ -513,7 +511,7 @@ boost::optional<ClientCursorPin> executeSingleExecUntilFirstBatch(
         cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
     }
 
-    collectQueryStats(aggExState, expCtx, execs[0].get(), maybePinnedCursor.get_ptr());
+    collectQueryStats(aggExState, execs[0].get(), maybePinnedCursor.get_ptr());
 
     if (aggExState.hasChangeStream()) {
         auto curOp = CurOp::get(opCtx);
@@ -582,7 +580,7 @@ void executeUntilFirstBatch(const AggExState& aggExState,
             }
             pinnedCursors.emplace_back(std::move(pinnedCursor));
         }
-        handleMultipleCursorsForExchange(aggExState, expCtx, pinnedCursors, result);
+        handleMultipleCursorsForExchange(aggExState, pinnedCursors, result);
 
         if (pinnedCursors.size() > 0) {
             maybePinnedCursor = std::move(pinnedCursors[0]);
@@ -919,7 +917,6 @@ void executeExplain(const AggExState& aggExState,
     }
     collectQueryStatsMongod(
         aggExState.getOpCtx(),
-        expCtx,
         std::move(CurOp::get(aggExState.getOpCtx())->debug().getQueryStatsInfo().key));
 }
 

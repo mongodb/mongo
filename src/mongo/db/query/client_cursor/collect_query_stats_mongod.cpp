@@ -31,9 +31,7 @@ void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCur
     }
 }
 
-void collectQueryStatsMongod(OperationContext* opCtx,
-                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             std::unique_ptr<query_stats::Key> key) {
+void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stats::Key> key) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // query stats directly.
     auto& opDebug = CurOp::get(opCtx)->debug();

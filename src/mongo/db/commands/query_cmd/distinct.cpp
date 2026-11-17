@@ -715,9 +715,7 @@ public:
 
             uassert(31299, "distinct too big, 16mb cap", result.len() < kMaxResponseSize);
 
-            auto* cq = executor->getCanonicalQuery();
-            collectQueryStatsMongod(
-                opCtx, cq->getExpCtx(), std::move(curOp->debug().getQueryStatsInfo().key));
+            collectQueryStatsMongod(opCtx, std::move(curOp->debug().getQueryStatsInfo().key));
 
             // Include queryStats metrics in the result to be sent to mongos.
             const bool includeMetrics =
@@ -813,8 +811,7 @@ public:
                 &resultBuilder, dbName.tenantId(), metrics));
 
             curOp->setEndOfOpMetrics(resultBuilder.asTempObj().getObjectField("values").nFields());
-            collectQueryStatsMongod(
-                opCtx, canonicalQuery->getExpCtx(), std::move(ownedQueryStatsKey));
+            collectQueryStatsMongod(opCtx, std::move(ownedQueryStatsKey));
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {

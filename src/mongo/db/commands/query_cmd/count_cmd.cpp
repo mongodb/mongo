@@ -429,8 +429,7 @@ public:
             // Store profiling data if profiling is enabled.
             collectProfilingDataIfNeeded(curOp, *exec);
 
-            collectQueryStatsMongod(
-                opCtx, expCtx, std::move(curOp->debug().getQueryStatsInfo().key));
+            collectQueryStatsMongod(opCtx, std::move(curOp->debug().getQueryStatsInfo().key));
 
             CountCommandReply reply = count_cmd_helper::buildCountReply(countResult);
             if (curOp->debug().getQueryStatsInfo().metricsRequested) {

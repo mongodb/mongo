@@ -20,9 +20,7 @@ namespace mongo {
 void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& cursor);
 // TODO SERVER-112083 Move this function to a better location since it has nothing to do with
 // ClientCursor.
-void collectQueryStatsMongod(OperationContext* opCtx,
-                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             std::unique_ptr<query_stats::Key> key);
+void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stats::Key> key);
 
 /**
  * Records query stats for reads and writes that error while the query stats key is still held by
