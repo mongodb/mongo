@@ -149,6 +149,15 @@ BEP_FULL="build_events_full.json"
 BEP_OUT="build_events.json"
 BASE_FLAGS="--verbose_failures ${LOCAL_ARG} ${MONGO_VERSION_ARG} ${bazel_args:-}"
 BASE_FLAGS+=" ${bazel_compile_flags:-} ${task_compile_flags:-} ${patch_compile_flags:-}"
+if bazel_evergreen_shutils::is_windows; then
+    # compile_all_but_not_unittests requests GNU's -s to skip unused executable symbols.
+    # COFF linkers do not accept it. Use the build setting so both compilation and
+    # PDB output declarations agree that these Windows artifacts have no debug symbols.
+    BASE_FLAGS=" ${BASE_FLAGS} "
+    while [[ "${BASE_FLAGS}" == *" --linkopt=-s "* ]]; do
+        BASE_FLAGS="${BASE_FLAGS/ --linkopt=-s / --debug_symbols=False }"
+    done
+fi
 GDB_INDEX_FLAGS=""
 if bazel_evergreen_shutils::should_disable_gdb_index "${task_name:-}"; then
     # Append this after all task and patch flags so CI configuration cannot

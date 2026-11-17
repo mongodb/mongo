@@ -1,4 +1,11 @@
 load("@rules_python//python:defs.bzl", "py_test")
+load(":python_runtime_test.bzl", "python_execution_runtime_test_suite", "windows_cross_python_runtime_test")
+
+exports_files(["runtime_toolchains.bzl"])
+
+python_execution_runtime_test_suite(name = "python_execution_runtime_test")
+
+windows_cross_python_runtime_test(name = "windows_cross_python_runtime_test")
 
 py_test(
     name = "python_toolchain_test",
@@ -6,5 +13,6 @@ py_test(
     data = [
         "python_toolchain.BUILD.tmpl",
         "python_toolchain.bzl",
+        "runtime_toolchains.bzl",
     ],
 )

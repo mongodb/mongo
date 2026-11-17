@@ -229,6 +229,13 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
                 owner = ctx.label,
                 libraries = depset(direct = [direct_lib]),
                 user_link_flags = cur_flags,
+                # Rust consumers use this CcInfo directly for remote linking.
+                # Keep the order files and linker scripts referenced by its flags.
+                additional_inputs = depset([
+                    file
+                    for input in binary_linker_inputs
+                    for file in input.additional_inputs
+                ]),
             )
             linking_context = cc_common.create_linking_context(linker_inputs = depset(direct = [linker_input], transitive = linker_input_deps))
 

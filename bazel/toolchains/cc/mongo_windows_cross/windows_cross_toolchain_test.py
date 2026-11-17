@@ -1,6 +1,8 @@
 """Protocol checks for the generated Windows host tool wrappers."""
 
 import ast
+import re
+import shlex
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,6 +12,58 @@ TOOLCHAIN_SOURCE = Path(__file__).with_name("mongo_windows_cross_toolchain.bzl")
 
 
 class WindowsCrossToolchainTest(unittest.TestCase):
+    def _warning_flags(self, source: str) -> set[str]:
+        flags = set()
+        for line in (TOOLCHAIN_SOURCE.parents[4] / ".bazelrc").read_text().splitlines():
+            tokens = shlex.split(line, comments=True)
+            if len(tokens) < 2 or not tokens[1].startswith("--per_file_copt="):
+                continue
+            # These Clang diagnostics must not change the native MSVC or Linux configs.
+            self.assertEqual(tokens[0], "build:windows-cross-x86_64")
+            pattern, options = tokens[1].removeprefix("--per_file_copt=").split("@", 1)
+            if re.search(pattern, source):
+                flags.update(options.split(","))
+        return flags
+
+    def test_warning_filters_cover_benchmark_and_fixture_diagnostics(self) -> None:
+        cases = {
+            "src/mongo/db/query/canonical_query_bm.cpp": "-Wno-unused-variable",
+            "src/mongo/db/pipeline/percentile_algo_bm_fixture.cpp": "-Wno-unused-variable",
+            "src/mongo/bson/column/bson_column_encoder.cpp": "-Wno-unused-lambda-capture",
+            "src/mongo/db/query/query_planner_bm.cpp": "-Wno-missing-braces",
+            "src/mongo/db/exec/sbe/sbe_unittest.cpp": "-Wno-unused-private-field",
+            "src/mongo/transport/session_workflow_bm.cpp": "-Wno-unused-private-field",
+            "src/mongo/db/sharding_environment/config_server_test_fixture.cpp": "-Wno-potentially-evaluated-expression",
+            "src/mongo/db/exec/classic/filter_bm.cpp": "-Wno-undefined-var-template",
+            "src/mongo/db/query/compiler/ce/ce_test_utils.cpp": "-Wno-undefined-var-template",
+            "src/mongo/db/pipeline/change_stream_pipeline_bm.cpp": "-Wno-undefined-var-template",
+            "src/third_party/s2/util/math/mathutil.cc": "-Wno-undefined-var-template",
+            "src/third_party/benchmark/dist/src/complexity.cc": "-Wno-unused-but-set-variable",
+            "src/third_party/benchmark/dist/src/benchmark.cc": "-Wno-invalid-offsetof",
+        }
+        for source, warning in cases.items():
+            with self.subTest(source=source):
+                # Bazel may report execroot-relative paths with a configuration prefix.
+                self.assertIn(
+                    warning, self._warning_flags("bazel-out/windows-fastbuild/bin/" + source)
+                )
+
+    def test_warning_filters_keep_unrelated_diagnostics_enabled(self) -> None:
+        ordinary = self._warning_flags("src/mongo/db/query/canonical_query.cpp")
+        for flag in (
+            "-Wno-unused-variable",
+            "-Wno-unused-private-field",
+            "-Wno-potentially-evaluated-expression",
+            "-Wno-undefined-var-template",
+            "-Wno-invalid-offsetof",
+            "-Wno-unused-but-set-variable",
+            "-Wno-unused",
+            "-Wno-everything",
+            "-w",
+        ):
+            self.assertNotIn(flag, ordinary)
+        self.assertEqual(self._warning_flags("external/other/library.cc"), set())
+
     def test_linux_execution_platform_overrides_inherited_msvc_setting(self) -> None:
         path = TOOLCHAIN_SOURCE.parents[3] / "platforms" / "platform_util.bzl"
         source = ast.parse(path.read_text())
@@ -22,7 +76,7 @@ class WindowsCrossToolchainTest(unittest.TestCase):
         exec(compile(ast.Module(body=[setup], type_ignores=[]), str(path), "exec"), namespace)
         namespace[setup.name]("amd64", "amazon_linux_2023", "")
         base, cross = [call.kwargs for call in native.platform.call_args_list]
-        self.assertNotIn("flags", base)
+        self.assertEqual(base["flags"], [])
         self.assertEqual(cross["parents"], [":" + base["name"]])
         self.assertEqual(cross["name"], "amazon_linux_2023_amd64_windows_cross_exec")
         self.assertEqual(
@@ -43,6 +97,7 @@ class WindowsCrossToolchainTest(unittest.TestCase):
         self.assertEqual(len(platforms), 3)
         self.assertEqual(len({platform["name"] for platform in platforms}), 3)
         self.assertIn(":use_mongo_linux_cross_execution", platforms[-1]["constraint_values"])
+        self.assertEqual(platforms[-1]["flags"], cross["flags"])
 
     def test_resource_directory_headers_are_declared_remote_inputs(self) -> None:
         source = ast.parse(TOOLCHAIN_SOURCE.read_text(encoding="utf-8"))

@@ -999,7 +999,13 @@ def _impl(ctx):
                     actions = [ACTION_NAMES.cpp_link_static_library],
                     flag_groups = [flag_group(flags = ["/ignore:4221"])],
                 ),
-            ],
+            ] + ([flag_set(
+                actions = all_link_actions,
+                # Microsoft's pinned ATL archive refers to a PDB from its build host
+                # that is not distributed with the SDK. Our objects use embedded /Z7
+                # debug info; keep generating and validating their output PDBs.
+                flag_groups = [flag_group(flags = ["/ignore:4099"])],
+            )] if ctx.attr.compiler == "clang-cl" else []),
         )
 
         no_legacy_features_feature = feature(name = "no_legacy_features")

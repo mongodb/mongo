@@ -121,6 +121,7 @@ def _py_download(ctx):
         ctx.file("BUILD.bazel", """
 # Stub toolchain - platform doesn't match host, not downloaded
 load("@rules_python//python:defs.bzl", "py_runtime_pair")
+load("@//bazel/toolchains/python:runtime_toolchains.bzl", "python_runtime_toolchains")
 
 exports_files(["availability.bzl"])
 
@@ -142,16 +143,18 @@ py_runtime_pair(
     py3_runtime = None,
 )
 
-toolchain(
+python_runtime_toolchains(
     name = "python_toolchain",
-    toolchain_type = "@rules_python//python:toolchain_type",
-    toolchain = ":runtime_pair",
-    exec_compatible_with = [
+    runtime_pair = ":runtime_pair",
+    constraints = [
         {constraints}
     ],
-    visibility = ["//visibility:public"],
+    windows = {windows},
 )
-""".format(constraints = constraints_str))
+""".format(
+            constraints = constraints_str,
+            windows = is_toolchain_windows,
+        ))
         return None
 
     if ctx.attr.urls:
@@ -250,6 +253,7 @@ toolchain(
     # Inject our string substitutions into the BUILD file template, and drop said BUILD file in the WORKSPACE root of the repository.
     substitutions = {
         "{constraints}": constraints_str,
+        "{windows}": str(is_toolchain_windows),
         "{cross_linux_python_excludes}": cross_linux_python_excludes,
         "{interpreter_path}": interpreter_path,
     }

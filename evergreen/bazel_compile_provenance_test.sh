@@ -41,11 +41,18 @@ run_compile() {
         bash "${test_root}/scripts/bazel_compile.sh" >"${test_root}/${name}/log" 2>&1 || result=$?
 }
 
+read_commands() {
+    commands=()
+    while IFS= read -r command; do
+        commands+=("$command")
+    done <"$1"
+}
+
 # Report-only aspects and positive target filters omit the provenance output
 # from a combined invocation. The second build must produce and copy it.
 run_compile filtered //src/... '--config=symbol-checker --output_groups=report --build_tag_filters=mongo_binary --linkopt=-s' 0 0 false
 [[ "$result" == 0 ]]
-mapfile -t commands <"${test_root}/filtered/commands.txt"
+read_commands "${test_root}/filtered/commands.txt"
 [[ "${#commands[@]}" == 2 ]]
 [[ "${commands[0]}" != *toolchain_provenance* ]]
 [[ "${commands[1]}" == *'--linkopt=-s'* ]]
@@ -63,6 +70,13 @@ run_compile resmoke_configs //buildscripts/resmokeconfig/... '--build_tag_filter
 run_compile windows archive-dist-stripped '' 0 0 true
 [[ "$result" == 0 && "$(wc -l <"${test_root}/windows/commands.txt")" == 1 ]]
 
+run_compile windows_no_symbols //src/... '--linkopt=-s --linkopt=-s --linkopt=-static' 0 0 true
+[[ "$result" == 0 ]]
+command="$(cat "${test_root}/windows_no_symbols/commands.txt")"
+[[ "$command" != *' --linkopt=-s '* ]]
+[[ "$command" == *' --debug_symbols=False '* ]]
+[[ "$command" == *' --linkopt=-static '* ]]
+
 run_compile build_failed archive-dist-stripped '' 7 0 false
 [[ "$result" == 7 && "$(wc -l <"${test_root}/build_failed/commands.txt")" == 1 ]]
 
@@ -71,7 +85,7 @@ run_compile probe_failed archive-dist-stripped '' 0 9 false
 [[ "$(cat "${test_root}/probe_failed/log")" == *'Compiler/linker provenance capture failed with exit code 9.'* ]]
 
 CAPTURE_TEST_PATCH=false run_compile release archive-dist-stripped '--config=public-release-local' 0 0 false
-mapfile -t commands <"${test_root}/release/commands.txt"
+read_commands "${test_root}/release/commands.txt"
 [[ "$result" == 0 && "${#commands[@]}" == 2 ]]
 suffix='--remote_executor= --noremote_accept_cached --remote_upload_local_results=false --modify_execution_info=.*=+no-cache'
 [[ "${commands[0]}" == *"$suffix" && "${commands[1]}" == *"$suffix" ]]

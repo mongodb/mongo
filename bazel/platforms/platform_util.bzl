@@ -20,6 +20,13 @@ def setup_platform(arch, distro_or_os, cache_silo, name_suffix = "", extra_const
             ":use_mongo_toolchain",
         ] + extra_constraints,
         exec_properties = exec_properties,
+        # rules_pycross resolves its optional IBM execution groups on Windows
+        # too. Tools in those groups target Linux and cannot inherit MSVC from
+        # the Windows binary configuration, even when the group is unused.
+        flags = [
+            "--@//bazel/config:compiler_type=clang",
+            "--@rules_rust//rust/settings:toolchain_linker_preference=cc",
+        ] if ":use_mongo_linux_cross_execution" in extra_constraints else [],
     )
 
     # Build tools for Windows cross builds run on Linux. Their target platform

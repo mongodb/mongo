@@ -136,7 +136,7 @@ def _write_linux_tool_wrappers(rctx):
     for wrapper, substitutions in linux_tool_wrapper_substitutions().items():
         rctx.template(
             "bin/" + wrapper,
-            template = LINUX_TOOL_WRAPPER_TEMPLATE,
+            LINUX_TOOL_WRAPPER_TEMPLATE,
             substitutions = substitutions,
             executable = True,
         )

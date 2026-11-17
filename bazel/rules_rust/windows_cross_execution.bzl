@@ -15,23 +15,14 @@ def windows_cross_action_environment(enabled, exec_os, env):
         result["PATH"] = "/usr/local/bin:/usr/bin:/bin"
     return result
 
-def windows_cross_native_cc_environment(enabled, exec_os, env):
-    """Use the native MSVC toolchain's absolute paths without Bazel's execpath prefix."""
-    result = dict(env)
-    if enabled and exec_os == "windows":
-        # The native MSVC toolchain records absolute paths under Program Files.
-        # Bazel's execpath representation of those paths is not a valid Windows
-        # filename for cc-rs. Strip only the prefix, retaining the selected tool
-        # and version rather than searching PATH or the working directory.
-        for key in ["CC", "CXX", "AR", "LD"]:
-            path = result[key].replace("\\", "/")
-            drive_index = path.find(":/")
-            if drive_index >= 1 and path[drive_index - 1].lower() in "abcdefghijklmnopqrstuvwxyz":
-                path = path[drive_index - 1:]
-            elif key != "LD" and not path.startswith("//"):
-                fail("Expected an absolute native Windows toolchain path for {}: {}".format(key, path))
+def windows_cross_cargo_environment(enabled, exec_os, env):
+    result = windows_cross_action_environment(enabled, exec_os, env)
+    if enabled and exec_os == "linux":
+        # Failed build scripts also upload their declared manifest directory.
+        # Linux absolute symlinks in that output cannot be downloaded on Windows.
+        result["RULES_RUST_CARGO_MANIFEST_COPY"] = "1"
 
-            # With linker_preference=rust, LD is a declared execroot-relative
-            # Rust linker. The Cargo runner already resolves it against execroot.
-            result[key] = path
+        # Build scripts run in CARGO_MANIFEST_DIR; expose execroot-relative
+        # toolchain flags, INCLUDE/LIB, and paths inside the Clang VFS overlay.
+        result["RULES_RUST_SYMLINK_EXEC_ROOT"] = "1"
     return result

@@ -48,8 +48,9 @@ load("//bazel/toolchains/cc/mongo_windows:mongo_windows_cc_toolchain_config.bzl"
 load(
     "//bazel/toolchains/cc/mongo_windows_cross:windows_rc_helpers.bzl",
     "windows_cross_rc_include_dirs",
-    "windows_cross_rc_library_dirs",
     "windows_cross_rc_source",
+    "windows_rc_action_environment",
+    "windows_rc_toolchain_options",
 )
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//bazel/config:generate_config_header.bzl", "generate_config_header")
@@ -1130,7 +1131,9 @@ def idl_generator_impl(ctx):
                     python_interpreter = python_file.path.replace("\\", "/")
                     break
     else:
-        python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
+        # IDL generation runs on the execution platform, including under WASI
+        # transitions whose target platform has no Python runtime.
+        python = ctx.attr._exec_python_toolchain[platform_common.ToolchainInfo].py3_runtime
         python_interpreter = python.interpreter.path
         python_files = python.files
 
@@ -1178,10 +1181,8 @@ def idl_generator_impl(ctx):
     else:
         action_wrapper = None
 
-    if use_windows_local_container:
-        python_path_value = ":".join([path.replace("\\", "/") for path in python_path])
-    else:
-        python_path_value = ctx.configuration.host_path_separator.join(python_path)
+    separator = ";" if python_interpreter.endswith(".exe") else ":"
+    python_path_value = separator.join([path.replace("\\", "/") for path in python_path])
 
     ctx.actions.run(
         executable = action_wrapper if use_macos_local_container else python_interpreter,
@@ -1267,6 +1268,10 @@ idl_generator_rule = rule(
         ),
         "_idl_use_linux_python": attr.label(
             default = "//bazel/config:idl_use_linux_python",
+        ),
+        "_exec_python_toolchain": attr.label(
+            default = "@rules_python//python:current_py_toolchain",
+            cfg = "exec",
         ),
         "_macos_cross_local_container_actions": attr.label(
             default = "//bazel/config:macos_cross_local_container_actions",
@@ -1813,19 +1818,6 @@ def _rc_impl(ctx):
     args.add("/fo" + out.path)  # /fo must be joined
     args.add(rc_source.path)
 
-    action_env = {}
-    if ctx.files.rc_tools:
-        action_env = {
-            "PATH": ctx.executable.rc.dirname,
-            "TEMP": "/tmp",
-            "TMP": "/tmp",
-            "TMPDIR": "/tmp",
-        }
-        library_dirs = windows_cross_rc_library_dirs(ctx.files.rc_tools)
-        if library_dirs:
-            # Both llvm-rc and the clang preprocessor inherit this loader path.
-            action_env["LD_LIBRARY_PATH"] = ":".join(library_dirs)
-
     # llvm-rc invokes clang for preprocessing. Keep that compiler in the action
     # input tree and expose the directory containing both tools on PATH.
     ctx.actions.run(
@@ -1838,7 +1830,7 @@ def _rc_impl(ctx):
         # bazelrc points TMP/TEMP at a Windows drive through --action_env, and
         # llvm-rc fails with "Unable to create temp file" when that directory
         # does not exist on the worker, so pin the temporary directory too.
-        env = action_env,
+        env = windows_rc_action_environment(ctx),
         use_default_shell_env = bool(ctx.files.rc_tools),
     )
 
@@ -1918,24 +1910,8 @@ def windows_rc(name, src, manifest_in = None, icon = None):
         name = name,
         src = src,
         resources = resources,
-        rc_tools = select({
-            "//bazel/platforms:windows_cross": [
-                "@mongo_windows_cross_toolchain_files//:rc_tools",
-            ],
-            "//conditions:default": [],
-        }),
-        rc_sysroot = select({
-            "//bazel/platforms:windows_cross": [
-                "@mongo_windows_cross_toolchain_files//:rc_sysroot_files",
-            ],
-            "//conditions:default": [],
-        }),
-        rc = select({
-            "//bazel/platforms:windows_cross": "@mongo_windows_cross_toolchain_files//:rc",
-            "@platforms//os:windows": "@mongo_windows_toolchain//:rc",
-            "//conditions:default": None,
-        }),
         windows_version_minimal = "//bazel/config:win_min_version",
+        **windows_rc_toolchain_options()
     )
 
 def mongo_rust_library(name, rustc_flags = [], target_compatible_with = [], **kwargs):

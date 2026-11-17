@@ -27,6 +27,12 @@ cc_test(
 )
 
 py_test(
+    name = "windows_bash_selection_test",
+    srcs = ["windows_bash_selection_test.py"],
+    data = ["windows_test_launcher.ps1"],
+)
+
+py_test(
     name = "windows_test_launcher_test",
     srcs = ["windows_test_launcher_test.py"],
     data = ["//bazel:windows_test_launcher"],

@@ -58,6 +58,7 @@ py_test(
     data = [
         "BUILD.tmpl",
         "mongo_windows_cross_toolchain.bzl",
+        "//:.bazelrc",
         "//bazel/platforms:platform_util.bzl",
     ],
     main = "windows_cross_toolchain_test.py",

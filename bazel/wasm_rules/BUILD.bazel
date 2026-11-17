@@ -1,3 +1,6 @@
 load(":wasm_aot_compile_test.bzl", "wasm_aot_compile_test_suite")
+load(":embed_binary_rc_test.bzl", "embed_binary_rc_test_suite")
 
 wasm_aot_compile_test_suite(name = "wasm_aot_compile_test")
+
+embed_binary_rc_test_suite(name = "embed_binary_rc_test")

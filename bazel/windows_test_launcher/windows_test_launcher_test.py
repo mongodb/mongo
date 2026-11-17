@@ -64,6 +64,51 @@ class WindowsTestLauncherTest(unittest.TestCase):
         runfiles_copy = str(Path(runfiles_dir) / "_main/deep/package" / Path(sys.executable).name)
         self._launch(runfiles_copy, runfiles_dir)
 
+    def test_runs_analysis_shell_scripts_with_native_bash(self):
+        self._launch_shell_test()
+
+    def test_shell_launch_ignores_malformed_path_entries(self):
+        for entry in ('"C:\\quoted path"', "C:\\invalid<path", "C:\\invalid|path"):
+            with self.subTest(entry=entry):
+                self._launch_shell_test(entry)
+
+    def test_shell_launch_ignores_path_bash_candidates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            # This executable cannot run the shell fixture. Selecting it instead of the
+            # installed native Bash makes the exit-status and argument assertions fail.
+            shutil.copy2(sys.executable, root / "bash.exe")
+            (root / "cygpath.exe").touch()
+            self._launch_shell_test(str(root))
+            self._launch_shell_test(".", working_directory=root)
+
+    def _launch_shell_test(
+        self, path_prefix: str = "", working_directory: Path | None = None
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="shell test ") as directory:
+            script = Path(directory) / "analysis test.sh"
+            script.write_text('printf "%s\\0" "$@"\nexit 7\n', encoding="utf-8", newline="\n")
+            self.assertNotIn(b"\r", script.read_bytes())
+            arguments = ["", "with spaces", 'embedded"quote', "%PATH%", "&|<>^!", ""]
+            result = subprocess.run(
+                [str(self._launcher()), str(script), *arguments],
+                env={
+                    **os.environ,
+                    "RUNFILES_DIR": "",
+                    "TEST_TIMEOUT": "60",
+                    "PATHEXT": ".CPL",
+                    "PATH": path_prefix + ";" + os.environ.get("PATH", ""),
+                },
+                cwd=working_directory,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+        self.assertEqual(result.returncode, 7, result.stderr)
+        self.assertEqual(result.stdout.split("\0"), [*arguments, ""])
+        self.assertIn("Process-under-test started with PID:", result.stderr)
+
     def test_timeout_writes_minidump_and_stops_test(self):
         with tempfile.TemporaryDirectory() as directory:
             binary_directory = Path(directory) / "bin"

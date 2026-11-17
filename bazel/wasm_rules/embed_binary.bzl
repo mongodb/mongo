@@ -11,6 +11,12 @@ to using the output in linkopts/additional_linker_inputs.
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+load(
+    "//bazel/toolchains/cc/mongo_windows_cross:windows_rc_helpers.bzl",
+    "windows_cross_rc_include_dirs",
+    "windows_rc_action_environment",
+    "windows_rc_toolchain_options",
+)
 
 _ASM_TEMPLATE_LINUX = """\
     .section .rodata,"a"
@@ -124,9 +130,9 @@ embed_binary_obj = rule(
     fragments = ["cpp"],
 )
 
-"""Rule to embed a binary file as a Windows resource using rc.exe.
+"""Rule to embed a binary file as a Windows resource using the resource toolchain.
 
-Generates an .rc file referencing the binary, compiles it to a .res with rc.exe,
+Generates an .rc file referencing the binary, compiles it to a .res,
 and provides CcInfo so dependents can link it via deps.
 
 At runtime, use FindResource/LoadResource/LockResource/SizeofResource to access
@@ -146,22 +152,27 @@ def _embed_binary_rc_impl(ctx):
         output = rc_file,
         content = '{resource_name} RCDATA "{input_path}"\n'.format(
             resource_name = resource_name,
-            input_path = input_file.path.replace("/", "\\\\"),
+            # Forward slashes work with native rc.exe and Linux llvm-rc.
+            input_path = input_file.path.replace("\\", "/"),
         ),
     )
 
     args = ctx.actions.args()
     args.add("/nologo")
+    for directory in windows_cross_rc_include_dirs(ctx):
+        args.add("/I", directory)
     args.add("/fo" + res_file.path)
     args.add(rc_file.path)
 
     ctx.actions.run(
         executable = ctx.executable.rc,
         arguments = [args],
-        inputs = [rc_file, input_file],
+        inputs = [rc_file, input_file] + ctx.files.rc_tools + ctx.files.rc_sysroot,
         outputs = [res_file],
-        mnemonic = "EmbedBinaryRC",
+        mnemonic = "WindowsRC",
         progress_message = "Embedding %s as Windows resource" % input_file.short_path,
+        env = windows_rc_action_environment(ctx),
+        use_default_shell_env = bool(ctx.files.rc_tools),
     )
 
     linker_input = cc_common.create_linker_input(
@@ -178,7 +189,7 @@ def _embed_binary_rc_impl(ctx):
         CcInfo(linking_context = linking_context),
     ]
 
-embed_binary_rc = rule(
+_embed_binary_rc_rule = rule(
     implementation = _embed_binary_rc_impl,
     attrs = {
         "src": attr.label(
@@ -198,10 +209,15 @@ embed_binary_rc = rule(
             executable = True,
             cfg = "exec",
             allow_files = True,
-            default = "@mongo_windows_toolchain//:rc",
-            doc = "The rc.exe compiler.",
+            doc = "The resource compiler for the execution platform.",
         ),
+        "rc_tools": attr.label_list(allow_files = True, cfg = "exec"),
+        "rc_sysroot": attr.label_list(allow_files = True, cfg = "exec"),
     },
     provides = [CcInfo],
-    doc = "Embeds a binary file as a Windows resource (.res) using rc.exe.",
+    doc = "Embeds a binary file as a Windows resource (.res).",
 )
+
+def embed_binary_rc(name, **kwargs):
+    """Embed a Windows resource with the same toolchain as other RC actions."""
+    _embed_binary_rc_rule(name = name, **(windows_rc_toolchain_options() | kwargs))

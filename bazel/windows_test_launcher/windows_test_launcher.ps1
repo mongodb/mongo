@@ -96,6 +96,66 @@ function ConvertTo-WindowsArgument([string]$arg) {
     return $quoted.ToString()
 }
 
+function Resolve-NativeWindowsBash([string]$candidate) {
+    if (-not $candidate) { return }
+    try {
+        $candidate = $candidate.Trim().Trim('"')
+        if (-not [IO.Path]::IsPathRooted($candidate)) { return }
+        $absolute = [IO.Path]::GetFullPath($candidate)
+        # Reject drive-relative and root-relative Windows paths too.
+        if ([IO.Path]::GetPathRoot($candidate).Replace('/', '\') -ine
+                [IO.Path]::GetPathRoot($absolute).Replace('/', '\')) { return }
+        if ([IO.Path]::GetFileName($absolute) -ine 'bash.exe' -or
+                -not [IO.File]::Exists($absolute)) { return }
+        $directory = [IO.Path]::GetDirectoryName($absolute)
+        # Cygwin and MSYS/Git Bash carry their native runtime next to Bash.
+        # Git's bin/bash.exe entry point uses the runtime under usr/bin instead.
+        $runtimes = @(
+            [IO.Path]::Combine($directory, 'cygwin1.dll'),
+            [IO.Path]::Combine($directory, 'msys-2.0.dll')
+        )
+        if ([IO.Path]::GetFileName($directory) -ieq 'bin') {
+            $runtimes += [IO.Path]::Combine([IO.Path]::GetDirectoryName($directory), 'usr', 'bin', 'msys-2.0.dll')
+        }
+        foreach ($runtime in $runtimes) {
+            if ([IO.File]::Exists($runtime)) { return $absolute }
+        }
+    } catch {
+        # Invalid configured paths are rejected without aborting discovery.
+        return
+    }
+}
+
+function Find-NativeWindowsBash {
+    if ($env:MONGO_BAZEL_BASH) {
+        $bash = Resolve-NativeWindowsBash $env:MONGO_BAZEL_BASH
+        if ($bash) { return $bash }
+        throw 'windows_test_launcher: MONGO_BAZEL_BASH must name an absolute native Git Bash or Cygwin bash.exe'
+    }
+    $systemDrive = if ($env:SystemDrive) { $env:SystemDrive + [IO.Path]::DirectorySeparatorChar } else { 'C:\' }
+    $candidates = @(
+        [IO.Path]::Combine($systemDrive, 'cygwin64', 'bin', 'bash.exe'),
+        [IO.Path]::Combine($systemDrive, 'cygwin', 'bin', 'bash.exe')
+    )
+    $gitRoots = @(
+        $(if ($env:ProgramFiles) { $env:ProgramFiles } else { [IO.Path]::Combine($systemDrive, 'Program Files') }),
+        $(if (${env:ProgramFiles(x86)}) { ${env:ProgramFiles(x86)} } else { [IO.Path]::Combine($systemDrive, 'Program Files (x86)') })
+    )
+    if ($env:LOCALAPPDATA) {
+        $gitRoots += @($env:LOCALAPPDATA, [IO.Path]::Combine($env:LOCALAPPDATA, 'Programs'))
+    }
+    foreach ($root in $gitRoots) {
+        $candidates += [IO.Path]::Combine($root, 'Git', 'usr', 'bin', 'bash.exe')
+        $candidates += [IO.Path]::Combine($root, 'Git', 'bin', 'bash.exe')
+    }
+    # PATH may contain relative directories, WSL, or unrelated executables.
+    foreach ($candidate in $candidates) {
+        $bash = Resolve-NativeWindowsBash $candidate
+        if ($bash) { return $bash }
+    }
+    throw 'windows_test_launcher: native Git Bash or Cygwin is required; set MONGO_BAZEL_BASH for a custom installation'
+}
+
 # Writes a full-memory minidump of $process to the test's undeclared outputs. The P/Invoke type is only
 # compiled when a dump is needed, so passing tests do not pay for it.
 function Write-TestMinidump([System.Diagnostics.Process]$process, [string]$binaryPath) {
@@ -139,6 +199,12 @@ public static class MongoTestMinidump {
 # and no redirection, the test inherits this console's stdin, stdout, and stderr.
 $startInfo = New-Object System.Diagnostics.ProcessStartInfo
 $startInfo.FileName = $testBin
+# Bazel emits shell scripts for AnalysisTestResultInfo, including when the assertions inspect
+# Windows targets. Select native Bash explicitly: bare bash can resolve to WSL on this host.
+if ([IO.Path]::GetExtension($testBin) -ieq '.sh') {
+    $startInfo.FileName = Find-NativeWindowsBash
+    $testArgs = @('--', $testBin.Replace('\', '/')) + $testArgs
+}
 $startInfo.Arguments = ($testArgs | ForEach-Object { ConvertTo-WindowsArgument $_ }) -join ' '
 $startInfo.UseShellExecute = $false
 $startInfo.WorkingDirectory = (Get-Location).ProviderPath

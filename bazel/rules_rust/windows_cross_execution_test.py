@@ -106,44 +106,23 @@ class WindowsCrossExecutionTest(unittest.TestCase):
                     self.assertEqual(old_count, int(header[2] or 1))
                     self.assertEqual(new_count, int(header[4] or 1))
 
-    def test_native_windows_cc_tools_use_absolute_toolchain_paths(self) -> None:
-        def fail(message: str) -> None:
-            raise ValueError(message)
-
-        namespace = {"fail": fail}
+    def test_cargo_exposes_execroot_paths_and_uses_portable_manifest_files(self) -> None:
+        namespace = {}
         source = Path(__file__).with_name("windows_cross_execution.bzl")
         exec(compile(source.read_text(), str(source), "exec"), namespace)
-        environment = namespace["windows_cross_native_cc_environment"]
-        original = {
-            "CC": "external/toolchain/C:/Program Files/MSVC/cl.exe",
-            "CXX": "external/toolchain/C:/Program Files/MSVC/cl.exe",
-            "AR": "external/toolchain/C:/Program Files/MSVC/lib.exe",
-            "LD": "external/toolchain/C:/Program Files/MSVC/link.exe",
-            "PATH": "C:/untrusted;C:/Program Files/MSVC",
-        }
+        env = {"INCLUDE": "external/cross/include;/sdk/include;", "LIB": "external/cross/lib"}
+        environment = namespace["windows_cross_cargo_environment"]
         self.assertEqual(
-            environment(True, "windows", original),
+            environment(True, "linux", env),
             {
-                "CC": "C:/Program Files/MSVC/cl.exe",
-                "CXX": "C:/Program Files/MSVC/cl.exe",
-                "AR": "C:/Program Files/MSVC/lib.exe",
-                "LD": "C:/Program Files/MSVC/link.exe",
-                "PATH": original["PATH"],
+                "PATH": "/usr/local/bin:/usr/bin:/bin",
+                **env,
+                "RULES_RUST_CARGO_MANIFEST_COPY": "1",
+                "RULES_RUST_SYMLINK_EXEC_ROOT": "1",
             },
         )
-        self.assertEqual(original["CC"], "external/toolchain/C:/Program Files/MSVC/cl.exe")
-        self.assertEqual(environment(False, "windows", original), original)
-        self.assertEqual(environment(True, "linux", original), original)
-        for path in ("D:\\MSVC\\cl.exe", "//server/MSVC/cl.exe", "C:/MSVC/cl.exe"):
-            with self.subTest(path=path):
-                tools = {key: path for key in ("CC", "CXX", "AR", "LD")}
-                self.assertEqual(
-                    environment(True, "windows", tools),
-                    {key: path.replace("\\", "/") for key in tools},
-                )
-        for path in ("cl.exe", "external/toolchain/cl.exe"):
-            with self.subTest(path=path), self.assertRaisesRegex(ValueError, "absolute native"):
-                environment(True, "windows", {key: path for key in ("CC", "CXX", "AR", "LD")})
+        self.assertEqual(environment(False, "linux", env), env)
+        self.assertEqual(environment(True, "windows", env), env)
 
     def test_only_windows_tools_are_kept_off_linux_rbe(self) -> None:
         namespace = {}
@@ -158,38 +137,6 @@ class WindowsCrossExecutionTest(unittest.TestCase):
                         {"no-remote-exec": "1"} if enabled and exec_os == "windows" else {},
                     )
 
-    def test_native_windows_cc_accepts_execroot_relative_rust_linker(self) -> None:
-        def fail(message: str) -> None:
-            raise ValueError(message)
-
-        namespace = {"fail": fail}
-        source = Path(__file__).with_name("windows_cross_execution.bzl")
-        exec(compile(source.read_text(), str(source), "exec"), namespace)
-        # get_linker_and_args uses the Rust toolchain's File.path when the
-        # Windows cross wrapper sets toolchain_linker_preference=rust.
-        linker = (
-            "bazel-out/x64_windows-opt/bin/external/rules_rust++rust+rw-tools/"
-            "rust_toolchain/bin/rust-lld.exe"
-        )
-        original = {
-            "CC": "external/msvc/C:/Program Files/MSVC/cl.exe",
-            "CXX": "external/msvc/C:/Program Files/MSVC/cl.exe",
-            "AR": "external/msvc/C:/Program Files/MSVC/lib.exe",
-            "LD": linker,
-        }
-        environment = namespace["windows_cross_native_cc_environment"]
-        self.assertEqual(
-            environment(True, "windows", original),
-            {
-                "CC": "C:/Program Files/MSVC/cl.exe",
-                "CXX": "C:/Program Files/MSVC/cl.exe",
-                "AR": "C:/Program Files/MSVC/lib.exe",
-                "LD": linker,
-            },
-        )
-        self.assertEqual(environment(False, "windows", original), original)
-        self.assertEqual(environment(True, "linux", original), original)
-
     def test_cargo_wrapper_controls_the_script_exec_transition(self) -> None:
         tree = ast.parse(WRAPPER.read_text())
         function = next(node for node in tree.body if isinstance(node, ast.FunctionDef))
@@ -201,7 +148,7 @@ class WindowsCrossExecutionTest(unittest.TestCase):
                     rules[kwargs["name"]] = kwargs
 
                 key = (
-                    "@@//bazel/rules_rust:windows_cross_native_cargo"
+                    "@@//bazel/rules_rust:windows_cross_linux_cargo"
                     if windows_cross
                     else "//conditions:default"
                 )
@@ -224,7 +171,7 @@ class WindowsCrossExecutionTest(unittest.TestCase):
                 self.assertEqual(script["data"], ["target_data"])
                 self.assertEqual(
                     script.get("exec_compatible_with", []),
-                    ["@platforms//os:windows"] if windows_cross else [],
+                    ["@platforms//os:linux"] if windows_cross else [],
                 )
                 self.assertNotIn("exec_compatible_with", rules["fixture_"])
                 self.assertNotIn("mongo_windows_cross_cargo_build_script_runner", rules["fixture"])

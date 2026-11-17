@@ -603,13 +603,18 @@ use_repo(
 )
 
 register_toolchains(
+    # Native Windows build tools (including WASI IDL generation) take priority
+    # when Windows execution is available, regardless of the target OS.
+    "@py_windows_x86_64//:python_toolchain_exec",
+    # Windows target runtimes take priority over Linux build-tool runtimes.
+    # A cfg="exec" Python generator targets Linux and skips this entry.
+    "@py_windows_x86_64//:python_toolchain",
     "@py_linux_arm64//:python_toolchain",
     "@py_linux_ppc64le//:python_toolchain",
     "@py_linux_s390x//:python_toolchain",
     "@py_linux_x86_64//:python_toolchain",
     "@py_macos_arm64//:python_toolchain",
     "@py_macos_x86_64//:python_toolchain",
-    "@py_windows_x86_64//:python_toolchain",
 )
 
 # broken on windows currently
@@ -671,9 +676,9 @@ single_version_override(
         "//bazel/rules_rust:ppc64le_cargo_bazel_url.patch",
         "//bazel/rules_rust:cargo_build_script_pwd_flags.patch",
         "//bazel/rules_rust:cargo_build_script_windows_path.patch",
-        "//bazel/rules_rust:cargo_build_script_windows_native_cc.patch",
         "//bazel/rules_rust:windows_cross_execution.patch",
         "//bazel/rules_rust:cargo_build_script_reproducible_cflags.patch",
+        "//bazel/rules_rust:cargo_manifest_copy.patch",
     ],
     version = "0.69.0",
 )
@@ -693,6 +698,7 @@ rust.toolchain(
         "wasm32-wasip1",
         "wasm32-wasip2",
         "x86_64-apple-darwin",
+        "x86_64-pc-windows-msvc",  # Linux-hosted Windows Rust cross compilation.
         "x86_64-unknown-linux-gnu",
     ],
     versions = ["nightly/2026-02-12"],

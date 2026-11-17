@@ -1,10 +1,13 @@
 # Define supported build platforms.
 load("//bazel/platforms:platform_util.bzl", "setup_platform")
+load(":windows_cross_exec_test.bzl", "windows_cross_exec_test")
 load("@rules_python//python:defs.bzl", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 
 exports_files(["platform_util.bzl"])
+
+windows_cross_exec_test(name = "windows_cross_optional_exec_test")
 
 py_test(
     name = "local_config_platform_test",

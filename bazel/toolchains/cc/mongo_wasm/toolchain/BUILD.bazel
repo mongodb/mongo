@@ -1,4 +1,5 @@
 load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
+load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load(":cc_toolchain_config_wasip2.bzl", "wasi_cc_toolchain_config_wasip2")
 load(":wasi_repo_test.bzl", "linux_tool_wrapper_fixture", "wasi_repo_test_suite")
@@ -6,6 +7,16 @@ load(":wasi_repo_test.bzl", "linux_tool_wrapper_fixture", "wasi_repo_test_suite"
 package(default_visibility = ["//visibility:public"])
 
 exports_files(["linux_tool_wrapper.sh"])
+
+py_test(
+    name = "wasi_repository_template_test",
+    srcs = ["wasi_repo_test.py"],
+    data = [
+        "linux_tool_wrapper.sh",
+        "wasi_repo.bzl",
+    ],
+    main = "wasi_repo_test.py",
+)
 
 # --- WASI Preview2 (wasm32-wasip2) toolchain/platform ---
 

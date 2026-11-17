@@ -1,4 +1,4 @@
-"""Exercise native Windows compiler/linker features without a Windows SDK."""
+"""Exercise Windows compiler/linker features without a Windows SDK."""
 
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
 load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
@@ -36,6 +36,8 @@ def _debug_policy_test_impl(ctx):
     asserts.equals(env, ctx.attr.symbols, "/Z7" in compile_flags)
     asserts.equals(env, ctx.attr.symbols, any([flag.startswith("/DEBUG") for flag in link_flags]))
     asserts.equals(env, ctx.attr.symbols, cc_common.is_enabled(feature_configuration = features, feature_name = "generate_pdb_file"))
+    asserts.equals(env, ctx.attr.compiler == "clang-cl", "/ignore:4099" in link_flags)
+    asserts.false(env, "/ignore:4217" in link_flags)
     if ctx.attr.mode in ["dbg", "fastbuild"]:
         asserts.true(env, "/Od" in compile_flags)
         asserts.true(env, "/INCREMENTAL:NO" in link_flags)
@@ -46,6 +48,7 @@ _debug_policy_test = rule(
     attrs = {
         "_impl_name": attr.string(default = "debug_policy_test"),
         "toolchain": attr.label(providers = [cc_common.CcToolchainInfo]),
+        "compiler": attr.string(),
         "mode": attr.string(),
         "symbols": attr.bool(),
     },
@@ -57,45 +60,47 @@ _debug_policy_test = rule(
 def debug_policy_test_suite(name):
     native.filegroup(name = name + "_empty", srcs = [])
     tests = []
-    for symbols in [False, True]:
-        suffix = "symbols" if symbols else "no_symbols"
-        config = name + "_config_" + suffix
-        toolchain = name + "_toolchain_" + suffix
-        mongo_windows_cc_toolchain_config(
-            name = config,
-            cpu = "x64_windows",
-            compiler = "msvc-cl",
-            toolchain_identifier = suffix,
-            archiver_flags = ["/NOLOGO"],
-            default_link_flags = ["/NOLOGO"],
-            global_defines = ["WIN32"],
-            tool_paths = {tool: "unused.exe" for tool in ["gcc", "ld", "ar", "cpp", "gcov", "nm", "objdump", "strip"]},
-            dbg_mode_debug_flag = "/DEBUG:FULL",
-            fastbuild_mode_debug_flag = "/DEBUG:FASTLINK",
-            debug_symbols = symbols,
-            tags = ["manual"],
-        )
-        cc_toolchain(
-            name = toolchain,
-            toolchain_identifier = suffix,
-            toolchain_config = ":" + config,
-            all_files = ":" + name + "_empty",
-            ar_files = ":" + name + "_empty",
-            as_files = ":" + name + "_empty",
-            compiler_files = ":" + name + "_empty",
-            dwp_files = ":" + name + "_empty",
-            linker_files = ":" + name + "_empty",
-            objcopy_files = ":" + name + "_empty",
-            strip_files = ":" + name + "_empty",
-            tags = ["manual"],
-        )
-        for mode in ["dbg", "fastbuild", "opt"]:
-            test = name + "_" + mode + "_" + suffix
-            _debug_policy_test(
-                name = test,
-                toolchain = ":" + toolchain,
-                symbols = symbols,
-                mode = mode,
+    for compiler in ["msvc-cl", "clang-cl"]:
+        for symbols in [False, True]:
+            suffix = compiler + ("_symbols" if symbols else "_no_symbols")
+            config = name + "_config_" + suffix
+            toolchain = name + "_toolchain_" + suffix
+            mongo_windows_cc_toolchain_config(
+                name = config,
+                cpu = "x64_windows",
+                compiler = compiler,
+                toolchain_identifier = suffix,
+                archiver_flags = ["/NOLOGO"],
+                default_link_flags = ["/NOLOGO"],
+                global_defines = ["WIN32"],
+                tool_paths = {tool: "unused.exe" for tool in ["gcc", "ld", "ar", "cpp", "gcov", "nm", "objdump", "strip"]},
+                dbg_mode_debug_flag = "/DEBUG:FULL",
+                fastbuild_mode_debug_flag = "/DEBUG:FASTLINK",
+                debug_symbols = symbols,
+                tags = ["manual"],
             )
-            tests.append(test)
+            cc_toolchain(
+                name = toolchain,
+                toolchain_identifier = suffix,
+                toolchain_config = ":" + config,
+                all_files = ":" + name + "_empty",
+                ar_files = ":" + name + "_empty",
+                as_files = ":" + name + "_empty",
+                compiler_files = ":" + name + "_empty",
+                dwp_files = ":" + name + "_empty",
+                linker_files = ":" + name + "_empty",
+                objcopy_files = ":" + name + "_empty",
+                strip_files = ":" + name + "_empty",
+                tags = ["manual"],
+            )
+            for mode in ["dbg", "fastbuild", "opt"]:
+                test = name + "_" + mode + "_" + suffix
+                _debug_policy_test(
+                    name = test,
+                    toolchain = ":" + toolchain,
+                    symbols = symbols,
+                    compiler = compiler,
+                    mode = mode,
+                )
+                tests.append(test)
     native.test_suite(name = name, tests = tests)

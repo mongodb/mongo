@@ -10,6 +10,39 @@ _WINDOWS_CROSS_RC_INCLUDE_DIRS = [
     "winsdk/include/cppwinrt",
 ]
 
+def windows_rc_toolchain_options():
+    """Select the resource compiler and its execution inputs for a Windows target."""
+    return {
+        "rc": select({
+            "//bazel/platforms:windows_cross": "@mongo_windows_cross_toolchain_files//:rc",
+            "@platforms//os:windows": "@mongo_windows_toolchain//:rc",
+            "//conditions:default": None,
+        }),
+        "rc_tools": select({
+            "//bazel/platforms:windows_cross": ["@mongo_windows_cross_toolchain_files//:rc_tools"],
+            "//conditions:default": [],
+        }),
+        "rc_sysroot": select({
+            "//bazel/platforms:windows_cross": ["@mongo_windows_cross_toolchain_files//:rc_sysroot_files"],
+            "//conditions:default": [],
+        }),
+    }
+
+def windows_rc_action_environment(ctx):
+    """Set up llvm-rc and its Clang preprocessor on the Linux execution platform."""
+    if not ctx.files.rc_tools:
+        return {}
+    environment = {
+        "PATH": ctx.executable.rc.dirname,
+        "TEMP": "/tmp",
+        "TMP": "/tmp",
+        "TMPDIR": "/tmp",
+    }
+    library_dirs = windows_cross_rc_library_dirs(ctx.files.rc_tools)
+    if library_dirs:
+        environment["LD_LIBRARY_PATH"] = ":".join(library_dirs)
+    return environment
+
 def windows_cross_rc_include_dirs(ctx):
     """Returns Windows cross sysroot include directories from staged files."""
     if not ctx.files.rc_sysroot:

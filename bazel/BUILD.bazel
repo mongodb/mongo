@@ -8,6 +8,12 @@ load(":test_exec_properties_test.bzl", "test_exec_properties_test_suite")
 
 package(default_visibility = ["//visibility:public"])
 
+py_test(
+    name = "separate_debug_test",
+    srcs = ["separate_debug_test.py"],
+    data = ["separate_debug.bzl"],
+)
+
 # Expose script for external usage through bazel.
 exports_files([
     "utils.bzl",

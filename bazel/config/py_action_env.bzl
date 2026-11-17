@@ -33,6 +33,7 @@ Usage:
 
 load("@rules_python//python:py_executable_info.bzl", "PyExecutableInfo")
 load("@rules_python//python:py_info.bzl", "PyInfo")
+load("@rules_python//python:py_runtime_info.bzl", "PyRuntimeInfo")
 
 def py_runtime_pythonpath(python, paths):
     """Format import paths for the selected interpreter's execution OS.
@@ -81,25 +82,31 @@ def py_linux_python_action(ctx, python_binary, python_interpreter_target, python
     }
     return python_interpreter, python_source, python_files, action_env
 
-def py_action_env_windows_dll_path(ctx):
+def py_action_env_windows_dll_path(ctx, python_binary = None):
     """Returns the Windows Python DLL and standard-library environment.
 
     On Windows, returns `PATH` and `PYTHONHOME` set to the Python distribution
     directory; on other platforms returns `{}`.
 
-    The rule using this helper must declare
-    `toolchains = ["@rules_python//python:toolchain_type"]`.
+    Pass the exec-configured binary when launching a py_binary so its runtime
+    determines the environment. For actions invoking a runtime directly, the
+    rule must declare `toolchains = ["@rules_python//python:toolchain_type"]`.
 
     Args:
         ctx: The rule context.
+        python_binary: Optional executable target providing PyRuntimeInfo.
 
     Returns:
         A dict suitable for merging into an action's `env`.
     """
-    toolchain = ctx.toolchains["@rules_python//python:toolchain_type"]
-    if not toolchain or not toolchain.py3_runtime:
+    if python_binary != None:
+        runtime = python_binary[PyRuntimeInfo]
+    else:
+        toolchain = ctx.toolchains["@rules_python//python:toolchain_type"]
+        runtime = toolchain.py3_runtime if toolchain else None
+    if not runtime:
         return {}
-    interpreter = toolchain.py3_runtime.interpreter
+    interpreter = runtime.interpreter
     if not interpreter or not interpreter.basename.endswith(".exe"):
         return {}
 
@@ -179,7 +186,10 @@ def py_action_env_pythonpath(ctx, python_binary, runfiles_package_dir):
     those actions work when Windows runfiles are manifest-only.
     """
     python_path = [runfiles_package_dir] + py_exec_import_paths(ctx, [python_binary])
-    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
+
+    # The binary is configured for execution. The consuming target can have a
+    # different runtime (Windows), or no runtime at all (WASI).
+    python = python_binary[PyRuntimeInfo]
     return {
         "PYTHONPATH": py_runtime_pythonpath(python, python_path),
     }

@@ -2,7 +2,8 @@
 # MODULE.bazel.
 
 load("@rules_python//python:defs.bzl", "py_test")
-load(":wheel_library_tool_runfiles_test.bzl", "wheel_installer_runfiles_analysis_test")
+load(":wheel_library_tool_runfiles_test.bzl", "wheel_installer_linux_runtime_analysis_test", "wheel_installer_runfiles_analysis_test")
+load("@py_linux_x86_64//:availability.bzl", "PYTHON_RUNTIME_AVAILABLE")
 load(":prebuilt_wheel_required.bzl", "prebuilt_wheel_required")
 load(":prebuilt_wheel_required_test.bzl", "source_build_disabled_test")
 
@@ -25,6 +26,12 @@ exports_files([
 
 wheel_installer_runfiles_analysis_test(
     name = "wheel_library_tool_runfiles_analysis_test",
+    target_under_test = "@pypi//:dnspython",
+)
+
+wheel_installer_linux_runtime_analysis_test(
+    name = "wheel_installer_linux_runtime_analysis_test",
+    target_compatible_with = [] if PYTHON_RUNTIME_AVAILABLE else ["@platforms//:incompatible"],
     target_under_test = "@pypi//:dnspython",
 )
 

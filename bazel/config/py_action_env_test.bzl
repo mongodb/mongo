@@ -1,12 +1,13 @@
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts", "unittest")
 load("@rules_python//python:py_info.bzl", "PyInfo")
-load(":py_action_env.bzl", "py_action_env_pythonpath", "py_runtime_pythonpath")
+load("@rules_python//python:py_runtime_info.bzl", "PyRuntimeInfo")
+load(":py_action_env.bzl", "py_action_env_pythonpath", "py_action_env_windows_dll_path", "py_runtime_pythonpath")
 
 def _runtime_pythonpath_test_impl(ctx):
     env = unittest.begin(ctx)
     paths = ["bazel-out\\exec\\asn1crypto", "bazel-out\\exec\\cryptography"]
-    linux_python = struct(interpreter = struct(extension = ""))
-    windows_python = struct(interpreter = struct(extension = "exe"))
+    linux_python = struct(interpreter = struct(extension = "", basename = "python3", dirname = "linux/dist/bin"))
+    windows_python = struct(interpreter = struct(extension = "exe", basename = "python.exe", dirname = "windows/dist"))
     asserts.equals(env, "bazel-out/exec/asn1crypto:bazel-out/exec/cryptography", py_runtime_pythonpath(linux_python, paths))
     asserts.equals(env, "bazel-out/exec/asn1crypto;bazel-out/exec/cryptography", py_runtime_pythonpath(windows_python, paths))
     binary = {
@@ -19,11 +20,15 @@ def _runtime_pythonpath_test_impl(ctx):
         (linux_python, ";", "runfiles/package:bazel-out/exec/bin/external/dependency/site-packages"),
         (windows_python, ":", "runfiles/package;bazel-out/exec/bin/external/dependency/site-packages"),
     ]:
+        binary[PyRuntimeInfo] = runtime
         context = struct(
             configuration = struct(host_path_separator = host_separator),
-            toolchains = {"@rules_python//python:toolchain_type": struct(py3_runtime = runtime)},
+            # A consuming WASI target can have no runtime, while its build tool does.
+            toolchains = {"@rules_python//python:toolchain_type": struct(py3_runtime = None)},
         )
         asserts.equals(env, expected, py_action_env_pythonpath(context, binary, "runfiles/package")["PYTHONPATH"])
+        expected_env = {"PATH": "windows/dist", "PYTHONHOME": "windows/dist"} if runtime == windows_python else {}
+        asserts.equals(env, expected_env, py_action_env_windows_dll_path(context, binary))
     return unittest.end(env)
 
 runtime_pythonpath_test = unittest.make(_runtime_pythonpath_test_impl)
@@ -178,6 +183,46 @@ idl_wrapper_runfiles_analysis_test = analysistest.make(
     },
     config_settings = {
         str(Label("//bazel/config:macos_cross_local_container_actions")): True,
+    },
+)
+
+def _idl_wasi_python_runtime_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    actions = [action for action in analysistest.target_actions(env) if action.mnemonic == "IdlcGenerator"]
+    asserts.equals(env, 1, len(actions))
+    asserts.true(env, "py_linux_x86_64" in actions[0].argv[0], "WASI generators must resolve an execution-platform Python runtime")
+    asserts.true(env, ";" not in actions[0].env["PYTHONPATH"], "Linux generators must use Linux import-path separators")
+    return analysistest.end(env)
+
+idl_wasi_python_runtime_analysis_test = analysistest.make(
+    _idl_wasi_python_runtime_test_impl,
+    config_settings = {
+        "//command_line_option:platforms": "@@//bazel/platforms:wasm32",
+        "//command_line_option:extra_execution_platforms": ["@@//bazel/platforms:ubuntu24_amd64_windows_cross_exec"],
+        "@@//bazel/config:windows_cross_local_container_actions": False,
+        "@@//bazel/config:compiler_type": "clang",
+    },
+)
+
+def _idl_wasi_windows_python_runtime_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    actions = [action for action in analysistest.target_actions(env) if action.mnemonic == "IdlcGenerator"]
+    asserts.equals(env, 1, len(actions))
+    action = actions[0]
+    asserts.true(env, action.argv[0].endswith("/dist/python.exe"), "Native Windows WASI generators must use Windows Python")
+    asserts.true(env, ";" in action.env["PYTHONPATH"], "Windows generators must use Windows import-path separators")
+    inputs = [file.path for file in action.inputs.to_list()]
+    asserts.true(env, any([path.endswith("/dist/python313.dll") for path in inputs]), "IDL actions must include the Windows Python runtime DLL")
+    asserts.true(env, any(["pyyaml@" in path for path in inputs]), "IDL actions must include the execution-configured Python dependencies")
+    return analysistest.end(env)
+
+idl_wasi_windows_python_runtime_analysis_test = analysistest.make(
+    _idl_wasi_windows_python_runtime_test_impl,
+    config_settings = {
+        "//command_line_option:platforms": "@@//bazel/platforms:wasm32",
+        "@@//bazel/config:windows_cross_local_container_actions": False,
+        "@@//bazel/config:idl_use_linux_python": False,
+        "@@//bazel/config:compiler_type": "clang",
     },
 )
 

@@ -10,7 +10,7 @@ load("@rules_python//python:defs.bzl", "py_binary")
 
 def _python_action_env(ctx, python_path):
     env = py_action_env_pythonpath(ctx, ctx.attr.python_binary, python_path)
-    windows_python_env = py_action_env_windows_dll_path(ctx)
+    windows_python_env = py_action_env_windows_dll_path(ctx, ctx.attr.python_binary)
     env.update(windows_python_env)
     windows_cross_host_path = ctx.attr._windows_cross_host_path[BuildSettingInfo].value
 

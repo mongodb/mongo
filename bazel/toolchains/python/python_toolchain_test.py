@@ -86,6 +86,46 @@ def load_download() -> Callable[[RepositoryContext], Any]:
 
 
 class PythonToolchainTest(unittest.TestCase):
+    def test_windows_runtime_supports_native_execution_and_cross_targets(self) -> None:
+        download = load_download()
+        helper = Path(__file__).with_name("runtime_toolchains.bzl")
+        namespace: dict[str, Any] = {}
+        exec(compile(helper.read_text(), str(helper), "exec"), namespace)
+        for host_os in ("windows", "linux"):
+            with self.subTest(host_os=host_os), tempfile.TemporaryDirectory() as tmp:
+                ctx = RepositoryContext(Path(tmp), host_os, "windows")
+                ctx.file("dist/python.exe", "interpreter\n")
+                download(ctx)
+                generated = ast.parse((Path(tmp) / "BUILD.bazel").read_text())
+                registration = next(
+                    node.value
+                    for node in generated.body
+                    if isinstance(node, ast.Expr)
+                    and isinstance(node.value, ast.Call)
+                    and isinstance(node.value.func, ast.Name)
+                    and node.value.func.id == "python_runtime_toolchains"
+                )
+                toolchains: dict[str, dict[str, Any]] = {}
+
+                def toolchain(name: str, **kwargs: Any) -> None:
+                    toolchains[name] = kwargs
+
+                namespace["native"] = SimpleNamespace(toolchain=toolchain)
+                namespace["python_runtime_toolchains"](
+                    **{
+                        keyword.arg: ast.literal_eval(keyword.value)
+                        for keyword in registration.keywords
+                    }
+                )
+                constraints = ["@platforms//os:windows", "@platforms//cpu:x86_64"]
+                target = toolchains["python_toolchain"]
+                native = toolchains["python_toolchain_exec"]
+                self.assertEqual(target["target_compatible_with"], constraints)
+                self.assertEqual(target["exec_compatible_with"], [])
+                self.assertEqual(native["exec_compatible_with"], constraints)
+                self.assertEqual(native.get("target_compatible_with", []), [])
+                self.assertEqual(native["toolchain"], target["toolchain"])
+
     def test_cross_linux_python_removes_case_colliding_terminfo_on_case_insensitive_hosts(
         self,
     ) -> None:

@@ -2,7 +2,12 @@ Resolve WheelInstall actions and Python toolchains from the selected execution g
 
 --- a/pycross/private/wheel_library.bzl
 +++ b/pycross/private/wheel_library.bzl
-@@ -42,21 +42,30 @@
+@@ -3,3 +3,4 @@
+ load("@bazel_skylib//lib:paths.bzl", "paths")
+ load("@rules_python//python:py_info.bzl", "PyInfo")
++load("@rules_python//python:py_runtime_info.bzl", "PyRuntimeInfo")
+ load(":providers.bzl", "PycrossWheelInfo")
+@@ -42,21 +43,31 @@
      # directory (where python313.dll lives, co-located with python.exe
      # in the python-build-standalone layout) on PATH so the loader
      # finds it. No-op on Linux/macOS.
@@ -12,10 +17,13 @@ Resolve WheelInstall actions and Python toolchains from the selected execution g
 +            ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
 +        ) or ctx.var.get("MONGO_IBM_CROSS") == "1"
 +    ) else None
-+    toolchain_ctx = ctx.exec_groups[exec_group] if exec_group else ctx
-+    _py = toolchain_ctx.toolchains["@rules_python//python:toolchain_type"]
-     if _py and _py.py3_runtime and _py.py3_runtime.interpreter:
-         _interp = _py.py3_runtime.interpreter
++    # The consuming Windows target has a Windows runtime, but the installer
++    # is configured for Linux execution. Use the executable's actual runtime.
++    _py = (ctx.attr._cross_tool if exec_group else ctx.attr._tool)[PyRuntimeInfo]
+-    if _py and _py.py3_runtime and _py.py3_runtime.interpreter:
+-        _interp = _py.py3_runtime.interpreter
++    if _py.interpreter:
++        _interp = _py.interpreter
          if _interp.basename.endswith(".exe"):
              env["PATH"] = _interp.dirname
 
@@ -43,7 +51,7 @@ Resolve WheelInstall actions and Python toolchains from the selected execution g
 
      has_py2_only_sources = ctx.attr.python_version == "PY2"
      has_py3_only_sources = ctx.attr.python_version == "PY3"
-@@ -142,6 +149,26 @@
+@@ -142,6 +153,26 @@
              cfg = "exec",
              executable = True,
          ),

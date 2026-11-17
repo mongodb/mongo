@@ -562,7 +562,9 @@ common:windows --enable_runfiles
 
 # Execute Windows tests through the native launcher from their original binary path.
 test:windows --run_under=//bazel:windows_test_launcher
+test:windows --test_env=MONGO_BAZEL_BASH
 test:windows-cross-x86_64 --run_under=//bazel:windows_test_launcher
+test:windows-cross-x86_64 --test_env=MONGO_BAZEL_BASH
 
 # Static linking and the native launcher for Evergreen Windows unit-test tasks.
 common:windows_unittest --linkstatic=True
@@ -819,6 +821,21 @@ common:windows-cross-x86_64 --//bazel/config:compress_debug_compile=False
 common:windows-cross-x86_64 --remote_download_outputs=toplevel
 # Keep native Rust intermediates available; download PDBs on demand for failed-test diagnostics.
 common:windows-cross-x86_64 --remote_download_regex=.*\.(a|exe|dll|lib|rlib|rmeta|res|manifest|json|txt)$
+
+# Keep source-warning compatibility limited to Windows cross builds. Benchmark range-loop
+# variables only advance the iterator; keep unused-variable diagnostics enabled in server code.
+build:windows-cross-x86_64 --per_file_copt=src/mongo/.*_bm(_fixture)?[.]cpp$@-Wno-unused-variable
+# Existing public headers have redundant captures and valid brace-elided union initializers.
+build:windows-cross-x86_64 --per_file_copt=src/mongo/.*[.]cpp$@-Wno-unused-lambda-capture,-Wno-missing-braces
+# Test helpers retain unused state in some build configurations.
+build:windows-cross-x86_64 --per_file_copt=src/mongo/.*(test.*|_bm(_fixture)?)[.]cpp$@-Wno-unused-private-field
+# This fixture intentionally checks a smart pointer's polymorphic object with typeid.
+build:windows-cross-x86_64 --per_file_copt=src/mongo/db/sharding_environment/config_server_test_fixture[.]cpp$@-Wno-potentially-evaluated-expression
+# Legacy S2's header declares MathLimits constants whose definitions are linked separately.
+# Limit this exception to S2 and the observed consumers of its MathUtil header.
+build:windows-cross-x86_64 --per_file_copt=(src/third_party/s2/.*[.]cc|src/mongo/db/(exec/classic/filter_bm|pipeline/change_stream_pipeline_bm|query/compiler/ce/ce_test_utils)[.]cpp)$@-Wno-undefined-var-template
+# Google Benchmark intentionally checks non-standard-layout offsets and retains a dead sum.
+build:windows-cross-x86_64 --per_file_copt=src/third_party/benchmark/dist/src/.*[.]cc$@-Wno-invalid-offsetof,-Wno-unused-but-set-variable
 
 # Cross-compile Linux s390x/ppc64le from the host Bazel process. Compile and
 # tool-generation actions execute on Linux x86_64/aarch64 RBE workers; the

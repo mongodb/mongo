@@ -138,7 +138,7 @@ def generate_config_header_impl(ctx):
         # Native Windows py_binary launchers need the Python DLL directory on
         # PATH. The host path is only meaningful when the generator itself is a
         # Windows executable.
-        action_env = py_action_env_windows_dll_path(ctx)
+        action_env = py_action_env_windows_dll_path(ctx, ctx.attr.generator_script)
         windows_cross_host_path = ctx.attr._windows_cross_host_path[BuildSettingInfo].value
         if windows_cross_host_path and action_env:
             action_env["PATH"] = windows_cross_host_path

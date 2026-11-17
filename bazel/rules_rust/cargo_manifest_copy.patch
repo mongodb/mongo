@@ -1,0 +1,307 @@
+diff --git cargo/private/cargo_build_script_runner/cargo_manifest_dir.rs cargo/private/cargo_build_script_runner/cargo_manifest_dir.rs
+--- cargo/private/cargo_build_script_runner/cargo_manifest_dir.rs
++++ cargo/private/cargo_build_script_runner/cargo_manifest_dir.rs
+@@ -78,10 +78,27 @@
+     Ok(entries.next().is_none())
+ }
+ 
++/// Copy files and directory inputs, resolving symlinks for portable outputs.
++fn copy_runfile(src: &Path, dest: &Path) -> Result<(), std::io::Error> {
++    if src.is_dir() {
++        std::fs::create_dir_all(dest)?;
++        for entry in std::fs::read_dir(src)? {
++            let entry = entry?;
++            copy_runfile(&entry.path(), &dest.join(entry.file_name()))?;
++        }
++        Ok(())
++    } else {
++        std::fs::copy(src, dest).map(|_| ())
++    }
++}
++
+ /// A struct for generating runfiles directories to use when running Cargo build scripts.
+ pub struct RunfilesMaker {
+     /// The output where a runfiles-like directory should be written.
+     output_dir: PathBuf,
++
++    /// Copy manifest inputs when outputs must be downloaded by a Windows client.
++    copy_runfiles: bool,
+ 
+     /// A list of file suffixes to retain when pruning runfiles.
+     filename_suffixes_to_retain: BTreeSet<String>,
+@@ -133,6 +150,9 @@
+ 
+         RunfilesMaker {
+             output_dir,
++            copy_runfiles: std::env::var("RULES_RUST_CARGO_MANIFEST_COPY")
++                .map(|value| value == "1")
++                .unwrap_or(false),
+             filename_suffixes_to_retain,
+             runfiles,
+         }
+@@ -159,7 +179,13 @@
+ 
+             let abs_src = std::env::current_dir().unwrap().join(src);
+ 
+-            symlink(&abs_src, &abs_dest).map_err(|e| {
++            // Failed build scripts return before draining this declared output.
++            // Copies keep those outputs portable and preserve the original error.
++            if self.copy_runfiles {
++                copy_runfile(&abs_src, &abs_dest)
++            } else {
++                symlink(&abs_src, &abs_dest)
++            }.map_err(|e| {
+                 format!(
+                     "Failed to link `{} -> {}` with {:?}",
+                     abs_src.display(),
+@@ -235,9 +261,14 @@
+         for (src, dest) in &self.runfiles {
+             let abs_dest = self.output_dir.join(dest);
+ 
+-            remove_symlink(&abs_dest).map_err(|e| {
++            let removal = if self.copy_runfiles && abs_dest.is_dir() && !abs_dest.is_symlink() {
++                std::fs::remove_dir_all(&abs_dest)
++            } else {
++                remove_symlink(&abs_dest)
++            };
++            removal.map_err(|e| {
+                 format!(
+-                    "Failed to delete symlink '{}' with {:?}",
++                    "Failed to delete runfile '{}' with {:?}",
+                     abs_dest.display(),
+                     e
+                 )
+@@ -264,7 +295,7 @@
+                 continue;
+             }
+ 
+-            std::fs::copy(src, &abs_dest).map_err(|e| {
++            copy_runfile(src, &abs_dest).map_err(|e| {
+                 format!(
+                     "Failed to copy `{} -> {}` with {:?}",
+                     src.display(),
+@@ -377,6 +408,91 @@
+ 
+     use super::*;
+ 
++    #[cfg(target_family = "unix")]
++    #[test]
++    fn portable_manifest_inputs_and_retention() {
++        let test_tmp = PathBuf::from(std::env::var("TEST_TMPDIR").unwrap());
++        for copy_runfiles in [false, true] {
++            let root = test_tmp.join(format!("manifest-copy-{copy_runfiles}"));
++            fs::create_dir(&root).unwrap();
++            let src = root.join("source.txt");
++            fs::write(&src, "crate source").unwrap();
++            let output_dir = root.join("runfiles");
++            let maker = RunfilesMaker {
++                output_dir: output_dir.clone(),
++                copy_runfiles,
++                filename_suffixes_to_retain: BTreeSet::from(["keep.txt".to_owned()]),
++                runfiles: BTreeMap::from([
++                    (src.clone(), "repo/keep.txt".to_owned()),
++                    (root.join("other.txt"), "repo/discard.txt".to_owned()),
++                ]),
++            };
++            fs::write(root.join("other.txt"), "discard").unwrap();
++            maker.create_runfiles_dir().unwrap();
++            // This is also the state uploaded when the script exits unsuccessfully.
++            for dest in maker.runfiles.values() {
++                let path = output_dir.join(dest);
++                assert_eq!(path.is_symlink(), !copy_runfiles);
++                assert!(path.is_file());
++            }
++            maker.drain_runfiles_dir(&root.join("out_dir")).unwrap();
++            let retained = output_dir.join("repo/keep.txt");
++            assert!(!retained.is_symlink());
++            assert_eq!(fs::read_to_string(retained).unwrap(), "crate source");
++            assert!(!output_dir.join("repo/discard.txt").exists());
++            assert_eq!(fs::read_to_string(src).unwrap(), "crate source");
++        }
++    }
++
++    #[cfg(target_family = "unix")]
++    #[test]
++    fn portable_directory_inputs_and_retention() {
++        let test_tmp = PathBuf::from(std::env::var("TEST_TMPDIR").unwrap());
++        for copy_runfiles in [false, true] {
++            let root = test_tmp.join(format!("manifest-directory-copy-{copy_runfiles}"));
++            let src = root.join("source");
++            fs::create_dir_all(src.join("nested/empty")).unwrap();
++            fs::write(src.join("nested/source.txt"), "crate source").unwrap();
++            symlink(&src.join("nested/source.txt"), &src.join("linked.txt")).unwrap();
++            let output_dir = root.join("runfiles");
++            let maker = RunfilesMaker {
++                output_dir: output_dir.clone(),
++                copy_runfiles,
++                filename_suffixes_to_retain: BTreeSet::from(["keep.dir".to_owned()]),
++                runfiles: BTreeMap::from([
++                    (src.clone(), "repo/keep.dir".to_owned()),
++                    (root.join("discard"), "repo/discard.dir".to_owned()),
++                ]),
++            };
++            fs::create_dir(root.join("discard")).unwrap();
++            fs::write(root.join("discard/other.txt"), "discard").unwrap();
++            maker.create_runfiles_dir().unwrap();
++            let retained = output_dir.join("repo/keep.dir");
++            assert_eq!(retained.is_symlink(), !copy_runfiles);
++            assert_eq!(
++                fs::read_to_string(retained.join("linked.txt")).unwrap(),
++                "crate source"
++            );
++            if copy_runfiles {
++                assert!(!retained.join("linked.txt").is_symlink());
++            }
++            maker.drain_runfiles_dir(&root.join("out_dir")).unwrap();
++            assert!(!retained.is_symlink());
++            assert!(!retained.join("linked.txt").is_symlink());
++            assert!(retained.join("nested/empty").is_dir());
++            assert_eq!(
++                fs::read_to_string(retained.join("nested/source.txt")).unwrap(),
++                "crate source"
++            );
++            assert!(!output_dir.join("repo/discard.dir").exists());
++            assert_eq!(
++                fs::read_to_string(src.join("nested/source.txt")).unwrap(),
++                "crate source"
++            );
++            assert!(src.join("linked.txt").is_symlink());
++        }
++    }
++
+     fn prepare_output_dir_with_symlinks() -> PathBuf {
+         let test_tmp = PathBuf::from(std::env::var("TEST_TMPDIR").unwrap());
+         let out_dir = test_tmp.join("out_dir");
+diff --git cargo/private/cargo_build_script_runner/bin.rs cargo/private/cargo_build_script_runner/bin.rs
+--- cargo/private/cargo_build_script_runner/bin.rs
++++ cargo/private/cargo_build_script_runner/bin.rs
+@@ -23,6 +23,34 @@
+ 
+ use cargo_build_script_runner::cargo_manifest_dir::{remove_symlink, symlink, RunfilesMaker};
+ use cargo_build_script_runner::{BuildScriptOutput, CompileAndLinkFlags};
++
++// Temporary execroot links must also be removed when a build script fails.
++// Otherwise the Windows client cannot download the failed action's outputs.
++#[derive(Default)]
++struct ExecRootLinks(Vec<PathBuf>);
++
++impl ExecRootLinks {
++    fn insert(&mut self, original: &Path, link: &Path) -> Result<(), String> {
++        match symlink(original, link) {
++            Ok(()) => {
++                self.0.push(link.to_owned());
++                Ok(())
++            }
++            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
++            Err(error) => Err(format!("Failed to create symlink: {error}")),
++        }
++    }
++}
++
++impl Drop for ExecRootLinks {
++    fn drop(&mut self) {
++        for link in self.0.drain(..) {
++            if let Err(error) = remove_symlink(&link) {
++                eprintln!("Failed to remove execroot link {}: {error}", link.display());
++            }
++        }
++    }
++}
+ 
+ fn run_buildrs() -> Result<(), String> {
+     // We use exec_root.join rather than std::fs::canonicalize, to avoid resolving symlinks, as
+@@ -60,7 +88,7 @@
+     create_dir_all(&out_dir_abs)
+         .unwrap_or_else(|_| panic!("Failed to make output directory: {:?}", out_dir_abs));
+ 
+-    let mut exec_root_links = Vec::new();
++    let mut exec_root_links = ExecRootLinks::default();
+     if should_symlink_exec_root() {
+         // Symlink the execroot to the manifest_dir so that we can use relative paths in the arguments.
+         let exec_root_paths = std::fs::read_dir(&exec_root)
+@@ -77,10 +105,8 @@
+                 .ok_or_else(|| "Failed while getting file name".to_string())?;
+             let link = manifest_dir.join(file_name);
+ 
+-            symlink_if_not_exists(&path, &link)
++            exec_root_links.insert(&path, &link)
+                 .map_err(|err| format!("Failed to symlink {path:?} to {link:?}: {err}"))?;
+-
+-            exec_root_links.push(link)
+         }
+     }
+ 
+@@ -219,8 +245,8 @@
+         )
+     });
+ 
+-    if !exec_root_links.is_empty() {
+-        for link in exec_root_links {
++    if !exec_root_links.0.is_empty() {
++        while let Some(link) = exec_root_links.0.last() {
+             remove_symlink(&link).map_err(|e| {
+                 format!(
+                     "Failed to remove exec_root link '{}' with {:?}",
+@@ -228,6 +254,7 @@
+                     e
+                 )
+             })?;
++            exec_root_links.0.pop();
+         }
+     }
+ 
+@@ -246,13 +273,6 @@
+         .unwrap_or(false)
+ }
+ 
+-/// Create a symlink from `link` to `original` if `link` doesn't already exist.
+-fn symlink_if_not_exists(original: &Path, link: &Path) -> Result<(), String> {
+-    symlink(original, link)
+-        .or_else(swallow_already_exists)
+-        .map_err(|err| format!("Failed to create symlink: {err}"))
+-}
+-
+ fn resolve_rundir(rundir: &str, exec_root: &Path, manifest_dir: &Path) -> Result<PathBuf, String> {
+     if rundir.is_empty() {
+         return Ok(manifest_dir.to_owned());
+@@ -268,14 +288,6 @@
+         return Err(format!("rundir must not contain .. but was {:?}", rundir));
+     }
+     Ok(exec_root.join(rundir_path))
+-}
+-
+-fn swallow_already_exists(err: std::io::Error) -> std::io::Result<()> {
+-    if err.kind() == std::io::ErrorKind::AlreadyExists {
+-        Ok(())
+-    } else {
+-        Err(err)
+-    }
+ }
+ 
+ /// A representation of expected command line arguments.
+@@ -430,6 +442,25 @@
+ mod test {
+     use super::*;
+ 
++    #[cfg(target_family = "unix")]
++    #[test]
++    fn execroot_links_are_removed_on_failure() {
++        let root = PathBuf::from(env::var("TEST_TMPDIR").unwrap()).join("execroot-link-failure");
++        create_dir_all(&root).unwrap();
++        let target = root.join("source");
++        create_dir_all(&target).unwrap();
++        let link = root.join("external");
++        let result: Result<(), String> = (|| {
++            let mut links = ExecRootLinks::default();
++            links.insert(&target, &link).unwrap();
++            Err("build script failed".to_owned())
++        })();
++        assert!(result.is_err());
++        assert!(!link.is_symlink());
++        assert!(target.is_dir());
++    }
++
++
+     #[test]
+     fn rustc_cfg_parsing() {
+         let macos_output = r#"\

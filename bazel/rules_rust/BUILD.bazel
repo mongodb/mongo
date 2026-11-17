@@ -4,9 +4,17 @@ load("@rules_python//python:defs.bzl", "py_test")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
-    name = "windows_cross_native_cargo",
+    name = "windows_cross_linux_cargo",
     constraint_values = ["@platforms//os:windows"],
     flag_values = {"//bazel/config:windows_cross_local_container_actions": "True"},
+)
+
+py_test(
+    name = "cargo_runner_execroot_test",
+    srcs = ["cargo_runner_execroot_test.py"],
+    args = ["$(location @rules_rust//cargo/private/cargo_build_script_runner:runner)"],
+    data = ["@rules_rust//cargo/private/cargo_build_script_runner:runner"],
+    target_compatible_with = ["@platforms//os:linux"],
 )
 
 py_test(
