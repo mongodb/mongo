@@ -8,6 +8,7 @@
 #include "mongo/base/init.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/static_immortal.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -1092,10 +1093,15 @@ ssl_want SSLWriteManager::encryptMessage(const void* pMessage,
 
 
 MONGO_INITIALIZER(InitializeSchannelGetServerIdentityFn)(mongo::InitializerContext*) {
-    auto sc = std::move(mongo::SharedLibrary::create("Schannel.dll").getValue());
+    // We cache a raw function pointer into Schannel.dll so the DLL must stay loaded for the
+    // lifetime of the process.
+    static mongo::StaticImmortal<std::unique_ptr<mongo::SharedLibrary>> schannelLibrary{
+        std::move(mongo::SharedLibrary::create("Schannel.dll").getValue())};
 
     SSLHandshakeManager::setSslGetServerIdentityFn(
-        sc->getFunctionAs<SslGetServerIdentityFn>("SslGetServerIdentity").getValue());
+        (*schannelLibrary)
+            ->getFunctionAs<SslGetServerIdentityFn>("SslGetServerIdentity")
+            .getValue());
 }
 
 }  // namespace detail
