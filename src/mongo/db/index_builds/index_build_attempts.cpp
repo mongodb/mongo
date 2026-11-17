@@ -298,11 +298,6 @@ bool checkWithinAttemptLimit(OperationContext* opCtx,
                              const std::string& ident,
                              ResumeIndexInfo& resumeInfo,
                              bool plannedHandoff) {
-    // Draining is exempt so unrelated failovers during a long drain do not abort the build.
-    if (resumeInfo.getPhase() == IndexBuildPhaseEnum::kDrainWrites) {
-        return true;
-    }
-
     const int limit = gMaxIndexBuildAttemptsAfterUncleanShutdown.load();
     const auto prevResumesWithoutProgress = resumeInfo.getResumesWithoutProgress();
     // The first unplanned resume establishes a baseline at 0. Later unplanned resumes without

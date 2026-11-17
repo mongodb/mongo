@@ -215,7 +215,8 @@ protected:
         CatalogTestFixture::tearDown();
     }
 
-    ResumeIndexInfo setUpRegisteredBuild(size_t indexCount) {
+    ResumeIndexInfo setUpRegisteredBuild(
+        size_t indexCount, IndexBuildPhaseEnum phase = IndexBuildPhaseEnum::kCollectionScan) {
         std::vector<IndexBuildInfo> indexes;
         for (size_t i = 0; i < indexCount; ++i) {
             const auto field = "field_" + std::to_string(i);
@@ -228,8 +229,8 @@ protected:
                                              "internal-skippedRecords-" + suffix,
                                              "internal-constraintViolations-" + suffix);
         }
-        auto info = index_builds::synthesizeResumeIndexInfo(
-            UUID::gen(), IndexBuildPhaseEnum::kCollectionScan, UUID::gen(), indexes);
+        auto info =
+            index_builds::synthesizeResumeIndexInfo(UUID::gen(), phase, UUID::gen(), indexes);
 
         CollectionOptions options;
         options.uuid = info.getCollectionUUID();
@@ -243,12 +244,20 @@ protected:
         return info;
     }
 
-    std::unique_ptr<RecordStore> makeResumeTable(const std::string& ident) {
+    std::unique_ptr<RecordStore> makeResumeTable(const std::string& ident,
+                                                 boost::optional<BSONObj> metadata = boost::none) {
         auto opCtx = operationContext();
         Lock::GlobalLock lk(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         auto table = getServiceContext()->getStorageEngine()->makeInternalRecordStore(
             opCtx, ident, KeyFormat::Long);
+        if (metadata) {
+            ASSERT_OK(table->insertRecord(opCtx,
+                                          *shard_role_details::getRecoveryUnit(opCtx),
+                                          metadata->objdata(),
+                                          metadata->objsize(),
+                                          Timestamp()));
+        }
         wuow.commit();
         return table;
     }
@@ -288,6 +297,80 @@ TEST_F(PrimaryDrivenIndexBuildAttemptsTest, CheckPersistsCountWithoutChangingRes
         checkWithinAttemptLimit(opCtx, kNss.dbName(), ident, info, /*plannedHandoff*/ false));
     EXPECT_THAT(readResumeInfo(ident).toBSON(), unittest::match::BSONObjEQ(expected.toBSON()));
 }
+
+class PrimaryDrivenIndexBuildAttemptsByPhaseTest
+    : public PrimaryDrivenIndexBuildAttemptsTest,
+      public testing::WithParamInterface<IndexBuildPhaseEnum> {};
+
+TEST_P(PrimaryDrivenIndexBuildAttemptsByPhaseTest, CountsResumesAndEnforcesLimit) {
+    auto opCtx = operationContext();
+    auto info = setUpRegisteredBuild(0, GetParam());
+    auto ident = ident::generateNewIndexBuildIdent(info.getBuildUUID());
+    auto table = makeResumeTable(ident, info.getMetadata().toBSON());
+    auto readMetadata = [&] {
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        ru.abandonSnapshot();
+        auto cursor = table->getCursor(opCtx, ru);
+        auto record = cursor->next();
+        ASSERT_TRUE(record);
+        EXPECT_EQ(RecordId(index_builds::primary_driven::metadataKey), record->id);
+        return IndexBuildMetadata::parse(record->data.toBson(),
+                                         IDLParserContext("IndexBuildMetadata"));
+    };
+
+    // The first resume records 0; resuming again without progress increments the stored count.
+    for (int count = 0; count <= kLimit; ++count) {
+        SCOPED_TRACE(count);
+        EXPECT_TRUE(checkWithinAttemptLimit(opCtx,
+                                            kNss.dbName(),
+                                            ident,
+                                            info,
+                                            /*plannedHandoff=*/false));
+        EXPECT_EQ(count, info.getResumesWithoutProgress());
+
+        auto written = readMetadata();
+        EXPECT_EQ(info.getBuildUUID(), written.getBuildUUID());
+        EXPECT_EQ(info.getCollectionUUID(), written.getCollectionUUID());
+        EXPECT_EQ(GetParam(), written.getPhase());
+        EXPECT_EQ(count, written.getResumesWithoutProgress());
+        info.setMetadata(written);
+    }
+
+    // At the limit, a planned handoff still resumes without incrementing the count.
+    EXPECT_TRUE(checkWithinAttemptLimit(opCtx,
+                                        kNss.dbName(),
+                                        ident,
+                                        info,
+                                        /*plannedHandoff=*/true));
+    EXPECT_EQ(kLimit, readMetadata().getResumesWithoutProgress());
+
+    // Another unplanned resume would exceed the limit and must not overwrite the checkpoint.
+    EXPECT_FALSE(checkWithinAttemptLimit(opCtx,
+                                         kNss.dbName(),
+                                         ident,
+                                         info,
+                                         /*plannedHandoff=*/false));
+    EXPECT_EQ(kLimit, readMetadata().getResumesWithoutProgress());
+}
+
+INSTANTIATE_TEST_SUITE_P(Phases,
+                         PrimaryDrivenIndexBuildAttemptsByPhaseTest,
+                         testing::Values(IndexBuildPhaseEnum::kCollectionScan,
+                                         IndexBuildPhaseEnum::kBulkLoad,
+                                         IndexBuildPhaseEnum::kDrainWrites),
+                         [](const testing::TestParamInfo<IndexBuildPhaseEnum>& info) {
+                             switch (info.param) {
+                                 case IndexBuildPhaseEnum::kCollectionScan:
+                                     return "CollectionScan";
+                                 case IndexBuildPhaseEnum::kBulkLoad:
+                                     return "BulkLoad";
+                                 case IndexBuildPhaseEnum::kDrainWrites:
+                                     return "DrainWrites";
+                                 case IndexBuildPhaseEnum::kInitialized:
+                                     return "Initialized";
+                             }
+                             MONGO_UNREACHABLE;
+                         });
 
 TEST_F(PrimaryDrivenIndexBuildAttemptsTest, CheckPlannedHandoffPreservesCount) {
     auto opCtx = operationContext();

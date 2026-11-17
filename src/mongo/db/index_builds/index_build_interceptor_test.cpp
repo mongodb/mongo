@@ -1244,6 +1244,7 @@ TEST_P(IndexBuilderInterceptorMultikeyDrainTest, DrainRecoversMultikeyPathsFromS
             persisted = true;
             return Status::OK();
         },
+        /*onDrainBatchApplied=*/{},
         IndexBuildInterceptor::TrackDuplicates::kNoTrack,
         IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
         IndexBuildInterceptor::DrainPhase::kFinal));
@@ -1317,6 +1318,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainRecoversFlagOnlyMultikeySideWriteRecord
             persisted = true;
             return Status::OK();
         },
+        /*onDrainBatchApplied=*/{},
         IndexBuildInterceptor::TrackDuplicates::kNoTrack,
         IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
         IndexBuildInterceptor::DrainPhase::kFinal));
@@ -1400,6 +1402,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainRetriesMultikeyOnlyBatches) {
                                                  getIndexEntry("ab_1"),
                                                  InsertDeleteOptions{.dupsAllowed = true},
                                                  persist,
+                                                 /*onDrainBatchApplied=*/{},
                                                  IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                  IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                  IndexBuildInterceptor::DrainPhase::kFinal);
@@ -1618,6 +1621,7 @@ TEST_P(IndexBuilderInterceptorNonPdibMultikeyTest, RecordsAndRecoversMultikeySta
             recovered = true;
             return Status::OK();
         },
+        /*onDrainBatchApplied=*/{},
         IndexBuildInterceptor::TrackDuplicates::kNoTrack,
         IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
         IndexBuildInterceptor::DrainPhase::kFinal));
@@ -1682,6 +1686,7 @@ TEST_P(IndexBuilderInterceptorDrainPhaseTest, DrainPhases) {
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 {},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 GetParam()));
@@ -1753,6 +1758,7 @@ TEST_P(IndexBuilderInterceptorPrepareConflictTest, InitialPrefixConflictRollsBac
                     uasserted(PrepareConflictInfo(0),
                               "Injected prepare conflict after applying keys");
                 },
+                /*onDrainBatchApplied=*/{},
                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                 yieldPolicy,
                 GetParam());
@@ -1780,6 +1786,7 @@ TEST_P(IndexBuilderInterceptorPrepareConflictTest, InitialPrefixConflictRollsBac
             recovered = true;
             return Status::OK();
         },
+        /*onDrainBatchApplied=*/{},
         IndexBuildInterceptor::TrackDuplicates::kNoTrack,
         IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
         GetParam()));
@@ -1817,6 +1824,7 @@ TEST_F(IndexBuilderInterceptorTest, LaterConflictEndsPreReadinessDrain) {
         [](OperationContext*, const MultikeyPaths&) -> Status {
             uasserted(PrepareConflictInfo(0), "Injected later prepare conflict");
         },
+        /*onDrainBatchApplied=*/{},
         IndexBuildInterceptor::TrackDuplicates::kNoTrack,
         IndexBuildInterceptor::DrainYieldPolicy::kYield,
         IndexBuildInterceptor::DrainPhase::kBeforeReadiness));
@@ -1849,6 +1857,7 @@ TEST_P(IndexBuilderInterceptorPrepareConflictTest, PreparedWriteBeyondInitiallyE
                                                  entry,
                                                  InsertDeleteOptions{.dupsAllowed = true},
                                                  {},
+                                                 /*onDrainBatchApplied=*/{},
                                                  IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                  IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                  GetParam());
@@ -1908,6 +1917,7 @@ TEST_F(IndexBuilderInterceptorTest, AbortedInitialTailDoesNotHideEarlierSideWrit
                                           entry,
                                           InsertDeleteOptions{.dupsAllowed = true},
                                           {},
+                                          /*onDrainBatchApplied=*/{},
                                           IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                           IndexBuildInterceptor::DrainPhase::kBeforeReadiness));
@@ -1984,6 +1994,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -2113,6 +2124,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -2183,6 +2195,7 @@ TEST_F(IndexBuilderInterceptorTest, RecoveredMultikeyPathsSurviveThrowingBatchCa
                 [](OperationContext*, const MultikeyPaths&) -> Status {
                     uasserted(ErrorCodes::InternalError, "Injected batch callback failure");
                 },
+                /*onDrainBatchApplied=*/{},
                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                 IndexBuildInterceptor::DrainPhase::kFinal);
@@ -2209,6 +2222,7 @@ TEST_F(IndexBuilderInterceptorTest, RecoveredMultikeyPathsSurviveThrowingBatchCa
             recovered = true;
             return Status::OK();
         },
+        /*onDrainBatchApplied=*/{},
         IndexBuildInterceptor::TrackDuplicates::kNoTrack,
         IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
         IndexBuildInterceptor::DrainPhase::kFinal));
@@ -2283,6 +2297,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
                                               entry,
                                               InsertDeleteOptions{.dupsAllowed = true},
                                               /*onMultikeyPathsRecovered=*/{},
+                                              /*onDrainBatchApplied=*/{},
                                               IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                               IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                               IndexBuildInterceptor::DrainPhase::kFinal));
@@ -2388,6 +2403,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
                                               entry,
                                               InsertDeleteOptions{.dupsAllowed = true},
                                               /*onMultikeyPathsRecovered=*/{},
+                                              /*onDrainBatchApplied=*/{},
                                               IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                               IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                               IndexBuildInterceptor::DrainPhase::kFinal));
@@ -2484,6 +2500,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexRollbackAfterPartialBatc
                                           entry,
                                           InsertDeleteOptions{.dupsAllowed = true},
                                           /*onMultikeyPathsRecovered=*/{},
+                                          /*onDrainBatchApplied=*/{},
                                           IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                           IndexBuildInterceptor::DrainPhase::kFinal),
@@ -2594,6 +2611,7 @@ TEST_F(IndexBuilderInterceptorTest, PreReadinessDrainRequiresCapturedTail) {
                 getIndexEntry("a_1"),
                 InsertDeleteOptions{.dupsAllowed = true},
                 {},
+                /*onDrainBatchApplied=*/{},
                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                 IndexBuildInterceptor::DrainPhase::kBeforeReadiness);
@@ -2797,6 +2815,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainSideWriteGeneratesNoContainerOpsWithout
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -2854,6 +2873,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainInsertSideWriteGeneratesContainerOpsPri
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -2928,6 +2948,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteSideWriteGeneratesContainerOpsPri
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -2965,6 +2986,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainEmptySideWritesTableGeneratesNoContaine
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -3014,6 +3036,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleSideWritesGeneratesContainerOps
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -3114,6 +3137,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -3176,6 +3200,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleBatchesGeneratesCorrectContaine
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -3261,6 +3286,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -3327,6 +3353,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -3402,6 +3429,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteOnUniqueIndexGeneratesContainerOp
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -3477,6 +3505,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -3559,6 +3588,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                           entry,
                                           InsertDeleteOptions{.dupsAllowed = true},
                                           /*onMultikeyPathsRecovered=*/{},
+                                          /*onDrainBatchApplied=*/{},
                                           IndexBuildInterceptor::TrackDuplicates::kTrack,
                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                           IndexBuildInterceptor::DrainPhase::kFinal);
@@ -3637,6 +3667,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 entry,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
+                                                /*onDrainBatchApplied=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
@@ -3719,6 +3750,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                           entry,
                                           InsertDeleteOptions{.dupsAllowed = true},
                                           /*onMultikeyPathsRecovered=*/{},
+                                          /*onDrainBatchApplied=*/{},
                                           IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
                                           IndexBuildInterceptor::DrainPhase::kFinal);

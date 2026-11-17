@@ -127,6 +127,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(
     const IndexCatalogEntry* indexCatalogEntry,
     const InsertDeleteOptions& options,
     const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered,
+    const SideWritesTracker::OnBatchAppliedFn& onDrainBatchApplied,
     TrackDuplicates trackDuplicates,
     DrainYieldPolicy drainYieldPolicy,
     DrainPhase drainPhase) {
@@ -139,31 +140,13 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(
             : Status::OK();
     };
 
-    // Report any multikey state the batch recovered from its records while its transaction is
-    // still open, so the caller can persist it alongside the keys it applied.
-    SideWritesTracker::OnBatchAppliedFn onBatchApplied;
-    if (onMultikeyPathsRecovered) {
-        onBatchApplied = [&](OperationContext* opCtx) -> Status {
-            boost::optional<MultikeyPaths> recovered;
-            {
-                std::unique_lock<std::mutex> lk(_multikeyPathMutex);
-                if (!std::exchange(_multikeyPathsRecovered, false)) {
-                    return Status::OK();
-                }
-                recovered = _multikeyPaths;
-            }
-            ScopeGuard restoreRecovered{[&] {
-                // Leave the state flagged so a later batch reports it again.
-                std::unique_lock<std::mutex> lk{_multikeyPathMutex};
-                _multikeyPathsRecovered = true;
-            }};
-            auto status = onMultikeyPathsRecovered(opCtx, recovered.value_or(MultikeyPaths{}));
-            if (status.isOK()) {
-                restoreRecovered.dismiss();
-            }
+    auto onBatchApplied = [&](OperationContext* opCtx) -> Status {
+        if (auto status = _reportRecoveredMultikeyPaths(opCtx, onMultikeyPathsRecovered);
+            !status.isOK()) {
             return status;
-        };
-    }
+        }
+        return onDrainBatchApplied ? onDrainBatchApplied(opCtx) : Status::OK();
+    };
 
     return _sideWritesTracker.drainWritesIntoIndex(opCtx,
                                                    coll,
@@ -173,6 +156,32 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(
                                                    onBatchApplied,
                                                    drainYieldPolicy,
                                                    drainPhase);
+}
+
+Status IndexBuildInterceptor::_reportRecoveredMultikeyPaths(
+    OperationContext* opCtx, const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered) {
+    if (!onMultikeyPathsRecovered) {
+        return Status::OK();
+    }
+
+    boost::optional<MultikeyPaths> recovered;
+    {
+        std::unique_lock<std::mutex> lk(_multikeyPathMutex);
+        if (!std::exchange(_multikeyPathsRecovered, false)) {
+            return Status::OK();
+        }
+        recovered = _multikeyPaths;
+    }
+    ScopeGuard restoreRecovered{[&] {
+        // Leave the state flagged so a later batch reports it again.
+        std::unique_lock<std::mutex> lk{_multikeyPathMutex};
+        _multikeyPathsRecovered = true;
+    }};
+    auto status = onMultikeyPathsRecovered(opCtx, recovered.value_or(MultikeyPaths{}));
+    if (status.isOK()) {
+        restoreRecovered.dismiss();
+    }
+    return status;
 }
 
 bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {

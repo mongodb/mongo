@@ -2580,6 +2580,16 @@ protected:
                                                 IndexBuildInterceptor::DrainPhase::kFinal));
     }
 
+    ResumeIndexInfo stageDrain(CollectionWriter& coll, const IndexBuildInfo& indexBuildInfo) {
+        insertDocs(coll, 0, 1, /*valueBytes=*/16);
+        auto info = runFirstBuild(coll, indexBuildInfo, [&](MultiIndexBlock& indexer) {
+            ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+            drain(indexer);
+        });
+        EXPECT_EQ(IndexBuildPhaseEnum::kDrainWrites, info.getPhase());
+        return info;
+    }
+
     boost::optional<int> storedResumesWithoutProgress() {
         return readResumeInfo().getResumesWithoutProgress();
     }
@@ -2772,6 +2782,55 @@ TEST_F(ResumedPdibResumeCountTest, LoadWithoutResumeStateWriteKeepsResumeCount) 
     auto acq = acquireForWrite(MODE_X);
     CollectionWriter coll(operationContext(), &acq);
     resumed.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(ResumedPdibResumeCountTest, DrainProgressClearsResumeCount) {
+    auto opCtx = operationContext();
+    auto acq = acquireExclusive();
+    CollectionWriter coll(opCtx, &acq);
+    auto indexBuildInfo = makeIndexBuildInfo();
+    auto info = stageDrain(coll, indexBuildInfo);
+
+    MultiIndexBlock resumed;
+    initResumed(resumed, coll, indexBuildInfo, markResumed(info, 0));
+    auto& observer = installResumeStateContainerObserver(opCtx);
+
+    // Neither batch recovers multikey state, so only drain progress can reset the count.
+    for (int value : {1, 2}) {
+        SCOPED_TRACE(value);
+        {
+            WriteUnitOfWork wuow(opCtx);
+            ASSERT_OK(Helpers::insert(opCtx, coll.get(), BSON("_id" << value << "a" << value)));
+            wuow.commit();
+        }
+        EXPECT_OK(resumed.drainBackgroundWrites(opCtx,
+                                                RecoveryUnit::ReadSource::kNoTimestamp,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
+        EXPECT_FALSE(storedResumesWithoutProgress());
+    }
+    EXPECT_EQ(1, observer.countUpdatesForIdent(ident()));
+    resumed.abortIndexBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(ResumedPdibResumeCountTest, EmptyDrainKeepsResumeCount) {
+    auto opCtx = operationContext();
+    auto acq = acquireExclusive();
+    CollectionWriter coll(opCtx, &acq);
+    auto indexBuildInfo = makeIndexBuildInfo();
+    auto info = stageDrain(coll, indexBuildInfo);
+
+    MultiIndexBlock resumed;
+    initResumed(resumed, coll, indexBuildInfo, markResumed(info, 1));
+    auto& observer = installResumeStateContainerObserver(opCtx);
+    EXPECT_OK(resumed.drainBackgroundWrites(opCtx,
+                                            RecoveryUnit::ReadSource::kNoTimestamp,
+                                            IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                            IndexBuildInterceptor::DrainPhase::kFinal));
+
+    EXPECT_EQ(1, storedResumesWithoutProgress());
+    EXPECT_EQ(0, observer.countUpdatesForIdent(ident()));
+    resumed.abortIndexBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
 TEST_F(ResumedPdibResumeCountTest, MultikeyResumeStateWriteClearsResumeCount) {

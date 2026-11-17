@@ -72,8 +72,7 @@ namespace primary_driven {
  * Checks the primary-driven build's resume count against maxIndexBuildAttemptsAfterUncleanShutdown.
  * Returns false if over the limit. Resumes identified as planned handoffs do not increment the
  * count. Otherwise, attempts to persist the count with majority write concern and updates
- * 'resumeInfo' on success. Builds already in the drain phase are exempt from checking or recording
- * the count.
+ * 'resumeInfo' on success.
  */
 bool checkWithinAttemptLimit(OperationContext* opCtx,
                              const DatabaseName& dbName,

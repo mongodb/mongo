@@ -106,12 +106,15 @@ public:
     /**
      * Drain the writes from the side writes table/tracker into the
      * index identified by `indexCatalogEntry`.
+     * If not null, 'onDrainBatchApplied' runs inside each nonempty batch's transaction before
+     * committing the batch.
      */
     Status drainWritesIntoIndex(OperationContext* opCtx,
                                 const CollectionPtr& coll,
                                 const IndexCatalogEntry* indexCatalogEntry,
                                 const InsertDeleteOptions& options,
                                 const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered,
+                                const SideWritesTracker::OnBatchAppliedFn& onDrainBatchApplied,
                                 TrackDuplicates trackDups,
                                 DrainYieldPolicy drainYieldPolicy,
                                 DrainPhase drainPhase);
@@ -219,6 +222,9 @@ private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 
     bool _checkAllWritesApplied(OperationContext* opCtx, bool fatal) const;
+
+    Status _reportRecoveredMultikeyPaths(
+        OperationContext* opCtx, const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered);
 
     /**
      * Merges 'multikeyPaths' into '_multikeyPaths'

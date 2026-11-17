@@ -1510,8 +1510,9 @@ Status MultiIndexBlock::drainBackgroundWrites(
     // Record the transition to the drain phase if the collection is non-empty or if the index build
     // was resumed from a prior phase. Rewrite both the IndexBuildMetadata and every per-index
     // IndexStateInfo since the metadata about the spilled data is no longer needed.
-    if (firstDrain && _containerWriteBehavior == ContainerWriteBehavior::kReplicate &&
-        _isResumable && (_lastRecordIdInserted.has_value() || _wasResumed)) {
+    if (firstDrain && _isResumable &&
+        _containerWriteBehavior == ContainerWriteBehavior::kReplicate &&
+        (_lastRecordIdInserted.has_value() || _wasResumed)) {
         _writeAllStateToContainer(opCtx);
     }
 
@@ -1541,6 +1542,16 @@ Status MultiIndexBlock::drainBackgroundWrites(
             return _recordRecoveredMultikeyPaths(opCtx, i, paths);
         };
 
+        // A committed nonempty drain batch is durable progress. Reset a pending resume count in
+        // that batch's transaction.
+        auto onDrainBatchApplied = [this](OperationContext* opCtx) -> Status {
+            if (_isResumable && _containerWriteBehavior == ContainerWriteBehavior::kReplicate &&
+                _resumeCountPending) {
+                _upsertIndexBuildMetadata(opCtx);
+            }
+            return Status::OK();
+        };
+
         // Update the number of keys and bytes written within a scope guard so that a drain which
         // throws part way through still contributes the batches it committed before throwing.
         const auto before = interceptor->getNumKeysAndBytesWritten();
@@ -1558,6 +1569,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
                                                         _indexes[i].block->getEntry(opCtx, coll),
                                                         _indexes[i].options,
                                                         onMultikeyPathsRecovered,
+                                                        onDrainBatchApplied,
                                                         trackDups,
                                                         drainYieldPolicy,
                                                         drainPhase);
