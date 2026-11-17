@@ -156,9 +156,14 @@ function testMatchStage(matchStage, expectedResults) {
                     dbName +
                     " and must be an array.",
             );
+            // Temporary collections (e.g. created by a concurrent moveCollection) may match the
+            // filter, so ignore them when checking the exact set of returned namespaces.
+            const responseWithoutTempColls = responseWithMatchStage.filter(
+                (collEntry) => !isTempNss(collEntry["ns"]),
+            );
             assert.eq(
                 expRes.expectedNamespaces.length,
-                responseWithMatchStage.length,
+                responseWithoutTempColls.length,
                 "Expected length not match with the $listClusterCatalog response targeting db '" +
                     dbName +
                     "' and followed by $match " +
