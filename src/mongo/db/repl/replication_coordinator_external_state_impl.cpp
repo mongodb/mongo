@@ -700,7 +700,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     _dropAllTempCollections(opCtx);
 
-    IndexBuildsCoordinator::get(opCtx)->onStepUp(opCtx);
+    IndexBuildsCoordinator::get(opCtx)->onStepUp(opCtx, /*plannedHandoff=*/false);
 
     // It is only necessary to check the system indexes on the first transition to primary.
     // On subsequent transitions to primary the indexes will have already been created.

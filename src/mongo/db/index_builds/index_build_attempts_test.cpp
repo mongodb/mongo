@@ -5,12 +5,21 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
+#include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/control/journal_flusher.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
@@ -183,3 +192,118 @@ TEST_F(IndexBuildAttemptsTest, RecoveryDeleteUpdatesNumRecords) {
 
 }  // namespace
 }  // namespace mongo::index_builds::build_attempts::two_phase
+
+namespace mongo::index_builds::build_attempts::primary_driven {
+namespace {
+
+constexpr int kLimit = 2;
+
+class PrimaryDrivenIndexBuildAttemptsTest : public CatalogTestFixture {
+protected:
+    const NamespaceString kNss =
+        NamespaceString::createNamespaceString_forTest("test.index_build_attempts");
+
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        static_cast<repl::ReplicationCoordinatorMock*>(
+            repl::ReplicationCoordinator::get(getServiceContext()))
+            ->alwaysAllowWrites(true);
+    }
+
+    void tearDown() override {
+        index_builds::primary_driven::registry(getServiceContext()).clear();
+        CatalogTestFixture::tearDown();
+    }
+
+    ResumeIndexInfo setUpRegisteredBuild(boost::optional<int> count) {
+        ResumeIndexInfo info;
+        info.setBuildUUID(UUID::gen());
+        info.setPhase(IndexBuildPhaseEnum::kCollectionScan);
+        info.setCollectionUUID(UUID::gen());
+        info.setResumesWithoutProgress(count);
+        info.setIndexes({});
+
+        CollectionOptions options;
+        options.uuid = info.getCollectionUUID();
+        uassertStatusOK(storageInterface()->createCollection(operationContext(), kNss, options));
+        index_builds::primary_driven::registry(getServiceContext())
+            .add(info.getBuildUUID(),
+                 kNss.dbName(),
+                 info.getCollectionUUID(),
+                 {},
+                 ident::generateNewIndexBuildIdent(info.getBuildUUID()));
+        return info;
+    }
+
+    std::unique_ptr<RecordStore> makeResumeTable(const std::string& ident,
+                                                 boost::optional<BSONObj> metadata) {
+        auto opCtx = operationContext();
+        Lock::GlobalLock lk(opCtx, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        auto table = getServiceContext()->getStorageEngine()->makeInternalRecordStore(
+            opCtx, ident, KeyFormat::Long);
+        if (metadata) {
+            ASSERT_OK(table->insertRecord(opCtx,
+                                          *shard_role_details::getRecoveryUnit(opCtx),
+                                          metadata->objdata(),
+                                          metadata->objsize(),
+                                          Timestamp()));
+        }
+        wuow.commit();
+        return table;
+    }
+
+    unittest::ServerParameterGuard _limit{"maxIndexBuildAttemptsAfterUncleanShutdown", kLimit};
+    unittest::ServerParameterGuard _containerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard _primaryDriven{"featureFlagPrimaryDrivenIndexBuilds", true};
+};
+
+TEST_F(PrimaryDrivenIndexBuildAttemptsTest, CheckRewritesMetadataRecord) {
+    auto opCtx = operationContext();
+    auto info = setUpRegisteredBuild(boost::none);
+    auto ident = ident::generateNewIndexBuildIdent(info.getBuildUUID());
+    auto table = makeResumeTable(ident, info.getMetadata().toBSON());
+
+    // The first resume records 0; resuming again without progress increments the stored count.
+    for (const int count : {0, 1}) {
+        SCOPED_TRACE(count);
+        ASSERT_TRUE(checkWithinAttemptLimit(opCtx,
+                                            kNss.dbName(),
+                                            info.getBuildUUID(),
+                                            info.getCollectionUUID(),
+                                            ident,
+                                            info,
+                                            false));
+        EXPECT_EQ(count, info.getResumesWithoutProgress());
+
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+        auto cursor = table->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        auto record = cursor->next();
+        ASSERT_TRUE(record);
+        EXPECT_EQ(RecordId(index_builds::primary_driven::metadataKey), record->id);
+        auto written = IndexBuildMetadata::parse(record->data.toBson(),
+                                                 IDLParserContext("IndexBuildMetadata"));
+        EXPECT_EQ(info.getBuildUUID(), written.getBuildUUID());
+        EXPECT_EQ(info.getCollectionUUID(), written.getCollectionUUID());
+        EXPECT_EQ(IndexBuildPhaseEnum::kCollectionScan, written.getPhase());
+        EXPECT_EQ(count, written.getResumesWithoutProgress());
+        info.setMetadata(written);
+    }
+}
+
+TEST_F(PrimaryDrivenIndexBuildAttemptsTest, CheckSkipsMissingMetadataRecord) {
+    auto opCtx = operationContext();
+    auto info = setUpRegisteredBuild(boost::none);
+    auto ident = ident::generateNewIndexBuildIdent(info.getBuildUUID());
+    auto table = makeResumeTable(ident, boost::none);
+
+    EXPECT_TRUE(checkWithinAttemptLimit(
+        opCtx, kNss.dbName(), info.getBuildUUID(), info.getCollectionUUID(), ident, info, false));
+    EXPECT_FALSE(info.getResumesWithoutProgress());
+
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    EXPECT_FALSE(table->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx))->next());
+}
+
+}  // namespace
+}  // namespace mongo::index_builds::build_attempts::primary_driven

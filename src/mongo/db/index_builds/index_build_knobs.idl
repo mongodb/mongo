@@ -46,8 +46,10 @@ server_parameters:
 
     maxIndexBuildAttemptsAfterUncleanShutdown:
         description: >
-            Maximum number of times a node attempts the same index build after an unclean
-            shutdown. A further attempt will request the primary to abort the build.
+            For two-phase index builds, the maximum number of retries per node after unclean
+            shutdowns. For primary-driven index builds, the maximum retry count without persisted
+            progress before the drain phase. Resumes explicitly marked as planned handoffs are not
+            counted. Exceeding the limit aborts the build.
         set_at: [startup, runtime]
         cpp_vartype: Atomic<int>
         cpp_varname: gMaxIndexBuildAttemptsAfterUncleanShutdown

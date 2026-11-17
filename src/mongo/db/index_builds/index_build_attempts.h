@@ -2,23 +2,24 @@
 // SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
+#include "mongo/db/database_name.h"
+#include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <string>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
 
-/**
- * Per-node attempt counts for unfinished two-phase index builds, persisted in
- * 'local.system.indexBuilds', so a node can abort a build that keeps crashing it. A build's count
- * starts at 0 when it first runs, is incremented after each unclean shutdown, and is made durable
- * before the build runs.
- */
 [[MONGO_MOD_PUBLIC]];
 namespace mongo::index_builds::build_attempts {
 
+/**
+ * Per-node attempt counts for unfinished two-phase index builds, persisted in
+ * 'local.system.indexBuilds'.
+ */
 namespace two_phase {
 
 /**
@@ -60,5 +61,28 @@ boost::optional<int> read(OperationContext* opCtx, const UUID& buildUUID);
 void trackSizeThroughRecovery(OperationContext* opCtx);
 
 }  // namespace two_phase
+
+/**
+ * Resume-attempt counts for unfinished primary-driven index builds, persisted in the build's
+ * replicated resume state and cleared when the build persists resume state.
+ */
+namespace primary_driven {
+
+/**
+ * Checks the primary-driven build's resume count against maxIndexBuildAttemptsAfterUncleanShutdown.
+ * Returns false if over the limit. Resumes identified as planned handoffs do not increment the
+ * count. Otherwise, attempts to persist the count with majority write concern and updates
+ * 'resumeInfo' on success. Builds already in the drain phase are exempt from checking or recording
+ * the count.
+ */
+bool checkWithinAttemptLimit(OperationContext* opCtx,
+                             const DatabaseName& dbName,
+                             const UUID& buildUUID,
+                             const UUID& collectionUUID,
+                             const std::string& ident,
+                             ResumeIndexInfo& resumeInfo,
+                             bool plannedHandoff);
+
+}  // namespace primary_driven
 
 }  // namespace mongo::index_builds::build_attempts

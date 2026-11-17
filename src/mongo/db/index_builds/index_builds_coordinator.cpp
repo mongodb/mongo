@@ -2270,7 +2270,7 @@ void IndexBuildsCoordinator::_attachInterceptorsForResumableBuildsOnStepUp(
     }
 }
 
-void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
+void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx, bool plannedHandoff) {
     if (MONGO_unlikely(hangIndexBuildOnStepUp.shouldFail())) {
         LOGV2(4753600, "Hanging due to hangIndexBuildOnStepUp fail point");
         hangIndexBuildOnStepUp.pauseWhileSet();
@@ -2297,15 +2297,17 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
 
     // The term has already been bumped for this election by the time we are called.
     const auto stepUpTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
-    _stepUpThread = stdx::thread([this, stepUpTerm] {
+    _stepUpThread = stdx::thread([this, stepUpTerm, plannedHandoff] {
         Client::initThread("IndexBuildsCoordinator-StepUp",
                            getGlobalServiceContext()->getService());
         auto threadCtx = Client::getCurrent()->makeOperationContext();
-        _onStepUpAsyncTaskFn(threadCtx.get(), stepUpTerm);
+        _onStepUpAsyncTaskFn(threadCtx.get(), stepUpTerm, plannedHandoff);
     });
 }
 
-void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx, long long stepUpTerm) {
+void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx,
+                                                  long long stepUpTerm,
+                                                  bool plannedHandoff) {
     const auto uassertStepUpNotAbandoned = [&] {
         uassert(ErrorCodes::InterruptedDueToReplStateChange,
                 "Index build step up task interrupted because the step-up was abandoned",
@@ -2468,7 +2470,7 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx, long 
             }
         }
 
-        _resumePrimaryDrivenIndexBuildsOnStepUp(opCtx);
+        _resumePrimaryDrivenIndexBuildsOnStepUp(opCtx, plannedHandoff);
 
         auto builds = activeIndexBuilds.getAllIndexBuilds();
         forEachIndexBuild(builds,
@@ -2480,7 +2482,8 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx, long 
     LOGV2(7508300, "Finished performing asynchronous step-up checks on index builds");
 }
 
-void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationContext* opCtx) {
+void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationContext* opCtx,
+                                                                     bool plannedHandoff) {
     const auto vCtx = VersionContext::getDecoration(opCtx);
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     const bool resumablePdibEnabled =
@@ -2501,6 +2504,8 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
                 return pending.contains(indexBuildInfo.indexIdent);
             });
 
+        Status abortCause{ErrorCodes::InterruptedDueToReplStateChange,
+                          "Aborting primary-driven index build upon step up"};
         bool resumeSucceeded = false;
         if (resumablePdibEnabled && build.indexBuildIdent && hasPendingInterceptors) {
             try {
@@ -2508,22 +2513,36 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
                     opCtx, build.collectionUUID, buildUUID, build.indexes, *build.indexBuildIdent);
 
                 invariant(pdibEnabled);
-                IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
-                    // TODO(SERVER-109664): Set this to IndexBuildMethodEnum::kHybrid
-                    .indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven,
-                    .indexBuildProtocol = IndexBuildProtocol::kPrimaryDriven,
-                    .commitQuorum = CommitQuorumOptions(CommitQuorumOptions::kPrimarySelfVote)};
+                if (!index_builds::build_attempts::primary_driven::checkWithinAttemptLimit(
+                        opCtx,
+                        build.dbName,
+                        buildUUID,
+                        build.collectionUUID,
+                        *build.indexBuildIdent,
+                        resumeInfo,
+                        plannedHandoff)) {
+                    indexBuildsSSS.exceededAttemptLimit.addAndFetch(1);
+                    abortCause = {ErrorCodes::IndexBuildAborted,
+                                  "Index build exceeded maxIndexBuildAttemptsAfterUncleanShutdown"};
+                } else {
+                    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
+                        // TODO(SERVER-109664): Set this to IndexBuildMethodEnum::kHybrid
+                        .indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven,
+                        .indexBuildProtocol = IndexBuildProtocol::kPrimaryDriven,
+                        .commitQuorum = CommitQuorumOptions(CommitQuorumOptions::kPrimarySelfVote)};
 
-                // This spawns a new thread and returns immediately.
-                [[maybe_unused]] auto fut = uassertStatusOK(resumeIndexBuild(opCtx,
-                                                                             build.dbName,
-                                                                             build.collectionUUID,
-                                                                             build.indexes,
-                                                                             buildUUID,
-                                                                             resumeInfo,
-                                                                             indexBuildOptions));
-                resumeSucceeded = true;
-                activeIndexBuilds.incrementResumeSucceeded(resumeInfo.getPhase());
+                    // This spawns a new thread and returns immediately.
+                    [[maybe_unused]] auto fut =
+                        uassertStatusOK(resumeIndexBuild(opCtx,
+                                                         build.dbName,
+                                                         build.collectionUUID,
+                                                         build.indexes,
+                                                         buildUUID,
+                                                         resumeInfo,
+                                                         indexBuildOptions));
+                    resumeSucceeded = true;
+                    activeIndexBuilds.incrementResumeSucceeded(resumeInfo.getPhase());
+                }
             } catch (const DBException& e) {
                 activeIndexBuilds.incrementResumeFailed();
                 LOGV2(12500301,
@@ -2536,20 +2555,19 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
 
         if (!resumeSucceeded) {
             try {
-                writeConflictRetry(opCtx,
-                                   "abortPrimaryDrivenIndexBuildOnStepUp",
-                                   {build.dbName, build.collectionUUID},
-                                   [&] {
-                                       uassertStatusOK(index_builds::primary_driven::abort(
-                                           opCtx,
-                                           build.dbName,
-                                           build.collectionUUID,
-                                           buildUUID,
-                                           build.indexes,
-                                           build.indexBuildIdent,
-                                           {ErrorCodes::InterruptedDueToReplStateChange,
-                                            "Aborting primary-driven index build upon step up"}));
-                                   });
+                writeConflictRetry(
+                    opCtx,
+                    "abortPrimaryDrivenIndexBuildOnStepUp",
+                    {build.dbName, build.collectionUUID},
+                    [&] {
+                        uassertStatusOK(index_builds::primary_driven::abort(opCtx,
+                                                                            build.dbName,
+                                                                            build.collectionUUID,
+                                                                            buildUUID,
+                                                                            build.indexes,
+                                                                            build.indexBuildIdent,
+                                                                            abortCause));
+                    });
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 // The collection was dropped, which already aborted this build. So, there is
                 // nothing left to do.
@@ -2574,7 +2592,8 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
 
             LOGV2(11130400,
                   "Index build: failed to resume primary-driven index build, aborting instead",
-                  "buildUUID"_attr = buildUUID);
+                  "buildUUID"_attr = buildUUID,
+                  "reason"_attr = abortCause);
         }
     }
 }

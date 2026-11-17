@@ -340,8 +340,9 @@ public:
     /**
      * Invoked when the node enters the primary state.
      * Unblocks index builds that have been waiting to commit/abort during the secondary state.
+     * 'plannedHandoff' is true when the previous primary stepped down by handing off to this node.
      */
-    void onStepUp(OperationContext* opCtx);
+    void onStepUp(OperationContext* opCtx, bool plannedHandoff);
 
     /**
      * Called during rollback to stop all active index builds. The state of these builds is distinct
@@ -540,7 +541,7 @@ private:
      * Resumes primary-driven index builds on step-up to primary. Resumed index builds will be
      * continued in a background thread. Index builds that cannot be resumed will be aborted.
      */
-    void _resumePrimaryDrivenIndexBuildsOnStepUp(OperationContext* opCtx);
+    void _resumePrimaryDrivenIndexBuildsOnStepUp(OperationContext* opCtx, bool plannedHandoff);
 
     /**
      * Sets up the in-memory and durable state of the index build.
@@ -942,7 +943,7 @@ protected:
      * is stepping up in; the task gives up if it observes a different term, since that means the
      * step-up it was launched for has been abandoned.
      */
-    void _onStepUpAsyncTaskFn(OperationContext* opCtx, long long stepUpTerm);
+    void _onStepUpAsyncTaskFn(OperationContext* opCtx, long long stepUpTerm, bool plannedHandoff);
 
     /**
      * Runs the index build.

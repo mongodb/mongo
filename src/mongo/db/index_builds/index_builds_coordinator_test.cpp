@@ -258,6 +258,21 @@ public:
         }
     }
 
+    void onAbortIndexBuild(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           const UUID& collUUID,
+                           const UUID& indexBuildUUID,
+                           const std::vector<IndexBuildInfo>& indexes,
+                           const Status& cause,
+                           bool fromMigrate,
+                           bool isViewlessTimeseries) override {
+        abortCauses.push_back(cause);
+        // Stands in for the abortIndexBuild oplog entry, which timestamps the abort's commit.
+        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(Timestamp(100, 1)));
+    }
+
+    std::vector<Status> abortCauses;
+
     static OpObserverMock* install(OperationContext* opCtx) {
         auto opObserverRegistry =
             dynamic_cast<OpObserverRegistry*>(opCtx->getServiceContext()->getOpObserver());
@@ -779,7 +794,8 @@ void persistPrimaryDrivenResumeState(OperationContext* opCtx,
                                      const UUID& buildUUID,
                                      const UUID& collectionUUID,
                                      const std::string& resumeStateIdent,
-                                     IndexBuildPhaseEnum phase) {
+                                     IndexBuildPhaseEnum phase,
+                                     boost::optional<int> resumesWithoutProgress = boost::none) {
     auto resumeIndexInfo =
         index_builds::synthesizeResumeIndexInfo(buildUUID, phase, collectionUUID, indexes);
 
@@ -787,6 +803,7 @@ void persistPrimaryDrivenResumeState(OperationContext* opCtx,
     metadata.setBuildUUID(resumeIndexInfo.getBuildUUID());
     metadata.setPhase(resumeIndexInfo.getPhase());
     metadata.setCollectionUUID(resumeIndexInfo.getCollectionUUID());
+    metadata.setResumesWithoutProgress(resumesWithoutProgress);
     auto metadataObj = metadata.toBSON();
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
@@ -862,7 +879,7 @@ void runResumePrimaryDrivenOnStepUpTest(OperationContext* opCtx,
             opCtx, indexes, buildUUID, collectionUUID, resumeStateIdent, phase);
     }
 
-    indexBuildsCoord->onStepUp(opCtx);
+    indexBuildsCoord->onStepUp(opCtx, /*plannedHandoff=*/false);
     indexBuildsCoord->awaitStepUpThread_forTestOnly();
     indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, collectionUUID);
 
@@ -942,10 +959,128 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpSkipsPrimaryDrivenIndexBuildWhoseCollec
     }
     ASSERT_EQ(registry.all().size(), 2);
 
-    indexBuildsCoord.onStepUp(opCtx);
+    indexBuildsCoord.onStepUp(opCtx, /*plannedHandoff=*/false);
     indexBuildsCoord.awaitStepUpThread_forTestOnly();
 
     EXPECT_TRUE(registry.all().empty());
+}
+
+struct StagedPrimaryDrivenBuild {
+    NamespaceString nss;
+    UUID collectionUUID;
+    std::string resumeStateIdent;
+};
+
+// Stages a two-index kPrimaryDriven build whose resume state is at `phase` and carries the given
+// resume count.
+StagedPrimaryDrivenBuild stagePrimaryDrivenBuildWithResumesWithoutProgress(
+    OperationContext* opCtx,
+    repl::StorageInterface* storageInterface,
+    std::string_view testName,
+    IndexBuildPhaseEnum phase,
+    boost::optional<int> resumesWithoutProgress) {
+    const auto nss = NamespaceString::createNamespaceString_forTest(
+        std::string{"IndexBuildsCoordinatorTest."} + std::string{testName});
+    ASSERT_OK(storageInterface->createCollection(opCtx, nss, CollectionOptions()));
+
+    // Avoid the empty collection index build optimization.
+    auto collectionUUID = [&] {
+        auto collection = getCollectionExclusive(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, collection.getCollectionPtr(), BSON("_id" << 1)));
+        wuow.commit();
+        return collection.uuid();
+    }();
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    std::vector<IndexBuildInfo> indexes;
+    indexes.emplace_back(
+        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"), "index-1", *storageEngine);
+    indexes.emplace_back(
+        BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"), "index-2", *storageEngine);
+
+    auto buildUUID = UUID::gen();
+    auto resumeStateIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    ASSERT_OK(index_builds::primary_driven::start(
+        opCtx, nss.dbName(), collectionUUID, buildUUID, indexes, resumeStateIdent));
+    persistPrimaryDrivenResumeState(
+        opCtx, indexes, buildUUID, collectionUUID, resumeStateIdent, phase, resumesWithoutProgress);
+    return {nss, collectionUUID, resumeStateIdent};
+}
+
+class IndexBuildsCoordinatorResumeLimitTest : public IndexBuildsCoordinatorTest {
+protected:
+    std::string testName() const {
+        return ::testing::UnitTest::GetInstance()->current_test_info()->name();
+    }
+
+    bool indexIsReady(const NamespaceString& nss) {
+        auto collection = getCollectionExclusive(operationContext(), nss);
+        return collection.getCollectionPtr()->getIndexCatalog()->findIndexByName(operationContext(),
+                                                                                 "a_1") != nullptr;
+    }
+
+    bool indexExists(const NamespaceString& nss) {
+        auto collection = getCollectionExclusive(operationContext(), nss);
+        return collection.getCollectionPtr()->getIndexCatalog()->findIndexByName(
+                   operationContext(), "a_1", IndexCatalog::InclusionPolicy::kUnfinished) !=
+            nullptr;
+    }
+
+    boost::optional<int> readResumeCount(const std::string& ident) {
+        auto opCtx = operationContext();
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+        auto info = index_builds::readAndParseResumeIndexInfo(
+            opCtx->getServiceContext()->getStorageEngine(), opCtx, ident);
+        ASSERT_TRUE(info);
+        return info->getResumesWithoutProgress();
+    }
+
+    // TODO (SERVER-116165): Remove.
+    unittest::ServerParameterGuard _ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard _ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    // TODO(SERVER-124910): Remove.
+    unittest::ServerParameterGuard _ffPDIBResume{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                 true};
+    unittest::ServerParameterGuard _limit{"maxIndexBuildAttemptsAfterUncleanShutdown", 2};
+};
+
+TEST_F(IndexBuildsCoordinatorResumeLimitTest, StepUpAbortsBuildPastResumeLimit) {
+    // The count is already at the limit, so another unplanned resume exceeds it.
+    auto opCtx = operationContext();
+    auto opObserver = OpObserverMock::install(opCtx);
+    auto staged = stagePrimaryDrivenBuildWithResumesWithoutProgress(
+        opCtx, storageInterface(), testName(), IndexBuildPhaseEnum::kCollectionScan, 2);
+
+    auto* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    indexBuildsCoord->onStepUp(opCtx, /*plannedHandoff=*/false);
+    indexBuildsCoord->awaitStepUpThread_forTestOnly();
+
+    EXPECT_TRUE(index_builds::primary_driven::registry(opCtx->getServiceContext()).all().empty());
+    ASSERT_EQ(opObserver->abortCauses.size(), 1U);
+    EXPECT_EQ(opObserver->abortCauses[0], ErrorCodes::IndexBuildAborted);
+    EXPECT_FALSE(indexExists(staged.nss));
+}
+
+TEST_F(IndexBuildsCoordinatorResumeLimitTest, StepUpKeepsCountOnPlannedHandoff) {
+    // A planned handoff with the count at the limit doesn't add to it, so the build resumes.
+    auto opCtx = operationContext();
+    auto opObserver = OpObserverMock::install(opCtx);
+    auto staged = stagePrimaryDrivenBuildWithResumesWithoutProgress(
+        opCtx, storageInterface(), testName(), IndexBuildPhaseEnum::kCollectionScan, 2);
+
+    auto* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    {
+        FailPointEnableBlock beforeProgress("hangAfterInitializingIndexBuild");
+        indexBuildsCoord->onStepUp(opCtx, /*plannedHandoff=*/true);
+        indexBuildsCoord->awaitStepUpThread_forTestOnly();
+        beforeProgress->waitForTimesEntered(beforeProgress.initialTimesEntered() + 1);
+        EXPECT_EQ(2, readResumeCount(staged.resumeStateIdent));
+    }
+    indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, staged.collectionUUID);
+
+    EXPECT_TRUE(opObserver->abortCauses.empty());
+    EXPECT_TRUE(indexIsReady(staged.nss));
 }
 
 INSTANTIATE_TEST_SUITE_P(
