@@ -42,8 +42,9 @@ GetNextResult ListSearchIndexesStage::doGetNext() {
         auto retrieveCollectionUUIDAndResolveViewStatus = retrieveCollectionUUIDAndResolveView(
             opCtx, pExpCtx->getUserNss(), /*failOnTsColl=*/false);
 
-        // Ignore any error sent by retrieveCollectionUUIDAndResolveView. This issue will be handled
-        // below by returning EOF.
+        // A non-OK status here means the target namespace was not found, which we handle below by
+        // returning EOF. Errors from the primary shard while resolving the namespace (e.g. a
+        // failing listCollections or _shardsvrResolveView) are thrown and propagate to the client.
         if (retrieveCollectionUUIDAndResolveViewStatus.isOK()) {
             std::tie(_collectionUUID, _resolvedNamespace, _view) =
                 retrieveCollectionUUIDAndResolveViewStatus.getValue();

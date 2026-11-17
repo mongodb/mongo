@@ -60,7 +60,8 @@ StatusWith<std::pair<boost::optional<UUID>, boost::optional<ResolvedNamespace>>>
         Shard::RetryPolicy::kIdempotent);
     boost::optional<ResolvedNamespace> resolvedView;
     boost::optional<UUID> uuid;
-    auto data = uassertStatusOK(response.swResponse).data;
+    uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+    auto data = response.swResponse.getValue().data;
 
     if (data.hasField("resolvedView")) {
         resolvedView = boost::make_optional(ResolvedNamespace::parseFromBSON(data["resolvedView"]));
@@ -100,8 +101,10 @@ SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* op
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kIdempotent);
 
+            uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+
             // We consider an empty response to mean that the collection doesn't exist.
-            auto batch = uassertStatusOK(response.swResponse).data["cursor"]["firstBatch"].Array();
+            auto batch = response.swResponse.getValue().data["cursor"]["firstBatch"].Array();
             if (batch.empty()) {
                 return std::make_pair(boost::none, boost::none);
             }
