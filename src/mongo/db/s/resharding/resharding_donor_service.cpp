@@ -117,6 +117,11 @@ const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::
 namespace span_names = otel::traces::span_names;
 using resharding::ensureFulfilledPromise;
 
+template <typename Future>
+bool isReadyAndSuccessful(const Future& future) {
+    return future.isReady() && future.getNoThrow().isOK();
+}
+
 primary_only_service_helpers::CancelState makeCancelState(const DonorShardContext& donorCtx) {
     primary_only_service_helpers::CancelState cancelState;
     if (donorCtx.getState() == DonorStateEnum::kDone && donorCtx.getAbortReason()) {
@@ -1313,6 +1318,37 @@ ReshardingDonorService::DonorStateMachine::_readDurableDonorContext(OperationCon
     return durable;
 }
 
+DonorTransitionFacts ReshardingDonorService::DonorStateMachine::_gatherTransitionFacts() const {
+    DonorTransitionFacts facts;
+    facts.performVerification = _metadata.getPerformVerification();
+
+    {
+        std::lock_guard<std::mutex> lk(_mutex);
+        facts.allRecipientsDoneCloning =
+            isReadyAndSuccessful(_promises.getAllRecipientsDoneCloningFuture());
+        facts.allRecipientsDoneApplying =
+            isReadyAndSuccessful(_promises.getAllRecipientsDoneApplyingFuture());
+        facts.changeStreamsMonitorStarted =
+            isReadyAndSuccessful(_changeStreamsMonitorStarted.getFuture());
+    }
+
+    return facts;
+}
+
+void ReshardingDonorService::DonorStateMachine::_validatePreTransition(
+    const DonorShardContext& before, const DonorShardContext& proposed) {
+    const auto result = validateDonorPreTransition(
+        {.before = before, .proposed = proposed, .facts = _gatherTransitionFacts()});
+    // Throwing while entering kError or kDone would prevent the donor from releasing the critical
+    // section or recording its abort reason, so only fail the tripwire there.
+    const bool canEnterErrorFlow = ableToEnterErrorFlow(proposed.getState());
+    if (canEnterErrorFlow) {
+        tassert(result.status);
+    } else {
+        tassertNoThrow(result.status);
+    }
+}
+
 void ReshardingDonorService::DonorStateMachine::_validatePostTransition(
     OperationContext* opCtx, const DonorShardContext& before, const DonorShardContext& proposed) {
     boost::optional<DonorShardContext> durable;
@@ -1352,16 +1388,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
         resharding::isTransitionValidationEnabled(_forwardableOpMetadata);
 
     if (validateTransitions) {
-        const auto preResult =
-            validateDonorPreTransition({.before = before, .proposed = expectedAfter});
-        // Throwing while entering a terminal state would prevent the donor from releasing the
-        // critical section or recording its abort reason, so only fail the tripwire there.
-        if (expectedAfter.getState() == DonorStateEnum::kError ||
-            expectedAfter.getState() == DonorStateEnum::kDone) {
-            tassertNoThrow(preResult.status);
-        } else {
-            tassert(preResult.status);
-        }
+        _validatePreTransition(before, expectedAfter);
     }
 
     _updateDonorDocument(std::move(newDonorCtx), factory);

@@ -83,6 +83,30 @@ const DonorPreConstraint kExistingAbortReasonUnchanged{
         return checkAbortReasonUnchanged(in.before.getAbortReason(), in.proposed.getAbortReason());
     }};
 
+const DonorPreConstraint kAllRecipientsDoneCloning{
+    "allRecipientsDoneCloning", [](const DonorPreTransitionInput& in) -> Status {
+        if (in.facts.allRecipientsDoneCloning) {
+            return Status::OK();
+        }
+        return transitionViolation("recipients have not all reported done cloning");
+    }};
+
+const DonorPreConstraint kChangeStreamsMonitorStartedIfVerifying{
+    "changeStreamsMonitorStartedIfVerifying", [](const DonorPreTransitionInput& in) -> Status {
+        if (!in.facts.performVerification || in.facts.changeStreamsMonitorStarted) {
+            return Status::OK();
+        }
+        return transitionViolation("change streams monitor has not started");
+    }};
+
+const DonorPreConstraint kAllRecipientsDoneApplying{
+    "allRecipientsDoneApplying", [](const DonorPreTransitionInput& in) -> Status {
+        if (in.facts.allRecipientsDoneApplying) {
+            return Status::OK();
+        }
+        return transitionViolation("recipients have not all reported done applying");
+    }};
+
 const DonorPostConstraint kDurableMatchesProposed{
     "durableMatchesProposed", [](const DonorPostTransitionInput& in) -> Status {
         return checkBsonMatches("durable", in.durable.toBSON(), in.proposed.toBSON());
@@ -100,7 +124,24 @@ ConstraintResult validateEnteringDonatingInitialData(const DonorPreTransitionInp
         .result();
 }
 
-ConstraintResult validateForward(const DonorPreTransitionInput& in) {
+ConstraintResult validateEnteringDonatingOplogEntries(const DonorPreTransitionInput& in) {
+    return preCheck(in)
+        .require(kCloneDetailsUnchanged)
+        .require(kNoAbortReason)
+        .require(kAllRecipientsDoneCloning)
+        .require(kChangeStreamsMonitorStartedIfVerifying)
+        .result();
+}
+
+ConstraintResult validateEnteringPreparingToBlockWrites(const DonorPreTransitionInput& in) {
+    return preCheck(in)
+        .require(kCloneDetailsUnchanged)
+        .require(kNoAbortReason)
+        .require(kAllRecipientsDoneApplying)
+        .result();
+}
+
+ConstraintResult validateEnteringBlockingWrites(const DonorPreTransitionInput& in) {
     return preCheck(in).require(kCloneDetailsUnchanged).require(kNoAbortReason).result();
 }
 
@@ -140,9 +181,10 @@ const std::map<DonorTransitionEdge, DonorTransitionValidators>& donorTransitionV
     static StaticImmortal validators = std::map<DonorTransitionEdge, DonorTransitionValidators>{
         // Forward edges.
         {{kPreparingToDonate, kDonatingInitialData}, {&validateEnteringDonatingInitialData}},
-        {{kDonatingInitialData, kDonatingOplogEntries}, {&validateForward}},
-        {{kDonatingOplogEntries, kPreparingToBlockWrites}, {&validateForward}},
-        {{kPreparingToBlockWrites, kBlockingWrites}, {&validateForward}},
+        {{kDonatingInitialData, kDonatingOplogEntries}, {&validateEnteringDonatingOplogEntries}},
+        {{kDonatingOplogEntries, kPreparingToBlockWrites},
+         {&validateEnteringPreparingToBlockWrites}},
+        {{kPreparingToBlockWrites, kBlockingWrites}, {&validateEnteringBlockingWrites}},
         // kError edges.
         {{kPreparingToDonate, kError}, {&validateEnteringError}},
         {{kDonatingInitialData, kError}, {&validateEnteringError}},

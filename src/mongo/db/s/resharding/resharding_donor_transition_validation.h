@@ -8,15 +8,27 @@
 
 namespace mongo {
 
+/**
+ * Runtime state the donor state machine gathers for transition checks.
+ */
+struct DonorTransitionFacts {
+    bool performVerification = false;
+    bool allRecipientsDoneCloning = false;
+    bool allRecipientsDoneApplying = false;
+    bool changeStreamsMonitorStarted = false;
+};
+
 struct DonorPreTransitionInput {
     const DonorShardContext& before;
     const DonorShardContext& proposed;
+    DonorTransitionFacts facts;
 };
 
 struct DonorPostTransitionInput {
     const DonorShardContext& before;
     const DonorShardContext& proposed;
     const DonorShardContext& durable;
+    DonorTransitionFacts facts;
 };
 
 ConstraintResult validateDonorPreTransition(const DonorPreTransitionInput& input);

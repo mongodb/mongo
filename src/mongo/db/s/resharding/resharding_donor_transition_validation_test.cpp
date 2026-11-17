@@ -58,15 +58,40 @@ DonorShardContext withState(DonorShardContext ctx, DonorStateEnum state) {
     return ctx;
 }
 
+// The fewest runtime facts that satisfy the pre and post checks for entering 'destination'.
+DonorTransitionFacts factsFor(DonorStateEnum destination) {
+    DonorTransitionFacts facts{.performVerification = true};
+    switch (destination) {
+        case kPreparingToBlockWrites:
+            facts.allRecipientsDoneApplying = true;
+            [[fallthrough]];
+        case kDonatingOplogEntries:
+            facts.allRecipientsDoneCloning = true;
+            facts.changeStreamsMonitorStarted = true;
+            break;
+        default:
+            break;
+    }
+    return facts;
+}
+
+ConstraintResult validate(const DonorShardContext& before,
+                          const DonorShardContext& after,
+                          const DonorTransitionFacts& facts) {
+    return validateDonorPreTransition({.before = before, .proposed = after, .facts = facts});
+}
+
 ConstraintResult validate(const DonorShardContext& before, const DonorShardContext& after) {
-    return validateDonorPreTransition({.before = before, .proposed = after});
+    return validate(before, after, factsFor(after.getState()));
 }
 
 ConstraintResult validateInstalled(const DonorShardContext& before,
                                    const DonorShardContext& proposed,
                                    const DonorShardContext& durable) {
-    return validateDonorPostTransition(
-        {.before = before, .proposed = proposed, .durable = durable});
+    return validateDonorPostTransition({.before = before,
+                                        .proposed = proposed,
+                                        .durable = durable,
+                                        .facts = factsFor(proposed.getState())});
 }
 
 void assertViolated(const std::vector<std::string>& expected,
@@ -199,6 +224,35 @@ TEST(ReshardingDonorTransitionValidationTest, RequiresCloneDetailsUnchanged) {
     auto changedOnError = aborted(kError);
     changedOnError.setDocumentsToClone(999);
     assertViolated({"cloneDetailsUnchanged"}, validate(before, changedOnError));
+}
+
+TEST(ReshardingDonorTransitionValidationTest, EnteringDonatingOplogEntriesRequiresRecipientsDone) {
+    auto facts = factsFor(kDonatingOplogEntries);
+    facts.allRecipientsDoneCloning = false;
+    assertViolated(
+        {"allRecipientsDoneCloning"},
+        validate(progressing(kDonatingInitialData), progressing(kDonatingOplogEntries), facts));
+}
+
+TEST(ReshardingDonorTransitionValidationTest, EnteringDonatingOplogEntriesRequiresStartedMonitor) {
+    auto facts = factsFor(kDonatingOplogEntries);
+    facts.changeStreamsMonitorStarted = false;
+    assertViolated(
+        {"changeStreamsMonitorStartedIfVerifying"},
+        validate(progressing(kDonatingInitialData), progressing(kDonatingOplogEntries), facts));
+
+    facts.performVerification = false;
+    ASSERT_OK(validate(progressing(kDonatingInitialData), progressing(kDonatingOplogEntries), facts)
+                  .status);
+}
+
+TEST(ReshardingDonorTransitionValidationTest,
+     EnteringPreparingToBlockWritesRequiresRecipientsDone) {
+    auto facts = factsFor(kPreparingToBlockWrites);
+    facts.allRecipientsDoneApplying = false;
+    assertViolated(
+        {"allRecipientsDoneApplying"},
+        validate(progressing(kDonatingOplogEntries), progressing(kPreparingToBlockWrites), facts));
 }
 
 TEST(ReshardingDonorTransitionValidationTest, DoneKeepsExistingAbortReason) {
