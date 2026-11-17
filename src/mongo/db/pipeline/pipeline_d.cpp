@@ -831,6 +831,19 @@ RewriteOnFirstDocumentResult tryDistinctGroupRewrite(const DocumentSourceContain
     }
 }
 
+/**
+ * $geoNear is skipped because it becomes the near query that the executor runs - $skip and $limit
+ * immediately after are applied directly to the query. Setting canSwapWithSkippingOrLimitingStage
+ * does not work as $sample if present will be swapped with $geoNear.
+ */
+DocumentSourceContainer::iterator skipAndLimitPushdownStart(DocumentSourceContainer& sources) {
+    auto itr = sources.begin();
+    if (itr != sources.end() && (*itr)->isInstanceOf<DocumentSourceGeoNear>()) {
+        ++itr;
+    }
+    return itr;
+}
+
 boost::optional<long long> extractSkipForPushdown(Pipeline* pipeline) {
     // If the disablePipelineOptimization failpoint is enabled, then do not attempt the skip
     // pushdown optimization.
@@ -839,7 +852,7 @@ boost::optional<long long> extractSkipForPushdown(Pipeline* pipeline) {
     }
     auto&& sources = pipeline->getSources();
 
-    auto skip = extractSkipForPushdown(sources.begin(), &sources);
+    auto skip = extractSkipForPushdown(skipAndLimitPushdownStart(sources), &sources);
     if (skip) {
         // Removing stages may have produced the opportunity for additional optimizations.
         pipeline_optimization::optimizePipeline(*pipeline);
@@ -858,8 +871,8 @@ SkipThenLimit extractSkipAndLimitForPushdown(Pipeline* pipeline) {
     // It is important to call 'extractLimitForPushdown' before 'extractSkipForPushdown'. Otherwise
     // there could be a situation when $limit stages in pipeline would prevent
     // 'extractSkipForPushdown' from extracting all $skip stages.
-    auto limit = extractLimitForPushdown(sources.begin(), &sources);
-    auto skip = extractSkipForPushdown(sources.begin(), &sources);
+    auto limit = extractLimitForPushdown(skipAndLimitPushdownStart(sources), &sources);
+    auto skip = extractSkipForPushdown(skipAndLimitPushdownStart(sources), &sources);
     auto skipThenLimit = LimitThenSkip(limit, skip).flip();
     if (skipThenLimit.getSkip() || skipThenLimit.getLimit()) {
         // Removing stages may have produced the opportunity for additional optimizations.
