@@ -807,6 +807,27 @@ TEST(SelectCompatibleVersionTest, MultipleHostMajorsPicksHighestCompatible) {
     ASSERT_EQ(chosen.minor, 1u);
 }
 
+TEST(SelectCompatibleVersionTest, HostAcceptsOldestMinorOfCurrentMajor) {
+    // Extensions compiled against an older minor of the current major must keep loading on a host
+    // built at a later minor.
+    const std::vector<::MongoExtensionAPIVersion> ext = {{MONGODB_EXTENSION_API_MAJOR_VERSION, 0}};
+    auto extVec = makeVec(ext);
+    auto chosen = selectCompatibleVersion(MONGO_EXTENSION_API_VERSIONS_SUPPORTED, extVec);
+    ASSERT_EQ(chosen.major, uint32_t{MONGODB_EXTENSION_API_MAJOR_VERSION});
+    ASSERT_EQ(chosen.minor, 0u);
+}
+
+TEST(SelectCompatibleVersionTest, HostPrefersLatestExtensionVersion) {
+    // An extension publishing both the oldest minor of the current major and the latest version
+    // negotiates the latest.
+    const std::vector<::MongoExtensionAPIVersion> ext = {{MONGODB_EXTENSION_API_MAJOR_VERSION, 0},
+                                                         MONGODB_EXTENSION_API_VERSION};
+    auto extVec = makeVec(ext);
+    auto chosen = selectCompatibleVersion(MONGO_EXTENSION_API_VERSIONS_SUPPORTED, extVec);
+    ASSERT_EQ(chosen.major, uint32_t{MONGODB_EXTENSION_API_MAJOR_VERSION});
+    ASSERT_EQ(chosen.minor, uint32_t{MONGODB_EXTENSION_API_MINOR_VERSION});
+}
+
 TEST_F(LoadExtensionsTest, LoadExtensionConfigFailsWhenConfigPathEmpty) {
     const auto previousExtensionsConfigPath = serverGlobalParams.extensionsConfigPath;
     ON_BLOCK_EXIT([&] { serverGlobalParams.extensionsConfigPath = previousExtensionsConfigPath; });

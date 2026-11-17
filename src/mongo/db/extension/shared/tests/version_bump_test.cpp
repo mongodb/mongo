@@ -3,7 +3,7 @@
 
 // This unit test simulates version bumps to the Extensions API without modifying the frozen
 // types/structs in public/api.h. Instead, it defines a small "future" slice of the API as it would
-// look after two minor bumps and one major bump on top of the current 1.0:
+// look after two minor bumps and one major bump on top of 1.0:
 //
 //   minor 1: appends MongoExtensionWidget::do_work_v1_1 and introduces MongoExtensionSuperWidget.
 //   minor 2: appends MongoExtensionWidget::do_extra_work_v1_2 and introduces

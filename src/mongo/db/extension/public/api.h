@@ -27,7 +27,7 @@ extern "C" {
 //
 ////////////////////////////////////////////////////////////////
 #define MONGODB_EXTENSION_API_MAJOR_VERSION 1
-#define MONGODB_EXTENSION_API_MINOR_VERSION 0
+#define MONGODB_EXTENSION_API_MINOR_VERSION 1
 
 // The current API version of the MongoDB extension.
 #define MONGODB_EXTENSION_API_VERSION                                            \
