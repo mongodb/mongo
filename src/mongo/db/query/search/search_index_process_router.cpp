@@ -129,15 +129,4 @@ SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* op
     return uuidAndPossibleCollName;
 }
 
-std::pair<UUID, boost::optional<ResolvedNamespace>>
-SearchIndexProcessRouter::fetchCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
-                                                                   const NamespaceString& nss) {
-    auto uuidResolvdNssPair = fetchCollectionUUIDAndResolveView(opCtx, nss);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' does not exist.",
-            uuidResolvdNssPair.first);
-
-    return std::make_pair(*uuidResolvdNssPair.first, uuidResolvdNssPair.second);
-}
-
 }  // namespace mongo

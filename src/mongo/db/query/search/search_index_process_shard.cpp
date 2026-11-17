@@ -60,15 +60,4 @@ SearchIndexProcessShard::fetchCollectionUUIDAndResolveView(OperationContext* opC
     }
 }
 
-std::pair<UUID, boost::optional<ResolvedNamespace>>
-SearchIndexProcessShard::fetchCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
-                                                                  const NamespaceString& nss) {
-    auto uuidResolvedViewPair = fetchCollectionUUIDAndResolveView(opCtx, nss);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' does not exist.",
-            uuidResolvedViewPair.first);
-
-    return std::make_pair(*uuidResolvedViewPair.first, uuidResolvedViewPair.second);
-}
-
 }  // namespace mongo

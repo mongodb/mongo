@@ -23,13 +23,6 @@ public:
     static void set(Service* service, std::unique_ptr<SearchIndexProcessInterface> impl);
 
     /**
-     * Returns the collection UUID and optionally a ResolvedView (if query is on a view). If no
-     * UUID, throws a NamespaceNotFound error.
-     */
-    virtual std::pair<UUID, boost::optional<ResolvedNamespace>>
-    fetchCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
-                                             const NamespaceString& nss) = 0;
-    /**
      * Returns the collection UUID (or boost::none if no collection is found) and optionally a
      * ResolvedNamespace if query is on a view (or boost::none if query is on a normal collection).
      *

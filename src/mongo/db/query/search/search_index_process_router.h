@@ -14,9 +14,6 @@ public:
     fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       bool failOnTsColl = true) override;
-
-    std::pair<UUID, boost::optional<ResolvedNamespace>> fetchCollectionUUIDAndResolveViewOrThrow(
-        OperationContext* opCtx, const NamespaceString& nss) override;
 };
 
 }  // namespace mongo
