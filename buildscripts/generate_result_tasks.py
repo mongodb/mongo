@@ -285,7 +285,7 @@ def make_task_group(
         setup_task=[BuiltInCommand("shell.exec", {"script": _RESULT_TASK_CLEANUP})]
         + ([] if resmoke_disable_rbe else _make_build_events_fetch(resmoke_task)),
         teardown_task=[
-            BuiltInCommand("attach.results", {"file_location": "report.json"}),
+            FunctionCall("attach report", {"report_file": "report.json"}),
             BuiltInCommand(
                 "s3.put",
                 {
@@ -726,7 +726,7 @@ def create_task_group_for_variant(variant_name: str, task_name: str, targets: li
             {"command": "shell.exec", "params": {"script": "rm -rf build/ results/ report.json"}}
         ],
         "teardown_task": [
-            {"command": "attach.results", "params": {"file_location": "report.json"}},
+            {"func": "attach report", "vars": {"report_file": "report.json"}},
             {
                 "command": "s3.put",
                 "params": {
