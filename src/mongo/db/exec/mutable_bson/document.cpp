@@ -474,6 +474,10 @@ struct ElementRep {
         _fieldNameSize = fieldNameSize;
     }
 
+    int cachedFieldNameSize(std::span<const char> buffer) const {
+        return _fieldNameSize > 0 ? _fieldNameSize : BSONElement::fieldNameSizeFromBuffer(buffer);
+    }
+
     BSONElement toSerializedElement(const BSONObj& holder) const {
         auto buffer = getSpanWithinObject(holder, offset);
         return _fieldNameSize > 0
@@ -825,7 +829,7 @@ public:
         if (hasValue(*rep)) {
             auto buffer = getSpanWithinObject(backing, rep->offset);
 
-            const auto eltFieldNameSize = BSONElement::fieldNameSizeFromBuffer(buffer);
+            const auto eltFieldNameSize = rep->cachedFieldNameSize(buffer);
             const auto type = static_cast<BSONType>(static_cast<int8_t>(buffer.front()));
 
             tassert(13324400,
@@ -940,7 +944,7 @@ public:
         // a BSONElement at 'nextOffset'. This is because we do a fatal bound check on
         // 'nextOffset' in this context. The BSONElement must not be constructed until that
         // check has passed, otherwise a tassert is triggered on construction.
-        const auto eltFieldNameSize = BSONElement::fieldNameSizeFromBuffer(buffer);
+        const auto eltFieldNameSize = rep->cachedFieldNameSize(buffer);
         const auto eltValueSize = BSONElement::valueSizeFromBuffer(buffer, eltFieldNameSize);
         const auto eltSize = 1 + eltFieldNameSize + eltValueSize;
         const int64_t nextOffset = static_cast<int64_t>(rep->offset) + eltSize;
