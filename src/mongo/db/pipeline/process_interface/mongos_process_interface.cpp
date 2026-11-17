@@ -448,13 +448,14 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
 
     if (fieldPaths) {
         auto supportingUniqueIndex = fieldsHaveSupportingUniqueIndex(expCtx, outputNs, *fieldPaths);
-        uassert(51190,
-                "Cannot find index to verify that join fields will be unique",
-                supportingUniqueIndex != SupportingUniqueIndex::None);
-
-        // If the user supplies the 'fields' array, we don't need to attach a ChunkVersion for
-        // the shards since we are not at risk of 'guessing' the wrong shard key.
-        return {*fieldPaths, boost::none, supportingUniqueIndex};
+        if (supportingUniqueIndex != SupportingUniqueIndex::None) {
+            // If the user supplied 'fields' array is a unique index, we don't need to attach a
+            // ChunkVersion for the shards since we are not at risk of 'guessing' the wrong shard
+            // key.
+            return {*fieldPaths, boost::none, supportingUniqueIndex};
+        }
+        // Without a unique index, explicit fields are still valid if they match the default
+        // document key of a sharded target (shard key + _id), which is resolved below.
     }
 
     // TODO SERVER-95749 Avoid forced collection cache refresh and validate RoutingContext in
@@ -485,9 +486,9 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
             return boost::none;
         }
 
-        // Without explicit fieldPaths, for sharded target collections, mongods use _id + shard key
-        // for uniqueness. The _id comparison uses the collection's default collation. Check the _id
-        // collation matches the query's collation. Shard keys must use the simple collation.
+        // For sharded target collections, mongods use _id + shard key for uniqueness. The _id
+        // comparison uses the collection's default collation. Check the _id collation matches the
+        // query's collation. Shard keys must use the simple collation.
         uassert(
             11749300,
             "$merge aggregation pipeline collation does not match destination collection collation",
@@ -499,10 +500,17 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
 
     auto docKeyPaths = collectDocumentKeyFieldsActingAsRouter(
         expCtx->getOperationContext(), outputNs, routingCtx.get());
-    return {std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
-                                std::make_move_iterator(docKeyPaths.end())),
-            placementVersion,
-            SupportingUniqueIndex::Full};
+    std::set<FieldPath> docKeyFields(std::make_move_iterator(docKeyPaths.begin()),
+                                     std::make_move_iterator(docKeyPaths.end()));
+
+    // Explicit fields with no supporting unique index must match the sharded document key exactly.
+    // Unlike a user-supplied unique index, the document key depends on the shard key, so the
+    // placement version is attached just as when 'on' is omitted.
+    uassert(51190,
+            "Cannot find index to verify that join fields will be unique",
+            !fieldPaths || (placementVersion && docKeyFields == *fieldPaths));
+
+    return {std::move(docKeyFields), placementVersion, SupportingUniqueIndex::Full};
 }
 
 }  // namespace mongo

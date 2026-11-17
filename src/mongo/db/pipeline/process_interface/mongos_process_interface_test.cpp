@@ -62,18 +62,19 @@ TEST_F(MongosProcessInterfaceTest,
         51179);
 }
 
-TEST_F(MongosProcessInterfaceTest, FailsToEnsureFieldsUniqueIfNotSupportedByIndex) {
+TEST_F(MongosProcessInterfaceTest, ExplicitFieldsWithSupportingIndexDoNotPinPlacementVersion) {
     auto expCtx = getExpCtx();
-    auto targetCollectionPlacementVersion = boost::none;
     auto processInterface = getProcessInterface();
-
     processInterface->hasSupportingIndexForFields =
-        MongoProcessInterface::SupportingUniqueIndex::None;
-    ASSERT_THROWS_CODE(
-        processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-            expCtx, {{"x"}}, targetCollectionPlacementVersion, expCtx->getNamespaceString()),
-        AssertionException,
-        51190);
+        MongoProcessInterface::SupportingUniqueIndex::NotNullish;
+    auto [fields, version, supporting] = processInterface->ensureFieldsUniqueOrResolveDocumentKey(
+        expCtx,
+        std::set<FieldPath>{FieldPath("a"), FieldPath("_id")},
+        boost::none,
+        expCtx->getNamespaceString());
+    ASSERT(fields == (std::set<FieldPath>{FieldPath("a"), FieldPath("_id")}));
+    ASSERT_FALSE(version);
+    ASSERT_EQ(supporting, MongoProcessInterface::SupportingUniqueIndex::NotNullish);
 }
 
 using MongosProcessInterfaceDeathTest = MongosProcessInterfaceTest;
