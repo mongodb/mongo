@@ -17,6 +17,7 @@ import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
@@ -46,7 +47,9 @@ describe("checkMetadataConsistency on a secondary lagged inside a collMod window
     const testDB = st.s.getDB(dbName);
     const coll = testDB.getCollection(collName);
 
+    const usesDisagg = isDisagg(st.rs0.getPrimary());
     let laggedSecondary = null;
+    let replicationPause = null;
 
     function checkMetadataConsistency() {
         return testDB
@@ -101,7 +104,27 @@ describe("checkMetadataConsistency on a secondary lagged inside a collMod window
         fp.wait();
 
         st.rs0.awaitReplication();
-        stopServerReplication(laggedSecondary);
+        // Lag only this secondary while the primary continues the collMod catalog updates. Both
+        // ASC and DSC use the oplog applier, but fetch entries differently. ASC uses OplogFetcher,
+        // so stopServerReplication() pauses it with stopReplProducer. DSC reads from the log
+        // service; its stopServerReplication() override pauses every replica set member,
+        // including the primary, which would prevent collMod from completing. Thus, we use
+        // hangInStandbyReadLoop to pause only the selected DSC standby.
+        if (usesDisagg) {
+            replicationPause = configureFailPoint(laggedSecondary, "hangInStandbyReadLoop");
+            // Force a write so an idle standby read loop receives data and observes the failpoint.
+            // Use a separate database to avoid affecting the metadata consistency checks.
+            // Intentionally use {w: 1} to avoid waiting on the paused secondary.
+            assert.commandWorked(
+                st.rs0
+                    .getPrimary()
+                    .getDB("replication_barrier")
+                    .replication_barrier.insert({_id: 1}, {writeConcern: {w: 1}}),
+            );
+            replicationPause.wait();
+        } else {
+            stopServerReplication(laggedSecondary);
+        }
 
         fp.off();
         awaitCollMod();
@@ -113,8 +136,14 @@ describe("checkMetadataConsistency on a secondary lagged inside a collMod window
     });
 
     after(function () {
+        if (replicationPause !== null) {
+            replicationPause.off();
+            replicationPause = null;
+        }
         if (laggedSecondary !== null) {
-            restartServerReplication(laggedSecondary);
+            if (!usesDisagg) {
+                restartServerReplication(laggedSecondary);
+            }
             laggedSecondary = null;
         }
         st.rs0.awaitReplication();
