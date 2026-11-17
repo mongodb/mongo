@@ -18,6 +18,64 @@ const MakeObjSpec::FieldAction& MakeObjSpec::getAction(size_t pos) const {
     return fieldsScopeIsOpen() ? kKeep : kDrop;
 }
 
+bool MakeObjSpec::validate() const {
+    return validateInternal(totalNumArgs);
+}
+
+bool MakeObjSpec::validateInternal(size_t rootNumArgs) const {
+    tassert(13948300,
+            "Expected a nonnegative traversal depth",
+            !traversalDepth || *traversalDepth >= 0);
+
+    if (fields.size() != actions.size() ||
+        (fieldsScope != FieldListScope::kOpen && fieldsScope != FieldListScope::kClosed)) {
+        return false;
+    }
+
+    size_t expectedNumArgs = 0;
+    size_t expectedNumFieldsToSearchFor = 0;
+    size_t mandatoryPos = 0;
+    for (size_t i = 0; i < actions.size(); ++i) {
+        if (fields.findPos(fields[i]) != i) {
+            return false;
+        }
+        const auto& action = actions[i];
+        if (action.isMakeObj()) {
+            const auto* nested = action.getMakeObjSpec();
+            if (!nested || !nested->validateInternal(rootNumArgs)) {
+                return false;
+            }
+            expectedNumArgs += nested->totalNumArgs;
+        } else if (action.isSetArg() || action.isAddArg() || action.isLambdaArg()) {
+            if (action.getArgIdx() >= rootNumArgs) {
+                return false;
+            }
+            ++expectedNumArgs;
+        }
+
+        if (action.isKeep()) {
+            expectedNumFieldsToSearchFor += fieldsScopeIsClosed();
+        } else if (action.isDrop() || action.isAddArg()) {
+            expectedNumFieldsToSearchFor += fieldsScopeIsOpen();
+        } else {
+            ++expectedNumFieldsToSearchFor;
+        }
+        if (action.isMandatory()) {
+            if (mandatoryPos == mandatoryFields.size() || mandatoryFields[mandatoryPos++] != i) {
+                return false;
+            }
+        }
+    }
+    for (size_t pos : displayOrder) {
+        if (pos >= fields.size()) {
+            return false;
+        }
+    }
+    return expectedNumArgs == totalNumArgs &&
+        expectedNumFieldsToSearchFor == numFieldsToSearchFor &&
+        mandatoryPos == mandatoryFields.size();
+}
+
 StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names) {
     const bool isClosed = fieldsScopeIsClosed();
 

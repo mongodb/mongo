@@ -230,6 +230,11 @@ struct MakeObjSpec {
      */
     const FieldAction& getAction(size_t pos) const;
 
+    /**
+     * Checks this spec as the root of a call. Nested actions index the root's argument list.
+     */
+    bool validate() const;
+
     bool returnsNothingOnMissingInput() const {
         return nonObjInputBehavior != NonObjInputBehavior::kNewObj;
     }
@@ -257,6 +262,9 @@ private:
     StringListSet buildFieldDict(std::vector<std::string> names);
 
     void init();
+
+    // Helper for validate.
+    bool validateInternal(size_t rootNumArgs) const;
 
     static FieldAction _singleKeepAction[1];
 

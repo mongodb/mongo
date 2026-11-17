@@ -3,6 +3,7 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe::value {
@@ -34,6 +35,85 @@ TEST(MakeObjSpecTest, GetArgIdxReturnsTheIndexOfAnyArgumentAction) {
     ASSERT_EQ(FieldAction{SetArg{1}}.getArgIdx(), 1u);
     ASSERT_EQ(FieldAction{MakeObjSpec::AddArg{2}}.getArgIdx(), 2u);
     ASSERT_EQ((FieldAction{LambdaArg{3, false}}.getArgIdx()), 3u);
+}
+
+TEST(MakeObjSpecTest, ValidateDefaultActions) {
+    for (auto scope : {FieldListScope::kOpen, FieldListScope::kClosed}) {
+        MakeObjSpec empty{scope, {}};
+        MakeObjSpec defaults{scope, {"a", "b"}};
+        ASSERT_TRUE(empty.validate());
+        ASSERT_TRUE(defaults.validate());
+    }
+}
+
+TEST(MakeObjSpecTest, NonnegativeAndUnlimitedTraversalDepthsAreValid) {
+    const boost::optional<int32_t> depths[] = {boost::none, 0, 2};
+    for (auto depth : depths) {
+        MakeObjSpec spec{FieldListScope::kOpen, {}, {}, NonObjInputBehavior::kNewObj, depth};
+        ASSERT_TRUE(spec.validate());
+    }
+}
+
+DEATH_TEST(MakeObjSpecDeathTest, NegativeTraversalDepth, "13948300") {
+    MakeObjSpec spec{FieldListScope::kOpen, {}, {}, NonObjInputBehavior::kNewObj, -1};
+    spec.validate();
+}
+
+TEST(MakeObjSpecTest, ValidateFlatSpecAndMetadata) {
+    std::vector<FieldAction> actions;
+    actions.emplace_back(SetArg{0});
+    actions.emplace_back(MakeObjSpec::AddArg{0});
+    actions.emplace_back(LambdaArg{2, false});
+    actions.emplace_back(Drop{});
+    MakeObjSpec valid{FieldListScope::kOpen, {"a", "b", "c", "d"}, std::move(actions)};
+    // Shared indexes and unused argument positions are allowed.
+    ASSERT_TRUE(valid.validate());
+
+    auto invalidIndex = valid.clone();
+    invalidIndex->actions[0] = SetArg{3};
+    ASSERT_FALSE(invalidIndex->validate());
+
+    auto missingAction = valid.clone();
+    missingAction->actions.pop_back();
+    ASSERT_FALSE(missingAction->validate());
+
+    auto wrongArgCount = valid.clone();
+    ++wrongArgCount->totalNumArgs;
+    ASSERT_FALSE(wrongArgCount->validate());
+
+    auto wrongSearchCount = valid.clone();
+    ++wrongSearchCount->numFieldsToSearchFor;
+    ASSERT_FALSE(wrongSearchCount->validate());
+
+    auto wrongMandatoryOrder = valid.clone();
+    std::swap(wrongMandatoryOrder->mandatoryFields[0], wrongMandatoryOrder->mandatoryFields[1]);
+    ASSERT_FALSE(wrongMandatoryOrder->validate());
+
+    auto missingMandatory = valid.clone();
+    missingMandatory->mandatoryFields.pop_back();
+    ASSERT_FALSE(missingMandatory->validate());
+
+    auto invalidDisplay = valid.clone();
+    invalidDisplay->displayOrder = {valid.fields.size()};
+    ASSERT_FALSE(invalidDisplay->validate());
+}
+
+TEST(MakeObjSpecTest, ValidateNestedSpecsUseRootArgumentIndexes) {
+    std::vector<FieldAction> nestedActions;
+    nestedActions.emplace_back(SetArg{1});
+    auto nested = std::make_unique<MakeObjSpec>(
+        FieldListScope::kOpen, std::vector<std::string>{"value"}, std::move(nestedActions));
+    auto& nestedAction = nested->actions.front();
+    std::vector<FieldAction> actions;
+    actions.emplace_back(MakeObj{std::move(nested)});
+    actions.emplace_back(SetArg{0});
+    MakeObjSpec root{FieldListScope::kClosed, {"nested", "root"}, std::move(actions)};
+
+    // The nested spec has one argument-bearing action, but reads index 1 in the root call.
+    ASSERT_TRUE(root.validate());
+
+    nestedAction = SetArg{root.totalNumArgs};
+    ASSERT_FALSE(root.validate());
 }
 
 std::vector<FieldAction> makeFieldActionVector(int depth = 2) {
