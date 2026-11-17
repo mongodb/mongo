@@ -9,6 +9,8 @@
 #include "mongo/transport/baton.h"
 #include "mongo/util/modules.h"
 
+#include <cstddef>
+#include <string_view>
 #include <utility>
 
 #include <asio.hpp>
@@ -18,6 +20,8 @@
 #endif
 
 namespace mongo::transport {
+
+struct ParserResults;
 
 /**
  * Provides common functionality between AsyncAsioSession and SyncAsioSession.
@@ -132,6 +136,12 @@ protected:
 
     GenericSocket& getSocket() override;
     ExecutorFuture<void> parseProxyProtocolHeader(const ReactorHandle& reactor) override;
+    /** Sets internal state according to the values in a successfully parsed PROXY header. */
+    void applyProxyParseResults(const ParserResults& results);
+    /** Largest proxy protocol header accepted on this session's port. */
+    size_t proxyProtocolMaxHeaderSize() const;
+    /** Logs a failed proxy protocol header, ends the session, and returns `s`. */
+    Status handleProxyProtocolError(Status s);
 
     const RestrictionEnvironment& getAuthEnvironment() const override {
         return _restrictionEnvironment;
@@ -235,6 +245,36 @@ protected:
                                     const BatonHandle& baton = nullptr);
 
 #ifdef MONGO_CONFIG_SSL
+    /**
+     * Decides whether the first ingress bytes are plaintext or a TLS ClientHello, and applies the
+     * requireSSL / preferSSL / proxy / HTTP policy. Does not read or write on the network socket.
+     * Returns an error when an invalid message is detected (for example, a plaintext request when
+     * the server is configured to require SSL).
+     */
+    StatusWith<bool> clientSentSSLRequest(std::string_view msgHeader);
+
+    /** Builds the ingress ssl::stream and records the handshake start. */
+    Status beginIngressSSL();
+
+    /**
+     * SNI logging, handshake metrics, and peer-certificate validation after a successful handshake.
+     */
+    Future<void> completeIngressSSLHandshake();
+
+    /**
+     * Classifies `msgHeader`, the first ingress bytes, and runs the ingress TLS handshake when they
+     * are a ClientHello. `handshake` is `Future<size_t>(SslStream&)`, is called with `*_sslSocket`,
+     * and must use the same already-read bytes that `msgHeader` refers to.
+     * Resolves to true when TLS ran.
+     */
+    template <typename Handshake>
+    Future<bool> classifyAndHandshakeSSL(std::string_view msgHeader, Handshake&& handshake);
+
+    /**
+     * `buffer` already holds the first message bytes. Returns true when TLS consumed them and the
+     * caller must read the message again. Dispatches to the sync or async handshake based on the
+     * session's blocking mode.
+     */
     template <typename MutableBufferSequence>
     Future<bool> maybeHandshakeSSLForIngress(const MutableBufferSequence& buffer);
 #endif
@@ -271,7 +311,7 @@ protected:
 #endif
 
     /**
-     * Synchronizes construction of _sslSocket in maybeHandshakeSSLForIngress and access of
+     * Synchronizes construction of _sslSocket in the ingress TLS handshake and access of
      * _sslSocket during shutdown in end(). Without synchronization, end() can operate on _socket
      * while its ownership is being passed to _sslSocket.
      * TODO (SERVER-83933) Remove this mutex after SSL handshake logic is moved to occur before

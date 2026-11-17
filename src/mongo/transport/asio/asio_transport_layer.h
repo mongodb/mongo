@@ -266,6 +266,9 @@ private:
 
     void _acceptConnection(GenericAcceptor& acceptor);
 
+    /** Hands `session` to the session manager, logging instead of throwing DBException. */
+    void _tryStartSession(std::shared_ptr<AsioSession> session);
+
     template <typename Endpoint>
     StatusWith<std::shared_ptr<AsioSession>> _doSyncConnect(
         Endpoint endpoint,

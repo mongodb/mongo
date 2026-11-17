@@ -1590,6 +1590,10 @@ bool isConnectionResetError(const std::error_code& ec) {
     return ec == asio::error::eof || ec == asio::error::invalid_argument;
 }
 
+void logAcceptError(const DBException& e) {
+    LOGV2_WARNING(23023, "Error accepting new connection", "error"_attr = e);
+}
+
 /** Tricky: TCP can be represented by IPPROTO_IP or IPPROTO_TCP. */
 template <typename Protocol>
 bool isTcp(Protocol&& p) {
@@ -1657,11 +1661,6 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
             _acceptConnection(acceptor);
         });
 
-
-        constexpr static auto logOnError = [](const DBException& e) {
-            LOGV2_WARNING(23023, "Error accepting new connection", "error"_attr = e);
-        };
-
         try {
             std::shared_ptr<AsioSession> session(
                 new SyncAsioSession(this, std::move(peerSocket), true));
@@ -1719,12 +1718,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                 session->parseProxyProtocolHeader(_listenerInterfaceMainPort->getReactor())
                     .getAsync([this, session = std::move(session), t = std::move(token)](Status s) {
                         if (s.isOK()) {
-                            invariant(!!_sessionManager);
-                            try {
-                                _sessionManager->startSession(std::move(session));
-                            } catch (const DBException& e) {
-                                logOnError(e);
-                            }
+                            _tryStartSession(std::move(session));
                         }
                         // We will release the token (i.e. `t`) as we leave this function.
                     });
@@ -1738,7 +1732,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                     5746600, "Error accepting new connection", "error"_attr = e.code().message());
             }
         } catch (const DBException& e) {
-            logOnError(e);
+            logAcceptError(e);
         }
     };
 
@@ -1747,6 +1741,15 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
     _trySetListenerSocketBacklogQueueDepth(acceptor);
 
     acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
+}
+
+void AsioTransportLayer::_tryStartSession(std::shared_ptr<AsioSession> session) {
+    invariant(!!_sessionManager);
+    try {
+        _sessionManager->startSession(std::move(session));
+    } catch (const DBException& e) {
+        logAcceptError(e);
+    }
 }
 
 SessionStatsResult AsioTransportLayer::collectReplicationSessionStats() {

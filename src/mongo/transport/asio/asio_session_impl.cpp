@@ -557,6 +557,61 @@ auto CommonAsioSession::getSocket() -> GenericSocket& {
     return _socket;
 }
 
+void CommonAsioSession::applyProxyParseResults(const ParserResults& results) {
+    // There may not be any endpoints if this connection is directly from the proxy itself or the
+    // information isn't available.
+    if (results.endpoints) {
+        _proxiedSrcRemoteAddr = results.endpoints->sourceAddress;
+        _proxiedSrcEndpoint =
+            HostAndPort(_proxiedSrcRemoteAddr->getAddr(), _proxiedSrcRemoteAddr->getPort());
+
+        const auto& dstEndpointAddr = results.endpoints->destinationAddress;
+        _proxiedDstEndpoint = HostAndPort(dstEndpointAddr.getAddr(), dstEndpointAddr.getPort());
+
+        // If the server has been configured to apply authentication restrictions against origin
+        // client IP addresses, then the session's auth restriction environment should be reset to
+        // apply against the source address advertised in the proxy protocol header.
+        if (clientSourceAuthenticationRestrictionMode == "origin"sv) {
+            _restrictionEnvironment =
+                RestrictionEnvironment(_proxiedSrcRemoteAddr.value(), _localAddr);
+        }
+
+        LOGV2_DEBUG(11978400,
+                    4,
+                    "Proxy protocol header parsed",
+                    "sourceAddress"_attr = results.endpoints->sourceAddress.toString(),
+                    "sourcePort"_attr = results.endpoints->sourceAddress.getPort(),
+                    "destinationAddress"_attr = results.endpoints->destinationAddress.toString(),
+                    "destinationPort"_attr = results.endpoints->destinationAddress.getPort(),
+                    "tlvs"_attr = makeTLVString(results.tlvs),
+                    "sslTlvs"_attr = results.sslTlvs ? makeTLVString(results.sslTlvs->subTLVs) : "",
+                    "bytesParsed"_attr = results.bytesParsed);
+    } else {
+        _proxiedSrcRemoteAddr = {};
+        _proxiedSrcEndpoint = {};
+        _proxiedDstEndpoint = {};
+    }
+
+    // Extract the SNI, DN and optional roles from the proxy protocol header TLVs if present and
+    // apply them to the session's tags. This is used to populate the SSLPeerInfo for the session.
+    applyProxyProtocolTlvs(results, shared_from_this());
+}
+
+size_t CommonAsioSession::proxyProtocolMaxHeaderSize() const {
+    return isConnectedToProxyUnixSocket()
+        ? static_cast<size_t>(proxyUnixSocketMaximumHeaderSize.loadRelaxed())
+        : kDefaultProxyProtocolHeaderReadSize;
+}
+
+Status CommonAsioSession::handleProxyProtocolError(Status s) {
+    LOGV2_DEBUG(6067900,
+                getExceptionLogSeverityLevel(),
+                "Error while parsing proxy protocol header",
+                "error"_attr = redact(s));
+    end();
+    return s;
+}
+
 ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHandle& reactor) {
     invariant(isIngress());
     invariant(reactor);
@@ -565,9 +620,7 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
     const Seconds proxyHeaderTimeout{Seconds(gProxyProtocolTimeoutSecs.load())};
     const Date_t deadline = reactor->now() + proxyHeaderTimeout;
 
-    const size_t headerReadSize = isConnectedToProxyUnixSocket()
-        ? static_cast<size_t>(proxyUnixSocketMaximumHeaderSize.loadRelaxed())
-        : kDefaultProxyProtocolHeaderReadSize;
+    const size_t headerReadSize = proxyProtocolMaxHeaderSize();
 
     auto buffer = std::make_shared<std::vector<char>>(headerReadSize);
     return AsyncTry([this, buffer, headerReadSize] {
@@ -593,50 +646,7 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
         .on(reactor, CancellationToken::uncancelable())
         .then([this, buffer](const boost::optional<ParserResults>& results) mutable {
             invariant(results);
-
-            // There may not be any endpoints if this connection is directly
-            // from the proxy itself or the information isn't available.
-            if (results->endpoints) {
-                _proxiedSrcRemoteAddr = results->endpoints->sourceAddress;
-                _proxiedSrcEndpoint =
-                    HostAndPort(_proxiedSrcRemoteAddr->getAddr(), _proxiedSrcRemoteAddr->getPort());
-
-                const auto& dstEndpointAddr = results->endpoints->destinationAddress;
-                _proxiedDstEndpoint =
-                    HostAndPort(dstEndpointAddr.getAddr(), dstEndpointAddr.getPort());
-
-                // If the server has been configured to apply authentication restrictions against
-                // origin client IP addresses, then the session's auth restriction environment
-                // should be reset to apply against the source address advertised in the proxy
-                // protocol header.
-                if (clientSourceAuthenticationRestrictionMode == "origin"sv) {
-                    _restrictionEnvironment =
-                        RestrictionEnvironment(_proxiedSrcRemoteAddr.value(), _localAddr);
-                }
-
-                // Log ParserResults for testing.
-                LOGV2_DEBUG(
-                    11978400,
-                    4,
-                    "Proxy protocol header parsed",
-                    "sourceAddress"_attr = results->endpoints->sourceAddress.toString(),
-                    "sourcePort"_attr = results->endpoints->sourceAddress.getPort(),
-                    "destinationAddress"_attr = results->endpoints->destinationAddress.toString(),
-                    "destinationPort"_attr = results->endpoints->destinationAddress.getPort(),
-                    "tlvs"_attr = makeTLVString(results->tlvs),
-                    "sslTlvs"_attr =
-                        results->sslTlvs ? makeTLVString(results->sslTlvs->subTLVs) : "",
-                    "bytesParsed"_attr = results->bytesParsed);
-            } else {
-                _proxiedSrcRemoteAddr = {};
-                _proxiedSrcEndpoint = {};
-                _proxiedDstEndpoint = {};
-            }
-
-            // Extract the SNI, DN and optional roles from the proxy protocol header TLVs if present
-            // and apply them to the session's tags. This is used to populate the SSLPeerInfo for
-            // the session.
-            applyProxyProtocolTlvs(*results, shared_from_this());
+            applyProxyParseResults(*results);
 
             // `opportunisticRead` expects to run as part of an asynchronous operation. We start the
             // operation below and make sure to mark it as completed, regardless of the completion
@@ -647,14 +657,7 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
             // Drain the read buffer.
             opportunisticRead(_socket, asio::buffer(buffer->data(), results->bytesParsed)).get();
         })
-        .onError([this](Status s) {
-            LOGV2_DEBUG(6067900,
-                        getExceptionLogSeverityLevel(),
-                        "Error while parsing proxy protocol header",
-                        "error"_attr = redact(s));
-            end();
-            return s;
-        });
+        .onError([this](Status s) { return handleProxyProtocolError(std::move(s)); });
 }
 
 Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
@@ -900,107 +903,58 @@ Future<void> CommonAsioSession::opportunisticWrite(Stream& stream,
 }
 
 #ifdef MONGO_CONFIG_SSL
-template <typename MutableBufferSequence>
-Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferSequence& buffer) {
-    invariant(buffer.size() >= sizeof(MSGHEADER::Value));
+namespace {
 
-    // Skip TLS handshake for connections over the unix proxy socket. The proxy protocol
-    // connection is local and trusted, so TLS is unnecessary. This also avoids hitting
-    // the requireSSL assertion below for non-TLS connections on the proxy socket.
-    if (isConnectedToProxyUnixSocket()) {
-        MSGHEADER::ConstView proxyHeaderView(static_cast<const char*>(buffer.data()));
-        auto proxyResponseTo = proxyHeaderView.getResponseToMsgId();
-        if (proxyResponseTo != 0 && proxyResponseTo != -1) {
-            return Future<bool>::makeReady(
-                Status(ErrorCodes::SSLHandshakeFailed,
-                       "TLS hello received on proxy protocol unix socket"));
-        }
-        return Future<bool>::makeReady(false);
-    }
-
-    MSGHEADER::ConstView headerView(static_cast<const char*>(buffer.data()));
-    auto responseTo = headerView.getResponseToMsgId();
-
-    if (checkForHTTPRequest(buffer)) {
-        return Future<bool>::makeReady(false);
-    }
-
-    // If the client is communicating to the server's unix domain socket, then the server
-    // should allow either a TLS handshake or plaintext irrespective of the server's
-    // TLS mode.
-    const bool isUnixDomainSockConn = [this]() {
+bool isUnixDomainSocketAddr(const HostAndPort& addr) {
 #ifndef _WIN32
-        return isUnixDomainSocket(local().host());
+    return isUnixDomainSocket(addr.host());
+#else
+    (void)addr;
+    return false;
 #endif
-        return false;
-    }();
+}
 
-    if (maybeProxyProtocolHeader(
-            std::string_view(static_cast<const char*>(buffer.data()), buffer.size()))) {
-        // Protocol requirements mean that neither raw mongorpc nor TLS client hello will look
-        // like Proxy.
-        return Future<bool>::makeReady(
-            Status(ErrorCodes::OperationFailed, "ProxyProtocol message detected on mongorpc port"));
+}  // namespace
+
+StatusWith<bool> CommonAsioSession::clientSentSSLRequest(std::string_view msgHeader) {
+    invariant(msgHeader.size() >= sizeof(MSGHEADER::Value));
+    // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage) length is checked on previous line
+    MSGHEADER::ConstView headerView(msgHeader.data());
+
+    // Skip TLS for the unix proxy socket. That hop is local and trusted, and a plaintext
+    // connection there must not trip the requireSSL check below.
+    if (isConnectedToProxyUnixSocket()) {
+        const auto proxyResponseTo = headerView.getResponseToMsgId();
+        if (proxyResponseTo != 0 && proxyResponseTo != -1) {
+            return Status(ErrorCodes::SSLHandshakeFailed,
+                          "TLS hello received on proxy protocol unix socket");
+        }
+        return false;
     }
 
-    // This logic was taken from the old mongo/util/net/sock.cpp.
-    //
-    // It lets us run both TLS and unencrypted mongo over the same port.
-    //
-    // The first message received from the client should have the responseTo field of the wire
-    // protocol message needs to be 0 or -1. Otherwise the connection is either sending
-    // garbage or a TLS Hello packet which will be caught by the TLS handshake.
+    if (checkForHTTPRequest(msgHeader)) {
+        return false;
+    }
+
+    // A client on the server's own unix domain socket may speak TLS or plaintext regardless of
+    // the server's TLS mode.
+    const bool isUnixDomainSockConn = isUnixDomainSocketAddr(local());
+
+    if (maybeProxyProtocolHeader(msgHeader)) {
+        // Neither a raw mongorpc message nor a TLS ClientHello looks like a proxy header.
+        return Status(ErrorCodes::OperationFailed,
+                      "ProxyProtocol message detected on mongorpc port");
+    }
+
+    // Taken from the old mongo/util/net/sock.cpp so TLS and plaintext can share a port.
+    // The first message's responseTo is 0 or -1. Anything else is either garbage or a TLS
+    // ClientHello, which the handshake then accepts or rejects.
+    const auto responseTo = headerView.getResponseToMsgId();
     if (responseTo != 0 && responseTo != -1) {
-        if (!_sslContext->ingress) {
-            return Future<bool>::makeReady(
-                Status(ErrorCodes::SSLHandshakeFailed,
-                       "SSL handshake received but server is started without SSL support"));
-        }
+        return true;
+    }
 
-        {
-            std::lock_guard lg(_sslSocketLock);
-            _sslSocket.emplace(std::move(_socket), *_sslContext->ingress, "");
-        }
-
-        auto doHandshake = [&] {
-            if (_blockingMode == sync) {
-                std::error_code ec;
-                _sslSocket->handshake(asio::ssl::stream_base::server, buffer, ec);
-                return futurize(ec, buffer.size());
-            } else {
-                return _sslSocket->async_handshake(
-                    asio::ssl::stream_base::server, buffer, UseFuture{});
-            }
-        };
-        IngressHandshakeMetrics::get(*this).onTLSHandshakeStarted(
-            getGlobalServiceContext()->getTickSource());
-        return doHandshake().then([this](size_t size) {
-            if (_sslSocket->get_sni()) {
-                auto sniName = _sslSocket->get_sni().value();
-                LOGV2_DEBUG(
-                    4908000, 2, "Client connected with SNI extension", "sniName"_attr = sniName);
-            } else {
-                LOGV2_DEBUG(4908001, 2, "Client connected without SNI extension");
-            }
-            IngressHandshakeMetrics::get(*this).onTLSHandshakeCompleted();
-            auto sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
-            if (!sslPeerInfo) {
-                return getSSLManager()
-                    ->parseAndValidatePeerCertificate(
-                        _sslSocket->native_handle(), _sslSocket->get_sni(), "", _remote, nullptr)
-                    .then([shared_this = shared_from_this()](SSLPeerInfo info) -> bool {
-                        auto& sslPeerInfo = SSLPeerInfo::forSession(shared_this);
-                        tassert(10355700,
-                                "SSLPeerInfo is not empty during ingress handshake",
-                                !sslPeerInfo);
-                        sslPeerInfo = std::make_shared<SSLPeerInfo>(info);
-                        return true;
-                    });
-            }
-
-            return Future<bool>::makeReady(true);
-        });
-    } else if (_tl->sslMode() == SSLParams::SSLMode_requireSSL) {
+    if (_tl->sslMode() == SSLParams::SSLMode_requireSSL) {
         if (isUnixDomainSockConn) {
             LOGV2_DEBUG(11772800,
                         1,
@@ -1009,23 +963,95 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
                         "connectionId"_attr = id(),
                         "local"_attr = local(),
                         "remote"_attr = remote());
-            return Future<bool>::makeReady(false);
+            return false;
         }
+        return Status(ErrorCodes::SSLHandshakeFailed,
+                      "The server is configured to only allow SSL connections");
+    }
 
-        uasserted(ErrorCodes::SSLHandshakeFailed,
-                  "The server is configured to only allow SSL connections");
+    // Plaintext on a unix domain socket is expected in every TLS mode, so skip the log.
+    if (!sslGlobalParams.disableNonSSLConnectionLogging &&
+        _tl->sslMode() == SSLParams::SSLMode_preferSSL && !isUnixDomainSockConn) {
+        LOGV2(23838,
+              "SSL mode is set to 'preferred' and connection to remote is not using SSL.",
+              "connectionId"_attr = id(),
+              "remote"_attr = remote());
+    }
+    return false;
+}
+
+Status CommonAsioSession::beginIngressSSL() {
+    if (!_sslContext->ingress) {
+        return Status(ErrorCodes::SSLHandshakeFailed,
+                      "SSL handshake received but server is started without SSL support");
+    }
+    {
+        std::lock_guard lg(_sslSocketLock);
+        _sslSocket.emplace(std::move(_socket), *_sslContext->ingress, "");
+    }
+    IngressHandshakeMetrics::get(*this).onTLSHandshakeStarted(
+        getGlobalServiceContext()->getTickSource());
+    return Status::OK();
+}
+
+Future<void> CommonAsioSession::completeIngressSSLHandshake() {
+    if (_sslSocket->get_sni()) {
+        auto sniName = _sslSocket->get_sni().value();
+        LOGV2_DEBUG(4908000, 2, "Client connected with SNI extension", "sniName"_attr = sniName);
     } else {
-        // Plaintext connections to unix domain sockets are expected regardless of the server's
-        // TLS mode, so omit logging here to prevent noise.
-        if (!sslGlobalParams.disableNonSSLConnectionLogging &&
-            _tl->sslMode() == SSLParams::SSLMode_preferSSL && !isUnixDomainSockConn) {
-            LOGV2(23838,
-                  "SSL mode is set to 'preferred' and connection to remote is not using SSL.",
-                  "connectionId"_attr = id(),
-                  "remote"_attr = remote());
-        }
+        LOGV2_DEBUG(4908001, 2, "Client connected without SNI extension");
+    }
+    IngressHandshakeMetrics::get(*this).onTLSHandshakeCompleted();
+
+    auto anchor = shared_from_this();
+    auto sslPeerInfo = SSLPeerInfo::forSession(anchor);
+    if (!sslPeerInfo) {
+        return getSSLManager()
+            ->parseAndValidatePeerCertificate(
+                _sslSocket->native_handle(), _sslSocket->get_sni(), "", _remote, nullptr)
+            .then([anchor](SSLPeerInfo info) {
+                auto& peerInfo = SSLPeerInfo::forSession(anchor);
+                tassert(10355700, "SSLPeerInfo is not empty during ingress handshake", !peerInfo);
+                peerInfo = std::make_shared<SSLPeerInfo>(info);
+            });
+    }
+    return Future<void>::makeReady();
+}
+
+template <typename Handshake>
+Future<bool> CommonAsioSession::classifyAndHandshakeSSL(std::string_view msgHeader,
+                                                        Handshake&& handshake) {
+    auto isSSL = clientSentSSLRequest(msgHeader);
+    if (!isSSL.isOK()) {
+        return Future<bool>::makeReady(isSSL.getStatus());
+    }
+    if (!isSSL.getValue()) {
         return Future<bool>::makeReady(false);
     }
+
+    auto begun = beginIngressSSL();
+    if (!begun.isOK()) {
+        return Future<bool>::makeReady(begun);
+    }
+    return std::forward<Handshake>(handshake)(*_sslSocket)
+        .then([this](size_t) { return completeIngressSSLHandshake(); })
+        .then([] { return true; });
+}
+
+template <typename MutableBufferSequence>
+Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferSequence& buffer) {
+    invariant(buffer.size() >= sizeof(MSGHEADER::Value));
+    const auto bytes = std::string_view(static_cast<const char*>(buffer.data()), buffer.size());
+    // False leaves the plaintext message in `buffer` for the caller. True tells read() to pull the
+    // real message: the handshake consumed `buffer` as a ClientHello.
+    return classifyAndHandshakeSSL(bytes, [&](auto& sslSocket) -> Future<size_t> {
+        if (_blockingMode == sync) {
+            std::error_code ec;
+            sslSocket.handshake(asio::ssl::stream_base::server, buffer, ec);
+            return futurize(ec, buffer.size());
+        }
+        return sslSocket.async_handshake(asio::ssl::stream_base::server, buffer, UseFuture{});
+    });
 }
 #endif  // MONGO_CONFIG_SSL
 

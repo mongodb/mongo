@@ -43,10 +43,6 @@ namespace {
 
 constexpr size_t kHeaderSize = sizeof(MSGHEADER::Value);
 
-// The size of the PROXY v2 fixed header: 12-byte signature + 1-byte version/command + 1-byte
-// address family + 2-byte length.
-constexpr size_t kProxyV2FixedHeaderSize = 16;
-
 // Number of bytes to peek: enough to identify PROXY v1 ("PROXY", 5 bytes) or the start of
 // the PROXY v2 signature ("\r\n\r\n", first 4 bytes of kProxyV2Signature).
 constexpr size_t kProxyPeekSize = transport::kProxyV1Signature.size();
@@ -700,24 +696,24 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
     // in a single shot.
 
     // Consume the fixed header (signature + version/command + address family + length).
-    std::vector<char> proxyBuf(kProxyV2FixedHeaderSize);
-    uassertStatusOK(_syncRead(proxyBuf.data(), kProxyV2FixedHeaderSize));
+    std::vector<char> proxyBuf(kProxyProtocolV2FixedHeaderSize);
+    uassertStatusOK(_syncRead(proxyBuf.data(), kProxyProtocolV2FixedHeaderSize));
 
     // The last 2 bytes of the fixed header are the big-endian length of the address + TLV block.
     uint16_t addrLen =
-        ConstDataRange(proxyBuf.data() + kProxyV2FixedHeaderSize - 2, sizeof(uint16_t))
+        ConstDataRange(proxyBuf.data() + kProxyProtocolV2FixedHeaderSize - 2, sizeof(uint16_t))
             .read<BigEndian<uint16_t>>();
     size_t maxHeaderSize = static_cast<size_t>(proxyUnixSocketMaximumHeaderSize.loadRelaxed());
     uassert(ErrorCodes::ProtocolError,
             fmt::format("PROXY v2 header on proxy UDS exceeds "
                         "proxyUnixSocketMaximumHeaderSize ({} > {})",
-                        kProxyV2FixedHeaderSize + addrLen,
+                        kProxyProtocolV2FixedHeaderSize + addrLen,
                         maxHeaderSize),
-            kProxyV2FixedHeaderSize + static_cast<size_t>(addrLen) <= maxHeaderSize);
+            kProxyProtocolV2FixedHeaderSize + static_cast<size_t>(addrLen) <= maxHeaderSize);
 
     if (addrLen > 0) {
-        proxyBuf.resize(kProxyV2FixedHeaderSize + addrLen);
-        uassertStatusOK(_syncRead(proxyBuf.data() + kProxyV2FixedHeaderSize, addrLen));
+        proxyBuf.resize(kProxyProtocolV2FixedHeaderSize + addrLen);
+        uassertStatusOK(_syncRead(proxyBuf.data() + kProxyProtocolV2FixedHeaderSize, addrLen));
     }
 
     MessageHooks::onProxyHeaderReceived(
