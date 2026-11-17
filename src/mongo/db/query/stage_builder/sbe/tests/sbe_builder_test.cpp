@@ -929,6 +929,71 @@ TEST_F(GoldenSbeStageBuilderTest, TestMergeSort) {
     runTest(std::move(node), expected);
 }
 
+std::unique_ptr<StreamingGroupNode> makeStreamingGroupNode(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    std::unique_ptr<QuerySolutionNode> child,
+    const BSONObj& groupSpec) {
+    VariablesParseState vps = expCtx->variablesParseState;
+    std::vector<AccumulationStatement> accStmts;
+    for (auto&& elem : groupSpec) {
+        if (elem.fieldNameStringData() != "_id") {
+            accStmts.push_back(
+                AccumulationStatement::parseAccumulationStatement(expCtx.get(), elem, vps));
+        }
+    }
+    return std::make_unique<StreamingGroupNode>(
+        std::move(child),
+        Expression::parseOperand(expCtx.get(), groupSpec["_id"], vps),
+        std::move(accStmts),
+        /*shouldProduceBson=*/true,
+        /*nonArrayIdFields=*/OrderedPathSet{});
+}
+
+// The planner removes the projection between a streaming group and its data access node when the
+// group reads only fields that the projection retains exactly, so the group sits directly on top
+// of the FETCH, or of the IXSCAN if the index covers the group.
+TEST_F(GoldenSbeStageBuilderTest, TestStreamingGroupOverFetch) {
+    createCollection({fromjson("{_id: 0, a: 1, c: 10}"),
+                      fromjson("{_id: 1, a: 2, c: 7}"),
+                      fromjson("{_id: 2, a: 1, c: 5}"),
+                      fromjson("{_id: 3, a: 3, c: 1}")},
+                     BSON("a" << 1));
+
+    auto groupSpec = fromjson("{_id: '$a', total: {$sum: '$c'}}");
+    auto groupNode = makeStreamingGroupNode(
+        _expCtx,
+        std::make_unique<FetchNode>(
+            makeIdxScanNode(_nss, makeIndexEntry(BSON("a" << 1)), "a", 0, 10), _nss),
+        groupSpec);
+
+    auto run = runPlan(makeQuerySolution(std::move(groupNode)));
+    ASSERT_STRING_CONTAINS(run.explain, "streaming_group ");
+
+    auto expected = sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(fromjson("{_id: 1, total: 15}")
+                   << fromjson("{_id: 2, total: 7}") << fromjson("{_id: 3, total: 1}"))));
+    ASSERT_SBE_VALUE_EQ(run.results.view(), expected.view());
+}
+
+TEST_F(GoldenSbeStageBuilderTest, TestStreamingGroupOverIndexScan) {
+    createCollection({fromjson("{_id: 0, a: 1, c: 10}"),
+                      fromjson("{_id: 1, a: 2, c: 7}"),
+                      fromjson("{_id: 2, a: 1, c: 5}"),
+                      fromjson("{_id: 3, a: 3, c: 1}")},
+                     BSON("a" << 1));
+
+    auto groupSpec = fromjson("{_id: '$a', n: {$sum: 1}}");
+    auto groupNode = makeStreamingGroupNode(
+        _expCtx, makeIdxScanNode(_nss, makeIndexEntry(BSON("a" << 1)), "a", 0, 10), groupSpec);
+
+    auto run = runPlan(makeQuerySolution(std::move(groupNode)));
+    ASSERT_STRING_CONTAINS(run.explain, "streaming_group ");
+
+    auto expected = sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(
+        fromjson("{_id: 1, n: 2}") << fromjson("{_id: 2, n: 1}") << fromjson("{_id: 3, n: 1}"))));
+    ASSERT_SBE_VALUE_EQ(run.results.view(), expected.view());
+}
+
 TEST_F(GoldenSbeStageBuilderTest, TestUnusedProjectionRemovedOnlyWithRewrites) {
     auto runWithRewrites = [&](bool enabled) {
         unittest::ServerParameterGuard rewritesFlag{"featureFlagSbeBlueprintRewrites", enabled};

@@ -121,9 +121,10 @@ public:
 
     /**
      * Walks the QuerySolutionNode tree rooted in 'soln', and looks for a ProjectionNodeSimple that
-     * is a child of GroupNode, and has a dependency set that's a super set of the the dependency
-     * set of the GroupNode. If that condition is met the ProjectionNodeSimple is redundant and can
-     * thus be elimiated to improve performance of the plan. Otherwise, this is a noop.
+     * is a child of GroupNode (or StreamingGroupNode), and has a dependency set that's a super set
+     * of the dependency set of the GroupNode. If that condition is met the ProjectionNodeSimple is
+     * redundant and can thus be eliminated to improve performance of the plan. Otherwise, this is a
+     * noop.
      */
     static std::unique_ptr<QuerySolution> removeInclusionProjectionBelowGroup(
         std::unique_ptr<QuerySolution> soln);

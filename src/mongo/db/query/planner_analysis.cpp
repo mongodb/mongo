@@ -854,13 +854,15 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
         return;
     }
 
-    // Look for a GROUP node whose immediate child is a PROJECTION that whose effects are invisible
-    // and can be eliminated. This is true when every field the group reads is passed through
-    // unchanged by the projection (i.e. isFieldRetainedExactly returns true for each required
-    // field). This covers both simple inclusion projections and mixed projections that have
-    // computed fields alongside plain pass-throughs, as long as the group only touches the
-    // pass-through fields.
-    if (solnRoot->getType() == StageType::STAGE_GROUP) {
+    // Look for a GROUP or STREAMING_GROUP node whose immediate child is a PROJECTION whose effects
+    // are invisible and can be eliminated. This is true when every field the group reads is passed
+    // through unchanged by the projection (i.e. isFieldRetainedExactly returns true for each
+    // required field). This covers both simple inclusion projections and mixed projections that
+    // have computed fields alongside plain pass-throughs, as long as the group only touches the
+    // pass-through fields. Eliminating the projection keeps a STREAMING_GROUP valid, as its child
+    // provides at least the sort order that the projection did.
+    const auto stageType = solnRoot->getType();
+    if (stageType == StageType::STAGE_GROUP || stageType == StageType::STAGE_STREAMING_GROUP) {
         auto groupNode = static_cast<GroupNode*>(solnRoot);
 
         QuerySolutionNode* projectNodeCandidate = groupNode->children[0].get();
@@ -881,7 +883,7 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
         }
     }
 
-    // Keep traversing the tree in search of GROUP stages.
+    // Keep traversing the tree in search of GROUP and STREAMING_GROUP stages.
     for (size_t i = 0; i < solnRoot->children.size(); ++i) {
         removeInclusionProjectionBelowGroupRecursive(solnRoot->children[i].get());
     }

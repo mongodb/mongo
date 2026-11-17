@@ -652,6 +652,77 @@ TEST_F(StreamingGroupNodeTest, BuildsGroupNodeForGroupAfterGroup) {
         << solution->root()->toString();
 }
 
+TEST_F(StreamingGroupNodeTest, InclusionProjectionBelowStreamingGroupIsElided) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    auto solution = planAggregate(
+        {fromjson("{$match: {a: 5}}"), fromjson("{$group: {_id: '$b', total: {$sum: '$c'}}}")},
+        nonArray(fromjson("{a: 1, b: 1}")));
+    auto* root = solution->root();
+    ASSERT_EQUALS(root->getType(), StageType::STAGE_STREAMING_GROUP) << root->toString();
+    ASSERT_EQUALS(root->children[0]->getType(), StageType::STAGE_FETCH) << root->toString();
+}
+
+TEST_F(StreamingGroupNodeTest, ComputedProjectionBelowStreamingGroupIsElided) {
+    addIndex(fromjson("{a: 1}"));
+
+    // The group reads only 'a' and 'c', which the projection retains exactly. The computed field
+    // 'k0' is unused, so evaluating it for every document is wasted work.
+    auto solution =
+        planAggregate({fromjson("{$match: {a: {$gte: 0}}}"),
+                       fromjson("{$project: {_id: 0, a: 1, c: 1, k0: {$concat: ['$x', '$y']}}}"),
+                       fromjson("{$group: {_id: '$a', total: {$sum: '$c'}}}")},
+                      nonArray(fromjson("{a: 1}")));
+    auto* root = solution->root();
+    ASSERT_EQUALS(root->getType(), StageType::STAGE_STREAMING_GROUP) << root->toString();
+    ASSERT_EQUALS(root->children[0]->getType(), StageType::STAGE_FETCH) << root->toString();
+}
+
+TEST_F(StreamingGroupNodeTest, ProjectionComputingGroupedFieldIsKeptBelowStreamingGroup) {
+    addIndex(fromjson("{a: 1}"));
+
+    // The group reads 'k0', which the projection computes, so the projection must stay. The group
+    // key 'a' is still retained exactly, so the group remains a streaming group.
+    auto solution = planAggregate({fromjson("{$match: {a: {$gte: 0}}}"),
+                                   fromjson("{$project: {_id: 0, a: 1, k0: {$add: ['$c', 1]}}}"),
+                                   fromjson("{$group: {_id: '$a', total: {$sum: '$k0'}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    auto* root = solution->root();
+    ASSERT_EQUALS(root->getType(), StageType::STAGE_STREAMING_GROUP) << root->toString();
+    ASSERT_EQUALS(root->children[0]->getType(), StageType::STAGE_PROJECTION_DEFAULT)
+        << root->toString();
+}
+
+TEST_F(StreamingGroupNodeTest, CoveredProjectionBelowStreamingGroupIsKept) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    // The index covers the group, so the projection is a PROJECTION_COVERED over the IXSCAN, which
+    // removeInclusionProjectionBelowGroup() leaves in place, as it does for a GROUP.
+    auto solution = planAggregate({fromjson("{$match: {a: {$gt: 0}}}"),
+                                   fromjson("{$group: {_id: {x: '$a', y: '$b'}, n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1, b: 1}")));
+    auto* root = solution->root();
+    ASSERT_EQUALS(root->getType(), StageType::STAGE_STREAMING_GROUP) << root->toString();
+    ASSERT_EQUALS(root->children[0]->getType(), StageType::STAGE_PROJECTION_COVERED)
+        << root->toString();
+    ASSERT_EQUALS(root->children[0]->children[0]->getType(), StageType::STAGE_IXSCAN)
+        << root->toString();
+}
+
+TEST_F(StreamingGroupNodeTest, ComputedProjectionOverIndexScanBelowStreamingGroupIsElided) {
+    addIndex(fromjson("{a: 1}"));
+
+    // The index covers the projection, so there is no FETCH below it. The group reads only 'a', so
+    // it can consume the index keys directly.
+    auto solution = planAggregate({fromjson("{$match: {a: {$gte: 0}}}"),
+                                   fromjson("{$project: {_id: 0, a: 1, k0: {$add: ['$a', 1]}}}"),
+                                   fromjson("{$group: {_id: '$a', n: {$sum: 1}}}")},
+                                  nonArray(fromjson("{a: 1}")));
+    auto* root = solution->root();
+    ASSERT_EQUALS(root->getType(), StageType::STAGE_STREAMING_GROUP) << root->toString();
+    ASSERT_EQUALS(root->children[0]->getType(), StageType::STAGE_IXSCAN) << root->toString();
+}
+
 TEST_F(StreamingGroupEligibilityTest, EligibleAfterEqualityPrefix) {
     addIndex(fromjson("{a: 1, b: 1}"));
 
