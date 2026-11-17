@@ -281,7 +281,7 @@ void ReplicaSetMonitorManager::shutdown() {
     }
 
     if (taskExecutor) {
-        LOGV2_DEBUG(20188, 1, "Shutting down task executor used for monitoring replica sets");
+        LOGV2(20188, "Shutting down task executor used for monitoring replica sets");
         taskExecutor->shutdown();
         taskExecutor->join();
     }

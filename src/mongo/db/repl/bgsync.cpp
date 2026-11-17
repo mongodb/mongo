@@ -359,7 +359,7 @@ void BackgroundSync::_produce() {
             auto status = _replCoord->abortCatchupIfNeeded(
                 ReplicationCoordinator::PrimaryCatchUpConclusionReason::kFailedWithError);
             if (!status.isOK()) {
-                LOGV2_DEBUG(21083, 1, "Aborting catch-up failed", "error"_attr = status);
+                LOGV2(21083, "Aborting catch-up failed", "error"_attr = status);
             }
             return;
         }
@@ -509,12 +509,10 @@ void BackgroundSync::_produce() {
         fassertFailedWithStatus(34440, exceptionToStatus());
     }
 
-    const auto logLevel = TestingProctor::instance().isEnabled() ? 0 : 1;
-    LOGV2_DEBUG(21092,
-                logLevel,
-                "Scheduling fetcher to read remote oplog",
-                "syncSource"_attr = source,
-                "lastOpTimeFetched"_attr = oplogFetcher->getLastOpTimeFetched());
+    LOGV2(21092,
+          "Scheduling fetcher to read remote oplog",
+          "syncSource"_attr = source,
+          "lastOpTimeFetched"_attr = oplogFetcher->getLastOpTimeFetched());
     auto scheduleStatus = oplogFetcher->startup();
     if (!scheduleStatus.isOK()) {
         LOGV2_WARNING(21119,
@@ -525,7 +523,7 @@ void BackgroundSync::_produce() {
     }
 
     oplogFetcher->join();
-    LOGV2_DEBUG(21093, 1, "Fetcher stopped reading remote oplog", "syncSource"_attr = source);
+    LOGV2(21093, "Fetcher stopped reading remote oplog", "syncSource"_attr = source);
 
     // If the background sync is stopped after the fetcher is started, we need to
     // re-evaluate our sync source and oplog common point.
@@ -666,7 +664,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         auto status = _replCoord->abortCatchupIfNeeded(
             ReplicationCoordinator::PrimaryCatchUpConclusionReason::kFailedWithError);
         if (!status.isOK()) {
-            LOGV2_DEBUG(21097, 1, "Aborting catch-up failed", "error"_attr = status);
+            LOGV2(21097, "Aborting catch-up failed", "error"_attr = status);
         }
         return;
     }
@@ -895,20 +893,18 @@ void BackgroundSync::start(OperationContext* opCtx) {
         // When a node steps down during drain mode, the last fetched optime would be newer than
         // the last applied.
         if (_lastOpTimeFetched <= lastAppliedOpTime) {
-            LOGV2_DEBUG(21110,
-                        1,
-                        "Setting bgsync _lastOpTimeFetched to lastAppliedOpTime",
-                        "lastAppliedOpTime"_attr = lastAppliedOpTime,
-                        "previousLastOpTimeFetched"_attr = _lastOpTimeFetched);
+            LOGV2(21110,
+                  "Setting bgsync _lastOpTimeFetched to lastAppliedOpTime",
+                  "lastAppliedOpTime"_attr = lastAppliedOpTime,
+                  "previousLastOpTimeFetched"_attr = _lastOpTimeFetched);
             _lastOpTimeFetched = lastAppliedOpTime;
         }
         // Reload the last applied optime from disk if it has been changed.
     } while (lastAppliedOpTime != _replCoord->getMyLastAppliedOpTime());
 
-    LOGV2_DEBUG(21111,
-                1,
-                "bgsync fetch queue set to lastOpTimeFetched",
-                "lastOpTimeFetched"_attr = _lastOpTimeFetched);
+    LOGV2(21111,
+          "bgsync fetch queue set to lastOpTimeFetched",
+          "lastOpTimeFetched"_attr = _lastOpTimeFetched);
 }
 
 OpTime BackgroundSync::_readLastAppliedOpTime(OperationContext* opCtx) {
@@ -949,10 +945,9 @@ bool BackgroundSync::shouldStopFetching() const {
 
     // Check current sync source.
     if (getSyncTarget().empty()) {
-        LOGV2_DEBUG(21114,
-                    1,
-                    "Stopping oplog fetcher; canceling oplog query because we have no valid sync "
-                    "source");
+        LOGV2(21114,
+              "Stopping oplog fetcher; canceling oplog query because we have no valid sync "
+              "source");
         return true;
     }
 
