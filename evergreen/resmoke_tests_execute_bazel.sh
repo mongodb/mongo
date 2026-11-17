@@ -318,7 +318,9 @@ gather_failed_tests() {
 
     # The --config flag needs to stay consistent for the `bazel run` to avoid evicting the previous results.
     # Strip out anything that isn't a --config flag that could interfere with the run command.
-    eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:gather_failed_tests || true
+    # Skip the diagnostic rerun: rerunning whole resmoke suites locally on this host is too
+    # expensive, and the original run's crash artifacts are still collected.
+    eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:gather_failed_tests -- --no-rerun || true
 }
 
 activate_result_tasks() {

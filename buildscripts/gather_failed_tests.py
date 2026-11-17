@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Annotated
 from zipfile import BadZipFile, ZipFile
 
 import typer
@@ -354,8 +355,14 @@ def _copy_bins_to_upload(upload_bin_dir: Path, upload_lib_dir: Path) -> None:
             continue  # It is likely a broken symlink.
 
 
-def main(build_events: str = "build_events.json"):
-    """Gathers failed-test binaries and symbols, then reruns tests locally for crash artifacts."""
+def main(
+    build_events: str = "build_events.json",
+    rerun: Annotated[
+        bool,
+        typer.Option(help="Rerun failed tests locally to capture crash artifacts."),
+    ] = True,
+):
+    """Gathers failed-test binaries and symbols, then optionally reruns tests for crash artifacts."""
 
     os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
 
@@ -402,9 +409,10 @@ def main(build_events: str = "build_events.json"):
     original_test_logs = {}
     can_rerun = False
     try:
-        original_test_logs = _snapshot_test_logs(original_testlogs_dirs)
         _archive_test_outputs(original_testlogs_dirs)
-        can_rerun = True
+        if rerun:
+            original_test_logs = _snapshot_test_logs(original_testlogs_dirs)
+            can_rerun = True
     except (OSError, shutil.Error, BadZipFile) as e:
         print(f"Failed to preserve original test outputs; skipping diagnostic rerun: {e}")
 
