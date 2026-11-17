@@ -1882,8 +1882,6 @@ export class ReplSetTest {
      * Blocks until the set is initialized with a primary and all non-arbiter members have reached
      * SECONDARY, then waits for step-up writes (primary-only services + query analysis writer)
      * and for cluster time key generation to complete.
-     *  TODO SERVER-124472: Determine if initiateForDisagg needs additional functionality to
-     *  match ASC ReplSetTest.initiate.
      */
     initiateForDisagg() {
         const startTime = new Date(); // Measure the execution time of this function.
