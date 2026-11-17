@@ -210,9 +210,9 @@ function runAuthoritativeCausalConsistencyTest(
     preMigrationOperationTime,
 ) {
     jsTest.log("Starting authoritative migration.");
-    const hangBeforeRefreshFP = configureFailPoint(
+    const hangBeforeShardCatalogCommitFP = configureFailPoint(
         st.shard0.rs.getPrimary(),
-        "hangBeforePostMigrationCommitRefresh",
+        "hangInMoveRangeCoordinatorShardCatalogCommit",
     );
 
     const staticMongod = MongoRunner.runMongod({});
@@ -225,7 +225,7 @@ function runAuthoritativeCausalConsistencyTest(
         st.shard1.shardName,
         true /* expectSuccess */,
     );
-    hangBeforeRefreshFP.wait();
+    hangBeforeShardCatalogCommitFP.wait();
 
     // The global catalog is committed but the recipient critical section is not released until
     // finalize, so a post-commit insert to the migrated chunk would block. {_id: 2} was inserted on
@@ -288,7 +288,7 @@ function runAuthoritativeCausalConsistencyTest(
     );
 
     jsTest.log("Completing chunk migration.");
-    hangBeforeRefreshFP.off();
+    hangBeforeShardCatalogCommitFP.off();
     joinMoveChunk();
 
     MongoRunner.stopMongod(staticMongod);
