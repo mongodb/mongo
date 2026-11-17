@@ -966,6 +966,57 @@ TEST_F(QueryMemoryLoadSheddingSweepSlotTest, FirstSightOfQueuedOperationOnlyPrim
     ASSERT_EQ(second.opCtx->getKillStatus(), ErrorCodes::QueryMemoryLimitExceeded);
 }
 
+// The sweep can kill a queued op just before its own thread reaches the load-shedding check. The
+// op-thread path must not count that op as shed a second time, and returns the pending kill status.
+TEST_F(QueryMemoryLoadSheddingQueuedSweepTest, OpThreadCheckSkipsOperationAlreadyShedBySweep) {
+    auto restore = scopedRestoreMarks();
+    gQueryMemoryLoadSheddingLowMarkPercent.store(50);
+    gQueryMemoryLoadSheddingHighMarkPercent.store(60);
+    ON_BLOCK_EXIT([] {
+        globalFailPointRegistry().find("queryMemoryPressureOverride")->setMode(FailPoint::off);
+    });
+    setPressureOverride(90);
+
+    auto holder = makeClientAndOp("holder");
+    makeEligibleHolding(holder.opCtx.get(), 1 << 20);
+    Lock::GlobalRead holderLock(holder.opCtx.get());
+
+    auto waiter = makeClientAndOp("waiter");
+    OperationContext* waiterOpCtx = waiter.opCtx.get();
+    makeEligibleHolding(waiterOpCtx, 1 << 20);
+    stdx::thread waiterThread([&] {
+        try {
+            Lock::GlobalRead lk(waiterOpCtx);
+        } catch (const DBException&) {
+        }
+    });
+    ScopeGuard join([&] {
+        waiterOpCtx->markKilled(ErrorCodes::Interrupted);
+        waiterThread.join();
+    });
+    waitUntilQueued(waiterOpCtx);
+
+    ASSERT_EQ(sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng()), 1);
+    advanceClock();
+    ASSERT_EQ(sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng()), 1);
+    ASSERT_EQ(waiterOpCtx->getKillStatus(), ErrorCodes::QueryMemoryLimitExceeded);
+    join.dismiss();
+    waiterThread.join();
+
+    auto shed = [&] {
+        BSONObjBuilder b;
+        appendQueryMemoryLoadSheddingStats(getServiceContext(), b);
+        return b.obj()["loadShedding"].Obj()["operationsShed"].numberLong();
+    };
+    ASSERT_EQ(shed(), 1);
+
+    // The op's thread now runs its own check on the already-killed op. It shares the sweep's dt
+    // baseline, so after the clock advances it rolls and would shed again without the kill check.
+    advanceClock();
+    ASSERT_EQ(queryMemoryCheckLoadShedding(waiterOpCtx), ErrorCodes::QueryMemoryLimitExceeded);
+    ASSERT_EQ(shed(), 1) << "one operation was recorded as shed " << shed() << " times";
+}
+
 // Drives the idle-query path -- the decision the idle-cursor sweep makes for a query sitting
 // between getMores. Unlike the interrupt path there is no opCtx to kill, so the decision is
 // returned to the caller, which destroys the cursor instead.

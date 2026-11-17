@@ -35,7 +35,11 @@
 #include <memory>
 #include <mutex>
 #include <numbers>
+#include <string>
 #include <utility>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -296,12 +300,28 @@ bool isShedCandidate(OperationContext* opCtx, bool eligible, int64_t opTrackedBy
     return !shard_role_details::getLocker(opCtx)->wasGlobalLockTakenInModeConflictingWithWrites();
 }
 
-// Bookkeeping and logging for a shed.
-void recordShed(QueryMemoryLoadSheddingState& processState,
-                OperationContext* opCtx,
-                const PressureSnapshot& pressure,
-                int64_t opTrackedBytes,
-                bool waitingForTicket) {
+// Everything the shed log line reports. recordShed() fills it while the caller still holds the
+// ClientLock (CurOp reads need it), and the sweep logs it after releasing the locks so log I/O
+// never blocks client creation/teardown, currentOp or killOp.
+struct ShedLogParams {
+    logv2::LogSeverity severity;
+    OperationId opId;
+    std::string ns;
+    BSONObj command;
+    std::string planSummary;
+    bool waitingForTicket;
+    int64_t rssBytes;
+    int64_t opTrackedBytes;
+    long long total;
+};
+
+// Counter updates for a shed. Returns parameters for the caller to log, or none when the line
+// would be suppressed.
+boost::optional<ShedLogParams> recordShed(QueryMemoryLoadSheddingState& processState,
+                                          OperationContext* opCtx,
+                                          const PressureSnapshot& pressure,
+                                          int64_t opTrackedBytes,
+                                          bool waitingForTicket) {
     const long long total = processState.operationsShed->fetchAndAdd(1) + 1;
     operationsShedCounter().add(1);
     processState.bytesShed->fetchAndAdd(opTrackedBytes);
@@ -310,18 +330,34 @@ void recordShed(QueryMemoryLoadSheddingState& processState,
     // subsequent lines within the second drop to a debug severity.
     static logv2::SeveritySuppressor logSeverity{
         Seconds{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+    const auto severity = logSeverity();
+    if (!logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, severity)) {
+        return boost::none;
+    }
     const auto* curOp = CurOp::get(opCtx);
+    return ShedLogParams{severity,
+                         opCtx->getOpID(),
+                         toStringForLogging(curOp->getNSS()),
+                         curOp->opDescription().getOwned(),
+                         std::string{curOp->getPlanSummary()},
+                         waitingForTicket,
+                         pressure.rssBytes,
+                         opTrackedBytes,
+                         total};
+}
+
+void logShed(const ShedLogParams& e) {
     LOGV2_DEBUG(13033300,
-                logSeverity().toInt(),
+                e.severity.toInt(),
                 "Load-shedding a memory-tracked operation: process memory is under pressure",
-                "opId"_attr = opCtx->getOpID(),
-                "ns"_attr = toStringForLogging(curOp->getNSS()),
-                "command"_attr = redact(curOp->opDescription()),
-                "planSummary"_attr = curOp->getPlanSummary(),
-                "waitingForTicket"_attr = waitingForTicket,
-                "currentUsageBytes"_attr = pressure.rssBytes,
-                "opTrackedBytes"_attr = opTrackedBytes,
-                "operationsShed"_attr = total);
+                "opId"_attr = e.opId,
+                "ns"_attr = e.ns,
+                "command"_attr = redact(e.command),
+                "planSummary"_attr = e.planSummary,
+                "waitingForTicket"_attr = e.waitingForTicket,
+                "currentUsageBytes"_attr = e.rssBytes,
+                "opTrackedBytes"_attr = e.opTrackedBytes,
+                "operationsShed"_attr = e.total);
 }
 
 // OTel mirrors of the idle-cursor shed counters, following operationsShedCounter() above.
@@ -463,10 +499,21 @@ Status queryMemoryCheckLoadShedding(OperationContext* opCtx) {
         return Status::OK();
     }
 
-    // Make the shed sticky via markKilled (like the deadline/killOp paths) so it is one-shot and
-    // every later interrupt check agrees, not a transient status a caller could swallow.
-    opCtx->markKilled(ErrorCodes::QueryMemoryLimitExceeded);
-    recordShed(processState, opCtx, pressure, opTrackedBytes, /*waitingForTicket*/ false);
+    // The sweep, killOp and other killers act under the ClientLock, so checking the kill status and
+    // marking the kill under it makes exactly one of them win.
+    {
+        ClientLock lk(opCtx->getClient());
+        // Return the status the caller's next checkForInterrupt() will see.
+        if (const auto killStatus = opCtx->getKillStatus(); killStatus != ErrorCodes::OK) {
+            return {killStatus, "Operation was killed before the load-shedding check"};
+        }
+        // Make the shed sticky via markKilled (like the deadline/killOp paths) so it is one-shot
+        // and every later interrupt check agrees, not a transient status a caller could swallow.
+        opCtx->markKilled(ErrorCodes::QueryMemoryLimitExceeded);
+    }
+    if (auto entry = recordShed(processState, opCtx, pressure, opTrackedBytes, false)) {
+        logShed(*entry);
+    }
     return {
         ErrorCodes::QueryMemoryLimitExceeded,
         "Operation load-shed because the server is under memory pressure. Retry when the server "
@@ -511,6 +558,9 @@ size_t sweepQueuedOperationsForMemoryPressure(ServiceContext* serviceContext, Ps
         return candidates;
     }
 
+    // Shed ops are logged after the loop to avoid IO while holding locks.
+    std::vector<ShedLogParams> logEntries;
+
     const Date_t now = serviceContext->getFastClockSource()->now();
     for (ServiceContext::LockedClientsCursor cursor(serviceContext);
          Client* client = cursor.next();) {
@@ -538,7 +588,12 @@ size_t sweepQueuedOperationsForMemoryPressure(ServiceContext* serviceContext, Ps
         }
         // The random roll was positive, so shed the query.
         serviceContext->killOperation(lk, opCtx, ErrorCodes::QueryMemoryLimitExceeded);
-        recordShed(processState, opCtx, pressure, opTrackedBytes, /*waitingForTicket*/ true);
+        if (auto entry = recordShed(processState, opCtx, pressure, opTrackedBytes, true)) {
+            logEntries.push_back(std::move(*entry));
+        }
+    }
+    for (const auto& entry : logEntries) {
+        logShed(entry);
     }
     return candidates;
 }

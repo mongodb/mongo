@@ -47,7 +47,8 @@ namespace mongo {
  * The load-shed decision, called from query-execution interrupt/yield points (see callers). Returns
  * QueryMemoryLimitExceeded (and marks the op killed) when the operation should be load-shed,
  * otherwise Status::OK() (disabled/exempt, RSS below the low mark, or the roll did not select it).
- * Must be called on the operation's own thread. noexcept-compatible: never throws.
+ * If the op was already killed, returns that kill status without counting a shed.
+ * Must be called on the operation's own thread.
  */
 [[MONGO_MOD_PUBLIC]] Status queryMemoryCheckLoadShedding(OperationContext* opCtx);
 
