@@ -14,6 +14,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo::exec::agg {
 
 /**
@@ -24,6 +26,10 @@ namespace mongo::exec::agg {
  *
  * A cached entry may legitimately be an empty vector (the key had no foreign matches); get()
  * distinguishes this from "not cached" via its return value.
+ *
+ * Entries are admitted either all at once via put(), or one foreign result at a time via
+ * beginPut()/PendingEntry::append()/finishPut() for callers that stream each foreign result
+ * downstream as soon as it arrives (e.g. a $lookup that has absorbed an $unwind).
  *
  * To avoid penalizing workloads it cannot help (e.g. high-cardinality joins where localField
  * values rarely repeat), the cache adaptively disables itself: after observing 'warmupSize'
@@ -42,6 +48,42 @@ namespace mongo::exec::agg {
  */
 class LookupResultCache {
 public:
+    /**
+     * An entry being filled one foreign result at a time. Started by beginPut() after get()
+     * misses, fed every foreign result in order through append(), and admitted by finishPut() once
+     * the foreign query reaches EOF. Destroying it without calling finishPut() (e.g. because the
+     * query stopped before the foreign results were exhausted) admits nothing.
+     *
+     * Buffered results are charged to the cache's memory tracker as they arrive. Once they outgrow
+     * the per-entry cap the entry can never be admitted, so append() releases them and ignores all
+     * further results.
+     */
+    class PendingEntry {
+    public:
+        void append(const Document& result);
+
+    private:
+        friend class LookupResultCache;
+
+        PendingEntry(Value key,
+                     size_t keySizeBytes,
+                     size_t maxEntrySizeBytes,
+                     SimpleMemoryUsageTracker* memoryTracker)
+            : _key(std::move(key)),
+              _sizeBytes(keySizeBytes),
+              _maxEntrySizeBytes(maxEntrySizeBytes),
+              _memoryToken(keySizeBytes, memoryTracker) {}
+
+        Value _key;
+        std::vector<Value> _results;
+        // Approximate size of '_key' plus every result appended so far, computed the same way as
+        // put()'s entry size.
+        size_t _sizeBytes;
+        size_t _maxEntrySizeBytes;
+        bool _exceededMaxEntrySize = false;
+        SimpleMemoryUsageToken _memoryToken;
+    };
+
     /**
      * Each cached entry is charged to 'memoryTracker' for as long as it stays cached, so the
      * tracker must outlive the cache. It may be null only for a cache that never admits entries
@@ -132,6 +174,19 @@ public:
      * cache entry only happens once we've decided to actually store it.
      */
     void put(const Value& key, const Value& results, size_t approxResultsSize);
+
+    /**
+     * Starts a PendingEntry for 'key', which must have just missed in get(). Returns boost::none
+     * if the cache is disabled, can't hold any entry, or 'key' alone exceeds the per-entry cap.
+     */
+    boost::optional<PendingEntry> beginPut(const Value& key);
+
+    /**
+     * Caches the results 'entry' accumulated, unless it outgrew the per-entry cap or the cache
+     * has been disabled since beginPut(). Evicts the least-recently-used entry if the cache is
+     * already at its maximum entry count.
+     */
+    void finishPut(PendingEntry entry);
 
     size_t size() const {
         return _entries.size();

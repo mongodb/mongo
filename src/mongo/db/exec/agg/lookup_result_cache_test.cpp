@@ -404,6 +404,141 @@ TEST_F(LookupResultCacheTest, FastBailoutDoesNotFireOnceWarmupDecisionIsLatched)
     ASSERT_TRUE(cache.isEnabled());
 }
 
+TEST_F(LookupResultCacheTest, PendingEntryIsAdmittedOnFinishWithResultsInOrder) {
+    LookupResultCache cache(kDefaultComparator, &_tracker, kUnboundedSize, kUnboundedSize);
+    auto pending = cache.beginPut(Value(0));
+    ASSERT_TRUE(pending);
+    pending->append(Document{{"_id", 1}});
+    pending->append(Document{{"_id", 2}});
+
+    // Nothing is admitted until finishPut().
+    ASSERT_FALSE(cache.hasKey(Value(0)));
+
+    cache.finishPut(std::move(*pending));
+    auto cached = cache.get(Value(0));
+    ASSERT_TRUE(cached);
+    ASSERT_EQ(cached->getArrayLength(), 2U);
+    ASSERT_VALUE_EQ(cached->getArray()[0], Value(Document{{"_id", 1}}));
+    ASSERT_VALUE_EQ(cached->getArray()[1], Value(Document{{"_id", 2}}));
+}
+
+TEST_F(LookupResultCacheTest, PendingEntryWithNoResultsCachesEmptyArray) {
+    LookupResultCache cache(kDefaultComparator, &_tracker, kUnboundedSize, kUnboundedSize);
+    auto pending = cache.beginPut(Value(0));
+    ASSERT_TRUE(pending);
+    cache.finishPut(std::move(*pending));
+
+    auto cached = cache.get(Value(0));
+    ASSERT_TRUE(cached);
+    ASSERT_EQ(cached->getArrayLength(), 0U);
+    ASSERT_EQ(cache.totalSizeBytes(), Value(0).getApproximateSize());
+}
+
+TEST_F(LookupResultCacheTest, PendingEntryMatchesPutSizeAccounting) {
+    const Document result{{"_id", 1}, {"v", "abc"sv}};
+    LookupResultCache viaPut(kDefaultComparator, &_tracker, kUnboundedSize, kUnboundedSize);
+    viaPut.put(Value(0), makeResults({Value(result)}), result.getApproximateSize());
+
+    SimpleMemoryUsageTracker otherTracker;
+    LookupResultCache viaPending(kDefaultComparator, &otherTracker, kUnboundedSize, kUnboundedSize);
+    auto pending = viaPending.beginPut(Value(0));
+    pending->append(result);
+    viaPending.finishPut(std::move(*pending));
+
+    ASSERT_EQ(viaPending.totalSizeBytes(), viaPut.totalSizeBytes());
+    ASSERT_EQ(otherTracker.inUseTrackedMemoryBytes(), _tracker.inUseTrackedMemoryBytes());
+}
+
+TEST_F(LookupResultCacheTest, PendingEntryChargesMemoryTrackerAsResultsArrive) {
+    LookupResultCache cache(kDefaultComparator, &_tracker, kUnboundedSize, kUnboundedSize);
+    {
+        auto pending = cache.beginPut(Value(0));
+        const size_t afterBegin = trackedBytes();
+        ASSERT_EQ(afterBegin, Value(0).getApproximateSize());
+
+        const Document result{{"_id", 1}};
+        pending->append(result);
+        ASSERT_EQ(trackedBytes(), afterBegin + result.getApproximateSize());
+    }
+    // Destroying an unfinished entry admits nothing and releases what it was charged.
+    ASSERT_FALSE(cache.hasKey(Value(0)));
+    ASSERT_EQ(trackedBytes(), 0U);
+
+    // A finished entry's charge carries over to the cache entry.
+    auto pending = cache.beginPut(Value(1));
+    pending->append(Document{{"_id", 1}});
+    const size_t beforeFinish = trackedBytes();
+    cache.finishPut(std::move(*pending));
+    ASSERT_EQ(trackedBytes(), beforeFinish);
+    ASSERT_EQ(trackedBytes(), cache.totalSizeBytes());
+}
+
+TEST_F(LookupResultCacheTest, PendingEntryExceedingPerEntryCapIsDroppedAndReleasesMemory) {
+    const Document result{{"_id", 1}};
+    const size_t keySize = Value(0).getApproximateSize();
+    // Room for the key and exactly one result.
+    LookupResultCache cache(kDefaultComparator,
+                            &_tracker,
+                            kUnboundedSize,
+                            /* maxEntrySizeBytes */ keySize + result.getApproximateSize());
+    auto pending = cache.beginPut(Value(0));
+    pending->append(result);
+    ASSERT_GT(trackedBytes(), 0U);
+
+    // The second result pushes the entry over the cap: what it buffered is released right away,
+    // and later results are ignored.
+    pending->append(result);
+    ASSERT_EQ(trackedBytes(), 0U);
+    pending->append(result);
+    ASSERT_EQ(trackedBytes(), 0U);
+
+    cache.finishPut(std::move(*pending));
+    ASSERT_FALSE(cache.hasKey(Value(0)));
+    ASSERT_EQ(cache.size(), 0U);
+    ASSERT_EQ(cache.totalSizeBytes(), 0U);
+    ASSERT_EQ(trackedBytes(), 0U);
+}
+
+TEST_F(LookupResultCacheTest, BeginPutReturnsNoneWhenCacheCannotAdmit) {
+    auto disabled = LookupResultCache::createDisabled(kDefaultComparator);
+    ASSERT_FALSE(disabled.beginPut(Value(0)));
+
+    LookupResultCache zeroEntries(
+        kDefaultComparator, &_tracker, /* maxEntries */ 0, kUnboundedSize);
+    ASSERT_FALSE(zeroEntries.beginPut(Value(0)));
+
+    // The key alone is over the per-entry cap, so no entry for it could ever be admitted.
+    LookupResultCache tinyEntries(
+        kDefaultComparator, &_tracker, kUnboundedSize, /* maxEntrySizeBytes */ 1);
+    ASSERT_FALSE(tinyEntries.beginPut(Value(0)));
+    ASSERT_EQ(trackedBytes(), 0U);
+}
+
+TEST_F(LookupResultCacheTest, FinishPutAfterDisableIsNoOp) {
+    LookupResultCache cache(kDefaultComparator, &_tracker, kUnboundedSize, kUnboundedSize);
+    auto pending = cache.beginPut(Value(0));
+    pending->append(Document{{"_id", 1}});
+    cache.disable();
+
+    cache.finishPut(std::move(*pending));
+    ASSERT_EQ(cache.size(), 0U);
+    ASSERT_EQ(trackedBytes(), 0U);
+}
+
+TEST_F(LookupResultCacheTest, FinishPutEvictsLeastRecentlyUsedWhenOverMaxEntries) {
+    LookupResultCache cache(kDefaultComparator, &_tracker, /* maxEntries */ 1, kUnboundedSize);
+    cache.put(Value(0), kEmptyResults, 0);
+
+    auto pending = cache.beginPut(Value(1));
+    pending->append(Document{{"_id", 1}});
+    cache.finishPut(std::move(*pending));
+
+    ASSERT_FALSE(cache.hasKey(Value(0)));
+    ASSERT_TRUE(cache.hasKey(Value(1)));
+    ASSERT_EQ(cache.size(), 1U);
+    ASSERT_EQ(trackedBytes(), cache.totalSizeBytes());
+}
+
 TEST_F(LookupResultCacheTest, CacheKeysRespectCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
     ValueComparator comparator{&collator};
