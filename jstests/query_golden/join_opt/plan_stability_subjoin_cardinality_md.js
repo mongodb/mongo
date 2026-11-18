@@ -415,12 +415,13 @@ function checkCommandEstimates(db, command) {
 
     assert(
         originalPlan.hasOwnProperty("cardinalityEstimate"),
-        "Plan does not have cardinalityEstimate field: " + tojson(originalPlan),
+        "Plan does not have cardinalityEstimate field: " + JSON.stringify(originalPlan),
     );
     assert(
         explain.queryPlanner.winningPlan.hasOwnProperty("usedJoinOptimization") &&
             explain.queryPlanner.winningPlan.usedJoinOptimization,
-        "Plan does not have usedJoinOptimization field set to true: " + tojson(originalPlan),
+        "Plan does not have usedJoinOptimization field set to true: " +
+            JSON.stringify(originalPlan),
     );
 
     // All our reconstructions use the same base collection
@@ -475,12 +476,12 @@ function checkCommandEstimates(db, command) {
         assert(
             false,
             `Unsuccessful reconstruction -- resultset length mismatch: ${globalReconstructionRows} vs. ${originalRows}` +
-                "Original plan:" +
-                tojson(originalPlan) +
-                "Reconstructed base collection:" +
+                "\nOriginal plan: " +
+                JSON.stringify(originalPlan) +
+                "\nReconstructed base collection: " +
                 globalReconstructionBaseCollection +
-                "Reconstructed pipeline:" +
-                tojson(globalReconstructedPipeline),
+                "\nReconstructed pipeline: " +
+                newlineBeforeEachStage(JSON.stringify(globalReconstructedPipeline)),
         );
     }
 
