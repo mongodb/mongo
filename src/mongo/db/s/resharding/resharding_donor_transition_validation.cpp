@@ -160,12 +160,57 @@ ConstraintResult validateEnteringDone(const DonorPreTransitionInput& in) {
         .result();
 }
 
+const DonorPostConstraint kInDonatingOplogEntriesFulfilled{
+    "inDonatingOplogEntriesFulfilled", [](const DonorPostTransitionInput& in) -> Status {
+        if (in.facts.inDonatingOplogEntries) {
+            return Status::OK();
+        }
+        return transitionViolation("inDonatingOplogEntries promise is not fulfilled");
+    }};
+
+const DonorPostConstraint kAllRecipientsDoneApplyingFulfilled{
+    "allRecipientsDoneApplyingFulfilled", [](const DonorPostTransitionInput& in) -> Status {
+        if (in.facts.allRecipientsDoneApplying) {
+            return Status::OK();
+        }
+        return transitionViolation("allRecipientsDoneApplying promise is not fulfilled");
+    }};
+
+const DonorPostConstraint kInBlockingWritesOrErrorFulfilled{
+    "inBlockingWritesOrErrorFulfilled", [](const DonorPostTransitionInput& in) -> Status {
+        if (in.facts.inBlockingWritesOrError) {
+            return Status::OK();
+        }
+        return transitionViolation("inBlockingWritesOrError promise is not fulfilled");
+    }};
+
 TransitionCheck<DonorPostTransitionInput> postCheck(const DonorPostTransitionInput& in) {
     return makePostTransitionCheck(in, in.before.getState(), in.proposed.getState());
 }
 
 ConstraintResult validatePostInstalled(const DonorPostTransitionInput& in) {
     return postCheck(in).require(kDurableMatchesProposed).result();
+}
+
+ConstraintResult validatePostDonatingOplogEntries(const DonorPostTransitionInput& in) {
+    return postCheck(in)
+        .require(kDurableMatchesProposed)
+        .require(kInDonatingOplogEntriesFulfilled)
+        .result();
+}
+
+ConstraintResult validatePostPreparingToBlockWrites(const DonorPostTransitionInput& in) {
+    return postCheck(in)
+        .require(kDurableMatchesProposed)
+        .require(kAllRecipientsDoneApplyingFulfilled)
+        .result();
+}
+
+ConstraintResult validatePostBlockingWritesOrError(const DonorPostTransitionInput& in) {
+    return postCheck(in)
+        .require(kDurableMatchesProposed)
+        .require(kInBlockingWritesOrErrorFulfilled)
+        .result();
 }
 
 using DonorTransitionEdge = std::pair<DonorStateEnum, DonorStateEnum>;
@@ -181,15 +226,21 @@ const std::map<DonorTransitionEdge, DonorTransitionValidators>& donorTransitionV
     static StaticImmortal validators = std::map<DonorTransitionEdge, DonorTransitionValidators>{
         // Forward edges.
         {{kPreparingToDonate, kDonatingInitialData}, {&validateEnteringDonatingInitialData}},
-        {{kDonatingInitialData, kDonatingOplogEntries}, {&validateEnteringDonatingOplogEntries}},
+        {{kDonatingInitialData, kDonatingOplogEntries},
+         {&validateEnteringDonatingOplogEntries, &validatePostDonatingOplogEntries}},
         {{kDonatingOplogEntries, kPreparingToBlockWrites},
-         {&validateEnteringPreparingToBlockWrites}},
-        {{kPreparingToBlockWrites, kBlockingWrites}, {&validateEnteringBlockingWrites}},
+         {&validateEnteringPreparingToBlockWrites, &validatePostPreparingToBlockWrites}},
+        {{kPreparingToBlockWrites, kBlockingWrites},
+         {&validateEnteringBlockingWrites, &validatePostBlockingWritesOrError}},
         // kError edges.
-        {{kPreparingToDonate, kError}, {&validateEnteringError}},
-        {{kDonatingInitialData, kError}, {&validateEnteringError}},
-        {{kDonatingOplogEntries, kError}, {&validateEnteringError}},
-        {{kPreparingToBlockWrites, kError}, {&validateEnteringError}},
+        {{kPreparingToDonate, kError},
+         {&validateEnteringError, &validatePostBlockingWritesOrError}},
+        {{kDonatingInitialData, kError},
+         {&validateEnteringError, &validatePostBlockingWritesOrError}},
+        {{kDonatingOplogEntries, kError},
+         {&validateEnteringError, &validatePostBlockingWritesOrError}},
+        {{kPreparingToBlockWrites, kError},
+         {&validateEnteringError, &validatePostBlockingWritesOrError}},
         // kDone edges.
         {{kPreparingToDonate, kDone}, {&validateEnteringDone}},
         {{kDonatingInitialData, kDone}, {&validateEnteringDone}},

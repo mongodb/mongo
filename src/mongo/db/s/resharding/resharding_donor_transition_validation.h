@@ -16,6 +16,8 @@ struct DonorTransitionFacts {
     bool allRecipientsDoneCloning = false;
     bool allRecipientsDoneApplying = false;
     bool changeStreamsMonitorStarted = false;
+    bool inDonatingOplogEntries = false;   // post only
+    bool inBlockingWritesOrError = false;  // post only
 };
 
 struct DonorPreTransitionInput {

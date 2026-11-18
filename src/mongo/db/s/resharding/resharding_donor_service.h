@@ -334,8 +334,9 @@ private:
     void _validatePreTransition(const DonorShardContext& before, const DonorShardContext& proposed);
 
     /**
-     * Checks that the proposed context got installed in memory and durably. Reports violations as
-     * tripwire assertions without throwing.
+     * Checks that the proposed context got installed in memory and durably and that the runtime
+     * facts hold. Throws only on edges before kBlockingWrites, where the failure is routed to an
+     * abort.
      */
     void _validatePostTransition(OperationContext* opCtx,
                                  const DonorShardContext& before,

@@ -592,6 +592,112 @@ TEST_F(ReshardingDonorServiceTest, FailedErrorValidationStillRecordsAbortReason)
                               DonorStateEnum::kDonatingInitialData);
 }
 
+TEST_F(ReshardingDonorServiceTest, PostValidationFailureBeforeBlockingWritesAborts) {
+    const std::vector<DonorStateEnum> throwingEdges{DonorStateEnum::kDonatingInitialData,
+                                                    DonorStateEnum::kDonatingOplogEntries,
+                                                    DonorStateEnum::kPreparingToBlockWrites};
+    for (const auto edge : throwingEdges) {
+        LOGV2(13798302,
+              "Forcing a post-transition validation failure",
+              "edge"_attr = idl::serialize(edge));
+
+        FailPointEnableBlock failpoint("reshardingDonorCorruptContextBeforeValidation",
+                                       BSON("post" << true << "state" << static_cast<int>(edge)));
+        unittest::TassertGuard tassertGuard(1);
+
+        auto doc = makeStateDocument({.isAlsoRecipient = false, .performVerification = false});
+        auto opCtx = makeOperationContext();
+        createSourceCollection(opCtx.get(), doc);
+        DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        if (edge > DonorStateEnum::kDonatingInitialData) {
+            notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
+        }
+        if (edge >= DonorStateEnum::kDonatingOplogEntries) {
+            notifyRecipientsDoneCloningNoWait(*donor);
+        }
+        if (edge >= DonorStateEnum::kPreparingToBlockWrites) {
+            notifyToStartBlockingWritesNoWait(*donor);
+        }
+
+        ASSERT_OK(donor->awaitInBlockingWritesOrError().getNoThrow());
+
+        auto persisted = getPersistedDonorDocument(opCtx.get(), doc.getReshardingUUID());
+        ASSERT_EQ(persisted.getMutableState().getState(), DonorStateEnum::kError);
+        auto abortReason = persisted.getMutableState().getAbortReason();
+        ASSERT(abortReason);
+        ASSERT_EQ(abortReason->getIntField("code"), ErrorCodes::ReshardingPostconditionFailure);
+
+        donor->abort(false);
+        ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+        checkStateDocumentRemoved(opCtx.get());
+    }
+}
+
+TEST_F(ReshardingDonorServiceTest, PostValidationFailureAtBlockingWritesIsNonThrowing) {
+    TestOptions testOptions{.isAlsoRecipient = false, .performVerification = false};
+
+    auto doc = makeStateDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    createSourceCollection(opCtx.get(), doc);
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor);
+
+    FailPointEnableBlock failpoint(
+        "reshardingDonorCorruptContextBeforeValidation",
+        BSON("post" << true << "state" << static_cast<int>(DonorStateEnum::kBlockingWrites)));
+    unittest::TassertGuard tassertGuard(1);
+
+    notifyToStartBlockingWrites(opCtx.get(), *donor);
+    awaitChangeStreamsMonitorCompleted(opCtx.get(), *donor, doc);
+    notifyReshardingCommitting(opCtx.get(), *donor, doc);
+
+    ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+    checkStateDocumentRemoved(opCtx.get());
+}
+
+TEST_F(ReshardingDonorServiceTest, FailedDonePostValidationStillReleasesCriticalSection) {
+    TestOptions testOptions{.isAlsoRecipient = false, .performVerification = false};
+
+    auto doc = makeStateDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    createSourceCollection(opCtx.get(), doc);
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor);
+    notifyToStartBlockingWrites(opCtx.get(), *donor);
+    awaitChangeStreamsMonitorCompleted(opCtx.get(), *donor, doc);
+
+    FailPointEnableBlock failpoint(
+        "reshardingDonorCorruptContextBeforeValidation",
+        BSON("post" << true << "state" << static_cast<int>(DonorStateEnum::kDone)));
+    unittest::TassertGuard tassertGuard(1);
+
+    notifyReshardingCommitting(opCtx.get(), *donor, doc);
+
+    ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+    checkStateDocumentRemoved(opCtx.get());
+}
+
+TEST_F(ReshardingDonorServiceTest, FailedErrorPostValidationStillRecordsAbortReason) {
+    externalState()->throwUnrecoverableErrorIn(DonorStateEnum::kDonatingInitialData,
+                                               kUpdateCoordinatorDocument);
+
+    FailPointEnableBlock failpoint(
+        "reshardingDonorCorruptContextBeforeValidation",
+        BSON("post" << true << "state" << static_cast<int>(DonorStateEnum::kError)));
+    unittest::TassertGuard tassertGuard(1);
+
+    runUnrecoverableErrorTest(TestOptions{.isAlsoRecipient = false, .performVerification = false},
+                              DonorStateEnum::kDonatingInitialData);
+}
+
 TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
     boost::optional<PauseDuringStateTransitions> donatingInitialDataTransitionGuard;
     donatingInitialDataTransitionGuard.emplace(controller(), DonorStateEnum::kDonatingInitialData);

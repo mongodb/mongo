@@ -108,6 +108,9 @@ MONGO_FAIL_POINT_DEFINE(removeDonorDocFailpoint);
 MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsBeforeObtainingTimestamp);
 MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsUpdatingChangeStreamsMonitorProgress);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseDonorInAbortBeforePromiseSet);
+// The default mode corrupts the proposed context to fail the pre-check. With
+// {"post": true, "state": N} it corrupts the read-back context instead, failing only the
+// post-check for destination N (N is DonorStateEnum's integer value, not its IDL string).
 MONGO_FAIL_POINT_DEFINE(reshardingDonorCorruptContextBeforeValidation);
 
 namespace {
@@ -120,6 +123,14 @@ using resharding::ensureFulfilledPromise;
 template <typename Future>
 bool isReadyAndSuccessful(const Future& future) {
     return future.isReady() && future.getNoThrow().isOK();
+}
+
+bool isPostValidationCorruption(const BSONObj& data) {
+    return data["post"].trueValue();
+}
+
+bool isPreValidationCorruption(const BSONObj& data) {
+    return !isPostValidationCorruption(data);
 }
 
 primary_only_service_helpers::CancelState makeCancelState(const DonorShardContext& donorCtx) {
@@ -1330,6 +1341,10 @@ DonorTransitionFacts ReshardingDonorService::DonorStateMachine::_gatherTransitio
             isReadyAndSuccessful(_promises.getAllRecipientsDoneApplyingFuture());
         facts.changeStreamsMonitorStarted =
             isReadyAndSuccessful(_changeStreamsMonitorStarted.getFuture());
+        facts.inDonatingOplogEntries =
+            isReadyAndSuccessful(_promises.getInDonatingOplogEntriesFuture());
+        facts.inBlockingWritesOrError =
+            isReadyAndSuccessful(_promises.getInBlockingWritesOrErrorFuture());
     }
 
     return facts;
@@ -1368,9 +1383,27 @@ void ReshardingDonorService::DonorStateMachine::_validatePostTransition(
         return;
     }
 
-    const auto result =
-        validateDonorPostTransition({.before = before, .proposed = proposed, .durable = *durable});
-    tassertNoThrow(result.status);
+    if (MONGO_unlikely(reshardingDonorCorruptContextBeforeValidation.shouldFail(
+            [&proposed](const BSONObj& data) {
+                return isPostValidationCorruption(data) &&
+                    data.getIntField("state") == static_cast<int>(proposed.getState());
+            }))) {
+        durable->setBytesToClone(durable->getBytesToClone().value_or(0) + 1);
+    }
+
+    const auto result = validateDonorPostTransition({.before = before,
+                                                     .proposed = proposed,
+                                                     .durable = *durable,
+                                                     .facts = _gatherTransitionFacts()});
+    // Before blocking-writes an error is routed through kError and cleanup still runs. From
+    // blocking-writes on, throwing would prevent cleanup or releasing the critical section.
+    const auto to = proposed.getState();
+    if (to == DonorStateEnum::kDonatingInitialData || to == DonorStateEnum::kDonatingOplogEntries ||
+        to == DonorStateEnum::kPreparingToBlockWrites) {
+        tassert(result.status);
+    } else {
+        tassertNoThrow(result.status);
+    }
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionState(
@@ -1440,7 +1473,8 @@ void ReshardingDonorService::DonorStateMachine::_transitionToError(
     auto newDonorCtx = _donorCtx.get();
     newDonorCtx.setState(DonorStateEnum::kError);
     resharding::emplaceTruncatedAbortReasonIfExists(newDonorCtx, abortReason);
-    if (MONGO_unlikely(reshardingDonorCorruptContextBeforeValidation.shouldFail())) {
+    if (MONGO_unlikely(
+            reshardingDonorCorruptContextBeforeValidation.shouldFail(isPreValidationCorruption))) {
         newDonorCtx.setBytesToClone(newDonorCtx.getBytesToClone().value_or(0) + 1);
     }
     _transitionState(std::move(newDonorCtx), factory);
@@ -1454,7 +1488,8 @@ void ReshardingDonorService::DonorStateMachine::_transitionToDone(
         resharding::emplaceTruncatedAbortReasonIfExists(newDonorCtx,
                                                         resharding::kCoordinatorAbortedError);
     }
-    if (MONGO_unlikely(reshardingDonorCorruptContextBeforeValidation.shouldFail())) {
+    if (MONGO_unlikely(
+            reshardingDonorCorruptContextBeforeValidation.shouldFail(isPreValidationCorruption))) {
         newDonorCtx.setBytesToClone(newDonorCtx.getBytesToClone().value_or(0) + 1);
     }
     _transitionState(std::move(newDonorCtx), factory);
