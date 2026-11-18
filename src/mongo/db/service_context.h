@@ -742,6 +742,11 @@ public:
      */
     Service* getService() const;
 
+    /**
+     * Returns the Service for the given role, or nullptr if this ServiceContext does not serve it.
+     */
+    Service* getService(ClusterRole role) const;
+
     ClientList::Cursor makeClientsCursor() const {
         return _clientsList.getCursor();
     }

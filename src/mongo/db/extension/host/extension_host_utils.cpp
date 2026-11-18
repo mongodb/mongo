@@ -48,4 +48,16 @@ MONGO_INITIALIZER(InitializeGlobalObservabilityContext)(InitializerContext*) {
 };
 }  // namespace
 
+namespace static_properties_util {
+
+ActionSet toActionSet(const MongoExtensionRequiredPrivilege& privilege) {
+    ActionSet actions;
+    for (const auto& entry : privilege.getActions()) {
+        actions.addAction(toActionType(entry.getAction()));
+    }
+    return actions;
+}
+
+}  // namespace static_properties_util
+
 }  // namespace mongo::extension::host

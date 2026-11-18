@@ -146,6 +146,10 @@ Service* ServiceContext::getService() const {
     MONGO_UNREACHABLE;
 }
 
+Service* ServiceContext::getService(ClusterRole role) const {
+    return _serviceSet->getService(role);
+}
+
 void Service::setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep) {
     auto old = _serviceEntryPoint.swap(std::move(sep));
     invariant(!old);

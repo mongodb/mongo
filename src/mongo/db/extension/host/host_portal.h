@@ -3,13 +3,17 @@
 #pragma once
 
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
+#include "mongo/db/extension/host/extension_command.h"
 #include "mongo/db/extension/host_connector/adapter/host_portal_adapter.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/shared/handle/command/command_descriptor.h"
 #include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
+
+#include <fmt/format.h>
 
 namespace mongo::extension::host {
 
@@ -45,6 +49,19 @@ public:
         }
         host::DocumentSourceExtensionOptimizable::registerStageRules(
             name, std::move(extensionStageRules));
+    };
+
+    void registerCommandDescriptor(
+        const ::MongoExtensionCommandDescriptor* descriptor) const override {
+        uassert(ErrorCodes::ExtensionError,
+                fmt::format("Extension commands require API version 1.1, but the negotiated "
+                            "version is {}",
+                            _capability.toString()),
+                _capability >= CommandDescriptorAPI::kMinSupportedCapability);
+        tassert(ErrorCodes::ExtensionError,
+                "Got null command descriptor during extension registration",
+                descriptor != nullptr);
+        host::ExtensionCommand::registerCommand(CommandDescriptorHandle(descriptor, _capability));
     };
 };
 

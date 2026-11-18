@@ -329,10 +329,7 @@ public:
 
             if (const auto& requiredPrivileges = _properties.getRequiredPrivileges()) {
                 for (const auto& rp : *requiredPrivileges) {
-                    ActionSet actions;
-                    for (const auto& entry : rp.getActions()) {
-                        actions.addAction(static_properties_util::toActionType(entry.getAction()));
-                    }
+                    const auto actions = static_properties_util::toActionSet(rp);
 
                     switch (rp.getResourcePattern()) {
                         case MongoExtensionPrivilegeResourcePatternEnum::kNamespace:

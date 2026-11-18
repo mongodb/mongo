@@ -24,6 +24,7 @@ public:
     virtual void registerStageRules(::MongoExtensionByteView stageName,
                                     const ::MongoExtensionPipelineRewriteRule* rules,
                                     size_t numRules) const = 0;
+    virtual void registerCommandDescriptor(const ::MongoExtensionCommandDescriptor*) const = 0;
 
     constexpr CapabilityVersion getCapabilityVersion() const {
         return _capability;
@@ -37,8 +38,7 @@ protected:
 
 /**
  * Adapts a C++ HostPortalBase to the C MongoExtensionHostPortal passed to extensions during
- * initialize(). Forwards register_stage_descriptor and get_extension_options to the wrapped
- * implementation. Owns the HostPortalBase and the serialized extension options.
+ * initialize(). Owns the HostPortalBase and the serialized extension options.
  */
 class HostPortalAdapter final : public ::MongoExtensionHostPortal {
 public:
@@ -66,6 +66,10 @@ public:
         return *_portal;
     }
 
+    static ::MongoExtensionHostPortalVTable getVTable() {
+        return VTABLE;
+    }
+
 private:
     static ::MongoExtensionStatus* _extRegisterStageDescriptor(
         const MongoExtensionHostPortal* hostPortal,
@@ -80,10 +84,17 @@ private:
         const ::MongoExtensionPipelineRewriteRule* rules,
         size_t numRules) noexcept;
 
+    static ::MongoExtensionStatus* _extRegisterCommandDescriptor(
+        const ::MongoExtensionHostPortal* hostPortal,
+        const ::MongoExtensionCommandDescriptor* cmdDesc) noexcept;
+
+    // The vtable always contains every slot the host knows about. Slots added after 1.0 are only
+    // read by extensions that negotiated a version that includes them.
     static constexpr ::MongoExtensionHostPortalVTable VTABLE = {
         .register_stage_descriptor = &_extRegisterStageDescriptor,
         .get_extension_options = &_extGetOptions,
         .register_stage_rules = &_extRegisterStageRules,
+        .register_command_descriptor = &_extRegisterCommandDescriptor,
     };
 
     const std::string _extensionOpts;

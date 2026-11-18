@@ -6,6 +6,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/api_version_vector_to_span.h"
 #include "mongo/db/extension/sdk/assert_util.h"
+#include "mongo/db/extension/sdk/command.h"
 #include "mongo/db/extension/sdk/host_portal.h"
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/versioned_extension.h"
@@ -21,7 +22,8 @@ namespace mongo::extension::sdk {
 
 /**
  * To register a new extension, extension writers should derive from this class and implement
- * initialize() to register aggregation stages. See test_examples/foo.cpp for an example.
+ * initialize() to register aggregation stages and commands. See test_examples/foo.cpp for an
+ * example.
  */
 class Extension {
 public:
@@ -58,10 +60,29 @@ protected:
         portal->registerStageRules(StageDescriptor::kStageName, rules);
     }
 
+    /**
+     * Registers a command with the host. Requires a host that negotiated API version 1.1 or later.
+     */
+    template <class CommandDescriptor>
+    void _registerCommand(const HostPortalHandle& portal) {
+        // Error out if CommandDescriptor is already registered to this extension.
+        sdk_uassert(13730002,
+                    (str::stream() << CommandDescriptor::kCommandName << " is already registered"),
+                    _commandDescriptors.find(CommandDescriptor::kCommandName) ==
+                        _commandDescriptors.end());
+
+        auto cmdDesc = std::make_unique<ExtensionCommandDescriptorAdapter>(
+            std::make_unique<CommandDescriptor>());
+        portal->registerCommandDescriptor(cmdDesc.get());
+        _commandDescriptors.emplace(CommandDescriptor::kCommandName, std::move(cmdDesc));
+    }
+
 private:
     stdx::unordered_map<std::string, std::unique_ptr<ExtensionAggStageDescriptorAdapter>>
         _stageDescriptors;
     stdx::unordered_map<std::string, std::unique_ptr<ExtensionAggStageDescriptorAdapter>> _rules;
+    stdx::unordered_map<std::string, std::unique_ptr<ExtensionCommandDescriptorAdapter>>
+        _commandDescriptors;
 };
 
 /**

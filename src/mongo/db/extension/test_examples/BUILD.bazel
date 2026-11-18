@@ -88,6 +88,7 @@ extensions_with_config(
         ":search_index_management_extension_signed_lib",
         ":assert_deadline_increased_after_batch_extension_signed_lib",
         ":binary_flag_stub_extension_signed_lib",
+        ":mock_commands_extension_signed_lib",
     ],
 )
 
@@ -335,6 +336,14 @@ signed_mongo_cc_extension_shared_library(
 signed_mongo_cc_extension_shared_library(
     name = "search_index_management_extension",
     srcs = ["search_index_management.cpp"],
+)
+
+# "mock_commands" registers extension commands. It is only loaded in no-passthrough tests, so it
+# must not have the _mongo_extension suffix.
+# TODO SERVER-138308: Add "mock_commands" and other command-registering extensions to passthrough tests.
+signed_mongo_cc_extension_shared_library(
+    name = "mock_commands_extension",
+    srcs = ["mock_commands.cpp"],
 )
 
 # "assert_deadline_increased_after_batch" is used to test that the operation deadline

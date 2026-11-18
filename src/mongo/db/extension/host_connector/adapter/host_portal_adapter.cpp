@@ -27,6 +27,15 @@ namespace mongo::extension::host_connector {
     });
 }
 
+::MongoExtensionStatus* HostPortalAdapter::_extRegisterCommandDescriptor(
+    const ::MongoExtensionHostPortal* hostPortal,
+    const ::MongoExtensionCommandDescriptor* cmdDesc) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
+        impl.registerCommandDescriptor(cmdDesc);
+    });
+}
+
 ::MongoExtensionByteView HostPortalAdapter::_extGetOptions(
     const ::MongoExtensionHostPortal* portal) noexcept {
     return stringViewAsByteView(static_cast<const HostPortalAdapter*>(portal)->_extensionOpts);

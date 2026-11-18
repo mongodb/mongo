@@ -24,6 +24,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/commands/server_status:server_status_metric",
         "//src/mongo/db/extension/shared",
         "//src/mongo/db/extension/shared/handle",
@@ -92,6 +93,7 @@ mongo_cc_library(
     srcs = [
         "document_source_extension_for_query_shape.cpp",
         "document_source_extension_optimizable.cpp",
+        "extension_command.cpp",
         "extension_stage.cpp",
     ],
     deps = [
@@ -101,12 +103,14 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:commands",
         "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/auth",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/host_connector/adapter:host_adapters",
         "//src/mongo/db/extension/host_connector/adapter:host_services_adapter",
         "//src/mongo/db/extension/host_connector/handle:host_handles",
         "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
+        "//src/mongo/db/extension/shared/handle/command:command_handles",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:docs_needed_bounds_visitor",
         "//src/mongo/db/pipeline:lite_parsed_desugarer",
@@ -196,6 +200,23 @@ mongo_cc_library(
             ":signature_validator",
         ],
     }),
+)
+
+mongo_cc_unit_test(
+    name = "extension_command_test",
+    srcs = [
+        "extension_command_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":extension_host",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/extension/host_connector/adapter:host_adapters",
+        "//src/mongo/db/extension/host_connector/adapter:host_services_adapter",
+        "//src/mongo/db/extension/sdk:sdk_cpp",
+        "//src/mongo/db/extension/shared/handle/command:command_handles",
+        "//src/mongo/unittest",
+    ],
 )
 
 mongo_cc_unit_test(

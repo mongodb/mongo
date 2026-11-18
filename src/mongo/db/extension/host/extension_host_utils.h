@@ -1,6 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 #pragma once
+#include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/public/extension_agg_stage_static_properties_gen.h"
@@ -40,6 +41,12 @@ inline ActionType toActionType(MongoExtensionPrivilegeActionEnum action) {
             MONGO_UNREACHABLE_TASSERT(11350601);
     }
 }
+
+/**
+ * Returns the actions that 'privilege' requires. The caller is responsible for applying the
+ * privilege to the resource named by its resource pattern.
+ */
+ActionSet toActionSet(const MongoExtensionRequiredPrivilege& privilege);
 
 inline StageConstraints::StreamType toStreamType(MongoExtensionStreamTypeEnum streamType) {
     switch (streamType) {

@@ -5,9 +5,13 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/extension/host_connector/adapter/host_portal_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/host_portal.h"
 #include "mongo/db/extension/sdk/host_services.h"
+#include "mongo/db/extension/sdk/tests/shared_test_commands.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/command/command_descriptor.h"
@@ -20,27 +24,7 @@
 namespace mongo::extension::sdk {
 namespace {
 
-/**
- * Echoes the request back, along with the namespace it received in the command context.
- */
-class EchoCommandDescriptor : public CommandDescriptor {
-public:
-    static constexpr std::string_view kCommandName = "testEcho";
-
-    EchoCommandDescriptor() : CommandDescriptor(std::string(kCommandName)) {}
-
-    BSONObj getProperties() const override {
-        return BSON("clusterRole" << "both"
-                                  << "adminOnly" << false);
-    }
-
-    BSONObj run(const BSONObj& requestBson,
-                const ::MongoExtensionCommandContext& ctx) const override {
-        return BSON("request" << requestBson << "db"
-                              << byteViewAsStringView(ctx.namespaceString.databaseName) << "coll"
-                              << byteViewAsStringView(ctx.namespaceString.collectionName));
-    }
-};
+using shared_test_commands::EchoCommandDescriptor;
 
 /**
  * Throws from both getProperties() and run().
@@ -247,6 +231,45 @@ TEST_F(CommandDescriptorTest, HandleTakesOwnershipOfReturnedBuffers) {
     handle->run(BSON("testCounting" << 1), ctx, result);
     ASSERT_EQ(CountingByteBuf::destroyed, 2);
     ASSERT_BSONOBJ_EQ(result.obj(), BSON("ok" << 1));
+}
+
+TEST_F(CommandDescriptorTest, RegisterCommandDescriptorIsRefusedAtApi10) {
+    // Stands in for a 1.0 host's vtable, which does not contain register_command_descriptor.
+    auto vtable = host_connector::HostPortalAdapter::getVTable();
+    vtable.register_command_descriptor = nullptr;
+    ::MongoExtensionHostPortal portal{&vtable, {}, 0};
+
+    // Building the handle checks the vtable, which must not require the 1.1 slot at 1.0. The slot
+    // is null, so reaching it would crash rather than throw.
+    HostPortalHandle handle(&portal, CapabilityVersion(MONGODB_EXTENSION_API_MAJOR_VERSION, 0));
+    auto adapter = makeAdapter<EchoCommandDescriptor>();
+    ASSERT_THROWS_CODE(handle->registerCommandDescriptor(adapter.get()), DBException, 13730000);
+}
+
+/**
+ * Registers EchoCommandDescriptor twice.
+ */
+class DuplicateCommandExtension : public Extension {
+public:
+    void initialize(const HostPortalHandle& portal) override {
+        _registerCommand<EchoCommandDescriptor>(portal);
+        _registerCommand<EchoCommandDescriptor>(portal);
+    }
+};
+
+TEST_F(CommandDescriptorTest, RegisterCommandRejectsDuplicateInSameExtension) {
+    // Accepts every command, so that only the SDK's own duplicate check can reject the second.
+    auto vtable = host_connector::HostPortalAdapter::getVTable();
+    vtable.register_command_descriptor =
+        [](const ::MongoExtensionHostPortal*,
+           const ::MongoExtensionCommandDescriptor*) -> ::MongoExtensionStatus* {
+        return &ExtensionStatusOK::getInstance();
+    };
+    ::MongoExtensionHostPortal portal{&vtable, {}, 0};
+
+    HostPortalHandle handle(&portal, CapabilityVersion::latestCapability());
+    DuplicateCommandExtension extension;
+    ASSERT_THROWS_CODE(extension.initialize(handle), DBException, 13730002);
 }
 
 }  // namespace

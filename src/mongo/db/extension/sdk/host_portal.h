@@ -5,9 +5,12 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/assert_util.h"
+#include "mongo/db/extension/sdk/command.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/command/command_descriptor.h"
 #include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/str.h"
 
 #include <string_view>
 
@@ -62,6 +65,16 @@ public:
         });
     }
 
+    void registerCommandDescriptor(const ExtensionCommandDescriptorAdapter* commandDesc) const {
+        sdk_uassert(13730000,
+                    (str::stream() << "Extension commands require API version 1.1, but the host "
+                                      "negotiated "
+                                   << _getCapabilityVersion().toString()),
+                    _getCapabilityVersion() >= CommandDescriptorAPI::kMinSupportedCapability);
+        invokeCAndConvertStatusToException(
+            [&] { return _vtable().register_command_descriptor(get(), commandDesc); });
+    }
+
     ::MongoExtensionAPIVersion getHostExtensionsAPIVersion() const {
         assertValid();
         return get()->hostExtensionsAPIVersion;
@@ -77,7 +90,8 @@ public:
             std::string(byteViewAsStringView(_vtable().get_extension_options(get()))));
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
+    static void assertVTableConstraints(const VTable_t& vtable,
+                                        const CapabilityVersion& capability) {
         sdk_tassert(10926401,
                     "Extension 'register_stage_descriptor' is null",
                     vtable.register_stage_descriptor != nullptr);
@@ -87,6 +101,11 @@ public:
         sdk_tassert(12201401,
                     "Extension 'register_stage_rules' is null",
                     vtable.register_stage_rules != nullptr);
+        if (capability >= CommandDescriptorAPI::kMinSupportedCapability) {
+            sdk_tassert(13730001,
+                        "Extension 'register_command_descriptor' is null",
+                        vtable.register_command_descriptor != nullptr);
+        }
     };
 };
 }  // namespace sdk

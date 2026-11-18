@@ -432,6 +432,23 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, NullRegisterStageRulesTasserts, "122
     sdk::HostPortalAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, NullRegisterCommandDescriptorTasserts, "13730001") {
+    ::MongoExtensionHostPortalVTable vtable{
+        .register_stage_descriptor = [](const ::MongoExtensionHostPortal*,
+                                        const ::MongoExtensionAggStageDescriptor*)
+            -> ::MongoExtensionStatus* { return nullptr; },
+        .get_extension_options = [](const ::MongoExtensionHostPortal*) -> ::MongoExtensionByteView {
+            return {};
+        },
+        .register_stage_rules = [](const ::MongoExtensionHostPortal*,
+                                   ::MongoExtensionByteView,
+                                   const ::MongoExtensionPipelineRewriteRule*,
+                                   size_t) -> ::MongoExtensionStatus* { return nullptr; },
+        .register_command_descriptor = nullptr,
+    };
+    sdk::HostPortalAPI::assertVTableConstraints(vtable, CapabilityVersion::latestCapability());
+}
+
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
              SourceStageForTransformExtensionStageBecomesInvalid,
              "10957209") {

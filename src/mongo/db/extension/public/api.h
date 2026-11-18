@@ -1322,8 +1322,8 @@ typedef struct MongoExtension {
 
 /**
  * MongoExtensionHostPortal serves as the entry point for extensions to integrate with the
- * server. It exposes function pointers for registering aggregation stages and pipeline
- * optimization rules.
+ * server. It exposes function pointers for registering aggregation stages, pipeline optimization
+ * rules, and commands.
  */
 typedef struct MongoExtensionHostPortal {
     const struct MongoExtensionHostPortalVTable* const vtable;
@@ -1356,6 +1356,14 @@ typedef struct MongoExtensionHostPortalVTable {
                                                   MongoExtensionByteView stageName,
                                                   const MongoExtensionPipelineRewriteRule* rules,
                                                   size_t numRules);
+
+    /**
+     * Register an extension command. Added in API version 1.1; an extension must not call it
+     * unless the host negotiated 1.1 or later.
+     */
+    MongoExtensionStatus* (*register_command_descriptor)(
+        const MongoExtensionHostPortal* hostPortal,
+        const MongoExtensionCommandDescriptor* descriptor);
 } MongoExtensionHostPortalVTable;
 
 /**
