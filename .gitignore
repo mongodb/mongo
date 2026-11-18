@@ -376,3 +376,6 @@ target
 .claude/agent-memory-local/
 .claude/worktrees/
 CLAUDE.local.md
+
+# C++ Code Coverage Artifacts
+coverage/
