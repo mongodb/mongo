@@ -4,11 +4,12 @@
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint_dead_slot_elimination.h"
 
 #include <variant>
+#include <vector>
 
 namespace mongo::stage_builder {
 namespace {
 /**
- * Removes dead slots from the plan. Limited to 'project' stages and the fields of 'scan' stages.
+ * Removes dead project entries, scan fields, and scalar group accumulators from the plan.
  */
 class DeadSlotEliminationRule final : public SbBlueprintRewriteRule {
 public:
@@ -26,6 +27,18 @@ public:
     }
 
 private:
+    static void removeUse(sbe::value::SlotId slot,
+                          const SbDetachedNode& node,
+                          SbBlueprintRewriteContext& ctx) {
+        auto& usage = ctx.slotUsage();
+        if (usage.removeUse(slot) == 0) {
+            auto definer = usage.getDefiningNode(slot);
+            if (definer && *definer != node.get()) {
+                ctx.enqueue(*definer);
+            }
+        }
+    }
+
     template <typename T>
     static boost::optional<SbDetachedNode> applyTo(T&,
                                                    SbDetachedNode&,
@@ -58,12 +71,7 @@ private:
             expr.visitReferencedSlots([&](SbSlot slot) {
                 // Removing 'outSlot' makes 'slot' dead, queue the stage that defines 'slot' for
                 // dead-slot-removal.
-                if (usage.removeUse(slot.getId()) == 0) {
-                    auto definer = usage.getDefiningNode(slot.getId());
-                    if (definer && *definer != node.get()) {
-                        ctx.enqueue(*definer);
-                    }
-                }
+                removeUse(slot.getId(), node, ctx);
             });
             usage.removeDef(outSlot.getId());
         }
@@ -105,6 +113,50 @@ private:
         names.resize(keep);
         slots.resize(keep);
         return std::move(node);
+    }
+
+    static boost::optional<SbDetachedNode> removeDeadAccumulators(
+        std::vector<SbBlueprintHashAggAccumulator>& accumulators,
+        bool definesSpillSlots,
+        SbDetachedNode& node,
+        SbBlueprintRewriteContext& ctx) {
+        auto& usage = ctx.slotUsage();
+        const auto removed = std::erase_if(accumulators, [&](const auto& acc) {
+            if (usage.numUses(acc.outSlot) != 0) {
+                return false;
+            }
+
+            // Spill slots are internal to the group. Their uses in merge expressions do not
+            // keep an otherwise unread accumulator alive, but must be removed from the summary.
+            SbSlotCollector uses;
+            acc.use(uses);
+            for (auto slot : uses.slots()) {
+                removeUse(slot, node, ctx);
+            }
+            usage.removeDef(acc.outSlot);
+            if (definesSpillSlots) {
+                usage.removeDef(acc.spillSlot);
+            }
+            return true;
+        });
+        if (removed == 0) {
+            return boost::none;
+        }
+        // Keep all grouping and cluster keys, even when unread above the group: they determine
+        // its output cardinality. A group with no accumulators must not be replaced by its child.
+        return std::move(node);
+    }
+
+    static boost::optional<SbDetachedNode> applyTo(SbBlueprintHashAgg& group,
+                                                   SbDetachedNode& node,
+                                                   SbBlueprintRewriteContext& ctx) {
+        return removeDeadAccumulators(group.accumulators, !group.compact, node, ctx);
+    }
+
+    static boost::optional<SbDetachedNode> applyTo(SbBlueprintStreamingAgg& group,
+                                                   SbDetachedNode& node,
+                                                   SbBlueprintRewriteContext& ctx) {
+        return removeDeadAccumulators(group.accumulators, true /* definesSpillSlots */, node, ctx);
     }
 };
 }  // namespace

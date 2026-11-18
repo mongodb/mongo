@@ -1,0 +1,14 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/DeadAccumulatorBetweenLiveOnesIsRemoved
+Live slots: s10 s12
+
+Before:
+[1] group [s3] [s9 = s3] [s10 = aggDoubleDoubleSum(s4), s11 = aggDoubleDoubleSum(s5), s12 = aggDoubleDoubleSum(s4)] spillSlots[s6, s7, s8] mergingExprs[aggMergeDoubleDoubleSums(s6), aggMergeDoubleDoubleSums(s7), aggMergeDoubleDoubleSums(s8)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = a, s5 = b] @"UUID" 
+
+After firing 1:
+[1] group [s3] [s9 = s3] [s10 = aggDoubleDoubleSum(s4), s12 = aggDoubleDoubleSum(s4)] spillSlots[s6, s8] mergingExprs[aggMergeDoubleDoubleSums(s6), aggMergeDoubleDoubleSums(s8)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = a, s5 = b] @"UUID" 
+
+After firing 2:
+[1] group [s3] [s9 = s3] [s10 = aggDoubleDoubleSum(s4), s12 = aggDoubleDoubleSum(s4)] spillSlots[s6, s8] mergingExprs[aggMergeDoubleDoubleSums(s6), aggMergeDoubleDoubleSums(s8)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = a] @"UUID" 

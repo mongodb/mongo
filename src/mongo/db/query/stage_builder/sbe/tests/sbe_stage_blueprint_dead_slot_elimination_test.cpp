@@ -28,6 +28,15 @@ protected:
         return _state->blueprint();
     }
 
+    SbHashAggAccumulator sum(SbBuilder& b, SbExpr input) {
+        auto spillSlot = SbSlot{_state->slotId()};
+        return {.spillSlot = spillSlot,
+                .implementation = SbHashAggCompiledAccumulator{
+                    {},
+                    b.makeFunction(sbe::EFn::kAggDoubleDoubleSum, std::move(input)),
+                    b.makeFunction(sbe::EFn::kAggMergeDoubleDoubleSums, spillSlot)}};
+    }
+
     // Runs dead slot elimination over the tree rooted at 'root', treating 'liveSlots' as read by
     // the root's consumer, until it converges or 'maxFirings' rules have fired. Checks that the
     // rule left the slot summary up to date.
@@ -246,6 +255,137 @@ TEST_F(SbBlueprintDeadSlotEliminationTest, RemovingAnEntryQueuesTheScanThatDefin
             b.makeBinaryOp(abt::Operations::Add, fieldSlots[0], b.makeInt32Constant(1)),
             b.makeBinaryOp(abt::Operations::Add, fieldSlots[1], b.makeInt32Constant(1)));
         return Plan{std::move(project), {recordSlot.getId(), outSlots[0].getId()}};
+    });
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, GroupWithOnlyDeadAccumulatorsKeepsGrouping) {
+    // Even when none of its outputs are read, a group must still produce one row per distinct
+    // key. A global group must likewise remain an aggregation, rather than forwarding input rows.
+    for (bool global : {false, true}) {
+        SbBuilder b{*_state, 1};
+        auto [input, slots] = b.makeProject(b.makeCoScan(3), b.makeInt32Constant(1));
+        SbHashAggAccumulatorVector accumulators;
+        accumulators.push_back(
+            {.spillSlot = SbSlot{_state->slotId()},
+             .implementation =
+                 SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>{slots[0]}});
+        auto [group, keys, outputs] = b.makeHashAgg(VariableTypes{},
+                                                    std::move(input),
+                                                    global ? SbSlotVector{} : slots,
+                                                    accumulators,
+                                                    boost::none,
+                                                    false /* compact */);
+        auto result = eliminateDeadSlots(std::move(group), {});
+        ASSERT_TRUE(result.converged);
+        const auto& rewritten = std::get<SbBlueprintHashAgg>(blueprint()[result.root]);
+        ASSERT_TRUE(rewritten.accumulators.empty());
+        ASSERT_EQ(rewritten.groupBySlots.size(), global ? 0 : 1);
+        ASSERT_EQ(rewritten.groupByOutSlots.size(), global ? 0 : 1);
+    }
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, DeadAccumulatorBetweenLiveOnesIsRemoved) {
+    runGoldenTest([&](SbBuilder& b) {
+        auto [scan, recordSlot, recordIdSlot, fields] =
+            b.makeScan(_uuid, DatabaseName::kAdmin, true, {"key", "a", "b"});
+        SbHashAggAccumulatorVector accumulators;
+        accumulators.push_back(sum(b, fields[1]));
+        accumulators.push_back(sum(b, fields[2]));
+        accumulators.push_back(sum(b, fields[1]));
+        auto [group, keys, outputs] = b.makeHashAgg(
+            VariableTypes{}, std::move(scan), {fields[0]}, accumulators, boost::none, false);
+        return Plan{std::move(group), {outputs[0].getId(), outputs[2].getId()}};
+    });
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, RemovingProjectEntryQueuesGroupAndItsInput) {
+    runGoldenTest([&](SbBuilder& b) {
+        auto [scan, recordSlot, recordIdSlot, fields] =
+            b.makeScan(_uuid, DatabaseName::kAdmin, true, {"key", "a", "b"});
+        auto [input, inputs] =
+            b.makeProject(std::move(scan),
+                          b.makeBinaryOp(abt::Operations::Add, fields[2], b.makeInt32Constant(1)));
+        SbHashAggAccumulatorVector accumulators;
+        accumulators.push_back(sum(b, fields[1]));
+        accumulators.push_back(sum(b, inputs[0]));
+        auto [group, keys, outputs] = b.makeHashAgg(
+            VariableTypes{}, std::move(input), {fields[0]}, accumulators, boost::none, false);
+        auto [project, finalSlots] =
+            b.makeProject(std::move(group),
+                          b.makeBinaryOp(abt::Operations::Add, outputs[0], b.makeInt32Constant(1)),
+                          b.makeBinaryOp(abt::Operations::Add, outputs[1], b.makeInt32Constant(1)));
+        return Plan{std::move(project), {finalSlots[0].getId()}};
+    });
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, RemovingAccumulatorsRemovesAllTheirExpressionUses) {
+    SbBuilder b{*_state, 1};
+    auto [scan, recordSlot, recordIdSlot, fields] =
+        b.makeScan(_uuid,
+                   DatabaseName::kAdmin,
+                   true,
+                   {"key", "init", "agg", "merge", "transform", "size", "live"});
+    auto spill = SbSlot{_state->slotId()};
+    SbHashAggAccumulatorVector accumulators;
+    accumulators.push_back(
+        {.spillSlot = spill,
+         .implementation = SbHashAggCompiledAccumulator{
+             fields[1],
+             b.makeFunction(sbe::EFn::kAggDoubleDoubleSum,
+                            b.makeBinaryOp(abt::Operations::Add, fields[2], fields[2])),
+             b.makeBinaryOp(abt::Operations::Add, spill, fields[3])}});
+    accumulators.push_back(
+        {.spillSlot = SbSlot{_state->slotId()},
+         .implementation =
+             SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>{fields[4]}});
+    accumulators.push_back(
+        {.spillSlot = SbSlot{_state->slotId()},
+         .implementation =
+             SbHashAggMinMaxNAccumulator<sbe::MinNHashAggAccumulator>{fields[4], fields[5], 1024}});
+    accumulators.push_back(sum(b, fields[6]));
+    auto [group, keys, outputs] = b.makeHashAgg(
+        VariableTypes{}, std::move(scan), {fields[0]}, accumulators, boost::none, false);
+    auto result = eliminateDeadSlots(std::move(group), {outputs[3].getId()});
+    ASSERT_TRUE(result.converged);
+    const auto& rewritten = std::get<SbBlueprintHashAgg>(blueprint()[result.root]);
+    ASSERT_EQ(rewritten.accumulators.size(), 1);
+    ASSERT_EQ(rewritten.accumulators[0].outSlot, outputs[3].getId());
+    const auto& rewrittenScan = std::get<SbBlueprintScan>(blueprint()[rewritten.child]);
+    ASSERT_EQ(rewrittenScan.info->scanFieldNames, (std::vector<std::string>{"key", "live"}));
+
+    // Nothing changes when all the remaining accumulators are live.
+    auto again = eliminateDeadSlots(SbStage{result.root}, {outputs[3].getId()});
+    ASSERT_TRUE(again.converged);
+    ASSERT_EQ(again.firings, 0);
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, CompactGroupRemovesDeadAccumulators) {
+    runGoldenTest([&](SbBuilder& b) {
+        auto [scan, recordSlot, recordIdSlot, fields] =
+            b.makeScan(_uuid, DatabaseName::kAdmin, true, {"key", "a", "b"});
+        SbHashAggAccumulatorVector accumulators;
+        for (size_t i : {1, 2}) {
+            accumulators.push_back(
+                {.spillSlot = SbSlot{_state->slotId()},
+                 .implementation =
+                     SbHashAggSinglePurposeScalarAccumulator<sbe::CompactPushHashAggAccumulator>{
+                         fields[i]}});
+        }
+        auto [group, keys, outputs] = b.makeHashAgg(
+            VariableTypes{}, std::move(scan), {fields[0]}, accumulators, boost::none, true);
+        return Plan{std::move(group), {outputs[0].getId()}};
+    });
+}
+
+TEST_F(SbBlueprintDeadSlotEliminationTest, StreamingGroupKeepsUnreadKeysAndClusterKeys) {
+    runGoldenTest([&](SbBuilder& b) {
+        auto [scan, recordSlot, recordIdSlot, fields] =
+            b.makeScan(_uuid, DatabaseName::kAdmin, true, {"key", "cluster", "a"});
+        SbHashAggAccumulatorVector accumulators;
+        accumulators.push_back(sum(b, fields[2]));
+        auto [group, keys, outputs] = b.makeStreamingAgg(
+            VariableTypes{}, std::move(scan), {fields[0]}, {fields[1]}, accumulators, boost::none);
+        return Plan{std::move(group), {}};
     });
 }
 }  // namespace

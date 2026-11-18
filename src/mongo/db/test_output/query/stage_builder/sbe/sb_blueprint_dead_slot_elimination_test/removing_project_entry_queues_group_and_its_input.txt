@@ -1,0 +1,30 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/RemovingProjectEntryQueuesGroupAndItsInput
+Live slots: s12
+
+Before:
+[1] project [s12 = (s10 + 1), s13 = (s11 + 1)] 
+[1] group [s3] [s9 = s3] [s10 = aggDoubleDoubleSum(s4), s11 = aggDoubleDoubleSum(s6)] spillSlots[s7, s8] mergingExprs[aggMergeDoubleDoubleSums(s7), aggMergeDoubleDoubleSums(s8)] 
+[1] project [s6 = (s5 + 1)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = a, s5 = b] @"UUID" 
+
+After firing 1:
+[1] project [s12 = (s10 + 1)] 
+[1] group [s3] [s9 = s3] [s10 = aggDoubleDoubleSum(s4), s11 = aggDoubleDoubleSum(s6)] spillSlots[s7, s8] mergingExprs[aggMergeDoubleDoubleSums(s7), aggMergeDoubleDoubleSums(s8)] 
+[1] project [s6 = (s5 + 1)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = a, s5 = b] @"UUID" 
+
+After firing 2:
+[1] project [s12 = (s10 + 1)] 
+[1] group [s3] [s9 = s3] [s10 = aggDoubleDoubleSum(s4)] spillSlots[s7] mergingExprs[aggMergeDoubleDoubleSums(s7)] 
+[1] project [s6 = (s5 + 1)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = a, s5 = b] @"UUID" 
+
+After firing 3:
+[1] project [s12 = (s10 + 1)] 
+[1] group [s3] [s9 = s3] [s10 = aggDoubleDoubleSum(s4)] spillSlots[s7] mergingExprs[aggMergeDoubleDoubleSums(s7)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = a, s5 = b] @"UUID" 
+
+After firing 4:
+[1] project [s12 = (s10 + 1)] 
+[1] group [s3] [s9 = s3] [s10 = aggDoubleDoubleSum(s4)] spillSlots[s7] mergingExprs[aggMergeDoubleDoubleSums(s7)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = a] @"UUID" 

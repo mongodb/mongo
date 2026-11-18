@@ -1,0 +1,14 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/StreamingGroupKeepsUnreadKeysAndClusterKeys
+Live slots:
+
+Before:
+[1] streaming_group [s3] [s7 = s3] clustered [s4] [s8 = aggDoubleDoubleSum(s5)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = cluster, s5 = a] @"UUID" 
+
+After firing 1:
+[1] streaming_group [s3] [s7 = s3] clustered [s4] [] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = cluster, s5 = a] @"UUID" 
+
+After firing 2:
+[1] streaming_group [s3] [s7 = s3] clustered [s4] [] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = cluster] @"UUID" 

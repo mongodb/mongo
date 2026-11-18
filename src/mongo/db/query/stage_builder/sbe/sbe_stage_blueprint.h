@@ -943,6 +943,40 @@ struct SbBlueprintHashAggAccumulator {
     sbe::value::SlotId outSlot{0};
     sbe::value::SlotId spillSlot{0};
     decltype(SbHashAggAccumulator::implementation) implementation;
+
+    void use(SbSlotCollector& out) const {
+        std::visit(
+            OverloadedVisitor{[&](const SbHashAggCompiledAccumulator& impl) {
+                                  out.add(impl.init);
+                                  out.add(impl.agg);
+                                  out.add(impl.merge);
+                              },
+                              [&]<class Impl>(const SbHashAggMinMaxNAccumulator<Impl>& impl) {
+                                  out.add(impl.transform);
+                                  out.add(impl.maxSizeExpr);
+                              },
+                              [&](const auto& impl) {
+                                  out.add(impl.transform);
+                              }},
+            implementation);
+    }
+
+    template <typename F>
+    void visitExprs(F&& fn) {
+        std::visit(OverloadedVisitor{[&](SbHashAggCompiledAccumulator& impl) {
+                                         fn(impl.init);
+                                         fn(impl.agg);
+                                         fn(impl.merge);
+                                     },
+                                     [&]<class Impl>(SbHashAggMinMaxNAccumulator<Impl>& impl) {
+                                         fn(impl.transform);
+                                         fn(impl.maxSizeExpr);
+                                     },
+                                     [&](auto& impl) {
+                                         fn(impl.transform);
+                                     }},
+                   implementation);
+    }
 };
 
 /**
@@ -976,20 +1010,7 @@ struct SbBlueprintHashAgg {
         out.add(groupBySlots);
         out.add(collatorSlot);
         for (const auto& acc : accumulators) {
-            std::visit(
-                OverloadedVisitor{[&](const SbHashAggCompiledAccumulator& impl) {
-                                      out.add(impl.init);
-                                      out.add(impl.agg);
-                                      out.add(impl.merge);
-                                  },
-                                  [&]<class Impl>(const SbHashAggMinMaxNAccumulator<Impl>& impl) {
-                                      out.add(impl.transform);
-                                      out.add(impl.maxSizeExpr);
-                                  },
-                                  [&](const auto& impl) {
-                                      out.add(impl.transform);
-                                  }},
-                acc.implementation);
+            acc.use(out);
         }
     }
 
@@ -1001,19 +1022,7 @@ struct SbBlueprintHashAgg {
     template <typename F>
     void visitExprs(F&& fn) {
         for (auto& acc : accumulators) {
-            std::visit(OverloadedVisitor{[&](SbHashAggCompiledAccumulator& impl) {
-                                             fn(impl.init);
-                                             fn(impl.agg);
-                                             fn(impl.merge);
-                                         },
-                                         [&]<class Impl>(SbHashAggMinMaxNAccumulator<Impl>& impl) {
-                                             fn(impl.transform);
-                                             fn(impl.maxSizeExpr);
-                                         },
-                                         [&](auto& impl) {
-                                             fn(impl.transform);
-                                         }},
-                       acc.implementation);
+            acc.visitExprs(fn);
         }
     }
 };
@@ -1047,20 +1056,7 @@ struct SbBlueprintStreamingAgg {
         out.add(clusterKeySlots);
         out.add(collatorSlot);
         for (const auto& acc : accumulators) {
-            std::visit(
-                OverloadedVisitor{[&](const SbHashAggCompiledAccumulator& impl) {
-                                      out.add(impl.init);
-                                      out.add(impl.agg);
-                                      out.add(impl.merge);
-                                  },
-                                  [&]<class Impl>(const SbHashAggMinMaxNAccumulator<Impl>& impl) {
-                                      out.add(impl.transform);
-                                      out.add(impl.maxSizeExpr);
-                                  },
-                                  [&](const auto& impl) {
-                                      out.add(impl.transform);
-                                  }},
-                acc.implementation);
+            acc.use(out);
         }
     }
 
@@ -1072,19 +1068,7 @@ struct SbBlueprintStreamingAgg {
     template <typename F>
     void visitExprs(F&& fn) {
         for (auto& acc : accumulators) {
-            std::visit(OverloadedVisitor{[&](SbHashAggCompiledAccumulator& impl) {
-                                             fn(impl.init);
-                                             fn(impl.agg);
-                                             fn(impl.merge);
-                                         },
-                                         [&]<class Impl>(SbHashAggMinMaxNAccumulator<Impl>& impl) {
-                                             fn(impl.transform);
-                                             fn(impl.maxSizeExpr);
-                                         },
-                                         [&](auto& impl) {
-                                             fn(impl.transform);
-                                         }},
-                       acc.implementation);
+            acc.visitExprs(fn);
         }
     }
 };

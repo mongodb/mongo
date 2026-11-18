@@ -1,0 +1,14 @@
+# Golden test output of SbBlueprintDeadSlotEliminationTest/CompactGroupRemovesDeadAccumulators
+Live slots: s9
+
+Before:
+[1] compact_group [s3] [s8 = s3] [s9 = _compactPush(s4), s10 = _compactPush(s5)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = a, s5 = b] @"UUID" 
+
+After firing 1:
+[1] compact_group [s3] [s8 = s3] [s9 = _compactPush(s4)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = a, s5 = b] @"UUID" 
+
+After firing 2:
+[1] compact_group [s3] [s8 = s3] [s9 = _compactPush(s4)] 
+[1] scan generic [s1 = record, s2 = recordId] [s3 = key, s4 = a] @"UUID" 
