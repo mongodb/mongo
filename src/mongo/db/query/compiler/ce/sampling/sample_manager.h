@@ -8,6 +8,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/compiler/ce/persistence/persistent_stats_manager.h"
 #include "mongo/db/query/compiler/ce/sampling/sample.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -53,10 +54,9 @@ struct PersistedSampleSummary {
 /**
  * This class coordinates loading and persisting samples.
  */
-class SampleManager {
+class SampleManager final : public PersistentStatsManager<SampleSpec, PersistedSampleSummary> {
 public:
-    SampleManager(OperationContext* opCtx,
-                  PlanYieldPolicy::YieldPolicy yieldPolicy,
+    SampleManager(PlanYieldPolicy::YieldPolicy yieldPolicy,
                   boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx);
 
     /**
@@ -69,7 +69,9 @@ public:
      * 'collections' holds the acquisitions the sample is loaded against. It is borrowed from the
      * caller and must outlive this call.
      */
-    Sample load(const MultipleCollectionAccessor& collections, const SampleSpec& spec);
+    Sample load(OperationContext* opCtx,
+                const MultipleCollectionAccessor& collections,
+                const SampleSpec& spec);
 
     /**
      * Draws a new sample for 'spec' from the source collection and persists it, replacing the
@@ -77,7 +79,8 @@ public:
      *
      * Returns summary statistics of the sample persisted if successful.
      */
-    StatusWith<PersistedSampleSummary> refresh(const SampleSpec& spec);
+    StatusWith<PersistedSampleSummary> refresh(OperationContext* opCtx,
+                                               const SampleSpec& spec) override;
 
 private:
     /**
@@ -85,12 +88,12 @@ private:
      * existing sample if one exists.
      * Returns summary statistics of the sample persisted if successful.
      */
-    StatusWith<PersistedSampleSummary> persistAndReplaceExisting(const SampleSpec& spec,
+    StatusWith<PersistedSampleSummary> persistAndReplaceExisting(OperationContext* opCtx,
+                                                                 const SampleSpec& spec,
                                                                  const Sample& sample,
                                                                  const UUID& collectionUuid,
                                                                  Date_t createdAt);
 
-    OperationContext* _opCtx;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     boost::intrusive_ptr<const ExpressionContext> _customerQueryExpCtx;
 };

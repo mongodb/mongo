@@ -9,6 +9,16 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "persistent_stats_manager",
+    hdrs = [
+        "persistent_stats_manager.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
 idl_generator(
     name = "persistent_stats_config_gen",
     src = "persistent_stats_config.idl",

@@ -254,18 +254,17 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
     return pages;
 }
 
-SampleManager::SampleManager(OperationContext* opCtx,
-                             PlanYieldPolicy::YieldPolicy yieldPolicy,
+SampleManager::SampleManager(PlanYieldPolicy::YieldPolicy yieldPolicy,
                              boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx)
-    : _opCtx(opCtx),
-      _yieldPolicy(yieldPolicy),
-      _customerQueryExpCtx(std::move(customerQueryExpCtx)) {}
+    : _yieldPolicy(yieldPolicy), _customerQueryExpCtx(std::move(customerQueryExpCtx)) {}
 
-Sample SampleManager::load(const MultipleCollectionAccessor& collections, const SampleSpec& spec) {
+Sample SampleManager::load(OperationContext* opCtx,
+                           const MultipleCollectionAccessor& collections,
+                           const SampleSpec& spec) {
     // Try to load a persisted sample if one exists. If unsuccessful, load a new sample on the fly.
     if (spec.samplingSource == SamplingSourceEnum::kPersistentSample) {
         std::unique_ptr<PersistentSampleLoader> loader =
-            makePersistentSampleLoader(_opCtx, collections, _yieldPolicy, _customerQueryExpCtx);
+            makePersistentSampleLoader(opCtx, collections, _yieldPolicy, _customerQueryExpCtx);
         auto loadStatus = loader->tryLoad(spec);
         if (loadStatus.isOK()) {
             return std::move(loadStatus.getValue());
@@ -282,22 +281,23 @@ Sample SampleManager::load(const MultipleCollectionAccessor& collections, const 
     SampleSpec onTheFlySpec = spec;
     onTheFlySpec.samplingSource = SamplingSourceEnum::kOnTheFlySample;
     std::unique_ptr<OnTheFlySampleLoader> loader = makeOnTheFlySampleLoader(
-        _opCtx, collections, _yieldPolicy, _customerQueryExpCtx, onTheFlySpec);
+        opCtx, collections, _yieldPolicy, _customerQueryExpCtx, onTheFlySpec);
     auto loadStatus = loader->tryLoad(onTheFlySpec);
     uassertStatusOK(loadStatus.getStatus());
 
     return std::move(loadStatus.getValue());
 }
 
-StatusWith<PersistedSampleSummary> SampleManager::refresh(const SampleSpec& spec) {
+StatusWith<PersistedSampleSummary> SampleManager::refresh(OperationContext* opCtx,
+                                                          const SampleSpec& spec) {
     tassert(13097203,
             "refresh() requires a spec that requests an on-the-fly sample",
             spec.samplingSource == SamplingSourceEnum::kOnTheFlySample);
 
     // Acquire the source collection to generate the sample.
     auto sourceCollection = acquireCollectionMaybeLockFree(
-        _opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(_opCtx, spec.nss, AcquisitionPrerequisites::kRead));
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, spec.nss, AcquisitionPrerequisites::kRead));
 
     uassert(13097202,
             str::stream() << "Couldn't find collection " << spec.nss.toStringForErrorMsg(),
@@ -314,15 +314,19 @@ StatusWith<PersistedSampleSummary> SampleManager::refresh(const SampleSpec& spec
 
     const UUID collectionUuid = sourceCollection.getCollectionPtr()->uuid();
     MultipleCollectionAccessor collections(std::move(sourceCollection));
-    Sample sample = load(collections, spec);
+    Sample sample = load(opCtx, collections, spec);
     // Release the source collection before persisting the sample since it is no longer needed.
     collections.clear();
 
-    return persistAndReplaceExisting(spec, sample, collectionUuid, Date_t::now());
+    return persistAndReplaceExisting(opCtx, spec, sample, collectionUuid, Date_t::now());
 }
 
 StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
-    const SampleSpec& spec, const Sample& sample, const UUID& collectionUuid, Date_t createdAt) {
+    OperationContext* opCtx,
+    const SampleSpec& spec,
+    const Sample& sample,
+    const UUID& collectionUuid,
+    Date_t createdAt) {
     const SamplingTechniqueEnum actualSamplingMethod = sample.technique();
     // A full collection scan is performed whenever sample size is >= collection size regardless
     // of requested sampling method, so the value persisted in the sample doc should still
@@ -344,15 +348,15 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
     const NamespaceString samplesNss =
         NamespaceStringUtil::deserialize(spec.nss.dbName(), kSamplesCollectionName);
     {
-        FixedFCVRegion fcvRegion(_opCtx);
+        FixedFCVRegion fcvRegion(opCtx);
         uassert(ErrorCodes::CommandNotSupported,
                 "The analyze command with sampling mode requires featureFlagPersistentStats to be "
                 "enabled",
                 feature_flags::gFeatureFlagPersistentStats.isEnabled(
-                    VersionContext::getDecoration(_opCtx), fcvRegion->acquireFCVSnapshot()));
+                    VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot()));
 
-        auto createCollectionStatus = repl::StorageInterface::get(_opCtx)->createCollection(
-            _opCtx,
+        auto createCollectionStatus = repl::StorageInterface::get(opCtx)->createCollection(
+            opCtx,
             samplesNss,
             CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()});
         if (createCollectionStatus != ErrorCodes::NamespaceExists) {
@@ -375,12 +379,12 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
     size_t writeConflicts = 0;
     // A concurrent writer of the same generation makes the insert conflict, so the retry picks
     // the next one.
-    writeConflictRetry(_opCtx, "analyzePersistSample", samplesNss, [&] {
+    writeConflictRetry(opCtx, "analyzePersistSample", samplesNss, [&] {
         try {
             const auto collection =
-                acquireCollection(_opCtx,
+                acquireCollection(opCtx,
                                   CollectionAcquisitionRequest::fromOpCtx(
-                                      _opCtx, samplesNss, AcquisitionPrerequisites::kWrite),
+                                      opCtx, samplesNss, AcquisitionPrerequisites::kWrite),
                                   MODE_IX);
             uassert(12844400,
                     str::stream() << "Sample collection " << samplesNss.toStringForErrorMsg()
@@ -391,17 +395,17 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
                     "Samples collection must be clustered on _id",
                     collection.getCollectionPtr()->isClustered());
 
-            WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::atomicGroup);
+            WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
 
             const uint64_t maxGenId = findMaxPersistentSampleGenId(
-                _opCtx, collection, recordIdForId(minId), recordIdForId(maxId), collectionUuid);
+                opCtx, collection, recordIdForId(minId), recordIdForId(maxId), collectionUuid);
             // TODO SERVER-138846 let it wrap to zero and handle it gracefully.
             tassert(13541600,
                     str::stream() << "Persistent sample gen_id of collection " << collectionUuid
                                   << " cannot be incremented past " << maxGenId,
                     maxGenId < std::numeric_limits<uint64_t>::max());
             genId = maxGenId + 1;
-            hangAfterFindingMaxPersistentSampleGenId.pauseWhileSet(_opCtx);
+            hangAfterFindingMaxPersistentSampleGenId.pauseWhileSet(opCtx);
 
             std::vector<BSONObj> pageDocs = makePersistentSamplePageDocs(collectionUuid,
                                                                          samplingMethodToPersist,
@@ -431,7 +435,7 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
             DeleteStageParams deleteParams;
             deleteParams.isMulti = true;
             auto deleteExec = InternalPlanner::deleteWithCollectionScan(
-                _opCtx,
+                opCtx,
                 collection,
                 deleteParams,
                 PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
@@ -441,7 +445,7 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
                 CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly);
             deleteExec->executeDelete();
 
-            uassertStatusOK(collection_internal::insertDocuments(_opCtx,
+            uassertStatusOK(collection_internal::insertDocuments(opCtx,
                                                                  collection.getCollectionPtr(),
                                                                  inserts.begin(),
                                                                  inserts.end(),

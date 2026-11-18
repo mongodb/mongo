@@ -277,9 +277,9 @@ void runSampleMode(OperationContext* opCtx, const NamespaceString& nss) {
 
     // TODO SERVER-127210: Investigate if this is the right yield policy to ensure we sample
     // from a consistent snapshot.
-    ce::SampleManager sampleManager(
-        opCtx, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, nullptr /*customerQueryExpCtx*/);
-    const auto summary = uassertStatusOK(sampleManager.refresh(spec));
+    ce::SampleManager sampleManager(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                    nullptr /*customerQueryExpCtx*/);
+    const auto summary = uassertStatusOK(sampleManager.refresh(opCtx, spec));
     recordPersistedSampleMetrics(summary);
 
     auto durationMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);

@@ -247,9 +247,9 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
             return fpNss.isEmpty() || _nss == fpNss;
         });
 
-    SampleManager sampleManager(_opCtx, _yieldPolicy, _customerQueryExpCtx);
+    SampleManager sampleManager(_yieldPolicy, _customerQueryExpCtx);
 
-    _sample = sampleManager.load(_collections, _spec);
+    _sample = sampleManager.load(_opCtx, _collections, _spec);
     _uniqueDocCount = boost::none;
     hangAfterCBRSamplingGenerateSample.executeIf(
         [&](const BSONObj&) { hangAfterCBRSamplingGenerateSample.pauseWhileSet(_opCtx); },
