@@ -2956,7 +2956,7 @@ mongo_cc_library(
         "//src/mongo/db/op_observer:user_write_block_mode_op_observer",
         "//src/mongo/db/op_observer:replica_set_write_block_op_observer",
         "periodic_runner_job_abort_expired_transactions",
-        "//src/mongo/db/pipeline:change_stream_expired_pre_image_remover",
+        "//src/mongo/db/pipeline:change_stream_expired_pre_image_remover_registerer",
         "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory",
         "//src/mongo/db/query/query_settings:query_settings_command_hooks",
         "//src/mongo/db/query/query_settings:query_settings_service",

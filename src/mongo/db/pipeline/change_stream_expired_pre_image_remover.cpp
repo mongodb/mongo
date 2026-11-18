@@ -26,11 +26,6 @@ const auto changeStreamExpiredPreImagesRemoverServiceDecorator =
     ServiceContext::declareDecoration<ChangeStreamExpiredPreImagesRemoverService>();
 }  // namespace
 
-const ReplicaSetAwareServiceRegistry::Registerer<ChangeStreamExpiredPreImagesRemoverService>
-    changeStreamExpiredPreImagesRemoverServiceJobRegistryRegisterer(
-        "ChangeStreamExpiredPreImagesRemoverService");
-
-
 ChangeStreamExpiredPreImagesRemoverService* ChangeStreamExpiredPreImagesRemoverService::get(
     ServiceContext* serviceContext) {
     return &changeStreamExpiredPreImagesRemoverServiceDecorator(serviceContext);

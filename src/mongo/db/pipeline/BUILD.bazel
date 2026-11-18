@@ -1237,6 +1237,20 @@ mongo_cc_library(
     ],
 )
 
+# Subscribes the pre-images remover to replica set lifecycle events. Depend on this only from
+# binaries that want the removal job driven by those events; callers that merely start or stop the
+# job depend on 'change_stream_expired_pre_image_remover' instead.
+mongo_cc_library(
+    name = "change_stream_expired_pre_image_remover_registerer",
+    srcs = [
+        "change_stream_expired_pre_image_remover_registerer.cpp",
+    ],
+    deps = [
+        ":change_stream_expired_pre_image_remover",
+        "//src/mongo/db/repl:replica_set_aware_service",
+    ],
+)
+
 mongo_cc_library(
     name = "expression_context_for_test",
     deps = [
