@@ -15,6 +15,9 @@ filters:
   - "write_ops_retryability*":
     approvers:
       - 10gen/query-execution-write-exec
+  - "write_ops_document_stream_integration_test*":
+    approvers:
+      - 10gen/query-execution-write-exec
 
   # These files contain high-level APIs for running write operations which are not currently owned
   # by a particular query subteam.

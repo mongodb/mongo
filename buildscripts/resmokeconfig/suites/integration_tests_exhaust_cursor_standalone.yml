@@ -1,0 +1,22 @@
+test_kind: cpp_integration_test
+
+selector:
+  root: bazel-bin/install/install-mongo_integration_test_test_list.txt
+  include_files:
+    - bazel-bin/**/exhaust_cursor_currentop_integration_test*
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config: {}
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        logComponentVerbosity:
+          command: 2
+        enableTestCommands: 1

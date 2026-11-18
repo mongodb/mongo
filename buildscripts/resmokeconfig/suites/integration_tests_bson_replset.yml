@@ -2,25 +2,25 @@ test_kind: cpp_integration_test
 
 selector:
   root: bazel-bin/install/install-mongo_integration_test_test_list.txt
-  exclude_files:
-    # Tests replica set monitor.
-    - bazel-bin/**/replica_set_monitor_integration_test*
-    - bazel-bin/**/network_interface_ssl_test* # Requires SSL
-    - bazel-bin/**/grpc_transport_integration_test # Must be run with parameters in the integration_tests_standalone_grpc variant
-
+  include_files:
+    - bazel-bin/**/bson_integration_test*
+    - bazel-bin/**/nesting_depth_integration_test*
 executor:
   archive:
     hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
       - ValidateCollections
   config: {}
   hooks:
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
     - class: ValidateCollections
-    - class: CleanEveryN
-      n: 20
   fixture:
-    class: MongoDFixture
+    class: ReplicaSetFixture
     mongod_options:
       set_parameters:
         logComponentVerbosity:
           command: 2
         enableTestCommands: 1
+    num_nodes: 2

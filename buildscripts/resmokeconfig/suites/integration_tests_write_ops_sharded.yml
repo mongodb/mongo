@@ -1,0 +1,30 @@
+test_kind: cpp_integration_test
+
+selector:
+  root: bazel-bin/install/install-mongo_integration_test_test_list.txt
+  include_files:
+    - bazel-bin/**/db_ops_integration_test*
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config: {}
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+  fixture:
+    class: ShardedClusterFixture
+    mongod_options:
+      set_parameters:
+        logComponentVerbosity:
+          command: 2
+        enableTestCommands: 1
+    mongos_options:
+      set_parameters:
+        logComponentVerbosity:
+          command: 2
+        enableTestCommands: 1

@@ -2,11 +2,8 @@ test_kind: cpp_integration_test
 
 selector:
   root: bazel-bin/install/install-mongo_integration_test_test_list.txt
-  exclude_files:
-    - bazel-bin/**/client_dbclient_connection_integration_test* # Needs sleep command
-    - bazel-bin/**/network_interface_ssl_test* # Requires SSL
-    - bazel-bin/**/grpc_transport_integration_test # Must be run with parameters in the integration_tests_standalone_grpc variant
-
+  include_files:
+    - bazel-bin/**/search_task_executors_integration_test*
 executor:
   archive:
     hooks:
