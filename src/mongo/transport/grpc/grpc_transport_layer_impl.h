@@ -9,6 +9,7 @@
 #include "mongo/transport/grpc/reactor.h"
 #include "mongo/transport/grpc/server.h"
 #include "mongo/transport/grpc_connection_stats_gen.h"
+#include "mongo/transport/reactor_options.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -94,10 +95,14 @@ public:
             case TransportLayer::kEgress:
                 return _egressReactor;
             case TransportLayer::kNewReactor:
-                return std::make_shared<GRPCReactor>();
+                return makeReactor(ReactorOptions{});
         }
 
         MONGO_UNREACHABLE;
+    }
+
+    ReactorHandle makeReactor(ReactorOptions options) override {
+        return std::make_shared<GRPCReactor>(std::move(options));
     }
 
     const std::vector<HostAndPort>& getListeningAddresses() const override;
