@@ -24,14 +24,7 @@ using DonorPostConstraint = TransitionConstraint<DonorPostTransitionInput>;
 
 const DonorPreConstraint kHasMinFetchTimestamp{
     "hasMinFetchTimestamp", [](const DonorPreTransitionInput& in) -> Status {
-        const auto& minFetchTimestamp = in.proposed.getMinFetchTimestamp();
-        if (!minFetchTimestamp) {
-            return transitionViolation("minFetchTimestamp is unset");
-        }
-        if (minFetchTimestamp->isNull()) {
-            return transitionViolation("minFetchTimestamp is null");
-        }
-        return Status::OK();
+        return checkSetAndNonNull("minFetchTimestamp", in.proposed.getMinFetchTimestamp());
     }};
 
 const DonorPreConstraint kHasValidCloneStats{

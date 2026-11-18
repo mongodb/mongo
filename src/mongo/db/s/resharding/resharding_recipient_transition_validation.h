@@ -3,8 +3,10 @@
 
 #pragma once
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/s/resharding/resharding_transition_check.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/time_support.h"
 
 #include <boost/optional.hpp>
 
@@ -18,14 +20,18 @@ namespace mongo {
  */
 
 /**
- * The part of the recipient document the contracts speak about, which grows together with the rules
- * that use it. Only the context and the immutable options so far.
+ * The fields of the recipient document that the contracts examine. The clone details are stored on
+ * the document, not in RecipientShardContext.
  */
 struct RecipientTransitionSnapshot {
     RecipientShardContext ctx;
+    boost::optional<Timestamp> cloneTimestamp;
+    boost::optional<int64_t> approxDocumentsToCopy;
+    boost::optional<int64_t> approxBytesToCopy;
+    boost::optional<Date_t> startConfigTxnCloneTime;
 
-    // Fixed at initialization, apart from each donor's minFetchTimestamp. The immutability check
-    // leaves the timestamps to the edge validators, which decide when they are set.
+    // Includes each donor's minFetchTimestamp. Fixed at initialization, except for those
+    // timestamps, which the edge validators govern.
     ReshardingRecipientOptions options;
 
     // Fixed for the operation. Lives in the shared CommonReshardingMetadata, not the options.

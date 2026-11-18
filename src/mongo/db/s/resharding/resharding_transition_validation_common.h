@@ -6,6 +6,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/s/resharding/resharding_transition_check.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -18,8 +19,8 @@
 namespace mongo {
 
 /**
- * Helpers shared by the donor and coordinator transition validators. Constraints stay next to the
- * document type they validate; only checks on plain field values live here.
+ * Helpers shared by the donor, recipient and coordinator transition validators. Constraints stay
+ * next to the document type they validate; only checks on plain field values live here.
  */
 
 inline Status transitionViolation(std::string reason) {
@@ -51,6 +52,24 @@ Status checkUnchanged(const char* field,
     return transitionViolation(str::stream()
                                << field << " changed from " << describeOptionalValue(before)
                                << " to " << describeOptionalValue(proposed));
+}
+
+/**
+ * A null timestamp is treated as unset.
+ */
+inline bool isSetAndNonNull(const boost::optional<Timestamp>& timestamp) {
+    return timestamp && !timestamp->isNull();
+}
+
+inline Status checkSetAndNonNull(const std::string& field,
+                                 const boost::optional<Timestamp>& value) {
+    if (!value) {
+        return transitionViolation(field + " is unset");
+    }
+    if (value->isNull()) {
+        return transitionViolation(field + " is null");
+    }
+    return Status::OK();
 }
 
 inline Status checkNonNegative(const char* field, const boost::optional<int64_t>& value) {
