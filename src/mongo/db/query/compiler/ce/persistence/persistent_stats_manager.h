@@ -6,21 +6,30 @@
 #include "mongo/base/status_with.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 
+class MultipleCollectionAccessor;
 class OperationContext;
 
 /**
  * API between PSAME and the specifics of each persistent statistic, with one implementation per
- * statistic kind. 'StatSpec' describes a statistic of that kind and 'RefreshSummary' is what a
- * refresh reports about the value it persisted.
+ * statistic kind. 'StatSpec' describes a statistic of that kind, 'Stat' is its value and
+ * 'RefreshSummary' is what a refresh reports about the value it persisted.
  */
-template <typename StatSpec, typename RefreshSummary>
+template <typename StatSpec, typename Stat, typename RefreshSummary>
 class [[MONGO_MOD_OPEN]] PersistentStatsManager {
 public:
     virtual ~PersistentStatsManager() = default;
 
-    // TODO SERVER-137525: Add load(StatSpec) -> Optional<Stat> for the read path.
+    /**
+     * Returns the statistic described by 'spec', or none if it cannot be served. 'collections'
+     * holds the caller's acquisitions the statistic is loaded against.
+     */
+    virtual boost::optional<Stat> tryLoad(OperationContext* opCtx,
+                                          const MultipleCollectionAccessor& collections,
+                                          const StatSpec& spec) = 0;
 
     /**
      * Computes the statistic described by 'spec' and persists it, replacing the persisted one.

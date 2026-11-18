@@ -261,6 +261,14 @@ SampleManager::SampleManager(PlanYieldPolicy::YieldPolicy yieldPolicy,
 Sample SampleManager::load(OperationContext* opCtx,
                            const MultipleCollectionAccessor& collections,
                            const SampleSpec& spec) {
+    auto sample = tryLoad(opCtx, collections, spec);
+    tassert(13752500, "SampleManager must always load a sample", sample.has_value());
+    return std::move(sample.value());
+}
+
+boost::optional<Sample> SampleManager::tryLoad(OperationContext* opCtx,
+                                               const MultipleCollectionAccessor& collections,
+                                               const SampleSpec& spec) {
     // Try to load a persisted sample if one exists. If unsuccessful, load a new sample on the fly.
     if (spec.samplingSource == SamplingSourceEnum::kPersistentSample) {
         std::unique_ptr<PersistentSampleLoader> loader =
@@ -278,6 +286,12 @@ Sample SampleManager::load(OperationContext* opCtx,
         }
     }
 
+    return loadOnTheFly(opCtx, collections, spec);
+}
+
+Sample SampleManager::loadOnTheFly(OperationContext* opCtx,
+                                   const MultipleCollectionAccessor& collections,
+                                   const SampleSpec& spec) {
     SampleSpec onTheFlySpec = spec;
     onTheFlySpec.samplingSource = SamplingSourceEnum::kOnTheFlySample;
     std::unique_ptr<OnTheFlySampleLoader> loader = makeOnTheFlySampleLoader(
@@ -314,7 +328,7 @@ StatusWith<PersistedSampleSummary> SampleManager::refresh(OperationContext* opCt
 
     const UUID collectionUuid = sourceCollection.getCollectionPtr()->uuid();
     MultipleCollectionAccessor collections(std::move(sourceCollection));
-    Sample sample = load(opCtx, collections, spec);
+    Sample sample = loadOnTheFly(opCtx, collections, spec);
     // Release the source collection before persisting the sample since it is no longer needed.
     collections.clear();
 

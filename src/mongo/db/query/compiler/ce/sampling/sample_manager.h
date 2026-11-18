@@ -54,7 +54,8 @@ struct PersistedSampleSummary {
 /**
  * This class coordinates loading and persisting samples.
  */
-class SampleManager final : public PersistentStatsManager<SampleSpec, PersistedSampleSummary> {
+class SampleManager final
+    : public PersistentStatsManager<SampleSpec, Sample, PersistedSampleSummary> {
 public:
     SampleManager(PlanYieldPolicy::YieldPolicy yieldPolicy,
                   boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx);
@@ -83,6 +84,10 @@ public:
                                                const SampleSpec& spec) override;
 
 private:
+    Sample loadOnTheFly(OperationContext* opCtx,
+                        const MultipleCollectionAccessor& collections,
+                        const SampleSpec& spec);
+
     /**
      * Serializes 'sample' into page document(s) and atomically persists them, replacing the
      * existing sample if one exists.
@@ -93,6 +98,10 @@ private:
                                                                  const Sample& sample,
                                                                  const UUID& collectionUuid,
                                                                  Date_t createdAt);
+
+    boost::optional<Sample> tryLoad(OperationContext* opCtx,
+                                    const MultipleCollectionAccessor& collections,
+                                    const SampleSpec& spec) override;
 
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     boost::intrusive_ptr<const ExpressionContext> _customerQueryExpCtx;
