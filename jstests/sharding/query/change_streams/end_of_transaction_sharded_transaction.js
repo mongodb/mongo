@@ -29,6 +29,7 @@
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {withFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, describe} from "jstests/libs/mochalite.js";
+import {ServerStatusMetrics} from "jstests/libs/query/change_stream_metrics_util.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {
     assertGetMoreFailsWithExpectedError,
@@ -256,17 +257,24 @@ describe("endOfTransaction for a sharded transaction", function () {
                 runShardedTransaction(1);
                 insertSentinel("sentinel-1");
 
-                // The transaction's insert into the watched collection is followed by its
-                // endOfTransaction event and then the sentinel, which bounds the stream.
-                const changes = cst.assertNextChangesEqual({
-                    cursor,
-                    expectedChanges: [
-                        expectedInsert(dbA, 1),
-                        {operationType: "endOfTransaction"},
-                        expectedInsert(dbA, "sentinel-1"),
-                    ],
+                // Metrics are populated at read time: the delta covers the getMores that
+                // synthesize and emit the event.
+                const delta = ServerStatusMetrics.withServerStatusMetrics(mongos.getDB(dbA), () => {
+                    const changes = cst.assertNextChangesEqual({
+                        cursor,
+                        expectedChanges: [
+                            expectedInsert(dbA, 1),
+                            {operationType: "endOfTransaction"},
+                            expectedInsert(dbA, "sentinel-1"),
+                        ],
+                    });
+                    assertEndOfTransactionEvent(changes[1], changes[0]);
                 });
-                assertEndOfTransactionEvent(changes[1], changes[0]);
+
+                const eot = ServerStatusMetrics.extractEndOfTransactionDelta(delta);
+                assert.gte(eot.emitted, 1, {eot});
+                assert.gte(eot.pbrtBumps, 1, {eot});
+                assert.eq(eot.tracked, 0, {eot});
             });
         },
     );
@@ -355,10 +363,17 @@ describe("endOfTransaction for a sharded transaction", function () {
                 runShardedTransaction(3);
                 insertSentinel("sentinel-3");
 
-                cst.assertNextChangesEqual({
-                    cursor,
-                    expectedChanges: [expectedInsert(dbA, 3), expectedInsert(dbA, "sentinel-3")],
+                const delta = ServerStatusMetrics.withServerStatusMetrics(mongos.getDB(dbA), () => {
+                    cst.assertNextChangesEqual({
+                        cursor,
+                        expectedChanges: [
+                            expectedInsert(dbA, 3),
+                            expectedInsert(dbA, "sentinel-3"),
+                        ],
+                    });
                 });
+                const eot = ServerStatusMetrics.extractEndOfTransactionDelta(delta);
+                assert.eq(eot.emitted, 0, {eot});
             });
         },
     );

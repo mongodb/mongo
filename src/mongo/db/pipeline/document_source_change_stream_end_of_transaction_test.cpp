@@ -7,6 +7,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/config.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/change_stream_end_of_transaction_stage.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
@@ -28,6 +29,9 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/split_pipeline.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/tassert_guard.h"
@@ -1512,6 +1516,187 @@ TEST_F(ChangeStreamStageTest, EndOfTransactionStreamSynthesizesForMultipleTransa
     ASSERT_EQ(results[7]["operationType"].getStringData(),
               DocumentSourceChangeStream::kEndOfTransactionOpType);
     ASSERT_EQ(results[7]["txnNumber"].getLong(), 8LL);
+}
+
+// Synthesis metrics.
+//
+
+// The EOT metrics are process-global and eagerly registered; the capturer is created first so the
+// recorded deltas are collected on demand. Reads are deltas against a "before" reading because
+// other tests in the binary may have bumped the same counters.
+class EndOfTransactionStageMetricsTest : public ChangeStreamStageTest {};
+
+TEST_F(EndOfTransactionStageMetricsTest, TrackedTransactionsFollowAggregatorEntries) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    auto stage = makeStage(getExpCtx());
+    disablePbrtAdvancer(stage);
+
+    const BSONObj lsid = testLsid().toBSON();
+    std::deque<GetNextResult> inputs;
+    // The first participant record creates the tracked entry; the transaction is not yet complete
+    // for the watched scope, so nothing is emitted.
+    inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+        makeAccountingControlEvent(lsid, "shardA", Timestamp(100, 1))));
+
+    auto trackedBefore = capturer.readInt64Counter(
+        otel::metrics::MetricNames::kChangeStreamEndOfTransactionSynthesisTransactionsTracked);
+    {
+        auto mock = setSource(std::move(inputs), getExpCtx(), stage);
+        ASSERT(stage->getNext().isEOF());
+        ASSERT_EQ(stage->numTrackedTransactions_forTest(), 1UL);
+    }
+    ASSERT_EQ(
+        capturer.readInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionSynthesisTransactionsTracked),
+        trackedBefore + 1);
+
+    // The completing record from the second participant erases the entry.
+    std::deque<GetNextResult> completing;
+    completing.push_back(GetNextResult::makeAdvancedControlDocument(
+        makeAccountingControlEvent(lsid, "shardB", Timestamp(100, 2))));
+    completing.push_back(GetNextResult::makeEOF());
+    {
+        auto mock = setSource(std::move(completing), getExpCtx(), stage);
+        ASSERT(!stage->getNext().isEOF());
+    }
+    ASSERT_EQ(
+        capturer.readInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionSynthesisTransactionsTracked),
+        trackedBefore);
+}
+
+// Reads the tracked gauge from the rendered RouterServer metric tree. The OTEL capturer cannot
+// read metrics on every platform (canReadMetrics() is false on macOS), but tree rendering works
+// locally. The gauge is process-global, so callers must compare relative deltas.
+long long readTrackedGaugeFromMetricTree() {
+    BSONObjBuilder bob;
+    globalMetricTreeSet()[ClusterRole::RouterServer].appendTo(bob);
+    BSONObj root = bob.obj();
+    ASSERT(!root["metrics"].eoo());
+    auto metrics = root["metrics"].embeddedObject();
+    ASSERT(!metrics["changeStreams"].eoo());
+    auto changeStreams = metrics["changeStreams"].embeddedObject();
+    ASSERT(!changeStreams["endOfTransaction"].eoo());
+    auto endOfTransaction = changeStreams["endOfTransaction"].embeddedObject();
+    ASSERT(!endOfTransaction["synthesis"].eoo());
+    auto synthesis = endOfTransaction["synthesis"].embeddedObject();
+    ASSERT(!synthesis["transactions"].eoo());
+    auto transactions = synthesis["transactions"].embeddedObject();
+    ASSERT(!transactions["tracked"].eoo());
+    return transactions["tracked"].numberLong();
+}
+
+// Entries still pending when the aggregator is destroyed (cursor kill, pipeline teardown) are
+// removed without a completion, so destruction must drain the process-global tracked gauge back
+// down, exactly as set-based completion does.
+TEST_F(EndOfTransactionStageMetricsTest, TrackedTransactionsDrainOnStageDestruction) {
+    auto stage = makeStage(getExpCtx());
+    disablePbrtAdvancer(stage);
+
+    const BSONObj lsid = testLsid().toBSON();
+    std::deque<GetNextResult> inputs;
+    // The first participant record creates the tracked entry; the transaction is not yet complete
+    // for the watched scope, so nothing is emitted.
+    inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+        makeAccountingControlEvent(lsid, "shardA", Timestamp(100, 1))));
+
+    const auto trackedBefore = readTrackedGaugeFromMetricTree();
+    {
+        auto mock = setSource(std::move(inputs), getExpCtx(), stage);
+        ASSERT(stage->getNext().isEOF());
+        ASSERT_EQ(stage->numTrackedTransactions_forTest(), 1UL);
+        ASSERT_EQ(readTrackedGaugeFromMetricTree(), trackedBefore + 1);
+        // Destroy the stage (and with it the aggregator holding the pending entry) while the
+        // mock source is still alive. The gauge must return to its before-value without a
+        // completion.
+        stage.reset();
+    }
+    ASSERT_EQ(readTrackedGaugeFromMetricTree(), trackedBefore);
+}
+
+// The event counter counts only events that survive the user pipeline: a filtered event is not
+// emitted to the consumer and must not be counted; a surviving event is counted exactly once.
+TEST_F(EndOfTransactionStageMetricsTest, EventCountedOnlyWhenSurvivingUserPipeline) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    const BSONObj lsid = testLsid().toBSON();
+    auto makeInputs = [&] {
+        std::deque<GetNextResult> inputs;
+        inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+            makeAccountingControlEvent(lsid, "shardA", Timestamp(100, 1))));
+        inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+            makeAccountingControlEvent(lsid, "shardB", Timestamp(100, 2))));
+        inputs.push_back(GetNextResult::makeEOF());
+        return inputs;
+    };
+
+    // A user pipeline that filters the endOfTransaction event out: nothing is emitted, so the
+    // counter must not move.
+    {
+        auto userPipeline =
+            makeUserPipeline(getExpCtx(), {fromjson("{$match: {operationType: 'insert'}}")});
+        auto stage = make_intrusive<ChangeStreamEndOfTransactionStage>(
+            kStageName, getExpCtx(), std::move(userPipeline));
+        disablePbrtAdvancer(stage);
+
+        const auto eventsBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEventEndOfTransactionEmitted);
+        auto mock = setSource(makeInputs(), getExpCtx(), stage);
+        ASSERT(stage->getNext().isEOF());
+        ASSERT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kChangeStreamEventEndOfTransactionEmitted),
+                  eventsBefore);
+    }
+
+    // No user pipeline: the event survives and is counted.
+    {
+        auto stage = makeStage(getExpCtx());
+        disablePbrtAdvancer(stage);
+
+        const auto eventsBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEventEndOfTransactionEmitted);
+        auto mock = setSource(makeInputs(), getExpCtx(), stage);
+        auto result = stage->getNext();
+        ASSERT(result.isAdvanced());
+        ASSERT_EQ(result.getDocument()["operationType"].getStringData(),
+                  DocumentSourceChangeStream::kEndOfTransactionOpType);
+        ASSERT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kChangeStreamEventEndOfTransactionEmitted),
+                  eventsBefore + 1);
+    }
+}
+
+// Without a user pipeline, the surviving event is forwarded to the advancer exactly as emitted:
+// this is the delivery gate for the production forwarder, which advances the merger's
+// client-visible post-batch resume token and bumps the synthesis pbrtBumps counter.
+TEST_F(ChangeStreamStageTest, EndOfTransactionSurvivingEventIsForwardedToThePbrtAdvancer) {
+    auto stage = makeStage(getExpCtx());  // No user pipeline: nothing filters the event.
+
+    std::vector<Document> forwardedEvents;
+    stage->setPbrtAdvancer_forTest(
+        [&forwardedEvents](const Document& doc) { forwardedEvents.push_back(doc); });
+
+    const BSONObj lsid = testLsid().toBSON();
+    std::deque<GetNextResult> inputs;
+    inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+        makeAccountingControlEvent(lsid, "shardA", Timestamp(100, 1))));
+    inputs.push_back(GetNextResult::makeAdvancedControlDocument(
+        makeAccountingControlEvent(lsid, "shardB", Timestamp(100, 2))));
+    inputs.push_back(GetNextResult::makeEOF());
+
+    auto mock = setSource(std::move(inputs), getExpCtx(), stage);
+    auto result = stage->getNext();
+    ASSERT(result.isAdvanced());
+    ASSERT_EQ(result.getDocument()["operationType"].getStringData(),
+              DocumentSourceChangeStream::kEndOfTransactionOpType);
+
+    ASSERT_EQ(forwardedEvents.size(), 1UL);
+    ASSERT_DOCUMENT_EQ(forwardedEvents[0], result.getDocument());
 }
 
 }  // namespace mongo

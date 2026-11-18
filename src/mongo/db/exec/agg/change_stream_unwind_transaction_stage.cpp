@@ -4,6 +4,7 @@
 
 #include "mongo/db/exec/agg/change_stream_unwind_transaction_stage.h"
 
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
@@ -873,12 +874,15 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::_createEndOfTransacti
         // The stream requires endOfTransaction events, but this transaction is ineligible: it
         // carries no 'allowEndOfTransaction' marker because the kill switch was off when it
         // committed. Fail only if the transaction touched the watched namespace.
-        uassert(ErrorCodes::ChangeStreamFatalError,
-                "The 'showEndOfTransaction' parameter to $changeStream was set to 'required', but "
-                "no endOfTransaction event could be generated for a transaction that affects the "
-                "stream's namespace, because the 'allowEndOfTransaction' server parameter was "
-                "disabled when the transaction committed",
-                !touchesWatchedNamespace);
+        if (touchesWatchedNamespace) {
+            change_stream::endOfTransactionRequiredMissingMetadata().add(1);
+            uasserted(
+                ErrorCodes::ChangeStreamFatalError,
+                "The 'showEndOfTransaction' parameter to $changeStream was set to 'required', "
+                "but no endOfTransaction event could be generated for a transaction that "
+                "affects the stream's namespace, because the 'allowEndOfTransaction' server "
+                "parameter was disabled when the transaction committed");
+        }
         return boost::none;
     }
 

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -23,5 +24,14 @@ namespace mongo {
  * It is not FCV-gated on master; FCV gating will be added when the feature is backported.
  */
 [[MONGO_MOD_PUBLIC]] bool isEndOfTransactionWritePathEnabled();
+
+/**
+ * Refreshes the allowEndOfTransaction gauge whenever the server parameter's effective value
+ * changes. Installed as the parameter's on_update callback. The callback ignores its value
+ * argument and re-reads the parameter instead: concurrent updates can interleave the atomic store
+ * and the callback, and re-reading lets the last callback to run converge the gauge on the latest
+ * stored value.
+ */
+Status onUpdateAllowEndOfTransaction(bool value);
 
 }  // namespace mongo

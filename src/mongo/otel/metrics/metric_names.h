@@ -615,6 +615,44 @@ public:
             "mongodb.serverStatus.metrics.changeStreams.shardTargeting.placementHistoryLookup."
             "latencyMillis");
 
+    static constexpr MetricName kChangeStreamEndOfTransactionRebuildsSucceeded =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.endOfTransaction.rebuilds.succeeded");
+    static constexpr MetricName kChangeStreamEndOfTransactionRebuildsFailed = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.endOfTransaction.rebuilds.failed");
+    static constexpr MetricName kChangeStreamEndOfTransactionRebuildTimeMicros =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.endOfTransaction.rebuildTimeMicros");
+    static constexpr MetricName kChangeStreamEndOfTransactionSynthesisTransactionsEvicted =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.endOfTransaction.synthesis.transactions."
+            "evicted");
+    static constexpr MetricName kChangeStreamEndOfTransactionSynthesisPbrtBumps =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.endOfTransaction.synthesis.pbrtBumps");
+    static constexpr MetricName kChangeStreamEndOfTransactionSynthesisTransactionsTracked =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.endOfTransaction."
+            "synthesis.transactions.tracked");
+    static constexpr MetricName kChangeStreamEndOfTransactionCompletedWithRemovedShards =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.endOfTransaction."
+            "completedWithRemovedShards");
+    static constexpr MetricName kChangeStreamEndOfTransactionLookbackDistanceExceeded =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.endOfTransaction.lookbackDistanceExceeded");
+    static constexpr MetricName kChangeStreamEndOfTransactionRequiredMissingMetadata =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.endOfTransaction.requiredMissingMetadata");
+    static constexpr MetricName kChangeStreamEventEndOfTransactionTransformed =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.event.endOfTransaction.transformed");
+    static constexpr MetricName kChangeStreamEventEndOfTransactionEmitted = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.event.endOfTransaction.emitted");
+    static constexpr MetricName kChangeStreamEndOfTransactionAllowEndOfTransaction =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.endOfTransaction.allowEndOfTransaction");
+
     // Storage Execution Team Metrics
     static constexpr MetricName kIndexBuildsActive =
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.active");

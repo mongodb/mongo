@@ -25,6 +25,7 @@
 
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {after, before, describe} from "jstests/libs/mochalite.js";
+import {ServerStatusMetrics} from "jstests/libs/query/change_stream_metrics_util.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {
     itWhenEndOfTransactionIsUsable,
@@ -181,20 +182,45 @@ describe("endOfTransaction for a shard-local stream", function () {
                     withChangeStreamTest(mongos.getDB(dbA), (cst) => {
                         const cursor = watchPassthrough(cst, shard0Name, "whenAvailable");
 
-                        runShardedTransaction(1);
-                        insertSentinel(dbA, "sentinel-1");
+                        // The passthrough stream synthesizes the event on the targeted shard:
+                        // the shard's transformed counter advances, the router's stay at zero.
+                        const routerDelta = ServerStatusMetrics.withServerStatusMetrics(
+                            mongos.getDB(dbA),
+                            () => {
+                                const shardDelta =
+                                    ServerStatusMetrics.withServerStatusMetricsAcrossCluster(
+                                        st.shard0.getDB(dbA),
+                                        () => {
+                                            runShardedTransaction(1);
 
-                        // The transaction's insert into the watched collection is followed by its
-                        // endOfTransaction event and then the sentinel, which bounds the stream.
-                        const changes = cst.assertNextChangesEqual({
-                            cursor,
-                            expectedChanges: [
-                                expectedInsert(dbA, 1),
-                                {operationType: "endOfTransaction"},
-                                expectedInsert(dbA, "sentinel-1"),
-                            ],
-                        });
-                        assertEndOfTransactionEvent(changes[1]);
+                                            insertSentinel(dbA, "sentinel-1");
+
+                                            // The transaction's insert into the watched collection is
+                                            // followed by its endOfTransaction event and then the
+                                            // sentinel, which bounds the stream.
+                                            const changes = cst.assertNextChangesEqual({
+                                                cursor,
+                                                expectedChanges: [
+                                                    expectedInsert(dbA, 1),
+                                                    {operationType: "endOfTransaction"},
+                                                    expectedInsert(dbA, "sentinel-1"),
+                                                ],
+                                            });
+                                            assertEndOfTransactionEvent(changes[1]);
+                                        },
+                                    );
+                                assert.gte(
+                                    ServerStatusMetrics.extractEndOfTransactionDelta(shardDelta)
+                                        .transformed,
+                                    1,
+                                );
+                            },
+                        );
+                        const routerEot =
+                            ServerStatusMetrics.extractEndOfTransactionDelta(routerDelta);
+                        assert.eq(routerEot.emitted, 0, {routerEot});
+                        assert.eq(routerEot.pbrtBumps, 0, {routerEot});
+                        assert.eq(routerEot.tracked, 0, {routerEot});
                     });
                 },
             );
@@ -212,18 +238,42 @@ describe("endOfTransaction for a shard-local stream", function () {
                     withChangeStreamTest(st.shard0.getDB(dbA), (cst) => {
                         const cursor = watchDirectToMongod(cst, "whenAvailable");
 
-                        runShardedTransaction(2);
-                        insertSentinel(dbA, "sentinel-2");
+                        // The shard-local stream synthesizes the event on the connected shard:
+                        // the shard's transformed counter advances, the router's stay at zero.
+                        const routerDelta = ServerStatusMetrics.withServerStatusMetrics(
+                            mongos.getDB(dbA),
+                            () => {
+                                const shardDelta =
+                                    ServerStatusMetrics.withServerStatusMetricsAcrossCluster(
+                                        st.shard0.getDB(dbA),
+                                        () => {
+                                            runShardedTransaction(2);
 
-                        const changes = cst.assertNextChangesEqual({
-                            cursor,
-                            expectedChanges: [
-                                expectedInsert(dbA, 2),
-                                {operationType: "endOfTransaction"},
-                                expectedInsert(dbA, "sentinel-2"),
-                            ],
-                        });
-                        assertEndOfTransactionEvent(changes[1]);
+                                            insertSentinel(dbA, "sentinel-2");
+
+                                            const changes = cst.assertNextChangesEqual({
+                                                cursor,
+                                                expectedChanges: [
+                                                    expectedInsert(dbA, 2),
+                                                    {operationType: "endOfTransaction"},
+                                                    expectedInsert(dbA, "sentinel-2"),
+                                                ],
+                                            });
+                                            assertEndOfTransactionEvent(changes[1]);
+                                        },
+                                    );
+                                assert.eq(
+                                    ServerStatusMetrics.extractEndOfTransactionDelta(shardDelta)
+                                        .transformed,
+                                    1,
+                                );
+                            },
+                        );
+                        const routerEot =
+                            ServerStatusMetrics.extractEndOfTransactionDelta(routerDelta);
+                        assert.eq(routerEot.emitted, 0, {routerEot});
+                        assert.eq(routerEot.pbrtBumps, 0, {routerEot});
+                        assert.eq(routerEot.tracked, 0, {routerEot});
                     });
                 },
             );

@@ -4,6 +4,7 @@
 #include "mongo/db/exec/agg/change_stream_end_of_transaction_stage.h"
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/exec/agg/change_stream_handle_topology_change_v2_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -117,6 +118,13 @@ std::map<std::string, std::set<ShardId>> parseParticipantMap(
 EndOfTransactionAggregator::EndOfTransactionAggregator(
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : _changeStream(ChangeStream::buildFromExpressionContext(expCtx)) {}
+
+EndOfTransactionAggregator::~EndOfTransactionAggregator() {
+    if (!_entries.empty()) {
+        change_stream::endOfTransactionSynthesisTransactionsTracked().add(
+            -static_cast<int64_t>(_entries.size()));
+    }
+}
 
 EndOfTransactionScopes EndOfTransactionScopes::createFromDocument(const Document& scopes) {
     EndOfTransactionScopes result;
@@ -239,7 +247,11 @@ boost::optional<EndOfTransactionControlEvent> EndOfTransactionAggregator::tryCom
     }
 
     const EndOfTransactionTxnId key{controlEvent.lsid, controlEvent.txnNumber};
-    auto& entry = _entries[key];
+    auto [it, inserted] = _entries.try_emplace(key);
+    if (inserted) {
+        change_stream::endOfTransactionSynthesisTransactionsTracked().add(1);
+    }
+    auto& entry = it->second;
     entry.expected = std::move(expected);
     entry.seen.insert(controlEvent.scopes.shardId);
     // Accounting records are delivered in ascending (clusterTime, txnOpIndex) order, so the record
@@ -255,6 +267,7 @@ boost::optional<EndOfTransactionControlEvent> EndOfTransactionAggregator::tryCom
 
     auto result = std::move(entry.completingRecord);
     _entries.erase(key);
+    change_stream::endOfTransactionSynthesisTransactionsTracked().add(-1);
     return result;
 }
 
@@ -287,6 +300,7 @@ void ChangeStreamEndOfTransactionStage::_forwardPbrtToTopologyStage(const Docume
             "expected the end-of-transaction stage's source to be the topology-change stage",
             topologyStage);
     topologyStage->advancePostBatchResumeToken(event);
+    change_stream::endOfTransactionSynthesisPbrtBumps().add(1);
 }
 
 void ChangeStreamEndOfTransactionStage::doDispose() {
@@ -397,9 +411,10 @@ boost::optional<Document> ChangeStreamEndOfTransactionStage::_handleAccountingCo
         return boost::none;
     }
 
-    // The event survived, so advance the merger's client-visible post-batch resume token to the
-    // emitted event's token.
+    // The event survived the user pipeline, so it is emitted: advance the merger's client-visible
+    // post-batch resume token to the event's token and count the emitted event.
     _pbrtAdvancer(*userResult);
+    change_stream::eventEndOfTransactionEmitted().add(1);
     return userResult;
 }
 

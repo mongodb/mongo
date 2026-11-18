@@ -119,6 +119,31 @@ export class ServerStatusMetrics {
         return this.getSsMetrics(db).changeStreams;
     }
 
+    /**
+     * Reads the allowEndOfTransaction gauge from this node's serverStatus; undefined when absent
+     * (older binaries in multiversion runs predate the metric).
+     */
+    static getAllowEndOfTransactionGauge(db) {
+        return (this.getCsMetrics(db).endOfTransaction || {}).allowEndOfTransaction;
+    }
+
+    /**
+     * Reads end-of-transaction metric deltas out of a serverStatus metrics diff, treating missing
+     * leaves as 0.
+     */
+    static extractEndOfTransactionDelta(delta) {
+        const cs = delta.changeStreams || {};
+        const eventEot = (cs.event || {}).endOfTransaction || {};
+        return {
+            transformed: eventEot.transformed || 0,
+            emitted: eventEot.emitted || 0,
+            pbrtBumps: ((cs.endOfTransaction || {}).synthesis || {}).pbrtBumps || 0,
+            tracked:
+                (((cs.endOfTransaction || {}).synthesis || {}).transactions || {}).tracked || 0,
+            requiredMissingMetadata: (cs.endOfTransaction || {}).requiredMissingMetadata || 0,
+        };
+    }
+
     static getCsErrorMetrics(db) {
         return this.getCsMetrics(db).error;
     }

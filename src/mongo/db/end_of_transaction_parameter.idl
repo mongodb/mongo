@@ -4,6 +4,9 @@
 global:
     mod_visibility: public
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/end_of_transaction_parameter.h"
+        - "mongo/db/change_stream_metrics_util.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -19,4 +22,5 @@ server_parameters:
         cpp_varname: gAllowEndOfTransaction
         cpp_vartype: Atomic<bool>
         default: true
+        on_update: "onUpdateAllowEndOfTransaction"
         redact: false

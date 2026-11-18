@@ -13,6 +13,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -487,6 +488,234 @@ inline otel::metrics::UpDownCounter<int64_t>& createShardTargetingDegradedGauge(
         "Latency of v2 change stream shard-targeting placement history lookups in milliseconds.",
         otel::metrics::MetricUnit::kMilliseconds,
         opts);
+}
+
+// --- End-of-transaction (EOT) change stream metrics ---
+//
+// All accessors use function-local statics; the eager-registration block in
+// 'document_source_change_stream.cpp' touches them at static-init time so they are visible in
+// serverStatus at zero. A successful rebuild must bump 'endOfTransactionRebuildsSucceeded()' and
+// record its latency into 'endOfTransactionRebuildTimeMicros()' together; a failed rebuild records
+// neither.
+
+inline otel::metrics::Counter<int64_t>& endOfTransactionRebuildsSucceeded() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.endOfTransaction.rebuilds.succeeded",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionRebuildsSucceeded,
+            "Number of on-demand end-of-transaction rebuilds that completed the resume at the "
+            "consumer's position.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& endOfTransactionRebuildsFailed() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.endOfTransaction.rebuilds.failed",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionRebuildsFailed,
+            "Number of end-of-transaction rebuilds that reached the rebuild cap and failed the "
+            "stream.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Histogram<int64_t>& endOfTransactionRebuildTimeMicros() {
+    static auto& histogram = []() -> otel::metrics::Histogram<int64_t>& {
+        otel::metrics::HistogramOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.endOfTransaction.rebuildTimeMicros",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+        };
+        // Successful rebuilds only: from catching the lookback kickback to the rebuilt stream
+        // having resumed at the consumer's resume position. Spans a cheap kickback to a slow
+        // oplog re-scan. Kept under the 10-bucket cap requested by MaaS.
+        opts.serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts;
+        opts.explicitBucketBoundaries = std::vector<double>({1e3, 1e4, 1e5, 1e6, 1e7, 1e8});
+        return otel::metrics::MetricsService::instance().createInt64Histogram(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionRebuildTimeMicros,
+            "Latency of successful end-of-transaction rebuilds in microseconds.",
+            otel::metrics::MetricUnit::kMicroseconds,
+            opts);
+    }();
+    return histogram;
+}
+
+inline otel::metrics::Counter<int64_t>& endOfTransactionSynthesisTransactionsEvicted() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.endOfTransaction.synthesis.transactions.evicted",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionSynthesisTransactionsEvicted,
+            "Number of tracked transactions evicted because an expected participant's accounting "
+            "record was never observed (whenAvailable disposition: event silently omitted).",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& endOfTransactionSynthesisPbrtBumps() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.endOfTransaction.synthesis.pbrtBumps",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionSynthesisPbrtBumps,
+            "Number of explicit advances of the client-visible post-batch resume token to the "
+            "emitted end-of-transaction token.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::UpDownCounter<int64_t>& endOfTransactionSynthesisTransactionsTracked() {
+    static auto& counter = []() -> otel::metrics::UpDownCounter<int64_t>& {
+        otel::metrics::UpDownCounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.endOfTransaction.synthesis.transactions.tracked",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+        };
+        return otel::metrics::MetricsService::instance().createInt64UpDownCounter(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionSynthesisTransactionsTracked,
+            "Current number of transaction state entries held by router-side end-of-transaction "
+            "aggregators, summed across all open change streams.",
+            otel::metrics::MetricUnit::kCount,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& endOfTransactionCompletedWithRemovedShards() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.endOfTransaction.completedWithRemovedShards",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionCompletedWithRemovedShards,
+            "Number of endOfTransaction events emitted best-effort after a participant shard was "
+            "removed (ignore-removed-shards mode). A subset of "
+            "changeStreams.event.endOfTransaction.transformed.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& endOfTransactionLookbackDistanceExceeded() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.endOfTransaction.lookbackDistanceExceeded",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionLookbackDistanceExceeded,
+            "Number of lookbacks refused because the floor was further behind the resume point "
+            "than the maximum lookback distance.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& endOfTransactionRequiredMissingMetadata() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.endOfTransaction.requiredMissingMetadata",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::ShardServer},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionRequiredMissingMetadata,
+            "Number of required change streams that failed because they encountered a transaction "
+            "commit entry without the required endOfTransaction metadata.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+// Shard-server-only: downstream filters (resume-point swallowing, user stages) may still drop a
+// transformed event.
+inline otel::metrics::Counter<int64_t>& eventEndOfTransactionTransformed() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.event.endOfTransaction.transformed",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::ShardServer},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEventEndOfTransactionTransformed,
+            "Number of endOfTransaction change events transformed on this node, including events "
+            "later filtered out.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+// Router-only: emission is guaranteed once the event survives the user sub-pipeline.
+inline otel::metrics::Counter<int64_t>& eventEndOfTransactionEmitted() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.event.endOfTransaction.emitted",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamEventEndOfTransactionEmitted,
+            "Number of endOfTransaction change events emitted to the consumer.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Gauge<int64_t>& endOfTransactionAllowEndOfTransactionGauge() {
+    static auto& gauge = []() -> otel::metrics::Gauge<int64_t>& {
+        otel::metrics::GaugeOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.endOfTransaction.allowEndOfTransaction",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Gauge(
+            otel::metrics::MetricNames::kChangeStreamEndOfTransactionAllowEndOfTransaction,
+            "Whether the allowEndOfTransaction server parameter is currently enabled (1) or "
+            "disabled (0).",
+            otel::metrics::MetricUnit::kBoolean,
+            opts);
+    }();
+    return gauge;
+}
+
+// Per-operationType transformed-event counters under changeStreams.event.<type>. Currently only
+// 'endOfTransaction' (shard-server-only); later work extends this to regular event types.
+// The literal matches DocumentSourceChangeStream::kEndOfTransactionOpType; keep in sync.
+inline void recordChangeEventTransformed(std::string_view operationType) {
+    if (operationType == "endOfTransaction") {
+        eventEndOfTransactionTransformed().add(1);
+    }
 }
 
 }  // namespace mongo::change_stream

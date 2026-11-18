@@ -31,8 +31,8 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
+import {ServerStatusMetrics} from "jstests/libs/query/change_stream_metrics_util.js";
 import {
-    assertChangeStreamEventEq,
     itWhenEndOfTransactionIsUsable,
     withChangeStreamTest,
     withSession,
@@ -67,6 +67,10 @@ describe("showEndOfTransaction: required fails when an event cannot be synthesiz
                     // carries no 'allowEndOfTransaction' marker, so no event can ever be synthesized
                     // for it. The helper restores the parameter when it returns.
                     runWithParamsAllNonConfigNodes(db, {allowEndOfTransaction: false}, () => {
+                        // The gauge mirrors the disabled knob on the node answering this
+                        // serverStatus.
+                        assert.eq(ServerStatusMetrics.getAllowEndOfTransactionGauge(db), 0);
+
                         withSession(db.getMongo(), (session) => {
                             const sessionColl = session
                                 .getDatabase(db.getName())
@@ -78,31 +82,46 @@ describe("showEndOfTransaction: required fails when an event cannot be synthesiz
                         });
                     });
 
-                    // The stream returns the transaction's own events, then fails once the whole
-                    // transaction has been unspooled because the required endOfTransaction event
-                    // cannot be produced.
-                    const changes = cst.getNextChanges(cursor, 2);
-                    assertChangeStreamEventEq(changes[0], {
-                        operationType: "insert",
-                        ns: {db: db.getName(), coll: collName},
-                        documentKey: {_id: 1},
-                        fullDocument: {_id: 1},
-                    });
-                    assertChangeStreamEventEq(changes[1], {
-                        operationType: "insert",
-                        ns: {db: db.getName(), coll: collName},
-                        documentKey: {_id: 2},
-                        fullDocument: {_id: 2},
-                    });
-
-                    const error = assert.throwsWithCode(
-                        () => cst.getNextBatch(cursor),
-                        ErrorCodes.ChangeStreamFatalError,
+                    const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(
+                        db,
+                        () => {
+                            // The stream returns the transaction's own events, then fails once the
+                            // whole transaction has been unspooled because the required
+                            // endOfTransaction event cannot be produced.
+                            cst.assertNextChangesEqual({
+                                cursor,
+                                expectedChanges: [
+                                    {
+                                        operationType: "insert",
+                                        ns: {db: db.getName(), coll: collName},
+                                        documentKey: {_id: 1},
+                                        fullDocument: {_id: 1},
+                                    },
+                                    {
+                                        operationType: "insert",
+                                        ns: {db: db.getName(), coll: collName},
+                                        documentKey: {_id: 2},
+                                        fullDocument: {_id: 2},
+                                    },
+                                ],
+                            });
+                            const error = assert.throwsWithCode(
+                                () => cst.getNextBatch(cursor),
+                                ErrorCodes.ChangeStreamFatalError,
+                            );
+                            assert(
+                                error.message.includes(
+                                    "no endOfTransaction event could be generated",
+                                ),
+                                "unexpected error message for the unproducible endOfTransaction event",
+                                {error},
+                            );
+                        },
                     );
-                    assert(
-                        error.message.includes("no endOfTransaction event could be generated"),
-                        "unexpected error message for the unproducible endOfTransaction event",
-                        {error},
+                    assert.eq(
+                        ServerStatusMetrics.extractEndOfTransactionDelta(delta)
+                            .requiredMissingMetadata,
+                        1,
                     );
                 });
             });

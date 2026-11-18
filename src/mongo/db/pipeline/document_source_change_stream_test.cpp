@@ -13,6 +13,7 @@
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/database_name.h"
 //#include "mongo/db/end_of_transaction_cluster_parameter_gen.h"
@@ -9123,6 +9124,30 @@ protected:
         }
     }
 
+    static long long readCsMetric(ClusterRole role, std::string_view relPath) {
+        BSONObjBuilder bob;
+        globalMetricTreeSet()[role].appendTo(bob);
+        BSONObj root = bob.obj();  // Must outlive obj — embeddedObject() is a non-owning view.
+        auto metricsEl = root["metrics"];
+        if (metricsEl.eoo())
+            return 0;
+        auto csEl = metricsEl.embeddedObject()["changeStreams"];
+        if (csEl.eoo())
+            return 0;
+        BSONObj obj = csEl.embeddedObject();
+        while (true) {
+            auto dot = relPath.find('.');
+            if (dot == std::string_view::npos) {
+                return obj[relPath].numberLong();
+            }
+            auto el = obj[relPath.substr(0, dot)];
+            if (el.eoo())
+                return 0;
+            obj = el.embeddedObject();
+            relPath = relPath.substr(dot + 1);
+        }
+    }
+
     // Opens a $changeStream on mongod (inRouter must be false).
     void openOnMongod(const BSONObj& stageSpec) {
         getExpCtx()->setUpdateChangeStreamFeatureCounters(true);
@@ -9551,5 +9576,273 @@ TEST_F(ChangeStreamMetricsTest, OptionAndScopeMetricsAreVisibleViaOtel) {
     }
 }
 
+TEST_F(ChangeStreamMetricsTest, EndOfTransactionMetricsRenderPerRole) {
+    // The allowEndOfTransaction gauge is the only both-role EOT metric and lives in the None tree;
+    // the event counters are role-scoped (transformed: ShardServer, emitted: RouterServer).
+    {
+        BSONObjBuilder bob;
+        globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+        BSONObj root = bob.obj();
+        auto changeStreams = root["metrics"].embeddedObject()["changeStreams"].embeddedObject();
+        ASSERT(changeStreams["event"].eoo());
+        ASSERT(!changeStreams["endOfTransaction"].eoo());
+        ASSERT_EQ(changeStreams["endOfTransaction"]
+                      .embeddedObject()["allowEndOfTransaction"]
+                      .numberLong(),
+                  1);
+    }
+    // Router-only metrics live in the RouterServer tree only.
+    {
+        BSONObjBuilder bob;
+        globalMetricTreeSet()[ClusterRole::RouterServer].appendTo(bob);
+        BSONObj root = bob.obj();
+        auto changeStreams = root["metrics"].embeddedObject()["changeStreams"].embeddedObject();
+        auto eot = changeStreams["endOfTransaction"].embeddedObject();
+        ASSERT(!eot["rebuilds"].embeddedObject()["succeeded"].eoo());
+        ASSERT_EQ(eot["rebuilds"].embeddedObject()["succeeded"].numberLong(), 0);
+        ASSERT_EQ(eot["rebuilds"].embeddedObject()["failed"].numberLong(), 0);
+        ASSERT(!eot["rebuildTimeMicros"].eoo());
+        // The pbrtBumps counter and the tracked gauge are process-global and other tests in this
+        // binary drive end-of-transaction synthesis, so only their presence is asserted here.
+        ASSERT(!eot["synthesis"].embeddedObject()["pbrtBumps"].eoo());
+        auto txn = eot["synthesis"].embeddedObject()["transactions"].embeddedObject();
+        ASSERT(!txn["tracked"].eoo());
+        ASSERT_EQ(txn["evicted"].numberLong(), 0);
+        ASSERT_EQ(eot["completedWithRemovedShards"].numberLong(), 0);
+        ASSERT_EQ(eot["lookbackDistanceExceeded"].numberLong(), 0);
+        // The emitted-event counter is process-global and other tests in this binary drive
+        // end-of-transaction synthesis, so only its presence is asserted here.
+        ASSERT(!changeStreams["event"]
+                    .embeddedObject()["endOfTransaction"]
+                    .embeddedObject()["emitted"]
+                    .eoo());
+    }
+    // mongod-only metrics live in the ShardServer tree only.
+    {
+        BSONObjBuilder bob;
+        globalMetricTreeSet()[ClusterRole::ShardServer].appendTo(bob);
+        BSONObj root = bob.obj();
+        auto changeStreams = root["metrics"].embeddedObject()["changeStreams"].embeddedObject();
+        auto eot = changeStreams["endOfTransaction"].embeddedObject();
+        ASSERT(!eot["requiredMissingMetadata"].eoo());
+        // The requiredMissingMetadata counter is process-global and other tests in this binary
+        // fail required streams on ineligible transactions, so only its presence is asserted.
+        ASSERT(!changeStreams["event"]
+                    .embeddedObject()["endOfTransaction"]
+                    .embeddedObject()["transformed"]
+                    .eoo());
+    }
+}
+
+TEST_F(ChangeStreamMetricsTest, EndOfTransactionRouterMetricsAbsentFromMongodTrees) {
+    for (auto role : {ClusterRole::None, ClusterRole::ShardServer}) {
+        BSONObjBuilder bob;
+        globalMetricTreeSet()[role].appendTo(bob);
+        BSONObj root = bob.obj();
+        auto changeStreams = root["metrics"].embeddedObject()["changeStreams"].embeddedObject();
+        auto eot = changeStreams["endOfTransaction"].embeddedObject();
+        ASSERT(eot["rebuilds"].eoo());
+        ASSERT(eot["synthesis"].eoo());
+        ASSERT(eot["completedWithRemovedShards"].eoo());
+        ASSERT(eot["lookbackDistanceExceeded"].eoo());
+        // Neither event counter is both-role: the None tree carries no 'event' subtree at all; a
+        // shard-server tree carries only the transformed counter (asserted in RenderPerRole).
+        if (role == ClusterRole::None) {
+            ASSERT(changeStreams["event"].eoo());
+        } else {
+            auto eventEot =
+                changeStreams["event"].embeddedObject()["endOfTransaction"].embeddedObject();
+            ASSERT(!eventEot["transformed"].eoo());
+            ASSERT(eventEot["emitted"].eoo());
+        }
+    }
+}
+
+TEST_F(ChangeStreamMetricsTest, EndOfTransactionMongodMetricAbsentFromRouterTree) {
+    BSONObjBuilder bob;
+    globalMetricTreeSet()[ClusterRole::RouterServer].appendTo(bob);
+    BSONObj root = bob.obj();
+    auto changeStreams = root["metrics"].embeddedObject()["changeStreams"].embeddedObject();
+    ASSERT(changeStreams["endOfTransaction"].embeddedObject()["requiredMissingMetadata"].eoo());
+    ASSERT(changeStreams["event"]
+               .embeddedObject()["endOfTransaction"]
+               .embeddedObject()["transformed"]
+               .eoo());
+}
+
+TEST_F(ChangeStreamMetricsTest, RecordChangeEventEmittedDispatchesEndOfTransaction) {
+    const long long before =
+        readCsMetric(ClusterRole::ShardServer, "event.endOfTransaction.transformed");
+    change_stream::recordChangeEventTransformed("endOfTransaction"sv);
+    ASSERT_EQ(before + 1,
+              readCsMetric(ClusterRole::ShardServer, "event.endOfTransaction.transformed"));
+
+    // Unknown operation types are ignored; later work adds the regular event types.
+    change_stream::recordChangeEventTransformed("insert"sv);
+    change_stream::recordChangeEventTransformed(""sv);
+    ASSERT_EQ(before + 1,
+              readCsMetric(ClusterRole::ShardServer, "event.endOfTransaction.transformed"));
+}
+
+TEST_F(ChangeStreamMetricsTest, SynthesizedEndOfTransactionEventsAreCounted) {
+    // This guard mirrors the mongod emission gate as it exists today (the unwind stage checks
+    // 'featureFlagEndOfTransactionChangeEvent'). No gates are modified by this change; if the gate
+    // ever migrates to 'featureFlagEndOfTransactionChangeEventSynthesis', this guard follows.
+    unittest::ServerParameterGuard controller("featureFlagEndOfTransactionChangeEvent", true);
+
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"sv},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 1}, {"x", "a"sv}}}}},
+         }}},
+    };
+
+    const long long before =
+        readCsMetric(ClusterRole::ShardServer, "event.endOfTransaction.transformed");
+    std::vector<Document> results =
+        getApplyOpsResults(applyOpsDoc, testLsid(), kShowExpandedEventsSpec);
+
+    // The transaction has one event plus the synthesized endOfTransaction event.
+    ASSERT_EQ(results.size(), 2UL);
+    ASSERT_EQ(results[1][DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kEndOfTransactionOpType);
+    ASSERT_EQ(before + 1,
+              readCsMetric(ClusterRole::ShardServer, "event.endOfTransaction.transformed"));
+}
+
+TEST_F(ChangeStreamMetricsTest, UnwatchedNamespaceSynthesizedEndOfTransactionEventsAreNotCounted) {
+    // This guard mirrors the mongod emission gate as it exists today (the unwind stage checks
+    // 'featureFlagEndOfTransactionChangeEvent'). No gates are modified by this change; if the gate
+    // ever migrates to 'featureFlagEndOfTransactionChangeEventSynthesis', this guard follows.
+    unittest::ServerParameterGuard controller("featureFlagEndOfTransactionChangeEvent", true);
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setTxnNumber(1);
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+
+    // Create two applyOps entries that together represent a whole transaction touching only a
+    // namespace this change stream does not watch.
+    repl::OpTime applyOpsOpTime1(Timestamp(100, 1), 1);
+    Document applyOps1{
+        {"applyOps",
+         V{std::vector<Document>{
+             D{{"op", "i"sv},
+               {"ns", "someotherdb.collname"sv},
+               {"ui", testUuid()},
+               {"o", V{D{{"_id", 1}}}},
+               {"o2", V{D{{"_id", 1}}}}},
+         }}},
+        {"partialTxn", true},
+    };
+
+    auto transactionEntry1 = makeOplogEntry(OpTypeEnum::kCommand,
+                                            nss.getCommandNS(),
+                                            applyOps1.toBson(),
+                                            testUuid(),
+                                            boost::none,  // fromMigrate
+                                            boost::none,  // o2 field
+                                            applyOpsOpTime1,
+                                            sessionInfo,
+                                            repl::OpTime());
+
+    repl::OpTime applyOpsOpTime2(Timestamp(100, 2), 1);
+    Document applyOps2{
+        {"applyOps",
+         V{std::vector<Document>{
+             D{{"op", "i"sv},
+               {"ns", "someotherdb.collname"sv},
+               {"ui", testUuid()},
+               {"o", V{D{{"_id", 2}}}},
+               {"o2", V{D{{"_id", 2}}}}},
+         }}},
+        /* The absence of the "partialTxn" and "prepare" fields indicates that this command commits
+           the transaction. */
+    };
+
+    // The committing entry links to the first applyOps entry via
+    // 'prevWriteOpTimeInTransaction', so the iterator walks the multi-entry chain arm where the
+    // synthesized endOfTransaction event can be dropped for not touching the watched namespace.
+    auto transactionEntry2 = makeOplogEntry(OpTypeEnum::kCommand,
+                                            nss.getCommandNS(),
+                                            applyOps2.toBson(),
+                                            testUuid(),
+                                            boost::none,  // fromMigrate
+                                            boost::none,  // o2 field
+                                            applyOpsOpTime2,
+                                            sessionInfo,
+                                            applyOpsOpTime1);
+
+    const long long before =
+        readCsMetric(ClusterRole::ShardServer, "event.endOfTransaction.transformed");
+
+    auto execPipeline = makeExecPipeline(transactionEntry2, kShowExpandedEventsSpec);
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
+
+    // Populate the MockTransactionHistoryEditor in reverse chronological order.
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>(
+        std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1}));
+
+    std::vector<Document> results;
+    auto next = transform->getNext();
+    while (next.isAdvanced()) {
+        results.push_back(next.releaseDocument());
+        next = transform->getNext();
+    }
+
+    // The transaction touched only an unwatched namespace, so no endOfTransaction event is
+    // synthesized downstream and the event counter must not move.
+    ASSERT_EQ(results.size(), 0u);
+    ASSERT_EQ(before, readCsMetric(ClusterRole::ShardServer, "event.endOfTransaction.transformed"));
+}
+
+TEST_F(ChangeStreamMetricsTest, RealNoopEndOfTransactionEventsAreCounted) {
+    // This guard mirrors the mongod emission gate: with the legacy feature flag enabled, the
+    // oplog match carries the 'o2.endOfTransaction' predicate and lets a real endOfTransaction
+    // noop entry reach the transform.
+    unittest::ServerParameterGuard controller("featureFlagEndOfTransactionChangeEvent", true);
+
+    // A real 'o2.endOfTransaction' noop oplog entry, as written when a transaction commits with
+    // the legacy feature flag enabled, listing the namespaces the transaction touched.
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setTxnNumber(1);
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+
+    auto entry = makeOplogEntry(OpTypeEnum::kNoop,
+                                NamespaceString::kAdminCommandNamespace,
+                                BSONObj(),
+                                boost::none,  // uuid: endOfTransaction entries carry none
+                                false,        // fromMigrate
+                                BSON("endOfTransaction" << BSON_ARRAY(nss.ns_forTest())),
+                                boost::none,  // opTime
+                                sessionInfo);
+
+    const long long before =
+        readCsMetric(ClusterRole::ShardServer, "event.endOfTransaction.transformed");
+
+    auto execPipeline = makeExecPipeline(entry, kShowExpandedEventsSpec);
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
+
+    std::vector<Document> results;
+    auto next = transform->getNext();
+    while (next.isAdvanced()) {
+        results.push_back(next.releaseDocument());
+        next = transform->getNext();
+    }
+
+    // The noop entry flows through the transform's endOfTransaction branch exactly once and is
+    // counted there.
+    ASSERT_EQ(results.size(), 1UL);
+    ASSERT_EQ(results[0][DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kEndOfTransactionOpType);
+    ASSERT_EQ(before + 1,
+              readCsMetric(ClusterRole::ShardServer, "event.endOfTransaction.transformed"));
+}
+
 }  // namespace
+
 }  // namespace mongo

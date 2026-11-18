@@ -7,6 +7,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
@@ -131,6 +132,25 @@ auto& csScopeDb = makeCsCounter(otel::metrics::MetricNames::kChangeStreamScopeDb
 auto& csScopeCollection = makeCsCounter(otel::metrics::MetricNames::kChangeStreamScopeCollection,
                                         "changeStreams.scope.collection",
                                         "Number of collection-scoped change streams opened.");
+
+// Forces eager registration of the end-of-transaction metrics at static-initialization time, so
+// they are visible in serverStatus (at zero) before any call site runs: the metrics tree is
+// frozen shortly after startup. This TU is linked into both mongod and mongos, so the metrics
+// appear wherever change streams can run.
+auto& kEotRebuildsSucceeded = change_stream::endOfTransactionRebuildsSucceeded();
+auto& kEotRebuildsFailed = change_stream::endOfTransactionRebuildsFailed();
+auto& kEotRebuildTimeMicros = change_stream::endOfTransactionRebuildTimeMicros();
+auto& kEotSynthesisTransactionsEvicted =
+    change_stream::endOfTransactionSynthesisTransactionsEvicted();
+auto& kEotSynthesisPbrtBumps = change_stream::endOfTransactionSynthesisPbrtBumps();
+auto& kEotSynthesisTransactionsTracked =
+    change_stream::endOfTransactionSynthesisTransactionsTracked();
+auto& kEotCompletedWithRemovedShards = change_stream::endOfTransactionCompletedWithRemovedShards();
+auto& kEotLookbackDistanceExceeded = change_stream::endOfTransactionLookbackDistanceExceeded();
+auto& kEotRequiredMissingMetadata = change_stream::endOfTransactionRequiredMissingMetadata();
+auto& kEotEventEndOfTransactionTransformed = change_stream::eventEndOfTransactionTransformed();
+auto& kEotEventEndOfTransactionEmitted = change_stream::eventEndOfTransactionEmitted();
+auto& kEotAllowEndOfTransactionGauge = change_stream::endOfTransactionAllowEndOfTransactionGauge();
 
 void incrementFullDocumentMetric(FullDocumentModeEnum mode) {
     switch (mode) {

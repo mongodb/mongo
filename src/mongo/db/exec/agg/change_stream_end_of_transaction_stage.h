@@ -121,6 +121,11 @@ class EndOfTransactionAggregator {
 public:
     explicit EndOfTransactionAggregator(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    // Drains the process-global tracked gauge for any entries still pending at destruction:
+    // entries removed without a set-based completion would otherwise leave the gauge inflated
+    // for the lifetime of the process.
+    ~EndOfTransactionAggregator();
+
     /**
      * Records an accounting control event. Returns the completing event, which the caller
      * serializes into the user-visible 'endOfTransaction' event document, or boost::none if the

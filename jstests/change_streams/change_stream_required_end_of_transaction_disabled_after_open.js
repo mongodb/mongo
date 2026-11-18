@@ -24,6 +24,7 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
+import {ServerStatusMetrics} from "jstests/libs/query/change_stream_metrics_util.js";
 import {itWhenEndOfTransactionIsUsable} from "jstests/libs/query/change_stream_util.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -53,8 +54,10 @@ describe("showEndOfTransaction: required fails when the feature is disabled afte
             );
             const cursorId = openRes.cursor.id;
 
-            // While the feature is enabled, getMore succeeds.
+            // While the feature is enabled, getMore succeeds, and the parameter gauge mirrors the
+            // knob's value.
             assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName}));
+            assert.eq(ServerStatusMetrics.getAllowEndOfTransactionGauge(db), 1);
 
             // Disable the feature on all nodes after the stream was opened. The next getMore must
             // fail with a descriptive, non-resumable error. The helper restores the original
@@ -64,7 +67,13 @@ describe("showEndOfTransaction: required fails when the feature is disabled afte
                     db.runCommand({getMore: cursorId, collection: collName}),
                     ErrorCodes.ChangeStreamFatalError,
                 );
+
+                // The gauge follows the disabled knob on the node answering this serverStatus.
+                assert.eq(ServerStatusMetrics.getAllowEndOfTransactionGauge(db), 0);
             });
+
+            // Restored knob, restored gauge.
+            assert.eq(ServerStatusMetrics.getAllowEndOfTransactionGauge(db), 1);
         },
     );
 });

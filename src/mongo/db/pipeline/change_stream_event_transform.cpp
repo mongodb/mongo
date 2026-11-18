@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/namespace_string.h"
@@ -634,6 +635,9 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                     checkValueType(
                         wallClockTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::date);
 
+                    // Both the unwind stage's synthesized pseudo-entry and a real
+                    // 'o2.endOfTransaction' noop entry reach this branch exactly once.
+                    change_stream::recordChangeEventTransformed(operationType);
                     return change_stream::makeEndOfTransactionChangeEvent(
                         Value(ResumeToken(resumeTokenData).toDocument()),
                         ts.getTimestamp(),

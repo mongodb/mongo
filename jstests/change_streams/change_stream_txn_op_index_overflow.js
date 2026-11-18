@@ -19,6 +19,8 @@ import {
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
 import {withFailPointForAllShardsAndMongos} from "jstests/libs/fail_point_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ServerStatusMetrics} from "jstests/libs/query/change_stream_metrics_util.js";
 import {
     assertEndOfTransaction,
     itWhenEndOfTransactionIsUsable,
@@ -87,20 +89,37 @@ describe("change stream transaction txnOpIndex limit", function () {
         "emits the endOfTransaction event after an operation at the last encodable index",
         function () {
             withChangeStreamTest(db, (cst) => {
-                runWithParamsAllNonConfigNodes(db, {allowEndOfTransaction: true}, () => {
-                    const cursor = cst.startWatchingChanges({
-                        pipeline: [{$changeStream: {showEndOfTransaction: "required"}}],
-                        collection: coll,
-                    });
-                    withInitialTxnOpIndex(kInt32Max - 1, () => {
-                        runTxnInsert(2);
-                        const changes = cst.getNextChanges(cursor, 2);
-                        assert.eq(changes[0].operationType, "insert", changes);
-                        assert.eq(changes[0].documentKey._id, 2, changes);
-                        assert.eq(changes[1].operationType, "endOfTransaction", changes);
-                        assertEndOfTransaction(changes);
+                // The metrics deltas are observed around the transaction. The transaction
+                // writes an unsharded collection, so it is a single-shard transaction: its
+                // event is synthesized by that shard's transform (the transformed counter)
+                // whether the test runs on a replica set or through mongos; the router's
+                // synthesis stage is not involved.
+                const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(db, () => {
+                    runWithParamsAllNonConfigNodes(db, {allowEndOfTransaction: true}, () => {
+                        const cursor = cst.startWatchingChanges({
+                            pipeline: [{$changeStream: {showEndOfTransaction: "required"}}],
+                            collection: coll,
+                        });
+                        withInitialTxnOpIndex(kInt32Max - 1, () => {
+                            runTxnInsert(2);
+                            const changes = cst.getNextChanges(cursor, 2);
+                            assert.eq(changes[0].operationType, "insert", changes);
+                            assert.eq(changes[0].documentKey._id, 2, changes);
+                            assert.eq(changes[1].operationType, "endOfTransaction", changes);
+                            assertEndOfTransaction(changes);
+                        });
                     });
                 });
+
+                const eot = ServerStatusMetrics.extractEndOfTransactionDelta(delta);
+                assert.gte(eot.transformed, 1, {eot});
+                if (FixtureHelpers.isMongos(db)) {
+                    // The router's synthesis stage is not involved for a single-shard
+                    // transaction.
+                    assert.eq(eot.emitted, 0, {eot});
+                    assert.eq(eot.pbrtBumps, 0, {eot});
+                    assert.eq(eot.tracked, 0, {eot});
+                }
             });
         },
     );

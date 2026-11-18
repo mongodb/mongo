@@ -2152,6 +2152,8 @@ mongo_cc_library(
     deps = [
         ":server_base",
         ":server_feature_flags",
+        ":service_context",
+        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 
@@ -2163,6 +2165,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":end_of_transaction_parameter",
+        "//src/mongo/db/commands/server_status:server_status_metric",
         "//src/mongo/unittest",
         "//src/mongo/unittest:server_parameter_guard",
     ],
