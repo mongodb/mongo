@@ -37,6 +37,28 @@ if [ "$PATCH" ]; then
     TAG_SUFFIX="$TAG_SUFFIX-$revision_order_id"
 fi
 
+FULL_IMAGE_TAG="$IMAGE:$GITSHA-$TAG_SUFFIX"
+
+MODE="${1:-}"
+case "$MODE" in
+"" | --build-only)
+    DO_BUILD=1
+    DO_PUSH=0
+    ;;
+--push-only)
+    DO_BUILD=0
+    DO_PUSH=1
+    ;;
+--push)
+    DO_BUILD=1
+    DO_PUSH=1
+    ;;
+*)
+    echo "Unknown argument: $MODE" >&2
+    exit 2
+    ;;
+esac
+
 cd src
 
 if [ "$DISTRO" != "amazon2023" ]; then
@@ -69,94 +91,89 @@ wait_for_job() {
     echo "=== $name completed ==="
 }
 
-# Start bazel and venv first — they don't need the system deps.
-if [ ! -f "$SRC_DIR/bazel-bin/src/mongo/db/mongod" ]; then
+if [ "$DO_BUILD" == "1" ]; then
+    # Start bazel and venv first — they don't need the system deps.
+    if [ ! -f "$SRC_DIR/bazel-bin/src/mongo/db/mongod" ]; then
+        cd "$workdir"
+        bash "$DIR/bazel_compile.sh" >"$LOGS_DIR/bazel.log" 2>&1 &
+        BAZEL_PID=$!
+        cd "$SRC_DIR"
+    fi
+
     cd "$workdir"
-    bash "$DIR/bazel_compile.sh" >"$LOGS_DIR/bazel.log" 2>&1 &
-    BAZEL_PID=$!
+    FORCE_CREATE=true bash "$DIR/functions/venv_setup.sh" >"$LOGS_DIR/venv.log" 2>&1 &
+    VENV_PID=$!
     cd "$SRC_DIR"
+
+    if ! command -v javac >/dev/null 2>&1; then
+        sudo dnf -y install java-17-amazon-corretto-devel wget unzip
+    fi
+
+    # Ensure externaljs dir exists for Docker COPY even if JS engine build hasn't finished.
+    mkdir -p "$SRC_DIR/externaljs"
+
+    bash "$DIR/streams_build_aspio.sh" \
+        --aspio-dir "$SRC_DIR/src/mongo/db/modules/enterprise/src/streams/aspio" \
+        --tools-dir "$SRC_DIR/streams_build_tools" \
+        --output-dir "$SRC_DIR" \
+        >"$LOGS_DIR/maven.log" 2>&1 &
+    MAVEN_PID=$!
+
+    sudo bash "$DIR/streams_build_js_engine.sh" \
+        --node-version 24 \
+        --build-dir "$SRC_DIR/asp-js-engine" \
+        --target-dir "$SRC_DIR/externaljs" \
+        >"$LOGS_DIR/jsengine.log" 2>&1 &
+    JSENGINE_PID=$!
+
+    if [ -n "${BAZEL_PID:-}" ]; then
+        wait_for_job $BAZEL_PID "Bazel compile" "$LOGS_DIR/bazel.log"
+    fi
+    wait_for_job $MAVEN_PID "Maven build" "$LOGS_DIR/maven.log"
+    wait_for_job $JSENGINE_PID "JS engine build" "$LOGS_DIR/jsengine.log"
+    wait_for_job $VENV_PID "Full venv setup" "$LOGS_DIR/venv.log"
+
+    mkdir -p ./dist-test/bin
+    cp -L ./bazel-bin/src/mongo/db/mongod ./dist-test/bin/mongod
+    cp -L ./bazel-bin/src/mongo/shell/mongo ./dist-test/bin/mongo
+    cp -L ./bazel-bin/src/mongo/s/mongos ./dist-test/bin/mongos
+    mkdir -p ./dist-test/bin/x509
+    cp -L ./bazel-bin/x509/*.pem ./dist-test/bin/x509/
+
+    mkdir -p ./bin
+    cp ./dist-test/bin/mongod ./bin/mongod
+    cp ./dist-test/bin/mongo ./bin/mongo
+
+    # Build docker build args array
+    BUILD_ARGS=(--build-arg "BUILD_VERSION=$GITSHA-$TAG_SUFFIX")
+    BUILD_ARGS+=(--build-arg "ASPIO_JAR_PATH=aspio.jar")
+    BUILD_ARGS+=(--build-arg "EXTERNALJS_PATH=externaljs")
+
+    docker build "${BUILD_ARGS[@]}" -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile.al2023 .
+
+    docker tag "$IMAGE" "$FULL_IMAGE_TAG"
+
+    docker images
+
+    # Export image tag for downstream test tasks to pull from ECR
+    echo "$FULL_IMAGE_TAG" >streams-image-tag.txt
+    echo "Exported image tag: $FULL_IMAGE_TAG"
+
+    tar -czvf streams-binaries.tgz dist-test/
+    echo "Created streams-binaries.tgz containing:"
+    tar -tzvf streams-binaries.tgz
 fi
 
-cd "$workdir"
-FORCE_CREATE=true bash "$DIR/functions/venv_setup.sh" >"$LOGS_DIR/venv.log" 2>&1 &
-VENV_PID=$!
-cd "$SRC_DIR"
+if [ "$DO_PUSH" == "1" ]; then
+    attempts=0
+    max_attempts=4
 
-# Install system deps for maven/js engine (runs in parallel with bazel/venv).
-# If you update this Java version, also update <java.version> in aspio/pom.xml and
-# java-17-amazon-corretto-devel in evergreen/streams_aspio_lint.sh and
-# evergreen/streams_image_build_and_push_sanitizer.sh
-if ! command -v javac >/dev/null 2>&1; then
-    sudo dnf -y install java-17-amazon-corretto-devel wget unzip
-fi
-
-# Ensure externaljs dir exists for Docker COPY even if JS engine build hasn't finished.
-mkdir -p "$SRC_DIR/externaljs"
-
-bash "$DIR/streams_build_aspio.sh" \
-    --aspio-dir "$SRC_DIR/src/mongo/db/modules/enterprise/src/streams/aspio" \
-    --tools-dir "$SRC_DIR/streams_build_tools" \
-    --output-dir "$SRC_DIR" \
-    >"$LOGS_DIR/maven.log" 2>&1 &
-MAVEN_PID=$!
-
-sudo bash "$DIR/streams_build_js_engine.sh" \
-    --node-version 24 \
-    --build-dir "$SRC_DIR/asp-js-engine" \
-    --target-dir "$SRC_DIR/externaljs" \
-    >"$LOGS_DIR/jsengine.log" 2>&1 &
-JSENGINE_PID=$!
-
-if [ -n "${BAZEL_PID:-}" ]; then
-    wait_for_job $BAZEL_PID "Bazel compile" "$LOGS_DIR/bazel.log"
-fi
-wait_for_job $MAVEN_PID "Maven build" "$LOGS_DIR/maven.log"
-wait_for_job $JSENGINE_PID "JS engine build" "$LOGS_DIR/jsengine.log"
-wait_for_job $VENV_PID "Full venv setup" "$LOGS_DIR/venv.log"
-
-mkdir -p ./dist-test/bin
-cp -L ./bazel-bin/src/mongo/db/mongod ./dist-test/bin/mongod
-cp -L ./bazel-bin/src/mongo/shell/mongo ./dist-test/bin/mongo
-cp -L ./bazel-bin/src/mongo/s/mongos ./dist-test/bin/mongos
-mkdir -p ./dist-test/bin/x509
-cp -L ./bazel-bin/x509/*.pem ./dist-test/bin/x509/
-
-attempts=0
-max_attempts=4
-
-if [ "$1" == "--push" ]; then
     while ! aws ecr get-login-password --region us-east-1 | docker login --password-stdin --username AWS $REGISTRY; do
         [ "$attempts" -ge "$max_attempts" ] && exit 1
         ((attempts++))
         sleep 10
     done
-fi
 
-mkdir -p ./bin
-cp ./dist-test/bin/mongod ./bin/mongod
-cp ./dist-test/bin/mongo ./bin/mongo
-
-# Build docker build args array
-BUILD_ARGS=(--build-arg "BUILD_VERSION=$GITSHA-$TAG_SUFFIX")
-BUILD_ARGS+=(--build-arg "ASPIO_JAR_PATH=aspio.jar")
-BUILD_ARGS+=(--build-arg "EXTERNALJS_PATH=externaljs")
-
-docker build "${BUILD_ARGS[@]}" -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile.al2023 .
-
-docker tag "$IMAGE" "$IMAGE:$GITSHA-$TAG_SUFFIX"
-
-docker images
-
-# Export image tag for downstream test tasks to pull from ECR
-FULL_IMAGE_TAG="$IMAGE:$GITSHA-$TAG_SUFFIX"
-echo "$FULL_IMAGE_TAG" >streams-image-tag.txt
-echo "Exported image tag: $FULL_IMAGE_TAG"
-
-tar -czvf streams-binaries.tgz dist-test/
-echo "Created streams-binaries.tgz containing:"
-tar -tzvf streams-binaries.tgz
-
-if [ "$1" == "--push" ]; then
     docker push "$FULL_IMAGE_TAG"
 
     # Only the amd64 build creates the multi-arch manifest
