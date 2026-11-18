@@ -562,6 +562,31 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
+    internalChangeStreamEndOfTransactionEvictionDelaySeconds:
+        description: >-
+            Router-side eviction delay, in seconds, for end-of-transaction tracking. The synthesis
+            stage evicts a tracked transaction once the stream's merge position (the minimum
+            promised sort key across the shards being merged) has advanced past the transaction's
+            maxTs by this many seconds. The delay is measured in oplog time against the merge
+            position, not wall-clock time. It must exceed the maximum expected commit span so that
+            a merely-slow transaction is never dropped: evicting an entry means its
+            endOfTransaction event is lost (a 'required' stream fails, a 'whenAvailable' stream
+            omits the event). Too small a value loses events; too large a value only grows router
+            memory. The default of 10 minutes is far above the normal commit span.
+        set_at: [startup, runtime]
+        cpp_varname: "internalChangeStreamEndOfTransactionEvictionDelaySeconds"
+        cpp_vartype: Atomic<int>
+        default: 600
+        validator:
+            gt: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: changeStreamEndOfTransactionEvictionDelaySeconds
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
     internalQueryMaxDocValidationErrorConsideredValues:
         mod_visibility: needs_replacement
         description: >-

@@ -34,7 +34,7 @@ The C++ server parameter name, the default value, and pqsSettable are projected 
 they are not part of the PQS wire contract and can change without breaking compatibility.
 
 ## 2. Output
-Number of PQS-settable knobs: 76
+Number of PQS-settable knobs: 77
 
 ### cbrCEMode
 ```json
@@ -47,6 +47,20 @@ Number of PQS-settable knobs: 76
 	],
 	"type" : "enum",
 	"wireName" : "cbrCEMode"
+}
+```
+
+### changeStreamEndOfTransactionEvictionDelaySeconds
+```json
+{
+	"bounds" : [
+		{
+			"kind" : "gt",
+			"value" : 0
+		}
+	],
+	"type" : "int",
+	"wireName" : "changeStreamEndOfTransactionEvictionDelaySeconds"
 }
 ```
 

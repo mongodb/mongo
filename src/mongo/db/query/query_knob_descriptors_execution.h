@@ -61,6 +61,10 @@
          kInternalChangeStreamEndOfTransactionMaxRebuildsName,                            \
          internalChangeStreamEndOfTransactionMaxRebuilds,                                 \
          getChangeStreamEndOfTransactionMaxRebuilds)                                      \
+    KNOB(kChangeStreamEndOfTransactionEvictionDelaySeconds,                               \
+         kInternalChangeStreamEndOfTransactionEvictionDelaySecondsName,                   \
+         internalChangeStreamEndOfTransactionEvictionDelaySeconds,                        \
+         getChangeStreamEndOfTransactionEvictionDelaySeconds)                             \
     KNOB(kMaxGroupAccumulatorsInSbe,                                                      \
          kInternalMaxGroupAccumulatorsInSbeName,                                          \
          gInternalMaxGroupAccumulatorsInSbe,                                              \
