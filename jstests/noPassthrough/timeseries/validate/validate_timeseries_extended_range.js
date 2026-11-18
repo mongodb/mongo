@@ -186,6 +186,11 @@ describe("Validation against snapshot using Replset", function () {
         // cleaned up.  Background validation will bypass extended range checks to prevent
         // failures until this issue can be addressed.
 
+        // TODO: SERVER-120042 It should not be required to re-create the collection for validation on a snapshot
+        assert.commandWorked(
+            this.db.createCollection(this.collName, {timeseries: {timeField: "time"}}),
+        );
+
         const res = this.db[this.collName].validate({background: true});
         assert(res.valid, res);
         assert.eq(res.nrecords, 1, {
@@ -202,6 +207,11 @@ describe("Validation against snapshot using Replset", function () {
         const clusterTime = assert.commandWorked(this.db.adminCommand({fsync: 1})).$clusterTime
             .clusterTime;
         assert(this.coll.drop());
+
+        // TODO: SERVER-120042 It should not be required to re-create the collection for validation on a snapshot
+        assert.commandWorked(
+            this.db.createCollection(this.collName, {timeseries: {timeField: "time"}}),
+        );
 
         const res = this.db[this.collName].validate({atClusterTime: clusterTime});
         assert(res.valid, res);
