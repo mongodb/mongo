@@ -1029,6 +1029,281 @@ class TestBranchFunctions(CopybaraTestCase):
             )
             self.assertNotEqual(result.destination_commit, public_hashes[0])
 
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
+    def test_find_matching_commit_pair_scans_destination_history_once(self, mock_run_command):
+        destination1, destination2 = "a" * 40, "b" * 40
+        mock_run_command.side_effect = [
+            "source3\nsource2\nsource1\n",
+            f"{destination2}\0GitOrigin-RevId: source3\nGitOrigin-RevId: source2\n\0"
+            f"{destination1}\0GitOrigin-RevId: source1\n\0",
+        ]
+
+        self.assertEqual(
+            sync_repo_with_copybara.find_matching_commit_pair("source", "destination"),
+            sync_repo_with_copybara.MatchingCommit("source2", destination2),
+        )
+        self.assertEqual(mock_run_command.call_count, 2)
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
+    def test_find_matching_commit_pair_no_match_scans_destination_history_once(
+        self, mock_run_command
+    ):
+        mock_run_command.side_effect = [
+            "source3\nsource2\nsource1\n",
+            f"{'a' * 40}\0GitOrigin-RevId: unrelated\n\0",
+        ]
+
+        self.assertIsNone(
+            sync_repo_with_copybara.find_matching_commit_pair("source", "destination")
+        )
+        self.assertEqual(mock_run_command.call_count, 2)
+
+    def test_find_matching_commit_pair_can_use_shared_history_without_origin_trailers(self):
+        with repo_temp_directory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            destination_dir = os.path.join(tmpdir, "destination")
+            os.mkdir(source_dir)
+            source_hashes = self.create_mock_repo_commits(source_dir, 3)
+            sync_repo_with_copybara.run_command(
+                f"git clone {sync_repo_with_copybara.shell_quote(source_dir)} "
+                f"{sync_repo_with_copybara.shell_quote(destination_dir)}"
+            )
+
+            self.assertIsNone(
+                sync_repo_with_copybara.find_matching_commit_pair(source_dir, destination_dir)
+            )
+            self.assertEqual(
+                sync_repo_with_copybara.find_matching_commit_pair(
+                    source_dir, destination_dir, allow_shared_history=True
+                ),
+                sync_repo_with_copybara.MatchingCommit(source_hashes[-1], source_hashes[-1]),
+            )
+
+            sync = self.make_branch_sync(source_dir, destination_dir, source_hashes[-1])
+            self.assertEqual(
+                sync_repo_with_copybara.find_destination_branch_start_point(
+                    sync, Path(source_dir), Path(destination_dir)
+                ),
+                sync_repo_with_copybara.MatchingCommit(source_hashes[-1], source_hashes[-1]),
+            )
+
+            # Commits left in the object database do not qualify unless a destination ref
+            # still reaches them.
+            for ref in ("refs/heads/master", "refs/remotes/origin/master"):
+                sync_repo_with_copybara.run_command(
+                    f"git -C {sync_repo_with_copybara.shell_quote(destination_dir)} "
+                    f"update-ref {ref} {source_hashes[0]}"
+                )
+            self.assertEqual(
+                sync_repo_with_copybara.find_matching_commit_pair(
+                    source_dir, destination_dir, allow_shared_history=True
+                ),
+                sync_repo_with_copybara.MatchingCommit(source_hashes[0], source_hashes[0]),
+            )
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.is_git_ancestor")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
+    def test_destination_branch_start_point_scans_once_and_skips_unrelated_branch(
+        self, mock_run_command, mock_is_git_ancestor
+    ):
+        destination1, destination2 = "a" * 40, "b" * 40
+        mock_run_command.side_effect = [
+            "head\n",
+            "source3\nsource2\nsource1\n",
+            f"{destination2}\0GitOrigin-RevId: source2\n\0"
+            f"{destination1}\0GitOrigin-RevId: source1\n\0",
+        ]
+        mock_is_git_ancestor.side_effect = (
+            lambda repo, ancestor, descendant: ancestor == destination1 and descendant == "head"
+        )
+        sync = self.make_branch_sync("source", "destination", "HEAD")
+
+        self.assertEqual(
+            sync_repo_with_copybara.find_destination_branch_start_point(
+                sync, Path("source"), Path("destination")
+            ),
+            sync_repo_with_copybara.MatchingCommit("source1", destination1),
+        )
+        self.assertEqual(mock_run_command.call_count, 3)
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
+    def test_shared_history_does_not_override_an_existing_origin_trailer(self, mock_run_command):
+        source1, source2 = "a" * 40, "b" * 40
+        mock_run_command.side_effect = [
+            f"{source2}\n{source1}\n",
+            f"{source2}\0GitOrigin-RevId: {source1}\n\0",
+        ]
+
+        self.assertEqual(
+            sync_repo_with_copybara.find_matching_commit_pair(
+                "source", "destination", allow_shared_history=True
+            ),
+            sync_repo_with_copybara.MatchingCommit(source1, source2),
+        )
+
+    def test_parse_destination_commit_log_validates_records(self):
+        module = sync_repo_with_copybara
+        self.assertEqual(list(module.parse_destination_commit_log("")), [])
+        for destination_commit in ("a" * 40, "b" * 64):
+            with self.subTest(destination_commit=destination_commit):
+                self.assertEqual(
+                    list(module.parse_destination_commit_log(f"{destination_commit}\0body\n\0")),
+                    [(destination_commit, "body\n")],
+                )
+        for output in (
+            f"{'a' * 40}\0body",
+            f"{'a' * 40}\0body\0extra\0",
+            "forged; touch injected\0body\0",
+            f"{'a' * 39}\0body\0",
+            f"{'a' * 41}\0body\0",
+            f"{'a' * 40}\n\0body\0",
+        ):
+            with self.subTest(output=output), self.assertRaises(ValueError):
+                list(module.parse_destination_commit_log(output))
+
+    def test_destination_history_ignores_forged_record_boundaries(self):
+        module = sync_repo_with_copybara
+        with repo_temp_directory() as tmpdir:
+            source_dir = Path(tmpdir) / "source"
+            destination_dir = Path(tmpdir) / "destination"
+            source_dir.mkdir()
+            destination_dir.mkdir()
+            source_hash = self.create_mock_repo_commits(source_dir, 1)[0]
+            self.create_mock_repo_commits(destination_dir, 1)
+
+            for forged_commit in ("forged; touch injected", "f" * 40):
+                with self.subTest(forged_commit=forged_commit):
+                    message_file = Path(tmpdir) / "message.txt"
+                    message_file.write_text(
+                        "Forged destination history record\n\n"
+                        "---COPYBARA_EXACT_SYNC_RECORD_BOUNDARY---\n"
+                        f"{forged_commit}\n\n"
+                        "---COPYBARA_DESTINATION_ORIGIN_RECORD_BOUNDARY---\n"
+                        f"{forged_commit}\n\n"
+                        f"GitOrigin-RevId: {source_hash}\n"
+                    )
+                    module.run_command(
+                        f"git -C {module.shell_quote(destination_dir)} commit --allow-empty"
+                        f" -F {module.shell_quote(message_file)}"
+                    )
+                    destination_commit = module.run_command(
+                        f"git -C {module.shell_quote(destination_dir)} rev-parse HEAD"
+                    ).strip()
+                    expected = module.MatchingCommit(source_hash, destination_commit)
+                    self.assertEqual(
+                        module.find_matching_commit_pair(str(source_dir), str(destination_dir)),
+                        expected,
+                    )
+                    self.assertEqual(
+                        module.find_destination_commits_for_source_commit(
+                            destination_dir, source_hash
+                        )[0],
+                        destination_commit,
+                    )
+                    self.assertEqual(
+                        module.find_latest_destination_origin_commit(destination_dir), expected
+                    )
+
+    def test_destination_index_matches_original_lookup_candidates(self):
+        with repo_temp_directory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            destination_dir = os.path.join(tmpdir, "destination")
+            os.mkdir(source_dir)
+            os.mkdir(destination_dir)
+            source_hashes = self.create_mock_repo_commits(source_dir, 6)
+            os.chdir(destination_dir)
+            initialize_git_repo_on_master()
+            for key, value in (
+                ("user.name", "Test User"),
+                ("user.email", "test@example.com"),
+                ("commit.gpgsign", "false"),
+            ):
+                sync_repo_with_copybara.run_command(
+                    f"git config --local {key} {sync_repo_with_copybara.shell_quote(value)}"
+                )
+
+            messages = [
+                "Initial destination history",
+                f"GitOrigin-RevId: {source_hashes[0]}",
+                f"GitOrigin-RevId: {source_hashes[0]}",
+                f"GitOrigin-RevId: {source_hashes[4]}\n\nGitOrigin-RevId: {source_hashes[1]}",
+                f"GitOrigin-RevId:{source_hashes[2]}",
+                f"GitOrigin-RevId:\t{source_hashes[3]}",
+                f"GitOrigin-RevId: {source_hashes[5]} extra text",
+                f"GitOrigin-RevId: {source_hashes[2]}\n\nGitOrigin-RevId:{source_hashes[2]}",
+            ]
+            for index, message in enumerate(messages):
+                message_file = Path(tmpdir) / "message.txt"
+                message_file.write_text(message + "\n")
+                sync_repo_with_copybara.run_command(
+                    f"git commit --allow-empty -F {sync_repo_with_copybara.shell_quote(message_file)}"
+                )
+                if index == 1:
+                    sync_repo_with_copybara.run_command("git branch sibling-base")
+            sync_repo_with_copybara.run_command("git checkout -b sibling sibling-base")
+            message_file.write_text(f"Unrelated duplicate\n\nGitOrigin-RevId: {source_hashes[0]}\n")
+            sync_repo_with_copybara.run_command(
+                f"git commit --allow-empty -F {sync_repo_with_copybara.shell_quote(message_file)}"
+            )
+            sync_repo_with_copybara.run_command("git checkout master")
+            for branch in ("master", "sibling"):
+                sync_repo_with_copybara.run_command(
+                    f"git update-ref refs/remotes/origin/{branch} {branch}"
+                )
+
+            destination_index = sync_repo_with_copybara.index_destination_commits(
+                destination_dir, source_hashes
+            )
+            for source_hash in [*source_hashes, "f" * 40]:
+                with self.subTest(source_hash=source_hash):
+                    old_candidates = (
+                        sync_repo_with_copybara.find_destination_commits_for_source_commit(
+                            destination_dir, source_hash
+                        )
+                    )
+                    self.assertEqual(destination_index.get(source_hash, []), old_candidates)
+
+                    sync = self.make_branch_sync(source_dir, destination_dir, source_hashes[-1])
+                    for branch in ("master", "sibling"):
+                        sync = replace(
+                            sync,
+                            copybara_config=sync.copybara_config._replace(
+                                destination=sync.copybara_config.destination._replace(branch=branch)
+                            ),
+                        )
+                        old_match = (
+                            sync_repo_with_copybara.find_destination_branch_match_for_source_commit(
+                                sync, Path(destination_dir), source_hash
+                            )
+                        )
+                        new_match = (
+                            sync_repo_with_copybara.find_destination_branch_match_for_source_commit(
+                                sync,
+                                Path(destination_dir),
+                                source_hash,
+                                destination_index=destination_index,
+                            )
+                        )
+                        self.assertEqual(new_match, old_match)
+
+            old_pair = next(
+                (
+                    sync_repo_with_copybara.MatchingCommit(source_hash, candidates[0])
+                    for source_hash in reversed(source_hashes)
+                    if (
+                        candidates
+                        := sync_repo_with_copybara.find_destination_commits_for_source_commit(
+                            destination_dir, source_hash
+                        )
+                    )
+                ),
+                None,
+            )
+            self.assertEqual(
+                sync_repo_with_copybara.find_matching_commit_pair(source_dir, destination_dir),
+                old_pair,
+            )
+
     def test_branch_exists(self):
         """Perform a test to check that the branch exists in a repository."""
         test_name = "branch_exists_test"
@@ -6465,6 +6740,66 @@ class TestMainWorkflow(CopybaraTestCase):
             release_tag="r8.2.7",
             release_source_commit="tagsha123",
         )
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
+    def test_migrate_initializes_production_legacy_history(self, mock_run_command):
+        sync = replace(
+            self.make_release_tag_sync(),
+            last_rev="baseline",
+            dry_run_args=("--init-history", "--last-rev=baseline"),
+        )
+
+        sync_repo_with_copybara.run_branch_migrate(sync)
+        self.assertEqual(
+            mock_run_command.call_args.args[0], "echo --init-history --last-rev=baseline"
+        )
+
+        sync_repo_with_copybara.run_branch_migrate(replace(sync, workflow_name="test_r8.2.7"))
+        self.assertEqual(mock_run_command.call_args.args[0], "echo")
+
+    def test_legacy_initialization_stops_after_first_successful_migration(self):
+        sync = self.make_release_tag_sync()
+        module = sync_repo_with_copybara
+        with (
+            patch.object(module, "validate_destination_not_past_target"),
+            patch.object(
+                module,
+                "fast_forward_destination_to_existing_match",
+                return_value=module.MatchingCommit("baseline", "baseline"),
+            ),
+            patch.object(module, "prepare_local_source_mirror", side_effect=lambda sync: sync),
+            patch.object(
+                module,
+                "list_pending_source_commits",
+                return_value=[make_source_commit(f"commit{i}") for i in range(1, 4)],
+            ),
+            patch.object(module, "rewrite_copybara_config"),
+            patch.object(module, "reset_preview_dir"),
+            patch.object(
+                module,
+                "run_branch_dry_run",
+                side_effect=[
+                    module.BranchDryRunResult(sync.branch, noop=True),
+                    module.BranchDryRunResult(sync.branch),
+                    module.BranchDryRunResult(sync.branch),
+                ],
+            ) as dry_run,
+            patch.object(
+                module, "run_branch_migrate", return_value=module.BranchMigrateResult(sync.branch)
+            ) as migrate,
+        ):
+            result = module.run_branch_commit_sync(sync, {})
+
+        self.assertEqual(result.migrated_commits, 2)
+        self.assertEqual(result.noop_commits, 1)
+        self.assertEqual(dry_run.call_args_list[1].args[0].last_rev, "baseline")
+        for step in (dry_run, migrate):
+            first_sync = step.call_args_list[0].args[0]
+            self.assertEqual(first_sync.last_rev, "baseline")
+            self.assertEqual(first_sync.dry_run_args, ("--init-history", "--last-rev=baseline"))
+            final_sync = step.call_args_list[-1].args[0]
+            self.assertIsNone(final_sync.last_rev)
+            self.assertEqual(final_sync.dry_run_args, ())
 
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
     @patch(
