@@ -35,6 +35,39 @@ value::ValueSetType valueToShallowSetHelper(value::TypeTags tag,
                                             value::Value value,
                                             const CollatorInterface* collator);
 
+// Calls 'fn' with a hash table of the values in 'input'. Reuses the hash table of a prepared
+// ArraySet if it uses the same collator, which saves building one on every call when constant
+// folding has prepared the input. Otherwise, builds a temporary table of views into 'input'.
+template <class Fn>
+auto withHashTable(value::TagValueView input, const CollatorInterface* collator, Fn&& fn) {
+    if (input.tag == value::TypeTags::ArraySet &&
+        value::getArraySetView(input.value)->getCollator() == collator) {
+        return fn(value::getArraySetView(input.value)->values());
+    }
+    return fn(valueToShallowSetHelper(input.tag, input.value, collator));
+}
+
+// Returns whether 'other' contains exactly the values in 'values'.
+bool sameValues(const value::ValueSetType& values,
+                value::TagValueView other,
+                const CollatorInterface* collator) {
+    if (other.tag == value::TypeTags::ArraySet &&
+        value::getArraySetView(other.value)->getCollator() == collator) {
+        return values == value::getArraySetView(other.value)->values();
+    }
+    // Stop at the first value that is missing from 'values'. Otherwise, 'other' is equal if it
+    // contains as many distinct values as 'values'.
+    value::ValueSetType seen(0, value::ValueHash(collator), value::ValueEq(collator));
+    bool missing = value::arrayAny(other.tag, other.value, [&](auto tag, auto val) {
+        if (!values.contains({tag, val})) {
+            return true;
+        }
+        seen.insert({tag, val});
+        return false;
+    });
+    return !missing && seen.size() == values.size();
+}
+
 // Returns the distinct values of 'lhs' that are not in 'rhsValues', in 'lhs' order.
 value::TagValueOwned arrayDifference(value::TagValueMaybeOwned& lhs,
                                      const value::ValueSetType& rhsValues,
@@ -205,18 +238,29 @@ value::TagValueMaybeOwned ByteCode::builtinSetDifferenceArray(ArityType arity) {
     auto& lhs = (*maybeInputs)[0];
     auto& rhs = (*maybeInputs)[1];
 
-    // Reuse the hash table of a prepared ArraySet if it uses the same collator. Otherwise, build
-    // a temporary table of views into the right-hand side.
-    if (rhs.tag() == value::TypeTags::ArraySet &&
-        value::getArraySetView(rhs.value())->getCollator() == collator) {
-        return arrayDifference(lhs, value::getArraySetView(rhs.value())->values(), collator);
-    }
-    return arrayDifference(
-        lhs, valueToShallowSetHelper(rhs.tag(), rhs.value(), collator), collator);
+    return withHashTable(rhs.view(), collator, [&](const value::ValueSetType& rhsValues) {
+        return arrayDifference(lhs, rhsValues, collator);
+    });
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSetEqualsArray(ArityType arity) {
-    MONGO_UNREACHABLE_TASSERT(13890503);
+    // Compiling setEqualsArray already checks that it has the collator and at least two arrays.
+    tassert(13889302, "Unexpected arity value", arity >= 3);
+    const CollatorInterface* collator = getSetCollator(viewFromStack(0));
+    // The result is a boolean, so the operands can stay on the stack as views.
+    for (size_t arg = 1; arg < arity; ++arg) {
+        if (!value::isArray(viewFromStack(arg).tag)) {
+            return value::TagValueMaybeOwned::nothing();
+        }
+    }
+    return withHashTable(viewFromStack(1), collator, [&](const value::ValueSetType& first) {
+        for (size_t arg = 2; arg < arity; ++arg) {
+            if (!sameValues(first, viewFromStack(arg), collator)) {
+                return value::TagValueMaybeOwned::boolean(false);
+            }
+        }
+        return value::TagValueMaybeOwned::boolean(true);
+    });
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSetIsSubsetArray(ArityType arity) {

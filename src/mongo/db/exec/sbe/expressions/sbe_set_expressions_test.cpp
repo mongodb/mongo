@@ -109,6 +109,11 @@ protected:
             EFn::kSetDifference, EFn::kSetDifferenceArray, std::move(lhs), std::move(rhs));
     }
 
+    std::unique_ptr<EExpression> makeEquals(std::unique_ptr<EExpression> lhs,
+                                            std::unique_ptr<EExpression> rhs) {
+        return makeSetOp(EFn::kSetEquals, EFn::kSetEqualsArray, std::move(lhs), std::move(rhs));
+    }
+
 private:
     std::unique_ptr<EExpression> makeSetOp(EFn legacyFn,
                                            EFn arrayFn,
@@ -279,12 +284,11 @@ TEST_P(SBEBuiltinArrayResultTest, ReturnsNothingSetDifference) {
     runAndAssertNothing(compiledExpr.get());
 }
 
-TEST_F(SBEBuiltinSetOpTest, ComputesSetEquals) {
+TEST_P(SBEBuiltinArrayResultTest, ComputesSetEquals) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setEqualsExpr =
-        makeFunction(EFn::kSetEquals, makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setEqualsExpr = makeEquals(makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setEqualsExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
@@ -300,17 +304,21 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetEquals) {
     runAndAssertBoolean(compiledExpr.get(), false);
 }
 
-TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetEquals) {
+TEST_P(SBEBuiltinArrayResultTest, ReturnsNothingSetEquals) {
     value::OwnedValueAccessor slotAccessor1, slotAccessor2;
     auto arrSlot1 = bindAccessor(&slotAccessor1);
     auto arrSlot2 = bindAccessor(&slotAccessor2);
-    auto setEqualsExpr =
-        makeFunction(EFn::kSetEquals, makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto setEqualsExpr = makeEquals(makeVariable(arrSlot1), makeVariable(arrSlot2));
     auto compiledExpr = compileExpression(*setEqualsExpr);
 
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
     slotAccessor1.reset(arrTag1, arrVal1);
     slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(189));
+    runAndAssertNothing(compiledExpr.get());
+
+    slotAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(189));
+    auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(1 << 2));
+    slotAccessor2.reset(arrTag2, arrVal2);
     runAndAssertNothing(compiledExpr.get());
 }
 
@@ -583,6 +591,99 @@ TEST_F(SBEBuiltinSetOpTest, SetDifferenceArrayUsesPreparedRhsOnlyWithSameCollato
         BSON_ARRAY("A" << "b"));
 }
 
+TEST_F(SBEBuiltinSetOpTest, SetEqualsArrayManyOperands) {
+    auto assertEquals = [&](const BSONArray& first,
+                            const BSONArray& second,
+                            const BSONArray& third,
+                            bool expected) {
+        auto expr = makeFunction(
+            EFn::kSetEqualsArray, noCollator(), arrayC(first), arrayC(second), arrayC(third));
+        auto compiledExpr = compileExpression(*expr);
+        runAndAssertBoolean(compiledExpr.get(), expected);
+    };
+
+    assertEquals(
+        BSON_ARRAY(1 << 2 << 3), BSON_ARRAY(3 << 1 << 2 << 1), BSON_ARRAY(2 << 2 << 3 << 1), true);
+    // The last operand is missing a value.
+    assertEquals(BSON_ARRAY(1 << 2 << 3), BSON_ARRAY(3 << 2 << 1), BSON_ARRAY(1 << 2 << 1), false);
+    // The last operand has an extra value.
+    assertEquals(BSON_ARRAY(1 << 2), BSON_ARRAY(2 << 1), BSON_ARRAY(1 << 2 << 3), false);
+    assertEquals(BSONArray(), BSONArray(), BSONArray(), true);
+    assertEquals(BSONArray(), BSON_ARRAY(1), BSONArray(), false);
+}
+
+TEST_F(SBEBuiltinSetOpTest, SetEqualsArrayReturnsNothingForLaterNonArray) {
+    auto expr = makeFunction(EFn::kSetEqualsArray,
+                             noCollator(),
+                             arrayC(BSON_ARRAY(1)),
+                             arrayC(BSON_ARRAY(2)),
+                             makeC(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(5)));
+    runAndAssertNothing(*expr);
+}
+
+TEST_F(SBEBuiltinSetOpTest, SetEqualsArrayAcceptsPreparedSetsAndBsonArrays) {
+    auto bson = BSON_ARRAY(3.0 << 2 << 1 << 2);
+    auto expr =
+        makeFunction(EFn::kSetEqualsArray,
+                     noCollator(),
+                     makeC(makeArraySet(BSON_ARRAY(1 << 2 << 3))),
+                     makeC(value::copyValue(value::TypeTags::bsonArray,
+                                            value::bitcastFrom<const char*>(bson.objdata()))),
+                     makeC(makeArraySet(BSON_ARRAY(3 << 1 << 2))));
+    auto compiledExpr = compileExpression(*expr);
+    runAndAssertBoolean(compiledExpr.get(), true);
+}
+
+TEST_F(SBEBuiltinSetOpTest, SetEqualsArrayUsesPreparedSetsOnlyWithSameCollator) {
+    CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
+    value::ViewOfValueAccessor collatorAccessor;
+    collatorAccessor.reset(value::TypeTags::collator,
+                           value::bitcastFrom<CollatorInterface*>(&collator));
+    auto collatorSlot = bindAccessor(&collatorAccessor);
+    auto assertEquals = [&](std::unique_ptr<EExpression> coll,
+                            std::unique_ptr<EExpression> first,
+                            std::unique_ptr<EExpression> second,
+                            bool expected) {
+        auto expr = makeFunction(
+            EFn::kSetEqualsArray, std::move(coll), std::move(first), std::move(second));
+        auto compiledExpr = compileExpression(*expr);
+        runAndAssertBoolean(compiledExpr.get(), expected);
+    };
+
+    assertEquals(makeVariable(collatorSlot),
+                 arrayC(BSON_ARRAY("a" << "B")),
+                 arrayC(BSON_ARRAY("b" << "A" << "a")),
+                 true);
+    // Prepared sets with the same collator, as either operand.
+    assertEquals(makeVariable(collatorSlot),
+                 arrayC(BSON_ARRAY("A")),
+                 makeC(makeArraySetWithCollator(BSON_ARRAY("a"), &collator)),
+                 true);
+    assertEquals(makeVariable(collatorSlot),
+                 makeC(makeArraySetWithCollator(BSON_ARRAY("a"), &collator)),
+                 arrayC(BSON_ARRAY("A")),
+                 true);
+    // Prepared sets without a collator must not be used to look up collated values. Here they
+    // hold two values that are equal under the collator.
+    assertEquals(makeVariable(collatorSlot),
+                 arrayC(BSON_ARRAY("A")),
+                 makeC(makeArraySet(BSON_ARRAY("a" << "A"))),
+                 true);
+    assertEquals(makeVariable(collatorSlot),
+                 makeC(makeArraySet(BSON_ARRAY("a" << "A"))),
+                 arrayC(BSON_ARRAY("A")),
+                 true);
+    // Prepared sets with a collator must not be used to look up values without one.
+    assertEquals(noCollator(),
+                 arrayC(BSON_ARRAY("A")),
+                 makeC(makeArraySetWithCollator(BSON_ARRAY("a"), &collator)),
+                 false);
+    assertEquals(noCollator(),
+                 makeC(makeArraySetWithCollator(BSON_ARRAY("a"), &collator)),
+                 arrayC(BSON_ARRAY("A")),
+                 false);
+}
+
 class SBEBuiltinSetOpDeathTest : public SBEBuiltinSetOpTest {};
 
 DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetUnionArrayInvalidCollator, "13889300") {
@@ -597,6 +698,13 @@ DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetIntersectionArrayInvalidCollator
 
 DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetDifferenceArrayInvalidCollator, "13889300") {
     runExpression(*makeFunction(EFn::kSetDifferenceArray,
+                                makeC(value::TypeTags::Null, 0),
+                                arrayC(BSONArray()),
+                                arrayC(BSONArray())));
+}
+
+DEATH_TEST_REGEX_F(SBEBuiltinSetOpDeathTest, SetEqualsArrayInvalidCollator, "13889300") {
+    runExpression(*makeFunction(EFn::kSetEqualsArray,
                                 makeC(value::TypeTags::Null, 0),
                                 arrayC(BSONArray()),
                                 arrayC(BSONArray())));
