@@ -274,14 +274,6 @@ Execution Engine: sbe
 			"stage" : "STREAMING_GROUP"
 		},
 		{
-			"stage" : "PROJECTION_SIMPLE",
-			"transformBy" : {
-				"_id" : false,
-				"a" : true,
-				"b" : true
-			}
-		},
-		{
 			"nss" : "test.distinct_query_planner_md",
 			"stage" : "FETCH"
 		},
