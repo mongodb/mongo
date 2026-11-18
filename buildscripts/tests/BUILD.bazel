@@ -193,6 +193,15 @@ py_test(
 )
 
 py_test(
+    name = "test_engflow_invocation_cost",
+    srcs = ["test_engflow_invocation_cost.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:engflow_invocation_cost",
+    ],
+)
+
+py_test(
     name = "test_bazel_plus_test_interface",
     srcs = ["test_bazel_plus_test_interface.py"],
     visibility = ["//visibility:public"],

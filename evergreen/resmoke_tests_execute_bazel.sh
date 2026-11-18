@@ -195,6 +195,15 @@ targets_for_build_phase() {
 
 STREAMED_TASKS_FILE="streamed_result_tasks.txt"
 
+# BEP of the pre-build phase. Only read for its invocation id, to price the phase's remote
+# execution; see log_remote_execution_cost.
+PREBUILD_BEP_FILE="build_events_prebuild.json"
+
+# BEP files of the bazel invocations this execution ran, for log_remote_execution_cost. Tracked
+# rather than assumed: a result task starts with the runner's build_events.json already in place,
+# and it stays there if the pre-build fails before the test phase replaces it.
+EXECUTED_BEP_FILES=()
+
 # Start the process that tails build_events.json and activates each result task
 # as soon as its target's remote execution completes, instead of waiting for the whole invocation.
 start_streaming_activation() {
@@ -235,7 +244,8 @@ run_build_and_test() {
     # cache-neutral) so the test phase does not re-analyze and rebuild. The `test` command
     # runs with --build_tests_only (set under the test: config in .bazelrc), which limits the
     # build to test targets and their deps; pass it explicitly here so this `build` builds the
-    # same set rather than every target in the ${targets} pattern. Also force
+    # same set rather than every target in the ${targets} pattern. The BEP file here only
+    # records the invocation id for log_remote_execution_cost. Also force
     # --remote_download_outputs=minimal: this phase only needs to confirm the targets compile,
     # so on a remote build it should leave outputs in the CAS rather than download test
     # binaries (and mongod) to this host. Tests execute remotely, so the test phase consumes
@@ -249,10 +259,14 @@ run_build_and_test() {
     local build_targets
     build_targets="$(targets_for_build_phase)"
 
+    # Drop the pre-build BEP left by a previous execution of this task.
+    rm -f "$PREBUILD_BEP_FILE"
+
     if [[ -n "$build_targets" ]]; then
+        EXECUTED_BEP_FILES+=("$PREBUILD_BEP_FILE")
         export RETRY_ON_FAIL=1
         bazel_evergreen_shutils::retry_bazel_cmd $build_attempts "$BAZEL_BINARY" \
-            build --build_tests_only --remote_download_outputs=minimal ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} -- ${build_targets}
+            build --build_tests_only --remote_download_outputs=minimal ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} --build_event_json_file="$PREBUILD_BEP_FILE" -- ${build_targets}
         RET=$?
 
         if [[ "$RET" != "0" ]]; then
@@ -269,6 +283,7 @@ run_build_and_test() {
 
     # Drop any BEP left by a previous execution of this task or by another bazel command.
     rm -f build_events.json engflow_links.json "$STREAMED_TASKS_FILE"
+    EXECUTED_BEP_FILES+=("build_events.json")
 
     bazel_evergreen_shutils::retry_bazel_cmd $test_attempts "$BAZEL_BINARY" \
         test ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} --build_event_json_file=build_events.json ${targets} &
@@ -305,6 +320,25 @@ write_engflow_links() {
     # Result tasks attach their own, per-target link from fetch_remote_test_results.sh.
     engflow_links::entry "EngFlow invocation" "$(engflow_links::invocation_url "$invocation_id")" |
         jq --slurp '.' >engflow_links.json
+}
+
+# Logs the estimated $ spend of the remote execution done by the bazel invocations above. A
+# retried pre-build only has its last attempt priced, since each attempt overwrites the BEP file.
+# Best-effort: failing to price the task must not fail it.
+log_remote_execution_cost() {
+    if [[ "${resmoke_disable_rbe}" == "true" ]]; then
+        return # Local execution never reaches EngFlow.
+    fi
+    local bep
+    local bep_args=()
+    for bep in "${EXECUTED_BEP_FILES[@]}"; do
+        bep_args+=(--build-events-file "$bep")
+    done
+    if [[ "${#bep_args[@]}" -eq 0 ]]; then
+        return
+    fi
+    python buildscripts/engflow_invocation_cost.py "${bep_args[@]}" ||
+        echo "WARNING: could not estimate the remote execution spend of this task."
 }
 
 gather_failed_tests() {
@@ -394,6 +428,7 @@ main() {
             # runner's results. Attach the binaries from this test with debug info to this task's artifacts.
             gather_failed_tests
         fi
+        log_remote_execution_cost
         # Explicitly shutdown the bazel server in case the Evergreen agent is tracking it for completion of this process.
         eval ${BAZEL_BINARY} shutdown
         exit_for_result_task "$RET"
@@ -402,6 +437,8 @@ main() {
     gather_failed_tests
 
     activate_result_tasks
+
+    log_remote_execution_cost
 
     # Explicitly shutdown the bazel server in case the Evergreen agent is tracking it for completion of this process.
     eval ${BAZEL_BINARY} shutdown

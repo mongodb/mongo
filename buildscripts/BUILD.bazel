@@ -892,6 +892,22 @@ py_library(
 )
 
 py_library(
+    name = "engflow_invocation_cost",
+    srcs = ["engflow_invocation_cost.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
     name = "stream_result_task_activation",
     srcs = ["stream_result_task_activation.py"],
     visibility = ["//visibility:public"],
