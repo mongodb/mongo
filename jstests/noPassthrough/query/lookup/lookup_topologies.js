@@ -48,6 +48,12 @@ const kExpectedResults = kLocalDocs.map(({join_key}) => ({
     join_result: kForeignDocs.filter((doc) => doc.join_key === join_key),
 }));
 
+// The exception is a $lookup followed by an $unwind of its output, which produces one
+// document per joined foreign document.
+const kExpectedUnwoundResults = kExpectedResults.flatMap(({join_key, join_result}) =>
+    join_result.map((joinedDoc) => ({join_key, join_result: joinedDoc})),
+);
+
 function makeTopologies(st) {
     return [
         function unshardedOnPrimary(ns) {},
@@ -63,14 +69,15 @@ function makeTopologies(st) {
     ];
 }
 
-function assertCorrectResult(result, foreignNs, debugInfo) {
+function assertCorrectResult(result, foreignNs, expectedResults, debugInfo) {
     // If we queried against the view, we'll have an additional "rand" field that
     // we need to remove before asserting the results. We want to make sure the
     // view behaved correctly and produced unique values.
     if (foreignNs === "foreignView") {
         const randValues = new Set();
         for (const doc of result) {
-            for (const joinedDoc of doc.join_result) {
+            // "join_result" is a single document rather than an array when it was unwound.
+            for (const joinedDoc of [doc.join_result].flat()) {
                 randValues.add(joinedDoc.rand);
                 delete joinedDoc.rand;
             }
@@ -80,7 +87,7 @@ function assertCorrectResult(result, foreignNs, debugInfo) {
         assert.eq(randValues.size, result.length, {randValues, result, ...debugInfo});
     }
 
-    assert.sameMembers(result, kExpectedResults, debugInfo);
+    assert.sameMembers(result, expectedResults, debugInfo);
 }
 
 // Generate the different $lookup shapes.
@@ -109,6 +116,20 @@ function* generateLookups() {
                 },
             },
         };
+        // The localField/foreignField stage again, followed by an $unwind of its output, which
+        // the $lookup absorbs.
+        yield {
+            foreignNs,
+            lookup: {
+                $lookup: {
+                    from: foreignNs,
+                    localField: "join_key",
+                    foreignField: "join_key",
+                    as: "join_result",
+                },
+            },
+            unwind: true,
+        };
     }
 }
 
@@ -134,14 +155,20 @@ function runAllCombinationsAgainstDb(db, debugInfo) {
         setParametersOnAllNonConfigNodes(db.getMongo(), flags);
         const flagDebugInfo = {...debugInfo, flags};
 
-        for (const {foreignNs, lookup} of generateLookups()) {
-            const pipeline = [lookup, {$project: {_id: 0, join_key: 1, join_result: 1}}];
+        for (const {foreignNs, lookup, unwind} of generateLookups()) {
+            const pipeline = [
+                lookup,
+                ...(unwind ? [{$unwind: "$join_result"}] : []),
+                {$project: {_id: 0, join_key: 1, join_result: 1}},
+            ];
+            const expectedResults = unwind ? kExpectedUnwoundResults : kExpectedResults;
 
             // Test the $lookup ran at the top-level.
             const debugInfoTopLevel = {...flagDebugInfo, pipeline};
             assertCorrectResult(
                 db.local.aggregate(pipeline).toArray(),
                 foreignNs,
+                expectedResults,
                 debugInfoTopLevel,
             );
 
@@ -151,7 +178,7 @@ function runAllCombinationsAgainstDb(db, debugInfo) {
             const debugInfoNested = {...flagDebugInfo, pipeline: nestedPipeline};
             const res = db.driver.aggregate(nestedPipeline).toArray();
             assert.eq(res.length, 1, {res});
-            assertCorrectResult(res[0].n, foreignNs, debugInfoNested);
+            assertCorrectResult(res[0].n, foreignNs, expectedResults, debugInfoNested);
         }
     }
 }

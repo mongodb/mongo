@@ -5,6 +5,8 @@
  */
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {describe, it, before, after, beforeEach} from "jstests/libs/mochalite.js";
+import {isLookupResultCacheEnabled} from "jstests/libs/query/aggregation_pipeline_utils.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 // Sets 'params' (a {name: value} map of setParameter names/values), runs 'fn', then restores each
 // parameter to whatever value it held before this call so the reset stays correct even if a
@@ -487,6 +489,116 @@ describe("$lookup result cache", function () {
                 {_id: 2, f: 1},
             ];
             assert(resultsEq(expected, actual), "wrong $lookup results", {expected, actual});
+        });
+
+        it("runs the foreign query once per distinct localField value", function () {
+            if (!isLookupResultCacheEnabled(this.db)) {
+                return;
+            }
+            const pipeline = [
+                {$lookup: {from: "foreign", localField: "local_k", foreignField: "k", as: "f"}},
+                {$unwind: "$f"},
+            ];
+            const lookupStage = getAggPlanStage(
+                this.db.local.explain("executionStats").aggregate(pipeline),
+                "$lookup",
+            );
+            assert(lookupStage, "expected a $lookup stage in the explain output");
+
+            // Without an index on 'k', every foreign query scans all 3 foreign documents. There
+            // are 3 distinct localField values among the 4 local documents.
+            assert.eq(lookupStage.totalDocsExamined, 3 * 3, {lookupStage});
+        });
+
+        it("returns correct results when entries outgrow the per-entry cap mid-stream", function () {
+            // Each foreign document is well over 100 bytes, so the entry being filled for
+            // local_k: 0 crosses the cap partway through its foreign results and is abandoned,
+            // while the results keep streaming.
+            const padding = "x".repeat(200);
+            assert.commandWorked(this.db.foreign.updateMany({}, {$set: {padding}}));
+            withParams(this.db, {internalLookupStageResultCacheMaxEntrySizeBytes: 400}, () => {
+                const pipeline = [
+                    {$lookup: {from: "foreign", localField: "local_k", foreignField: "k", as: "f"}},
+                    {$unwind: "$f"},
+                    {$project: {f: "$f._id"}},
+                ];
+                const actual = this.db.local.aggregate(pipeline).toArray();
+                const expected = [
+                    {_id: 0, f: 0},
+                    {_id: 0, f: 1},
+                    {_id: 1, f: 2},
+                    {_id: 2, f: 0},
+                    {_id: 2, f: 1},
+                ];
+                assert(resultsEq(expected, actual), "wrong $lookup results", {expected, actual});
+
+                const lookupStage = getAggPlanStage(
+                    this.db.local.explain("executionStats").aggregate(pipeline),
+                    "$lookup",
+                );
+                assert(lookupStage, "expected a $lookup stage in the explain output");
+                // The abandoned entry for local_k: 0 is never cached, so all 4 local documents run
+                // a foreign query that scans all 3 foreign documents.
+                assert.eq(lookupStage.totalDocsExamined, 4 * 3, {lookupStage});
+            });
+        });
+
+        it("returns correct results after eviction under a small entry-count cap", function () {
+            withParams(this.db, {internalLookupStageResultCacheMaxEntries: 1}, () => {
+                const actual = this.db.local
+                    .aggregate([
+                        {
+                            $lookup: {
+                                from: "foreign",
+                                localField: "local_k",
+                                foreignField: "k",
+                                as: "f",
+                            },
+                        },
+                        {$unwind: "$f"},
+                        {$project: {f: "$f._id"}},
+                    ])
+                    .toArray();
+                const expected = [
+                    {_id: 0, f: 0},
+                    {_id: 0, f: 1},
+                    {_id: 1, f: 2},
+                    {_id: 2, f: 0},
+                    {_id: 2, f: 1},
+                ];
+                assert(resultsEq(expected, actual), "wrong $lookup results", {expected, actual});
+            });
+        });
+
+        it("does not cache results for a non-deterministic view", function () {
+            this.db.foreignView.drop();
+            assert.commandWorked(
+                this.db.createView("foreignView", "foreign", [{$addFields: {r: {$rand: {}}}}]),
+            );
+            try {
+                const actual = this.db.local
+                    .aggregate([
+                        {
+                            $lookup: {
+                                from: "foreignView",
+                                localField: "local_k",
+                                foreignField: "k",
+                                as: "f",
+                            },
+                        },
+                        {$unwind: "$f"},
+                        {$project: {_id: 0, r: "$f.r"}},
+                    ])
+                    .toArray();
+
+                // local_k: 0 appears twice and matches 2 foreign documents each time, and
+                // local_k: 1 matches 1, so evaluating $rand per result gives 5 distinct values.
+                assert.eq(actual.length, 5, {actual});
+                const randValues = new Set(actual.map((doc) => doc.r));
+                assert.eq(randValues.size, 5, "cache may be serving stale view results", {actual});
+            } finally {
+                this.db.foreignView.drop();
+            }
         });
     });
 });

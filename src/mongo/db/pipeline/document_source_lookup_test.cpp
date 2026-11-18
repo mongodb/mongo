@@ -1912,18 +1912,125 @@ TEST_F(DocumentSourceLookUpTest, ResultCacheDisabledWithLetVariables) {
     ASSERT_FALSE(lookupStage->resultCacheEnabled_forTest());
 }
 
-TEST_F(DocumentSourceLookUpTest, ResultCacheDisabledWithAbsorbedUnwind) {
+TEST_F(DocumentSourceLookUpTest, ResultCacheServesRepeatedLocalFieldValueWithAbsorbedUnwind) {
+    if (kDebugBuild) {
+        // The $lookup result cache is not used in debug builds.
+        GTEST_SKIP();
+    }
     auto expCtx = getExpCtx();
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
     expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
-        std::deque<DocumentSource::GetNextResult>{}));
+        std::deque<DocumentSource::GetNextResult>{Document{{"_id", 1}, {"k", 1}},
+                                                  Document{{"_id", 2}, {"k", 1}},
+                                                  Document{{"_id", 3}, {"k", 2}}}));
 
-    // Otherwise a pure localField/foreignField join (no pipeline, no let vars), but with an
-    // absorbed $unwind: the cache isn't accessed on this path today, so it isn't constructed.
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {from: 'coll', localField: 'x', foreignField: 'k', as: 'as', "
+        "$_internalUnwind: {$unwind: {path: '$as', includeArrayIndex: 'idx'}}}}",
+        expCtx);
+
+    auto mockLocalStage =
+        exec::agg::MockStage::createForTest({"{x: 1}", "{x: 2}", "{x: 1}"}, expCtx);
+    auto stage = exec::agg::buildStageAndStitch(lookupDS, mockLocalStage);
+    auto lookupStage = boost::dynamic_pointer_cast<exec::agg::LookUpStage>(stage);
+    ASSERT(lookupStage);
+    ASSERT_TRUE(lookupStage->resultCacheEnabled_forTest());
+
+    const Document firstMatch{{"x", 1}, {"as", Document{{"_id", 1}, {"k", 1}}}, {"idx", 0LL}};
+    const Document secondMatch{{"x", 1}, {"as", Document{{"_id", 2}, {"k", 1}}}, {"idx", 1LL}};
+
+    // The first unwound result is returned before the foreign results for x: 1 are exhausted, so
+    // the entry can't have been cached yet.
+    auto next = lookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), firstMatch);
+    ASSERT_FALSE(lookupStage->resultCacheHasKey_forTest(Value(1)));
+
+    // Returning the last result reaches the foreign pipeline's EOF, which admits the entry.
+    next = lookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), secondMatch);
+    ASSERT_TRUE(lookupStage->resultCacheHasKey_forTest(Value(1)));
+
+    next = lookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(),
+                       (Document{{"x", 2}, {"as", Document{{"_id", 3}, {"k", 2}}}, {"idx", 0LL}}));
+    ASSERT_TRUE(lookupStage->resultCacheHasKey_forTest(Value(2)));
+    ASSERT_EQ(lookupStage->resultCacheSize_forTest(), 2U);
+
+    // The repeated x: 1 is unwound from the cached entry, one result per getNext().
+    next = lookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), firstMatch);
+    next = lookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), secondMatch);
+    ASSERT_EQ(lookupStage->resultCacheSize_forTest(), 2U);
+
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceLookUpTest, ResultCacheServesEmptyResultWithAbsorbedUnwind) {
+    if (kDebugBuild) {
+        // The $lookup result cache is not used in debug builds.
+        GTEST_SKIP();
+    }
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{Document{{"_id", 1}}}));
+
     auto lookupDS = makeLookUpFromJson(
         "{$lookup: {from: 'coll', localField: 'x', foreignField: '_id', as: 'as', "
+        "$_internalUnwind: {$unwind: {path: '$as', includeArrayIndex: 'idx', "
+        "preserveNullAndEmptyArrays: true}}}}",
+        expCtx);
+
+    auto mockLocalStage =
+        exec::agg::MockStage::createForTest({"{x: 5}", "{x: 5}", "{x: 1}"}, expCtx);
+    auto stage = exec::agg::buildStageAndStitch(lookupDS, mockLocalStage);
+    auto lookupStage = boost::dynamic_pointer_cast<exec::agg::LookUpStage>(stage);
+    ASSERT(lookupStage);
+
+    auto next = lookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), (Document{{"x", 5}, {"idx", BSONNULL}}));
+    ASSERT_TRUE(lookupStage->resultCacheHasKey_forTest(Value(5)));
+
+    // The repeated non-matching value is served from the cached empty entry, and is still
+    // preserved.
+    next = lookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), (Document{{"x", 5}, {"idx", BSONNULL}}));
+    ASSERT_EQ(lookupStage->resultCacheSize_forTest(), 1U);
+
+    next = lookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(),
+                       (Document{{"x", 1}, {"as", Document{{"_id", 1}}}, {"idx", 0LL}}));
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceLookUpTest, ResultCacheReleasesPendingEntryMemoryOnDisposeWithAbsorbedUnwind) {
+    if (kDebugBuild) {
+        // The $lookup result cache is not used in debug builds.
+        GTEST_SKIP();
+    }
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{Document{{"_id", 1}, {"k", 1}},
+                                                  Document{{"_id", 2}, {"k", 1}}}));
+
+    auto lookupDS = makeLookUpFromJson(
+        "{$lookup: {from: 'coll', localField: 'x', foreignField: 'k', as: 'as', "
         "$_internalUnwind: {$unwind: {path: '$as'}}}}",
         expCtx);
 
@@ -1931,7 +2038,15 @@ TEST_F(DocumentSourceLookUpTest, ResultCacheDisabledWithAbsorbedUnwind) {
     auto stage = exec::agg::buildStageAndStitch(lookupDS, mockLocalStage);
     auto lookupStage = boost::dynamic_pointer_cast<exec::agg::LookUpStage>(stage);
     ASSERT(lookupStage);
-    ASSERT_FALSE(lookupStage->resultCacheEnabled_forTest());
+
+    // Stop after the first unwound result (e.g. a downstream $limit), while the entry for x: 1 is
+    // still being filled. Its buffered results are charged to the memory tracker.
+    ASSERT_TRUE(lookupStage->getNext().isAdvanced());
+    ASSERT_FALSE(lookupStage->resultCacheHasKey_forTest(Value(1)));
+    ASSERT_GT(lookupStage->memoryTrackerBytes_forTest(), 0);
+
+    lookupStage->dispose();
+    ASSERT_EQ(lookupStage->memoryTrackerBytes_forTest(), 0);
 }
 
 TEST_F(DocumentSourceLookUpTest, ResultCacheDisabledWhenForeignNamespaceIsView) {

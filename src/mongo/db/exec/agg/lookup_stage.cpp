@@ -156,8 +156,6 @@ LookUpStage::LookUpStage(std::string_view stageName,
         _cache = std::make_shared<SequentialDocumentCache>(
             loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes)
                 .get(pExpCtx->getOperationContext()));
-        // TODO SERVER-132796: extend the result cache above to cover $lookup that has absorbed a
-        // $unwind.
     }
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
         feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
@@ -175,7 +173,6 @@ LookupResultCache LookUpStage::makeResultCache(
     //        - View resolution is only done at parse-time when
     //          `featureFlagExtensionsInsideHybridSearch` is on. We gate on this flag for that
     //          reason.
-    //   - The $lookup has not absorbed an $unwind (the cache does not implement this case yet).
     //   - The operation is not in a multi-document transaction, where a cached result could
     //     predate the transaction's own later writes to the foreign collection.
     //   - The stage is not executing on a router.
@@ -187,8 +184,8 @@ LookupResultCache LookUpStage::makeResultCache(
     auto* opCtx = pExpCtx->getOperationContext();
     const bool inMultiDocumentTransaction = opCtx && opCtx->inMultiDocumentTransaction();
     if (!hasLocalFieldForeignFieldJoin() || hasUserPipeline || !_letVariables.empty() ||
-        _hasAbsorbedUnwindSrc || !hybridSearchFlagEnabled || _fromNsIsAView ||
-        inMultiDocumentTransaction || pExpCtx->getInRouter() || kDebugBuild) {
+        !hybridSearchFlagEnabled || _fromNsIsAView || inMultiDocumentTransaction ||
+        pExpCtx->getInRouter() || kDebugBuild) {
         return LookupResultCache::createDisabled();
     }
 
@@ -395,6 +392,8 @@ void LookUpStage::doDispose() {
     if (_sharedState->pipeline) {
         _sharedState->pipeline.reset();
     }
+    _pendingResultCacheEntry.reset();
+    _cachedUnwindResults.reset();
     // unwindResult() reads the foreign pipeline whenever '_nextValue' is set, so it must not
     // outlive the pipeline.
     _nextValue.reset();
@@ -667,12 +666,24 @@ GetNextResult LookUpStage::unwindResult() {
 
         _input = nextInput.releaseDocument();
 
-        _sharedState->pipeline = buildPipeline(_fromExpCtx, *_input);
+        boost::optional<Value> resultCacheKey = _resultCache.computeKey(*_input, _localField);
+        if (const Value* cached = resultCacheKey ? _resultCache.get(*resultCacheKey) : nullptr) {
+            _cachedUnwindResults = *cached;
+            _cachedUnwindResultsPos = 0;
+        } else {
+            _sharedState->pipeline = buildPipeline(_fromExpCtx, *_input);
 
-        // The $lookup stage takes responsibility for disposing of its Pipeline, since it will
-        // potentially be used by multiple OperationContexts, and the $lookup stage is part of an
-        // outer Pipeline that will propagate dispose() calls before being destroyed.
-        _sharedState->execPipeline = exec::agg::buildPipeline(_sharedState->pipeline->freeze());
+            // The $lookup stage takes responsibility for disposing of its Pipeline, since it will
+            // potentially be used by multiple OperationContexts, and the $lookup stage is part of
+            // an outer Pipeline that will propagate dispose() calls before being destroyed.
+            _sharedState->execPipeline = exec::agg::buildPipeline(_sharedState->pipeline->freeze());
+
+            // Started only after buildPipeline(), which disables the cache if it finds the
+            // foreign namespace is a view.
+            if (resultCacheKey) {
+                _pendingResultCacheEntry = _resultCache.beginPut(*resultCacheKey);
+            }
+        }
 
         _cursorIndex = 0;
         _nextValue = nextUnwindForeignResult();
@@ -708,7 +719,32 @@ GetNextResult LookUpStage::unwindResult() {
 }
 
 boost::optional<Document> LookUpStage::nextUnwindForeignResult() {
-    return _sharedState->execPipeline->getNext();
+    // We may be in the process of unwinding cached results.
+    if (_cachedUnwindResults) {
+        const auto& results = _cachedUnwindResults->getArray();
+        if (_cachedUnwindResultsPos < results.size()) {
+            const auto& next = results[_cachedUnwindResultsPos];
+            ++_cachedUnwindResultsPos;
+            return next.getDocument();
+        }
+        _cachedUnwindResults.reset();
+        return boost::none;
+    }
+
+    // Otherwise, get the next result, and add it to the cache entry if we're building
+    // one. If it's the end of the pipeline, place the completed cache entry in the
+    // map.
+    // If we're not building a cache entry, just return the result.
+    auto next = _sharedState->execPipeline->getNext();
+    if (_pendingResultCacheEntry) {
+        if (next) {
+            _pendingResultCacheEntry->append(*next);
+        } else {
+            _resultCache.finishPut(std::move(*_pendingResultCacheEntry));
+            _pendingResultCacheEntry.reset();
+        }
+    }
+    return next;
 }
 
 bool LookUpStage::foreignShardedLookupAllowed() const {

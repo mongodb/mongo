@@ -126,7 +126,9 @@ private:
 
     /**
      * Returns the next foreign result for '_input' in unwindResult(), or boost::none once they are
-     * exhausted.
+     * exhausted. Reads them from '_cachedUnwindResults' on a result cache hit, otherwise from the
+     * foreign pipeline, feeding each into '_pendingResultCacheEntry' and admitting it to the cache
+     * at the pipeline's EOF.
      */
     boost::optional<Document> nextUnwindForeignResult();
 
@@ -149,8 +151,8 @@ private:
 
     /**
      * Returns the LRU result cache for this stage: enabled if this is a pure localField/
-     * foreignField equijoin (no pipeline, no 'let' vars, no view target, no absorbed $unwind) with
-     * a non-zero size configuration, otherwise pre-disabled (see
+     * foreignField equijoin (no pipeline, no 'let' vars, no view target) with a non-zero size
+     * configuration, otherwise pre-disabled (see
      * LookupResultCache::createDisabled()). Called from the constructor's initializer list, so it
      * may only read members declared (and thus already initialized) before '_resultCache'.
      */
@@ -235,8 +237,17 @@ private:
     // An LRU cache from localField value to foreign query results, used to avoid re-running the
     // foreign query for repeated values. Always constructed, but pre-disabled (isEnabled() ==
     // false) for a $lookup that isn't eligible for a pure equijoin cache (e.g. a pipeline, 'let'
-    // variables, a view target, or an absorbed $unwind).
+    // variables, or a view target).
     LookupResultCache _resultCache;
+
+    // With an absorbed $unwind, holds the cached foreign results being unwound for '_input' on a
+    // result cache hit, and the position of the next one to return.
+    boost::optional<Value> _cachedUnwindResults;
+    size_t _cachedUnwindResultsPos = 0;
+
+    // With an absorbed $unwind, accumulates the foreign results streamed for '_input' on a result
+    // cache miss, so they can be cached once the foreign pipeline reaches EOF.
+    boost::optional<LookupResultCache::PendingEntry> _pendingResultCacheEntry;
 };
 
 }  // namespace mongo::exec::agg
