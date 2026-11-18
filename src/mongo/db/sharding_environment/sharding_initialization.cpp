@@ -104,8 +104,7 @@ std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
             "TaskExecutorPool-" + std::to_string(i),
             {.connectionHook = std::make_unique<ShardingNetworkConnectionHook>(),
              .metadataHook = metadataHookBuilder(),
-             .connectionPoolOptions = connPoolOptions,
-             .alwaysEmitFullReactorHistogram = true}));
+             .connectionPoolOptions = connPoolOptions}));
 
         executors.emplace_back(std::move(exec));
     }

@@ -11,7 +11,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_metrics.h"
-#include "mongo/transport/reactor_options.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/duration.h"
@@ -157,9 +156,6 @@ public:
 
     enum WhichReactor { kIngress, kEgress, kNewReactor };
     virtual ReactorHandle getReactor(WhichReactor which) = 0;
-    virtual ReactorHandle makeReactor(ReactorOptions) {
-        return getReactor(kNewReactor);
-    }
 
     virtual BatonHandle makeBaton(OperationContext* opCtx) const {
         return {};

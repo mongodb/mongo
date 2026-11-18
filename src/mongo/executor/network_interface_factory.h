@@ -25,7 +25,6 @@ struct ConnectionPoolNetworkInterfaceOptions {
     ConnectionPool::Options connectionPoolOptions;
     transport::TransportProtocol protocol = transport::TransportProtocol::MongoRPC;
     bool trackRequestCounts = false;
-    bool alwaysEmitFullReactorHistogram = false;
 };
 
 /** Returns a new NetworkInterface that uses a connection pool. */
@@ -36,7 +35,6 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
 struct NetworkInterfaceOptions {
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook;
     bool trackRequestCounts = false;
-    bool alwaysEmitFullReactorHistogram = false;
 };
 
 #ifdef MONGO_CONFIG_GRPC

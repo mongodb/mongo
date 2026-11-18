@@ -34,13 +34,7 @@ std::vector<Microseconds> partitions() {
 }  // namespace
 
 ExecutorStats::ExecutorStats(TickSource* tickSource)
-    : ExecutorStats(tickSource, /*fullHistogram=*/false) {}
-
-ExecutorStats::ExecutorStats(TickSource* tickSource, bool fullHistogram)
-    : _waiting(partitions()),
-      _running(partitions()),
-      _tickSource(tickSource),
-      _fullHistogram(fullHistogram) {}
+    : _waiting(partitions()), _running(partitions()), _tickSource(tickSource) {}
 
 ExecutorStats::Task ExecutorStats::wrapTask(ExecutorStats::Task&& task) {
     _scheduled.increment(1);
@@ -81,7 +75,7 @@ void ExecutorStats::serialize(BSONObjBuilder* bob, bool forServerStatus) const {
     bob->append("executed"sv, _executed.get());
     bob->append("averageWaitTimeMicros"sv, _averageWaitTimeMicros.get().value_or(0));
     bob->append("averageRunTimeMicros"sv, _averageRunTimeMicros.get().value_or(0));
-    if (_fullHistogram || !forServerStatus) {
+    if (!forServerStatus) {
         appendHistogram(*bob, _waiting, "waitTime");
         appendHistogram(*bob, _running, "runTime");
     }

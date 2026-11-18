@@ -4,8 +4,6 @@
 
 #include "mongo/transport/asio/asio_transport_layer.h"
 
-#include "mongo/transport/reactor_options.h"
-
 #include <fstream>
 #include <functional>
 
@@ -216,10 +214,7 @@ private:
 
 class AsioReactor final : public Reactor {
 public:
-    AsioReactor() : AsioReactor{ReactorOptions{}} {}
-
-    explicit AsioReactor(ReactorOptions options)
-        : _stats(&_tickSource, options.alwaysEmitFullHistogram) {}
+    AsioReactor() : _tickSource(this), _stats(&_tickSource), _ioContext() {}
 
     void run() override {
         try {
@@ -286,7 +281,7 @@ public:
     }
 
 private:
-    ReactorTickSource _tickSource{this};
+    ReactorTickSource _tickSource;
 
     ExecutorStats _stats;
 
@@ -1582,14 +1577,10 @@ ReactorHandle AsioTransportLayer::getReactor(WhichReactor which) {
         case TransportLayer::kEgress:
             return _egressReactor;
         case TransportLayer::kNewReactor:
-            return makeReactor(ReactorOptions{});
+            return std::make_shared<AsioReactor>();
     }
 
     MONGO_UNREACHABLE;
-}
-
-ReactorHandle AsioTransportLayer::makeReactor(ReactorOptions options) {
-    return std::make_shared<AsioReactor>(std::move(options));
 }
 
 namespace {

@@ -288,24 +288,4 @@ TEST_F(ExecutorStatsTest, ServerStatusSerializationContainsAveragesNotHistograms
     ASSERT_GT(obj.getField("averageRunTimeMicros").numberDouble(), 0);
 }
 
-void verifyServerStatusHistogramEmission(bool fullHistogram) {
-    TickSourceMock<Nanoseconds> tickSource;
-    ExecutorStats stats(&tickSource, fullHistogram);
-
-    BSONObjBuilder bob;
-    stats.serialize(&bob, /*forServerStatus=*/true);
-    const auto obj = bob.obj();
-
-    ASSERT_EQ(obj.hasField("waitTime"), fullHistogram);
-    ASSERT_EQ(obj.hasField("runTime"), fullHistogram);
-}
-
-TEST_F(ExecutorStatsTest, FullHistogramOverrideEmitsHistogramsInServerStatus) {
-    verifyServerStatusHistogramEmission(/*fullHistogram=*/true);
-}
-
-TEST_F(ExecutorStatsTest, DefaultServerStatusOmitsHistograms) {
-    verifyServerStatusHistogramEmission(/*fullHistogram=*/false);
-}
-
 }  // namespace mongo
