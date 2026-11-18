@@ -1731,8 +1731,7 @@ Status WiredTigerUtil::createTable(WiredTigerRecoveryUnit& ru,
     auto& session = *ru.getSessionNoTxn();
     LOGV2(51780, "create table", "uri"_attr = uri, "config"_attr = config);
 
-    const bool publishCreate =
-        kvEngine && kvEngine->usesSchemaEpochs() && gFeatureFlagEnableSchemaEpochs.isEnabled();
+    const bool publishCreate = kvEngine && kvEngine->usesSchemaEpochs();
     std::unique_lock<std::mutex> lock;
     bool inStepdown = false;
     if (publishCreate) {

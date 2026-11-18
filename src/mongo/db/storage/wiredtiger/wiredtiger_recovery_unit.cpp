@@ -141,7 +141,7 @@ void WiredTigerRecoveryUnit::_setAndValidateTableTimestamps(
                 invariant(_schemaEpoch);
             }
         }
-        if (!gFeatureFlagEnableSchemaEpochs.isEnabled() || !stepdownEpoch)
+        if (!stepdownEpoch)
             continue;
 
         auto epoch = provider.getSchemaEpochForTimestamp(ts);
