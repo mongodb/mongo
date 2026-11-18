@@ -5,9 +5,6 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// TODO: SERVER-138724 Add back in once duplicate events tolerated
-quit();
-
 function getCollectionUuid(conn, dbName, collName) {
     const listCollectionRes = assert.commandWorked(
         conn.getDB(dbName).runCommand({listCollections: 1, filter: {name: collName}}),

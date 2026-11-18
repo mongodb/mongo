@@ -16,6 +16,7 @@ import {
     isInvalidated,
 } from "jstests/libs/query/change_stream_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {DedupCommandEventTracker} from "jstests/libs/util/change_stream/change_stream_reader_dedup.js";
 
 /**
  * Best-effort cursor cleanup. The server kills cursors after invalidate, so
@@ -141,6 +142,8 @@ class ChangeStreamReader {
      *       that don't want to deal with unpredictable per-shard event counts.
      *   - startAtClusterTime: Optional Timestamp to start at (reconstructed after
      *       thread boundary crossing).
+     *   - dedupSeedKeys: Optional dedup keys seen before `startAtClusterTime` for a
+     *       mid-stream reader.
      * @private
      */
     static _execute(conn, config) {
@@ -149,21 +152,33 @@ class ChangeStreamReader {
             const ts = config.startAtClusterTime;
             config.startAtClusterTime = new Timestamp(ts.t, ts.i);
         }
+        // Reader state shared by all read paths. The dedup tracker is created once and is
+        // always on: a duplicate command (DDL) event is a server-retry artifact, never a
+        // legitimate expected event. All raw events enter the reader through _nextEvent().
+        const st = {
+            conn,
+            cfg: config,
+            dedup: new DedupCommandEventTracker(config.dedupSeedKeys),
+            cst: null,
+            cursor: null,
+            resumeToken: null,
+            useStartAfter: false,
+        };
         switch (config.readingMode) {
             case ChangeStreamReadingMode.kContinuous:
-                ChangeStreamReader._readContinuous(conn, config);
+                ChangeStreamReader._readContinuous(st);
                 break;
             case ChangeStreamReadingMode.kFetchOneAndResume:
-                ChangeStreamReader._readFetchOneAndResume(conn, config);
+                ChangeStreamReader._readFetchOneAndResume(st);
                 break;
             case ChangeStreamReadingMode.kFetchOneAndResumeFromPbrt:
-                ChangeStreamReader._readFetchOneAndResume(conn, config, /*resumeFromPbrt=*/ true);
+                ChangeStreamReader._readFetchOneAndResume(st, /*resumeFromPbrt=*/ true);
                 break;
             case ChangeStreamReadingMode.kReadUntilDone:
-                ChangeStreamReader._drainEvents(conn, config, false);
+                ChangeStreamReader._drainEvents(st, false);
                 break;
             case ChangeStreamReadingMode.kFetchOneAndResumeUntilDone:
-                ChangeStreamReader._drainEvents(conn, config, true);
+                ChangeStreamReader._drainEvents(st, true);
                 break;
             default:
                 throw new Error(`Unknown change stream reading mode: ${config.readingMode}`);
@@ -334,44 +349,101 @@ class ChangeStreamReader {
     }
 
     /**
-     * Read events continuously, keeping the cursor open.
-     * Handles invalidate events by reopening the cursor with startAfter.
+     * The single entry point through which raw change events enter the reader.
+     *
+     * Fetches at most one event (blocking when requested) and runs deduplication. The
+     * reader's resume token is ALWAYS advanced here — including for duplicate command (DDL)
+     * events suppressed by dedup — so a reopened cursor never re-reads a suppressed event.
+     * This invariant lives nowhere else.
+     *
+     * Duplicates are collapsed internally (the fetch loops until a non-duplicate event or
+     * exhaustion) unless `allowDuplicates` is set: only the fetch-one-and-resume mode opts
+     * in, because its fresh-cursor-per-event policy must close the cursor that carried a
+     * duplicate before fetching the next one.
+     *
+     * @param {Object} st - Reader state (see _execute).
+     * @param {boolean} [options.blocking] - Block until an event arrives (continuous
+     *     and fetch-one-and-resume modes) instead of returning null on an empty batch.
+     * @param {boolean} [options.allowDuplicates] - Return collapsed duplicates to the
+     *     caller (marked `duplicate: true`) instead of skipping them internally.
+     * @returns {{event: Object|null, duplicate: boolean}} `event` is null only when no
+     *     event was available (non-blocking reads); `duplicate` marks a suppressed
+     *     duplicate whose resume token was still advanced.
      * @private
      */
-    static _readContinuous(conn, cfg) {
-        jsTest.log.debug("ChangeStreamReader Starting continuous read", cfg);
-        let cst = null;
-        let cursor = null;
-        const readEventTypes = [];
-        let lastResumeToken = null;
-        let lastWasInvalidate = false;
+    static _nextEvent(st, {blocking = false, allowDuplicates = false} = {}) {
+        while (true) {
+            let event;
+            if (blocking) {
+                ({
+                    changeEvent: event,
+                    cst: st.cst,
+                    cursor: st.cursor,
+                } = ChangeStreamReader._readOneEvent(
+                    st.conn,
+                    st.cfg,
+                    st.cst,
+                    st.cursor,
+                    st.resumeToken,
+                    st.useStartAfter,
+                ));
+            } else {
+                event = ChangeStreamReader._tryGetNextEvent(st.cst, st.cursor);
+            }
+            if (event === null) {
+                return {event: null, duplicate: false};
+            }
 
-        for (let count = 0; count < cfg.numberOfEventsToRead; count++) {
-            const result = ChangeStreamReader._readOneEvent(
-                conn,
-                cfg,
-                cst,
-                cursor,
-                lastResumeToken,
-                lastWasInvalidate,
-            );
-            cst = result.cst;
-            cursor = result.cursor;
+            // Always advance the resume token, even for a suppressed duplicate, so the
+            // reopened cursor does not re-read it.
+            st.resumeToken = event._id;
+
+            if (st.dedup.shouldSkip(event)) {
+                jsTest.log.debug("ChangeStreamReader collapsed duplicate event", {
+                    instanceName: st.cfg.instanceName,
+                    operationType: event.operationType,
+                    ns: event.ns,
+                });
+                if (allowDuplicates) {
+                    return {event, duplicate: true};
+                }
+                continue;
+            }
+            return {event, duplicate: false};
+        }
+    }
+
+    /**
+     * Read events continuously, keeping the cursor open.
+     * Handles invalidate events by reopening the cursor with startAfter.
+     * @param {Object} st - Reader state (see _execute).
+     * @private
+     */
+    static _readContinuous(st) {
+        const cfg = st.cfg;
+        jsTest.log.debug("ChangeStreamReader Starting continuous read", cfg);
+        const readEventTypes = [];
+
+        // Read until numberOfEventsToRead events have been RECORDED. Duplicate command
+        // (DDL) events keep advancing the resume token but are neither recorded nor counted.
+        let count = 0;
+        while (count < cfg.numberOfEventsToRead) {
+            const {event} = ChangeStreamReader._nextEvent(st, {blocking: true});
 
             const isInvalidate = ChangeStreamReader._processEvent(
-                conn,
+                st.conn,
                 cfg,
-                result.changeEvent,
+                event,
                 count,
                 readEventTypes,
             );
-            lastResumeToken = result.changeEvent._id;
-            lastWasInvalidate = isInvalidate;
+            st.useStartAfter = isInvalidate;
+            count++;
 
             if (isInvalidate) {
-                tryCleanUp(cst, cfg.instanceName);
-                cst = null;
-                cursor = null;
+                tryCleanUp(st.cst, cfg.instanceName);
+                st.cst = null;
+                st.cursor = null;
             }
         }
 
@@ -379,57 +451,62 @@ class ChangeStreamReader {
             instanceName: cfg.instanceName,
             readEventTypes,
         });
-        tryCleanUp(cst, cfg.instanceName);
+        tryCleanUp(st.cst, cfg.instanceName);
     }
 
     /**
      * Read all available events until a getMore returns no events (awaitData
      * timeout). Writers must be finished before calling this method.
      *
+     * @param {Object} st - Reader state (see _execute).
      * @param {boolean} reopenPerEvent - If true, reopen the cursor after every
      *   event (FOAR semantics). If false, keep it open and only reopen after
      *   invalidates (continuous semantics).
      * @private
      */
-    static _drainEvents(conn, cfg, reopenPerEvent) {
+    static _drainEvents(st, reopenPerEvent) {
+        const cfg = st.cfg;
         jsTest.log.debug(
             `ChangeStreamReader Starting drain (reopenPerEvent=${reopenPerEvent})`,
             cfg,
         );
 
-        let lastResumeToken = null;
         const readEventTypes = [];
         let count = 0;
 
-        let {cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg, null, false);
+        ({cst: st.cst, cursor: st.cursor} = ChangeStreamReader._openChangeStream(
+            st.conn,
+            cfg,
+            null,
+            false,
+        ));
 
         while (true) {
-            const event = ChangeStreamReader._tryGetNextEvent(cst, cursor);
+            const {event} = ChangeStreamReader._nextEvent(st);
             if (event === null) {
                 break;
             }
 
             const isInvalidate = ChangeStreamReader._processEvent(
-                conn,
+                st.conn,
                 cfg,
                 event,
                 count++,
                 readEventTypes,
             );
-            lastResumeToken = event._id;
 
             if (reopenPerEvent || isInvalidate) {
-                tryCleanUp(cst, cfg.instanceName);
-                ({cst, cursor} = ChangeStreamReader._openChangeStream(
-                    conn,
+                tryCleanUp(st.cst, cfg.instanceName);
+                ({cst: st.cst, cursor: st.cursor} = ChangeStreamReader._openChangeStream(
+                    st.conn,
                     cfg,
-                    lastResumeToken,
+                    st.resumeToken,
                     isInvalidate,
                 ));
             }
         }
 
-        tryCleanUp(cst, cfg.instanceName);
+        tryCleanUp(st.cst, cfg.instanceName);
         jsTest.log.debug("ChangeStreamReader Read events", {
             instanceName: cfg.instanceName,
             readEventTypes,
@@ -441,20 +518,23 @@ class ChangeStreamReader {
      * Uses resumeAfter with the previous event's token.
      * After an invalidate, uses startAfter to reopen the cursor.
      *
-     * '_readOneEvent' blocks until an event arrives, so it never sees an empty batch and can
-     * only resume from an event token. With 'resumeFromPbrt' the cursor is kept open for up to
-     * kMaxPbrtGetMores more getMores; the first empty batch yields a postBatchResumeToken,
-     * which is then used to resume, as drivers do on an idle stream.
+     * '_readOneEvent' (via _nextEvent with blocking=true) blocks until an event arrives, so it
+     * never sees an empty batch and can only resume from an event token. With 'resumeFromPbrt'
+     * the cursor is kept open for up to kMaxPbrtGetMores more getMores; the first empty batch
+     * yields a postBatchResumeToken, which is then used to resume, as drivers do on an idle
+     * stream.
      *
+     * @param {Object} st - Reader state (see _execute).
+     * @param {boolean} resumeFromPbrt - Also poll the open cursor after each event and
+     *   resume from its post-batch resume token when the batch is empty.
      * @private
      */
-    static _readFetchOneAndResume(conn, cfg, resumeFromPbrt = false) {
+    static _readFetchOneAndResume(st, resumeFromPbrt = false) {
+        const cfg = st.cfg;
         jsTest.log.debug(
             `ChangeStreamReader Starting fetch-one-and-resume (resumeFromPbrt=${resumeFromPbrt})`,
             cfg,
         );
-        let resumeToken = null;
-        let useStartAfter = false;
         // null, "eventToken" or "pbrt": how the current cursor was opened.
         let resumedFrom = null;
         const readEventTypes = [];
@@ -462,23 +542,28 @@ class ChangeStreamReader {
 
         let count = 0;
         while (count < cfg.numberOfEventsToRead) {
-            const {changeEvent, cst, cursor} = ChangeStreamReader._readOneEvent(
-                conn,
-                cfg,
-                null,
-                null,
-                resumeToken,
-                useStartAfter,
-            );
+            // Fetch-one-and-resume opens a fresh cursor for every event. It opts into
+            // seeing duplicates: a collapsed duplicate must close this fresh cursor so
+            // the next event is fetched from a cursor resumed past the duplicate.
+            st.cst = null;
+            st.cursor = null;
+            const {event, duplicate} = ChangeStreamReader._nextEvent(st, {
+                blocking: true,
+                allowDuplicates: true,
+            });
+            if (duplicate) {
+                tryCleanUp(st.cst, cfg.instanceName);
+                continue;
+            }
+
             let isInvalidate = ChangeStreamReader._processEvent(
-                conn,
+                st.conn,
                 cfg,
-                changeEvent,
+                event,
                 count++,
                 readEventTypes,
                 {resumedFrom},
             );
-            resumeToken = changeEvent._id;
             resumedFrom = "eventToken";
 
             // An invalidate closes the cursor, so there is nothing left to poll.
@@ -488,29 +573,28 @@ class ChangeStreamReader {
                     i < ChangeStreamReader.kMaxPbrtGetMores && count < cfg.numberOfEventsToRead;
                     i++
                 ) {
-                    const event = ChangeStreamReader._tryGetNextEvent(cst, cursor);
-                    if (event === null) {
-                        resumeToken = cst.getResumeToken(cursor);
+                    const {event: extraEvent} = ChangeStreamReader._nextEvent(st);
+                    if (extraEvent === null) {
+                        st.resumeToken = st.cst.getResumeToken(st.cursor);
                         resumedFrom = "pbrt";
                         break;
                     }
                     isInvalidate = ChangeStreamReader._processEvent(
-                        conn,
+                        st.conn,
                         cfg,
-                        event,
+                        extraEvent,
                         count++,
                         readEventTypes,
                     );
-                    resumeToken = event._id;
                     if (isInvalidate) {
                         break;
                     }
                 }
             }
             resumeStats[resumedFrom]++;
-            useStartAfter = isInvalidate;
+            st.useStartAfter = isInvalidate;
 
-            tryCleanUp(cst, cfg.instanceName);
+            tryCleanUp(st.cst, cfg.instanceName);
         }
 
         jsTest.log.info("ChangeStreamReader Read events", {

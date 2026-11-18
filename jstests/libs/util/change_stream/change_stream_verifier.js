@@ -28,7 +28,7 @@ import {
     ChangeStreamReader,
     ChangeStreamReadingMode,
 } from "jstests/libs/util/change_stream/change_stream_reader.js";
-
+import {makeCommandDedupKey} from "jstests/libs/util/change_stream/change_stream_reader_dedup.js";
 /**
  * Format a change event record for debugging output.
  * @param {Object} rec - Event record containing changeEvent
@@ -129,9 +129,11 @@ class VerifierContext {
 
     /**
      * Launch a reader from a specific cluster time without waiting for completion.
+     * @param {Array<string>} [dedupSeedKeys] - Dedup keys seen before `clusterTime`, so this
+     *     reader collapses the same duplicates as the reference reader.
      * @returns {string} The instance name of the launched reader (use with getChangeEvents to collect).
      */
-    launchReaderFromClusterTime(conn, instanceName, clusterTime, limit) {
+    launchReaderFromClusterTime(conn, instanceName, clusterTime, limit, dedupSeedKeys = []) {
         const baseCfg = this.changeStreamReaderConfigs[instanceName];
         assert(baseCfg, `No reader config for instanceName=${instanceName}`);
         assert(limit > 0, `limit must be a positive number, got ${limit}`);
@@ -141,6 +143,7 @@ class VerifierContext {
             numberOfEventsToRead: limit,
             readingMode: ChangeStreamReadingMode.kContinuous,
             startAtClusterTime: clusterTime,
+            dedupSeedKeys,
         });
 
         ChangeStreamReader.run(conn, cfg);
@@ -530,7 +533,13 @@ class PrefixReadTestCase {
                 .slice(startIdx, startIdx + this._limit)
                 .map(PrefixReadTestCase._extractComparable);
             if (expected.length > 0) {
-                items.push({ts, expected});
+                // The resume reader starts mid-stream, so seed its dedup tracker with the
+                // keys seen before `ts` to collapse the same duplicates as the reference reader.
+                const dedupSeedKeys = events
+                    .slice(0, startIdx)
+                    .map((rec) => makeCommandDedupKey(rec.changeEvent))
+                    .filter((key) => key !== null);
+                items.push({ts, expected, dedupSeedKeys});
             }
         }
         return items;
@@ -544,6 +553,7 @@ class PrefixReadTestCase {
                 this._readerInstanceName,
                 item.ts,
                 item.expected.length,
+                item.dedupSeedKeys,
             ),
         };
     }

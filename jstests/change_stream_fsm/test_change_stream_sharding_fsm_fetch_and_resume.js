@@ -23,8 +23,7 @@ import {
 import {State} from "jstests/libs/util/change_stream/change_stream_sharding_state.js";
 import {describe, it, afterEach} from "jstests/libs/mochalite.js";
 
-// TODO: SERVER-138724 Add back in once duplicate events tolerated
-describe.skip("Change Stream Sharding FSM Fetch-One-And-Resume", function () {
+describe("Change Stream Sharding FSM Fetch-One-And-Resume", function () {
     let env;
     afterEach(function () {
         env?.teardown();

@@ -122,8 +122,7 @@ function runMoveChunkTest({
     csTest.cleanUp();
 }
 
-// TODO: SERVER-138724 Add back in once duplicate events tolerated
-describe.skip("MoveChunk System Events (v2)", function () {
+describe("MoveChunk System Events (v2)", function () {
     const dbName = "test_move_chunk_events";
     const collName = "coll";
 
