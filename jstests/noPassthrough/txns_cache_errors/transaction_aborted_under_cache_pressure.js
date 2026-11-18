@@ -1,7 +1,14 @@
 /**
  * Validate we are aborting multi-document transactions when we are under cache pressure.
  *
- * @tags: [requires_persistence, requires_wiredtiger, requires_fcv_83]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_wiredtiger,
+ *   requires_fcv_83,
+ *   # TODO(SERVER-139429): Re-enable once the test is made deterministic with failpoints, or
+ *   # delete it if the evaluation finds no coverage value over existing tests.
+ *   __TEMPORARILY_DISABLED__,
+ * ]
  */
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
