@@ -703,6 +703,14 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     // Recover to the stable timestamp.
     auto stableTimestamp = _recoverToStableTimestamp(opCtx);
 
+    // The recordIdsGroupId marker is deliberately unlogged and written only at its fencing entry's
+    // timestamp, so that recovering to the stable timestamp rolls it back together with the data:
+    // a mint or clear after the stable timestamp is undone along with the fencing entry that made
+    // it. That rollback bypasses setRecordIdsGroupId and clearRecordIdsGroupId, so reload the
+    // in-memory membership cache from the recovered marker before oplog recovery replays any
+    // entries.
+    _replicationProcess->getConsistencyMarkers()->reloadEffectiveRecordIdsGroupId(opCtx);
+
     _rollbackStats.stableTimestamp = stableTimestamp;
     _listener->onRecoverToStableTimestamp(stableTimestamp);
 

@@ -33,6 +33,17 @@ class StorageInterface;
 inline constexpr std::string_view kRecordIdsGroupIdDocId = "recordIdsGroupId";
 
 /**
+ * A node's membership in a set-wide Replicated RecordIds group: the group it belongs to and the
+ * OpTime of the fencing entry that founded that group.
+ */
+struct RecordIdsGroupMembership {
+    UUID groupId;
+    OpTime foundingOpTime;
+
+    bool operator==(const RecordIdsGroupMembership&) const = default;
+};
+
+/**
  * This interface provides helper functions for maintaining the documents used for
  * maintaining data consistency.
  *
@@ -301,12 +312,55 @@ public:
      * startup before replication starts.
      *
      * This reads from storage on every call and must not be used per-op. Hot paths (oplog rid
-     * emission on the primary, rid honoring in the applier) must instead consult the cached
-     * membership view that is loaded at startup and updated transactionally at each mint and
-     * clear.
+     * emission on the primary, rid honoring in the applier) must instead consult
+     * getEffectiveRecordIdsGroupId, the cached membership view that is loaded at startup and
+     * updated transactionally at each mint and clear.
      */
     virtual boost::optional<RecordIdsGroupIdDocument> getRecordIdsGroupId(
         OperationContext* opCtx) = 0;
+
+    /**
+     * Returns this node's effective Replicated RecordIds group membership, or boost::none if the
+     * node is not a member of any group. This is the membership predicate that every consumer
+     * (oplog rid emission, rid honoring in the applier, the rid-inclusive dbhash, and the
+     * hello/replSetGetStatus reporting surface) must consult. Unlike getRecordIdsGroupId, this
+     * never reads directly from storage and is safe to call per op.
+     *
+     * If the persistence provider requires replicated RecordIds, this returns the sentinel
+     * membership: the all-zeros groupId with a null founding OpTime, since no fencing entry
+     * founded the group. It can never equal a minted groupId, because UUID::gen() always sets
+     * the RFC 4122 version 4 bits.
+     *
+     * Otherwise, this returns an in-memory cache of the stored marker. The cache must have been
+     * loaded by reloadEffectiveRecordIdsGroupId; this tasserts if it has not.
+     * setRecordIdsGroupId and clearRecordIdsGroupId update the cache when, and only when, their
+     * WriteUnitOfWork commits.
+     */
+    virtual boost::optional<RecordIdsGroupMembership> getEffectiveRecordIdsGroupId(
+        OperationContext* opCtx) const = 0;
+
+    /**
+     * Reloads the in-memory effective recordIdsGroupId cache from storage. This reads from storage,
+     * except when the persistence provider requires replicated RecordIds: then
+     * getEffectiveRecordIdsGroupId always returns the sentinel membership and never consults the
+     * cache, so this does nothing.
+     *
+     * setRecordIdsGroupId and clearRecordIdsGroupId keep the cache up to date on commit. Any other
+     * change to the stored marker leaves the cache stale, so callers must reload after it.
+     *
+     * The storage read and the cache write are not atomic. Callers must therefore guarantee that
+     * no mint or clear can commit concurrently with the reload. Otherwise, the reload can
+     * overwrite that commit's cache update with the older value it read, silently losing the mint
+     * or clear. The current callers, and why each is safe:
+     *  - startup, before replication recovery or oplog application (the cache starts unloaded).
+     *    Replication has not started, so nothing can mint or clear.
+     *  - rollback, after recover-to-stable, which by design rolls the unlogged marker back
+     *    along with the data. The node is in ROLLBACK, so it is not primary and cannot mint,
+     *    and the oplog buffer has drained, so the applier cannot apply a clear.
+     *  - file copy based initial sync, which replaces the marker with the sync source's. Every
+     *    storage switch holds the global lock in MODE_X, which excludes any mint or clear.
+     */
+    virtual void reloadEffectiveRecordIdsGroupId(OperationContext* opCtx) = 0;
 
     /**
      * Clears the recordIdsGroupId by dropping the collection. Clears are always collection drops,

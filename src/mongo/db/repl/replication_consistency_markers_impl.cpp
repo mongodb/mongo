@@ -14,6 +14,8 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/rss/persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -34,6 +36,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <array>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -632,6 +635,18 @@ void ReplicationConsistencyMarkersImpl::setRecordIdsGroupId(OperationContext* op
                                                 collection.getCollectionPtr(),
                                                 InsertStatement(doc.toBSON()),
                                                 /*opDebug=*/nullptr));
+
+    // Publish the new membership to the in-memory cache only once the marker write commits, so
+    // hot-path readers of getEffectiveRecordIdsGroupId never observe an uncommitted mint and an
+    // aborted WriteUnitOfWork leaves the cache untouched. The collection lock acquired above is
+    // held until the WriteUnitOfWork ends (two-phase locking), so the commit handlers of a mint
+    // and a clear (which takes MODE_X) can never be reordered relative to their storage commits.
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [this, membership = RecordIdsGroupMembership{groupId, foundingOpTime}](
+            OperationContext*, boost::optional<Timestamp>) {
+            auto lk = _effectiveRecordIdsGroupIdMutex.writeLock();
+            _effectiveRecordIdsGroupId.emplace(membership);
+        });
 }
 
 boost::optional<RecordIdsGroupIdDocument> ReplicationConsistencyMarkersImpl::getRecordIdsGroupId(
@@ -649,6 +664,49 @@ boost::optional<RecordIdsGroupIdDocument> ReplicationConsistencyMarkersImpl::get
     return RecordIdsGroupIdDocument::parse(result.getValue());
 }
 
+boost::optional<RecordIdsGroupMembership>
+ReplicationConsistencyMarkersImpl::getEffectiveRecordIdsGroupId(OperationContext* opCtx) const {
+    // If the persistence provider requires replicated RecordIds, every node reports the sentinel
+    // membership regardless of the persisted marker.
+    if (rss::ReplicatedStorageService::get(opCtx)
+            .getPersistenceProvider()
+            .shouldUseReplicatedRecordIds()) {
+        return RecordIdsGroupMembership{UUID::fromCDR(std::array<unsigned char, UUID::kNumBytes>{}),
+                                        OpTime()};
+    }
+    auto lk = _effectiveRecordIdsGroupIdMutex.readLock();
+    tassert(13843302,
+            "getEffectiveRecordIdsGroupId called before reloadEffectiveRecordIdsGroupId",
+            _effectiveRecordIdsGroupId.has_value());
+    return *_effectiveRecordIdsGroupId;
+}
+
+void ReplicationConsistencyMarkersImpl::reloadEffectiveRecordIdsGroupId(OperationContext* opCtx) {
+    // If the persistence provider requires replicated RecordIds, getEffectiveRecordIdsGroupId
+    // always returns the sentinel membership and never consults the cache, so there is nothing to
+    // load.
+    if (rss::ReplicatedStorageService::get(opCtx)
+            .getPersistenceProvider()
+            .shouldUseReplicatedRecordIds()) {
+        return;
+    }
+
+    boost::optional<RecordIdsGroupMembership> membership;
+    if (auto doc = getRecordIdsGroupId(opCtx)) {
+        membership = RecordIdsGroupMembership{doc->getGroupId(), doc->getFoundingOpTime()};
+    }
+
+    LOGV2(13843301,
+          "Loaded Replicated RecordIds group membership",
+          "isMember"_attr = membership.has_value(),
+          "groupId"_attr = membership ? boost::make_optional(membership->groupId) : boost::none,
+          "foundingOpTime"_attr =
+              membership ? boost::make_optional(membership->foundingOpTime) : boost::none);
+
+    auto lk = _effectiveRecordIdsGroupIdMutex.writeLock();
+    _effectiveRecordIdsGroupId.emplace(std::move(membership));
+}
+
 void ReplicationConsistencyMarkersImpl::clearRecordIdsGroupId(OperationContext* opCtx) {
     // Clears are always drops of the whole collection, never untimestamped document writes:
     // untimestamped writes to this timestamped document would rewrite its history and break
@@ -659,6 +717,16 @@ void ReplicationConsistencyMarkersImpl::clearRecordIdsGroupId(OperationContext* 
     // This mirrors StorageInterfaceImpl::dropCollection minus its WriteUnitOfWork.
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork(),
               "clearRecordIdsGroupId must be called within a WriteUnitOfWork");
+
+    // Publish the cleared membership to the in-memory cache only once the drop commits (see
+    // setRecordIdsGroupId). This is registered before the early return below so that the cache is
+    // cleared even when there is nothing to drop.
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [this](OperationContext*, boost::optional<Timestamp>) {
+            auto lk = _effectiveRecordIdsGroupIdMutex.writeLock();
+            // Loaded, and not a member. Assigning boost::none would mark it unloaded instead.
+            _effectiveRecordIdsGroupId.emplace(boost::none);
+        });
 
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
         shard_role_details::getLocker(opCtx));

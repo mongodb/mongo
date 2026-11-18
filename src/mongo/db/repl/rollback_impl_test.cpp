@@ -24,6 +24,7 @@
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/oplog_interface_mock.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
+#include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rollback_test_fixture.h"
 #include "mongo/db/rss/replicated_storage_service.h"
@@ -600,6 +601,36 @@ TEST_F(RollbackImplTest, RollbackSucceedsIfTopOfOplogIsFirstOpAfterCommonPoint) 
 
     // Run rollback.
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+}
+
+TEST_F(RollbackImplTest, RollbackReloadsEffectiveRecordIdsGroupId) {
+    auto consistencyMarkers = dynamic_cast<ReplicationConsistencyMarkersMock*>(
+        _replicationProcess->getConsistencyMarkers());
+    ASSERT(consistencyMarkers);
+
+    // The node holds a groupId before rollback.
+    consistencyMarkers->setRecordIdsGroupId(
+        _opCtx.get(), UUID::gen(), OpTime({Seconds(123), 4}, 1LL));
+    ASSERT_TRUE(consistencyMarkers->getEffectiveRecordIdsGroupId(_opCtx.get()));
+
+    // Recovering to the stable timestamp rolls the unlogged marker back together with the data, so
+    // a groupId minted after the stable timestamp is undone. The fixture's recover-to-stable does
+    // not touch the marker, so simulate that by removing the stored marker behind the effective
+    // membership, which is now stale.
+    consistencyMarkers->replaceStoredRecordIdsGroupId_forTest(boost::none);
+    ASSERT_TRUE(consistencyMarkers->getEffectiveRecordIdsGroupId(_opCtx.get()));
+
+    auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 5 * 1000));
+    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 2 * 1000));
+    _remoteOplog->setOperations({commonPoint});
+    ASSERT_OK(_insertOplogEntry(commonPoint.first));
+    ASSERT_OK(_insertOplogEntry(topOfOplog.first));
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+
+    // Rollback must reload the effective membership from the recovered marker.
+    ASSERT_FALSE(consistencyMarkers->getEffectiveRecordIdsGroupId(_opCtx.get()));
 }
 
 TEST_F(RollbackImplTest, RollbackKillsNecessaryOperations) {

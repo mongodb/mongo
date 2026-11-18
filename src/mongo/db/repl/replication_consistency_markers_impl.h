@@ -13,6 +13,7 @@
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/util/modules.h"
 
 #include <mutex>
@@ -79,6 +80,9 @@ public:
                              const UUID& groupId,
                              const OpTime& foundingOpTime) override;
     boost::optional<RecordIdsGroupIdDocument> getRecordIdsGroupId(OperationContext* opCtx) override;
+    boost::optional<RecordIdsGroupMembership> getEffectiveRecordIdsGroupId(
+        OperationContext* opCtx) const override;
+    void reloadEffectiveRecordIdsGroupId(OperationContext* opCtx) override;
     void clearRecordIdsGroupId(OperationContext* opCtx) override;
 
 private:
@@ -124,6 +128,18 @@ private:
     const NamespaceString _oplogTruncateAfterPointNss;
     const NamespaceString _initialSyncIdNss;
     const NamespaceString _recordIdsGroupIdNss;
+
+    // The effective Replicated RecordIds group membership: an in-memory cache of the
+    // recordIdsGroupId document, served by getEffectiveRecordIdsGroupId unless the persistence
+    // provider requires replicated RecordIds (in which case it is never loaded). The outer optional
+    // is whether the cache is loaded; the inner one is the membership itself (boost::none: not a
+    // member). It starts unloaded so that a read before the startup load fails loudly instead of
+    // reporting "not a member". It is (re)loaded from storage only by
+    // reloadEffectiveRecordIdsGroupId, and otherwise only changed from the onCommit handlers
+    // registered by setRecordIdsGroupId and clearRecordIdsGroupId, so it never reflects an
+    // uncommitted or aborted write.
+    mutable WriteRarelyRWMutex _effectiveRecordIdsGroupIdMutex;
+    boost::optional<boost::optional<RecordIdsGroupMembership>> _effectiveRecordIdsGroupId;
 
     // Protects modifying and reading _isPrimary below.
     mutable std::mutex _truncatePointIsPrimaryMutex;

@@ -115,20 +115,30 @@ BSONObj ReplicationConsistencyMarkersMock::getInitialSyncId(OperationContext* op
 
 void ReplicationConsistencyMarkersMock::createRecordIdsGroupIdCollection(OperationContext* opCtx) {}
 
+namespace {
+RecordIdsGroupIdDocument makeRecordIdsGroupIdDocument(const RecordIdsGroupMembership& membership) {
+    RecordIdsGroupIdDocument doc;
+    doc.set_id(kRecordIdsGroupIdDocId);
+    doc.setGroupId(membership.groupId);
+    doc.setFoundingOpTime(membership.foundingOpTime);
+    return doc;
+}
+}  // namespace
+
 void ReplicationConsistencyMarkersMock::setRecordIdsGroupId(OperationContext* opCtx,
                                                             const UUID& groupId,
                                                             const OpTime& foundingOpTime) {
-    RecordIdsGroupIdDocument doc;
-    doc.set_id(kRecordIdsGroupIdDocId);
-    doc.setGroupId(groupId);
-    doc.setFoundingOpTime(foundingOpTime);
+    RecordIdsGroupMembership membership{groupId, foundingOpTime};
 
     std::lock_guard<std::mutex> lock(_recordIdsGroupIdMutex);
     // A groupId is only ever written while groupless, and writing over an existing one is always
     // a bug.
     invariant(!_recordIdsGroupId.has_value(),
               "setRecordIdsGroupId called while a recordIdsGroupId document is already present");
-    _recordIdsGroupId = doc;
+    _recordIdsGroupId = makeRecordIdsGroupIdDocument(membership);
+    // The mock has no WriteUnitOfWork, so the effective membership changes immediately rather
+    // than on commit.
+    _effectiveRecordIdsGroupId = membership;
 }
 
 boost::optional<RecordIdsGroupIdDocument> ReplicationConsistencyMarkersMock::getRecordIdsGroupId(
@@ -137,9 +147,35 @@ boost::optional<RecordIdsGroupIdDocument> ReplicationConsistencyMarkersMock::get
     return _recordIdsGroupId;
 }
 
+boost::optional<RecordIdsGroupMembership>
+ReplicationConsistencyMarkersMock::getEffectiveRecordIdsGroupId(OperationContext* opCtx) const {
+    // Like ReplicationConsistencyMarkersImpl, this serves the in-memory effective membership, not
+    // the stored document, so tests can catch callers that forget to reload after the stored
+    // document changes behind it. See _effectiveRecordIdsGroupId for where the mock differs.
+    std::lock_guard<std::mutex> lock(_recordIdsGroupIdMutex);
+    return _effectiveRecordIdsGroupId;
+}
+
+void ReplicationConsistencyMarkersMock::reloadEffectiveRecordIdsGroupId(OperationContext* opCtx) {
+    boost::optional<RecordIdsGroupMembership> membership;
+    if (auto doc = getRecordIdsGroupId(opCtx)) {
+        membership = RecordIdsGroupMembership{doc->getGroupId(), doc->getFoundingOpTime()};
+    }
+    std::lock_guard<std::mutex> lock(_recordIdsGroupIdMutex);
+    _effectiveRecordIdsGroupId = std::move(membership);
+}
+
 void ReplicationConsistencyMarkersMock::clearRecordIdsGroupId(OperationContext* opCtx) {
     std::lock_guard<std::mutex> lock(_recordIdsGroupIdMutex);
     _recordIdsGroupId = boost::none;
+    _effectiveRecordIdsGroupId = boost::none;
+}
+
+void ReplicationConsistencyMarkersMock::replaceStoredRecordIdsGroupId_forTest(
+    const boost::optional<RecordIdsGroupMembership>& membership) {
+    std::lock_guard<std::mutex> lock(_recordIdsGroupIdMutex);
+    _recordIdsGroupId =
+        membership ? boost::make_optional(makeRecordIdsGroupIdDocument(*membership)) : boost::none;
 }
 
 }  // namespace repl

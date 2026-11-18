@@ -949,6 +949,12 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) 
 
 void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
                                          StorageEngine::LastShutdownState lastShutdownState) {
+    // Load the Replicated RecordIds group membership cache before any oplog application,
+    // including startup recovery and standalone oplog recovery below, so that every consumer of
+    // getEffectiveRecordIdsGroupId sees the persisted membership. After this, the cache is kept
+    // coherent by the writes that change the marker.
+    _replicationProcess->getConsistencyMarkers()->reloadEffectiveRecordIdsGroupId(opCtx);
+
     if (!_settings.isReplSet()) {
         try {
             // We do not need to check for magic restore since magic restore always runs in a

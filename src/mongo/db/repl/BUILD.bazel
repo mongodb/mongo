@@ -837,6 +837,8 @@ mongo_cc_library(
         "//src/mongo/db:server_options",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/rss:persistence_provider",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
@@ -2542,6 +2544,7 @@ mongo_cc_unit_test(
         ":oplog_entry",
         ":replication_recovery",
         ":storage_interface",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/db/session:session_catalog_mongod",
     ],
 )

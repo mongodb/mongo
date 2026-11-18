@@ -20,6 +20,7 @@
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl_gen.h"
@@ -272,6 +273,32 @@ TEST_F(ReplCoordTest, NodeEntersStartupStateWhenStartingUpWithNoLocalConfig) {
     logs.stop();
     ASSERT_EQUALS(3, logs.countTextContaining("Did not find local "));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
+}
+
+TEST_F(ReplCoordTest, StartupLoadsEffectiveRecordIdsGroupId) {
+    init();
+    auto consistencyMarkers = dynamic_cast<ReplicationConsistencyMarkersMock*>(
+        ReplicationProcess::get(getServiceContext())->getConsistencyMarkers());
+    ASSERT(consistencyMarkers);
+
+    // A groupId persisted before the restart.
+    auto groupId = UUID::gen();
+    OpTime foundingOpTime({Seconds(123), 4}, 1LL);
+    consistencyMarkers->replaceStoredRecordIdsGroupId_forTest(
+        RecordIdsGroupMembership{groupId, foundingOpTime});
+    {
+        // Nothing has reloaded the effective membership from the stored document yet.
+        const auto opCtx = makeOperationContext();
+        ASSERT_FALSE(consistencyMarkers->getEffectiveRecordIdsGroupId(opCtx.get()));
+    }
+
+    start();
+
+    const auto opCtx = makeOperationContext();
+    auto membership = consistencyMarkers->getEffectiveRecordIdsGroupId(opCtx.get());
+    ASSERT_TRUE(membership);
+    ASSERT_EQ(membership->groupId, groupId);
+    ASSERT_EQ(membership->foundingOpTime, foundingOpTime);
 }
 
 TEST_F(ReplCoordTest, RecordsACleanShutdownDocumentWhenStartingUpAfterACleanShutdown) {

@@ -12,6 +12,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -21,11 +22,13 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
+#include <array>
 #include <memory>
 #include <utility>
 
@@ -331,6 +334,218 @@ TEST_F(ReplicationConsistencyMarkersTest, RecordIdsGroupIdLifecycle) {
     ASSERT_TRUE(doc);
     ASSERT_EQ(doc->getGroupId(), groupId);
     ASSERT_EQ(doc->getFoundingOpTime(), foundingOpTime);
+}
+
+TEST_F(ReplicationConsistencyMarkersTest, EffectiveRecordIdsGroupIdCacheCoherence) {
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
+    auto opCtx = getOperationContext();
+
+    // After the startup load, a groupless node is not a member.
+    consistencyMarkers.reloadEffectiveRecordIdsGroupId(opCtx);
+    ASSERT_FALSE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+
+    consistencyMarkers.createRecordIdsGroupIdCollection(opCtx);
+    ASSERT_FALSE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+
+    auto groupId = UUID::gen();
+    OpTime foundingOpTime({Seconds(123), 4}, 1LL);
+
+    // An aborted mint leaves both the marker and the cache groupless.
+    {
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.setRecordIdsGroupId(opCtx, groupId, foundingOpTime);
+        ASSERT_FALSE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+    }
+    ASSERT_FALSE(consistencyMarkers.getRecordIdsGroupId(opCtx));
+    ASSERT_FALSE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+
+    // A committed mint is published to the cache only at commit.
+    {
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.setRecordIdsGroupId(opCtx, groupId, foundingOpTime);
+        ASSERT_FALSE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+        wuow.commit();
+    }
+    auto membership = consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx);
+    ASSERT_TRUE(membership);
+    ASSERT_EQ(membership->groupId, groupId);
+    ASSERT_EQ(membership->foundingOpTime, foundingOpTime);
+
+    // An aborted clear leaves both the marker and the cache intact.
+    {
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.clearRecordIdsGroupId(opCtx);
+        ASSERT_TRUE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+    }
+    ASSERT_TRUE(consistencyMarkers.getRecordIdsGroupId(opCtx));
+    ASSERT_TRUE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+
+    // A committed clear is published to the cache only at commit.
+    {
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.clearRecordIdsGroupId(opCtx);
+        ASSERT_TRUE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+        wuow.commit();
+    }
+    ASSERT_FALSE(consistencyMarkers.getRecordIdsGroupId(opCtx));
+    ASSERT_FALSE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+
+    // The cache always agrees with what a fresh load from storage produces.
+    consistencyMarkers.reloadEffectiveRecordIdsGroupId(opCtx);
+    ASSERT_FALSE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+}
+
+TEST_F(ReplicationConsistencyMarkersTest, EffectiveRecordIdsGroupIdLoadsPersistedMarker) {
+    auto opCtx = getOperationContext();
+    auto groupId = UUID::gen();
+    OpTime foundingOpTime({Seconds(123), 4}, 1LL);
+    {
+        ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                             kMinValidNss,
+                                                             kOplogTruncateAfterPointNss,
+                                                             kInitialSyncIdNss,
+                                                             kRecordIdsGroupIdNss);
+        consistencyMarkers.createRecordIdsGroupIdCollection(opCtx);
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.setRecordIdsGroupId(opCtx, groupId, foundingOpTime);
+        wuow.commit();
+    }
+
+    // Simulate a restart: a fresh instance starts with an unloaded cache while the marker is
+    // persisted, and the startup load picks it up.
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
+
+    // The fresh instance's cache is unloaded, so a read before the startup load trips the tassert
+    // rather than reporting "not a member".
+    ASSERT_TASSERT_CODE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx), 13843302);
+
+    consistencyMarkers.reloadEffectiveRecordIdsGroupId(opCtx);
+    auto membership = consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx);
+    ASSERT_TRUE(membership);
+    ASSERT_EQ(membership->groupId, groupId);
+    ASSERT_EQ(membership->foundingOpTime, foundingOpTime);
+}
+
+TEST_F(ReplicationConsistencyMarkersTest, EffectiveRecordIdsGroupIdDoesNotReadStorage) {
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
+    auto opCtx = getOperationContext();
+    auto groupId = UUID::gen();
+    consistencyMarkers.createRecordIdsGroupIdCollection(opCtx);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.setRecordIdsGroupId(opCtx, groupId, OpTime({Seconds(123), 4}, 1LL));
+        wuow.commit();
+    }
+
+    // Drop the marker collection behind the cache's back. If the accessor consulted storage it
+    // would now report no membership; it must keep serving the cached value.
+    ASSERT_OK(getStorageInterface()->dropCollection(opCtx, kRecordIdsGroupIdNss));
+    ASSERT_FALSE(consistencyMarkers.getRecordIdsGroupId(opCtx));
+    auto membership = consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx);
+    ASSERT_TRUE(membership);
+    ASSERT_EQ(membership->groupId, groupId);
+
+    // Changes underneath the cache are only picked up by an explicit load (as rollback does after
+    // recovering to the stable timestamp).
+    consistencyMarkers.reloadEffectiveRecordIdsGroupId(opCtx);
+    ASSERT_FALSE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+}
+
+TEST_F(ReplicationConsistencyMarkersTest, EffectiveRecordIdsGroupIdCachesNonMembership) {
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
+    auto opCtx = getOperationContext();
+
+    // "Not a member" is cached too: a marker written behind the cache's back is not seen until
+    // the next load.
+    consistencyMarkers.reloadEffectiveRecordIdsGroupId(opCtx);
+    ASSERT_FALSE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+    auto groupId = UUID::gen();
+    {
+        ReplicationConsistencyMarkersImpl otherMarkers(getStorageInterface(),
+                                                       kMinValidNss,
+                                                       kOplogTruncateAfterPointNss,
+                                                       kInitialSyncIdNss,
+                                                       kRecordIdsGroupIdNss);
+        otherMarkers.createRecordIdsGroupIdCollection(opCtx);
+        WriteUnitOfWork wuow(opCtx);
+        otherMarkers.setRecordIdsGroupId(opCtx, groupId, OpTime({Seconds(123), 4}, 1LL));
+        wuow.commit();
+    }
+    ASSERT_FALSE(consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx));
+
+    consistencyMarkers.reloadEffectiveRecordIdsGroupId(opCtx);
+    auto membership = consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx);
+    ASSERT_TRUE(membership);
+    ASSERT_EQ(membership->groupId, groupId);
+}
+
+/**
+ * Attached storage in every respect except that it mandates replicated RecordIds.
+ */
+class ReplicatedRecordIdsMandatedPersistenceProvider : public rss::AttachedPersistenceProvider {
+public:
+    bool shouldUseReplicatedRecordIds() const override {
+        return true;
+    }
+};
+
+class ReplicationConsistencyMarkersReplicatedRecordIdsProviderTest
+    : public ReplicationConsistencyMarkersTest {
+protected:
+    Options makeServiceContextOptions() override {
+        return ReplicationConsistencyMarkersTest::makeServiceContextOptions()
+            .setPersistenceProvider(
+                std::make_unique<ReplicatedRecordIdsMandatedPersistenceProvider>());
+    }
+};
+
+TEST_F(ReplicationConsistencyMarkersReplicatedRecordIdsProviderTest,
+       EffectiveRecordIdsGroupIdIsSentinel) {
+    ReplicationConsistencyMarkersImpl consistencyMarkers(getStorageInterface(),
+                                                         kMinValidNss,
+                                                         kOplogTruncateAfterPointNss,
+                                                         kInitialSyncIdNss,
+                                                         kRecordIdsGroupIdNss);
+    auto opCtx = getOperationContext();
+
+    auto assertIsAllZero = [&] {
+        auto membership = consistencyMarkers.getEffectiveRecordIdsGroupId(opCtx);
+        ASSERT_TRUE(membership);
+        ASSERT_EQ(membership->groupId.data(), (std::array<unsigned char, UUID::kNumBytes>{}));
+        ASSERT_EQ(membership->foundingOpTime.getTimestamp(), Timestamp(0, 0));
+        ASSERT_EQ(membership->foundingOpTime.getTerm(), OpTime::kUninitializedTerm);
+    };
+
+    // The sentinel is reported without any load: when the provider mandates replicated
+    // RecordIds, the cached marker is never consulted.
+    assertIsAllZero();
+    consistencyMarkers.reloadEffectiveRecordIdsGroupId(opCtx);
+    assertIsAllZero();
+
+    // Even if a marker were present, the provider mandate wins.
+    consistencyMarkers.createRecordIdsGroupIdCollection(opCtx);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        consistencyMarkers.setRecordIdsGroupId(opCtx, UUID::gen(), OpTime({Seconds(123), 4}, 1LL));
+        wuow.commit();
+    }
+    assertIsAllZero();
 }
 
 DEATH_TEST_F(ReplicationConsistencyMarkersDeathTest,
