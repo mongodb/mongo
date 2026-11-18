@@ -354,6 +354,63 @@ export function assertEndOfTransaction(changes) {
     }
 }
 
+/**
+ * Repeatedly reads one event at a time from the change stream 'cursor' until 'predicate(event)'
+ * returns true, and returns the events observed. The matching event is included in the result only
+ * when 'includeMatch' is true (the default). The wait is bounded by 'assert.soon', so a matching
+ * event that never arrives fails the assertion rather than hanging.
+ */
+export function collectUntil(cst, cursor, predicate, {includeMatch = true, msg} = {}) {
+    const events = [];
+    assert.soon(
+        () => {
+            const [event] = cst.getNextChanges(cursor, 1);
+            if (predicate(event)) {
+                if (includeMatch) {
+                    events.push(event);
+                }
+                return true;
+            }
+            events.push(event);
+            return false;
+        },
+        () => `${msg ?? "did not observe a matching event"}: ${tojsonMaybeTruncate(events)}`,
+        undefined,
+        0,
+    );
+    return events;
+}
+
+/**
+ * Collects change events from 'cursor' until the sentinel insert into 'sentinelColl' is observed;
+ * returns the events seen before the sentinel.
+ */
+export function collectUntilSentinel(cst, cursor, sentinelColl, sentinelId) {
+    return collectUntil(
+        cst,
+        cursor,
+        (event) =>
+            event.operationType === "insert" &&
+            event.ns &&
+            event.ns.coll === sentinelColl &&
+            bsonWoCompare(event.documentKey._id, sentinelId) === 0,
+        {
+            includeMatch: false,
+            msg: `did not observe sentinel event in ${sentinelColl} with _id ${tojsonMaybeTruncate(sentinelId)}`,
+        },
+    );
+}
+
+/**
+ * Collects change events from 'cursor' until the stream is invalidated; returns every event
+ * including the trailing invalidate.
+ */
+export function collectUntilInvalidate(cst, cursor) {
+    return collectUntil(cst, cursor, (event) => event.operationType === "invalidate", {
+        msg: "did not observe an invalidate event",
+    });
+}
+
 export function isResumableChangeStreamError(error) {
     return "errorLabels" in error && error.errorLabels.includes("ResumableChangeStreamError");
 }
