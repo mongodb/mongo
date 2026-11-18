@@ -269,7 +269,7 @@ private:
  * benign defaults.
  */
 inline JoinEdgeSelectivityEstimate makeJoinSelectivityEstimate(double s) {
-    return {.ndv = cost_based_ranker::oneCE, .selectivity = makeSel(s)};
+    return {.smallerSide = {.ndv = cost_based_ranker::oneCE}, .selectivity = makeSel(s)};
 }
 
 /**

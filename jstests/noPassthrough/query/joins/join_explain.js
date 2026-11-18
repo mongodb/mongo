@@ -87,20 +87,27 @@ function validateJoinCostComponents(
 
         // Each join embedding node reports the NDV estimate(s) and their provenance behind the
         // join edge(s) it applies.
-        assert(stage.hasOwnProperty("ndvEstimates"), "ndvEstimates missing from join stage", {
-            stage,
-        });
-        assert.gt(stage.ndvEstimates.length, 0, "Expected at least one ndv estimate", {
-            stage,
-        });
+        assert(
+            stage.hasOwnProperty("joinSelectivityEstimates"),
+            "joinSelectivityEstimates missing from join stage",
+            {stage},
+        );
+        assert.gt(
+            stage.joinSelectivityEstimates.length,
+            0,
+            "Expected at least one join selectivity estimate",
+            {stage},
+        );
         const childNamespaces = [coll1.getFullName(), coll2.getFullName(), coll3.getFullName()];
-        for (const est of stage.ndvEstimates) {
-            assert.gte(est.ndv, 0, "ndv must be non-negative", {est});
-            assert.eq(est.ndvSource, expectedNdvSource, "Unexpected ndvSource", est);
+        for (const est of stage.joinSelectivityEstimates) {
+            assert.eq(est.ndvs.length, 1, "Expected a single ndv", {est});
+            const [ndv] = est.ndvs;
+            assert.gte(ndv.ndv, 0, "ndv must be non-negative", {est});
+            assert.eq(ndv.ndvSource, expectedNdvSource, "Unexpected ndvSource", est);
             assert(
-                childNamespaces.includes(est.assumedPkSide),
-                "Expected primary key to be chosen from available namespaces",
-                {stage, childNamespaces, assumedPkSide: est.assumedPkSide},
+                childNamespaces.includes(ndv.nss),
+                "Expected ndv namespace to be one of the joined collections",
+                {stage, childNamespaces, nss: ndv.nss},
             );
         }
 
@@ -320,8 +327,8 @@ runTest(pipeline, true /* expectRejected */);
                 {stage},
             );
             assert(
-                !stage.hasOwnProperty("ndvEstimates"),
-                "ndvEstimates should be absent when knob is off",
+                !stage.hasOwnProperty("joinSelectivityEstimates"),
+                "joinSelectivityEstimates should be absent when knob is off",
                 {stage},
             );
         }
@@ -340,8 +347,8 @@ runTest(pipeline, true /* expectRejected */);
         }
     }
 
-    // Verify that when the knob is ON, joinCostComponents and ndvEstimates are present on every
-    // join opt stage. Enable the use of unique indexes for NDV estimation.
+    // Verify that when the knob is ON, joinCostComponents and joinSelectivityEstimates are present
+    // on every join opt stage. Enable the use of unique indexes for NDV estimation.
     const detailedExplain = {querySettings: {queryKnobs: {enableDetailedJoinExplain: true}}};
     assert.commandWorked(
         conn.adminCommand({

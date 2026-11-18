@@ -10,6 +10,16 @@
 
 namespace mongo::join_ordering {
 
+namespace {
+void appendNdvEstimate(BSONArrayBuilder& arr, const JoinKeyNdvEstimate& est) {
+    BSONObjBuilder bob(arr.subobjStart());
+    bob.append("nss",
+               NamespaceStringUtil::serialize(est.nss, SerializationContext::stateDefault()));
+    bob.append("ndv", est.ndv.toDouble());
+    bob.append("ndvSource", toStringData(est.ndv.source()));
+}
+}  // namespace
+
 std::string_view toStringData(MackertLohmanCase c) {
     switch (c) {
         case MackertLohmanCase::kCollectionFitsCache:
@@ -33,15 +43,17 @@ void JoinExtraEstimateInfo::serialize(BSONObjBuilder& bob) const {
     }
 
     if (!edgeSelectivities.empty()) {
-        BSONArrayBuilder arr(bob.subarrayStart("ndvEstimates"));
+        BSONArrayBuilder arr(bob.subarrayStart("joinSelectivityEstimates"));
         for (const auto& est : edgeSelectivities) {
             BSONObjBuilder sub(arr.subobjStart());
-            sub.append("assumedPkSide",
-                       NamespaceStringUtil::serialize(est.assumedPkSide,
-                                                      SerializationContext::stateDefault()));
-            sub.append("ndv", est.ndv.toDouble());
-            sub.append("ndvSource", toStringData(est.ndv.source()));
-            sub.append("selectivity", est.selectivity.toDouble());
+            {
+                BSONArrayBuilder ndvs(sub.subarrayStart("ndvs"));
+                appendNdvEstimate(ndvs, est.smallerSide);
+                if (est.largerSide) {
+                    appendNdvEstimate(ndvs, *est.largerSide);
+                }
+            }
+            sub.append("predicateSelectivity", est.selectivity.toDouble());
         }
     }
 

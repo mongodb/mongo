@@ -7,6 +7,8 @@
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional.hpp>
+
 namespace mongo::join_ordering {
 /**
  * Tracks for each node ID the cardinality estimate (with all single-table predicates applied).
@@ -21,12 +23,20 @@ using NodeCardinalities = std::vector<cost_based_ranker::CardinalityEstimate>;
 using NodeCBRCosts = std::vector<cost_based_ranker::CostEstimate>;
 
 /**
+ * The estimated number of distinct values of the join key on one side of a join edge.
+ */
+struct JoinKeyNdvEstimate {
+    NamespaceString nss;
+    cost_based_ranker::CardinalityEstimate ndv;
+};
+
+/**
  * Stores information about the selectivity of a join edge.
  */
 struct JoinEdgeSelectivityEstimate {
-    // Namespace we used as the primary key.
-    NamespaceString assumedPkSide;
-    cost_based_ranker::CardinalityEstimate ndv;
+    JoinKeyNdvEstimate smallerSide;
+    // Only present if cheaply estimable.
+    boost::optional<JoinKeyNdvEstimate> largerSide;
     cost_based_ranker::SelectivityEstimate selectivity;
 };
 

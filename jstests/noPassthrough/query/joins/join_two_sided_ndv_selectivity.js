@@ -29,8 +29,8 @@ function makeColl(db, name, source, {numDocs, ndv = numDocs}) {
     return coll;
 }
 
-// Checks the join's NDV estimate with each collection on either side of the $lookup.
-function assertNdvEstimate(small, large, expectedPkSide, expectedSource) {
+// Checks the join's NDV estimates with each collection on either side of the $lookup.
+function assertNdvEstimate(small, large, expectedPkSide, expectedSource, expectedNumNdvs) {
     // Syntactic join order shouldn't matter, so try both orders.
     for (const [local, foreign] of [
         [small, large],
@@ -48,17 +48,27 @@ function assertNdvEstimate(small, large, expectedPkSide, expectedSource) {
                 },
                 {$unwind: "$f"},
             ],
-            // Reports 'ndvEstimates' on join stages.
+            // Reports 'joinSelectivityEstimates' on join stages.
             {querySettings: {queryKnobs: {enableDetailedJoinExplain: true}}},
         );
         assert(joinOptUsed(explain), "expected join optimization", {explain});
         const joins = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(
-            (s) => s.ndvEstimates,
+            (s) => s.joinSelectivityEstimates,
         );
         assert.eq(joins.length, 1, "expected one join", {explain});
-        const [est] = joins[0].ndvEstimates;
-        assert.eq(est.assumedPkSide, expectedPkSide.getFullName(), {est});
-        assert.eq(est.ndvSource, expectedSource, {est});
+        const [est] = joins[0].joinSelectivityEstimates;
+        assert.eq(est.ndvs.length, expectedNumNdvs, {est});
+        const ndvUsedForSelectivity = est.ndvs.find(
+            (ndv) => ndv.nss === expectedPkSide.getFullName(),
+        );
+        assert(ndvUsedForSelectivity, "expected an ndv for the primary key side", {est});
+        assert.eq(ndvUsedForSelectivity.ndvSource, expectedSource, {est});
+        assert.close(
+            est.predicateSelectivity,
+            1 / ndvUsedForSelectivity.ndv,
+            {est},
+            10 /* places */,
+        );
     }
 }
 
@@ -101,7 +111,8 @@ describe("two-sided join NDV estimation", function () {
                     small: makeColl(db, `small_${small}_${large}`, small, {numDocs: 4}),
                     large: makeColl(db, `large_${small}_${large}`, large, {numDocs: 500}),
                 };
-                assertNdvEstimate(colls.small, colls.large, colls[pkSide], ndvSource);
+                const numNdvs = large === "sampling" ? 1 : 2;
+                assertNdvEstimate(colls.small, colls.large, colls[pkSide], ndvSource, numNdvs);
             });
         }
     });
@@ -110,13 +121,13 @@ describe("two-sided join NDV estimation", function () {
         it("keeps the small side's sampled NDV", function () {
             const small = makeColl(db, "small_fewer_sampling", "sampling", {numDocs: 4});
             const large = makeColl(db, "large_fewer_sampling", "hll", {numDocs: 500, ndv: 2});
-            assertNdvEstimate(small, large, small, "Sampling");
+            assertNdvEstimate(small, large, small, "Sampling", 2);
         });
 
         it("keeps the small side's unique index NDV", function () {
             const small = makeColl(db, "small_fewer_unique", "unique", {numDocs: 4});
             const large = makeColl(db, "large_fewer_unique", "hll", {numDocs: 500, ndv: 2});
-            assertNdvEstimate(small, large, small, "Metadata");
+            assertNdvEstimate(small, large, small, "Metadata", 2);
         });
     });
 });

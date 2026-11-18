@@ -541,12 +541,16 @@ Explain values that change between runs or are covered by other tests are replac
 				"estimatesMetadata" : {
 					"ceSource" : "Sampling"
 				},
-				"ndvEstimates" : [
+				"joinSelectivityEstimates" : [
 					{
-						"assumedPkSide" : "shop.suppliers",
-						"ndv" : "<normalized>",
-						"ndvSource" : "Sampling",
-						"selectivity" : "<normalized>"
+						"ndvs" : [
+							{
+								"nss" : "shop.suppliers",
+								"ndv" : "<normalized>",
+								"ndvSource" : "Sampling"
+							}
+						],
+						"predicateSelectivity" : "<normalized>"
 					}
 				],
 				"joinCostComponents" : {
@@ -572,12 +576,16 @@ Explain values that change between runs or are covered by other tests are replac
 						"estimatesMetadata" : {
 							"ceSource" : "Metadata"
 						},
-						"ndvEstimates" : [
+						"joinSelectivityEstimates" : [
 							{
-								"assumedPkSide" : "shop.products",
-								"ndv" : "<normalized>",
-								"ndvSource" : "Metadata",
-								"selectivity" : "<normalized>"
+								"ndvs" : [
+									{
+										"nss" : "shop.products",
+										"ndv" : "<normalized>",
+										"ndvSource" : "Metadata"
+									}
+								],
+								"predicateSelectivity" : "<normalized>"
 							}
 						],
 						"joinCostComponents" : {
@@ -607,12 +615,16 @@ Explain values that change between runs or are covered by other tests are replac
 									"ceSource" : "Metadata"
 								},
 								"innerCardinalityBeforeJoinEstimate" : "<normalized>",
-								"ndvEstimates" : [
+								"joinSelectivityEstimates" : [
 									{
-										"assumedPkSide" : "shop.customers",
-										"ndv" : "<normalized>",
-										"ndvSource" : "Metadata",
-										"selectivity" : "<normalized>"
+										"ndvs" : [
+											{
+												"nss" : "shop.customers",
+												"ndv" : "<normalized>",
+												"ndvSource" : "Metadata"
+											}
+										],
+										"predicateSelectivity" : "<normalized>"
 									}
 								],
 								"joinCostComponents" : {
@@ -795,12 +807,16 @@ Explain values that change between runs or are covered by other tests are replac
 				"estimatesMetadata" : {
 					"ceSource" : "Sampling"
 				},
-				"ndvEstimates" : [
+				"joinSelectivityEstimates" : [
 					{
-						"assumedPkSide" : "shop.suppliers",
-						"ndv" : "<normalized>",
-						"ndvSource" : "Sampling",
-						"selectivity" : "<normalized>"
+						"ndvs" : [
+							{
+								"nss" : "shop.suppliers",
+								"ndv" : "<normalized>",
+								"ndvSource" : "Sampling"
+							}
+						],
+						"predicateSelectivity" : "<normalized>"
 					}
 				],
 				"joinCostComponents" : {
@@ -826,12 +842,16 @@ Explain values that change between runs or are covered by other tests are replac
 						"estimatesMetadata" : {
 							"ceSource" : "Metadata"
 						},
-						"ndvEstimates" : [
+						"joinSelectivityEstimates" : [
 							{
-								"assumedPkSide" : "shop.products",
-								"ndv" : "<normalized>",
-								"ndvSource" : "Metadata",
-								"selectivity" : "<normalized>"
+								"ndvs" : [
+									{
+										"nss" : "shop.products",
+										"ndv" : "<normalized>",
+										"ndvSource" : "Metadata"
+									}
+								],
+								"predicateSelectivity" : "<normalized>"
 							}
 						],
 						"joinCostComponents" : {
@@ -861,12 +881,16 @@ Explain values that change between runs or are covered by other tests are replac
 									"ceSource" : "Metadata"
 								},
 								"innerCardinalityBeforeJoinEstimate" : "<normalized>",
-								"ndvEstimates" : [
+								"joinSelectivityEstimates" : [
 									{
-										"assumedPkSide" : "shop.customers",
-										"ndv" : "<normalized>",
-										"ndvSource" : "Metadata",
-										"selectivity" : "<normalized>"
+										"ndvs" : [
+											{
+												"nss" : "shop.customers",
+												"ndv" : "<normalized>",
+												"ndvSource" : "Metadata"
+											}
+										],
+										"predicateSelectivity" : "<normalized>"
 									}
 								],
 								"joinCostComponents" : {

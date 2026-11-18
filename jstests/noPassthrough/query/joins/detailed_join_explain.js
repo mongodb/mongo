@@ -93,7 +93,7 @@ describe("enableDetailedJoinExplain", function () {
         );
         assert.gt(joinStages.length, 0, "expected join-optimized stages", {explainOutput});
         for (const stage of joinStages) {
-            for (const field of ["joinCostComponents", "ndvEstimates"]) {
+            for (const field of ["joinCostComponents", "joinSelectivityEstimates"]) {
                 assert.eq(stage.hasOwnProperty(field), expectDetails, `unexpected '${field}'`, {
                     stage,
                 });

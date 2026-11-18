@@ -117,9 +117,9 @@ const kNormalizedFields = [
     "costEstimate",
     "cardinalityEstimate",
     "innerCardinalityBeforeJoinEstimate",
-    // In 'ndvEstimates'.
+    // In 'joinSelectivityEstimates'.
     "ndv",
-    "selectivity",
+    "predicateSelectivity",
     // In 'joinCostComponents'.
     "docsProcessed",
     "docsOutput",

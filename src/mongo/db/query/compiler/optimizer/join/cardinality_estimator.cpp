@@ -46,12 +46,12 @@ std::vector<ce::FieldPathAndEqSemantics> joinKeyFields(const JoinReorderingConte
 
 // Estimates the NDV of the join key of 'edge' on the side of 'nodeId'. Returns boost::none if that
 // requires sampling and 'allowSampling' is false.
-boost::optional<CardinalityEstimate> joinKeyNdv(
+template <bool allowSampling>
+boost::optional<JoinKeyNdvEstimate> joinKeyNdv(
     const JoinReorderingContext& ctx,
     const SamplingEstimatorMap& samplingEstimators,
     const JoinEdge& edge,
     NodeId nodeId,
-    bool allowSampling,
     OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
     auto& nss = ctx.joinGraph.getNode(nodeId).collectionName;
     auto fields = joinKeyFields(ctx, edge, nodeId);
@@ -67,14 +67,19 @@ boost::optional<CardinalityEstimate> joinKeyNdv(
     if (ctx.uniqueFieldInfo.contains(nss) &&
         fieldsAreUnique(fieldNames, ctx.uniqueFieldInfo.at(nss))) {
         ++metrics.numUniqueIndexesUsedForNDV;
-        return CardinalityEstimate(samplingEstimator->getCollCard().cardinality(),
-                                   EstimationSource::Metadata);
+        return JoinKeyNdvEstimate{
+            .nss = nss,
+            .ndv = CardinalityEstimate(samplingEstimator->getCollCard().cardinality(),
+                                       EstimationSource::Metadata)};
     }
-    if (allowSampling) {
+    if constexpr (allowSampling) {
         // Will use persisted NDV stats if available and use the sample otherwise.
-        return samplingEstimator->estimateNDV(fields);
+        return JoinKeyNdvEstimate{.nss = nss, .ndv = samplingEstimator->estimateNDV(fields)};
     }
-    return samplingEstimator->tryEstimateNDVFromPersistentStats(fields);
+    if (auto ndv = samplingEstimator->tryEstimateNDVFromPersistentStats(fields)) {
+        return JoinKeyNdvEstimate{.nss = nss, .ndv = *ndv};
+    }
+    return boost::none;
 }
 }  // namespace
 
@@ -184,21 +189,20 @@ JoinEdgeSelectivityEstimate JoinCardinalityEstimator::joinPredicateSel(
     // For the purposes of estimation, we assume that this edge represents a "primary key" to
     // "foreign key" join, despite these concepts not existing in MongoDB. We start by assuming that
     // the node with the smaller CE is the primary key side.
-    auto primaryKeyNodeId =
-        cost_based_ranker::exactLtEq(leftCard, rightCard) ? edge.left : edge.right;
-    auto otherNodeId = primaryKeyNodeId == edge.left ? edge.right : edge.left;
+    auto smallerNodeId = cost_based_ranker::exactLtEq(leftCard, rightCard) ? edge.left : edge.right;
+    auto largerNodeId = smallerNodeId == edge.left ? edge.right : edge.left;
 
-    auto ndv = *joinKeyNdv(
-        ctx, samplingEstimators, edge, primaryKeyNodeId, /*allowSampling=*/true, metrics);
+    auto smallerSide =
+        *joinKeyNdv</*allowSampling=*/true>(ctx, samplingEstimators, edge, smallerNodeId, metrics);
+    auto largerSide =
+        joinKeyNdv</*allowSampling=*/false>(ctx, samplingEstimators, edge, largerNodeId, metrics);
 
     // If we can cheaply get the NDV of the other side, we pick the max of the two since it better
     // estimates Card(P).
-    auto otherNdv =
-        joinKeyNdv(ctx, samplingEstimators, edge, otherNodeId, /*allowSampling=*/false, metrics);
-    if (otherNdv && cost_based_ranker::exactGt(*otherNdv, ndv)) {
-        ndv = *otherNdv;
-        primaryKeyNodeId = otherNodeId;
-    }
+    const bool largerSideIsPk =
+        largerSide && cost_based_ranker::exactGt(largerSide->ndv, smallerSide.ndv);
+    auto primaryKeyNodeId = largerSideIsPk ? largerNodeId : smallerNodeId;
+    auto ndv = largerSideIsPk ? largerSide->ndv : smallerSide.ndv;
     auto& primaryKeyNode = ctx.joinGraph.getNode(primaryKeyNodeId);
 
     cost_based_ranker::SelectivityEstimate sel{cost_based_ranker::oneSel};
@@ -217,7 +221,9 @@ JoinEdgeSelectivityEstimate JoinCardinalityEstimator::joinPredicateSel(
                 "ndvEstimate"_attr = ndv,
                 "selectivityEstimate"_attr = sel);
 
-    return {.assumedPkSide = primaryKeyNode.collectionName, .ndv = ndv, .selectivity = sel};
+    return {.smallerSide = std::move(smallerSide),
+            .largerSide = std::move(largerSide),
+            .selectivity = sel};
 }
 
 cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSubsetCardinality(

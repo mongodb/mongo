@@ -201,8 +201,14 @@ TEST_F(JoinPredicateEstimatorFixture, NDVMaxOfBothSidesFromPersistedStats) {
     // The selectivity estimate comes from 1 / max(NDV(A.foo), NDV(B.bar)) = 1 / 7504.
     auto expectedSel = SelectivityEstimate{SelectivityType{1.0 / 7504}, EstimationSource::Sampling};
     ASSERT_EQ(expectedSel, selEst.selectivity);
-    ASSERT_EQ(bNss, selEst.assumedPkSide);
-    ASSERT_EQ(EstimationSource::HyperLogLog, selEst.ndv.source());
+    // Both NDVs are reported.
+    ASSERT_EQ(aNss, selEst.smallerSide.nss);
+    ASSERT_EQ(4.0, selEst.smallerSide.ndv.toDouble());
+    ASSERT_EQ(EstimationSource::HyperLogLog, selEst.smallerSide.ndv.source());
+    ASSERT(selEst.largerSide);
+    ASSERT_EQ(bNss, selEst.largerSide->nss);
+    ASSERT_EQ(7504.0, selEst.largerSide->ndv.toDouble());
+    ASSERT_EQ(EstimationSource::HyperLogLog, selEst.largerSide->ndv.source());
     ASSERT_EQ(0, ceMetrics.numUniqueIndexesUsedForNDV);
 }
 
@@ -241,8 +247,14 @@ TEST_F(JoinPredicateEstimatorFixture, NDVMaxOfSampledAndPersistedStats) {
     // The selectivity estimate comes from 1 / max(NDV(A.foo), NDV(B.bar)) = 1 / 7504.
     auto expectedSel = SelectivityEstimate{SelectivityType{1.0 / 7504}, EstimationSource::Sampling};
     ASSERT_EQ(expectedSel, selEst.selectivity);
-    ASSERT_EQ(bNss, selEst.assumedPkSide);
-    ASSERT_EQ(EstimationSource::HyperLogLog, selEst.ndv.source());
+    // Both NDVs are reported.
+    ASSERT_EQ(aNss, selEst.smallerSide.nss);
+    ASSERT_EQ(5.0, selEst.smallerSide.ndv.toDouble());
+    ASSERT_EQ(EstimationSource::Sampling, selEst.smallerSide.ndv.source());
+    ASSERT(selEst.largerSide);
+    ASSERT_EQ(bNss, selEst.largerSide->nss);
+    ASSERT_EQ(7504.0, selEst.largerSide->ndv.toDouble());
+    ASSERT_EQ(EstimationSource::HyperLogLog, selEst.largerSide->ndv.source());
 }
 
 // Join graph: A -- B with compound edge A.foo = B.baz && A.bar = B.qux. Persisted NDV statistics
@@ -489,8 +501,11 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFields) {
         // NDV came from sampling, so the unique-index shortcut was not taken.
         ASSERT_EQ(0, ceMetrics.numUniqueIndexesUsedForNDV);
         // The recorded estimate captures the sampled NDV and its provenance.
-        ASSERT_EQ(5.0, ndvEstimate.ndv.toDouble());
-        ASSERT_EQ(EstimationSource::Sampling, ndvEstimate.ndv.source());
+        ASSERT_EQ(aNss, ndvEstimate.smallerSide.nss);
+        ASSERT_EQ(5.0, ndvEstimate.smallerSide.ndv.toDouble());
+        ASSERT_EQ(EstimationSource::Sampling, ndvEstimate.smallerSide.ndv.source());
+        // 'b' has neither a unique index nor persisted statistics, so its NDV is not estimated.
+        ASSERT_FALSE(ndvEstimate.largerSide);
     }
     // Selectivity test with persisted statistics.
     {
@@ -508,8 +523,8 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFields) {
         auto expectedSel = SelectivityEstimate{SelectivityType{0.2}, EstimationSource::HyperLogLog};
         ASSERT_EQ(expectedSel, ndvEstimate.selectivity);
         // The recorded estimate captures the persisted-statistics provenance rather than sampling.
-        ASSERT_EQ(5.0, ndvEstimate.ndv.toDouble());
-        ASSERT_EQ(EstimationSource::HyperLogLog, ndvEstimate.ndv.source());
+        ASSERT_EQ(5.0, ndvEstimate.smallerSide.ndv.toDouble());
+        ASSERT_EQ(EstimationSource::HyperLogLog, ndvEstimate.smallerSide.ndv.source());
     }
     // Selectivity test with unique information. Tell the context that "foo" is a unique field. This
     // should change our estimate for NDV(a.foo) to |a| = 10, giving a new selectivity of 0.1.
@@ -522,10 +537,10 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFields) {
         // The NDV for this edge came from index uniqueness metadata rather than sampling. Note that
         // 'operator==' above ignores the estimation source, so assert on it separately to keep the
         // metric and the behavior it describes from drifting apart.
-        ASSERT_EQ(EstimationSource::Metadata, ndvEstimate.ndv.source());
+        ASSERT_EQ(EstimationSource::Metadata, ndvEstimate.smallerSide.ndv.source());
         ASSERT_EQ(1, ceMetrics.numUniqueIndexesUsedForNDV);
         // The recorded estimate captures the unique-index NDV shortcut.
-        ASSERT_EQ(10.0, ndvEstimate.ndv.toDouble());
+        ASSERT_EQ(10.0, ndvEstimate.smallerSide.ndv.toDouble());
     }
 }
 
@@ -566,8 +581,8 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFieldsCompoundJo
         ASSERT_EQ(0, ceMetrics.numUniqueIndexesUsedForNDV);
         // The recorded estimate captures the sampled NDV and its provenance. The field paths are
         // reported in canonical sorted order.
-        ASSERT_EQ(5.0, ndvEstimate.ndv.toDouble());
-        ASSERT_EQ(EstimationSource::Sampling, ndvEstimate.ndv.source());
+        ASSERT_EQ(5.0, ndvEstimate.smallerSide.ndv.toDouble());
+        ASSERT_EQ(EstimationSource::Sampling, ndvEstimate.smallerSide.ndv.source());
     }
     // Selectivity test with unique information. Tell the context that {"foo", "bar"} are unique.
     // This should change our NDV estimate to 10, giving a new selectivity of 0.1.
@@ -577,10 +592,10 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFieldsCompoundJo
             jCtx, samplingEstimators, jCtx.joinGraph.getEdge(0), ceMetrics);
         auto expectedSel = SelectivityEstimate{SelectivityType{0.1}, EstimationSource::Sampling};
         ASSERT_EQ(expectedSel, ndvEstimate.selectivity);
-        ASSERT_EQ(EstimationSource::Metadata, ndvEstimate.ndv.source());
+        ASSERT_EQ(EstimationSource::Metadata, ndvEstimate.smallerSide.ndv.source());
         ASSERT_EQ(1, ceMetrics.numUniqueIndexesUsedForNDV);
         // The recorded estimate captures the unique-index NDV shortcut.
-        ASSERT_EQ(10.0, ndvEstimate.ndv.toDouble());
+        ASSERT_EQ(10.0, ndvEstimate.smallerSide.ndv.toDouble());
     }
 }
 
@@ -614,10 +629,57 @@ TEST_F(JoinPredicateEstimatorFixture, NDVMaxOfUniqueIndexAndPersistedStats) {
         jCtx, samplingEstimators, jCtx.joinGraph.getEdge(0), ceMetrics);
     auto expectedSel = SelectivityEstimate{SelectivityType{1.0 / 15}, EstimationSource::Sampling};
     ASSERT_EQ(expectedSel, selEst.selectivity);
-    ASSERT_EQ(bNss, selEst.assumedPkSide);
-    ASSERT_EQ(EstimationSource::HyperLogLog, selEst.ndv.source());
+    // Both NDVs are reported.
+    ASSERT_EQ(aNss, selEst.smallerSide.nss);
+    ASSERT_EQ(10.0, selEst.smallerSide.ndv.toDouble());
+    ASSERT_EQ(EstimationSource::Metadata, selEst.smallerSide.ndv.source());
+    ASSERT(selEst.largerSide);
+    ASSERT_EQ(bNss, selEst.largerSide->nss);
+    ASSERT_EQ(15.0, selEst.largerSide->ndv.toDouble());
+    ASSERT_EQ(EstimationSource::HyperLogLog, selEst.largerSide->ndv.source());
     // The unique index on 'a' is counted even though it did not serve the winning NDV.
     ASSERT_EQ(1, ceMetrics.numUniqueIndexesUsedForNDV);
+}
+
+// Join graph: a -- b with edge a.foo = b.bar. 'a' is smaller with a sampled NDV(a.foo) = 5, 'b' has
+// persisted NDV statistics with NDV(b.bar) = 2. The selectivity comes from the larger NDV of 'a',
+// but the NDV of 'b' is still reported since it was estimated.
+TEST_F(JoinPredicateEstimatorFixture, NDVOfLargerSideReportedWhenSmaller) {
+    auto aNss = NamespaceString::createNamespaceString_forTest("a");
+    auto bNss = NamespaceString::createNamespaceString_forTest("b");
+    auto aNodeId = *graph.addNode(aNss, nullptr, boost::none);
+    auto bNodeId = *graph.addNode(bNss, nullptr, FieldPath{"b"});
+
+    resolvedPaths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "foo"});
+    resolvedPaths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "bar"});
+    graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
+
+    SamplingEstimatorMap samplingEstimators;
+    auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
+    aSamplingEstimator->addFakeNDVEstimate(
+        {FieldPath("foo")}, CardinalityEstimate{CardinalityType{5}, EstimationSource::Sampling});
+    samplingEstimators[aNss] = std::move(aSamplingEstimator);
+    auto bSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
+    bSamplingEstimator->addFakePersistedNDVEstimate(
+        {FieldPath("bar")}, CardinalityEstimate{CardinalityType{2}, EstimationSource::HyperLogLog});
+    samplingEstimators[bNss] = std::move(bSamplingEstimator);
+
+    auto jCtx = makeContext();
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics ceMetrics;
+    auto selEst = JoinCardinalityEstimator::joinPredicateSel(
+        jCtx, samplingEstimators, jCtx.joinGraph.getEdge(0), ceMetrics);
+    // The selectivity estimate comes from 1 / max(5, 2) = 1 / 5.
+    auto expectedSel = SelectivityEstimate{SelectivityType{0.2}, EstimationSource::Sampling};
+    ASSERT_EQ(expectedSel, selEst.selectivity);
+    ASSERT_EQ(aNss, selEst.smallerSide.nss);
+    ASSERT_EQ(5.0, selEst.smallerSide.ndv.toDouble());
+    ASSERT_EQ(EstimationSource::Sampling, selEst.smallerSide.ndv.source());
+    ASSERT(selEst.largerSide);
+    ASSERT_EQ(bNss, selEst.largerSide->nss);
+    ASSERT_EQ(2.0, selEst.largerSide->ndv.toDouble());
+    ASSERT_EQ(EstimationSource::HyperLogLog, selEst.largerSide->ndv.source());
 }
 
 }  // namespace mongo::join_ordering
