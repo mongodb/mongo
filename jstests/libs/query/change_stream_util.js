@@ -1604,8 +1604,11 @@ export function waitForClusterTime(db, conn) {
             targetWholeCluster: true,
             ignoreRemovedShards: false,
             checkIfPointInTimeIsInFuture: true,
-        }).historicalPlacement.status;
-        return res == 0;
+        });
+        // The command can fail transiently while the config server primary is stepping down (e.g.
+        // NotWritablePrimary), in which case the response has no 'historicalPlacement' field. Retry
+        // instead of dereferencing a missing field.
+        return res.historicalPlacement && res.historicalPlacement.status == 0;
     }, "Timed out waiting for cluster time to pass current time");
 
     return currentTime;
