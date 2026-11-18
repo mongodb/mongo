@@ -699,6 +699,38 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
         });
 }
 
+CommitCommandForParticipant makeCommitCommandForParticipant(
+    const BSONObj& commitObj,
+    const ShardId& participant,
+    const EndOfTransactionScopesInfoBase& endOfTransactionScopes,
+    const absl::flat_hash_set<ShardId>& writeParticipantSet,
+    const EndOfTransactionMetadataShardCache& metadataShardCache) {
+    // Attach the metadata only to write participants. Skip shards that are known to reject it, so
+    // the extra probe round trip is only paid once per shard (per cache TTL) instead of once per
+    // commit.
+    // TODO SERVER-138031: Remove reliance on shard eligibity cache once 10.0 is the latest
+    // reachable version.
+    if (!writeParticipantSet.contains(participant) ||
+        !metadataShardCache.isShardDefinitelyEligible(participant)) {
+        return {commitObj, boost::none};
+    }
+
+    EndOfTransactionScopesInfo scopes;
+    scopes.setBase(endOfTransactionScopes);
+    scopes.setShardId(participant);
+
+    BSONObjBuilder builder;
+    builder.appendElements(commitObj);
+    {
+        // Serialize directly into the sub-object to avoid materializing an intermediate BSONObj
+        // for 'endOfTransactionScopes'.
+        BSONObjBuilder scopesBuilder(
+            builder.subobjStart(CommitTransaction::kEndOfTransactionScopesFieldName));
+        scopes.serialize(&scopesBuilder);
+    }
+    return {builder.obj(), commitObj};
+}
+
 Future<void> sendCommit(ServiceContext* service,
                         txn::AsyncWorkScheduler& scheduler,
                         const LogicalSessionId& lsid,
@@ -724,18 +756,14 @@ Future<void> sendCommit(ServiceContext* service,
     // The caller decides whether the accounting metadata is part of the durable decision by passing
     // a non-empty scopes object. Do not re-read the kill switch here, so the commands sent to the
     // participants always match the persisted decision.
-    const bool haveEndOfTransactionScopes =
-        !endOfTransactionScopes.getClusterParticipants().empty();
-    auto& metadataShardCache = EndOfTransactionMetadataShardCache::get(service);
-
+    //
     // The metadata is attached only to write participants. Read-only participants (which prepare
     // and commit an empty transaction) have no transaction changes to order, so their commit
-    // entries are left un-augmented.
+    // entries are left un-augmented. The set is empty iff the scopes are.
     const auto& writeParticipants = endOfTransactionScopes.getClusterParticipants();
-    absl::flat_hash_set<ShardId> writeParticipantSet;
-    if (haveEndOfTransactionScopes) {
-        writeParticipantSet.insert(writeParticipants.begin(), writeParticipants.end());
-    }
+    const absl::flat_hash_set<ShardId> writeParticipantSet(writeParticipants.begin(),
+                                                           writeParticipants.end());
+    const auto& metadataShardCache = EndOfTransactionMetadataShardCache::get(service);
 
     OperationContextFn operationContextFn = [lsid,
                                              txnNumberAndRetryCounter](OperationContext* opCtx) {
@@ -753,32 +781,12 @@ Future<void> sendCommit(ServiceContext* service,
     responses.reserve(participants.size());
 
     for (const auto& participant : participants) {
-        BSONObj commandObj = commitObj;
-        boost::optional<BSONObj> commandObjWithoutEndOfTransactionScopes;
-
-        // Attach the metadata only to write participants. Skip shards that are known to reject it,
-        // so the extra probe round trip is only paid once per shard (per cache TTL) instead of once
-        // per commit.
-        // TODO SERVER-138031: Remove reliance on shard eligibity cache once 10.0 is the latest
-        // reachable version.
-        if (haveEndOfTransactionScopes && writeParticipantSet.contains(participant) &&
-            metadataShardCache.isShardDefinitelyEligible(participant)) {
-            EndOfTransactionScopesInfo scopes;
-            scopes.setBase(endOfTransactionScopes);
-            scopes.setShardId(participant);
-
-            BSONObjBuilder builder;
-            builder.appendElements(commitObj);
-            {
-                // Serialize directly into the sub-object to avoid materializing an intermediate
-                // BSONObj for 'endOfTransactionScopes'.
-                BSONObjBuilder scopesBuilder(
-                    builder.subobjStart(CommitTransaction::kEndOfTransactionScopesFieldName));
-                scopes.serialize(&scopesBuilder);
-            }
-            commandObj = builder.obj();
-            commandObjWithoutEndOfTransactionScopes = commitObj;
-        }
+        auto [commandObj, commandObjWithoutEndOfTransactionScopes] =
+            makeCommitCommandForParticipant(commitObj,
+                                            participant,
+                                            endOfTransactionScopes,
+                                            writeParticipantSet,
+                                            metadataShardCache);
 
         responses.push_back(
             sendDecisionToShard(service,

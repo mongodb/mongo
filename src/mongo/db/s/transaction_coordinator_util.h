@@ -14,6 +14,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/s/end_of_transaction_metadata_shard_cache.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/s/transaction_coordinator_structures.h"
@@ -176,6 +177,29 @@ Future<repl::OpTime> persistDecision(
     const txn::CoordinatorCommitDecision& decision,
     const std::vector<NamespaceString>& affectedNamespaces,
     const EndOfTransactionScopesInfoBase& endOfTransactionScopes = {});
+
+/**
+ * The commitTransaction command to send to one participant, as built by sendCommit.
+ * 'commandWithoutEndOfTransactionScopes' is set iff 'command' carries the end-of-transaction
+ * accounting metadata, so that the metadata can be stripped if the participant rejects it.
+ */
+struct CommitCommandForParticipant {
+    BSONObj command;
+    boost::optional<BSONObj> commandWithoutEndOfTransactionScopes;
+};
+
+/**
+ * Builds the commitTransaction command for 'participant' from the common 'commitObj'. The
+ * metadata in 'endOfTransactionScopes' is attached, together with the participant's shard id, iff
+ * 'participant' is in 'writeParticipantSet' and 'metadataShardCache' does not know it to reject
+ * the metadata. An empty 'writeParticipantSet' means no metadata is attached to any participant.
+ */
+CommitCommandForParticipant makeCommitCommandForParticipant(
+    const BSONObj& commitObj,
+    const ShardId& participant,
+    const EndOfTransactionScopesInfoBase& endOfTransactionScopes,
+    const absl::flat_hash_set<ShardId>& writeParticipantSet,
+    const EndOfTransactionMetadataShardCache& metadataShardCache);
 
 /**
  * Sends commit to all shards and returns a future that will be resolved when all participants have

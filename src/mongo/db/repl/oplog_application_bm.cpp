@@ -37,6 +37,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/end_of_transaction_metadata_bm_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role.h"
@@ -282,6 +283,61 @@ BSONObj makeDoc(int idx) {
     return BSON("_id" << OID::gen() << "value" << idx);
 }
 
+// End-of-transaction (EOT) metadata presets for BM_TestPreparesEot: the 'endOfTransactionScopes'
+// object a write participant puts in its commitTransaction entry, for a transaction of the given
+// shape. The preset is one of the kScopes* values below; they are plain ints because they are
+// passed through Google Benchmark's integer arguments.
+constexpr int kScopesNone = 0;    // no metadata (same as BM_TestPrepares)
+constexpr int kScopesSparse = 1;  // 4 write shards, 10 namespaces, 2 shards per namespace
+constexpr int kScopesDense = 2;   // 8 write shards, 50 namespaces, every shard on every namespace
+
+const char* scopesPresetName(int preset) {
+    switch (preset) {
+        case kScopesNone:
+            return "none";
+        case kScopesSparse:
+            return "sparse";
+        case kScopesDense:
+            return "dense";
+    }
+    MONGO_UNREACHABLE;
+}
+
+BSONObj makeEndOfTransactionScopesPreset(int preset) {
+    // Same fields as ShapeArgs in end_of_transaction_metadata_bm.cpp (w / n / k there).
+    struct ShapeArgs {
+        int writeShards;         // write-candidate shards
+        int namespaces;          // namespaces written
+        int shardsPerNamespace;  // shards per namespace (2 = sparse, writeShards = dense)
+    };
+    static constexpr ShapeArgs kPresets[] = {
+        {0, 0, 0},   // kScopesNone: no metadata; the entry is the same as in master
+        {4, 10, 2},  // kScopesSparse: typical multi-collection app transaction (20 pairs)
+        {8, 50, 8},  // kScopesDense: proposed worst case, all shards on all namespaces (400 pairs)
+    };
+    static_assert(std::size(kPresets) == kScopesDense + 1);
+    invariant(preset >= kScopesNone && preset <= kScopesDense);
+    if (preset == kScopesNone) {
+        return BSONObj();
+    }
+    const auto& args = kPresets[preset];
+    const auto shape =
+        eot_bm::makeShape(args.writeShards, args.namespaces, args.shardsPerNamespace);
+    return eot_bm::makeParticipantScopesBSON(eot_bm::computeScopes(shape),
+                                             shape.participants.front());
+}
+
+BSONObj makeCommitTransactionObject(const Timestamp& commitTimestamp,
+                                    const BSONObj& endOfTransactionScopes) {
+    BSONObjBuilder builder;
+    builder.append("commitTransaction", 1);
+    builder.append("commitTimestamp", commitTimestamp);
+    if (!endOfTransactionScopes.isEmpty()) {
+        builder.append("endOfTransactionScopes", endOfTransactionScopes);
+    }
+    return builder.obj();
+}
+
 // Documents for the update and delete validation-hash benchmarks. 'payload' pads the document to
 // the desired size, since hashing cost is proportional to objsize(). 'n' is the field the update
 // benchmark modifies.
@@ -471,7 +527,10 @@ public:
 
     // Concurrency is the number of concurrent clients preparing transactions on the primary at the
     // same time.
-    void createPrepareBatches(int concurrency, int totalOps, int batchSize) {
+    // 'scopesPreset' selects the end-of-transaction metadata carried by every commit entry; see
+    // makeEndOfTransactionScopesPreset.
+    void createPrepareBatches(int concurrency, int totalOps, int batchSize, int scopesPreset = 0) {
+        const BSONObj endOfTransactionScopes = makeEndOfTransactionScopesPreset(scopesPreset);
         std::vector<BSONObj> lsidObjs;
         lsidObjs.reserve(concurrency);
         for (int i = 0; i < concurrency; i++) {
@@ -524,7 +583,7 @@ public:
                                << "ns"
                                << "admin.$cmd"
                                << "o"
-                               << BSON("commitTransaction" << 1 << "commitTimestamp" << visibleTs)
+                               << makeCommitTransactionObject(visibleTs, endOfTransactionScopes)
                                << "ts" << commitTs << "t" << term1 << "v" << 2 << "wall"
                                << Date_t::now() << "prevOpTime"
                                << BSON("ts" << prepTs << "t" << term1)));
@@ -549,7 +608,7 @@ public:
                        << "c"
                        << "ns"
                        << "admin.$cmd"
-                       << "o" << BSON("commitTransaction" << 1 << "commitTimestamp" << visibleTs)
+                       << "o" << makeCommitTransactionObject(visibleTs, endOfTransactionScopes)
                        << "ts" << commitTs << "t" << term1 << "v" << 2 << "wall" << Date_t::now()
                        << "prevOpTime" << BSON("ts" << prepTs << "t" << term1)));
         }
@@ -567,6 +626,15 @@ public:
                      << "ns" << _foobarNs.getCommandNS().toString_forTest() << "o" << o << "ts"
                      << Timestamp(1, i) << "t" << term1 << "v" << 2 << "wall" << Date_t::now()));
         }
+    }
+
+    // Total serialized size of the oplog entries to apply.
+    size_t oplogBytes() const {
+        size_t bytes = 0;
+        for (const auto& entry : _oplogEntries) {
+            bytes += entry.objsize();
+        }
+        return bytes;
     }
 
     void reset() {
@@ -783,6 +851,30 @@ void BM_TestPrepares(benchmark::State& state) {
     runBMTest(testSvcCtx, fixture, state);
 }
 
+// Same as BM_TestPrepares, but every commit entry carries the end-of-transaction metadata preset
+// given by the 'scopes' argument. The metadata does not depend on the number of operations per
+// transaction, so 'opsPerTxn' shows how its relative apply cost shrinks as transactions get longer.
+// Every run applies kPreparesEotTxns transactions, so times are comparable across rows; divide
+// 'real_time' by 'txns' for the per-transaction time.
+constexpr int kPreparesEotTxns = 1000;
+
+void BM_TestPreparesEot(benchmark::State& state) {
+    const int concurrency = state.range(0);
+    const int opsPerTxn = state.range(1);
+    TestServiceContext testSvcCtx;
+    Fixture fixture(&testSvcCtx);
+    const int scopesPreset = state.range(2);
+    fixture.createPrepareBatches(
+        concurrency, kPreparesEotTxns * opsPerTxn, opsPerTxn, scopesPreset);
+    runBMTest(testSvcCtx, fixture, state);
+
+    state.SetLabel(scopesPresetName(scopesPreset));
+
+    state.counters["txns"] = kPreparesEotTxns;
+    state.counters["oplog_bytes_per_txn"] =
+        static_cast<double>(fixture.oplogBytes()) / kPreparesEotTxns;
+}
+
 void BM_TestCreateIndex(benchmark::State& state) {
     TestServiceContext testSvcCtx;
     Fixture fixture(&testSvcCtx);
@@ -829,6 +921,13 @@ BENCHMARK(BM_TestPrepares)
     ->Args({500, 100 * 1000, 10})
     ->Args({500, 100 * 1000, 100})
     ->Args({500, 100 * 1000, 500})
+    ->UseManualTime()
+    ->Unit(benchmark::kMillisecond);
+
+// 'scopes' is one of the kScopes* presets; the output label shows its name.
+BENCHMARK(BM_TestPreparesEot)
+    ->ArgNames({"concurrency", "opsPerTxn", "scopes"})
+    ->ArgsProduct({{10}, {1, 10, 100}, {kScopesNone, kScopesSparse, kScopesDense}})
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
