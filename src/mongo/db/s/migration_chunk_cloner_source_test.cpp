@@ -76,8 +76,10 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
@@ -1926,6 +1928,74 @@ TEST_F(MigrationChunkClonerSourceTest, JumboChunkIndexScanWithYielding) {
     });
     ASSERT_OK(cloner.commitClone(operationContext(), /*clearShardCatalogCache=*/true));
     futureCommit.default_timed_get();
+}
+
+TEST_F(MigrationChunkClonerSourceTest, JumboChunkCloneFailureDoesNotLeaveExecutorAttached) {
+    const int kNumDocs = 20000;
+    const int kDocSize = 1024;
+    std::vector<BSONObj> initialDocs;
+    for (int i = 0; i < kNumDocs; i++) {
+        initialDocs.push_back(createSizedCollectionDocument(i, kDocSize));
+    }
+    createShardedCollection(initialDocs);
+
+    ShardsvrMoveRange req =
+        createMoveRangeRequest(ChunkRange(BSON("X" << 0), BSON("X" << kNumDocs)));
+    req.setForceJumbo(ForceJumbo::kForceManual);
+    req.setMaxChunkSizeBytes(1024 * 1024);
+
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
+
+    {
+        auto futureStartClone = launchAsync([&]() {
+            onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+        });
+        ASSERT_OK(cloner.startClone(operationContext(),
+                                    UUID::gen(),
+                                    _lsid,
+                                    _txnNumber,
+                                    /*enclosingChunk=*/boost::none,
+                                    /*isAuthoritative=*/false));
+        futureStartClone.default_timed_get();
+    }
+
+    {
+        BSONArrayBuilder arrBuilder;
+        auto collection = acquireCollection(operationContext(), kNss, MODE_IS);
+        ASSERT_OK(cloner.nextCloneBatch(operationContext(), collection, &arrBuilder));
+        ASSERT_TRUE(cloner.hasOngoingJumboChunkCloning());
+    }
+
+    // Each '_migrateClone' request runs on its own operation context, which is destroyed while the
+    // cloner and its executor live on.
+    {
+        auto client = getServiceContext()->getService()->makeClient("failingCloneBatch");
+        auto opCtx = client->makeOperationContext();
+        FailPointEnableBlock failPoint("failMigrationJumboCloneAfterExecutorFetchesDocument");
+        BSONArrayBuilder arrBuilder;
+        ASSERT_EQ(ErrorCodes::InternalError,
+                  cloner.nextCloneBatch(opCtx.get(), boost::none, &arrBuilder).code());
+    }
+    ASSERT_FALSE(cloner.hasOngoingJumboChunkCloning());
+
+    {
+        unittest::TassertGuard tassertGuard;
+        BSONArrayBuilder arrBuilder;
+        auto collection = acquireCollection(operationContext(), kNss, MODE_IS);
+        ASSERT_EQ(13734200,
+                  cloner.nextCloneBatch(operationContext(), collection, &arrBuilder).code());
+    }
+
+    auto futureCancel = launchAsync([&]() {
+        onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+    });
+    cloner.cancelClone(operationContext());
+    futureCancel.default_timed_get();
 }
 
 TEST_F(MigrationChunkClonerSourceTest, NextModsBatchNonDeprioritizableAfterCommitClone) {

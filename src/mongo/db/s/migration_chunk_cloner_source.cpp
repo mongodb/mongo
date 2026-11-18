@@ -89,6 +89,7 @@ const char kRecvChunkAbort[] = "_recvChunkAbort";
 const Hours kMaxWaitToCommitCloneForJumboChunk(6);
 
 MONGO_FAIL_POINT_DEFINE(failTooMuchMemoryUsed);
+MONGO_FAIL_POINT_DEFINE(failMigrationJumboCloneAfterExecutorFetchesDocument);
 MONGO_FAIL_POINT_DEFINE(hangAfterProcessingDeferredXferMods);
 
 std::shared_ptr<executor::TaskExecutor> getRecipientCommandExecutor() {
@@ -676,13 +677,31 @@ void MigrationChunkClonerSource::_nextCloneBatchFromIndexScan(
                            Milliseconds(internalQueryExecYieldPeriodMS.load()));
     boost::optional<HandleTransactionResourcesFromStasher> scopedResourceHandler;
     auto isFirstIteration = !_jumboChunkCloneState->clonerExec;
+    ScopeGuard destroyExecutorOnFailure([&] {
+        auto exec = [&] {
+            std::lock_guard<std::mutex> lk(_mutex);
+            return std::move(_jumboChunkCloneState->clonerExec);
+        }();
+        if (exec) {
+            exec->dispose(opCtx);
+            exec.get_deleter().dismissDisposal();
+        }
+    });
     if (isFirstIteration) {
+        {
+            std::lock_guard<std::mutex> lk(_mutex);
+            tassert(13734200,
+                    "Jumbo chunk cloning cannot restart its index scan after documents were "
+                    "already cloned",
+                    _jumboChunkCloneState->docsCloned == 0);
+        }
         tassert(10711502,
                 "Expected an active acquisition when running nextCloneBatch from index scan at the "
                 "first iteration",
                 static_cast<bool>(collection));
         auto exec = uassertStatusOK(_getIndexScanExecutor(
             opCtx, *collection, InternalPlanner::IndexScanOptions::IXSCAN_FETCH));
+        std::lock_guard<std::mutex> lk(_mutex);
         _jumboChunkCloneState->clonerExec = std::move(exec);
     } else {
         // Restore the acquisition
@@ -702,6 +721,11 @@ void MigrationChunkClonerSource::_nextCloneBatchFromIndexScan(
             std::unique_lock<std::mutex> lk(_mutex);
             _jumboChunkCloneState->clonerState = execState;
             lk.unlock();
+
+            if (MONGO_unlikely(failMigrationJumboCloneAfterExecutorFetchesDocument.shouldFail())) {
+                uasserted(ErrorCodes::InternalError,
+                          "Failing jumbo chunk clone after the executor fetched a document");
+            }
 
             opCtx->checkForInterrupt();
 
@@ -733,6 +757,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromIndexScan(
 
     _jumboChunkCloneState->clonerExec->saveState();
     _jumboChunkCloneState->clonerExec->detachFromOperationContext();
+    destroyExecutorOnFailure.dismiss();
 
     // From the second iteration, the destruction of the HandleTransactionResourcesFromStasher will
     // re-stash resources.

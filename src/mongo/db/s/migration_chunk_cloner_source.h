@@ -342,6 +342,7 @@ public:
     /* Whether the cloner has stashed a jumbo chunk state with a query plan, indicating a jumbo
      * chunk migration is ongoing and it should be continued.*/
     bool hasOngoingJumboChunkCloning() {
+        std::lock_guard<std::mutex> lk(_mutex);
         return _jumboChunkCloneState.has_value() &&
             static_cast<bool>(_jumboChunkCloneState->clonerExec) && _forceJumbo;
     }
