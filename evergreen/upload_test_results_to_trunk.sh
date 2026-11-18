@@ -128,23 +128,30 @@ export_repo_info() {
         # changes, and for merge queue patches both revision and the SHA in github_head_branch are
         # the merge group's base, not its head. Instead, report a fake SHA based on the Evergreen
         # version ID, which is unique per patch.
-        TRUNK_REPO_HEAD_SHA="$(printf '%s' "$version_id" | sha1sum | awk '{print $1}')"
-        export TRUNK_REPO_HEAD_SHA
         if [ "${is_commit_queue:-}" = "true" ]; then
             # Evergreen always sets github_head_branch for merge queue patches, e.g.
             # gh-readonly-queue/master/pr-123-<base sha>.
             export TRUNK_REPO_HEAD_BRANCH="$github_head_branch"
+            export TRUNK_REPO_HEAD_SHA="$(printf '%s' "$version_id" | sha1sum | awk '{print $1}')"
+        elif [ -n "${github_commit:-}" ] && [ -n "${github_pr_head_branch:-}" ]; then
+            export TRUNK_REPO_HEAD_SHA="$github_commit"
+            export TRUNK_REPO_HEAD_BRANCH="$github_pr_head_branch"
         else
+            export TRUNK_REPO_HEAD_SHA="$(printf '%s' "$version_id" | sha1sum | awk '{print $1}')"
             export TRUNK_REPO_HEAD_BRANCH="evergreen-patch/${version_id}"
         fi
     else
         export TRUNK_REPO_HEAD_SHA="${revision:-}"
         export TRUNK_REPO_HEAD_BRANCH="${branch_name:-}"
     fi
+
     if [ -n "${TRUNK_REPO_URL:-}" ] && [ -n "${TRUNK_REPO_HEAD_SHA:-}" ] &&
         [ -n "${TRUNK_REPO_HEAD_BRANCH:-}" ] && [ -n "${TRUNK_REPO_HEAD_AUTHOR_NAME:-}" ]; then
         export TRUNK_USE_UNCLONED_REPO=true
     fi
+
+    # Unset TRUNK_PR_NUMBER if empty. trunk-analytics-cli tries to parse an empty value and aborts.
+    [ -n "${TRUNK_PR_NUMBER:-}" ] || unset TRUNK_PR_NUMBER
 }
 
 main() {
