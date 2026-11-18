@@ -119,7 +119,7 @@ filters:
       - 10gen/server-security
   - "s2":
     approvers:
-      - 10gen/query-integration
+      - 10gen/query-execution
   - "s2n":
     approvers:
       - 10gen/server-security
