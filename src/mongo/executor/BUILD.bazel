@@ -253,6 +253,7 @@ mongo_cc_library(
     deps = [
         ":task_executor_interface",
         "//src/mongo/db:server_base",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util:processinfo",
     ],
 )
@@ -455,6 +456,24 @@ mongo_cc_library(
         "//src/mongo/unittest:integration_test_main",
         "//src/mongo/util:version_impl",
         "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "task_executor_pool_test",
+    srcs = [
+        "task_executor_pool_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":network_interface_mock",
+        ":task_executor_interface",
+        ":task_executor_pool",
+        ":thread_pool_task_executor_test_fixture",
+        "//src/mongo:base",
+        "//src/mongo/db/commands/server_status:server_status_metric",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/unittest",
     ],
 )
 

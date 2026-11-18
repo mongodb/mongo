@@ -161,6 +161,8 @@ public:
         MetricNameMaker::make("mongodb.network.egress.resolution_operations");
     static constexpr MetricName kNetworkEgressSSLOperations =
         MetricNameMaker::make("mongodb.network.egress.ssl_operations");
+    static constexpr MetricName kNetworkEgressTaskExecutorPoolSize =
+        MetricNameMaker::make("mongodb.network.egress.task_executor_pool_size");
     static constexpr MetricName kNetworkCompressionIngressCompressorBytesIn = MetricNameMaker::make(
         "mongodb.serverStatus.network.compression.ingress.compressor.bytesIn");
     static constexpr MetricName kNetworkCompressionIngressCompressorBytesOut =

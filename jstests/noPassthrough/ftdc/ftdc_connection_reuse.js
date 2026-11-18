@@ -28,6 +28,20 @@ const numPools = assert.commandWorked(
     st.s.adminCommand({"getParameter": 1, "taskExecutorPoolSize": 1}),
 )["taskExecutorPoolSize"];
 
+// The resolved task executor pool size is reported in serverStatus, and therefore captured by FTDC.
+assert.eq(
+    numPools,
+    verifyGetDiagnosticData(st.s.getDB("admin")).serverStatus.metrics.taskExecutorPool.size,
+    "mongos FTDC should report the resolved task executor pool size",
+);
+// mongod always uses a single task executor, regardless of taskExecutorPoolSize.
+assert.eq(
+    1,
+    assert.commandWorked(st.rs0.getPrimary().adminCommand({serverStatus: 1, metrics: 1})).metrics
+        .taskExecutorPool.size,
+    "shard primary should report a single task executor",
+);
+
 function sumOverPools(diagnosticData, host, property) {
     let sum = 0;
     for (const pool of Object.keys(diagnosticData["pools"])) {

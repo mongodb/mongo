@@ -4,6 +4,10 @@
 #include "mongo/executor/task_executor_pool.h"
 
 #include "mongo/executor/task_executor_pool_parameters_gen.h"  // IWYU pragma: keep
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/server_status_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"  // IWYU pragma: keep
 
@@ -15,6 +19,19 @@
 
 namespace mongo {
 namespace executor {
+
+namespace {
+
+auto& taskExecutorPoolSizeMetric = otel::metrics::MetricsService::instance().createInt64Gauge(
+    otel::metrics::MetricNames::kNetworkEgressTaskExecutorPoolSize,
+    "Number of executors in the sharding task executor pool, after resolving taskExecutorPoolSize "
+    "(values <= 0 select a size based on the number of cores).",
+    otel::metrics::MetricUnit::kCount,
+    {.serverStatusOptions =
+         otel::metrics::ServerStatusOptions{.dottedPath = "taskExecutorPool.size"},
+     .reportingPolicy = otel::metrics::ReportingPolicy::kIfCurrentlyNonZero});
+
+}  // namespace
 
 size_t TaskExecutorPool::getSuggestedPoolSize() {
     // The default task executor pool size is 1, which should be fine in almost all cases.
@@ -104,6 +121,7 @@ void TaskExecutorPool::addExecutors(std::vector<std::shared_ptr<TaskExecutor>> e
 
     _fixedExecutor = std::move(fixedExecutor);
     _executors = std::move(executors);
+    taskExecutorPoolSizeMetric.set(_executors.size());
 }
 
 const std::shared_ptr<TaskExecutor>& TaskExecutorPool::getArbitraryExecutor() {
