@@ -122,6 +122,101 @@ TEST(TypeSetTest, SameCanonicalClassesLeavesAnyUnconstrained) {
     ASSERT_EQ(sameCanonicalClasses(TypeSet::any()), TypeSet::any());
 }
 
+TEST(TypeSetTest, OrderedComparisonTypesWithNumericAndUnionBounds) {
+    const TypeSet beforeNumbers = unionType(
+        unionType(TypeSet(BSONType::minKey, Extent::kAll), TypeSet(BSONType::eoo, Extent::kAll)),
+        unionType(TypeSet(BSONType::undefined, Extent::kAll),
+                  TypeSet(BSONType::null, Extent::kAll)));
+    const TypeSet numbers = TypeSet::numericTypes(Extent::kAll);
+    const TypeSet numberSubset = TypeSet::numericTypes(Extent::kSubset);
+    const TypeSet stringSubset = unionType(TypeSet(BSONType::string, Extent::kSubset),
+                                           TypeSet(BSONType::symbol, Extent::kSubset));
+    const TypeSet numberOrString = unionType(numbers, TypeSet(BSONType::string, Extent::kAll));
+    const TypeSet afterNumbers = complement(unionType(beforeNumbers, numbers));
+
+    for (bool inclusive : {false, true}) {
+        ASSERT_EQ(orderedComparisonTypes(numbers, true, inclusive),
+                  unionType(beforeNumbers, numberSubset));
+        ASSERT_EQ(orderedComparisonTypes(numberOrString, true, inclusive),
+                  unionType(unionType(beforeNumbers, numbers), stringSubset));
+        ASSERT_EQ(orderedComparisonTypes(numbers, false, inclusive),
+                  unionType(afterNumbers, numberSubset));
+        ASSERT_EQ(orderedComparisonTypes(numberOrString, false, inclusive),
+                  unionType(afterNumbers, numberSubset));
+    }
+}
+
+TEST(TypeSetTest, OrderedComparisonTypesWithNullBound) {
+    const TypeSet beforeNull = unionType(TypeSet(BSONType::minKey, Extent::kAll),
+                                         unionType(TypeSet(BSONType::eoo, Extent::kAll),
+                                                   TypeSet(BSONType::undefined, Extent::kAll)));
+    const TypeSet null(BSONType::null, Extent::kAll);
+    const TypeSet afterNull = complement(unionType(beforeNull, null));
+
+    ASSERT_EQ(orderedComparisonTypes(null, true, false), beforeNull);
+    ASSERT_EQ(orderedComparisonTypes(null, true, true), unionType(beforeNull, null));
+    ASSERT_EQ(orderedComparisonTypes(null, false, false), afterNull);
+    ASSERT_EQ(orderedComparisonTypes(null, false, true), unionType(afterNull, null));
+}
+
+TEST(TypeSetTest, OrderedComparisonTypesWithEmptyBound) {
+    for (bool less : {false, true}) {
+        for (bool inclusive : {false, true}) {
+            ASSERT_EQ(orderedComparisonTypes(TypeSet::never(), less, inclusive), TypeSet::never());
+        }
+    }
+}
+
+TEST(TypeSetTest, OrderedComparisonTypesCoversEachCanonicalClass) {
+    for (BSONType bound : kAllTypes) {
+        for (bool less : {false, true}) {
+            for (bool inclusive : {false, true}) {
+                const auto result =
+                    orderedComparisonTypes(TypeSet(bound, Extent::kAll), less, inclusive);
+                for (BSONType candidate : kAllTypes) {
+                    const auto candidateType = TypeSet(candidate, Extent::kSubset);
+                    const int candidateOrder = canonicalizeBSONType(candidate);
+                    const int boundOrder = canonicalizeBSONType(bound);
+                    const bool beforeBoundary =
+                        less ? candidateOrder < boundOrder : candidateOrder > boundOrder;
+                    const bool atBoundary = candidateOrder == boundOrder;
+                    const bool expected = beforeBoundary ||
+                        (atBoundary && (inclusive || !candidateType.isSingletonType()));
+                    ASSERT_EQ(result.hasType(candidate), expected)
+                        << typeName(bound) << ", " << typeName(candidate) << ", less " << less
+                        << ", inclusive " << inclusive;
+                    if (expected) {
+                        ASSERT_EQ(result.getExtent(candidate),
+                                  beforeBoundary ? Extent::kAll
+                                                 : candidateType.getExtent(candidate))
+                            << typeName(bound) << ", " << typeName(candidate) << ", less " << less
+                            << ", inclusive " << inclusive;
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST(TypeSetTest, OrderedComparisonTypesWithUnionBounds) {
+    for (BSONType first : kAllTypes) {
+        for (BSONType second : kAllTypes) {
+            const TypeSet firstBound(first, Extent::kAll);
+            const TypeSet secondBound(second, Extent::kAll);
+            for (bool less : {false, true}) {
+                for (bool inclusive : {false, true}) {
+                    ASSERT_EQ(
+                        orderedComparisonTypes(unionType(firstBound, secondBound), less, inclusive),
+                        unionType(orderedComparisonTypes(firstBound, less, inclusive),
+                                  orderedComparisonTypes(secondBound, less, inclusive)))
+                        << typeName(first) << ", " << typeName(second) << ", less " << less
+                        << ", inclusive " << inclusive;
+                }
+            }
+        }
+    }
+}
+
 TEST(TypeSetTest, SameCanonicalClassRejectsInvalidBSONTypes) {
     for (auto type : {static_cast<BSONType>(-2),
                       static_cast<BSONType>(20),

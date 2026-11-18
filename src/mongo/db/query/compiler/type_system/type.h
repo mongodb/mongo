@@ -120,6 +120,7 @@ private:
     friend TypeSet intersectType(TypeSet lhs, TypeSet rhs);
     friend TypeSet complement(TypeSet typeSet);
     friend TypeSet sameCanonicalClass(BSONType type);
+    friend TypeSet orderedComparisonTypes(TypeSet bound, bool less, bool inclusive);
 
     TypeSet(detail::TypeMask types, detail::TypeMask subsetTypes);
 
@@ -318,6 +319,12 @@ TypeSet sameCanonicalClass(BSONType type);
 
 /// Returns the union of the equality comparison classes for all types represented by 'types'.
 TypeSet sameCanonicalClasses(TypeSet types);
+
+/**
+ * Returns a conservative set of types that can compare less than (or greater than, when 'less' is
+ * false) some value in 'bound'. When 'inclusive' is true, equality is also allowed.
+ */
+TypeSet orderedComparisonTypes(TypeSet bound, bool less, bool inclusive);
 
 /**
  * Returns 'input' with the type of the 'fieldName' field of the object intersected with

@@ -8,6 +8,8 @@
 
 #include <utility>
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo::pipeline::type_system {
 namespace {
 
@@ -105,6 +107,60 @@ Type narrowBySomeChild(Type inputType,
     return result;
 }
 
+struct ComparisonOperands {
+    /// The field path whose type should be narrowed.
+    const ExpressionFieldPath* path;
+    /// The inferred type of the other comparison operand.
+    Type otherType;
+    /// Whether 'path' is the first (left-hand) comparison operand; determines the direction of
+    /// the ordered type constraint.
+    bool pathIsFirst;
+};
+
+/**
+ * Finds a field-path operand at 'pathIndex' and infers the type of the other operand using
+ * 'inputType'.
+ */
+boost::optional<ComparisonOperands> findComparisonOperands(
+    const Expression::ExpressionVector& children, const Type& inputType, size_t pathIndex) {
+    const ExpressionFieldPath* path = getIfExpressionFieldPath(children[pathIndex].get());
+    if (!path || path->isVariableReference() || path->isROOT()) {
+        return boost::none;
+    }
+
+    Type otherType = getOutputType(inputType, children[1 - pathIndex].get());
+    if (otherType.getTypeSet() == TypeSet::any()) {
+        return boost::none;
+    }
+    return ComparisonOperands{path, std::move(otherType), pathIndex == 0};
+}
+
+/**
+ * Returns the type constraint for a comparison expression based on the operands and the comparison
+ * operator. 'assumeTrue' indicates whether the comparison is assumed to be true or false. Returns a
+ * type representing the constraint on the field-path operand based on the comparison.
+ */
+Type getComparisonConstraint(const ComparisonOperands& operands,
+                             ExpressionCompare::CmpOp op,
+                             bool assumeTrue) {
+    if (op == ExpressionCompare::EQ || op == ExpressionCompare::NE) {
+        const bool assumeEqual = op == ExpressionCompare::EQ ? assumeTrue : !assumeTrue;
+        Type constraint(sameCanonicalClasses(operands.otherType.getTypeSet()));
+        return assumeEqual ? std::move(constraint) : complement(std::move(constraint));
+    }
+
+    tassert(13918801,
+            "Expected an ordered comparison",
+            op == ExpressionCompare::LT || op == ExpressionCompare::LTE);
+    // For a false comparison, reverse the operator (e.g. !(a < b) becomes a >= b).
+    // Complementing the inferred constraint instead can exclude valid values when the bound is a
+    // union: for b of type number|string, the constraint for a < b includes all numbers, but
+    // a >= b can also hold for numbers (e.g. a = 5, b = 1).
+    const bool less = operands.pathIsFirst == assumeTrue;
+    const bool inclusive = (op == ExpressionCompare::LTE) == assumeTrue;
+    return Type(orderedComparisonTypes(operands.otherType.getTypeSet(), less, inclusive));
+}
+
 /**
  * Narrows the input type by every expression which carries type information.
  * An expression left without an override leaves the input type unchanged, which is always valid.
@@ -139,35 +195,31 @@ struct NarrowTypeExpressionVisitor final
 
     void visit(const ExpressionCompare* expr) override {
         const auto op = expr->getOp();
-        if (op != ExpressionCompare::EQ && op != ExpressionCompare::NE) {
+
+        // Only equality and ordered comparisons involving a field path are modeled.
+        const auto& children = expr->getChildren();
+        tassert(13598400, "ExpressionCompare must have two operands", children.size() == 2);
+
+        const bool isEquality = op == ExpressionCompare::EQ || op == ExpressionCompare::NE;
+        const bool isInequality = op == ExpressionCompare::LT || op == ExpressionCompare::LTE;
+        if (!isEquality && !isInequality) {
             return;
         }
-        const bool assumeEqual = op == ExpressionCompare::EQ ? assumeTrue : !assumeTrue;
 
-        // Only equality involving a field path is modeled.
-        const auto& children = expr->getChildren();
-        tassert(13598400, "$eq must have two operands", children.size() == 2);
-
-        // Either operand may be the field path.
-        for (auto [pathIndex, otherIndex] : {std::pair{0, 1}, std::pair{1, 0}}) {
-            const ExpressionFieldPath* path = getIfExpressionFieldPath(children[pathIndex].get());
-            if (!path || path->isVariableReference() || path->isROOT()) {
+        // Under negated equality, only a singleton type identifies the other operand's value.
+        const bool requireSingleton =
+            isEquality && (op == ExpressionCompare::EQ ? !assumeTrue : assumeTrue);
+        for (size_t pathIndex : {0, 1}) {
+            auto operands = findComparisonOperands(children, type, pathIndex);
+            if (!operands || (requireSingleton && !operands->otherType.isSingletonType())) {
                 continue;
             }
-
-            const Type outputType = getOutputType(type, children[otherIndex].get());
-            // Under negation, only a singleton type identifies the other operand's value.
-            if (outputType.getTypeSet() == TypeSet::any() ||
-                (!assumeEqual && !outputType.isSingletonType())) {
-                continue;
-            }
-
-            Type constraint(sameCanonicalClasses(outputType.getTypeSet()));
+            Type constraint = getComparisonConstraint(*operands, op, assumeTrue);
             type = expression::narrowPath(std::move(type),
-                                          path->getFieldPathWithoutCurrentPrefix(),
+                                          operands->path->getFieldPathWithoutCurrentPrefix(),
                                           expression::PathSemantics::kFieldPath,
                                           std::move(constraint),
-                                          assumeEqual);
+                                          true);
             return;
         }
     }

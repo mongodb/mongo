@@ -274,6 +274,300 @@ TEST(ExpressionTypingTest, EqualityNarrowingLeavesUnsupportedOperandsUnchanged) 
     }
 }
 
+TEST(ExpressionTypingTest, OrderedComparisonNarrowingUsesCanonicalTypeOrder) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto path =
+        ExpressionFieldPath::createPathFromString(expCtx.get(), "a", expCtx->variablesParseState);
+    auto one = ExpressionConstant::create(expCtx.get(), Value(1));
+
+    const Type beforeNumbers =
+        unionType(unionType(allValues(BSONType::minKey), Type::missing()),
+                  unionType(allValues(BSONType::undefined), allValues(BSONType::null)));
+    const Type withinNumbers = numbers(Extent::kSubset);
+    const Type beforeOrWithinNumbers = unionType(beforeNumbers, withinNumbers);
+    const Type afterNumbers =
+        unionType(withinNumbers, complement(unionType(beforeNumbers, numbers())));
+
+    for (auto op : {ExpressionCompare::LT, ExpressionCompare::LTE}) {
+        for (bool reverse : {false, true}) {
+            auto expr = reverse ? ExpressionCompare::create(expCtx.get(), op, one, path)
+                                : ExpressionCompare::create(expCtx.get(), op, path, one);
+            const Type expectedWhenTrue = reverse ? afterNumbers : beforeOrWithinNumbers;
+            const Type expectedWhenFalse = reverse ? beforeOrWithinNumbers : afterNumbers;
+            ASSERT_EQ(narrowType(Type::anyObject(), expr.get(), true).getField("a").toDebugString(),
+                      expectedWhenTrue.toDebugString())
+                << "op " << op << ", reverse " << reverse << ", assuming true";
+            ASSERT_EQ(
+                narrowType(Type::anyObject(), expr.get(), false).getField("a").toDebugString(),
+                expectedWhenFalse.toDebugString())
+                << "op " << op << ", reverse " << reverse << ", assuming false";
+        }
+    }
+}
+
+TEST(ExpressionTypingTest, OrderedComparisonNarrowingIntersectsWithExistingFieldType) {
+    const Type stringInput = openObject({{"a", allValues(BSONType::string)}});
+    for (const auto& op : {"$lt", "$lte"}) {
+        ASSERT_EQ(narrowedDebugString("{" + std::string(op) + ": ['$a', 1]}", stringInput), "never")
+            << op;
+        ASSERT_EQ(narrowedDebugString("{" + std::string(op) + ": ['$a', 1]}", stringInput, false),
+                  stringInput.toDebugString())
+            << op;
+        ASSERT_EQ(narrowedDebugString("{" + std::string(op) + ": [1, '$a']}", stringInput),
+                  stringInput.toDebugString())
+            << op;
+        ASSERT_EQ(narrowedDebugString("{" + std::string(op) + ": [1, '$a']}", stringInput, false),
+                  "never")
+            << op;
+    }
+}
+
+TEST(ExpressionTypingTest, OrderedComparisonNarrowingDottedPaths) {
+    const Type input = openObject({{"a", openObject({{"b", allValues(BSONType::string)}})}});
+    for (const auto& op : {"$lt", "$lte"}) {
+        const auto fieldFirst = "{" + std::string(op) + ": ['$a.b', 1]}";
+        const auto constantFirst = "{" + std::string(op) + ": [1, '$$ROOT.a.b']}";
+        ASSERT_EQ(narrowedDebugString(fieldFirst, input), "never") << op;
+        ASSERT_EQ(narrowedDebugString(fieldFirst, input, false), input.toDebugString()) << op;
+        ASSERT_EQ(narrowedDebugString(constantFirst, input), input.toDebugString()) << op;
+        ASSERT_EQ(narrowedDebugString(constantFirst, input, false), "never") << op;
+    }
+}
+
+TEST(ExpressionTypingTest, OrderedComparisonNarrowingRespectsInclusiveBounds) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto path =
+        ExpressionFieldPath::createPathFromString(expCtx.get(), "a", expCtx->variablesParseState);
+    const std::vector<Value> candidates{
+        Value(), Value(MINKEY), Value(BSONNULL), Value(0), Value(1), Value("x"sv), Value(MAXKEY)};
+    const std::vector<std::pair<ExpressionCompare::CmpOp, Value>> cases{
+        {ExpressionCompare::LT, Value(MINKEY)},
+        {ExpressionCompare::LTE, Value(MINKEY)},
+        {ExpressionCompare::LT, Value(MAXKEY)},
+        {ExpressionCompare::LTE, Value(MAXKEY)}};
+
+    for (const auto& [op, bound] : cases) {
+        auto constant = ExpressionConstant::create(expCtx.get(), bound);
+        auto expr = ExpressionCompare::create(expCtx.get(), op, path, constant);
+        const auto narrowedTrue = narrowType(Type::anyObject(), expr.get(), true);
+        const auto narrowedFalse = narrowType(Type::anyObject(), expr.get(), false);
+        for (const auto& candidate : candidates) {
+            Document doc = candidate.missing() ? Document{} : Document{{"a", candidate}};
+            const bool result = expr->evaluate(doc, &expCtx->variables, {}).getBool();
+            ASSERT_TRUE((result ? narrowedTrue : narrowedFalse).hasValue(Value(doc)))
+                << "op " << op << ", bound " << bound.toString() << ", candidate "
+                << candidate.toString() << ", result " << result << ", type "
+                << (result ? narrowedTrue : narrowedFalse).toDebugString();
+        }
+    }
+
+    auto lessThanMin =
+        ExpressionCompare::create(expCtx.get(),
+                                  ExpressionCompare::LT,
+                                  path,
+                                  ExpressionConstant::create(expCtx.get(), Value(MINKEY)));
+    ASSERT_EQ(narrowType(Type::anyObject(), lessThanMin.get(), true).toDebugString(), "never");
+
+    auto atMostMin =
+        ExpressionCompare::create(expCtx.get(),
+                                  ExpressionCompare::LTE,
+                                  path,
+                                  ExpressionConstant::create(expCtx.get(), Value(MINKEY)));
+    ASSERT_EQ(narrowType(Type::anyObject(), atMostMin.get(), true).toDebugString(),
+              "{a: minKey, ...}");
+    ASSERT_EQ(narrowType(Type::anyObject(), atMostMin.get(), false).toDebugString(),
+              "{a: ~minKey, ...}");
+
+    auto lessThanMax =
+        ExpressionCompare::create(expCtx.get(),
+                                  ExpressionCompare::LT,
+                                  path,
+                                  ExpressionConstant::create(expCtx.get(), Value(MAXKEY)));
+    ASSERT_EQ(narrowType(Type::anyObject(), lessThanMax.get(), true).toDebugString(),
+              "{a: ~maxKey, ...}");
+    ASSERT_EQ(narrowType(Type::anyObject(), lessThanMax.get(), false).toDebugString(),
+              "{a: maxKey, ...}");
+
+    auto atMostMax =
+        ExpressionCompare::create(expCtx.get(),
+                                  ExpressionCompare::LTE,
+                                  path,
+                                  ExpressionConstant::create(expCtx.get(), Value(MAXKEY)));
+    ASSERT_EQ(narrowType(Type::anyObject(), atMostMax.get(), true).toDebugString(), "object");
+    ASSERT_EQ(narrowType(Type::anyObject(), atMostMax.get(), false).toDebugString(), "never");
+}
+
+TEST(ExpressionTypingTest, OrderedComparisonNarrowingPreservesEvaluationResults) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto values = extendedRepresentatives();
+    values.push_back(Value(2));
+    auto path =
+        ExpressionFieldPath::createPathFromString(expCtx.get(), "a", expCtx->variablesParseState);
+    for (auto op : {ExpressionCompare::LT, ExpressionCompare::LTE}) {
+        for (const auto& constant : values) {
+            auto literal = ExpressionConstant::create(expCtx.get(), constant);
+            for (bool reverse : {false, true}) {
+                auto expr = reverse ? ExpressionCompare::create(expCtx.get(), op, literal, path)
+                                    : ExpressionCompare::create(expCtx.get(), op, path, literal);
+                const auto narrowedTrue = narrowType(Type::anyObject(), expr.get(), true);
+                const auto narrowedFalse = narrowType(Type::anyObject(), expr.get(), false);
+                if (constant.getType() == BSONType::null) {
+                    ASSERT_NE(narrowedTrue.toDebugString(), "object")
+                        << "op " << op << ", reverse " << reverse;
+                    ASSERT_NE(narrowedFalse.toDebugString(), "object")
+                        << "op " << op << ", reverse " << reverse;
+                }
+                for (const auto& candidate : values) {
+                    Document doc{{"a", candidate}};
+                    const bool result = expr->evaluate(doc, &expCtx->variables, {}).getBool();
+                    ASSERT_TRUE((result ? narrowedTrue : narrowedFalse).hasValue(Value(doc)))
+                        << "op " << op << ", constant " << constant.toString() << ", candidate "
+                        << candidate.toString() << ", reverse " << reverse << ", result " << result
+                        << ", type " << (result ? narrowedTrue : narrowedFalse).toDebugString();
+                }
+            }
+        }
+    }
+}
+
+TEST(ExpressionTypingTest, OrderedComparisonNarrowingPreservesUnionBoundResults) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const Type boundType = unionType(
+        Type::null(), unionType(allValues(BSONType::string), allValues(BSONType::boolean)));
+    const Type input = openObject(
+        {{"a", unionType(unionType(numbers(), Type::anyArray()), boundType)}, {"b", boundType}});
+    const std::vector<Value> candidates{Value(BSONNULL),
+                                        Value(false),
+                                        Value(true),
+                                        Value("x"sv),
+                                        Value(1),
+                                        Value(std::vector<Value>{}),
+                                        Value(std::vector<Value>{Value(1)})};
+    const std::vector<Value> bounds{Value(BSONNULL), Value("x"sv), Value(false), Value(true)};
+    for (const auto& spec : {"{$lt: ['$a', '$b']}",
+                             "{$lte: ['$a', '$b']}",
+                             "{$lt: ['$b', '$a']}",
+                             "{$lte: ['$b', '$a']}",
+                             "{$not: [{$lt: ['$a', '$b']}]}",
+                             "{$not: [{$lte: ['$a', '$b']}]}",
+                             "{$not: [{$lt: ['$b', '$a']}]}",
+                             "{$not: [{$lte: ['$b', '$a']}]}"}) {
+        auto expr = parseExpr(fromjson(spec), *expCtx);
+        const auto narrowedTrue = narrowType(input, expr.get(), true);
+        const auto narrowedFalse = narrowType(input, expr.get(), false);
+        for (const auto& candidate : candidates) {
+            for (const auto& bound : bounds) {
+                const Document doc{{"a", candidate}, {"b", bound}};
+                const bool result = expr->evaluate(doc, &expCtx->variables, {}).getBool();
+                ASSERT_TRUE((result ? narrowedTrue : narrowedFalse).hasValue(Value(doc)))
+                    << spec << ", document " << doc.toString() << ", result " << result << ", type "
+                    << (result ? narrowedTrue : narrowedFalse).toDebugString();
+            }
+        }
+    }
+}
+
+TEST(ExpressionTypingTest, OrderedComparisonNarrowingPreservesFalseUnionBoundResults) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const Type input =
+        openObject({{"a", numbers()}, {"b", unionType(Type::null(), allValues(BSONType::string))}});
+    const Document numberLessThanNull{{"a", Value(1)}, {"b", Value(BSONNULL)}};
+    const Document stringGreaterThanNumber{{"a", Value(1)}, {"b", Value("x"sv)}};
+
+    for (const auto& [spec, nullResult, stringResult] :
+         {std::tuple{"{$lt: ['$a', '$b']}", false, true},
+          std::tuple{"{$lte: ['$a', '$b']}", false, true},
+          std::tuple{"{$lt: ['$b', '$a']}", true, false},
+          std::tuple{"{$lte: ['$b', '$a']}", true, false}}) {
+        auto expr = parseExpr(fromjson(spec), *expCtx);
+        const auto narrowedTrue = narrowType(input, expr.get(), true);
+        const auto narrowedFalse = narrowType(input, expr.get(), false);
+        for (const auto& [doc, expected] : {std::pair{numberLessThanNull, nullResult},
+                                            std::pair{stringGreaterThanNumber, stringResult}}) {
+            const bool result = expr->evaluate(doc, &expCtx->variables, {}).getBool();
+            ASSERT_EQ(result, expected) << spec << ", document " << doc.toString();
+            ASSERT_TRUE((result ? narrowedTrue : narrowedFalse).hasValue(Value(doc)))
+                << spec << ", document " << doc.toString() << ", result " << result << ", type "
+                << (result ? narrowedTrue : narrowedFalse).toDebugString();
+        }
+    }
+}
+
+TEST(ExpressionTypingTest, LessThanNarrowingHandlesBoundsAndTypedOperands) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto path =
+        ExpressionFieldPath::createPathFromString(expCtx.get(), "a", expCtx->variablesParseState);
+    auto min = ExpressionConstant::create(expCtx.get(), Value(MINKEY));
+    auto max = ExpressionConstant::create(expCtx.get(), Value(MAXKEY));
+    auto lessThanMin = ExpressionCompare::create(expCtx.get(), ExpressionCompare::LT, path, min);
+    auto lessThanMax = ExpressionCompare::create(expCtx.get(), ExpressionCompare::LT, path, max);
+    auto maxLessThan = ExpressionCompare::create(expCtx.get(), ExpressionCompare::LT, max, path);
+    ASSERT_EQ(narrowType(Type::anyObject(), lessThanMin.get(), true).toDebugString(), "never");
+    ASSERT_EQ(narrowType(Type::anyObject(), lessThanMin.get(), false).toDebugString(), "object");
+    ASSERT_EQ(narrowType(Type::anyObject(), lessThanMax.get(), true).toDebugString(),
+              "{a: ~maxKey, ...}");
+    ASSERT_EQ(narrowType(Type::anyObject(), lessThanMax.get(), false).toDebugString(),
+              "{a: maxKey, ...}");
+    ASSERT_EQ(narrowType(Type::anyObject(), maxLessThan.get(), true).toDebugString(), "never");
+    ASSERT_EQ(narrowType(Type::anyObject(), maxLessThan.get(), false).toDebugString(), "object");
+
+    const Type input = openObject(
+        {{"a", Type::anyObject()}, {"b", unionType(Type::null(), allValues(BSONType::string))}});
+    ASSERT_EQ(narrowedDebugString("{$lt: ['$a', '$b']}", input), "never");
+    ASSERT_EQ(narrowedDebugString("{$lt: ['$b', '$a']}", input, false), "never");
+}
+
+TEST(ExpressionTypingTest, LessThanNarrowingPreservesEvaluationResults) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto values = extendedRepresentatives();
+    values.insert(values.end(), {Value(), Value(2), Value(MAXKEY)});
+    auto path =
+        ExpressionFieldPath::createPathFromString(expCtx.get(), "a", expCtx->variablesParseState);
+    for (const auto& bound : values) {
+        auto literal = ExpressionConstant::create(expCtx.get(), bound);
+        for (bool reverse : {false, true}) {
+            auto expr = reverse
+                ? ExpressionCompare::create(expCtx.get(), ExpressionCompare::LT, literal, path)
+                : ExpressionCompare::create(expCtx.get(), ExpressionCompare::LT, path, literal);
+            const auto narrowedTrue = narrowType(Type::anyObject(), expr.get(), true);
+            const auto narrowedFalse = narrowType(Type::anyObject(), expr.get(), false);
+            for (const auto& value : values) {
+                Document doc{{"a", value}};
+                const bool result = expr->evaluate(doc, &expCtx->variables, {}).getBool();
+                const auto& narrowed = result ? narrowedTrue : narrowedFalse;
+                ASSERT_TRUE(narrowed.hasValue(Value(doc)))
+                    << "bound " << bound.toString() << ", value " << value.toString()
+                    << ", reverse " << reverse << ", result " << result << ", type "
+                    << narrowed.toDebugString();
+            }
+        }
+    }
+}
+
+TEST(ExpressionTypingTest, LessThanNarrowingPreservesDottedAndLogicalEvaluationResults) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto corpus = generateDocumentCorpus("a.b");
+    for (const auto& spec : {"{$lt: ['$a.b', 1]}",
+                             "{$lt: [null, '$a.b']}",
+                             "{$not: [{$lt: ['$a.b', 1]}]}",
+                             "{$and: [{$lt: ['$a.b', 1]}, {$lt: [null, '$a.b']}]}"}) {
+        auto expr = parseExpr(fromjson(spec), *expCtx);
+        const auto narrowedTrue = narrowType(Type::anyObject(), expr.get(), true);
+        const auto narrowedFalse = narrowType(Type::anyObject(), expr.get(), false);
+        ASSERT_TRUE(narrowedTrue.toDebugString() != "object" ||
+                    narrowedFalse.toDebugString() != "object")
+            << spec;
+        for (const auto& bson : corpus) {
+            Document doc(bson);
+            const bool result = expr->evaluate(doc, &expCtx->variables, {}).coerceToBool();
+            const auto& narrowed = result ? narrowedTrue : narrowedFalse;
+            ASSERT_TRUE(narrowed.hasValue(Value(doc)))
+                << spec << ", document " << doc.toString() << ", result " << result << ", type "
+                << narrowed.toDebugString();
+        }
+    }
+}
+
 TEST(ExpressionTypingTest, LogicalEmptyChild) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const Type anyObject = Type::anyObject();

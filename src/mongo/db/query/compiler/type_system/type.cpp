@@ -108,6 +108,16 @@ constexpr auto kCanonicalClassMasks = [] {
     return masks;
 }();
 
+constexpr auto kLessCanonicalClassMasks = [] {
+    std::array<TypeMask, kCanonicalClassMasks.size()> masks{};
+    TypeMask lowerTypes = 0;
+    for (size_t i = 0; i < masks.size(); ++i) {
+        masks[i] = lowerTypes;
+        lowerTypes |= kCanonicalClassMasks[i];
+    }
+    return masks;
+}();
+
 /// A bitmask containing all BSONTypes.
 constexpr TypeMask kAllTypesMask = typeMask(kAllTypes.begin(), kAllTypes.end());
 
@@ -732,6 +742,29 @@ TypeSet sameCanonicalClasses(TypeSet types) {
         if (types.hasType(type)) {
             result = unionType(std::move(result), sameCanonicalClass(type));
         }
+    }
+    return result;
+}
+
+TypeSet orderedComparisonTypes(TypeSet bound, bool less, bool inclusive) {
+    TypeSet result = TypeSet::never();
+    for (BSONType type : kAllTypes) {
+        if (!bound.hasType(type)) {
+            continue;
+        }
+
+        const auto index = canonicalizeBSONType(type) - kCanonicalTypeMin;
+        const TypeMask classMask = kCanonicalClassMasks[index];
+        const TypeMask lowerMask = kLessCanonicalClassMasks[index];
+        const bool includeSingletons = less ? inclusive : !inclusive;
+        const TypeMask boundaryMask =
+            includeSingletons ? classMask : classMask & ~kSingletonTypesMask;
+        TypeSet lowerOrEqual(lowerMask | boundaryMask, boundaryMask);
+
+        // For number|string, a > bound can hold for numbers when bound is a number.
+        // Complement each bound separately: complementing their union would exclude those numbers.
+        result = unionType(std::move(result),
+                           less ? std::move(lowerOrEqual) : complement(std::move(lowerOrEqual)));
     }
     return result;
 }
