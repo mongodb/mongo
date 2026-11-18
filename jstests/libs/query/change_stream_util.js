@@ -1675,10 +1675,12 @@ export function withBalancerEnabled(conn, cb) {
  * @param {Mongo} conn - The connection on which to start the session.
  * @param {Function} cb - Callback invoked with the started session; its return value is returned
  *     by this function.
+ * @param {object} [options] - Optional session options passed through to 'conn.startSession()'
+ *     (e.g. '{causalConsistency: false}').
  * @returns {*} - The value returned by 'cb'.
  */
-export function withSession(conn, cb) {
-    const session = conn.startSession();
+export function withSession(conn, cb, options = {}) {
+    const session = conn.startSession(options);
     try {
         return cb(session);
     } finally {
