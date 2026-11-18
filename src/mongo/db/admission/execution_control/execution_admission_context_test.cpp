@@ -606,6 +606,19 @@ TEST_F(ExecutionAdmissionContextFinalizeStatsTest, LoadShedStatsRecordedWithoutA
     ASSERT_EQ(maybeStats->deprioritizable.totalOpsLoadShed.loadRelaxed(), 0);
 }
 
+TEST_F(ExecutionAdmissionContextFinalizeStatsTest, ExemptPriorityLoadShedOmitsFinalizedStats) {
+    auto opCtx = makeOperationContext();
+    ScopedAdmissionPriority<ExecutionAdmissionContext> exemptPriority(
+        opCtx.get(), AdmissionContext::Priority::kExempt);
+    auto& admCtx = ExecutionAdmissionContext::get(opCtx.get());
+    admCtx.recordOperationLoadShed();
+    auto maybeStats = admCtx.finalizeStats(100, 1000);
+    ASSERT(maybeStats.has_value());
+    ASSERT_EQ(maybeStats->nonDeprioritizable.totalOpsLoadShed.loadRelaxed(), 0);
+    ASSERT_EQ(maybeStats->deprioritizable.totalOpsLoadShed.loadRelaxed(), 0);
+    ASSERT_EQ(maybeStats->nonDeprioritizable.totalOpsFinished.loadRelaxed(), 0);
+}
+
 TEST_F(ExecutionAdmissionContextFinalizeStatsTest,
        LoadShedWithoutAdmissionsUsesHeuristicAtFinalizeWithZeroThreshold) {
     unittest::ServerParameterGuard thresholdGuard(

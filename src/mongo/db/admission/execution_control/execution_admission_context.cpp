@@ -170,9 +170,13 @@ boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionCon
     }
 
     // Record finalized stats when the operation used non-exempt admissions, or when it was shed
-    // before acquiring execution tickets (admissions may be zero).
+    // while not kExempt. kExempt ops bypass the ticket queue, so they are omitted even if
+    // getLoadShed() is set. Nested exempt work that restores normal/low priority can still count
+    // if a later non-exempt wait is shed.
     const bool hasNonExemptAdmissions = getAdmissions() > getExemptedAdmissions();
-    if (hasNonExemptAdmissions || getLoadShed()) {
+    const bool shedAsNonExempt =
+        getLoadShed() && getPriority() != AdmissionContext::Priority::kExempt;
+    if (hasNonExemptAdmissions || shedAsNonExempt) {
         // Updates go to the deprioritizable or non-deprioritizable finalized bucket, not
         // read/write, since operation type may have changed during the operation's lifetime.
         auto& stats = _isDeprioritizable(/*isFinalization=*/true) ? _deprioritizableFinalStats

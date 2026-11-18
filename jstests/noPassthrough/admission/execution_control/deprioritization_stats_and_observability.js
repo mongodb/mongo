@@ -886,8 +886,14 @@ describe("Execution control statistics and observability", function () {
                     ),
                 );
             }
-            holdFailPoint.wait({timesEntered: kNumReadTickets});
-            return {priorFrameworkControl, preYield, holdFailPoint, holdJoinShells};
+            const holdState = {priorFrameworkControl, preYield, holdFailPoint, holdJoinShells};
+            try {
+                holdFailPoint.wait({timesEntered: kNumReadTickets});
+            } catch (e) {
+                releaseHeldReadTickets(holdState);
+                throw e;
+            }
+            return holdState;
         }
 
         function releaseHeldReadTickets(holdState) {
