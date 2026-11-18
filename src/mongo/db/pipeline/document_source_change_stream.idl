@@ -272,6 +272,20 @@ structs:
                     Defaults to false.
                 query_shape: literal
 
+            backfillingStartAtOperationTime:
+                cpp_name: backfillingStartAtOperationTime
+                type: timestamp
+                optional: true
+                description:
+                    An internal-only field. When set, the oplog scan starts at this timestamp,
+                    while the resume token (resumeAfter/startAfter/startAtOperationTime) remains
+                    the suppression point. It is set by the router when it transparently rebuilds
+                    a change stream after an end-of-transaction lookback, so that the router can
+                    reconstruct its accounting state from an earlier oplog position. It is
+                    accepted only for a command that came from the router and is excluded from
+                    the query shape.
+                query_shape: parameter
+
     DocumentSourceChangeStreamOplogMatchSpec:
         strict: true
         description:
@@ -297,6 +311,18 @@ structs:
             startAfterInvalidate:
                 type: resumeToken
                 optional: true
+            resumePoint:
+                type: resumeToken
+                optional: true
+                description:
+                    The stream's resume point. When set, an invalidating command that sorts before
+                    this token is not an invalidation, because the stream has already moved past
+                    it. The full token is carried rather than only its cluster time so that a
+                    command at the same cluster time that sorts before the resume point (for
+                    example, a cross-shard event ordered by its shard UUID) is also suppressed. It
+                    is set only when the router rebuilds the stream after an end-of-transaction
+                    lookback, because that rebuild scans the oplog from an earlier point than the
+                    resume point.
 
     DocumentSourceChangeStreamCheckResumabilitySpec:
         strict: true
