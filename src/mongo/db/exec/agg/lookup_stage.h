@@ -125,6 +125,12 @@ private:
     GetNextResult unwindResult();
 
     /**
+     * Returns the next foreign result for '_input' in unwindResult(), or boost::none once they are
+     * exhausted.
+     */
+    boost::optional<Document> nextUnwindForeignResult();
+
+    /**
      * Builds the $lookup pipeline using the resolved view definition for a sharded foreign view and
      * updates the '_sharedState->resolvedPipeline', as well as '_fieldMatchPipelineIdx' in the case
      * of a 'foreign' join.

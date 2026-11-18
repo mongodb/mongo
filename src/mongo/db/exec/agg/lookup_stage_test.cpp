@@ -153,6 +153,54 @@ TEST_F(LookupStageTest, ShouldPropagatePausesWhileUnwinding) {
     ASSERT_TRUE(lookupStage->getNext().isEOF());
 }
 
+TEST_F(LookupStageTest, ShouldAccumulateForeignStatsOnceWhileUnwinding) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{Document{{"_id", 0}}, Document{{"_id", 1}}}));
+
+    auto mockLocalStage =
+        exec::agg::MockStage::createForTest({Document{{"foreignId", 0}},
+                                             DocumentSource::GetNextResult::makePauseExecution(),
+                                             Document{{"foreignId", 1}},
+                                             DocumentSource::GetNextResult::makePauseExecution()},
+                                            expCtx);
+
+    // Each foreign query sorts its one matching document, so the $lookup's 'keysSorted' counts
+    // how many foreign queries' stats it has accumulated.
+    auto lookup = makeLookUpFromJson(
+        "{$lookup: {from: 'foreign', localField: 'foreignId', foreignField: '_id', "
+        "pipeline: [{$sort: {_id: 1}}], as: 'foreignDoc'}}",
+        expCtx);
+    lookup->setUnwindStage_forTest(
+        DocumentSourceUnwind::create(expCtx, "foreignDoc", false, boost::none));
+
+    auto lookupStage = exec::agg::buildStageAndStitch(lookup.get(), mockLocalStage);
+    auto keysSorted = [&] {
+        return static_cast<const DocumentSourceLookupStats*>(lookupStage->getSpecificStats())
+            ->planSummaryStats.keysSorted;
+    };
+
+    // A foreign query's stats are accumulated when the $lookup moves past its local document.
+    ASSERT_TRUE(lookupStage->getNext().isAdvanced());
+    ASSERT_EQ(keysSorted(), 0);
+    ASSERT_TRUE(lookupStage->getNext().isPaused());
+    ASSERT_EQ(keysSorted(), 1);
+    ASSERT_TRUE(lookupStage->getNext().isAdvanced());
+    ASSERT_EQ(keysSorted(), 1);
+    ASSERT_TRUE(lookupStage->getNext().isPaused());
+    ASSERT_EQ(keysSorted(), 2);
+
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
+    ASSERT_TRUE(lookupStage->getNext().isEOF());
+    ASSERT_EQ(keysSorted(), 2);
+
+    lookupStage->dispose();
+    ASSERT_EQ(keysSorted(), 2);
+}
+
 TEST_F(LookupStageTest, ShouldReplaceNonCorrelatedPrefixWithCacheAfterFirstSubPipelineIteration) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs =

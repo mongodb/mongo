@@ -395,6 +395,9 @@ void LookUpStage::doDispose() {
     if (_sharedState->pipeline) {
         _sharedState->pipeline.reset();
     }
+    // unwindResult() reads the foreign pipeline whenever '_nextValue' is set, so it must not
+    // outlive the pipeline.
+    _nextValue.reset();
     _resultCache.disable();
 }
 
@@ -645,7 +648,7 @@ GetNextResult LookUpStage::unwindResult() {
     // Loop until we get a document that has at least one match.
     // Note we may return early from this loop if our source stage is exhausted or if the unwind
     // source was asked to return empty arrays and we get a document without a match.
-    while (!_sharedState->pipeline || !_nextValue) {
+    while (!_nextValue) {
         // Accumulate stats from the pipeline for the previous input, if applicable. This is to
         // avoid missing the accumulation of stats on an early exit (below) if the input (i.e., left
         // side of the lookup) is done.
@@ -653,6 +656,8 @@ GetNextResult LookUpStage::unwindResult() {
             _sharedState->execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
             _sharedState->execPipeline->reattachToOperationContext(pExpCtx->getOperationContext());
             _sharedState->execPipeline->dispose();
+            _sharedState->execPipeline.reset();
+            _sharedState->pipeline.reset();
         }
 
         auto nextInput = pSource->getNext();
@@ -670,7 +675,7 @@ GetNextResult LookUpStage::unwindResult() {
         _sharedState->execPipeline = exec::agg::buildPipeline(_sharedState->pipeline->freeze());
 
         _cursorIndex = 0;
-        _nextValue = _sharedState->execPipeline->getNext();
+        _nextValue = nextUnwindForeignResult();
 
         if (_unwindPreserveNullsAndEmptyArrays && !_nextValue) {
             // There were no results for this cursor, but the $unwind was asked to preserve empty
@@ -688,7 +693,7 @@ GetNextResult LookUpStage::unwindResult() {
 
     invariant(bool(_input) && bool(_nextValue));
     auto currentValue = *_nextValue;
-    _nextValue = _sharedState->execPipeline->getNext();
+    _nextValue = nextUnwindForeignResult();
 
     // Move input document into output if this is the last or only result, otherwise perform a copy.
     MutableDocument output(_nextValue ? *_input : std::move(*_input));
@@ -700,6 +705,10 @@ GetNextResult LookUpStage::unwindResult() {
 
     ++_cursorIndex;
     return output.freeze();
+}
+
+boost::optional<Document> LookUpStage::nextUnwindForeignResult() {
+    return _sharedState->execPipeline->getNext();
 }
 
 bool LookUpStage::foreignShardedLookupAllowed() const {
