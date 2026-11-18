@@ -57,9 +57,29 @@ public:
         dassert(_retryImageWrites.empty());
     }
 
-    bool _isSkippableDelete(OplogEntry* op) {
+    /**
+     * True for any delete of a config.image_collection row, whatever its key.
+     */
+    static bool _isRetryImageDelete(OplogEntry* op) {
         return op->getOpType() == OpTypeEnum::kDelete &&
             op->getNss() == NamespaceString::kConfigImagesNamespace;
+    }
+
+    /**
+     * Parses the key of a delete in config.image_collection as a logical session id, or returns
+     * boost::none if the key is not one.
+     */
+    static boost::optional<LogicalSessionId> _parseRetryImageKey(OplogEntry* op) {
+        try {
+            return LogicalSessionId::parse(op->getIdElement().Obj(),
+                                           IDLParserContext("RectifyConfigImagesWrites"));
+        } catch (const DBException&) {
+            return boost::none;
+        }
+    }
+
+    bool _isSkippableDelete(OplogEntry* op) {
+        return _isRetryImageDelete(op) && _parseRetryImageKey(op).has_value();
     }
     /**
      * Returns true if the op should be skipped because it's a delete in the retry images
@@ -79,18 +99,13 @@ public:
             invariant(sessionId.has_value(),
                       "Oplog entry with `needsRetryImage` should also have a session id");
             retryImageKey = *sessionId;
-        } else if (_isSkippableDelete(op)) {
-            try {
-                retryImageKey = LogicalSessionId::parse(
-                    op->getIdElement().Obj(), IDLParserContext("RectifyConfigImagesWrites"));
-            } catch (const ExceptionFor<ErrorCodes::FailedToParse>&) {
+        } else if (_isRetryImageDelete(op)) {
+            retryImageKey = _parseRetryImageKey(op);
+            if (!retryImageKey) {
                 LOGV2_WARNING(6796201,
                               "Found a delete oplog entry for the config.image_collection which "
-                              "did not have a session id as key",
+                              "did not have a session id as key; applying it as an ordinary delete",
                               "op"_attr = redact(op->toBSONForLogging()));
-                dassert(false,
-                        "Found a delete oplog entry for the config.image_collection which did not "
-                        "have a session id as key");
             }
         }
         if (retryImageKey) {

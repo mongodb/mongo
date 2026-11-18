@@ -1914,6 +1914,55 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncorr
     ASSERT(!collectionExists(_opCtx.get(), nssTenant2));
 }
 
+// A user with write access to the config database can store arbitrary documents in
+// config.image_collection, so the  '_id' may not necessarily be a logical session id if a user has
+// manually manipulated this collection. Make sure the secondary does not crash, and applies the
+// change the same way the primary does, in this case.
+TEST_F(OplogApplierImplTest, DeleteFromConfigImagesWithNonSessionIdKeyIsApplied) {
+    auto configImagesUUID =
+        createCollectionWithUuid(_opCtx.get(), NamespaceString::kConfigImagesNamespace);
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+
+    // The two key shapes from the finding.  They fail in different places and raise different
+    // error codes, so both have to be covered.
+    const std::vector<BSONObj> nonSessionIdKeys = {
+        BSON("_id" << 1),                           // not a document at all
+        BSON("_id" << BSON("notASessionId" << 1)),  // a document, but not a logical session id
+    };
+
+    setServerParameter("replWriterThreadCount", 1);
+    setServerParameter("replWriterMinThreadCount", 1);
+    auto workerPool = makeReplWorkerPool();
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary, false),
+        workerPool.get());
+
+    for (size_t i = 0; i < nonSessionIdKeys.size(); ++i) {
+        const auto& key = nonSessionIdKeys[i];
+        ASSERT_OK(getStorageInterface()->insertDocument(
+            _opCtx.get(), NamespaceString::kConfigImagesNamespace, {key}, 0));
+
+        auto deleteOp = makeOplogEntry(OpTime{{2, static_cast<unsigned>(i + 1)}, 1},
+                                       repl::OpTypeEnum::kDelete,
+                                       NamespaceString::kConfigImagesNamespace,
+                                       configImagesUUID,
+                                       key);
+
+        ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {deleteOp}));
+
+        CollectionReader collectionReaderConfigImages(_opCtx.get(),
+                                                      NamespaceString::kConfigImagesNamespace);
+        ASSERT_NOT_OK(collectionReaderConfigImages.next());
+    }
+}
+
 TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierRetryableUpdate) {
     const auto sessionId = makeLogicalSessionIdForTest();
     OperationSessionInfo sessionInfo;
