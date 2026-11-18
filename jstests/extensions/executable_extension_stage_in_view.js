@@ -62,15 +62,15 @@ function makeView(suffix, source, pipeline) {
         });
     }
 
-    // Verify running $readNDocuments on a view fails because the view's pipeline gets prepended,
-    // making the desugared source stage no longer first.
+    // Source stages emit documents and logically cannot follow other stages like those in a view
+    // pipeline.
     {
         const viewName = makeView("readNDocuments_on_view_fails", coll.getName(), [
             {$match: {x: {$gt: 0}}},
         ]);
         assert.throwsWithCode(
             () => testDb[viewName].aggregate([{$readNDocuments: {numDocs: 2}}]).toArray(),
-            40602,
+            13844101,
         );
     }
 
@@ -115,12 +115,13 @@ function makeView(suffix, source, pipeline) {
         }
     }
 
-    // Verify running a source stage on a view fails because the view's pipeline gets prepended.
+    // Source stages emit documents and logically cannot follow other stages like those in a view
+    // pipeline.
     {
         const viewName = makeView("toast_on_view_fails", coll.getName(), [{$match: {x: {$gt: 0}}}]);
         assert.throwsWithCode(
             () => testDb[viewName].aggregate([{$toast: {temp: 350.0, numSlices: 2}}]).toArray(),
-            40602,
+            13844101,
         );
     }
 

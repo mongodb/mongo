@@ -343,6 +343,11 @@ public:
             getName(), _arguments, std::move(shardId));
     }
 
+    MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()
+        const override {
+        return MongoExtensionFirstStageViewApplicationPolicy::kDoNothing;
+    }
+
     std::unique_ptr<sdk::AggStageAstNode> clone() const override {
         return std::make_unique<MultiStreamSourceAstNode>(getName(), _arguments);
     }

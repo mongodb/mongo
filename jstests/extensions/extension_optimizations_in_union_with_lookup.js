@@ -256,7 +256,12 @@ describe("extension optimizations in $unionWith/$lookup subpipelines", function 
                             const err = assert.throws(() =>
                                 testDb[outer].aggregate(pipeline).toArray(),
                             );
-                            assert.eq(err.code, 40602, "expected kFirst position rejection", {err});
+                            assert.eq(
+                                err.code,
+                                13844101,
+                                "expected the source stage to reject the view",
+                                {err},
+                            );
                             return;
                         }
 

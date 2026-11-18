@@ -306,7 +306,14 @@ public:
               _astNode(std::move(astNode)),
               _properties(_astNode->getProperties()),
               _nss(nss),
-              _ifrContext(std::move(ifrContext)) {}
+              _ifrContext(std::move(ifrContext)) {
+            uassert(13844100,
+                    fmt::format("Extension stage '{}' is a source stage and cannot by definition "
+                                "prepend a view pipeline. It must declare the kDoNothing "
+                                "first-stage view application policy",
+                                stageName),
+                    _isViewPolicyValid());
+        }
 
         std::unique_ptr<StageParams> getStageParams() const override {
             return std::make_unique<ExpandedStageParams>(_astNode->clone());
@@ -396,6 +403,13 @@ public:
         bool isSelectionStage() const override;
 
     private:
+        bool _isViewPolicyValid() const {
+            return _properties.getRequiresInputDocSource() ||
+                view_util::toFirstStageApplicationPolicy(
+                    _astNode->getFirstStageViewApplicationPolicy()) ==
+                FirstStageViewApplicationPolicy::kDoNothing;
+        }
+
         std::unique_ptr<LiteParsedDocumentSource> _doClone() const override {
             return std::make_unique<LiteParsedExpanded>(
                 getParseTimeName(), _astNode->clone(), _nss, _ifrContext);

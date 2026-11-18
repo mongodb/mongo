@@ -24,6 +24,8 @@
 #include <string>
 #include <string_view>
 
+#include <fmt/format.h>
+
 namespace mongo::extension::sdk {
 
 // Explicit template instantiations are provided in aggregation_stage.cpp.
@@ -393,6 +395,10 @@ public:
 
     virtual std::unique_ptr<AggStageAstNode> clone() const = 0;
 
+    /**
+     * Source stages must override this to declare kDoNothing; the host rejects a source stage that
+     * leaves the default in place.
+     */
     virtual MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()
         const {
         return MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend;
@@ -402,7 +408,18 @@ public:
     // metadata outside of the call to bindResolvedNamespace, it must make its own copy of it. There
     // are no guarantees on the lifetime outside of the scope of this function.
     virtual void bindResolvedNamespace(const ResolvedNamespace& resolvedNamespace) {
-        // Default implementation is a no-op.
+        sdk_uassert(13844101,
+                    fmt::format("Stage {} does not support views. Attempted to use in view: {}",
+                                getName(),
+                                resolvedNamespace.viewName()),
+                    !_isSourceStage());
+    }
+
+private:
+    bool _isSourceStage() const {
+        auto properties = getProperties();
+        auto elt = properties["requiresInputDocSource"];
+        return elt.ok() && elt.isBoolean() && !elt.boolean();
     }
 
 protected:

@@ -111,6 +111,11 @@ public:
         return builder.obj();
     }
 
+    MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()
+        const override {
+        return MongoExtensionFirstStageViewApplicationPolicy::kDoNothing;
+    }
+
     std::unique_ptr<sdk::AggStageAstNode> clone() const override {
         return std::make_unique<FruitsAsDocumentsAstNode>(_name, _arguments);
     }

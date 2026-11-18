@@ -57,6 +57,15 @@ public:
         return builder.obj();
     }
 
+    MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()
+        const override {
+        return MongoExtensionFirstStageViewApplicationPolicy::kDoNothing;
+    }
+
+    void bindResolvedNamespace(const sdk::ResolvedNamespace&) override {
+        // $search supports views, so it opts out of the source-stage default rejection.
+    }
+
     std::unique_ptr<sdk::AggStageAstNode> clone() const override {
         return std::make_unique<ExtensionSearchAstNode>(getName(), _arguments);
     }
@@ -175,6 +184,10 @@ public:
     MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()
         const override {
         return MongoExtensionFirstStageViewApplicationPolicy::kDoNothing;
+    }
+
+    void bindResolvedNamespace(const sdk::ResolvedNamespace&) override {
+        // $searchMeta supports views, so it opts out of the source-stage default rejection.
     }
 
     std::unique_ptr<sdk::AggStageAstNode> clone() const override {

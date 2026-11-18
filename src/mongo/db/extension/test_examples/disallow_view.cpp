@@ -98,6 +98,11 @@ public:
         sdk_uasserted(12756000, message);
     }
 
+    MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()
+        const override {
+        return MongoExtensionFirstStageViewApplicationPolicy::kDoNothing;
+    }
+
     std::unique_ptr<sdk::AggStageAstNode> clone() const override {
         return std::make_unique<DisallowViewSourceAstNode>(getName(), _arguments);
     }
