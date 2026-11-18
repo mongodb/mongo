@@ -329,20 +329,30 @@ export function getV3Plans(explain) {
 
 /**
  * The values that legitimately differ between two explain invocations of the same query on the same
- * data: planning and trial timing, and yield bookkeeping. Everything else is expected to be
- * reproducible, so keeping this list short and named is what gives a deep explain comparison its
- * teeth - resist adding to it.
+ * data: planning, trial and execution timing, yield bookkeeping, and when an on-the-fly CE sample
+ * was taken. Everything else is expected to be reproducible, so keeping this list short and named
+ * is what gives a deep explain comparison its teeth - resist adding to it.
  *
  */
 const kRunVaryingExplainFields = new Set([
     "optimizationTimeMillis",
     "optimizationTimeMicros",
+    "executionTimeMillis",
     "executionTimeMillisEstimate",
     "executionTimeMicros",
     "executionTimeNanos",
     "saveState",
     "restoreState",
     "needYield",
+    // Join optimization phase timings, in queryPlanner.joinOptimizer.metrics.
+    "joinModelingTimeMicros",
+    "sbeLoweringTimeMicros",
+    "samplingTimeMicros",
+    "cbrPlanningTimeMicros",
+    "planEnumerationTimeMicros",
+    "ceTimeMicros",
+    // In queryPlanner.ceSamplingMetadata.
+    "sampleCreatedAt",
 ]);
 
 /**
@@ -352,18 +362,19 @@ const kRunVaryingExplainFields = new Set([
  *
  * Field *presence* is never normalized: a normalized field is still present, so a field appearing or
  * disappearing between the two outputs still fails the comparison. Recurses through both objects and
- * arrays; scalars pass through unchanged.
+ * arrays; scalars pass through unchanged. 'extraFields' names more fields to normalize.
  */
-export function normalizeRunVarying(value) {
+export function normalizeRunVarying(value, extraFields = []) {
     if (Array.isArray(value)) {
-        return value.map(normalizeRunVarying);
+        return value.map((v) => normalizeRunVarying(v, extraFields));
     }
     if (typeof value === "object" && value !== null) {
         const out = {};
         for (const key of Object.keys(value)) {
-            out[key] = kRunVaryingExplainFields.has(key)
-                ? "<normalized>"
-                : normalizeRunVarying(value[key]);
+            out[key] =
+                kRunVaryingExplainFields.has(key) || extraFields.includes(key)
+                    ? "<normalized>"
+                    : normalizeRunVarying(value[key], extraFields);
         }
         return out;
     }
