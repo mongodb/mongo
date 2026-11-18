@@ -107,6 +107,10 @@ public:
     static constexpr std::string_view metaFieldStream = "$stream"sv;
     static constexpr std::string_view metaFieldChangeStreamControlEvent =
         "$changeStreamControlEvent"sv;
+    static constexpr std::string_view metaFieldTimeseriesBucketMinTime =
+        "$timeseriesBucketMinTime"sv;
+    static constexpr std::string_view metaFieldTimeseriesBucketMaxTime =
+        "$timeseriesBucketMaxTime"sv;
     static constexpr std::array kAllMetadataFields = {metaFieldTextScore,
                                                       metaFieldRandVal,
                                                       metaFieldSortKey,
@@ -123,7 +127,9 @@ public:
                                                       metaFieldScore,
                                                       metaFieldScoreDetails,
                                                       metaFieldStream,
-                                                      metaFieldChangeStreamControlEvent};
+                                                      metaFieldChangeStreamControlEvent,
+                                                      metaFieldTimeseriesBucketMinTime,
+                                                      metaFieldTimeseriesBucketMaxTime};
 
 private:
     static bool isMetadataFieldName_cold(std::string_view fieldName);

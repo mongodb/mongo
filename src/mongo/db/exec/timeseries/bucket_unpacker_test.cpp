@@ -1381,5 +1381,43 @@ TEST_F(BucketUnpackerTest, TamperedCompressedElementMismatchTimeField) {
     ASSERT_FALSE(unpacker.hasNext());
 }
 
+TEST_F(BucketUnpackerTest, BucketSpecCopiesPreserveMetadataFlags) {
+    BucketSpec spec{"time", std::string{"meta"}, {}, BucketSpec::Behavior::kInclude};
+    spec.includeMinTimeAsMetadata = true;
+    spec.includeMaxTimeAsMetadata = true;
+
+    BucketSpec copyConstructed{spec};
+    ASSERT_TRUE(copyConstructed.includeMinTimeAsMetadata);
+    ASSERT_TRUE(copyConstructed.includeMaxTimeAsMetadata);
+
+    BucketSpec moveConstructed{std::move(copyConstructed)};
+    ASSERT_TRUE(moveConstructed.includeMinTimeAsMetadata);
+    ASSERT_TRUE(moveConstructed.includeMaxTimeAsMetadata);
+
+    BucketSpec assigned;
+    assigned = spec;
+    ASSERT_TRUE(assigned.includeMinTimeAsMetadata);
+    ASSERT_TRUE(assigned.includeMaxTimeAsMetadata);
+
+    BucketSpec moveAssigned;
+    moveAssigned = std::move(moveConstructed);
+    ASSERT_TRUE(moveAssigned.includeMinTimeAsMetadata);
+    ASSERT_TRUE(moveAssigned.includeMaxTimeAsMetadata);
+}
+
+TEST_F(BucketUnpackerTest, CopyPreservesMetadataFlags) {
+    BucketSpec spec{"time", std::string{"meta"}, {}, BucketSpec::Behavior::kInclude};
+    spec.includeMinTimeAsMetadata = true;
+    spec.includeMaxTimeAsMetadata = true;
+
+    const BucketUnpacker unpacker{std::move(spec)};
+    ASSERT_TRUE(unpacker.includeMinTimeAsMetadata());
+    ASSERT_TRUE(unpacker.includeMaxTimeAsMetadata());
+
+    const auto copied = unpacker.copy();
+    ASSERT_TRUE(copied.includeMinTimeAsMetadata());
+    ASSERT_TRUE(copied.includeMaxTimeAsMetadata());
+}
+
 }  // namespace
 }  // namespace mongo

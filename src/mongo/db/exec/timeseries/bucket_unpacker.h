@@ -165,6 +165,8 @@ public:
         unpackerCopy._spec = _spec;
         unpackerCopy._includeMetaField = _includeMetaField;
         unpackerCopy._includeTimeField = _includeTimeField;
+        unpackerCopy._includeMinTimeAsMetadata = _includeMinTimeAsMetadata;
+        unpackerCopy._includeMaxTimeAsMetadata = _includeMaxTimeAsMetadata;
         return unpackerCopy;
     }
 

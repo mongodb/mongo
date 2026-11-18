@@ -1447,6 +1447,36 @@ TEST(MetaFields, FromBsonWithMetadataAcceptsIndexKeyMetadata) {
     ASSERT_BSONOBJ_EQ(bsonWithoutMetadata, BSON("a" << 1));
 }
 
+TEST(MetaFields, TimeseriesBucketTimesMetadataSerializesCorrectly) {
+    const Date_t minTime = Date_t::fromMillisSinceEpoch(123);
+    const Date_t maxTime = Date_t::fromMillisSinceEpoch(456);
+    Document doc{BSON("a" << 1)};
+    MutableDocument mutableDoc{doc};
+    mutableDoc.metadata().setTimeseriesBucketMinTime(minTime);
+    mutableDoc.metadata().setTimeseriesBucketMaxTime(maxTime);
+    doc = mutableDoc.freeze();
+
+    auto serialized = doc.toBsonWithMetaData();
+    ASSERT_BSONOBJ_EQ(serialized,
+                      BSON("a" << 1 << "$timeseriesBucketMinTime" << minTime
+                               << "$timeseriesBucketMaxTime" << maxTime));
+
+    // The metadata must not show up in the user-visible document.
+    ASSERT_BSONOBJ_EQ(doc.toBson(), BSON("a" << 1));
+}
+
+TEST(MetaFields, FromBsonWithMetadataAcceptsTimeseriesBucketTimes) {
+    const Date_t minTime = Date_t::fromMillisSinceEpoch(123);
+    const Date_t maxTime = Date_t::fromMillisSinceEpoch(456);
+    auto doc = Document::fromBsonWithMetaData(BSON("a" << 1 << "$timeseriesBucketMinTime" << minTime
+                                                       << "$timeseriesBucketMaxTime" << maxTime));
+    ASSERT_TRUE(doc.metadata().hasTimeseriesBucketMinTime());
+    ASSERT_EQ(doc.metadata().getTimeseriesBucketMinTime(), minTime);
+    ASSERT_TRUE(doc.metadata().hasTimeseriesBucketMaxTime());
+    ASSERT_EQ(doc.metadata().getTimeseriesBucketMaxTime(), maxTime);
+    ASSERT_BSONOBJ_EQ(doc.toBson(), BSON("a" << 1));
+}
+
 TEST(MetaFields, FromBsonWithMetadataHandlesEmptyFieldName) {
     auto bson = BSON("" << 1 << "$indexKey" << BSON("b" << 1));
     auto doc = Document::fromBsonWithMetaData(bson);

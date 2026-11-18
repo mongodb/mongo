@@ -549,6 +549,10 @@ void DocumentStorage::loadLazyMetadata() const {
                 _metadataFields.setScoreDetails(Value(elem));
             } else if (fieldName == Document::metaFieldStream) {
                 _metadataFields.setStream(Value(elem));
+            } else if (fieldName == Document::metaFieldTimeseriesBucketMinTime) {
+                _metadataFields.setTimeseriesBucketMinTime(elem.Date());
+            } else if (fieldName == Document::metaFieldTimeseriesBucketMaxTime) {
+                _metadataFields.setTimeseriesBucketMaxTime(elem.Date());
             } else if (fieldName == Document::metaFieldChangeStreamControlEvent) {
                 if (elem.type() == BSONType::string) {
                     // New wire format: the field carries the category as a string.
@@ -711,6 +715,12 @@ void Document::toBsonWithMetaDataOnly(BSONObjBuilder* builder) const {
     }
     if (metadata().hasStream()) {
         metadata().getStream().addToBsonObj(builder, metaFieldStream);
+    }
+    if (metadata().hasTimeseriesBucketMinTime()) {
+        builder->append(metaFieldTimeseriesBucketMinTime, metadata().getTimeseriesBucketMinTime());
+    }
+    if (metadata().hasTimeseriesBucketMaxTime()) {
+        builder->append(metaFieldTimeseriesBucketMaxTime, metadata().getTimeseriesBucketMaxTime());
     }
     if (metadata().isChangeStreamControlEvent()) {
         builder->append(metaFieldChangeStreamControlEvent,

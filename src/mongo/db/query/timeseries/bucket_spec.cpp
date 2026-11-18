@@ -495,7 +495,9 @@ BucketSpec::BucketSpec(std::string timeField,
 }
 
 BucketSpec::BucketSpec(const BucketSpec& other)
-    : _fieldSet(other._fieldSet),
+    : includeMinTimeAsMetadata(other.includeMinTimeAsMetadata),
+      includeMaxTimeAsMetadata(other.includeMaxTimeAsMetadata),
+      _fieldSet(other._fieldSet),
       _behavior(other._behavior),
       _computedMetaProjFields(other._computedMetaProjFields),
       _timeField(other._timeField),
@@ -508,7 +510,9 @@ BucketSpec::BucketSpec(const BucketSpec& other)
 }
 
 BucketSpec::BucketSpec(BucketSpec&& other)
-    : _fieldSet(std::move(other._fieldSet)),
+    : includeMinTimeAsMetadata(other.includeMinTimeAsMetadata),
+      includeMaxTimeAsMetadata(other.includeMaxTimeAsMetadata),
+      _fieldSet(std::move(other._fieldSet)),
       _behavior(other._behavior),
       _computedMetaProjFields(std::move(other._computedMetaProjFields)),
       _timeField(std::move(other._timeField)),
@@ -528,6 +532,8 @@ BucketSpec::BucketSpec(const TimeseriesOptions& tsOptions)
 
 BucketSpec& BucketSpec::operator=(const BucketSpec& other) {
     if (&other != this) {
+        includeMinTimeAsMetadata = other.includeMinTimeAsMetadata;
+        includeMaxTimeAsMetadata = other.includeMaxTimeAsMetadata;
         _fieldSet = other._fieldSet;
         _behavior = other._behavior;
         _computedMetaProjFields = other._computedMetaProjFields;
@@ -543,6 +549,8 @@ BucketSpec& BucketSpec::operator=(const BucketSpec& other) {
 }
 
 BucketSpec& BucketSpec::operator=(BucketSpec&& other) {
+    includeMinTimeAsMetadata = other.includeMinTimeAsMetadata;
+    includeMaxTimeAsMetadata = other.includeMaxTimeAsMetadata;
     _fieldSet = std::move(other._fieldSet);
     _behavior = other._behavior;
     _computedMetaProjFields = std::move(other._computedMetaProjFields);
