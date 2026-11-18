@@ -3,6 +3,15 @@ filters:
   - "*":
     approvers:
       - 10gen/query-optimization
+  - "/join_opt/":
+    approvers:
+      - 10gen/query-optimization-join-ordering
+  - "/libs/join_opt.js":
+    approvers:
+      - 10gen/query-optimization-join-ordering
+  - "/expected_output/internalEnableJoinOptimization/":
+    approvers:
+      - 10gen/query-optimization-join-ordering
   - "**/*plan_stability*":
     approvers:
       - 10gen/query-optimization-correctness

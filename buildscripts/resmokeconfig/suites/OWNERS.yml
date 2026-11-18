@@ -123,6 +123,9 @@ filters:
   - "query_golden*":
     approvers:
       - 10gen/query-optimization
+  - "query_golden_join_optimization*":
+    approvers:
+      - 10gen/query-optimization-join-ordering
   - "queryable_wt*":
     approvers:
       - 10gen/server-backup-restore
