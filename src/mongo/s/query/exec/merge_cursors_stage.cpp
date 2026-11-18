@@ -159,6 +159,10 @@ Status MergeCursorsStage::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     return _blockingResultsMerger->setAwaitDataTimeout(awaitDataTimeout);
 }
 
+boost::optional<Milliseconds> MergeCursorsStage::getAwaitDataTimeout_forTest() const {
+    return _blockingResultsMerger->getAwaitDataTimeout_forTest();
+}
+
 void MergeCursorsStage::enableUndoNextMode() {
     _blockingResultsMerger->enableUndoNextMode();
 }

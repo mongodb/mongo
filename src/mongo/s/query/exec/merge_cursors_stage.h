@@ -58,6 +58,7 @@ public:
 
     bool remotesExhausted() const;
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
+    [[MONGO_MOD_PRIVATE]] boost::optional<Milliseconds> getAwaitDataTimeout_forTest() const;
 
     const PlanSummaryStats& getPlanSummaryStats() const {
         return _stats.planSummaryStats;

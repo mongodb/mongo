@@ -125,6 +125,15 @@ public:
     }
 
     /**
+     * Test-only accessor for the await-data timeout propagated to the stage's results merger, if
+     * any. Default implementation forwards to the stage's child.
+     */
+    [[MONGO_MOD_PRIVATE]] virtual boost::optional<Milliseconds> getAwaitDataTimeout_forTest()
+        const {
+        return _child ? _child->getAwaitDataTimeout_forTest() : boost::none;
+    }
+
+    /**
      * Returns the postBatchResumeToken if this RouterExecStage tree is executing a $changeStream;
      * otherwise, returns an empty BSONObj. Default implementation forwards to the stage's child.
      */

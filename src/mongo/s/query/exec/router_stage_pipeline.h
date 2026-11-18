@@ -67,6 +67,10 @@ public:
         return boost::none;
     }
 
+    boost::optional<Milliseconds> getAwaitDataTimeout_forTest() const final {
+        return _mergeCursorsStage ? _mergeCursorsStage->getAwaitDataTimeout_forTest() : boost::none;
+    }
+
 protected:
     Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 

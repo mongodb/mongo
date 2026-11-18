@@ -196,7 +196,7 @@ public:
      * Returns the user-specified maxTimeMS value that is sent along with requests to remote shards,
      * if set.
      */
-    boost::optional<Milliseconds> getAwaitDataTimeout_forTest() const;
+    [[MONGO_MOD_PRIVATE]] boost::optional<Milliseconds> getAwaitDataTimeout_forTest() const;
 
     /**
      * Returns the effective maxTimeMS value that is sent along with requests to remote shards, if

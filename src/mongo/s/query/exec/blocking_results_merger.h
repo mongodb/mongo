@@ -60,6 +60,10 @@ public:
         return _arm->setAwaitDataTimeout(awaitDataTimeout);
     }
 
+    [[MONGO_MOD_PRIVATE]] boost::optional<Milliseconds> getAwaitDataTimeout_forTest() const {
+        return _arm->getAwaitDataTimeout_forTest();
+    }
+
     void reattachToOperationContext(OperationContext* opCtx) {
         _arm->reattachToOperationContext(opCtx);
     }

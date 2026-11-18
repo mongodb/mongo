@@ -68,6 +68,15 @@ public:
         return _resultsMerger.takeMetrics();
     }
 
+    /**
+     * Test-only accessor for the await-data timeout propagated to the stage's results merger, if
+     * any. Default implementation forwards to the stage's child.
+     */
+    [[MONGO_MOD_PRIVATE]] boost::optional<Milliseconds> getAwaitDataTimeout_forTest()
+        const override {
+        return _resultsMerger.getAwaitDataTimeout_forTest();
+    }
+
 protected:
     Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final {
         return _resultsMerger.setAwaitDataTimeout(awaitDataTimeout);
