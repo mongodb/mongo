@@ -55,7 +55,7 @@ output: {
                 "h:4": {
                     "declaringScope": "scope:1",
                     "scope:2": {
-                        "exhaustiveScope": "scope:0",
+                        "exhaustiveScope": "scope:2",
                         "fields": {
                             "<missing>:5": {
                                 "declaringScope": "scope:2",

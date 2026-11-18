@@ -3123,6 +3123,34 @@ TEST_F(PipelineDependencyGraphTest, GetConstantSubpathOfScalarIsMissing) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, GetConstantSiblingOfDottedSetAfterInclusionIsMissing) {
+    setPipeline(R"([
+        {$project: {_id: 0, x: 1}},
+        {$set: {"a.b": 1}}
+    ])");
+    runTest([&] {
+        auto ab = graph->getConstant(nullptr, "a.b");
+        ASSERT_TRUE(ab.has_value());
+        ASSERT_VALUE_EQ(*ab, Value(1));
+        // TODO(SERVER-139658): This should report Value().
+        ASSERT_FALSE(graph->getConstant(nullptr, "a.c").has_value());
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantSiblingOfDottedSetAfterScalarSetIsUnknown) {
+    setPipeline(R"([
+        {$set: {a: 1}},
+        {$set: {"a.b": 1}}
+    ])");
+    runTest([&] {
+        auto ab = graph->getConstant(nullptr, "a.b");
+        ASSERT_TRUE(ab.has_value());
+        ASSERT_VALUE_EQ(*ab, Value(1));
+        // TODO(SERVER-139658): This should report Value().
+        ASSERT_FALSE(graph->getConstant(nullptr, "a.c").has_value());
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, GetConstantObjectLiteralCapturesLeafConstants) {
     pathArrayness->addPath("a", {}, false);
     pathArrayness->addPath("a.b", {}, false);
@@ -3409,6 +3437,18 @@ TEST_F(PipelineDependencyGraphTest, CanPathBeArrayDeepScalarShadow) {
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d"));
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d.e"));
+    });
+}
+
+// Regression test for SERVER-139165.
+TEST_F(PipelineDependencyGraphTest, GetConstantFromObjectOnDottedPath) {
+    setPipeline(R"([
+        {$project: {_id: 0, a: {$const: {c: 5}}}},
+        {$set: {"a.b": 1}}
+    ])");
+    runTest([&] {
+        auto c = graph->getConstant(nullptr, "a.c");
+        ASSERT_TRUE(!c || !c->missing()) << "a.c wrongly folded to missing";
     });
 }
 

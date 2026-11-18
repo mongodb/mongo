@@ -1642,8 +1642,12 @@ private:
             auto embeddedScope = _scopes.getNextId();
             newBaseField = _fields.append(Field{scope, embeddedScope});
 
-            auto [exhaustiveEmbeddedScope, parentEmbeddedScope] = resolveNewBaseFieldScopes(
-                scope, prefixPolicy, existingBaseField, embeddedScope, cursor.pathToCursor());
+            auto [exhaustiveEmbeddedScope, parentEmbeddedScope] =
+                resolveNewBaseFieldScopes(scope,
+                                          prefixPolicy,
+                                          {existingBaseField, existingBaseFieldType},
+                                          embeddedScope,
+                                          cursor.pathToCursor());
 
             if (parentEmbeddedScope) {
                 // The new field depends on the previous field, since it inherits paths.
@@ -1682,19 +1686,39 @@ private:
 
     /**
      * Returns the ScopeIds for a new base field.
-     * 'existingBaseField' is the result of looking up the base field.
+     * 'existingBase' is the result of looking up the base field in the current scope.
      * 'embeddedScope' is the ScopeId for the new scope that will be created for the base field.
      */
     std::pair<ScopeId, ScopeId> resolveNewBaseFieldScopes(ScopeId scopeId,
                                                           ModifiedPrefixPolicy prefixPolicy,
-                                                          FieldId existingBaseField,
+                                                          FieldMatch existingBase,
                                                           ScopeId embeddedScope,
                                                           ParsedPathView pathToBaseField) const {
+        auto [existingBaseField, existingBaseFieldType] = existingBase;
+        // If the base field we matched was not exactly known, we cannot inherit anything.
+        bool canInheritFieldsFromBase = [&]() {
+            switch (existingBaseFieldType) {
+                case FieldMatchType::kExact:
+                case FieldMatchType::kBaseDocument:
+                    return true;
+                case FieldMatchType::kMissing:
+                case FieldMatchType::kShadowed:
+                    // We cannot inherit anything for the embeddedScope of "a.b" (the base field we
+                    // are resolving), if we matched "a" (without embeddedScope) or if the field is
+                    // missing in "a".
+                    return false;
+            }
+            MONGO_UNREACHABLE_TASSERT(13916501);
+        }();
+
         // The prior embedded scope (sibling subfields) is only safe to inherit when the base
         // field's existing contents are guaranteed to survive the modification:
         //   - kPreserveArrays
         //   - kEnsureObjects + non-array base
         bool isParentEmbeddedScopePreserved = [&]() {
+            if (!canInheritFieldsFromBase) {
+                return false;
+            }
             switch (prefixPolicy) {
                 case ModifiedPrefixPolicy::kPreserveArrays:
                     return true;
@@ -1736,14 +1760,14 @@ private:
                 // No previous field -> base collection.
                 return ScopeId::none();
             }
+            if (!parentEmbeddedScope) {
+                // Previous field is a leaf in a non-exhaustive scope -> this new scope
+                return embeddedScope;
+            }
             if (auto previousExhaustiveScope =
                     _scopes[_fields[existingBaseField].declaringScope].exhaustiveScope) {
                 // Previous field's scope is exhaustive -> inherit it.
                 return previousExhaustiveScope;
-            }
-            if (!parentEmbeddedScope) {
-                // Previous field is a leaf in a non-exhaustive scope -> this new scope
-                return embeddedScope;
             }
             // The parent's scope is the exhaustive scope.
             return parentEmbeddedScope;
