@@ -213,7 +213,11 @@ mongo_cc_unit_test(
         "ftdc_util_test.cpp",
         "metadata_compressor_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = [
+        "mongo_unittest_second_group",
+        # TODO(SERVER-139716): Make MultipleCollectors independent of scheduling delays.
+        "windows_timing_sensitive",
+    ],
     deps = [
         ":ftdc",
         ":ftdc_server",
