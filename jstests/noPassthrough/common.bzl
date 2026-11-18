@@ -34,6 +34,7 @@ NO_PASSTHROUGH_DATA = [
     "//jstests/noPassthrough/libs/configExpand:reflect",
     "//jstests/noPassthrough/libs/configExpand:rest_server",
     "//jstests/noPassthrough/network/libs:net.max_incoming_connections_rate_limiter.yaml",
+    "//jstests/noPassthrough/network/libs:raw_op_msg_client",
     "//jstests/noPassthrough/observability/libs:otel_http_server",
     "//jstests/noPassthrough/query/query-integration:external_data_source.bson",
     "//jstests/noPassthrough/query/query-integration:external_data_source_malformed_bson_fixture.bson",
