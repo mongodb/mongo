@@ -181,7 +181,6 @@ struct MakeObjSpec {
           numFieldsToSearchFor(other.numFieldsToSearchFor),
           totalNumArgs(other.totalNumArgs),
           mandatoryFields(std::move(other.mandatoryFields)),
-          displayOrder(other.displayOrder),
           fields(other.fields) {}
 
     MakeObjSpec(MakeObjSpec&& other)
@@ -192,7 +191,6 @@ struct MakeObjSpec {
           numFieldsToSearchFor(other.numFieldsToSearchFor),
           totalNumArgs(other.totalNumArgs),
           mandatoryFields(std::move(other.mandatoryFields)),
-          displayOrder(std::move(other.displayOrder)),
           fields(std::move(other.fields)) {}
 
     MakeObjSpec& operator=(const MakeObjSpec& other) = delete;
@@ -308,8 +306,6 @@ public:
     // of the input object, it will perform the actions in this list in order they appear for each
     // field that wasn't present in the input object.
     std::vector<size_t> mandatoryFields;
-
-    std::vector<size_t> displayOrder;
 
     // This StringListSet provides the field name->idx mapping that is used throughout this
     // data structure. For a given field F that is present in 'fields', the idx of the field

@@ -92,10 +92,6 @@ TEST(MakeObjSpecTest, ValidateFlatSpecAndMetadata) {
     auto missingMandatory = valid.clone();
     missingMandatory->mandatoryFields.pop_back();
     ASSERT_FALSE(missingMandatory->validate());
-
-    auto invalidDisplay = valid.clone();
-    invalidDisplay->displayOrder = {valid.fields.size()};
-    ASSERT_FALSE(invalidDisplay->validate());
 }
 
 TEST(MakeObjSpecTest, ValidateNestedSpecsUseRootArgumentIndexes) {

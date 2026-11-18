@@ -66,11 +66,6 @@ bool MakeObjSpec::validateInternal(size_t rootNumArgs) const {
             }
         }
     }
-    for (size_t pos : displayOrder) {
-        if (pos >= fields.size()) {
-            return false;
-        }
-    }
     return expectedNumArgs == totalNumArgs &&
         expectedNumFieldsToSearchFor == numFieldsToSearchFor &&
         mandatoryPos == mandatoryFields.size();
@@ -139,13 +134,8 @@ std::string MakeObjSpec::toString() const {
     StringBuilder builder;
     builder << "[";
 
-    bool hasDisplayOrder = !displayOrder.empty();
-    size_t n = hasDisplayOrder ? displayOrder.size() : fields.size();
-
     bool first = true;
-    for (size_t i = 0; i < n; ++i) {
-        size_t pos = hasDisplayOrder ? displayOrder[i] : i;
-
+    for (size_t pos = 0; pos < fields.size(); ++pos) {
         auto& name = fields[pos];
         auto& action = actions[pos];
 
