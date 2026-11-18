@@ -352,6 +352,9 @@ typedef struct MongoExtensionResolvedNamespace {
  * immediately copying the values into an owned copy if they must persist beyond the scope of the
  * callee function.
  *
+ * namespaceString is the namespace the stage executes against. On mongod, when an aggregation runs
+ * against a view, this is the view's resolved source collection rather than the view itself.
+ *
  * shardId is populated with the shard identifier when running on a shard server. When running on
  * a router or a standalone deployment, shardId is empty.
  *
@@ -1218,6 +1221,63 @@ typedef struct MongoExtensionDistributedPlanLogicVTable {
         const MongoExtensionDistributedPlanLogic* distributedPlanLogic,
         MongoExtensionByteBuf** output);
 } MongoExtensionDistributedPlanLogicVTable;
+
+////////////////////////////////////////////////////////////////
+//
+//
+//       COMMANDS
+//
+//
+////////////////////////////////////////////////////////////////
+
+/**
+ * MongoExtensionCommandContext contains the per-invocation context of an extension command, which
+ * is available when the host runs the command. Note that the members of this struct are provided as
+ * views, meaning the values' underlying data is not owned by this struct. When a callee receives a
+ * MongoExtensionCommandContext as a parameter, the callee is responsible for immediately copying
+ * the values into an owned copy if they must persist beyond the scope of the callee function.
+ *
+ * namespaceString is the namespace to which the user sent the command. For a view, this is the
+ * database and view name rather than the resolved source collection.
+ */
+typedef struct MongoExtensionCommandContext {
+    const ::MongoExtensionNamespaceString namespaceString;
+} MongoExtensionCommandContext;
+
+/**
+ * A CommandDescriptor describes a server command provided by an extension, and runs it on behalf
+ * of the host. Ownership of these objects remains with the extension.
+ */
+typedef struct MongoExtensionCommandDescriptor {
+    const struct MongoExtensionCommandDescriptorVTable* const vtable;
+} MongoExtensionCommandDescriptor;
+
+typedef struct MongoExtensionCommandDescriptorVTable {
+    /**
+     * Returns the name of the command.
+     */
+    MongoExtensionByteView (*get_name)(const MongoExtensionCommandDescriptor* descriptor);
+
+    /**
+     * Returns static properties of this command as a serialized BSON document conforming to the
+     * MongoExtensionCommandStaticProperties IDL schema. Ownership of the output buffer is
+     * transferred to the caller.
+     */
+    MongoExtensionStatus* (*get_properties)(const MongoExtensionCommandDescriptor* descriptor,
+                                            MongoExtensionByteBuf** properties);
+
+    /**
+     * Run the command with the user-provided command request as input.
+     *
+     * requestBson contains the full command request as a BSON document. In case of success,
+     * `responseBson` is populated with the command response as a BSON document and owned by the
+     * caller.
+     */
+    MongoExtensionStatus* (*run)(const MongoExtensionCommandDescriptor* descriptor,
+                                 MongoExtensionByteView requestBson,
+                                 const MongoExtensionCommandContext* ctx,
+                                 MongoExtensionByteBuf** responseBson);
+} MongoExtensionCommandDescriptorVTable;
 
 ////////////////////////////////////////////////////////////////
 //

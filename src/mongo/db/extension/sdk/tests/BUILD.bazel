@@ -14,6 +14,7 @@ mongo_cc_unit_test(
         "aggregation_stage_test.cpp",
         "api_version_vector_to_span_test.cpp",
         "catalog_context_test.cpp",
+        "command_test.cpp",
         "exec_agg_stage_results_and_metadata_source_test.cpp",
         "extension_factory_test.cpp",
         "get_next_result_test.cpp",
@@ -34,6 +35,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/shared",
         "//src/mongo/db/extension/shared/handle",
         "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
+        "//src/mongo/db/extension/shared/handle/command:command_handles",
         "//src/mongo/db/pipeline:expression_context_for_test",
     ],
 )
