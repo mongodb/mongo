@@ -552,9 +552,9 @@ Explain values that change between runs or are covered by other tests are replac
 				"joinCostComponents" : {
 					"docsProcessed" : "<normalized>",
 					"docsOutput" : "<normalized>",
-					"numDocsTransmitted" : "<normalized>",
-					"sequentialIOPages" : "<normalized>",
-					"randomIOPages" : "<normalized>",
+					"docsTransmitted" : "<normalized>",
+					"sequentialIOs" : "<normalized>",
+					"randomIOs" : "<normalized>",
 					"localOpCost" : "<normalized>",
 					"totalCost" : "<normalized>"
 				},
@@ -583,9 +583,9 @@ Explain values that change between runs or are covered by other tests are replac
 						"joinCostComponents" : {
 							"docsProcessed" : "<normalized>",
 							"docsOutput" : "<normalized>",
-							"numDocsTransmitted" : "<normalized>",
-							"sequentialIOPages" : "<normalized>",
-							"randomIOPages" : "<normalized>",
+							"docsTransmitted" : "<normalized>",
+							"sequentialIOs" : "<normalized>",
+							"randomIOs" : "<normalized>",
 							"localOpCost" : "<normalized>",
 							"totalCost" : "<normalized>"
 						},
@@ -606,7 +606,7 @@ Explain values that change between runs or are covered by other tests are replac
 								"estimatesMetadata" : {
 									"ceSource" : "Metadata"
 								},
-								"cardinalityRHSBeforeJoinPred" : "<normalized>",
+								"innerCardinalityBeforeJoinEstimate" : "<normalized>",
 								"ndvEstimates" : [
 									{
 										"assumedPkSide" : "shop.customers",
@@ -618,9 +618,9 @@ Explain values that change between runs or are covered by other tests are replac
 								"joinCostComponents" : {
 									"docsProcessed" : "<normalized>",
 									"docsOutput" : "<normalized>",
-									"numDocsTransmitted" : "<normalized>",
-									"sequentialIOPages" : "<normalized>",
-									"randomIOPages" : "<normalized>",
+									"docsTransmitted" : "<normalized>",
+									"sequentialIOs" : "<normalized>",
+									"randomIOs" : "<normalized>",
 									"localOpCost" : "<normalized>",
 									"totalCost" : "<normalized>",
 									"mackertLohmanCase" : "collection-fits-cache"
@@ -643,9 +643,9 @@ Explain values that change between runs or are covered by other tests are replac
 										"joinCostComponents" : {
 											"docsProcessed" : "<normalized>",
 											"docsOutput" : "<normalized>",
-											"numDocsTransmitted" : "<normalized>",
-											"sequentialIOPages" : "<normalized>",
-											"randomIOPages" : "<normalized>",
+											"docsTransmitted" : "<normalized>",
+											"sequentialIOs" : "<normalized>",
+											"randomIOs" : "<normalized>",
 											"localOpCost" : "<normalized>",
 											"totalCost" : "<normalized>"
 										},
@@ -739,9 +739,9 @@ Explain values that change between runs or are covered by other tests are replac
 								"joinCostComponents" : {
 									"docsProcessed" : "<normalized>",
 									"docsOutput" : "<normalized>",
-									"numDocsTransmitted" : "<normalized>",
-									"sequentialIOPages" : "<normalized>",
-									"randomIOPages" : "<normalized>",
+									"docsTransmitted" : "<normalized>",
+									"sequentialIOs" : "<normalized>",
+									"randomIOs" : "<normalized>",
 									"localOpCost" : "<normalized>",
 									"totalCost" : "<normalized>"
 								}
@@ -766,9 +766,9 @@ Explain values that change between runs or are covered by other tests are replac
 						"joinCostComponents" : {
 							"docsProcessed" : "<normalized>",
 							"docsOutput" : "<normalized>",
-							"numDocsTransmitted" : "<normalized>",
-							"sequentialIOPages" : "<normalized>",
-							"randomIOPages" : "<normalized>",
+							"docsTransmitted" : "<normalized>",
+							"sequentialIOs" : "<normalized>",
+							"randomIOs" : "<normalized>",
 							"localOpCost" : "<normalized>",
 							"totalCost" : "<normalized>"
 						}
@@ -806,9 +806,9 @@ Explain values that change between runs or are covered by other tests are replac
 				"joinCostComponents" : {
 					"docsProcessed" : "<normalized>",
 					"docsOutput" : "<normalized>",
-					"numDocsTransmitted" : "<normalized>",
-					"sequentialIOPages" : "<normalized>",
-					"randomIOPages" : "<normalized>",
+					"docsTransmitted" : "<normalized>",
+					"sequentialIOs" : "<normalized>",
+					"randomIOs" : "<normalized>",
 					"localOpCost" : "<normalized>",
 					"totalCost" : "<normalized>"
 				},
@@ -837,9 +837,9 @@ Explain values that change between runs or are covered by other tests are replac
 						"joinCostComponents" : {
 							"docsProcessed" : "<normalized>",
 							"docsOutput" : "<normalized>",
-							"numDocsTransmitted" : "<normalized>",
-							"sequentialIOPages" : "<normalized>",
-							"randomIOPages" : "<normalized>",
+							"docsTransmitted" : "<normalized>",
+							"sequentialIOs" : "<normalized>",
+							"randomIOs" : "<normalized>",
 							"localOpCost" : "<normalized>",
 							"totalCost" : "<normalized>"
 						},
@@ -860,7 +860,7 @@ Explain values that change between runs or are covered by other tests are replac
 								"estimatesMetadata" : {
 									"ceSource" : "Metadata"
 								},
-								"cardinalityRHSBeforeJoinPred" : "<normalized>",
+								"innerCardinalityBeforeJoinEstimate" : "<normalized>",
 								"ndvEstimates" : [
 									{
 										"assumedPkSide" : "shop.customers",
@@ -872,9 +872,9 @@ Explain values that change between runs or are covered by other tests are replac
 								"joinCostComponents" : {
 									"docsProcessed" : "<normalized>",
 									"docsOutput" : "<normalized>",
-									"numDocsTransmitted" : "<normalized>",
-									"sequentialIOPages" : "<normalized>",
-									"randomIOPages" : "<normalized>",
+									"docsTransmitted" : "<normalized>",
+									"sequentialIOs" : "<normalized>",
+									"randomIOs" : "<normalized>",
 									"localOpCost" : "<normalized>",
 									"totalCost" : "<normalized>",
 									"mackertLohmanCase" : "collection-fits-cache"
@@ -897,9 +897,9 @@ Explain values that change between runs or are covered by other tests are replac
 										"joinCostComponents" : {
 											"docsProcessed" : "<normalized>",
 											"docsOutput" : "<normalized>",
-											"numDocsTransmitted" : "<normalized>",
-											"sequentialIOPages" : "<normalized>",
-											"randomIOPages" : "<normalized>",
+											"docsTransmitted" : "<normalized>",
+											"sequentialIOs" : "<normalized>",
+											"randomIOs" : "<normalized>",
 											"localOpCost" : "<normalized>",
 											"totalCost" : "<normalized>"
 										},
@@ -980,9 +980,9 @@ Explain values that change between runs or are covered by other tests are replac
 								"joinCostComponents" : {
 									"docsProcessed" : "<normalized>",
 									"docsOutput" : "<normalized>",
-									"numDocsTransmitted" : "<normalized>",
-									"sequentialIOPages" : "<normalized>",
-									"randomIOPages" : "<normalized>",
+									"docsTransmitted" : "<normalized>",
+									"sequentialIOs" : "<normalized>",
+									"randomIOs" : "<normalized>",
 									"localOpCost" : "<normalized>",
 									"totalCost" : "<normalized>"
 								}
@@ -1007,9 +1007,9 @@ Explain values that change between runs or are covered by other tests are replac
 						"joinCostComponents" : {
 							"docsProcessed" : "<normalized>",
 							"docsOutput" : "<normalized>",
-							"numDocsTransmitted" : "<normalized>",
-							"sequentialIOPages" : "<normalized>",
-							"randomIOPages" : "<normalized>",
+							"docsTransmitted" : "<normalized>",
+							"sequentialIOs" : "<normalized>",
+							"randomIOs" : "<normalized>",
 							"localOpCost" : "<normalized>",
 							"totalCost" : "<normalized>"
 						}

@@ -51,7 +51,7 @@ assert.commandWorked(coll3.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1}));
 
 function validateJoinCostComponents(
     explain,
-    expectedCardinalityRHSBeforeJoinPred,
+    expectedInnerCardinalityBeforeJoinEstimate,
     expectedNdvSource,
 ) {
     const winningStages = getAllPlanStages(getWinningPlanFromExplain(explain));
@@ -70,9 +70,9 @@ function validateJoinCostComponents(
         for (const field of [
             "docsProcessed",
             "docsOutput",
-            "numDocsTransmitted",
-            "sequentialIOPages",
-            "randomIOPages",
+            "docsTransmitted",
+            "sequentialIOs",
+            "randomIOs",
             "localOpCost",
             "totalCost",
         ]) {
@@ -122,9 +122,9 @@ function validateJoinCostComponents(
             );
 
             assert.eq(
-                expectedCardinalityRHSBeforeJoinPred,
-                stage.cardinalityRHSBeforeJoinPred,
-                "cardinalityRHSBeforeJoinPred must be the RHS cardinality after its own " +
+                expectedInnerCardinalityBeforeJoinEstimate,
+                stage.innerCardinalityBeforeJoinEstimate,
+                "innerCardinalityBeforeJoinEstimate must be the RHS cardinality after its own " +
                     "predicates",
                 {stage},
             );
@@ -351,11 +351,11 @@ runTest(pipeline, true /* expectRejected */);
         }),
     );
     {
-        // Basic case. Every RHS filter in 'pipeline' matches all 100 documents, so each INLJ stage must report exactly the RHS collection size for 'cardinalityRHSBeforeJoinPred'.
+        // Basic case. Every RHS filter in 'pipeline' matches all 100 documents, so each INLJ stage must report exactly the RHS collection size for 'innerCardinalityBeforeJoinEstimate'.
         const explain = coll1.explain().aggregate(pipeline, detailedExplain);
         validateJoinCostComponents(
             explain,
-            100 /* expectedCardinalityRHSBeforeJoinPred */,
+            100 /* expectedInnerCardinalityBeforeJoinEstimate */,
             "Sampling" /* expectedNdvSource */,
         );
     }
@@ -370,11 +370,11 @@ runTest(pipeline, true /* expectRejected */);
         const explain = coll1.explain().aggregate(inljPipeline, detailedExplain);
         validateJoinCostComponents(
             explain,
-            100 /* expectedCardinalityRHSBeforeJoinPred */,
+            100 /* expectedInnerCardinalityBeforeJoinEstimate */,
             "Sampling" /* expectedNdvSource */,
         );
 
-        // Verify the semantics of 'cardinalityRHSBeforeJoinPred' with a selective RHS predicate:
+        // Verify the semantics of 'innerCardinalityBeforeJoinEstimate' with a selective RHS predicate:
         // it must report the number of RHS docs matching the RHS's own predicates (50 of 100) and
         // not the whole RHS collection size.
         {
@@ -391,10 +391,10 @@ runTest(pipeline, true /* expectRejected */);
                 {$unwind: "$coll2"},
             ]);
             const explain = coll1.explain().aggregate(selectivePipeline, detailedExplain);
-            // Now we have a filter, so 'cardinalityRHSBeforeJoinPred' reports how many docs match the filter (50).
+            // Now we have a filter, so 'innerCardinalityBeforeJoinEstimate' reports how many docs match the filter (50).
             validateJoinCostComponents(
                 explain,
-                50 /* expectedCardinalityRHSBeforeJoinPred */,
+                50 /* expectedInnerCardinalityBeforeJoinEstimate */,
                 "Sampling" /* expectedNdvSource */,
             );
         }
@@ -411,7 +411,7 @@ runTest(pipeline, true /* expectRejected */);
         const explain = coll1.explain().aggregate(inljPipeline, detailedExplain);
         validateJoinCostComponents(
             explain,
-            100 /* expectedCardinalityRHSBeforeJoinPred */,
+            100 /* expectedInnerCardinalityBeforeJoinEstimate */,
             "HyperLogLog" /* expectedNdvSource */,
         );
     }
@@ -423,7 +423,7 @@ runTest(pipeline, true /* expectRejected */);
         const explain = coll1.explain().aggregate(inljPipeline, detailedExplain);
         validateJoinCostComponents(
             explain,
-            100 /* expectedCardinalityRHSBeforeJoinPred */,
+            100 /* expectedInnerCardinalityBeforeJoinEstimate */,
             "Metadata" /* expectedNdvSource */,
         );
     }

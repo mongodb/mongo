@@ -178,13 +178,13 @@ void addEstimatesForExplain(const JoinReorderingContext& ctx,
         auto joinEst = std::make_unique<JoinExtraEstimateInfo>(ce, cost.getTotalCost());
         joinEst->docsProcessed = cost.getNumDocsProcessed().toDouble();
         joinEst->docsOutput = cost.getNumDocsOutput().toDouble();
-        joinEst->numDocsTransmitted = cost.getNumDocsTransmitted().toDouble();
-        joinEst->sequentialIOPages = cost.getIoSeqPages().toDouble();
-        joinEst->randomIOPages = cost.getIoRandPages().toDouble();
+        joinEst->docsTransmitted = cost.getNumDocsTransmitted().toDouble();
+        joinEst->sequentialIOs = cost.getIoSeqPages().toDouble();
+        joinEst->randomIOs = cost.getIoRandPages().toDouble();
         joinEst->localOpCost = cost.getLocalOpCost().toDouble();
         joinEst->totalCost = cost.getTotalCost().toDouble();
         joinEst->mackertLohmanCase = cost.getMackertLohmanCase();
-        joinEst->cardinalityRHSBeforeJoinPred = cost.getCardinalityRHSBeforeJoinPred();
+        joinEst->innerCardinalityBeforeJoinEstimate = cost.getInnerCardinalityBeforeJoinEstimate();
         for (const auto edgeId : edges) {
             if (const auto* ndv = ceEstimator->getEdgeSelectivityEstimate(edgeId)) {
                 joinEst->edgeSelectivities.push_back(*ndv);

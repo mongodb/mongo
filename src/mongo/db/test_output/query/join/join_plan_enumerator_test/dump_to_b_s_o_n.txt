@@ -180,7 +180,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 1010,
                         "Source": "Code"
                     }
@@ -282,7 +282,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 10,
                         "Source": "Code"
                     }
@@ -405,7 +405,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 2010,
                         "Source": "Code"
                     }
@@ -507,7 +507,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 10,
                         "Source": "Code"
                     }
@@ -645,7 +645,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 2010,
                         "Source": "Code"
                     }
@@ -685,7 +685,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 2010,
                         "Source": "Code"
                     }
@@ -725,7 +725,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 2010,
                         "Source": "Code"
                     }
@@ -765,7 +765,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 2010,
                         "Source": "Code"
                     }
@@ -805,7 +805,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 2010,
                         "Source": "Code"
                     }
@@ -845,7 +845,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 2010,
                         "Source": "Code"
                     }
@@ -1443,7 +1443,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 1010,
                         "Source": "Code"
                     }
@@ -1483,7 +1483,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 1010,
                         "Source": "Code"
                     }
@@ -1523,7 +1523,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 1010,
                         "Source": "Code"
                     }
@@ -1563,7 +1563,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 1010,
                         "Source": "Code"
                     }
@@ -1603,7 +1603,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 1010,
                         "Source": "Code"
                     }
@@ -1643,7 +1643,7 @@
                         "Source": "Sampling"
                     },
                     "mackertLohmanCase": "collection-fits-cache",
-                    "cardinalityRHSBeforeJoinPred": {
+                    "innerCardinalityBeforeJoinEstimate": {
                         "Cardinality": 1010,
                         "Source": "Code"
                     }

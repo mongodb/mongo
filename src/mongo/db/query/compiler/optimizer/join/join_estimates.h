@@ -68,7 +68,7 @@ public:
                      JoinCostEstimate leftCost,
                      JoinCostEstimate rightCost,
                      MackertLohmanCase mackertLohmanCase,
-                     CardinalityEstimate cardinalityRHSBeforeJoinPred);
+                     CardinalityEstimate innerCardinalityBeforeJoinEstimate);
 
     JoinCostEstimate(CostEstimate totalCost);
 
@@ -104,8 +104,8 @@ public:
         return _mackertLohmanCase;
     }
 
-    boost::optional<CardinalityEstimate> getCardinalityRHSBeforeJoinPred() const {
-        return _cardinalityRHSBeforeJoinPred;
+    boost::optional<CardinalityEstimate> getInnerCardinalityBeforeJoinEstimate() const {
+        return _innerCardinalityBeforeJoinEstimate;
     }
 
     std::string toString() const;
@@ -145,7 +145,7 @@ private:
     // INDEXED_NESTED_LOOP_JOIN nodes; boost::none for all other join types.
     boost::optional<MackertLohmanCase> _mackertLohmanCase;
 
-    boost::optional<CardinalityEstimate> _cardinalityRHSBeforeJoinPred;
+    boost::optional<CardinalityEstimate> _innerCardinalityBeforeJoinEstimate;
 };
 
 inline std::ostream& operator<<(std::ostream& os, const JoinCostEstimate& cost) {
@@ -165,15 +165,15 @@ public:
 
     double docsProcessed{0};
     double docsOutput{0};
-    double numDocsTransmitted{0};
-    double sequentialIOPages{0};
-    double randomIOPages{0};
+    double docsTransmitted{0};
+    double sequentialIOs{0};
+    double randomIOs{0};
     double localOpCost{0};
     double totalCost{0};
     std::vector<JoinEdgeSelectivityEstimate> edgeSelectivities;
     // Only set for INDEXED_NESTED_LOOP_JOIN nodes; absent for HJ and NLJ.
     boost::optional<MackertLohmanCase> mackertLohmanCase;
-    boost::optional<CardinalityEstimate> cardinalityRHSBeforeJoinPred;
+    boost::optional<CardinalityEstimate> innerCardinalityBeforeJoinEstimate;
 
     void serialize(BSONObjBuilder& bob) const override;
 };

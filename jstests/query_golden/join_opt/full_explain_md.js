@@ -116,16 +116,16 @@ const kNormalizedFields = [
     "planCacheKey",
     "costEstimate",
     "cardinalityEstimate",
-    "cardinalityRHSBeforeJoinPred",
+    "innerCardinalityBeforeJoinEstimate",
     // In 'ndvEstimates'.
     "ndv",
     "selectivity",
     // In 'joinCostComponents'.
     "docsProcessed",
     "docsOutput",
-    "numDocsTransmitted",
-    "sequentialIOPages",
-    "randomIOPages",
+    "docsTransmitted",
+    "sequentialIOs",
+    "randomIOs",
     "localOpCost",
     "totalCost",
 ];

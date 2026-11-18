@@ -18,8 +18,8 @@ class JoinExplainResult(NamedTuple):
     left_input_cost: float
     right_input_cost: float | None  # None for INLJ
     mackert_lohman_case: int | None
-    sequential_io_pages: float | None
-    random_io_pages: float | None
+    sequential_ios: float | None
+    random_ios: float | None
 
 
 class CachedExecutionTime(NamedTuple):
@@ -98,6 +98,6 @@ async def run_join_explain(
         left_input_cost=join_node["inputStages"][0]["costEstimate"],
         right_input_cost=join_node["inputStages"][1].get("costEstimate"),
         mackert_lohman_case=MACKERT_LOHMAN_CASES.get(join_cost_components.get("mackertLohmanCase")),
-        sequential_io_pages=join_cost_components.get("sequentialIOPages"),
-        random_io_pages=join_cost_components.get("randomIOPages"),
+        sequential_ios=join_cost_components.get("sequentialIOs"),
+        random_ios=join_cost_components.get("randomIOs"),
     )

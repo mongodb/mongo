@@ -422,9 +422,9 @@ async def calibrate_join_algorithms(
 
             hj_actual_spilling = [r.used_disk for r in hj_results if r.used_disk is not None]
             inlj_ml_cases = [r.mackert_lohman_case for r in inlj_results]
-            hj_seq_io_mean = mean(r.sequential_io_pages for r in hj_results)
-            inlj_seq_io_mean = mean(r.sequential_io_pages for r in inlj_results)
-            inlj_rand_io_mean = mean(r.random_io_pages for r in inlj_results)
+            hj_seq_io_mean = mean(r.sequential_ios for r in hj_results)
+            inlj_seq_io_mean = mean(r.sequential_ios for r in inlj_results)
+            inlj_rand_io_mean = mean(r.random_ios for r in inlj_results)
 
             inlj_mean = (
                 cached.inlj_time_ms
