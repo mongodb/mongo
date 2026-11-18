@@ -17,6 +17,7 @@
 #include "mongo/bson/column/bsoncolumn_util.h"
 #include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/platform/bits.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decimal_counter.h"
@@ -25,6 +26,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstring>
 #include <memory>
 #include <span>
@@ -36,6 +38,20 @@
 
 #include <absl/container/inlined_vector.h>
 #include <fmt/format.h>
+
+// SSE2 is part of the x86-64 baseline, so no runtime feature detection or special compiler flags
+// are needed. GCC and Clang (including clang-cl) define __SSE2__ unless it was disabled with
+// -mno-sse2. MSVC does not define __SSE2__ for x64, so it is recognized by _M_AMD64 instead.
+// ARM64EC also defines _M_AMD64 and must not take the x86 path. Other architectures use the
+// portable scalar scan.
+#if !defined(_M_ARM64EC) &&                        \
+    ((defined(__x86_64__) && defined(__SSE2__)) || \
+     (defined(_MSC_VER) && !defined(__clang__) && defined(_M_AMD64)))
+#include <emmintrin.h>
+#define MONGO_BSON_VALIDATE_HAVE_SSE2 1
+#else
+#define MONGO_BSON_VALIDATE_HAVE_SSE2 0
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -511,6 +527,12 @@ public:
             uassertBSONValidation(InvalidBSON,
                                   (size_t)size <= _maxLength,
                                   "BSON literal content exceeds buffer size");
+            // The iterative scan below is bounded by the literal's declared end, so that end must
+            // hold the literal's EOO, just as validate() requires for a top-level object. Without
+            // this check, field name scanning could run past the literal into the rest of the
+            // column before the length mismatch is detected.
+            uassertBSONValidation(
+                InvalidBSON, _data[size - 1] == 0, "BSON literal content not terminated with EOO");
             _validateIterative(Cursor{ptr, _data + size});
             return size;
         } else {
@@ -572,11 +594,49 @@ private:
         size_t strlen() const {
             // This is actually by far the hottest code in all of BSON validation.
             dassert(ptr < end);
-            size_t len = 0;
-            while (ptr[len])
-                ++len;
-            return len;
+            // Every caller guarantees that end[-1] is a NUL byte: validate() checks the object's
+            // final EOO, validateAndMeasureElem() checks the EOO of a nested literal before
+            // scanning it, and BSONColumn validation checks the column's final EOO. The scalar
+            // scan therefore stops before 'end' without its own bounds check. The vector path
+            // below only reads while a whole chunk lies inside [ptr, end).
+            //
+            // Check for EOO first: it ends every object and array, and resolving it with a single
+            // byte compare keeps small and empty nested objects as cheap as before.
+            if (*ptr == 0)
+                return 0;
+#if MONGO_BSON_VALIDATE_HAVE_SSE2
+            // Most field names are short. The compiler turns the scalar loop into a call to libc
+            // strlen, whose call and dispatch overhead is comparable to scanning a short name, so
+            // resolve elements whose type byte, name and NUL fit in the first two 16-byte chunks
+            // inline. That covers field names of up to 30 bytes. A single chunk is not enough: a
+            // name just over 14 bytes would pay for a missed probe and then for the libc call
+            // anyway. Each chunk is read only if it lies entirely in [ptr, end).
+            const auto available = static_cast<size_t>(end - ptr);
+            if (MONGO_likely(available >= kScanChunk)) {
+                if (auto zeros = zeroMask(ptr); MONGO_likely(zeros != 0))
+                    return static_cast<size_t>(countTrailingZerosNonZero32(zeros));
+                if (available >= 2 * kScanChunk) {
+                    if (auto zeros = zeroMask(ptr + kScanChunk); zeros != 0)
+                        return kScanChunk + static_cast<size_t>(countTrailingZerosNonZero32(zeros));
+                    return 2 * kScanChunk + std::strlen(ptr + 2 * kScanChunk);
+                }
+                return kScanChunk + std::strlen(ptr + kScanChunk);
+            }
+#endif
+            return std::strlen(ptr);
         }
+
+#if MONGO_BSON_VALIDATE_HAVE_SSE2
+        // Returns a bit mask of the zero bytes in the 16 bytes starting at 'p'.
+        static unsigned int zeroMask(const char* p) {
+            const auto chunk = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p));
+            return static_cast<unsigned int>(
+                _mm_movemask_epi8(_mm_cmpeq_epi8(chunk, _mm_setzero_si128())));
+        }
+#endif
+
+        // Number of bytes inspected by each vectorized probe in strlen().
+        static constexpr size_t kScanChunk = 16;
 
         const char* ptr;
         const char* const end;
