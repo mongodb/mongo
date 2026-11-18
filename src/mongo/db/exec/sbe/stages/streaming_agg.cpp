@@ -233,15 +233,19 @@ void StreamingAggStage::startNewGroupAt(size_t idx) {
     _curGroupIdx = idx;
     tassert(13625704, "Too many groups seen in a single cluster", idx < kMaxParallelGroups);
 
-    value::MaterializedRow keyCopy(_inGroupKey);
-    keyCopy.makeOwned();
     if (idx < _groupKeys.size()) {
-        _groupKeys[idx] = std::move(keyCopy);
         tassert(13625705,
                 "Group row width must match the number of accumulators",
                 _groupAggs[idx].size() == _accumulatorList.size());
+
+        // Reuse the row's backing storage, copying each key before releasing the previous value.
+        auto& key = _groupKeys[idx];
+        for (size_t i = 0; i < _keySlots.size(); ++i) {
+            key.reset(i, _inGroupKey.getViewOfValue(i).copy());
+        }
     } else {
-        _groupKeys.emplace_back(std::move(keyCopy));
+        auto& key = _groupKeys.emplace_back(_inGroupKey);
+        key.makeOwned();
         _groupAggs.emplace_back(_accumulatorList.size());
     }
 

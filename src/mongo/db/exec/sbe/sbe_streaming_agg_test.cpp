@@ -336,6 +336,72 @@ TEST_F(StreamingAggStageTest, ResetsStateAfterReopen) {
     assertResults(stage.get(), resultAccessor, expectedValue.tag(), expectedValue.value());
 }
 
+TEST_F(StreamingAggStageTest, OwnsProjectedDeepKeysAcrossRecycledRowsAndReopen) {
+    BSONArrayBuilder docs;
+    BSONArrayBuilder expected;
+    for (int group = 0; group < 8; ++group) {
+        auto key = "long-group-key-" + std::to_string(group);
+        auto payload = BSON("label" << key << "values" << BSON_ARRAY(group << Decimal128("1.25")));
+        auto doc = BSON("key" << key << "payload" << payload);
+        docs.append(doc);
+        docs.append(doc);
+        expected.append(BSON_ARRAY("prefix-" + key << BSON("payload" << payload)));
+    }
+
+    auto [scanSlot, scanStage] = generateVirtualScan(docs.arr());
+    auto keySlots = generateMultipleSlotIds(2);
+    auto getField = [&](std::string_view field) {
+        return makeFunction(EFn::kGetField, makeVariable(scanSlot), makeStringConstant(field));
+    };
+    SlotExprPairVector projects;
+    projects.emplace_back(
+        keySlots[0], makeFunction(EFn::kConcat, makeStringConstant("prefix-"), getField("key")));
+    projects.emplace_back(
+        keySlots[1],
+        makeFunction(EFn::kNewObj, makeStringConstant("payload"), getField("payload")));
+    // Both projections produce owned values that are replaced on every input row. Saved group
+    // keys must own their copies while the child advances and the stage recycles its key rows.
+    auto [keyOutSlots, stage] = makeStreamingAgg(
+        makeS<ProjectStage>(std::move(scanStage), std::move(projects), kEmptyPlanNodeId), keySlots);
+    auto ctx = makeCompileCtx();
+    auto accessors = prepareTree(ctx.get(), stage.get(), keyOutSlots);
+    auto expectedRows = expected.arr();
+    assertSameRows(stage.get(), accessors, expectedRows);
+
+    stage->close();
+    stage->open(true);
+    assertSameRows(stage.get(), accessors, expectedRows);
+}
+
+TEST_F(StreamingAggStageTest, RecyclesDeepKeyRowsAcrossChangingClusterSizes) {
+    // Grow, shrink, then grow the number of groups in a cluster, changing the owned key's type
+    // along the way. This reuses key rows containing strings, objects, and Decimal128 values.
+    auto objectKey = BSON("nested" << BSON_ARRAY("long-nested-string" << Decimal128("2.5")));
+    runGroupTest(BSON_ARRAY(BSON("a" << "long-cluster-key-1" << "v" << 1)
+                            << BSON("a" << objectKey << "v" << 2)
+                            << BSON("a" << objectKey << "b" << BSONNULL << "v" << 4)
+                            << BSON("a" << objectKey << "v" << 8)
+                            << BSON("a" << Decimal128("3.5") << "v" << 16)
+                            << BSON("a" << "long-cluster-key-4" << "v" << 32)
+                            << BSON("a" << "long-cluster-key-4" << "b" << BSONNULL << "v" << 64)
+                            << BSON("a" << "long-cluster-key-4" << "c" << BSONNULL << "v" << 128)
+                            << BSON("a" << "long-cluster-key-4" << "b" << BSONNULL << "c"
+                                        << BSONNULL << "v" << 256)
+                            << BSON("a" << 5 << "v" << 512)),
+                 {"a", "b", "c"},
+                 {false, true, true},
+                 EFn::kSum,
+                 BSON_ARRAY(BSON_ARRAY("long-cluster-key-1" << "missing" << "missing" << 1)
+                            << BSON_ARRAY(objectKey << "missing" << "missing" << 10)
+                            << BSON_ARRAY(objectKey << BSONNULL << "missing" << 4)
+                            << BSON_ARRAY(Decimal128("3.5") << "missing" << "missing" << 16)
+                            << BSON_ARRAY("long-cluster-key-4" << "missing" << "missing" << 32)
+                            << BSON_ARRAY("long-cluster-key-4" << BSONNULL << "missing" << 64)
+                            << BSON_ARRAY("long-cluster-key-4" << "missing" << BSONNULL << 128)
+                            << BSON_ARRAY("long-cluster-key-4" << BSONNULL << BSONNULL << 256)
+                            << BSON_ARRAY(5 << "missing" << "missing" << 512)));
+}
+
 TEST_F(StreamingAggStageTest, SumAccumulatorGroupsByKey) {
     value::TagValueOwned inputValue =
         value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(
