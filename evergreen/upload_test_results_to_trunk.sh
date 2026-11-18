@@ -15,6 +15,7 @@
 #                        Suite name for TRUNK_REPORT_FILE (part of the Trunk test id): the display
 #                        task name if set, else the task name
 #   TRUNK_CONVERTER      Path to evergreen_report_to_junit.py
+#   JOB_NAME, JOB_URL    Evergreen job name and Spruce task URL shown in Trunk
 #   TRUNK_REPO_URL, TRUNK_REPO_HEAD_AUTHOR_NAME, TRUNK_PR_NUMBER
 #                        Git metadata for tasks without a git checkout (the CLI reads these itself;
 #                        see `trunk-analytics-cli upload --help`). An empty PR number is ignored.
@@ -122,22 +123,18 @@ upload() {
 }
 
 export_repo_info() {
-    [ -n "${TRUNK_PR_NUMBER:-}" ] || unset TRUNK_PR_NUMBER
-    if [ "${is_patch:-}" = "true" ] || [ "${is_commit_queue:-}" = "true" ]; then
-        local -r merge_group_sha="${github_head_branch##*-}"
-        if [ -n "${github_commit:-}" ]; then
-            export TRUNK_REPO_HEAD_SHA="$github_commit"
-        elif [[ "$merge_group_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            export TRUNK_REPO_HEAD_SHA="$merge_group_sha"
-        elif [ -n "${version_id:-}" ]; then
-            TRUNK_REPO_HEAD_SHA="$(printf '%s' "$version_id" | sha1sum | awk '{print $1}')"
-            export TRUNK_REPO_HEAD_SHA
-        fi
-        if [ -n "${github_pr_head_branch:-}" ]; then
-            export TRUNK_REPO_HEAD_BRANCH="$github_pr_head_branch"
-        elif [ -n "${github_head_branch:-}" ]; then
+    if [ "${is_patch:-}" = "true" ]; then
+        # Evergreen does not expose an accurate commit SHA for patches: they may have uncommitted
+        # changes, and for merge queue patches both revision and the SHA in github_head_branch are
+        # the merge group's base, not its head. Instead, report a fake SHA based on the Evergreen
+        # version ID, which is unique per patch.
+        TRUNK_REPO_HEAD_SHA="$(printf '%s' "$version_id" | sha1sum | awk '{print $1}')"
+        export TRUNK_REPO_HEAD_SHA
+        if [ "${is_commit_queue:-}" = "true" ]; then
+            # Evergreen always sets github_head_branch for merge queue patches, e.g.
+            # gh-readonly-queue/master/pr-123-<base sha>.
             export TRUNK_REPO_HEAD_BRANCH="$github_head_branch"
-        elif [ -n "${version_id:-}" ]; then
+        else
             export TRUNK_REPO_HEAD_BRANCH="evergreen-patch/${version_id}"
         fi
     else
