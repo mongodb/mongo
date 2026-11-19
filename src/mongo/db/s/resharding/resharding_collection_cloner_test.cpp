@@ -46,6 +46,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
 
 #include <cstdint>
@@ -124,12 +125,29 @@ std::vector<TestOptions> makeAllTestOptions() {
 
 class ReshardingCollectionClonerTest : public ShardServerTestFixtureWithCatalogCacheMock {
 protected:
-    void initializePipelineTest(
-        const ShardKeyPattern& newShardKeyPattern,
-        const ShardId& recipientShard,
-        const std::deque<DocumentSource::GetNextResult>& sourceCollectionData,
-        const std::deque<DocumentSource::GetNextResult>& configCacheChunksData,
-        const TestOptions& testOptions) {
+    // OperationContext with a client region and logical session id attached, as needed to run
+    // multi-document transactions.
+    struct SessionedOpCtx {
+        explicit SessionedOpCtx(ServiceContext* serviceContext)
+            : _client(serviceContext->getService()->makeClient("AlternativeClient")),
+              _clientRegion(_client),
+              _opCtxHolder(cc().makeOperationContext()) {
+            _opCtxHolder->setLogicalSessionId(makeLogicalSessionId(_opCtxHolder.get()));
+        }
+
+        OperationContext* opCtx() {
+            return _opCtxHolder.get();
+        }
+
+    private:
+        ServiceContext::UniqueClient _client;
+        AlternativeClientRegion _clientRegion;
+        ServiceContext::UniqueOperationContext _opCtxHolder;
+    };
+
+    void initializeClonerTest(const ShardKeyPattern& newShardKeyPattern,
+                              const ShardId& recipientShard,
+                              bool storeProgress) {
         _sourceNss = NamespaceString::createNamespaceString_forTest(
             std::string("testDb"sv) + std::to_string(_sourceDbNum++), "testColl"sv);
         _sourceUUID = UUID::gen();
@@ -155,8 +173,17 @@ protected:
             recipientShard,
             Timestamp(1, 0), /* dummy value */
             _tempNss,
-            testOptions.storeProgress,
+            storeProgress,
             false);
+    }
+
+    void initializePipelineTest(
+        const ShardKeyPattern& newShardKeyPattern,
+        const ShardId& recipientShard,
+        const std::deque<DocumentSource::GetNextResult>& sourceCollectionData,
+        const std::deque<DocumentSource::GetNextResult>& configCacheChunksData,
+        const TestOptions& testOptions) {
+        initializeClonerTest(newShardKeyPattern, recipientShard, testOptions.storeProgress);
 
         getCatalogCacheMock()->setCollectionReturnValue(
             _tempNss,
@@ -282,13 +309,8 @@ protected:
         std::function<void(std::unique_ptr<SeekableRecordCursor>)> verifyFunction) {
         initializePipelineTest(shardKey, recipientShard, collectionData, configData, testOptions);
 
-        auto newClient =
-            operationContext()->getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto opCtxHolder = cc().makeOperationContext();
-        auto opCtx = opCtxHolder.get();
-
-        opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
+        SessionedOpCtx sessionedOpCtx(getServiceContext());
+        auto* const opCtx = sessionedOpCtx.opCtx();
 
         TxnNumber txnNum(0);
         // Make the documents require multiple insert batches.
@@ -349,6 +371,14 @@ protected:
             BSON(ReshardingRecipientResumeData::kIdFieldName << getSourceId().toBSON()));
     }
 
+    const HostAndPort _myHostAndPort{kMyShardName.toString() + ":123"};
+
+    // Initialized at the start of each test case.
+    NamespaceString _tempNss;
+    UUID _reshardingUUID = UUID::gen();
+    std::unique_ptr<ReshardingMetrics> _metrics;
+    std::unique_ptr<ReshardingCollectionCloner> _cloner;
+
 private:
     void _advanceResumeToken(size_t batchSize) {
         _resumeTokenNum += batchSize;
@@ -361,16 +391,9 @@ private:
     const DatabaseVersion _sourceDbVersion{UUID::gen(), Timestamp(1, 1)};
     int _sourceDbNum;
 
-    const HostAndPort _myHostAndPort{kMyShardName.toString() + ":123"};
-
-
     // Initialized at the start of each test case.
     NamespaceString _sourceNss;
     UUID _sourceUUID = UUID::gen();
-    NamespaceString _tempNss;
-    UUID _reshardingUUID = UUID::gen();
-    std::unique_ptr<ReshardingMetrics> _metrics;
-    std::unique_ptr<ReshardingCollectionCloner> _cloner;
     std::unique_ptr<Pipeline> _pipeline;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     // Mock 'postBatchResumeToken'. Incremented every a mock batch is processed.
@@ -558,6 +581,52 @@ TEST_F(ReshardingCollectionClonerTest, CompoundHashedShardKey) {
                         kExpectedCopiedCount,
                         verify);
     }
+}
+
+TEST_F(ReshardingCollectionClonerTest, InsertBatchTransactionallyRetriesTemporarilyUnavailable) {
+    initializeClonerTest(ShardKeyPattern{fromjson("{x: 1}")}, kMyShardName, /*storeProgress=*/true);
+
+    SessionedOpCtx sessionedOpCtx(getServiceContext());
+    auto* const opCtx = sessionedOpCtx.opCtx();
+
+    constexpr int kNumDocs = 3;
+    std::vector<InsertStatement> batch;
+    int numBytes = 0;
+    for (int i = 0; i < kNumDocs; ++i) {
+        BSONObj obj = BSON("_id" << i);
+        numBytes += obj.objsize();
+        batch.emplace_back(std::move(obj));
+    }
+
+    // Make the first attempt fail with TemporarilyUnavailable.
+    auto fp = globalFailPointRegistry().find("failReshardingClonerBatchInsert");
+    fp->setMode(FailPoint::nTimes, 1, BSON("errorCode" << ErrorCodes::TemporarilyUnavailable));
+
+    TxnNumber txnNum = 0;
+    ASSERT_EQ(resharding::data_copy::insertBatchTransactionally(opCtx,
+                                                                _tempNss,
+                                                                txnNum,
+                                                                batch,
+                                                                _reshardingUUID,
+                                                                kMyShardName,
+                                                                _myHostAndPort,
+                                                                BSON("tokenNum" << 1),
+                                                                /*storeProgress=*/true),
+              numBytes);
+    ASSERT_EQ(txnNum, 2);
+
+    // The rolled-back first attempt must not leave duplicated documents.
+    const auto tempColl = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, _tempNss, AcquisitionPrerequisites::kRead),
+        MODE_IX);
+    ASSERT_EQ(tempColl.getCollectionPtr()->numRecords(opCtx), kNumDocs);
+
+    // The retry must not double-count the batch in the resume data.
+    auto resumeData = ReshardingRecipientResumeData::parse(
+        getResumeDataDocument(opCtx), IDLParserContext("ReshardingCollectionClonerTest"));
+    ASSERT_EQ(*resumeData.getDocumentsCopied(), kNumDocs);
+    ASSERT_EQ(*resumeData.getBytesCopied(), numBytes);
 }
 }  // namespace
 }  // namespace mongo

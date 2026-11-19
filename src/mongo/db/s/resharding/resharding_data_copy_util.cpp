@@ -47,6 +47,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -65,7 +66,34 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
-namespace mongo::resharding::data_copy {
+MONGO_FAIL_POINT_DEFINE(failReshardingClonerBatchInsert);
+
+namespace mongo {
+namespace {
+
+bool isFatalClonerError(ErrorCodes::Error code) {
+    // Stale config errors need a shard-version refresh, so throw to the caller.
+    if (ErrorCodes::isStaleShardVersionError(code)) {
+        return true;
+    }
+
+    // isCommitOrAbort is true so retriable errors like InterruptedDueToReplStateChange escape to
+    // the layer above instead.
+    if (isTransientTransactionError(
+            code, /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/true)) {
+        return false;
+    }
+
+    // WT cache-pressure errors roll back the in-flight transaction, so retrying the batch is safe.
+    if (code == ErrorCodes::TemporarilyUnavailable) {
+        return false;
+    }
+
+    return true;
+}
+}  // namespace
+
+namespace resharding::data_copy {
 using namespace std::literals::string_view_literals;
 
 void ensureCollectionExists(OperationContext* opCtx,
@@ -322,6 +350,11 @@ int insertBatchTransactionally(OperationContext* opCtx,
                     // resume token.
                     uassertStatusOK(collection_internal::insertDocuments(
                         opCtx, outputColl.getCollectionPtr(), batch.begin(), batch.end(), nullptr));
+
+                    failReshardingClonerBatchInsert.execute([&](const BSONObj& data) {
+                        uasserted(ErrorCodes::Error(data["errorCode"].safeNumberInt()),
+                                  "Failing resharding batch insert due to failpoint");
+                    });
                 }
 
                 auto resumeDataColl = acquireCollection(
@@ -365,12 +398,7 @@ int insertBatchTransactionally(OperationContext* opCtx,
             });
             return numBytes;
         } catch (const DBException& ex) {
-            // Stale config errors requires that we refresh shard version, not just try again, so
-            // we let the layer above handle them. We set isCommitOrAbort to true to avoid retrying
-            // on errors in ErrorCodes::isRetriableError like InterruptedDueToReplStateChange.
-            if (ErrorCodes::isStaleShardVersionError(ex.code()) ||
-                !isTransientTransactionError(
-                    ex.code(), /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/true))
+            if (isFatalClonerError(ex.code()))
                 throw;
             logAndBackoff(7973400,
                           MONGO_LOGV2_DEFAULT_COMPONENT,
@@ -551,4 +579,5 @@ std::vector<ReshardingRecipientResumeData> getRecipientResumeData(OperationConte
     return results;
 }
 
-}  // namespace mongo::resharding::data_copy
+}  // namespace resharding::data_copy
+}  // namespace mongo
