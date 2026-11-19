@@ -20,7 +20,8 @@ using namespace std::literals::string_view_literals;
 
 namespace {
 // The following fields will be removed for query shape serialization.
-const StringDataSet kFieldsToRemoveForQueryShapeSerialization = {"version", "supportedEvents"};
+const StringDataSet kFieldsToRemoveForQueryShapeSerialization = {
+    "version", "supportedEvents", "backfillingStartAtOperationTime"};
 }  // namespace
 
 REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalChangeStreamTransform,

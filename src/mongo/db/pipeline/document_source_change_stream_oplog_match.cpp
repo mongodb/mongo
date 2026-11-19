@@ -123,11 +123,23 @@ boost::intrusive_ptr<DocumentSourceChangeStreamOplogMatch>
 DocumentSourceChangeStreamOplogMatch::create(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                              const DocumentSourceChangeStreamSpec& spec) {
     auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
+    // The oplog scan starts at the internal backfilling point when one is set (a rebuild after an
+    // end-of-transaction lookback); otherwise it starts at the resume point. The resume token
+    // remains the suppression point regardless.
+    const Timestamp startFromInclusive =
+        spec.getBackfillingStartAtOperationTime().value_or(resumeToken.clusterTime);
+    // The router sets the backfilling point only when it rebuilds the stream to scan from before
+    // the resume point, so it is never later than the resume point. A later point would make the
+    // scan start after the resume point and silently skip the events in between, so reject it.
+    uassert(ErrorCodes::InvalidOptions,
+            "The 'backfillingStartAtOperationTime' parameter to $changeStream must not be later "
+            "than the resume point",
+            startFromInclusive <= resumeToken.clusterTime);
     std::vector<BSONObj> backingBsonObjs;
-    auto opLogMatchFilter = change_stream_filter::buildOplogMatchFilter(
-        expCtx, resumeToken.clusterTime, backingBsonObjs);
+    auto opLogMatchFilter =
+        change_stream_filter::buildOplogMatchFilter(expCtx, startFromInclusive, backingBsonObjs);
     return make_intrusive<DocumentSourceChangeStreamOplogMatch>(
-        resumeToken.clusterTime, expCtx, std::move(opLogMatchFilter), std::move(backingBsonObjs));
+        startFromInclusive, expCtx, std::move(opLogMatchFilter), std::move(backingBsonObjs));
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceChangeStreamOplogMatch::createFromBson(

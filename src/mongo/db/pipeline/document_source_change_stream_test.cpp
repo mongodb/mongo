@@ -16,7 +16,6 @@
 #include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/database_name.h"
-//#include "mongo/db/end_of_transaction_cluster_parameter_gen.h"
 #include "mongo/db/exec/agg/change_stream_transform_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
@@ -46,6 +45,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/end_of_transaction_rebuild_state.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -67,6 +67,7 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -5588,6 +5589,144 @@ TEST_F(ChangeStreamStageTest, ShowEndOfTransactionSerialization) {
         // 'required' must be serialized.
         checkSerialization(BSON("showEndOfTransaction" << "required"), "required"sv);
     }
+}
+
+// A change stream fixture whose client has a transport session, so it is treated as an external
+// network client rather than as an internal thread.
+class ChangeStreamStageTestWithSession : public ChangeStreamStageTest {
+public:
+    std::shared_ptr<transport::Session> makeSession() override {
+        return std::make_shared<transport::MockSession>(nullptr);
+    }
+};
+
+TEST_F(ChangeStreamStageTest, BackfillingStartAtOperationTimeSerializationAndQueryShape) {
+    auto expCtx = getExpCtx();
+    expCtx->setFromRouter(true);
+
+    const Timestamp backfillFrom(90, 1);
+    const BSONObj spec =
+        BSON(DocumentSourceChangeStreamTransform::kStageName
+             << BSON("startAtOperationTime" << Timestamp(100, 1)
+                                            << "backfillingStartAtOperationTime" << backfillFrom));
+
+    auto stage = DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), expCtx);
+
+    // Serializing the spec for the shards keeps the internal backfilling start point.
+    {
+        std::vector<Value> serialization;
+        stage->serializeToArray(serialization);
+        ASSERT_EQ(serialization.size(), 1UL);
+        const auto serializedSpec = serialization[0]
+                                        .getDocument()
+                                        .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                        .getDocument();
+        ASSERT_EQ(serializedSpec["backfillingStartAtOperationTime"].getTimestamp(), backfillFrom);
+    }
+
+    // Shapifying removes the internal field so it cannot influence the query shape hash.
+    {
+        std::vector<Value> serialization;
+        query_shape::SerializationOptions opts{
+            .literalPolicy =
+                query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
+        stage->serializeToArray(serialization, opts);
+        ASSERT_EQ(serialization.size(), 1UL);
+        // When shapifying, the internal transform stage serializes under the '$changeStream' name.
+        const auto serializedSpec = serialization[0]
+                                        .getDocument()
+                                        .getField(DocumentSourceChangeStream::kStageName)
+                                        .getDocument();
+        ASSERT_TRUE(serializedSpec["backfillingStartAtOperationTime"].missing());
+    }
+}
+
+TEST_F(ChangeStreamStageTest, BackfillingStartAtOperationTimeRejectedFromConsumer) {
+    // The internal backfilling start point is accepted only for a command that came from the
+    // router; consumer input carrying it is rejected.
+    auto expCtx = getExpCtx();
+    expCtx->setFromRouter(false);
+
+    const BSONObj spec = BSON(DSChangeStream::kStageName
+                              << BSON("startAtOperationTime" << Timestamp(100, 1)
+                                                             << "backfillingStartAtOperationTime"
+                                                             << Timestamp(90, 1)));
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(ChangeStreamStageTestWithSession,
+       BackfillingStartAtOperationTimeRejectedForNonInternalClient) {
+    // 'fromRouter' is a request field, so a request that claims it but runs on a non-internal
+    // (user) connection must not be treated as coming from the router.
+    auto expCtx = getExpCtx();
+    expCtx->setFromRouter(true);
+
+    const BSONObj spec = BSON(DSChangeStream::kStageName
+                              << BSON("startAtOperationTime" << Timestamp(100, 1)
+                                                             << "backfillingStartAtOperationTime"
+                                                             << Timestamp(90, 1)));
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(ChangeStreamStageTestWithSession,
+       BackfillingStartAtOperationTimeAcceptedDuringInternalRebuildWithSession) {
+    // The router's internal rebuild is authorized regardless of the connection's client type.
+    auto expCtx = getExpCtx();
+    expCtx->setFromRouter(false);
+    change_stream::kEndOfTransactionRebuildState(expCtx->getOperationContext()).rebuildInProgress =
+        true;
+
+    const BSONObj spec = BSON(DSChangeStream::kStageName
+                              << BSON("startAtOperationTime" << Timestamp(100, 1)
+                                                             << "backfillingStartAtOperationTime"
+                                                             << Timestamp(90, 1)));
+    ASSERT_DOES_NOT_THROW(DSChangeStream::createFromBson(spec.firstElement(), expCtx));
+}
+
+TEST_F(ChangeStreamStageTest, BackfillingStartAtOperationTimeAcceptedDuringInternalRebuild) {
+    // The router's own internal rebuild of a change stream is authorized to set the internal
+    // backfilling start point even though the command did not come from the router.
+    auto expCtx = getExpCtx();
+    expCtx->setFromRouter(false);
+    change_stream::kEndOfTransactionRebuildState(expCtx->getOperationContext()).rebuildInProgress =
+        true;
+
+    const BSONObj spec = BSON(DSChangeStream::kStageName
+                              << BSON("startAtOperationTime" << Timestamp(100, 1)
+                                                             << "backfillingStartAtOperationTime"
+                                                             << Timestamp(90, 1)));
+    ASSERT_DOES_NOT_THROW(DSChangeStream::createFromBson(spec.firstElement(), expCtx));
+}
+
+TEST_F(ChangeStreamStageTest, BackfillingStartAtOperationTimeLaterThanResumePointRejected) {
+    // The internal backfilling start point must not be later than the resume point: the scan would
+    // start after the resume point and silently skip the events in between.
+    auto expCtx = getExpCtx();
+    expCtx->setFromRouter(true);
+
+    const BSONObj spec = BSON(DSChangeStream::kStageName
+                              << BSON("startAtOperationTime" << Timestamp(100, 1)
+                                                             << "backfillingStartAtOperationTime"
+                                                             << Timestamp(110, 1)));
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(ChangeStreamStageTest, BackfillingStartAtOperationTimeAtResumePointAccepted) {
+    // A backfilling start point exactly at the resume point is a no-op scan start and is accepted.
+    auto expCtx = getExpCtx();
+    expCtx->setFromRouter(true);
+
+    const BSONObj spec = BSON(DSChangeStream::kStageName
+                              << BSON("startAtOperationTime" << Timestamp(100, 1)
+                                                             << "backfillingStartAtOperationTime"
+                                                             << Timestamp(100, 1)));
+    ASSERT_DOES_NOT_THROW(DSChangeStream::createFromBson(spec.firstElement(), expCtx));
 }
 
 TEST_F(ChangeStreamStageTest, ShowEndOfTransactionGating) {

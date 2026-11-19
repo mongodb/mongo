@@ -18,6 +18,7 @@
 #include "mongo/db/pipeline/change_stream_read_mode.h"
 #include "mongo/db/pipeline/change_stream_reader_builder.h"
 #include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
+#include "mongo/db/pipeline/end_of_transaction_rebuild_state.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/repl/optime.h"
@@ -30,6 +31,7 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/pcre_util.h"
 
 #include <string>
@@ -45,6 +47,8 @@ namespace mongo {
 using namespace std::literals::string_view_literals;
 
 using boost::intrusive_ptr;
+
+MONGO_FAIL_POINT_DEFINE(allowClientBackfillingStartAtOperationTime);
 
 namespace {
 
@@ -253,6 +257,12 @@ ResumeTokenData initializeResumeState(const boost::intrusive_ptr<ExpressionConte
 
     expCtx->setChangeStreamTokenVersion(
         std::max(expCtx->getChangeStreamTokenVersion(), clientToken.version));
+
+    // A stream that emits endOfTransaction events is required to use resume token format 2 or
+    // higher (SERVER-139443), for the tokens it produces as well as for the client's resume token.
+    // The two therefore share the same eventIdentifier layout, so comparing the client's resume
+    // token against a token the stream generates is not decided by the version-specific encoding of
+    // the event identity.
 
     // If the user explicitly requested to resume from a high water mark token, but its version
     // differs from the version chosen above, regenerate it with the new version. There is no need
@@ -738,6 +748,26 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     uassert(40573,
             "The $changeStream stage is only supported on replica sets or mongos",
             expCtx->getInRouter() || (replCoord && replCoord->getSettings().isReplSet()));
+
+    // The internal backfilling start point is set only by the router when it transparently rebuilds
+    // a change stream after an end-of-transaction lookback. It is accepted only for a command that
+    // came from the router or for the router's own internal rebuild, so consumer input carrying it
+    // is rejected. 'fromRouter' is a request field, so do not treat it as proof of router
+    // provenance on its own: also require an internal or direct client, which is what the router
+    // uses to forward the command to the shards. The fail point lets tests exercise the rebuilt
+    // stream's behavior without driving a real lookback.
+    if (MONGO_unlikely(allowClientBackfillingStartAtOperationTime.shouldFail())) {
+        change_stream::kEndOfTransactionRebuildState(expCtx->getOperationContext())
+            .rebuildInProgress = true;
+    }
+    auto* client = expCtx->getOperationContext()->getClient();
+    const bool fromRouter = expCtx->getFromRouter() &&
+        (isInternalClient(client) || (client && client->isInDirectClient()));
+    uassert(ErrorCodes::InvalidOptions,
+            "The 'backfillingStartAtOperationTime' parameter to $changeStream is internal-only",
+            !spec.getBackfillingStartAtOperationTime() || fromRouter ||
+                change_stream::kEndOfTransactionRebuildState(expCtx->getOperationContext())
+                    .rebuildInProgress);
 
     // We will not validate user specified options when we are not expecting to execute queries,
     // such as during $queryStats.
