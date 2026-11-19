@@ -17,8 +17,13 @@
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -32,6 +37,9 @@ namespace {
 // RecordId is not found in secondary mode. Observing this code proves the fast path was taken: the
 // query path would instead report ErrorCodes::UpdateOperationFailed for a missing document.
 constexpr int kRecordNotFoundInFastPathCode = 11902401;
+
+// The debug log id written when an update is applied as an upsert by RecordId.
+constexpr int kUpsertByRecordIdLogId = 11869504;
 
 class ClusteredCollectionFastPathTest : public OplogApplierImplTest {
 protected:
@@ -161,21 +169,47 @@ TEST_F(ClusteredCollectionFastPathDisabledTestEnableSteadyStateConstraints,
     ASSERT_EQ(ErrorCodes::UpdateOperationFailed, status.code());
 }
 
-// An upsert update oplog entry must NOT take the fast path even when it is enabled: the fast path
-// suppresses upsert and would fatally assert on the (legitimately) missing document. It instead
-// falls through to the upsert-aware query path and inserts the document. This mirrors
-// config.transactions, whose updates are generated with upsert:true (see session_update_tracker).
+// An upsert update oplog entry does not take the fast path, even with steady state constraints
+// disabled. It falls through to the upsert-aware query path, which inserts the document at the
+// RecordId derived from its _id. This mirrors config.transactions, whose updates are generated with
+// upsert:true (see session_update_tracker), and for which a missing record is expected.
 TEST_F(ClusteredCollectionFastPathTest, UpsertOplogEntryFallsThroughAndInserts) {
     ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, ridForId(BSON("_id" << 99))));
 
     auto op = makeUpdateOplogEntryWithUpsert(
         nextOpTime(), _nss, BSON("_id" << 99), BSON("_id" << 99 << "x" << 1));
+    const auto prevUpdatesOnMissingDoc = replOpCounters().updatesOnMissingDoc->value();
+    unittest::MinimumLoggedSeverityGuard verbosityGuard{logv2::LogComponent::kReplication,
+                                                        logv2::LogSeverity::Debug(2)};
+    unittest::LogCaptureGuard logs;
     ASSERT_OK(runOpSteadyState(op));
+    logs.stop();
 
     // The document was upserted via the query path and lands at the RecordId derived from its _id.
+    ASSERT_EQ(0, logs.countBSONContainingSubset(BSON("id" << kUpsertByRecordIdLogId)));
     auto inserted = documentAtRecordId(_opCtx.get(), _nss, ridForId(BSON("_id" << 99)));
     ASSERT_TRUE(inserted.has_value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 99 << "x" << 1), inserted.value());
+    ASSERT_EQ(0, replOpCounters().updatesOnMissingDoc->value() - prevUpdatesOnMissingDoc);
+}
+
+// With steady state constraints disabled, an update whose document is missing is applied as an
+// upsert through the fast path and reported as a relaxed constraint.
+TEST_F(ClusteredCollectionFastPathTest, MissingDocUpdateUpsertsViaFastPath) {
+    auto op = makeUpdateDocumentOplogEntry(
+        nextOpTime(), _nss, BSON("_id" << 1234), BSON("$set" << BSON("x" << 1)));
+    const auto prevUpdatesOnMissingDoc = replOpCounters().updatesOnMissingDoc->value();
+    unittest::MinimumLoggedSeverityGuard verbosityGuard{logv2::LogComponent::kReplication,
+                                                        logv2::LogSeverity::Debug(2)};
+    unittest::LogCaptureGuard logs;
+    ASSERT_OK(runOpSteadyState(op));
+    logs.stop();
+
+    ASSERT_EQ(1, logs.countBSONContainingSubset(BSON("id" << kUpsertByRecordIdLogId)));
+    auto inserted = documentAtRecordId(_opCtx.get(), _nss, ridForId(BSON("_id" << 1234)));
+    ASSERT_TRUE(inserted.has_value());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1234 << "x" << 1), inserted.value());
+    ASSERT_EQ(1, replOpCounters().updatesOnMissingDoc->value() - prevUpdatesOnMissingDoc);
 }
 
 // =============================================================================

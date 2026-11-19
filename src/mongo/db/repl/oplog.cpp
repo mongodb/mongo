@@ -1743,6 +1743,7 @@ RecordId resolveRecordIdForDiagnostics(const CollectionPtr& collection,
 // Compares 'actualHash', recomputed by this non-primary over 'preImage' and 'postImage', against
 // the hash the primary recorded on 'op'. Every mismatch is logged. It is then fatal, unless
 // 'continuousInternodeValidationFatalOnMismatch' is disabled or the node is still starting up.
+// 'actualHash' is none when this node cannot recompute the hash, which is reported as a mismatch.
 //
 // An update hashes both of its images and XOR-es the two together, so it passes both. An insert
 // hashes only the document it inserts and a delete only the document it removes, so those pass that
@@ -1764,11 +1765,11 @@ void verifyValidationHash(OperationContext* opCtx,
                           const RecordId& recordId,
                           boost::optional<const BSONObj&> preImage,
                           boost::optional<const BSONObj&> postImage,
-                          int64_t actualHash,
+                          boost::optional<int64_t> actualHash,
                           const OplogEntry& op) {
     const boost::optional<int64_t> expectedHash = getValidationHash(op);
     invariant(expectedHash);
-    if (*expectedHash == actualHash) {
+    if (actualHash && *expectedHash == *actualHash) {
         return;
     }
 
@@ -1790,9 +1791,11 @@ void verifyValidationHash(OperationContext* opCtx,
     const BSONObj storedDocument = foundStoredDocument ? readBack.value().getOwned() : BSONObj();
     // For deletes the document has not been removed yet, so 'diagnosticDoc' is the stored document
     // and a diff would always be empty. With no stored document there is nothing to diff against,
-    // and an all-fields-deleted diff would read as though this node held nothing.
+    // and an all-fields-deleted diff would read as though this node held nothing. Without an actual
+    // hash this node had no pre-image, so the stored document is the one it just wrote and a diff
+    // would read as though the images agreed.
     boost::optional<BSONObj> fieldLevelDiff =
-        (op.getOpType() == OpTypeEnum::kDelete || !foundStoredDocument)
+        (op.getOpType() == OpTypeEnum::kDelete || !foundStoredDocument || !actualHash)
         ? boost::none
         : doc_diff::computeInlineDiff(diagnosticDoc, storedDocument);
 
@@ -2013,6 +2016,105 @@ void resetOplogConstraintViolationLoggerForTest() {
     oplogConstraintViolationLogger->resetForTest();
 }
 
+namespace {
+// The result of an update that did not match a document.
+UpdateResult noMatchUpdateResult() {
+    return {/*existing=*/false,
+            /*modifiers=*/false,
+            /*numDocsModified=*/0ULL,
+            /*numMatched=*/0ULL,
+            /*upsertedObject=*/BSONObj::kEmptyObject};
+}
+
+// Applies an update whose document does not exist at 'rid' on a steady state secondary as an
+// upsert, inserting the document the update produces at 'rid'. The validation metadata on an update
+// entry describes a change from the primary's pre-image, which this node does not have, so it is
+// treated as failing validation, with the severity its validation is configured with. The caller
+// has already reported the missing document.
+UpdateResult upsertByRid(OperationContext* opCtx,
+                         const RecordId& rid,
+                         const OplogEntry& op,
+                         const CollectionAcquisition& coll,
+                         const BSONElement& idField,
+                         const UpdateRequest& request) {
+    const CollectionPtr& collPtr = coll.getCollectionPtr();
+
+    // The size delta is per-collection replicated metadata, so failing to verify it is only fatal
+    // when per-collection validation failures are. Otherwise no delta is recorded for the
+    // checkpoint validator, as on the query path.
+    const auto& sizeMeta = op.getDurableReplOperation().getSizeMetadata();
+    const auto* singleOpMeta =
+        sizeMeta ? std::get_if<SingleOpSizeMetadata>(&sizeMeta.value()) : nullptr;
+    if (singleOpMeta && singleOpMeta->getSz()) {
+        logOplogConstraintViolation(opCtx,
+                                    op.getNss(),
+                                    OplogConstraintViolationEnum::kReplicatedSizeDeltaMismatch,
+                                    "update",
+                                    redact(op.toBSONForLogging()),
+                                    /*status=*/boost::none);
+        uassert(11869501,
+                fmt::format("Cannot verify the replicated size delta of an update applied as an "
+                            "upsert for ns: '{}', uuid: '{}', rid: '{}', oplog sz: '{}', "
+                            "opTime: '{}', oplog entry: '{}'",
+                            collPtr->ns().toStringForErrorMsg(),
+                            collPtr->uuid().toString(),
+                            rid.toString(),
+                            *singleOpMeta->getSz(),
+                            op.getOpTime().toString(),
+                            redact(op.toBSONForLogging()).toString()),
+                !fassertOnPerCollectionContinuousInternodeValidationFailure.load());
+    }
+
+    const BSONObj newDoc = update::produceOplogUpsertDocument(opCtx, coll, request);
+
+    InsertStatement insertStmt(newDoc);
+    // Insert at the RecordId from the oplog entry, or the document would get a locally allocated
+    // one. For clustered collections, the document's rid is derived from _id, and the insert path
+    // uses the document to derive it so we do not need to set it here.
+    if (op.getDurableReplOperation().getRecordId()) {
+        insertStmt.replicatedRecordId = rid;
+    }
+    const Status status = collection_internal::insertDocument(
+        opCtx, collPtr, insertStmt, /*opDebug=*/nullptr, /*fromMigrate=*/false);
+    if (status == ErrorCodes::DuplicateKey) {
+        assertOnInconsistentDocuments(opCtx,
+                                      collPtr,
+                                      redact(op.toBSONForLogging()),
+                                      op,
+                                      idField,
+                                      /*msgId=*/11869503,
+                                      /*reason=*/"the _id is stored at a different record id");
+    }
+    uassertStatusOK(status);
+
+    if (shouldVerifyValidationHash(opCtx, collPtr, OplogApplication::Mode::kSecondary, op)) {
+        verifyValidationHash(opCtx,
+                             collPtr,
+                             rid,
+                             /*preImage=*/boost::none,
+                             newDoc,
+                             /*actualHash=*/boost::none,
+                             op);
+    }
+
+    LOGV2_DEBUG(11869504,
+                2,
+                "Applied an update oplog entry as an upsert by recordId",
+                "recordId"_attr = rid,
+                "oplogEntry"_attr = redact(op.toBSONForLogging()));
+
+    UpdateResult result{/*existing=*/false,
+                        /*modifiers=*/false,
+                        /*numDocsModified=*/0ULL,
+                        /*numMatched=*/0ULL,
+                        /*upsertedObject=*/newDoc};
+    if (request.shouldReturnNewDocs()) {
+        result.requestedDocImage = newDoc;
+    }
+    return result;
+}
+}  // namespace
+
 UpdateResult updateObjectByRid(OperationContext* opCtx,
                                RecordId rid,
                                const OplogEntry& op,
@@ -2021,14 +2123,19 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                const BSONElement& idField,
                                OplogApplication::Mode mode,
                                UpdateRequest request,
+                               bool upsert,
                                bool recordChangeStreamPreImage,
                                BSONObj& preImage,
                                CheckpointDeltaRecording deltaRecording) {
+    // Whether a missing document is upserted is decided by 'upsert' alone. The request's upsert
+    // flag is only meaningful to the query path, which upserts at a locally allocated RecordId, so
+    // it must not be set here.
+    tassert(7834903,
+            "updateObjectByRid decides upserts from its 'upsert' parameter, not the request",
+            !request.isUpsert());
+
     const CollectionPtr& collPtr = coll.getCollectionPtr();
 
-    tassert(7834903, "updateObjectByRid does not support upsert requests", !request.isUpsert());
-
-    // TODO SERVER-118695 Upsert oplogs should also be allowed to create collections
     if (!collPtr) {
         if (mode == OplogApplication::Mode::kSecondary) {
             const auto& opObj = redact(op.toBSONForLogging());
@@ -2047,11 +2154,7 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                   op.getTimestamp().toString(),
                                   op.getTerm().has_value() ? op.getTerm().value() : -1));
         }
-        return {false, /* existing */
-                false, /* modifiers */
-                0ULL,  /* numDocsModified */
-                0ULL,  /* numMatched */
-                BSONObj::kEmptyObject /* upsertedObject */};
+        return noMatchUpdateResult();
     }
 
     auto cursor = collPtr.get()->getCursor(opCtx);
@@ -2060,6 +2163,8 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
     if (!record.has_value()) {
         invariant(!recordChangeStreamPreImage || request.shouldReturnNewDocs());
         if (mode == OplogApplication::Mode::kSecondary) {
+            // The update targets a document this node does not have, so this node may have
+            // diverged whether or not the update is applied as an upsert.
             const auto& opObj = redact(op.toBSONForLogging());
             opCounters->gotUpdateOnMissingDoc();
             logOplogConstraintViolation(opCtx,
@@ -2069,9 +2174,17 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                         opObj,
                                         /*status=*/boost::none,
                                         /*isCappedCollection=*/collPtr->isCapped());
-            // This error is always fatal regardless of steady state constraints. We throw an error
-            // here instead of deferring to the typical numMatched = 0 handling since this should
-            // be a fatal error for capped collections.
+            // 'upsert' is only set when steady state constraints are not enforced. Capped
+            // collections are excluded: inserting at a specific RecordId would break their
+            // insertion order.
+            // An update that must record a change stream pre-image is also
+            // excluded: a missing document has no pre-image, so it fails below with the
+            // inconsistency diagnostics, as the query path also fails on it.
+            if (upsert && !collPtr->isCapped() && !recordChangeStreamPreImage) {
+                return upsertByRid(opCtx, rid, op, coll, idField, request);
+            }
+            // We throw an error here instead of deferring to the typical numMatched = 0 handling
+            // since this should also be a fatal error for capped collections.
             assertOnInconsistentDocuments(opCtx,
                                           collPtr,
                                           opObj,
@@ -2080,11 +2193,7 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                           /*msgId=*/11902401,
                                           /*reason=*/"the record was not found");
         }
-        return {false, /* existing */
-                false, /* modifiers */
-                0ULL,  /* numDocsModified */
-                0ULL,  /* numMatched */
-                BSONObj::kEmptyObject /* upsertedObject */};
+        return noMatchUpdateResult();
     }
 
     // BSON validation of the fetched record is a steady-state consistency check, so it is only
@@ -2143,11 +2252,7 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                 fmt::format("the record: '{}' has a different _id than we were expecting",
                             redact(obj.value()).toString()));
         }
-        return {false, /* existing */
-                false, /* modifiers */
-                0ULL,  /* numDocsModified */
-                0ULL,  /* numMatched */
-                BSONObj::kEmptyObject /* upsertedObject */};
+        return noMatchUpdateResult();
     }
 
     // Oplog entries from the applyOps command need to set fromMigrate:true when they write to
@@ -2485,13 +2590,10 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
 // stay 'boost::none' for clustered collections (they are not recordIdsReplicated and their oplog
 // entries carry no "rid" field) so the consistency tassert in applyOperation_inlock holds.
 //
-// Upsert oplog entries are excluded. The fast path suppresses upsert (it sets
-// request.setUpsert(false)) and treats a missing record as fatal, but an upsert legitimately
-// targets a possibly-nonexistent document. Clustered collections can receive upsert update oplog
-// entries (e.g. config.transactions, whose updates are generated with upsert:true in
-// session_update_tracker.cpp), so those must keep going through the upsert-aware query path.
-// TODO SERVER-118695: once the by-rid path supports upsert requests, the fast path can handle these
-// entries instead of falling back to the query path.
+// Upsert oplog entries are excluded. Clustered collections can receive upsert update oplog entries
+// (e.g. config.transactions, whose updates are generated with upsert:true in
+// session_update_tracker.cpp), and those go through the upsert-aware query path, which inserts a
+// missing document at the same RecordId derived from its _id.
 boost::optional<RecordId> computeEffectiveRid(OperationContext* opCtx,
                                               const OplogEntry& op,
                                               OpTypeEnum opType,
@@ -3165,16 +3267,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
             BSONObj updateCriteria = idField.wrap();
 
             const bool upsertOplogEntry = op.getUpsert().value_or(false);
-            // TODO SERVER-118695 The upsert oplog field should only ever be true on applyOps
-            // entries. It may make more sense to only allow this flag on entries that don't specify
-            // a specific RecordId.
+            // The upsert flag is only set on applyOps entries and on config.transactions updates
+            // derived during oplog application, and neither carries a replicated RecordId.
             tassert(7834905,
                     "Oplog entries with upsert:true are not allowed to also contain a RecordId",
                     !upsertOplogEntry || !opRid.has_value());
-            // When we have a deterministically derivable RecordId (either replicated or derived
-            // from _id for clustered collections), we never upconvert to an upsert: the fast path
-            // locates the document by RecordId and a missing document is treated as an error.
-            const bool upsert = (alwaysUpsert && !effectiveRid.has_value()) || upsertOplogEntry;
+            // An update is converted to an upsert when steady state constraints are not enforced.
+            // The query path upserts through the request, and the RecordId path, which inserts a
+            // missing document at that RecordId, is told directly.
+            const bool upsert = alwaysUpsert || upsertOplogEntry;
             auto request = UpdateRequest();
             request.setNamespaceString(requestNss);
             request.setQuery(updateCriteria);
@@ -3191,7 +3292,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(o, options);
 
             request.setUpdateModification(std::move(updateMod));
-            request.setUpsert(upsert);
+            request.setUpsert(upsert && !effectiveRid.has_value());
             request.setFromOplogApplication(true);
             request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
             if (mode != OplogApplication::Mode::kInitialSync && isDataConsistent) {
@@ -3259,8 +3360,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                     UpdateResult ur = [&]() {
                         if (effectiveRid.has_value()) {
-                            // TODO SERVER-118695 Support upsert requests
-                            request.setUpsert(false);
                             return updateObjectByRid(opCtx,
                                                      *effectiveRid,
                                                      op,
@@ -3269,6 +3368,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                                      idField,
                                                      mode,
                                                      request,
+                                                     upsert,
                                                      recordChangeStreamPreImage,
                                                      changeStreamPreImage,
                                                      deltaRecording);
@@ -3315,10 +3415,26 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             }
                         }
                     } else if (!upsertOplogEntry && !ur.upsertedId.isEmpty() &&
-                               !(collection && collection->isCapped())) {
-                        // This indicates we upconverted an update to an upsert, and it did indeed
-                        // upsert. In steady state mode this is unexpected.
-                        if (mode == OplogApplication::Mode::kSecondary) {
+                               !effectiveRid.has_value()) {
+                        // This indicates the query path upconverted an update to an upsert, and it
+                        // did indeed upsert. The RecordId path reports this in updateObjectByRid.
+                        if (collection && collection->isCapped()) {
+                            // This can happen benignly if the document was already removed from
+                            // this node's copy of the capped collection, so it is logged separately
+                            // from other constraint violations.
+                            if (mode == OplogApplication::Mode::kSecondary) {
+                                logOplogConstraintViolation(
+                                    opCtx,
+                                    op.getNss(),
+                                    OplogConstraintViolationEnum::kUpdateOnMissingDoc,
+                                    "update",
+                                    redact(op.toBSONForLogging()),
+                                    /*status=*/boost::none,
+                                    /*isCappedCollection=*/true,
+                                    /*cappedViolationIsTolerated=*/true);
+                            }
+                        } else if (mode == OplogApplication::Mode::kSecondary) {
+                            // In steady state mode this is unexpected.
                             opCountersToUse->gotUpdateOnMissingDoc();
                             logOplogConstraintViolation(
                                 opCtx,
@@ -3347,22 +3463,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                 "an upsert.",
                                 "oplogEntry"_attr = redact(op.toBSONForLogging()));
                         }
-                    } else if (!upsertOplogEntry && !ur.upsertedId.isEmpty() && collection &&
-                               collection->isCapped() &&
-                               mode == OplogApplication::Mode::kSecondary) {
-                        // We upconverted an update on a capped collection to an upsert. This can
-                        // happen benignly if the document was already removed from this node's
-                        // copy of the capped collection, so it is logged separately from other
-                        // constraint violations.
-                        logOplogConstraintViolation(
-                            opCtx,
-                            op.getNss(),
-                            OplogConstraintViolationEnum::kUpdateOnMissingDoc,
-                            "update",
-                            redact(op.toBSONForLogging()),
-                            /*status=*/boost::none,
-                            /*isCappedCollection=*/true,
-                            /*cappedViolationIsTolerated=*/true);
                     }
 
                     if (op.getNeedsRetryImage()) {

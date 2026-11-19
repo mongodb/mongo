@@ -39,6 +39,7 @@
 
 #include <cstddef>
 #include <map>
+#include <memory>
 #include <string_view>
 #include <vector>
 
@@ -573,14 +574,11 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
     return {newObj, docWasModified};
 }
 
-std::pair<UpdateResult, BSONObj> parseAndTransformOplogUpdate(OperationContext* opCtx,
-                                                              const CollectionAcquisition& coll,
-                                                              const Snapshotted<BSONObj>& oldObj,
-                                                              const UpdateRequest& request,
-                                                              const RecordId& rid,
-                                                              const SeekableRecordCursor* cursor) {
-    // TODO SERVER-118695 Support upsert requests
-    tassert(7834901, "This helper cannot be used to serve upsert requests.", !request.isUpsert());
+namespace {
+// Parses an oplog update request into a CanonicalUpdate, whose UpdateDriver applies the update.
+std::unique_ptr<CanonicalUpdate> makeOplogCanonicalUpdate(OperationContext* opCtx,
+                                                          const CollectionAcquisition& coll,
+                                                          const UpdateRequest& request) {
     tassert(7834900,
             "This helper cannot serve update requests that have a collation set.",
             request.getCollation().isEmpty());
@@ -600,8 +598,19 @@ std::pair<UpdateResult, BSONObj> parseAndTransformOplogUpdate(OperationContext* 
         &request,
         makeExtensionsCallback<ExtensionsCallbackReal>(opCtx, &request.getNsString())));
 
-    auto canonicalUpdate = uassertStatusOK(
+    return uassertStatusOK(
         CanonicalUpdate::make(expCtx, std::move(parsedUpdate), coll.getCollectionPtr()));
+}
+}  // namespace
+
+std::pair<UpdateResult, BSONObj> parseAndTransformOplogUpdate(OperationContext* opCtx,
+                                                              const CollectionAcquisition& coll,
+                                                              const Snapshotted<BSONObj>& oldObj,
+                                                              const UpdateRequest& request,
+                                                              const RecordId& rid,
+                                                              const SeekableRecordCursor* cursor) {
+    tassert(7834901, "This helper cannot be used to serve upsert requests.", !request.isUpsert());
+    auto canonicalUpdate = makeOplogCanonicalUpdate(opCtx, coll, request);
 
     mutablebson::Document doc{};
     auto* driver = canonicalUpdate->getDriver();
@@ -636,6 +645,22 @@ std::pair<UpdateResult, BSONObj> parseAndTransformOplogUpdate(OperationContext* 
     }
 
     return {ur, newObj};
+}
+
+BSONObj produceOplogUpsertDocument(OperationContext* opCtx,
+                                   const CollectionAcquisition& coll,
+                                   const UpdateRequest& request) {
+    auto canonicalUpdate = makeOplogCanonicalUpdate(opCtx, coll, request);
+
+    // Oplog application targets a single document by _id, so the upserted document starts out
+    // holding only that _id.
+    const BSONElement idElem = request.getQuery()[idFieldName];
+    tassert(11869506, "An oplog upsert request must target an _id", !idElem.eoo());
+    mutablebson::Document doc;
+    uassertStatusOK(doc.root().appendElement(idElem));
+    generateNewDocumentFromUpdateOp(opCtx, FieldRefSet(), canonicalUpdate->getDriver(), doc);
+    ensureIdFieldIsFirst(&doc, /*generateOIDIfMissing=*/false);
+    return doc.getObject();
 }
 
 }  // namespace update

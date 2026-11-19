@@ -16,12 +16,15 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/shard_role_mock.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/unittest/death_test.h"
@@ -50,6 +53,7 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                const BSONElement& idField,
                                OplogApplication::Mode mode,
                                UpdateRequest request,
+                               bool upsert,
                                bool recordChangeStreamPreImage,
                                BSONObj& preImage,
                                CheckpointDeltaRecording deltaRecording);
@@ -154,20 +158,219 @@ TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints,
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "keep" << 1), updatedDoc.value());
 }
 
-TEST_F(UpdateWithRecordIdTestDisableSteadyStateConstraints, RecordIdNotFoundInSecondaryModeFails) {
+TEST_F(UpdateWithRecordIdTestDisableSteadyStateConstraints,
+       RecordIdNotFoundInSecondaryModeUpserts) {
     // Create a recordId that doesn't exist in the collection.
     const RecordId nonExistentRid(999);
 
     // Verify the recordId doesn't have a document.
     ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, nonExistentRid));
 
-    // TODO SERVER-118695 Application should succeed
-    // Create and apply the update oplog entry with the non-existent recordId. Oplog entries with a
-    // RecordId will never send an upsert request even when disabling steady state constraints sets
-    // alwaysUpsert:true.
+    // With steady state constraints disabled, an update whose document is missing is applied as an
+    // upsert that inserts the document at the oplog entry's recordId.
     auto op = makeUpdateOplogEntryWithRecordId(
         nextOpTime(), _nss, BSON("_id" << 999), BSON("$set" << BSON("a" << 1)), nonExistentRid);
-    ASSERT_EQ(runOpSteadyState(op).code(), 11902401);
+    const auto prevUpdatesOnMissingDoc = replOpCounters().updatesOnMissingDoc->value();
+    ASSERT_OK(runOpSteadyState(op));
+
+    auto insertedDoc = documentAtRecordId(_opCtx.get(), _nss, nonExistentRid);
+    ASSERT_TRUE(insertedDoc.has_value());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 999 << "a" << 1), insertedDoc.value());
+
+    // The missing document is reported once as a relaxed constraint.
+    ASSERT_EQ(1, replOpCounters().updatesOnMissingDoc->value() - prevUpdatesOnMissingDoc);
+}
+
+TEST_F(UpdateWithRecordIdTestDisableSteadyStateConstraints,
+       RecordIdNotFoundWithReplacementUpdateUpserts) {
+    const RecordId nonExistentRid(999);
+    auto op = makeUpdateOplogEntryWithRecordId(nextOpTime(),
+                                               _nss,
+                                               BSON("_id" << 999),
+                                               BSON("_id" << 999 << "x" << 1 << "y" << 2),
+                                               nonExistentRid);
+    ASSERT_OK(runOpSteadyState(op));
+
+    auto insertedDoc = documentAtRecordId(_opCtx.get(), _nss, nonExistentRid);
+    ASSERT_TRUE(insertedDoc.has_value());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 999 << "x" << 1 << "y" << 2), insertedDoc.value());
+}
+
+TEST_F(UpdateWithRecordIdTestDisableSteadyStateConstraints,
+       RecordIdNotFoundWithV2DeltaUpdateUpsertsPartialDocument) {
+    const RecordId nonExistentRid(999);
+    auto deltaUpdate = update_oplog_entry::makeDeltaOplogEntry(
+        BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 150)));
+    auto op = makeUpdateOplogEntryWithRecordId(
+        nextOpTime(), _nss, BSON("_id" << 999), deltaUpdate, nonExistentRid);
+    ASSERT_OK(runOpSteadyState(op));
+
+    // Only the fields the delta sets are present, the same as an upsert through the query path.
+    auto insertedDoc = documentAtRecordId(_opCtx.get(), _nss, nonExistentRid);
+    ASSERT_TRUE(insertedDoc.has_value());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 999 << "x" << 150), insertedDoc.value());
+}
+
+TEST_F(UpdateWithRecordIdTestDisableSteadyStateConstraints, ExistingDocumentIsUpdatedInPlace) {
+    const RecordId rid(1);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 1 << "x" << 100), rid);
+
+    auto op = makeUpdateOplogEntryWithRecordId(
+        nextOpTime(), _nss, BSON("_id" << 1), BSON("$set" << BSON("x" << 200)), rid);
+    const auto prevUpdatesOnMissingDoc = replOpCounters().updatesOnMissingDoc->value();
+    ASSERT_OK(runOpSteadyState(op));
+
+    auto updatedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
+    ASSERT_TRUE(updatedDoc.has_value());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 200), updatedDoc.value());
+    ASSERT_EQ(0, replOpCounters().updatesOnMissingDoc->value() - prevUpdatesOnMissingDoc);
+}
+
+TEST_F(UpdateWithRecordIdTestDisableSteadyStateConstraints,
+       RecordIdNotFoundWithSizeDeltaUpsertsWhenValidationFailuresAreNotFatal) {
+    // The size delta on an update entry cannot be verified without a local pre-image. That is a
+    // per-collection validation failure, which is only logged when it is not fatal.
+    unittest::ServerParameterGuard notFatalOnFailure{
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", false};
+    const RecordId nonExistentRid(999);
+    auto op = makeUpdateOplogEntryWithRecordIdAndSizeMetadata(nextOpTime(),
+                                                              _nss,
+                                                              BSON("_id" << 999),
+                                                              BSON("$set" << BSON("a" << 1)),
+                                                              nonExistentRid,
+                                                              /*sizeDelta=*/5);
+    ASSERT_OK(runOpSteadyState(op));
+
+    auto insertedDoc = documentAtRecordId(_opCtx.get(), _nss, nonExistentRid);
+    ASSERT_TRUE(insertedDoc.has_value());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 999 << "a" << 1), insertedDoc.value());
+}
+
+TEST_F(UpdateWithRecordIdTestDisableSteadyStateConstraints,
+       RecordIdNotFoundWithSizeDeltaFailsWhenValidationFailuresAreFatal) {
+    unittest::ServerParameterGuard fatalOnFailure{
+        "fassertOnPerCollectionContinuousInternodeValidationFailure", true};
+    const RecordId nonExistentRid(999);
+    auto op = makeUpdateOplogEntryWithRecordIdAndSizeMetadata(nextOpTime(),
+                                                              _nss,
+                                                              BSON("_id" << 999),
+                                                              BSON("$set" << BSON("a" << 1)),
+                                                              nonExistentRid,
+                                                              /*sizeDelta=*/5);
+    ASSERT_EQ(runOpSteadyState(op).code(), 11869501);
+    ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, nonExistentRid));
+}
+
+TEST_F(UpdateWithRecordIdTestDisableSteadyStateConstraints,
+       RecordIdNotFoundButIdExistsAtAnotherRecordIdFails) {
+    // The _id the entry targets is already stored at a different recordId, so the document cannot
+    // be inserted at the entry's recordId.
+    const BSONObj doc = BSON("_id" << 5 << "x" << 1);
+    insertDocumentAtRecordId(_opCtx.get(), _nss, doc, RecordId(1));
+
+    auto op = makeUpdateOplogEntryWithRecordId(
+        nextOpTime(), _nss, BSON("_id" << 5), BSON("$set" << BSON("x" << 2)), RecordId(999));
+    const auto prevUpdatesOnMissingDoc = replOpCounters().updatesOnMissingDoc->value();
+    ASSERT_EQ(runOpSteadyState(op).code(), 11869503);
+
+    ASSERT_BSONOBJ_EQ(doc, documentAtRecordId(_opCtx.get(), _nss, RecordId(1)).value());
+    ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, RecordId(999)));
+    ASSERT_EQ(1, replOpCounters().updatesOnMissingDoc->value() - prevUpdatesOnMissingDoc);
+}
+
+TEST_F(UpdateWithRecordIdTestDisableSteadyStateConstraints,
+       RecordIdNotFoundWithChangeStreamPreImageFailsAsInconsistent) {
+    // A pre-image cannot be recorded for a document that did not exist, so the update is not
+    // applied as an upsert and fails as an inconsistency.
+    const RecordId nonExistentRid(999);
+    auto op = makeUpdateOplogEntryWithRecordId(
+        nextOpTime(), _nss, BSON("_id" << 999), BSON("$set" << BSON("a" << 1)), nonExistentRid);
+
+    UpdateRequest request;
+    request.setNamespaceString(_nss);
+    request.setQuery(BSON("_id" << 999));
+    request.setUpdateModification(write_ops::UpdateModification::parseFromOplogEntry(
+        op.getObject(), write_ops::UpdateModification::DiffOptions{}));
+    request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_NEW);
+    request.setFromOplogApplication(true);
+
+    auto coll = acquireCollection(_opCtx.get(),
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      _opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+    BSONObj preImage;
+    const auto idField = op.getObject2().value()["_id"];
+    {
+        WriteUnitOfWork wuow(_opCtx.get());
+        ASSERT_THROWS_CODE(updateObjectByRid(_opCtx.get(),
+                                             nonExistentRid,
+                                             op,
+                                             coll,
+                                             &replOpCounters(),
+                                             idField,
+                                             OplogApplication::Mode::kSecondary,
+                                             std::move(request),
+                                             /*upsert=*/true,
+                                             /*recordChangeStreamPreImage=*/true,
+                                             preImage,
+                                             CheckpointDeltaRecording::kPerOperation),
+                           DBException,
+                           11902401);
+    }
+    ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, nonExistentRid));
+}
+
+/**
+ * Applies update entries that carry a per-document validation hash, with steady state constraints
+ * disabled.
+ */
+class UpdateWithRecordIdAndValidationHashTest
+    : public UpdateWithRecordIdTestDisableSteadyStateConstraints {
+protected:
+    unittest::ServerParameterGuard _validationFlag{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+};
+
+using UpdateWithRecordIdAndValidationHashDeathTest = UpdateWithRecordIdAndValidationHashTest;
+DEATH_TEST_F(UpdateWithRecordIdAndValidationHashDeathTest,
+             RecordIdNotFoundWithHashIsReportedAsMismatch,
+             "12851600") {
+    // The hash on an update covers the pre-image, which a node that upserts the document lacks.
+    const RecordId nonExistentRid(999);
+    auto op = makeUpdateOplogEntryWithRecordIdAndHash(nextOpTime(),
+                                                      _nss,
+                                                      BSON("_id" << 999),
+                                                      BSON("$set" << BSON("a" << 1)),
+                                                      nonExistentRid,
+                                                      /*hash=*/12345);
+    std::ignore = runOpSteadyState(op);
+}
+
+class UpdateWithRecordIdAndLogOnlyValidationHashTest
+    : public UpdateWithRecordIdAndValidationHashTest {
+protected:
+    unittest::ServerParameterGuard _fatalOnMismatch{"continuousInternodeValidationFatalOnMismatch",
+                                                    false};
+};
+
+TEST_F(UpdateWithRecordIdAndLogOnlyValidationHashTest,
+       RecordIdNotFoundWithHashLogsMismatchAndUpserts) {
+    const RecordId nonExistentRid(999);
+    auto op = makeUpdateOplogEntryWithRecordIdAndHash(nextOpTime(),
+                                                      _nss,
+                                                      BSON("_id" << 999),
+                                                      BSON("$set" << BSON("a" << 1)),
+                                                      nonExistentRid,
+                                                      /*hash=*/12345);
+    unittest::LogCaptureGuard logs;
+    ASSERT_OK(runOpSteadyState(op));
+    logs.stop();
+
+    // 12882800 is the validation hash mismatch log line.
+    ASSERT_EQ(1, logs.countBSONContainingSubset(BSON("id" << 12882800)));
+    auto insertedDoc = documentAtRecordId(_opCtx.get(), _nss, nonExistentRid);
+    ASSERT_TRUE(insertedDoc.has_value());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 999 << "a" << 1), insertedDoc.value());
 }
 
 TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints, RecordIdNotFoundInSecondaryModeFails) {
@@ -192,13 +395,13 @@ TEST_F(UpdateWithRecordIdTestDisableSteadyStateConstraints, IdMismatchFails) {
     insertDocumentAtRecordId(_opCtx.get(), _nss, doc, rid);
 
     // Create an update oplog entry that references the same recordId but with a different _id.
-    // With constraints disabled and alwaysUpsert=true, the code falls back to _id-based lookup.
-    // Since _id=999 doesn't exist, this will upsert a new document.
+    // The record at that recordId exists, so this is not upserted even with constraints disabled,
+    // and the mismatch is fatal.
     auto op = makeUpdateOplogEntryWithRecordId(
         nextOpTime(), _nss, BSON("_id" << 999), BSON("$set" << BSON("y" << 1)), rid);
 
     ASSERT_EQ(runOpSteadyState(op).code(), 7834902);
-    // Original document should remain unchanged since upsert path was used.
+    // The original document is unchanged.
     ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
     auto existingDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_BSONOBJ_EQ(doc, existingDoc.value());
@@ -623,7 +826,11 @@ TEST_F(UpdateWithRecordIdAndPreImagesTest,
     ASSERT_EQUALS(preImageDocument.getOperationTime(), op.getWallClockTime());
 }
 
-using UpdateWithRecordIdAndPreImagesDeathTest = UpdateWithRecordIdAndPreImagesTest;
+// Steady state constraints are disabled, so without change stream pre-images this update would be
+// applied as an upsert. Applying it through the oplog applier makes the caller request the
+// pre-image as RETURN_OLD, as in production, which the missing document cannot provide.
+using UpdateWithRecordIdAndPreImagesDeathTest =
+    SetSteadyStateConstraints<UpdateWithRecordIdAndPreImagesTest, false>;
 DEATH_TEST_F(UpdateWithRecordIdAndPreImagesDeathTest,
              UpdateByRecordIdWithPreImagesDocumentNotFoundDies,
              "invariant") {
@@ -645,7 +852,8 @@ DEATH_TEST_F(UpdateWithRecordIdAndPreImagesDeathTest,
         opTime, _nss, BSON("_id" << 999), BSON("$set" << BSON("x" << 200)), nonExistentRid);
 
     // Apply the update oplog entry in secondary mode. Since change stream pre-images are enabled
-    // and the document doesn't exist, we cannot retrieve the pre-image and the invariant will fail.
+    // and the document doesn't exist, we cannot retrieve the pre-image and the invariant will fail
+    // before the update can be applied as an upsert.
     std::ignore = runOpSteadyState(op);
 }
 
@@ -911,6 +1119,7 @@ TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints,
                                          idField,
                                          OplogApplication::Mode::kSecondary,
                                          std::move(request),
+                                         /*upsert=*/false,
                                          /*recordChangeStreamPreImage=*/false,
                                          preImage,
                                          CheckpointDeltaRecording::kPerOperation),
