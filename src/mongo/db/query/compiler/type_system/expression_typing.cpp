@@ -149,15 +149,17 @@ Type getComparisonConstraint(const ComparisonOperands& operands,
         return assumeEqual ? std::move(constraint) : complement(std::move(constraint));
     }
 
+    const bool isLess = op == ExpressionCompare::LT || op == ExpressionCompare::LTE;
     tassert(13918801,
             "Expected an ordered comparison",
-            op == ExpressionCompare::LT || op == ExpressionCompare::LTE);
+            isLess || op == ExpressionCompare::GT || op == ExpressionCompare::GTE);
     // For a false comparison, reverse the operator (e.g. !(a < b) becomes a >= b).
     // Complementing the inferred constraint instead can exclude valid values when the bound is a
     // union: for b of type number|string, the constraint for a < b includes all numbers, but
     // a >= b can also hold for numbers (e.g. a = 5, b = 1).
-    const bool less = operands.pathIsFirst == assumeTrue;
-    const bool inclusive = (op == ExpressionCompare::LTE) == assumeTrue;
+    const bool less = (isLess == operands.pathIsFirst) == assumeTrue;
+    const bool inclusive =
+        (op == ExpressionCompare::LTE || op == ExpressionCompare::GTE) == assumeTrue;
     return Type(orderedComparisonTypes(operands.otherType.getTypeSet(), less, inclusive));
 }
 
@@ -196,12 +198,12 @@ struct NarrowTypeExpressionVisitor final
     void visit(const ExpressionCompare* expr) override {
         const auto op = expr->getOp();
 
-        // Only equality and ordered comparisons involving a field path are modeled.
         const auto& children = expr->getChildren();
         tassert(13598400, "ExpressionCompare must have two operands", children.size() == 2);
 
         const bool isEquality = op == ExpressionCompare::EQ || op == ExpressionCompare::NE;
-        const bool isInequality = op == ExpressionCompare::LT || op == ExpressionCompare::LTE;
+        const bool isInequality = op == ExpressionCompare::LT || op == ExpressionCompare::LTE ||
+            op == ExpressionCompare::GT || op == ExpressionCompare::GTE;
         if (!isEquality && !isInequality) {
             return;
         }

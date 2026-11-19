@@ -266,8 +266,7 @@ TEST(ExpressionTypingTest, EqualityNarrowingLeavesUnsupportedOperandsUnchanged) 
                              "{$eq: [1, 1]}",
                              "{$eq: ['$a', {$add: [1, 1]}]}",
                              "{$eq: ['$a', '$$NOW']}",
-                             "{$eq: [{$add: ['$a', 1]}, 1]}",
-                             "{$gt: ['$a', 1]}"}) {
+                             "{$eq: [{$add: ['$a', 1]}, 1]}"}) {
         for (bool assumeTrue : {false, true}) {
             ASSERT_EQ(narrowedDebugString(expr, input, assumeTrue), input.toDebugString()) << expr;
         }
@@ -301,6 +300,92 @@ TEST(ExpressionTypingTest, OrderedComparisonNarrowingUsesCanonicalTypeOrder) {
                 narrowType(Type::anyObject(), expr.get(), false).getField("a").toDebugString(),
                 expectedWhenFalse.toDebugString())
                 << "op " << op << ", reverse " << reverse << ", assuming false";
+        }
+    }
+}
+
+TEST(ExpressionTypingTest, GreaterComparisonNarrowingUsesCanonicalTypeOrder) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto path =
+        ExpressionFieldPath::createPathFromString(expCtx.get(), "a", expCtx->variablesParseState);
+    auto one = ExpressionConstant::create(expCtx.get(), Value(1));
+    const Type beforeNumbers =
+        unionType(unionType(allValues(BSONType::minKey), Type::missing()),
+                  unionType(allValues(BSONType::undefined), allValues(BSONType::null)));
+    const Type beforeOrWithinNumbers = unionType(beforeNumbers, numbers(Extent::kSubset));
+    const Type afterOrWithinNumbers =
+        unionType(numbers(Extent::kSubset), complement(unionType(beforeNumbers, numbers())));
+    for (auto op : {ExpressionCompare::GT, ExpressionCompare::GTE}) {
+        for (bool reverse : {false, true}) {
+            auto expr = reverse ? ExpressionCompare::create(expCtx.get(), op, one, path)
+                                : ExpressionCompare::create(expCtx.get(), op, path, one);
+            const auto& expectedTrue = reverse ? beforeOrWithinNumbers : afterOrWithinNumbers;
+            const auto& expectedFalse = reverse ? afterOrWithinNumbers : beforeOrWithinNumbers;
+            ASSERT_EQ(narrowType(Type::anyObject(), expr.get(), true).getField("a").toDebugString(),
+                      expectedTrue.toDebugString())
+                << "op " << op << ", reverse " << reverse;
+            ASSERT_EQ(
+                narrowType(Type::anyObject(), expr.get(), false).getField("a").toDebugString(),
+                expectedFalse.toDebugString())
+                << "op " << op << ", reverse " << reverse;
+        }
+    }
+}
+
+TEST(ExpressionTypingTest, GreaterComparisonNarrowingRespectsSingletonBounds) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto path =
+        ExpressionFieldPath::createPathFromString(expCtx.get(), "a", expCtx->variablesParseState);
+    for (const auto& [op, bound, expectedTrue, expectedFalse] :
+         {std::tuple{ExpressionCompare::GT, Value(MINKEY), "{a: ~minKey, ...}", "{a: minKey, ...}"},
+          std::tuple{ExpressionCompare::GTE, Value(MINKEY), "object", "never"},
+          std::tuple{ExpressionCompare::GT, Value(MAXKEY), "never", "object"},
+          std::tuple{
+              ExpressionCompare::GTE, Value(MAXKEY), "{a: maxKey, ...}", "{a: ~maxKey, ...}"}}) {
+        auto literal = ExpressionConstant::create(expCtx.get(), bound);
+        auto expr = ExpressionCompare::create(expCtx.get(), op, path, literal);
+        ASSERT_EQ(narrowType(Type::anyObject(), expr.get(), true).toDebugString(), expectedTrue)
+            << "op " << op << ", bound " << bound.toString();
+        ASSERT_EQ(narrowType(Type::anyObject(), expr.get(), false).toDebugString(), expectedFalse)
+            << "op " << op << ", bound " << bound.toString();
+    }
+}
+
+TEST(ExpressionTypingTest, GreaterComparisonNarrowingDottedPaths) {
+    const Type input = openObject({{"a", openObject({{"b", allValues(BSONType::string)}})}});
+    for (const auto& op : {"$gt", "$gte"}) {
+        const auto fieldFirst = "{" + std::string(op) + ": ['$a.b', 1]}";
+        const auto constantFirst = "{" + std::string(op) + ": [1, '$$ROOT.a.b']}";
+        ASSERT_EQ(narrowedDebugString(fieldFirst, input), input.toDebugString()) << op;
+        ASSERT_EQ(narrowedDebugString(fieldFirst, input, false), "never") << op;
+        ASSERT_EQ(narrowedDebugString(constantFirst, input), "never") << op;
+        ASSERT_EQ(narrowedDebugString(constantFirst, input, false), input.toDebugString()) << op;
+    }
+}
+
+TEST(ExpressionTypingTest, OrderedComparisonNarrowingPreservesUnionOperandResults) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const Type input = openObject(
+        {{"a", Type::any()}, {"b", unionType(Type::null(), allValues(BSONType::string))}});
+    for (const auto& spec : {"{$lt: ['$a', '$b']}",
+                             "{$lte: ['$a', '$b']}",
+                             "{$lt: ['$b', '$a']}",
+                             "{$lte: ['$b', '$a']}",
+                             "{$gt: ['$a', '$b']}",
+                             "{$gte: ['$a', '$b']}",
+                             "{$gt: ['$b', '$a']}",
+                             "{$gte: ['$b', '$a']}"}) {
+        auto expr = parseExpr(fromjson(spec), *expCtx);
+        const auto narrowedTrue = narrowType(input, expr.get(), true);
+        const auto narrowedFalse = narrowType(input, expr.get(), false);
+        for (const auto& doc : {Document{{"a", 1}, {"b", "x"sv}},
+                                Document{{"a", "x"sv}, {"b", Value(BSONNULL)}},
+                                Document{{"a", "x"sv}, {"b", "x"sv}}}) {
+            const bool result = expr->evaluate(doc, &expCtx->variables, {}).getBool();
+            const auto& narrowed = result ? narrowedTrue : narrowedFalse;
+            ASSERT_TRUE(narrowed.hasValue(Value(doc)))
+                << spec << ", document " << doc.toString() << ", result " << result << ", type "
+                << narrowed.toDebugString();
         }
     }
 }
@@ -403,7 +488,10 @@ TEST(ExpressionTypingTest, OrderedComparisonNarrowingPreservesEvaluationResults)
     values.push_back(Value(2));
     auto path =
         ExpressionFieldPath::createPathFromString(expCtx.get(), "a", expCtx->variablesParseState);
-    for (auto op : {ExpressionCompare::LT, ExpressionCompare::LTE}) {
+    for (auto op : {ExpressionCompare::LT,
+                    ExpressionCompare::LTE,
+                    ExpressionCompare::GT,
+                    ExpressionCompare::GTE}) {
         for (const auto& constant : values) {
             auto literal = ExpressionConstant::create(expCtx.get(), constant);
             for (bool reverse : {false, true}) {
@@ -446,12 +534,20 @@ TEST(ExpressionTypingTest, OrderedComparisonNarrowingPreservesUnionBoundResults)
     const std::vector<Value> bounds{Value(BSONNULL), Value("x"sv), Value(false), Value(true)};
     for (const auto& spec : {"{$lt: ['$a', '$b']}",
                              "{$lte: ['$a', '$b']}",
+                             "{$gt: ['$a', '$b']}",
+                             "{$gte: ['$a', '$b']}",
                              "{$lt: ['$b', '$a']}",
                              "{$lte: ['$b', '$a']}",
+                             "{$gt: ['$b', '$a']}",
+                             "{$gte: ['$b', '$a']}",
                              "{$not: [{$lt: ['$a', '$b']}]}",
                              "{$not: [{$lte: ['$a', '$b']}]}",
+                             "{$not: [{$gt: ['$a', '$b']}]}",
+                             "{$not: [{$gte: ['$a', '$b']}]}",
                              "{$not: [{$lt: ['$b', '$a']}]}",
-                             "{$not: [{$lte: ['$b', '$a']}]}"}) {
+                             "{$not: [{$lte: ['$b', '$a']}]}",
+                             "{$not: [{$gt: ['$b', '$a']}]}",
+                             "{$not: [{$gte: ['$b', '$a']}]}"}) {
         auto expr = parseExpr(fromjson(spec), *expCtx);
         const auto narrowedTrue = narrowType(input, expr.get(), true);
         const auto narrowedFalse = narrowType(input, expr.get(), false);
