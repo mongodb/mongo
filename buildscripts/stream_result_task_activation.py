@@ -21,7 +21,11 @@ import typer
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from buildscripts.evergreen_activate_result_tasks import STREAMED_TASKS_FILE, get_result_tasks
+from buildscripts.evergreen_activate_result_tasks import (
+    STREAMED_TASKS_FILE,
+    activate_or_restart_tasks,
+    get_result_tasks,
+)
 from buildscripts.util.evergreen_retry import get_extra_retry_evergreen_api
 from buildscripts.util.fileops import read_yaml_file
 
@@ -225,23 +229,15 @@ def make_activator(
             LOGGER.warning("Failed to record streamed labels", exc_info=True)
 
     def activate(labels: set[str]) -> set[str]:
-        succeeded = set()
-        to_activate = []
-        for label in sorted(labels):
-            task = tasks_by_label[label]
-            if task.activated:
-                if execution > 0:
-                    evg_api.restart_task(task.task_id)
-                succeeded.add(label)
-            else:
-                to_activate.append(label)
-        if to_activate:
-            evg_api.activate_version_tasks(
-                version_id, [{"name": build_variant, "tasks": to_activate}]
-            )
-            succeeded.update(to_activate)
-        record(succeeded)
-        return succeeded
+        activate_or_restart_tasks(
+            evg_api,
+            (tasks_by_label[label] for label in sorted(labels)),
+            version_id,
+            build_variant,
+            allow_restart=execution > 0,
+        )
+        record(labels)
+        return set(labels)
 
     return activate
 

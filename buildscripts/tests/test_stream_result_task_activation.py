@@ -295,6 +295,28 @@ class TestMakeActivator(unittest.TestCase):
         activate = make_activator(evg_api, tasks, "v", "bv", execution=0)
         self.assertEqual(activate({"//a:a"}), {"//a:a"})
 
+    def test_api_failure_does_not_record_labels_and_can_be_retried(self):
+        for failing_method in ("restart_task", "activate_version_tasks"):
+            with self.subTest(failing_method=failing_method), tempfile.TemporaryDirectory() as tmp:
+                record = os.path.join(tmp, "streamed.txt")
+                evg_api = MagicMock()
+                method = getattr(evg_api, failing_method)
+                method.side_effect = RuntimeError("Evergreen unavailable")
+                tasks = {
+                    "//a:a": self._task("//a:a", True),
+                    "//b:b": self._task("//b:b", False),
+                }
+                activate = make_activator(
+                    evg_api, tasks, "v", "bv", execution=1, record_path=record
+                )
+                with self.assertRaises(RuntimeError):
+                    activate({"//a:a", "//b:b"})
+                self.assertEqual(get_streamed_labels(record), set())
+
+                method.side_effect = None
+                self.assertEqual(activate({"//a:a", "//b:b"}), {"//a:a", "//b:b"})
+                self.assertEqual(get_streamed_labels(record), {"//a:a", "//b:b"})
+
 
 class TestEndOfRunSkipsStreamedTasks(unittest.TestCase):
     """The runner's end-of-run pass must not re-handle what the watcher already did.

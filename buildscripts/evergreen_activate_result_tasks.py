@@ -3,12 +3,14 @@
 import json
 import os
 import sys
+from collections.abc import Iterable
 from typing import Annotated, Optional
 
 import structlog
 import typer
 
 from evergreen.api import EvergreenApi
+from evergreen.task import Task
 
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -78,7 +80,13 @@ def get_streamed_labels(path: str = STREAMED_TASKS_FILE) -> set[str]:
         return set()
 
 
-def activate_or_restart_tasks(evg_api, tasks, version_id, build_variant, allow_restart=False):
+def activate_or_restart_tasks(
+    evg_api: EvergreenApi,
+    tasks: Iterable[Task],
+    version_id: str,
+    build_variant: str,
+    allow_restart: bool = False,
+) -> None:
     activate = []
     for task in tasks:
         if task.activated:
