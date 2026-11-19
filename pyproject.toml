@@ -202,7 +202,7 @@ lint = [
     "types-requests>=2.32.0.20240712,<3",
     "tqdm",
     "colorama>=0.4.6,<0.5",
-    "evergreen-lint>=0.1.10,<0.2",
+    "evergreen-lint>=0.2.0,<0.3",
     "ruff>=0.6.7,<0.7",
     "license-expression>=30.4.4,<31",
 ]

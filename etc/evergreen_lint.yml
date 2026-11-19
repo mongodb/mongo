@@ -154,6 +154,35 @@ rules:
           - requires_execution_on_windows_patch_build
           - requires_extra_system_deps
 
+      # Every task must be classified by release criticality. Together, the three groups below
+      # allow exactly these combinations:
+      #   non_release_critical
+      #   release_critical
+      #   infinite_release_critical
+      #   release_critical + infinite_release_critical
+      - group_name: "release_criticality_tags"
+        tag_regex: ^(non_release_critical|release_critical|infinite_release_critical)$
+        tag_list:
+          - non_release_critical
+          - release_critical
+          - infinite_release_critical
+        min_num_of_tags: 1
+        max_num_of_tags: 2
+      - group_name: "non_release_critical_excludes_release_critical"
+        tag_regex: ^(non_release_critical|release_critical)$
+        tag_list:
+          - non_release_critical
+          - release_critical
+        min_num_of_tags: 0
+        max_num_of_tags: 1
+      - group_name: "non_release_critical_excludes_infinite_release_critical"
+        tag_regex: ^(non_release_critical|infinite_release_critical)$
+        tag_list:
+          - non_release_critical
+          - infinite_release_critical
+        min_num_of_tags: 0
+        max_num_of_tags: 1
+
   - rule: "enforce-tags-for-variants"
     tags:
       # Required variants should have "required" tag
@@ -164,6 +193,42 @@ rules:
       - tag_name: "suggested"
         variant_config:
           display_name_regex: "^\\*.+$"
+
+  - rule: "enforce-tag-groups-for-variants"
+    tag_groups:
+      # Every variant must be classified by release criticality. Together, the four groups below
+      # require a variant to be either a "non_release_variant", or a release variant with 1 or more
+      # of the release_variant_* tags.
+      - group_name: "release_variant_tags"
+        tag_regex: ^(non_release_variant|release_variant_atlas_infinite|release_variant_atlas_core|release_variant_self_managed)$
+        tag_list:
+          - non_release_variant
+          - release_variant_atlas_infinite
+          - release_variant_atlas_core
+          - release_variant_self_managed
+        min_num_of_tags: 1
+        max_num_of_tags: 4
+      - group_name: "non_release_variant_excludes_release_variant_atlas_infinite"
+        tag_regex: ^(non_release_variant|release_variant_atlas_infinite)$
+        tag_list:
+          - non_release_variant
+          - release_variant_atlas_infinite
+        min_num_of_tags: 0
+        max_num_of_tags: 1
+      - group_name: "non_release_variant_excludes_release_variant_atlas_core"
+        tag_regex: ^(non_release_variant|release_variant_atlas_core)$
+        tag_list:
+          - non_release_variant
+          - release_variant_atlas_core
+        min_num_of_tags: 0
+        max_num_of_tags: 1
+      - group_name: "non_release_variant_excludes_release_variant_self_managed"
+        tag_regex: ^(non_release_variant|release_variant_self_managed)$
+        tag_list:
+          - non_release_variant
+          - release_variant_self_managed
+        min_num_of_tags: 0
+        max_num_of_tags: 1
 
   # Forbid tasks with specific tags from being used in buildvariants with certain tags
   # Allows for specific tasks to be included even if violate the linters

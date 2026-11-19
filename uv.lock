@@ -576,16 +576,16 @@ wheels = [
 
 [[package]]
 name = "evergreen-lint"
-version = "0.1.10"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "pyyaml" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7f/94/76123872c7278f60f01e0d353e930615a508cd56a8784182995062328fce/evergreen_lint-0.1.10.tar.gz", hash = "sha256:46beb783c9578b34792885f63dfb5a00c55d936f4b207558e11daf522692efb3", size = 16547, upload-time = "2025-06-17T20:42:13.058Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/20/c91333f9a16baf31680ff2c5f634390f94b1b4e56af4e9d30b2161b610c9/evergreen_lint-0.2.0.tar.gz", hash = "sha256:1742367c676f7ac08b40ae204721286ca36a2ae8dcffd716c9c5558d27f00f19", size = 17855, upload-time = "2026-11-16T20:07:09.189Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7c/81/4494344cc8fa685ae9f624b77bcd2bdb0e3e209c29a36cc6f8e609297406/evergreen_lint-0.1.10-py3-none-any.whl", hash = "sha256:925b91ecf0dfbca9d42a8afc268aa606da9abb2b7edc831b52a156ea246fcc7b", size = 25107, upload-time = "2025-06-17T20:42:11.839Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/e7/4530a7ec13015e9a863cfec81e5334010300593697f2828a6db26891fa99/evergreen_lint-0.2.0-py3-none-any.whl", hash = "sha256:d55689db80820aa041db587c860573c57dbad82ed710e97cf4b7014b0ba62ded", size = 26837, upload-time = "2026-11-16T20:07:08.272Z" },
 ]
 
 [[package]]
@@ -1572,7 +1572,7 @@ jira-client = [
 ]
 lint = [
     { name = "colorama", specifier = ">=0.4.6,<0.5" },
-    { name = "evergreen-lint", specifier = ">=0.1.10,<0.2" },
+    { name = "evergreen-lint", specifier = ">=0.2.0,<0.3" },
     { name = "gitpython", specifier = ">=3.1.7,<4" },
     { name = "license-expression", specifier = ">=30.4.4,<31" },
     { name = "mypy", specifier = ">=1.11.1,<2" },
