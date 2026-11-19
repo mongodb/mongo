@@ -197,7 +197,7 @@ filters:
   - "lookup_set_cache*":
     approvers:
       - 10gen/query-execution-classic
-  - "memory_token_container_util.h":
+  - "memory_usage_container_util.h":
     approvers:
       - 10gen/query-execution-classic
   - "monotonic_expression*":

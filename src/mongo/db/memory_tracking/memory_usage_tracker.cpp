@@ -243,6 +243,21 @@ void DeduplicatorReporter::add(int64_t bytesDiff, int64_t recordsDiff) {
     }
 }
 
+namespace {
+// The single place that logs, counts and throws for an exceeded memory limit, shared by the
+// tracker and by consumers that track their own byte count.
+[[noreturn]] void failMemoryLimitExceeded(const std::string& errmsg) {
+    LOGV2_ERROR(12932700, "Query exceeded the memory limit", "error"_attr = errmsg);
+    operationsFailedDueToMemoryLimit.add(1);
+    uasserted(ErrorCodes::ExceededMemoryLimit, errmsg);
+}
+}  // namespace
+
+void uassertedMemoryLimitExceeded(std::string_view name, int64_t used, int64_t limit) {
+    failMemoryLimitExceeded(str::stream() << name << " needs too much memory. Needs: " << used
+                                          << " bytes. Local memory limit: " << limit << " bytes.");
+}
+
 void SimpleMemoryUsageTracker::uassertedMemoryLimitExceeded(OperationContext* opCtx,
                                                             std::string_view name,
                                                             std::string_view stageName) const {
@@ -266,10 +281,7 @@ void SimpleMemoryUsageTracker::uassertedMemoryLimitExceeded(OperationContext* op
                 << " bytes.";
         }
     }
-    std::string errmsg = msg;
-    LOGV2_ERROR(12932700, "Query exceeded the memory limit", "error"_attr = errmsg);
-    operationsFailedDueToMemoryLimit.add(1);
-    uasserted(ErrorCodes::ExceededMemoryLimit, errmsg);
+    failMemoryLimitExceeded(msg);
 }
 
 void SimpleMemoryUsageTracker::assertCanSpill(bool canSpill,

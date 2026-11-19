@@ -300,7 +300,7 @@ Value AccumulatorSum::getValue(bool toBeMerged) {
 
 AccumulatorSum::AccumulatorSum(ExpressionContext* const expCtx) : AccumulatorState(expCtx) {
     // This is a fixed size AccumulatorState so we never need to update this.
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorSum::_initConstant(const BSONType& type) {
@@ -335,7 +335,7 @@ AccumulatorSum::AccumulatorSum(ExpressionContext* const expCtx, boost::optional<
     }
 
     // This is a fixed size AccumulatorState so we never need to update this.
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorSum::reset() {

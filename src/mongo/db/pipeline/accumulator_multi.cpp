@@ -9,6 +9,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/memory_usage_container_util.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
@@ -137,7 +138,7 @@ void AccumulatorN::processInternal(const Value& input, bool merging) {
 
 AccumulatorMinMaxN::AccumulatorMinMaxN(ExpressionContext* const expCtx, MinMaxSense sense)
     : AccumulatorN(expCtx), _sense(sense) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 const char* AccumulatorMinMaxN::getOpName() const {
@@ -234,8 +235,9 @@ void AccumulatorMinMaxN::_processValue(const Value& val) {
     }
     // For kMin we maintain a max-heap (largest value at front) so we can quickly evict the worst
     // kept element. For kMax we maintain a min-heap (smallest value at front) for the same reason.
-    auto heapComp = [&](const std::pair<Value, int64_t>& a, const std::pair<Value, int64_t>& b) {
-        return _valueComp.compare(a.first, b.first) * _sense < 0;
+    auto heapComp = [&](const ValueWithMemoryUsage<Value>& a,
+                        const ValueWithMemoryUsage<Value>& b) {
+        return _valueComp.compare(a.value, b.value) * _sense < 0;
     };
 
     // Defer computing getApproximateSize() until we know we will keep the value. In steady state
@@ -245,17 +247,17 @@ void AccumulatorMinMaxN::_processValue(const Value& val) {
         auto sz = static_cast<int64_t>(val.getApproximateSize());
         _heap.push_back({val, sz});
         std::push_heap(_heap.begin(), _heap.end(), heapComp);
-        _memUsageTracker.add(sz);
+        _memUsage += sz;
         checkMemUsage();
-    } else if (_valueComp.compare(_heap.front().first, val) * _sense > 0) {
+    } else if (_valueComp.compare(_heap.front().value, val) * _sense > 0) {
         // The heap root is strictly worse than val (larger for kMin, smaller for kMax), so evict
         // it and insert val. Adjust memory before modifying the heap so the tracker stays
         // consistent if checkMemUsage throws.
         auto sz = static_cast<int64_t>(val.getApproximateSize());
         std::pop_heap(_heap.begin(), _heap.end(), heapComp);
-        _memUsageTracker.add(sz - _heap.back().second);
-        _heap.back().first = val;
-        _heap.back().second = sz;
+        _memUsage += sz - _heap.back().memoryUsage;
+        _heap.back().value = val;
+        _heap.back().memoryUsage = sz;
         std::push_heap(_heap.begin(), _heap.end(), heapComp);
         checkMemUsage();
     }
@@ -265,7 +267,7 @@ Value AccumulatorMinMaxN::getValue(bool toBeMerged) {
     std::vector<Value> vals;
     vals.reserve(_heap.size());
     for (auto& entry : _heap) {
-        vals.push_back(entry.first);
+        vals.push_back(entry.value);
     }
     // vals is a valid heap by Value compare: the heap property is preserved.
     std::sort_heap(vals.begin(), vals.end(), [&](const Value& a, const Value& b) {
@@ -276,10 +278,9 @@ Value AccumulatorMinMaxN::getValue(bool toBeMerged) {
 
 void AccumulatorMinMaxN::reset() {
     for (auto& entry : _heap) {
-        _memUsageTracker.add(-entry.second);
+        _memUsage -= entry.memoryUsage;
     }
     _heap.clear();
-    // Reserve space is not tracked by _memUsageTracker, so get rid of it.
     _heap.shrink_to_fit();
 }
 
@@ -293,7 +294,7 @@ const char* AccumulatorMaxN::getName() {
 
 AccumulatorFirstLastN::AccumulatorFirstLastN(ExpressionContext* const expCtx, FirstLastSense sense)
     : AccumulatorN(expCtx), _variant(sense) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 // TODO SERVER-59327 Deduplicate with the block in 'AccumulatorMinMaxN::parseMinMaxN'
@@ -338,14 +339,14 @@ void AccumulatorFirstLastN::_processValue(const Value& val) {
         // $lastN full: evict the oldest slot. The stored size lets us update the tracker without
         // recomputing getApproximateSize() on the outgoing value.
         auto valToProcess = val.missing() ? Value(BSONNULL) : val;
-        const int64_t newSize = valToProcess.getApproximateSize();
-        _memUsageTracker.add(newSize - _ring[_ringHead].second);
+        const auto newSize = static_cast<int64_t>(valToProcess.getApproximateSize());
+        _memUsage += newSize - _ring[_ringHead].memoryUsage;
         _ring[_ringHead] = {std::move(valToProcess), newSize};
         _ringHead = (_ringHead + 1) % _ring.size();
     } else {
         auto valToProcess = val.missing() ? Value(BSONNULL) : val;
-        const int64_t newSize = valToProcess.getApproximateSize();
-        _memUsageTracker.add(newSize);
+        const auto newSize = static_cast<int64_t>(valToProcess.getApproximateSize());
+        _memUsage += newSize;
         _ring.push_back({std::move(valToProcess), newSize});
     }
 
@@ -383,9 +384,9 @@ boost::intrusive_ptr<Expression> AccumulatorFirstLastN::parseExpression(
 
 void AccumulatorFirstLastN::reset() {
     _ring.clear();
-    // memoryUsageTracker doesn't track reserved space so get rid of it.
+    // We do not track reserved space so get rid of it.
     _ring.shrink_to_fit();
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
     _ringHead = 0;
 }
 
@@ -394,7 +395,7 @@ Value AccumulatorFirstLastN::getValue(bool toBeMerged) {
     size_t const n = _ring.size();
     result.reserve(n);
     for (size_t i = 0; i < n; ++i) {
-        result.emplace_back(_ring[(_ringHead + i) % n].first);
+        result.emplace_back(_ring[(_ringHead + i) % n].value);
     }
     return Value{std::move(result)};
 }
@@ -504,7 +505,7 @@ AccumulatorTopBottomN<sense, single>::AccumulatorTopBottomN(ExpressionContext* c
     _sortKeyComparator.emplace(internalSortPattern);
     _sortKeyGenerator.emplace(std::move(internalSortPattern), expCtx->getCollator());
 
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 
     // STL expects a less-than function not a 3-way compare function so this lambda wraps
     // SortKeyComparator.
@@ -645,6 +646,11 @@ std::pair<Value, Value> AccumulatorTopBottomN<sense, single>::_genKeyOutPair(con
     return {sortKey, output};
 }
 
+// Bytes charged to '_memUsage' for one KeyOutPair in the _map
+static size_t mapEntryBytes(const Value& key, const Value& output) {
+    return key.getApproximateSize() + output.getApproximateSize() + sizeof(std::pair<Value, Value>);
+}
+
 template <TopBottomSense sense, bool single>
 void AccumulatorTopBottomN<sense, single>::_processValue(const Value& val) {
     auto keyOutPair = _genKeyOutPair(val);
@@ -667,17 +673,16 @@ void AccumulatorTopBottomN<sense, single>::_processValue(const Value& val) {
 
         // When the sort key produces a tie we keep the first value seen.
         if (cmp > 0) {
+            _memUsage -= cmpElem->second.memoryUsage;
             _map->erase(cmpElem);
         } else {
             return;
         }
     }
 
-    const auto memUsage = keyOutPair.first.getApproximateSize() +
-        keyOutPair.second.getApproximateSize() + sizeof(KeyOutPair);
-    _map->emplace(keyOutPair.first,
-                  SimpleMemoryUsageTokenWith<Value>{
-                      SimpleMemoryUsageToken{memUsage, &_memUsageTracker}, keyOutPair.second});
+    const int64_t memBytes = mapEntryBytes(keyOutPair.first, keyOutPair.second);
+    _map->emplace(keyOutPair.first, ValueWithMemoryUsage<Value>{keyOutPair.second, memBytes});
+    _memUsage += memBytes;
     checkMemUsage();
 }
 
@@ -693,6 +698,7 @@ void AccumulatorTopBottomN<sense, single>::remove(const Value& val) {
     // already in the container. So lower_bound() / erase() will remove the oldest equal element,
     // which is what we want, to satisfy "remove() undoes add() when called in FIFO order".
     auto it = _map->lower_bound(keyOutPair.first);
+    _memUsage -= it->second.memoryUsage;
     _map->erase(it);
 }
 
@@ -746,9 +752,9 @@ Value AccumulatorTopBottomN<sense, single>::getValueConst(bool toBeMerged) const
         if (toBeMerged) {
             result.emplace_back(BSON(kFieldNameGeneratedSortKey << keyOutPair.first
                                                                 << kFieldNameOutput
-                                                                << keyOutPair.second.value()));
+                                                                << keyOutPair.second.value));
         } else {
-            result.push_back(keyOutPair.second.value());
+            result.push_back(keyOutPair.second.value);
         }
     };
 
@@ -771,6 +777,7 @@ Value AccumulatorTopBottomN<sense, single>::getValueConst(bool toBeMerged) const
 template <TopBottomSense sense, bool single>
 void AccumulatorTopBottomN<sense, single>::reset() {
     _map->clear();
+    _memUsage = sizeof(*this);
 }
 
 // Explicitly specify the following classes should generated and should live in this compilation

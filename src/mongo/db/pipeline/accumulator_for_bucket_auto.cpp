@@ -9,6 +9,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/memory_usage_container_util.h"
 #include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
@@ -107,7 +108,10 @@ private:
     // firstN/lastN do NOT ignore null values.
     void _processValue(const Value& val) final;
 
-    std::map<long long, SimpleMemoryUsageTokenWith<Value>> _map;
+    // The output value together with the bytes charged to '_memUsage' for its entry. The size is
+    // recorded at insertion time and released from that same number on erase, because
+    // 'Value::getApproximateSize()' is not guaranteed to return the same result later.
+    std::map<long long, ValueWithMemoryUsage<Value>> _map;
 };
 
 /**
@@ -126,7 +130,7 @@ public:
     }
 
     AccumulatorMergeObjectsForBucketAuto(ExpressionContext* expCtx) : AccumulatorState(expCtx) {
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     void processInternal(const Value& input, /*merging=*/bool) final;
@@ -138,7 +142,7 @@ public:
     void reset() final {
         _fieldPositions.clear();
         _output.reset();
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx) {
@@ -158,7 +162,7 @@ public:
 
 private:
     MutableDocument _output;
-    StringMap<SimpleMemoryUsageTokenWith<long long>> _fieldPositions;
+    StringMap<long long> _fieldPositions;
 };
 
 /**
@@ -187,8 +191,8 @@ public:
     void processInternal(const Value& input, bool merging) final;
 
     void reset() final {
-        std::map<long long, SimpleMemoryUsageTokenWith<Value>>().swap(_inputPositionToValueMap);
-        _memUsageTracker.set(sizeof(*this));
+        std::map<long long, Value>().swap(_inputPositionToValueMap);
+        _memUsage = sizeof(*this);
     }
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
@@ -203,7 +207,7 @@ public:
     }
 
 protected:
-    std::map<long long, SimpleMemoryUsageTokenWith<Value>> _inputPositionToValueMap;
+    std::map<long long, Value> _inputPositionToValueMap;
 };
 
 class AccumulatorPushForBucketAuto : public AccumulatorPushConcatArraysCommonForBucketAuto {
@@ -218,13 +222,13 @@ public:
                                  boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
         : AccumulatorPushConcatArraysCommonForBucketAuto(
               expCtx, maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxPushBytes})) {
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     Value getValue(bool toBeMerged) final {
         std::vector<Value> array;
         for (const auto& [_, value] : _inputPositionToValueMap) {
-            array.push_back(std::move(value.value()));
+            array.push_back(std::move(value));
         }
         return Value(array);
     }
@@ -247,7 +251,7 @@ public:
         : AccumulatorPushConcatArraysCommonForBucketAuto(
               expCtx,
               maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxConcatArraysBytes})) {
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     void addToMap(long long inputPosition, Value input) final;
@@ -255,16 +259,15 @@ public:
     Value getValue(bool toBeMerged) final {
         std::vector<Value> array;
         for (const auto& [_, entry] : _inputPositionToValueMap) {
-            auto entryVal = entry.value();
             tassert(9736200,
                     str::stream()
                         << "Expected to find an array as the entries in the position map, instead "
                            "found type: "
-                        << typeName(entryVal.getType()),
-                    entryVal.isArray());
+                        << typeName(entry.getType()),
+                    entry.isArray());
 
             // Flatten the array for the final result.
-            for (auto&& elem : entryVal.getArray()) {
+            for (auto&& elem : entry.getArray()) {
                 array.push_back(std::move(elem));
             }
         }
@@ -337,7 +340,7 @@ template <FirstLastSense sense, bool single>
 AccumulatorFirstLastNForBucketAuto<sense, single>::AccumulatorFirstLastNForBucketAuto(
     ExpressionContext* const expCtx)
     : AccumulatorN(expCtx) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 
@@ -350,6 +353,11 @@ static std::pair<long long, Value> genKeyOutPair(const Value& val) {
     Value output = val[AccumulatorN::kFieldNameOutput];
     Value sortKey = val[AccumulatorN::kFieldNameGeneratedSortKey];
     return {std::move(sortKey.coerceToLong()), std::move(output)};
+}
+
+// Bytes charged to '_memUsage' for one (position, value) entry of a positional map.
+static size_t positionedEntryBytes(const Value& value) {
+    return sizeof(long long) + value.getApproximateSize() + sizeof(std::pair<long long, Value>);
 }
 
 template <FirstLastSense sense, bool single>
@@ -374,6 +382,7 @@ void AccumulatorFirstLastNForBucketAuto<sense, single>::_processValue(const Valu
 
         // When the sort key produces a tie we keep the first value seen.
         if (cmp) {
+            _memUsage -= cmpElem->second.memoryUsage;
             _map.erase(cmpElem);
         } else {
             return;
@@ -385,11 +394,12 @@ void AccumulatorFirstLastNForBucketAuto<sense, single>::_processValue(const Valu
         keyOutPair.second = Value(BSONNULL);
     }
 
-    const auto memUsage =
-        sizeof(long long) + keyOutPair.second.getApproximateSize() + sizeof(KeyOutPair);
-    _map.emplace(keyOutPair.first,
-                 SimpleMemoryUsageTokenWith<Value>{
-                     SimpleMemoryUsageToken{memUsage, &_memUsageTracker}, keyOutPair.second});
+    // Only charge when the entry is actually inserted.
+    const int64_t memBytes = positionedEntryBytes(keyOutPair.second);
+    if (_map.emplace(keyOutPair.first, ValueWithMemoryUsage<Value>{keyOutPair.second, memBytes})
+            .second) {
+        _memUsage += memBytes;
+    }
     checkMemUsage();
 }
 
@@ -419,6 +429,7 @@ Document AccumulatorFirstLastNForBucketAuto<sense, single>::serialize(
 template <FirstLastSense sense, bool single>
 void AccumulatorFirstLastNForBucketAuto<sense, single>::reset() {
     _map.clear();
+    _memUsage = sizeof(*this);
 }
 
 template <FirstLastSense sense, bool single>
@@ -431,7 +442,7 @@ Value AccumulatorFirstLastNForBucketAuto<sense, single>::getValue(/*toBeMerged=*
     auto it = begin;
     for (auto inserted = 0; inserted < *_n && it != end; ++inserted, ++it) {
         const auto& keyOutPair = *it;
-        result.push_back(keyOutPair.second.value());
+        result.push_back(keyOutPair.second.value);
     }
 
     if constexpr (!single) {
@@ -477,19 +488,13 @@ void AccumulatorMergeObjectsForBucketAuto::processInternal(const Value& compound
 
         auto largestPositionIter = _fieldPositions.find(inputFieldName);
         if (largestPositionIter == _fieldPositions.cend() ||
-            largestPositionIter->second.value() < inputPosition) {
-            // Remember this new position, and track memory usage. The token charges for the value
-            // held in _output for this field, the field name (stored in both _output and
-            // _fieldPositions), and a flat per-entry constant for the _fieldPositions entry. Other
-            // container overhead, such as _output's per-field metadata and buffer slack, is not
-            // modeled.
-            const auto memUsage = sizeof(inputPosition) + inputFieldValue.getApproximateSize() +
-                2 * inputFieldName.size() +
-                sizeof(std::pair<std::string, SimpleMemoryUsageTokenWith<long long>>);
-            _fieldPositions.emplace(
-                inputFieldName,
-                SimpleMemoryUsageTokenWith<long long>{
-                    SimpleMemoryUsageToken{memUsage, &_memUsageTracker}, inputPosition});
+            largestPositionIter->second < inputPosition) {
+            // Remember this new position, and track memory usage. Only a new field name is
+            // inserted (and charged); 'emplace' leaves an existing entry untouched.
+            if (_fieldPositions.emplace(inputFieldName, inputPosition).second) {
+                _memUsage += sizeof(inputPosition) + inputFieldValue.getApproximateSize() +
+                    2 * inputFieldName.size();
+            }
 
             // Update the output.
             _output.setField(inputFieldName, std::move(inputFieldValue));
@@ -532,16 +537,12 @@ void AccumulatorPushConcatArraysCommonForBucketAuto::processInternal(const Value
 
 void AccumulatorPushConcatArraysCommonForBucketAuto::addToMap(long long inputPosition,
                                                               Value input) {
-    const auto memUsage = sizeof(long long) + input.getApproximateSize() + sizeof(KeyOutPair);
-
     tassert(9059700,
             str::stream() << "Received a duplicate input position: " << inputPosition,
             !_inputPositionToValueMap.contains(inputPosition));
 
-    _inputPositionToValueMap.insert(
-        std::pair{inputPosition,
-                  SimpleMemoryUsageTokenWith<Value>{
-                      SimpleMemoryUsageToken{memUsage, &_memUsageTracker}, std::move(input)}});
+    _memUsage += positionedEntryBytes(input);
+    _inputPositionToValueMap.insert(std::pair{inputPosition, std::move(input)});
     checkMemUsage();
 }
 

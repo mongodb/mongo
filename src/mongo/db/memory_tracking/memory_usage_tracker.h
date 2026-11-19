@@ -20,6 +20,14 @@
 
 namespace mongo {
 /**
+ * Fails the operation with ExceededMemoryLimit for a consumer that tracks its own byte count
+ * instead of using a tracker (e.g. accumulators). Logs the error and bumps the
+ * 'operationsFailedDueToMemoryLimit' metric, like SimpleMemoryUsageTracker does.
+ */
+[[noreturn]] [[MONGO_MOD_NEEDS_REPLACEMENT]] void uassertedMemoryLimitExceeded(
+    std::string_view name, int64_t used, int64_t limit);
+
+/**
  * Memory usage tracker for use cases where we don't need per-function memory tracking.
  *
  * TODO SERVER-113197: Remove streams dependency on this class.
@@ -576,8 +584,5 @@ private:
 
 template <typename T>
 using MemoryUsageTokenWith = MemoryUsageTokenWithImpl<SimpleMemoryUsageTracker, T>;
-
-template <typename T>
-using SimpleMemoryUsageTokenWith = MemoryUsageTokenWithImpl<SimpleMemoryUsageTracker, T>;
 
 }  // namespace mongo

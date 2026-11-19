@@ -6,6 +6,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/memory_usage_container_util.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/pipeline/window_function/window_function_sum.h"
 #include "mongo/util/modules.h"
@@ -31,7 +32,7 @@ public:
                                     boost::optional<long long> unitMillis = boost::none,
                                     bool isNonremovable = false)
         : WindowFunctionState(expCtx), _integral(expCtx), _unitMillis(unitMillis) {
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     void add(Value value) override;
@@ -46,9 +47,9 @@ public:
         _nanCount = 0;
         _integral.reset();
         // AccumulatorIntegral's reset() depends on the fact that WindowFunctionIntegral's reset()
-        // will set '_memUsageTracker' to sizeof(*this). If you want to reset '_memUsageTracker' to
+        // will set '_memUsage' to sizeof(*this). If you want to reset '_memUsage' to
         // other value, please update AccumulatorIntegral's reset() as well.
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     Value getValue(boost::optional<Value> current = boost::none) const override;
@@ -65,7 +66,7 @@ private:
     void assertValueType(const Value& value);
 
     WindowFunctionSum _integral;
-    std::deque<SimpleMemoryUsageTokenWith<Value>> _values;
+    std::deque<ValueWithMemoryUsage<Value>> _values;
     boost::optional<long long> _unitMillis;
     int _nanCount = 0;
     bool isNonremovable = false;

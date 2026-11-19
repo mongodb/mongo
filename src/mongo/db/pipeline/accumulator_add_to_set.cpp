@@ -33,7 +33,7 @@ void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
     auto addValue = [this](auto&& val) {
         bool inserted = _set.insert(val).second;
         if (inserted) {
-            _memUsageTracker.add(val.getApproximateSize());
+            _memUsage += val.getApproximateSize();
             checkMemUsage();
         }
     };
@@ -62,11 +62,11 @@ AccumulatorAddToSet::AccumulatorAddToSet(ExpressionContext* const expCtx,
     : AccumulatorState(
           expCtx, maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxAddToSetBytes})),
       _set(expCtx->getValueComparator().makeFlatUnorderedValueSet()) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorAddToSet::reset() {
     _set = getExpressionContext()->getValueComparator().makeFlatUnorderedValueSet();
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 }  // namespace mongo

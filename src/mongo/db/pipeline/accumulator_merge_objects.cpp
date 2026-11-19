@@ -34,11 +34,11 @@ REGISTER_STABLE_WINDOW_FUNCTION(
 
 AccumulatorMergeObjects::AccumulatorMergeObjects(ExpressionContext* const expCtx)
     : AccumulatorState(expCtx) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorMergeObjects::reset() {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
     _output.reset();
 }
 
@@ -61,7 +61,7 @@ void AccumulatorMergeObjects::processInternal(const Value& input, bool merging) 
 
         _output.setField(pair.first, std::move(pair.second));
     }
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 Value AccumulatorMergeObjects::getValue(bool toBeMerged) {

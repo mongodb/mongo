@@ -27,7 +27,7 @@ void AccumulatorCovariance::processInternal(const Value& input, bool merging) {
 
 AccumulatorCovariance::AccumulatorCovariance(ExpressionContext* const expCtx, bool isSamp)
     : AccumulatorForWindowFunctions(expCtx), _covarianceWF(expCtx, isSamp) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorCovariance::reset() {

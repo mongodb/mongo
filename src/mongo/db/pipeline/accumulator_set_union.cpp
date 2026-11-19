@@ -16,14 +16,14 @@ AccumulatorSetUnion::AccumulatorSetUnion(ExpressionContext* const expCtx,
     : AccumulatorState(
           expCtx, maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxSetUnionBytes})),
       _set(expCtx->getValueComparator().makeFlatUnorderedValueSet()) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorSetUnion::addValues(const std::vector<Value>& values) {
     for (auto&& val : values) {
         bool inserted = _set.insert(val).second;
         if (inserted) {
-            _memUsageTracker.add(val.getApproximateSize());
+            _memUsage += val.getApproximateSize();
             checkMemUsage();
         }
     }
@@ -64,7 +64,7 @@ Value AccumulatorSetUnion::getValue(bool) {
 
 void AccumulatorSetUnion::reset() {
     _set = getExpressionContext()->getValueComparator().makeFlatUnorderedValueSet();
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 }  // namespace mongo

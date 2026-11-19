@@ -19,14 +19,14 @@ AccumulatorIntegral::AccumulatorIntegral(ExpressionContext* const expCtx,
                                          boost::optional<long long> unitMillis)
     : AccumulatorForWindowFunctions(expCtx),
       _integralWF(expCtx, unitMillis, /*isNonremovable=*/true) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorIntegral::processInternal(const Value& input, bool merging) {
     tassert(5558800, "$integral can't be merged", !merging);
 
     _integralWF.add(input);
-    _memUsageTracker.set(sizeof(*this) + _integralWF.getApproximateSize() - sizeof(_integralWF));
+    _memUsage = sizeof(*this) + _integralWF.getApproximateSize() - sizeof(_integralWF);
 }
 
 Value AccumulatorIntegral::getValue(bool toBeMerged) {
@@ -35,7 +35,7 @@ Value AccumulatorIntegral::getValue(bool toBeMerged) {
 
 void AccumulatorIntegral::reset() {
     _integralWF.reset();
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 }  // namespace mongo

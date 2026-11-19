@@ -53,7 +53,7 @@ void AccumulatorRank::processInternal(const Value& input, bool merging) {
         _lastRank += _numSameRank;
         _numSameRank = 1;
         _lastInput = input;
-        _memUsageTracker.set(sizeof(*this) + _lastInput->getApproximateSize() - sizeof(Value));
+        _memUsage = sizeof(*this) + _lastInput->getApproximateSize() - sizeof(Value);
     } else {
         ++_numSameRank;
     }
@@ -70,13 +70,13 @@ void AccumulatorDenseRank::processInternal(const Value& input, bool merging) {
     if (isNewValue(input)) {
         ++_lastRank;
         _lastInput = input;
-        _memUsageTracker.set(sizeof(*this) + _lastInput->getApproximateSize() - sizeof(Value));
+        _memUsage = sizeof(*this) + _lastInput->getApproximateSize() - sizeof(Value);
     }
 }
 
 AccumulatorRankBase::AccumulatorRankBase(ExpressionContext* const expCtx)
     : AccumulatorForWindowFunctions(expCtx), _legacySortKeyGen(boost::none) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 AccumulatorRankBase::AccumulatorRankBase(ExpressionContext* const expCtx, bool isAscending)
@@ -84,7 +84,7 @@ AccumulatorRankBase::AccumulatorRankBase(ExpressionContext* const expCtx, bool i
       _legacySortKeyGen(SortKeyGenerator{
           SortPattern({SortPattern::SortPatternPart{isAscending, FieldPath{kTempSortKeyField}}}),
           expCtx->getCollator()}) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 bool AccumulatorRankBase::isNewValue(Value thisInput) {
@@ -107,13 +107,13 @@ bool AccumulatorRankBase::isNewValue(Value thisInput) {
 void AccumulatorRankBase::reset() {
     _lastInput = boost::none;
     _lastRank = 0;
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorRank::reset() {
     _lastInput = boost::none;
     _numSameRank = 1;
     _lastRank = 0;
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 }  // namespace mongo

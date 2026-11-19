@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/accumulator_multi.h"
+#include "mongo/db/pipeline/memory_usage_container_util.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/util/modules.h"
 
@@ -34,14 +35,14 @@ public:
 
     WindowFunctionFirstLastN(ExpressionContext* const expCtx, long long n)
         : WindowFunctionState(expCtx), _n(n) {
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     void add(Value value) final {
         auto valToInsert = value.missing() ? Value(BSONNULL) : std::move(value);
-        _values.emplace_back(
-            SimpleMemoryUsageToken{valToInsert.getApproximateSize(), &_memUsageTracker},
-            std::move(valToInsert));
+        int64_t size = static_cast<int64_t>(valToInsert.getApproximateSize());
+        _values.emplace_back(ValueWithMemoryUsage<Value>{std::move(valToInsert), size});
+        _memUsage += size;
     }
 
     void remove(Value value) final {
@@ -52,7 +53,8 @@ public:
                 str::stream() << "Attempted to remove an element other than the first element from "
                                  "window function "
                               << getName(),
-                _expCtx->getValueComparator().compare(iter->value(), valToRemove) == 0);
+                _expCtx->getValueComparator().compare(iter->value, valToRemove) == 0);
+        _memUsage -= iter->memoryUsage;
         _values.erase(iter);
     }
 
@@ -76,11 +78,11 @@ public:
 
     void reset() final {
         _values.clear();
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
 private:
-    std::vector<SimpleMemoryUsageTokenWith<Value>> _values;
+    std::vector<ValueWithMemoryUsage<Value>> _values;
     long long _n;
 };
 using WindowFunctionFirstN = WindowFunctionFirstLastN<FirstLastSense::kFirst>;

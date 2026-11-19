@@ -357,8 +357,8 @@
 {
 	"setWindowFieldsSpilledBytes" : "X",
 	"setWindowFieldsSpilledDataStorageSize" : "X",
-	"setWindowFieldsSpilledRecords" : 3,
-	"setWindowFieldsSpills" : 2,
+	"setWindowFieldsSpilledRecords" : 2,
+	"setWindowFieldsSpills" : 1,
 	"sortSpilledBytes" : "X",
 	"sortSpilledDataStorageSize" : "X",
 	"sortSpilledRecords" : 13,

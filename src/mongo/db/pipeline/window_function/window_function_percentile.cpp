@@ -32,7 +32,7 @@ void WindowFunctionPercentileCommon::add(Value value) {
         return;
     }
     _values.insert(d);
-    _memUsageTracker.add(sizeof(double));
+    _memUsage += sizeof(double);
 }
 
 void WindowFunctionPercentileCommon::remove(Value value) {
@@ -49,13 +49,13 @@ void WindowFunctionPercentileCommon::remove(Value value) {
     tassert(7455904,
             "Cannot remove a value not tracked by WindowFunctionPercentile",
             iter != _values.end());
-    _memUsageTracker.add(-static_cast<int64_t>(sizeof(double)));
+    _memUsage -= static_cast<int64_t>(sizeof(double));
     _values.erase(iter);
 }
 
 void WindowFunctionPercentileCommon::reset() {
     _values.clear();
-    // resetting _memUsageTracker is the responsibility of the derived classes.
+    // resetting _memUsage is the responsibility of the derived classes.
 }
 
 Value WindowFunctionPercentileCommon::computePercentile(double p) const {
@@ -115,7 +115,7 @@ Value WindowFunctionPercentile::getValue(boost::optional<Value> current) const {
 
 void WindowFunctionPercentile::reset() {
     WindowFunctionPercentileCommon::reset();
-    _memUsageTracker.set(sizeof(*this) + _ps.capacity() * sizeof(double));
+    _memUsage = sizeof(*this) + _ps.capacity() * sizeof(double);
 }
 
 Value WindowFunctionMedian::getValue(boost::optional<Value> current) const {
@@ -127,7 +127,7 @@ Value WindowFunctionMedian::getValue(boost::optional<Value> current) const {
 
 void WindowFunctionMedian::reset() {
     WindowFunctionPercentileCommon::reset();
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 }  // namespace mongo

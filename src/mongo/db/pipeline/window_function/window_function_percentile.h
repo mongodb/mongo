@@ -56,7 +56,7 @@ public:
                                       PercentileMethodEnum method,
                                       const std::vector<double>& ps)
         : WindowFunctionPercentileCommon(expCtx, method), _ps(ps) {
-        _memUsageTracker.set(sizeof(*this) + _ps.capacity() * sizeof(double));
+        _memUsage = sizeof(*this) + _ps.capacity() * sizeof(double);
     }
 
     Value getValue(boost::optional<Value> current = boost::none) const final;
@@ -76,7 +76,7 @@ public:
 
     explicit WindowFunctionMedian(ExpressionContext* const expCtx, PercentileMethodEnum method)
         : WindowFunctionPercentileCommon(expCtx, method) {
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     Value getValue(boost::optional<Value> current = boost::none) const final;

@@ -41,7 +41,7 @@ public:
 
     AccumulatorInternalJsReduce(ExpressionContext* const expCtx, std::string_view funcSource)
         : AccumulatorState(expCtx), _funcSource(funcSource) {
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     void processInternal(const Value& input, bool merging) final;

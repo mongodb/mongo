@@ -224,10 +224,11 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
         assertMergingInputType(input, BSONType::array);
         dynamic_cast<PartialPercentile<Value>*>(_algo.get())->combine(input);
 
-        _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
-        if (!_memUsageTracker.withinMemoryLimit(getExpressionContext()->getOperationContext())) {
+        _memUsage = sizeof(*this) + _algo->memUsageBytes();
+        const int64_t limit = _memUsageLimit.get(getExpressionContext()->getOperationContext());
+        if (MONGO_unlikely(_memUsage > limit)) {
             _algo->spill();
-            _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
+            _memUsage = sizeof(*this) + _algo->memUsageBytes();
         }
         return;
     }
@@ -235,7 +236,7 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
         return;
     }
     _algo->incorporate(input.coerceToDouble());
-    _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
+    _memUsage = sizeof(*this) + _algo->memUsageBytes();
 }
 
 Value AccumulatorPercentile::formatFinalValue(int nPercentiles, const std::vector<double>& pctls) {
@@ -283,7 +284,7 @@ AccumulatorPercentile::AccumulatorPercentile(ExpressionContext* const expCtx,
       _percentiles(ps),
       _algo(createPercentileAlgorithm(method)),
       _method(method) {
-    _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
+    _memUsage = sizeof(*this) + _algo->memUsageBytes();
 }
 
 void AccumulatorPercentile::reset() {
@@ -294,7 +295,7 @@ void AccumulatorPercentile::reset() {
     // Note that the approximate percentile case has a no-op reset, because it cannot spill to disk.
     _algo->reset();
 
-    _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
+    _memUsage = sizeof(*this) + _algo->memUsageBytes();
 }
 
 Document AccumulatorPercentile::serialize(boost::intrusive_ptr<Expression> initializer,

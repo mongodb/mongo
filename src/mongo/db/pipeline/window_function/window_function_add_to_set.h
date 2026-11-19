@@ -6,7 +6,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/memory_token_container_util.h"
+#include "mongo/db/pipeline/memory_usage_container_util.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/util/assert_util.h"
@@ -31,14 +31,15 @@ public:
 
     explicit WindowFunctionAddToSet(ExpressionContext* const expCtx)
         : WindowFunctionState(expCtx, MemoryUsageLimit{query_knobs::kMaxAddToSetBytes}),
-          _values(MemoryTokenValueComparator(&_expCtx->getValueComparator())) {
-        _memUsageTracker.set(sizeof(*this));
+          _values(ValueWithMemoryUsageComparator(&_expCtx->getValueComparator())) {
+        _memUsage = sizeof(*this);
     }
 
     void add(Value value) override {
-        _values.emplace(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
-                        std::move(value));
-        _memUsageTracker.assertWithinMemoryLimit(_expCtx->getOperationContext(), kName);
+        int64_t size = static_cast<int64_t>(value.getApproximateSize());
+        _values.emplace(ValueWithMemoryUsage<Value>{std::move(value), size});
+        _memUsage += size;
+        checkMemUsage(kName);
     }
 
     /**
@@ -48,12 +49,13 @@ public:
         auto iter = _values.find(std::move(value));
         tassert(
             5423800, "Can't remove from an empty WindowFunctionAddToSet", iter != _values.end());
+        _memUsage -= iter->memoryUsage;
         _values.erase(iter);
     }
 
     void reset() override {
         _values.clear();
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     Value getValue(boost::optional<Value> current = boost::none) const override {
@@ -61,14 +63,14 @@ public:
         if (_values.empty())
             return kDefault;
         for (auto it = _values.begin(); it != _values.end(); it = _values.upper_bound(*it)) {
-            output.push_back(it->value());
+            output.push_back(it->value);
         }
 
         return Value(std::move(output));
     }
 
 private:
-    std::multiset<SimpleMemoryUsageTokenWith<Value>, MemoryTokenValueComparator> _values;
+    std::multiset<ValueWithMemoryUsage<Value>, ValueWithMemoryUsageComparator> _values;
 };
 
 }  // namespace mongo

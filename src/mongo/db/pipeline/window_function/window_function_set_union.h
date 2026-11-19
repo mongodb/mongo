@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/memory_token_container_util.h"
+#include "mongo/db/pipeline/memory_usage_container_util.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/util/modules.h"
@@ -21,8 +21,8 @@ public:
 
     explicit WindowFunctionSetUnion(ExpressionContext* const expCtx)
         : WindowFunctionState(expCtx, MemoryUsageLimit{query_knobs::kMaxSetUnionBytes}),
-          _values(MemoryTokenValueComparator(&_expCtx->getValueComparator())) {
-        _memUsageTracker.set(sizeof(*this));
+          _values(ValueWithMemoryUsageComparator(&_expCtx->getValueComparator())) {
+        _memUsage = sizeof(*this);
     }
 
     void add(Value value) override {
@@ -36,11 +36,11 @@ public:
                               << typeName(value.getType()),
                 value.isArray());
 
-        auto* opCtx = _expCtx->getOperationContext();
         for (const auto& val : value.getArray()) {
-            _values.emplace(SimpleMemoryUsageToken{val.getApproximateSize(), &_memUsageTracker},
-                            val);
-            _memUsageTracker.assertWithinMemoryLimit(opCtx, kName);
+            int64_t size = static_cast<int64_t>(val.getApproximateSize());
+            _values.emplace(ValueWithMemoryUsage<Value>{val, size});
+            _memUsage += size;
+            checkMemUsage(kName);
         }
     }
 
@@ -62,13 +62,14 @@ public:
             tassert(1628405,
                     "Can't remove a value that is not contained in the WindowFunctionSetUnion",
                     iter != _values.end());
+            _memUsage -= iter->memoryUsage;
             _values.erase(iter);
         }
     }
 
     void reset() override {
         _values.clear();
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     Value getValue(boost::optional<Value> current = boost::none) const override {
@@ -77,14 +78,14 @@ public:
             return kDefault;
         }
         for (auto it = _values.begin(); it != _values.end(); it = _values.upper_bound(*it)) {
-            output.push_back(it->value());
+            output.push_back(it->value);
         }
 
         return Value(std::move(output));
     }
 
 private:
-    std::multiset<SimpleMemoryUsageTokenWith<Value>, MemoryTokenValueComparator> _values;
+    std::multiset<ValueWithMemoryUsage<Value>, ValueWithMemoryUsageComparator> _values;
 };
 
 }  // namespace mongo

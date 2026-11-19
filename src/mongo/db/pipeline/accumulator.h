@@ -62,7 +62,7 @@ public:
     AccumulatorState(ExpressionContext* const expCtx,
                      MemoryUsageLimit maxAllowedMemoryUsageBytes =
                          MemoryUsageLimit{std::numeric_limits<int64_t>::max()})
-        : _memUsageTracker(maxAllowedMemoryUsageBytes), _expCtx(expCtx) {}
+        : _memUsageLimit(maxAllowedMemoryUsageBytes), _expCtx(expCtx) {}
 
     /** Marks the beginning of a new group. The input is the result of evaluating
      *  AccumulatorExpression::initializer, which can read from the group key.
@@ -93,7 +93,7 @@ public:
     virtual const char* getOpName() const = 0;
 
     int64_t getMemUsage() const {
-        return _memUsageTracker.inUseTrackedMemoryBytes();
+        return _memUsage;
     }
 
     /// Reset this accumulator to a fresh state, ready for a new call to startNewGroup.
@@ -162,19 +162,15 @@ protected:
 
     // Utility to check that memory limit isn't exceeded.
     void checkMemUsage() {
-        auto* opCtx = getExpressionContext()->getOperationContext();
-        // The withinMemoryLimit() check is redundant with the call to assertWithinMemoryLimit(),
-        // but the call to getOpName() is a virtual function call, which is expensive, whereas
-        // withinMemoryLimit() is inlined and cheap.  Since the common case is that we are
-        // within the limit, check withinMemoryLimit() first to avoid the virtual call in the
-        // common case.  This avoids a performance regression.
-        if (MONGO_unlikely(!_memUsageTracker.withinMemoryLimit(opCtx))) {
-            _memUsageTracker.assertWithinMemoryLimit(opCtx, getOpName());
+        const int64_t limit = _memUsageLimit.get(getExpressionContext()->getOperationContext());
+        if (MONGO_unlikely(_memUsage > limit)) {
+            // Out of line, and getOpName() is only called here, to keep the common path cheap.
+            uassertedMemoryLimitExceeded(getOpName(), _memUsage, limit);
         }
     }
 
-    /// subclasses are expected to update this as necessary
-    SimpleMemoryUsageTracker _memUsageTracker;
+    int64_t _memUsage = 0;
+    MemoryUsageLimit _memUsageLimit;
 
     /// Member which tracks if this accumulator requires any more input values to compute its final
     /// result. In general, most accumulators require all input values, however, some accumulators

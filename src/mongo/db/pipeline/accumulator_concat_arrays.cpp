@@ -20,7 +20,7 @@ AccumulatorConcatArrays::AccumulatorConcatArrays(
     : AccumulatorState(
           expCtx,
           maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxConcatArraysBytes})) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorConcatArrays::processInternal(const Value& input, bool merging) {
@@ -53,7 +53,7 @@ void AccumulatorConcatArrays::processInternal(const Value& input, bool merging) 
 }
 
 void AccumulatorConcatArrays::addValuesFromArray(const Value& values) {
-    _memUsageTracker.add(values.getApproximateSize());
+    _memUsage += values.getApproximateSize();
 
     checkMemUsage();
 
@@ -66,7 +66,7 @@ Value AccumulatorConcatArrays::getValue(bool) {
 
 void AccumulatorConcatArrays::reset() {
     std::vector<Value>().swap(_array);
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 }  // namespace mongo

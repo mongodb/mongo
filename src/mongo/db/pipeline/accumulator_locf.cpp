@@ -20,7 +20,7 @@ REGISTER_WINDOW_FUNCTION(
 
 AccumulatorLocf::AccumulatorLocf(ExpressionContext* const expCtx)
     : AccumulatorForWindowFunctions(expCtx) {
-    _memUsageTracker.set(sizeof(*this) + _lastNonNull.getApproximateSize());
+    _memUsage = sizeof(*this) + _lastNonNull.getApproximateSize();
 }
 
 void AccumulatorLocf::processInternal(const Value& input, bool merging) {
@@ -28,7 +28,7 @@ void AccumulatorLocf::processInternal(const Value& input, bool merging) {
 
     if (!input.nullish()) {
         _lastNonNull = input;
-        _memUsageTracker.set(sizeof(*this) + _lastNonNull.getApproximateSize());
+        _memUsage = sizeof(*this) + _lastNonNull.getApproximateSize();
     }
 }
 
@@ -39,7 +39,7 @@ Value AccumulatorLocf::getValue(bool toBeMerged) {
 
 void AccumulatorLocf::reset() {
     _lastNonNull = Value(BSONNULL);
-    _memUsageTracker.set(sizeof(*this) + _lastNonNull.getApproximateSize());
+    _memUsage = sizeof(*this) + _lastNonNull.getApproximateSize();
 }
 
 }  // namespace mongo

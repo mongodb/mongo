@@ -13,7 +13,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/memory_token_container_util.h"
+#include "mongo/db/pipeline/memory_usage_container_util.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -140,11 +140,7 @@ public:
 private:
     void _processValue(const Value& val) final;
 
-    // Each entry stores the value and its precomputed approximate size.
-    // We avoid using SimpleMemoryUsageTokenWith here because we avoid
-    // significant overhead in the SMUTW move assignment operator when
-    // bubbling up new values inside the heap.
-    using Heap = std::vector<std::pair<Value, int64_t>>;
+    using Heap = std::vector<ValueWithMemoryUsage<Value>>;
 
     const ValueComparator _valueComp = getExpressionContext()->getValueComparator();
     Heap _heap;
@@ -221,9 +217,7 @@ private:
     // firstN/lastN do NOT ignore null values.
     void _processValue(const Value& val) final;
 
-    // We avoid using SimpleMemoryUsageTokenWith<> here due to significant overhead in the move
-    // constructor as we add/remove values.
-    std::vector<std::pair<Value, int64_t>> _ring;
+    std::vector<ValueWithMemoryUsage<Value>> _ring;
     size_t _ringHead = 0;
     Sense _variant;
 };
@@ -370,8 +364,11 @@ private:
     // initialized.
     boost::optional<SortKeyGenerator> _sortKeyGenerator;
     boost::optional<SortKeyComparator> _sortKeyComparator;
+    // The output value together with the bytes charged to '_memUsage' for its map entry. The size
+    // is recorded at insertion time and released from that same number on erase, because
+    // 'Value::getApproximateSize()' is not guaranteed to return the same result later.
     boost::optional<
-        std::multimap<Value, SimpleMemoryUsageTokenWith<Value>, std::function<bool(Value, Value)>>>
+        std::multimap<Value, ValueWithMemoryUsage<Value>, std::function<bool(Value, Value)>>>
         _map;
 };
 

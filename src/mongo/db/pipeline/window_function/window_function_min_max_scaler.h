@@ -19,7 +19,6 @@ namespace mongo {
  */
 class WindowFunctionMinMaxScaler : public WindowFunctionMinMaxCommon {
 public:
-    using WindowFunctionMinMaxCommon::_memUsageTracker;
     using WindowFunctionMinMaxCommon::_values;
 
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx,
@@ -31,7 +30,7 @@ public:
     explicit WindowFunctionMinMaxScaler(ExpressionContext* const expCtx,
                                         std::pair<Value, Value> sMinAndsMax = {Value(0), Value(1)})
         : WindowFunctionMinMaxCommon(expCtx), _sMinAndsMax(sMinAndsMax.first, sMinAndsMax.second) {
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     Value getValue(boost::optional<Value> current) const final {
@@ -51,8 +50,8 @@ public:
 
         // First value in ordered set is the min of the window.
         // Last value in the ordered set is the max of the window.
-        const min_max_scaler::MinAndMax windowMinAndMax(_values.begin()->value(),
-                                                        _values.rbegin()->value());
+        const min_max_scaler::MinAndMax windowMinAndMax(_values.begin()->value,
+                                                        _values.rbegin()->value);
 
         return min_max_scaler::computeResult(*current, windowMinAndMax, _sMinAndsMax);
     }

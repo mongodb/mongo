@@ -103,7 +103,7 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
 
     _key = kField;
 
-    _memUsageTracker.add(vField.getApproximateSize());
+    _memUsage += vField.getApproximateSize();
     _values.push_back(std::move(vField));
 }
 
@@ -173,7 +173,7 @@ Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
 
 void AccumulatorInternalJsReduce::reset() {
     _values.clear();
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
     _key = Value{};
 }
 
@@ -336,10 +336,9 @@ Value AccumulatorJs::getValue(bool toBeMerged) {
 }
 
 void AccumulatorJs::resetMemUsageBytes() {
-    _memUsageTracker.set(sizeof(*this) + _init.capacity() + _accumulate.capacity() +
-                         _merge.capacity());
+    _memUsage = sizeof(*this) + _init.capacity() + _accumulate.capacity() + _merge.capacity();
     if (_finalize) {
-        _memUsageTracker.add(_finalize->capacity());
+        _memUsage += _finalize->capacity();
     }
 }
 
@@ -368,7 +367,7 @@ void AccumulatorJs::startNewGroup(Value const& input) {
 
     // getApproximateSize includes sizeof(Value), but we already counted that in resetMemUsageBytes
     // as part of sizeof(*this).
-    _memUsageTracker.add(_state->getApproximateSize() - sizeof(Value));
+    _memUsage += _state->getApproximateSize() - sizeof(Value);
 }
 
 void AccumulatorJs::reset() {
@@ -398,8 +397,7 @@ void AccumulatorJs::processInternal(const Value& input, bool merging) {
 
     // getApproximateSize includes sizeof(Value), but we already counted that in resetMemUsageBytes
     // as part of sizeof(*this).
-    _memUsageTracker.add(input.getApproximateSize() - sizeof(Value) +
-                         sizeof(std::pair<Value, bool>));
+    _memUsage += input.getApproximateSize() - sizeof(Value) + sizeof(std::pair<Value, bool>);
 }
 
 void AccumulatorJs::reduceMemoryConsumptionIfAble() {
@@ -481,7 +479,7 @@ void AccumulatorJs::reduceMemoryConsumptionIfAble() {
     _pendingCalls.clear();
 
     resetMemUsageBytes();
-    _memUsageTracker.add(_state->getApproximateSize());
+    _memUsage += _state->getApproximateSize();
 }
 
 }  // namespace mongo

@@ -95,7 +95,7 @@ Value AccumulatorStdDev::getValue(bool toBeMerged) {
 AccumulatorStdDev::AccumulatorStdDev(ExpressionContext* const expCtx, bool isSamp)
     : AccumulatorState(expCtx), _isSamp(isSamp), _count(0), _mean(0), _m2(0) {
     // This is a fixed size AccumulatorState so we never need to update this
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorStdDev::reset() {

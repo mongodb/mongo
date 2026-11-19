@@ -33,7 +33,7 @@ void AccumulatorPush::processInternal(const Value& input, bool merging) {
     if (!merging) {
         if (!input.missing()) {
             _array.push_back(input);
-            _memUsageTracker.add(input.getApproximateSize());
+            _memUsage += input.getApproximateSize();
             checkMemUsage();
         }
     } else {
@@ -45,7 +45,7 @@ void AccumulatorPush::processInternal(const Value& input, bool merging) {
         const vector<Value>& vec = input.getArray();
         for (auto&& val : vec) {
             getExpressionContext()->checkForInterrupt();
-            _memUsageTracker.add(val.getApproximateSize());
+            _memUsage += val.getApproximateSize();
             checkMemUsage();
             _array.push_back(val);
         }
@@ -60,11 +60,11 @@ AccumulatorPush::AccumulatorPush(ExpressionContext* const expCtx,
                                  boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
     : AccumulatorState(expCtx,
                        maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxPushBytes})) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorPush::reset() {
     vector<Value>().swap(_array);
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 }  // namespace mongo

@@ -87,7 +87,7 @@ public:
           _partitions(std::move(partitions)),
           _range(std::move(range)),
           _partitionTable(pExpCtx->getValueComparator()
-                              .makeUnorderedValueMap<SimpleMemoryUsageTokenWith<DensifyValue>>()) {
+                              .makeUnorderedValueMap<MemoryUsageTokenWith<DensifyValue>>()) {
         _maxDocs = internalQueryMaxAllowedDensifyDocs.load();
     }
 
@@ -281,7 +281,7 @@ private:
     // Store of the value we've seen for each partition. In the non-partitioned case should only
     // have one key -- "true". This allows us to pretend that all input is partitioned and use the
     // same codepath.
-    ValueUnorderedMap<SimpleMemoryUsageTokenWith<DensifyValue>> _partitionTable;
+    ValueUnorderedMap<MemoryUsageTokenWith<DensifyValue>> _partitionTable;
 };
 
 }  // namespace agg

@@ -65,38 +65,41 @@ void WindowFunctionIntegral::add(Value value) {
 
     // Update "_integral" if there are at least two values including the value to add.
     if (_values.size() > 0) {
-        _integral.add(integralOfTwoPointsByTrapezoidalRule(_values.back().value(), value));
+        _integral.add(integralOfTwoPointsByTrapezoidalRule(_values.back().value, value));
     }
 
     // "WindowFunctionIntegral" could be used as a non-removable accumulator which does not need to
     // track the values in the window because no removal will be made. 'pop_front()' whenever a new
     // value is added to the queue so as to save memory.
     if (!_values.empty() && isNonremovable) {
+        _memUsage -= _values.front().memoryUsage;
         _values.pop_front();
     }
-    _values.emplace_back(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
-                         std::move(value));
+    int64_t size = static_cast<int64_t>(value.getApproximateSize());
+    _values.emplace_back(ValueWithMemoryUsage<Value>{std::move(value), size});
+    _memUsage += size;
 }
 
 void WindowFunctionIntegral::remove(Value value) {
     assertValueType(value);
     tassert(5423903, "Can't remove from an empty WindowFunctionIntegral", _values.size() > 0);
-    tassert(
-        5423904,
-        "Attempted to remove an element other than the first element from WindowFunctionIntegral",
-        _expCtx->getValueComparator().evaluate(_values.front().value() == value));
+    tassert(5423904,
+            "Attempted to remove an element other than the first element from "
+            "WindowFunctionIntegral",
+            _expCtx->getValueComparator().evaluate(_values.front().value == value));
 
     const auto& arr = value.getArray();
     if (arr[0].isNaN() || arr[1].isNaN())
         _nanCount--;
 
+    _memUsage -= _values.front().memoryUsage;
     _values.pop_front();
 
     // Update "_integral" if there are at least two values before removing the current value.
     // In the case that the value to remove is the last value in the window, the integral is
     // guaranteed to be 0, so there is no need to update '_integral'.
     if (_values.size() > 0) {
-        _integral.remove(integralOfTwoPointsByTrapezoidalRule(value, _values.front().value()));
+        _integral.remove(integralOfTwoPointsByTrapezoidalRule(value, _values.front().value));
     }
 }
 

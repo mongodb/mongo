@@ -59,7 +59,7 @@ Value convertNonFiniteInputValue(Value value) {
 
 WindowFunctionCovariance::WindowFunctionCovariance(ExpressionContext* const expCtx, bool isSamp)
     : WindowFunctionState(expCtx), _isSamp(isSamp), _meanX(expCtx), _meanY(expCtx), _cXY(expCtx) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 Value WindowFunctionCovariance::getValue(boost::optional<Value> current) const {
@@ -138,6 +138,7 @@ void WindowFunctionCovariance::reset() {
     _meanX.reset();
     _meanY.reset();
     _cXY.reset();
+    _memUsage = sizeof(*this);
 }
 
 }  // namespace mongo

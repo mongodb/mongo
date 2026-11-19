@@ -10,6 +10,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/memory_usage_container_util.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/util/assert_util.h"
@@ -29,8 +30,9 @@ public:
         if (value.nullish()) {
             return;
         }
-        _values.emplace(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
-                        std::move(value));
+        int64_t size = static_cast<int64_t>(value.getApproximateSize());
+        _values.emplace(ValueWithMemoryUsage<Value>{std::move(value), size});
+        _memUsage += size;
     }
 
     void remove(Value value) final {
@@ -43,28 +45,28 @@ public:
         // which is what we want, to satisfy "remove() undoes add() when called in FIFO order".
         auto iter = _values.find(value);
         tassert(5371400, "Can't remove from an empty WindowFunctionMinMax", iter != _values.end());
+        _memUsage -= iter->memoryUsage;
         _values.erase(iter);
     }
 
     void reset() final {
         _values.clear();
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
 protected:
     // Constructor hidden so that only instances of the derived types can be created.
     explicit WindowFunctionMinMaxCommon(ExpressionContext* const expCtx)
         : WindowFunctionState(expCtx),
-          _values(MemoryTokenValueComparator(&_expCtx->getValueComparator())) {}
+          _values(ValueWithMemoryUsageComparator(&_expCtx->getValueComparator())) {}
 
     // Holds all the values in the window, in order, with constant-time access to both ends.
-    std::multiset<SimpleMemoryUsageTokenWith<Value>, MemoryTokenValueComparator> _values;
+    std::multiset<ValueWithMemoryUsage<Value>, ValueWithMemoryUsageComparator> _values;
 };
 
 template <AccumulatorMinMax::Sense sense>
 class WindowFunctionMinMax : public WindowFunctionMinMaxCommon {
 public:
-    using WindowFunctionMinMaxCommon::_memUsageTracker;
     using WindowFunctionMinMaxCommon::_values;
 
     static inline const Value kDefault = Value{BSONNULL};
@@ -75,16 +77,16 @@ public:
 
     explicit WindowFunctionMinMax(ExpressionContext* const expCtx)
         : WindowFunctionMinMaxCommon(expCtx) {
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     Value getValue(boost::optional<Value> current = boost::none) const final {
         if (_values.empty())
             return kDefault;
         if constexpr (sense == AccumulatorMinMax::Sense::kMin) {
-            return _values.begin()->value();
+            return _values.begin()->value;
         } else {
-            return _values.rbegin()->value();
+            return _values.rbegin()->value;
         }
         MONGO_UNREACHABLE_TASSERT(5371401);
     }
@@ -93,7 +95,6 @@ public:
 template <AccumulatorMinMax::Sense sense>
 class WindowFunctionMinMaxN : public WindowFunctionMinMaxCommon {
 public:
-    using WindowFunctionMinMaxCommon::_memUsageTracker;
     using WindowFunctionMinMaxCommon::_values;
 
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx,
@@ -117,7 +118,7 @@ public:
 
     explicit WindowFunctionMinMaxN(ExpressionContext* const expCtx, long long n)
         : WindowFunctionMinMaxCommon(expCtx), _n(n) {
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
     Value getValue(boost::optional<Value> current = boost::none) const final {
@@ -131,7 +132,7 @@ public:
             result.reserve(n);
             auto it = begin;
             for (size_t i = 0; i < n; ++i, ++it) {
-                result.push_back(it->value());
+                result.push_back(it->value);
             }
             return Value(std::move(result));
         };

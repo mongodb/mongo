@@ -10,11 +10,21 @@
 
 namespace mongo {
 
-class MemoryTokenValueComparator {
+// A value paired with the bytes charged to the memory tracker when it was inserted into a
+// container. Release exactly 'memoryUsage' when the entry is removed, since the value's size may
+// not be recomputable later. Use for manual tracking where a MemoryUsageTokenWith per element would
+// add too much overhead.
+template <typename T>
+struct ValueWithMemoryUsage {
+    T value;
+    int64_t memoryUsage{0};
+};
+
+class ValueWithMemoryUsageComparator {
 public:
     using is_transparent = std::true_type;
 
-    explicit MemoryTokenValueComparator(const ValueComparator* comparator)
+    explicit ValueWithMemoryUsageComparator(const ValueComparator* comparator)
         : _comparator(comparator) {}
 
     template <typename LHS, typename RHS>
@@ -23,20 +33,18 @@ public:
     }
 
 private:
-    const Value& _getValue(const Value& v) const {
+    static const Value& _getValue(const Value& v) {
         return v;
     }
-
-    template <typename Tracker>
-    const Value& _getValue(const MemoryUsageTokenWithImpl<Tracker, Value>& v) const {
-        return v.value();
+    static const Value& _getValue(const ValueWithMemoryUsage<Value>& v) {
+        return v.value;
     }
 
     const ValueComparator* _comparator;
 };
 
 /**
- * Helper function to convert container of MemoryUsageTokenWith<Value> to a Value, containing an
+ * Helper function to convert container of ValueWithMemoryUsage<Value> to a Value, containing an
  * array of Values.
  */
 template <typename Iterator>
@@ -44,7 +52,7 @@ Value convertToValueFromMemoryTokenWithValue(Iterator begin, Iterator end, size_
     std::vector<Value> result;
     result.reserve(size);
     while (begin != end) {
-        result.emplace_back(begin->value());
+        result.emplace_back(begin->value);
         ++begin;
     }
     return Value{std::move(result)};

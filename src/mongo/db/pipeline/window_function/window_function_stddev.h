@@ -18,7 +18,7 @@ protected:
           _isSamp(isSamp),
           _count(0),
           _nonfiniteValueCount(0) {
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
     }
 
 public:
@@ -56,7 +56,7 @@ public:
     void reset() override {
         _m2->reset();
         _sum->reset();
-        _memUsageTracker.set(sizeof(*this));
+        _memUsage = sizeof(*this);
         _count = 0;
         _nonfiniteValueCount = 0;
     }
@@ -84,7 +84,7 @@ private:
         _count += quantity;
         _sum->process(Value{value.coerceToDouble() * quantity}, false);
         _m2->process(Value{x * x * quantity / (_count * (_count - quantity))}, false);
-        _memUsageTracker.set(sizeof(*this) + _sum->getMemUsage() + _m2->getMemUsage());
+        _memUsage = sizeof(*this) + _sum->getMemUsage() + _m2->getMemUsage();
     }
 
     // Std dev cannot make use of RemovableSum because of its specific handling of non-finite

@@ -14,7 +14,7 @@ REGISTER_ACCUMULATOR(last, genericParseSingleExpressionAccumulator<AccumulatorLa
 void AccumulatorLast::processInternal(const Value& input, bool merging) {
     /* always remember the last value seen */
     _last = input;
-    _memUsageTracker.set(sizeof(*this) + _last.getApproximateSize() - sizeof(Value));
+    _memUsage = sizeof(*this) + _last.getApproximateSize() - sizeof(Value);
 }
 
 Value AccumulatorLast::getValue(bool toBeMerged) {
@@ -22,11 +22,11 @@ Value AccumulatorLast::getValue(bool toBeMerged) {
 }
 
 AccumulatorLast::AccumulatorLast(ExpressionContext* const expCtx) : AccumulatorState(expCtx) {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
 }
 
 void AccumulatorLast::reset() {
-    _memUsageTracker.set(sizeof(*this));
+    _memUsage = sizeof(*this);
     _last = Value();
 }
 

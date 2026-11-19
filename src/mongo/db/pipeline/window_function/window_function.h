@@ -24,7 +24,7 @@ public:
     WindowFunctionState(ExpressionContext* const expCtx,
                         MemoryUsageLimit maxAllowedMemoryUsageBytes =
                             MemoryUsageLimit{std::numeric_limits<int64_t>::max()})
-        : _expCtx(expCtx), _memUsageTracker(maxAllowedMemoryUsageBytes) {}
+        : _expCtx(expCtx), _memUsageLimit(maxAllowedMemoryUsageBytes) {}
     virtual ~WindowFunctionState() = default;
 
     WindowFunctionState(const WindowFunctionState&) = delete;
@@ -54,14 +54,21 @@ public:
         tasserted(13571601, "This window function does not support restoreState()");
     }
     size_t getApproximateSize() {
-        tassert(5414200,
-                "_memUsageTracker is not set for function",
-                _memUsageTracker.inUseTrackedMemoryBytes() != 0);
-        return _memUsageTracker.inUseTrackedMemoryBytes();
+        return _memUsage;
     }
 
 protected:
+    // Utility to check that memory limit isn't exceeded.
+    void checkMemUsage(std::string_view opName) {
+        const int64_t limit = _memUsageLimit.get(_expCtx->getOperationContext());
+        if (MONGO_unlikely(_memUsage > limit)) {
+            uassertedMemoryLimitExceeded(opName, _memUsage, limit);
+        }
+    }
+
     ExpressionContext* _expCtx;
-    SimpleMemoryUsageTracker _memUsageTracker;
+
+    int64_t _memUsage = 0;
+    MemoryUsageLimit _memUsageLimit;
 };
 }  // namespace mongo
