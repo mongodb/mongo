@@ -93,7 +93,11 @@ mongo_cc_unit_test(
     srcs = [
         "ticketholder_test.cpp",
     ],
-    tags = ["mongo_unittest_seventh_group"],
+    tags = [
+        "mongo_unittest_seventh_group",
+        # ReleaseToPoolWakesWaiters has a load-sensitive 400 ms assertion (SERVER-139106).
+        "windows_timing_sensitive",
+    ],
     deps = [
         ":ticketholder",
         "//src/mongo/db:service_context_test_fixture",
