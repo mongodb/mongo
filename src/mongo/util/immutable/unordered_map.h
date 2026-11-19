@@ -7,6 +7,7 @@
 #include "mongo/util/immutable/details/memory_policy.h"
 #include "mongo/util/modules.h"
 
+#include <absl/container/hash_container_defaults.h>
 #include <immer/map.hpp>
 #include <immer/map_transient.hpp>
 
@@ -36,6 +37,6 @@ namespace mongo::immutable {
 template <class K,
           class V,
           class Hasher = DefaultHasher<K>,
-          class Eq = absl::container_internal::hash_default_eq<K>>
+          class Eq = absl::DefaultHashContainerEq<K>>
 using unordered_map = immer::map<K, V, EnsureTrustedHasher<Hasher, K>, Eq, detail::MemoryPolicy>;
 }  // namespace mongo::immutable

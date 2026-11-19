@@ -3,11 +3,9 @@
 
 #pragma once
 
-// This file depends on internal implementation details in abseil. In a library upgrade you may have
-// to re-write this file significantly.
 #include "mongo/util/modules.h"
 
-#include <absl/container/internal/hash_function_defaults.h>
+#include <absl/container/hash_container_defaults.h>
 
 /**
  * To be safe we let abseil hash the produced hash one more time to protect ourselves against bad
@@ -22,7 +20,7 @@
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 template <typename Key>
-using DefaultHasher = absl::container_internal::hash_default_hash<Key>;
+using DefaultHasher = absl::DefaultHashContainerHash<Key>;
 
 template <typename Hasher, typename Key>
 struct IsTrustedHasher : std::is_same<Hasher, DefaultHasher<Key>> {};

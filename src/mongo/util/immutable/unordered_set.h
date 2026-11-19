@@ -7,6 +7,7 @@
 #include "mongo/util/immutable/details/memory_policy.h"
 #include "mongo/util/modules.h"
 
+#include <absl/container/hash_container_defaults.h>
 #include <immer/set.hpp>
 #include <immer/set_transient.hpp>
 
@@ -35,8 +36,6 @@ namespace mongo::immutable {
  *
  * Documentation: 'immer/set.h' and https://sinusoid.es/immer/
  */
-template <class T,
-          class Hasher = DefaultHasher<T>,
-          class Eq = absl::container_internal::hash_default_eq<T>>
+template <class T, class Hasher = DefaultHasher<T>, class Eq = absl::DefaultHashContainerEq<T>>
 using unordered_set = immer::set<T, EnsureTrustedHasher<Hasher, T>, Eq, detail::MemoryPolicy>;
 }  // namespace mongo::immutable

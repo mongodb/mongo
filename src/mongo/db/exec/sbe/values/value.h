@@ -48,6 +48,7 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
+#include <absl/container/hash_container_defaults.h>
 #include <boost/optional/optional.hpp>
 #include <boost/predef/hardware/simd.h>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
@@ -1074,8 +1075,8 @@ private:
  * This is the main reason for having the 'DeepEqualityHashSet' wrapper type.
  */
 template <class T,
-          class Hash = absl::container_internal::hash_default_hash<T>,
-          class Eq = absl::container_internal::hash_default_eq<T>,
+          class Hash = absl::DefaultHashContainerHash<T>,
+          class Eq = absl::DefaultHashContainerEq<T>,
           class Allocator = std::allocator<T>>
 class DeepEqualityHashSet {
 public:
@@ -1199,8 +1200,8 @@ private:
  */
 template <class K,
           class V,
-          class Hash = absl::container_internal::hash_default_hash<K>,
-          class Eq = absl::container_internal::hash_default_eq<K>,
+          class Hash = absl::DefaultHashContainerHash<K>,
+          class Eq = absl::DefaultHashContainerEq<K>,
           class Allocator = std::allocator<std::pair<const K, V>>>
 class DeepEqualityHashMap {
 public:
