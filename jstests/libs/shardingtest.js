@@ -2081,9 +2081,18 @@ ShardingTest.prototype.checkShardFilteringMetadata = function() {
 
 /**
  * Stops the balancer during ShardingTest initialization.
+ *
+ * _configsvrBalancerStop persists the balancer mode as "off" before it joins the current balancer
+ * round, so a MaxTimeMSExpired error means that the balancer is already stopped but that a round
+ * was still in flight. Retry if the operation times out; the command is idempotent.
  */
 ShardingTest.prototype._stopBalancerForInit = function() {
-    this.stopBalancer();
+    retryOnRetryableError(
+        () => this.stopBalancer(),
+        10 /* numRetries */,
+        1000 /* sleepMs */,
+        [ErrorCodes.MaxTimeMSExpired],
+    );
 };
 
 /**
