@@ -35,3 +35,15 @@ py_test(
         "//buildscripts/monitor_build_status",
     ],
 )
+
+py_test(
+    name = "test_merge_queue_quota_check",
+    srcs = [
+        "__init__.py",
+        "test_merge_queue_quota_check.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/monitor_build_status",
+    ],
+)

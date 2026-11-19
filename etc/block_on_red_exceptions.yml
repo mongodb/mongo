@@ -1,0 +1,44 @@
+# VP-approved exceptions to the Block-on-Red merge gate (SERVER-138460).
+#
+# Source: the "Exceptions for Core Server / Non-burndown work" list in the
+# Infinite Burndown doc. That doc remains the human record of the approval;
+# this file is what the automation reads, so adding an exception is a PR.
+#
+# Emails are Jira user names resolved from the display names in that list.
+# `reason` is the workstream the doc records the person against.
+
+exceptions:
+  - email: erwin.pe@mongodb.com
+    reason: Landlock
+  - email: adam.rayner@mongodb.com
+    reason: Monguard
+  - email: varun.ravichandran@mongodb.com
+    reason: Monguard
+  - email: ryan.berryhill@mongodb.com
+    reason: Monguard
+  - email: fabio.darosa@mongodb.com
+    reason: Monguard
+  - email: ananya.patil@mongodb.com
+    reason: Monguard
+  - email: owen.chen@mongodb.com
+    reason: Monguard
+  - email: anand.paithankar@mongodb.com
+    reason: Message Filter Plugin (MFP)
+  - email: adithi.raghavan@mongodb.com
+    reason: $queryStats perf improvement
+  - email: jan.steemann@mongodb.com
+    reason: End Of Transaction, Changestreams 9.0 support
+  - email: denis.grebennicov@mongodb.com
+    reason: Changestreams 9.0 support
+  - email: alya.berciu@mongodb.com
+    reason: Join Order Optimization (JOO) EAP
+  - email: ben.shteinfeld@mongodb.com
+    reason: Join Order Optimization (JOO) EAP
+  - email: naafiyan.ahmed@mongodb.com
+    reason: Join Order Optimization (JOO) EAP
+  - email: max.verbinnen@mongodb.com
+    reason: Join Order Optimization (JOO) EAP
+  - email: henri.nikku@mongodb.com
+    reason: Join Order Optimization (JOO) EAP
+  - email: matt.olma@mongodb.com
+    reason: Join Order Optimization (JOO) EAP
