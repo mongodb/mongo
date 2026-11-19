@@ -487,31 +487,15 @@ public:
 
     /**
      * Throws if the provided feature flag is not enabled according to the expressions
-     * VersionContext and IncrementalFeatureRolloutContext. This function assumes the caller has
-     * verified that the feature flag should be checked.
+     * VersionContext and IncrementalFeatureRolloutContext.
      */
-    void throwIfParserShouldRejectFeature(std::string_view name, FeatureFlag& flag);
+    void throwIfFeatureFlagNotEnabledInParser(std::string_view name, FeatureFlag& flag);
 
     /**
-     * Returns true if parsers should not check if feature flags are enabled on the expressions
-     * VersionContext or IncrementalFeatureRolloutContext and false otherwise.
-     *
-     * TODO SERVER-99552 remove function when support is added for 'VersionContext' for all DDL
-     * operations in replica sets. Currently, secondaries can fail to apply oplog entries when
-     * creating collections that have validators or views that depend on expressions with new query
-     * features.
+     * For parsers that branch on a flag rather than rejecting.  Resolves against this context's
+     * VersionContext, falling back to the last-LTS FCV when no FCV is initialized.
      */
-    bool shouldParserIgnoreFeatureFlagCheck() const {
-        tassert(10499200, "Operation context is not initialized", _params.opCtx);
-        return (_params.isParsingCollectionValidator || _params.isParsingViewDefinition) &&
-            !_params.opCtx->isEnforcingConstraints();
-    }
-
-    /**
-     * Throws only if the parser should check the feature flag and the feature flag provided is not
-     * enabled in the expressions VersionContext and IncrementalFeatureRolloutContext
-     */
-    void ignoreFeatureInParserOrRejectAndThrow(std::string_view name, FeatureFlag& flag);
+    bool isFeatureFlagEnabledInParser(const FCVGatedFeatureFlag& flag) const;
 
     void setOperationContext(OperationContext* opCtx) {
         if (_params.opCtx != opCtx) {
@@ -1116,10 +1100,6 @@ public:
         return _params.isFleQuery;
     }
 
-    bool shouldParserAllowStreams() const {
-        return shouldParserIgnoreFeatureFlagCheck() || _featureFlagStreams.get(_params.vCtx);
-    }
-
     bool isMapReduceCommand() const {
         return _params.isMapReduceCommand;
     }
@@ -1594,6 +1574,25 @@ protected:
 
 private:
     /**
+     * Returns true if parsers should not check whether feature flags are enabled on this
+     * context's VersionContext or IncrementalFeatureRolloutContext, because a node that already
+     * validated this MQL is replaying it to us.
+     *
+     * Private on purpose: parsers should consult flags through
+     * throwIfFeatureFlagNotEnabledInParser() or isFeatureFlagEnabledInParser().
+     *
+     * TODO SERVER-99552 remove function when support is added for 'VersionContext' for all DDL
+     * operations in replica sets. Currently, secondaries can fail to apply oplog entries when
+     * creating collections that have validators or views that depend on expressions with new query
+     * features.
+     */
+    bool shouldParserIgnoreFeatureFlagCheck() const {
+        tassert(10499200, "Operation context is not initialized", _params.opCtx);
+        return (_params.isParsingCollectionValidator || _params.isParsingViewDefinition) &&
+            !_params.opCtx->isEnforcingConstraints();
+    }
+
+    /**
      * Returns the type inferred from the document validator for the given namespace.
      * Does not mark the type as used, that is left to the caller.
      */
@@ -1643,10 +1642,6 @@ private:
     // Validators and profile filters share their ExpressionContext across operation threads.
     // Synchronizes initialization.
     mutable std::once_flag _featureFlagMqlJsEngineGapInit;
-
-    // Initialized in constructor to avoid including server_feature_flags_gen.h
-    // in this header file.
-    Deferred<bool (*)(const VersionContext&)> _featureFlagStreams;
 };
 
 /**

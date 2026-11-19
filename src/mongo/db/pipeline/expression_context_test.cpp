@@ -984,5 +984,216 @@ TEST_F(ExpressionContextTest, StageMemoryTrackerUnaffectedByExpressionFallbackEx
     stageTracker.add(-100);
 }
 
+// (Generic FCV reference): test-only
+FCVGatedFeatureFlag makeLatestGatedFlag() {
+    return FCVGatedFeatureFlag{true /* enabled */,
+                               multiversion::toString(multiversion::GenericFCV::kLatest)};
+}
+
+// Sets the node's global FCV for the duration of the test, restoring whatever it was (including
+// uninitialized) on scope exit. Pass boost::none for "uninitialized", the state a node is in
+// before it has read its FCV document — e.g. while initial sync clones a validator.
+class ScopedGlobalFCV {
+public:
+    using FCV = multiversion::FeatureCompatibilityVersion;
+
+    explicit ScopedGlobalFCV(boost::optional<FCV> fcv) {
+        const auto snapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        _original = snapshot.isVersionInitialized() ? boost::make_optional(snapshot.getVersion())
+                                                    : boost::none;
+        _set(fcv);
+    }
+
+    ~ScopedGlobalFCV() {
+        _set(_original);
+    }
+
+private:
+    static void _set(boost::optional<FCV> fcv) {
+        if (fcv) {
+            serverGlobalParams.mutableFCV.setVersion(*fcv);
+        } else {
+            serverGlobalParams.mutableFCV.reset();
+        }
+    }
+
+    boost::optional<FCV> _original;
+};
+
+TEST_F(ExpressionContextTest, FeatureFlagInParserFallsBackToLastLTSWhenNoFCVIsAvailable) {
+    auto flag = makeLatestGatedFlag();
+    auto opCtx = makeOperationContext();
+    const auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv);
+
+    // Note the context must be built *inside* each scope: ExpressionContextBuilder::opCtx() pins
+    // the node's global FCV as an Operation FCV at build time, so a context built beforehand
+    // would carry the old FCV and never reach the uninitialized path at all.
+    auto buildExpCtx = [&] {
+        return ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+    };
+
+    {
+        ScopedGlobalFCV uninitialized{boost::none};
+        auto expCtx = buildExpCtx();
+        ASSERT_FALSE(expCtx->getVersionContext().hasOperationFCV());
+        ASSERT_FALSE(expCtx->isFeatureFlagEnabledInParser(flag));
+    }
+    {
+        // (Generic FCV reference): test-only
+        ScopedGlobalFCV latest{multiversion::GenericFCV::kLatest};
+        auto expCtx = buildExpCtx();
+        ASSERT_TRUE(expCtx->isFeatureFlagEnabledInParser(flag));
+    }
+    {
+        // (Generic FCV reference): test-only
+        ScopedGlobalFCV lastLTS{multiversion::GenericFCV::kLastLTS};
+        auto expCtx = buildExpCtx();
+        ASSERT_FALSE(expCtx->isFeatureFlagEnabledInParser(flag));
+    }
+}
+
+TEST_F(ExpressionContextTest, FeatureFlagInParserPrefersOperationFCVOverTheGlobalFCV) {
+    auto flag = makeLatestGatedFlag();
+    auto opCtx = makeOperationContext();
+    const auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv);
+
+    // OFCV above the gate, so flags should be true.
+    {
+        // (Generic FCV reference): test-only
+        ScopedGlobalFCV lastLTS{multiversion::GenericFCV::kLastLTS};
+        auto expCtx = ExpressionContextBuilder{}
+                          .opCtx(opCtx.get(), VersionContext{multiversion::GenericFCV::kLatest})
+                          .ns(nss)
+                          .build();
+        ASSERT_TRUE(expCtx->isFeatureFlagEnabledInParser(flag));
+    }
+
+    // OFCV below the gate, so flags should be false.
+    {
+        // (Generic FCV reference): test-only
+        ScopedGlobalFCV latest{multiversion::GenericFCV::kLatest};
+        auto expCtx = ExpressionContextBuilder{}
+                          .opCtx(opCtx.get(), VersionContext{multiversion::GenericFCV::kLastLTS})
+                          .ns(nss)
+                          .build();
+        ASSERT_FALSE(expCtx->isFeatureFlagEnabledInParser(flag));
+    }
+}
+
+TEST_F(ExpressionContextTest, FeatureFlagInParserSkipsTheCheckWhenReplayingValidatedMql) {
+    auto flag = makeLatestGatedFlag();
+    // Pin the node below the gate so the skip is the only thing that can return true.
+    // (Generic FCV reference): test-only
+    ScopedGlobalFCV lastLTS{multiversion::GenericFCV::kLastLTS};
+    const auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv);
+
+    auto buildExpCtx = [&](OperationContext* opCtx, bool isView, bool isValidator) {
+        return ExpressionContextBuilder{}
+            .opCtx(opCtx)
+            .ns(nss)
+            .isParsingViewDefinition(isView)
+            .isParsingCollectionValidator(isValidator)
+            .build();
+    };
+    {
+        // Control: an ordinary user parse on an enforcing operation gets no skip.
+        auto opCtx = makeOperationContext();
+        ASSERT_FALSE(
+            buildExpCtx(opCtx.get(), true /* isView */, false)->isFeatureFlagEnabledInParser(flag));
+        ASSERT_FALSE(buildExpCtx(opCtx.get(), false, true /* isValidator */)
+                         ->isFeatureFlagEnabledInParser(flag));
+    }
+    {
+        auto opCtx = makeOperationContext();
+        opCtx->setEnforceConstraints(false);
+
+        ASSERT_TRUE(
+            buildExpCtx(opCtx.get(), true /* isView */, false)->isFeatureFlagEnabledInParser(flag));
+        ASSERT_TRUE(buildExpCtx(opCtx.get(), false, true /* isValidator */)
+                        ->isFeatureFlagEnabledInParser(flag));
+
+        // A non-enforcing operation parsing anything else still checks the flag.
+        ASSERT_FALSE(buildExpCtx(opCtx.get(), false, false)->isFeatureFlagEnabledInParser(flag));
+    }
+}
+
+TEST_F(ExpressionContextTest, CheckFeatureFlagInParserThrowsOnlyWhenTheFlagIsDisabled) {
+    auto flag = makeLatestGatedFlag();
+    auto opCtx = makeOperationContext();
+    const auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv);
+
+    auto buildExpCtx = [&] {
+        return ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+    };
+
+    {
+        // Node below the gate: the parser rejects the syntax, naming it in the error.
+        // (Generic FCV reference): test-only
+        ScopedGlobalFCV lastLTS{multiversion::GenericFCV::kLastLTS};
+        auto expCtx = buildExpCtx();
+        ASSERT_THROWS_WITH_CHECK(
+            expCtx->throwIfFeatureFlagNotEnabledInParser("$testOnlyOperator"sv, flag),
+            AssertionException,
+            [](const AssertionException& ex) {
+                ASSERT_EQ(ex.code(), ErrorCodes::QueryFeatureNotAllowed);
+                ASSERT_STRING_CONTAINS(ex.reason(), "$testOnlyOperator");
+            });
+    }
+    {
+        // Node at the gate: the parser accepts it.
+        // (Generic FCV reference): test-only
+        ScopedGlobalFCV latest{multiversion::GenericFCV::kLatest};
+        auto expCtx = buildExpCtx();
+        ASSERT_DOES_NOT_THROW(
+            expCtx->throwIfFeatureFlagNotEnabledInParser("$testOnlyOperator"sv, flag));
+    }
+}
+
+TEST_F(ExpressionContextTest, CheckFeatureFlagInParserSkipsTheCheckWhenReplayingValidatedMql) {
+    auto flag = makeLatestGatedFlag();
+    // Pin the node below the gate so the skip is the only thing that can suppress the throw.
+    // (Generic FCV reference): test-only
+    ScopedGlobalFCV lastLTS{multiversion::GenericFCV::kLastLTS};
+    const auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv);
+
+    auto buildExpCtx = [&](OperationContext* opCtx, bool isView, bool isValidator) {
+        return ExpressionContextBuilder{}
+            .opCtx(opCtx)
+            .ns(nss)
+            .isParsingViewDefinition(isView)
+            .isParsingCollectionValidator(isValidator)
+            .build();
+    };
+    {
+        // Control: an ordinary user parse on an enforcing operation still rejects.
+        auto opCtx = makeOperationContext();
+        ASSERT_THROWS_CODE(buildExpCtx(opCtx.get(), true /* isView */, false)
+                               ->throwIfFeatureFlagNotEnabledInParser("$testOnlyOperator"sv, flag),
+                           AssertionException,
+                           ErrorCodes::QueryFeatureNotAllowed);
+        ASSERT_THROWS_CODE(buildExpCtx(opCtx.get(), false, true /* isValidator */)
+                               ->throwIfFeatureFlagNotEnabledInParser("$testOnlyOperator"sv, flag),
+                           AssertionException,
+                           ErrorCodes::QueryFeatureNotAllowed);
+    }
+    {
+        auto opCtx = makeOperationContext();
+        opCtx->setEnforceConstraints(false);
+
+        ASSERT_DOES_NOT_THROW(
+            buildExpCtx(opCtx.get(), true /* isView */, false)
+                ->throwIfFeatureFlagNotEnabledInParser("$testOnlyOperator"sv, flag));
+        ASSERT_DOES_NOT_THROW(
+            buildExpCtx(opCtx.get(), false, true /* isValidator */)
+                ->throwIfFeatureFlagNotEnabledInParser("$testOnlyOperator"sv, flag));
+
+        // Should throw for ordinary parse.
+        ASSERT_THROWS_CODE(buildExpCtx(opCtx.get(), false, false)
+                               ->throwIfFeatureFlagNotEnabledInParser("$testOnlyOperator"sv, flag),
+                           AssertionException,
+                           ErrorCodes::QueryFeatureNotAllowed);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

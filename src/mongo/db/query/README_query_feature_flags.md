@@ -20,19 +20,21 @@ get right.
    take special care to (a) be sure to do the FCV/flag check while holding a global lock which would
    conflict with a global S lock to change the FCV (i.e. a mode stronger than MODE_IS), and (c)
    avoid FCV checks when applying oplog entries on secondaries (the primary has already validated).
-   Please ensure language change features are guarded by an FCV-gated feature flag AND that you use
-   `ExpressionContext::shouldParserIgnoreFeatureFlagCheck()` to detect and permit cases where a
-   secondary is applying changes that a primary has already checked for FCV compatibility.
+   Please ensure language change features are guarded by an FCV-gated feature flag AND that you
+   resolve the flag through the `ExpressionContext`, which permits the cases where a secondary is
+   applying changes that a primary has already checked for FCV compatibility.
 
 1. MQL is serialized across the wire in mixed-version clusters, so we should be sure to use FCV to
    guard our feature flags to remove any chance of nodes not understanding each other.
 
-A good example following these recommendations is [inside our DocumentSources
-parser][good_parse_example] which consults
-`ExpressionContext::ignoreFeatureInParserOrRejectAndThrow()` to decide how to validate. Note that
-this helper first consults whether we need to ignore validation as a replica secondary, and then
-passes the VersionContext to the feature flag check. Finally, in absence of any known FCV, the
-safest thing to do is default to the 'LastLTS' (Last Long Term Support-ed version) behavior.
+A good example following these recommendations is `Expression::parseExpression()` [in our expression
+parser][good_parse_example], which consults
+`ExpressionContext::throwIfFeatureFlagNotEnabledInParser()` to decide how to validate. Parsers that
+branch on a flag rather than reject outright use `ExpressionContext::isFeatureFlagEnabledInParser()`
+instead. Note that both helpers first consult whether we need to ignore validation as a replica
+secondary, and then passes the VersionContext to the feature flag check. Finally, in the absence of
+any known FCV, the safest thing to do is default to the 'LastLTS' (Last Long Term Support-ed
+version) behavior.
 
 ## Details
 
@@ -286,7 +288,7 @@ cannot offer any more specific advice.
 [fcv_readme]: /src/mongo/db/README.md#fcv-and-feature-flags
 [version_context]: /src/mongo/db/version_context.h
 [good_parse_example]:
-  https://github.com/mongodb/mongo/blob/8ac5a0c814a5e8a0f79825327fdf6c3aa118c0fa/src/mongo/db/pipeline/document_source.cpp#L135
+  https://github.com/mongodb/mongo/blob/4aebe53c2e92b8ea62529ebcde22a5fde8ce24b2/src/mongo/db/pipeline/expression.cpp#L239
 [SERVER-103028]: https://jira.mongodb.org/browse/SERVER-103028
 [SERVER-91281]: https://jira.mongodb.org/browse/SERVER-91281
 [SERVER-109985]: https://jira.mongodb.org/browse/SERVER-109985

@@ -49,11 +49,8 @@ boost::intrusive_ptr<Expression> ExpressionMap::parse(ExpressionContext* const e
     expCtx->checkAndIncrementMemoryIntensiveExprCount(expr.fieldNameStringData());
 
 
-    const bool isExposeArrayIndexEnabled = expCtx->shouldParserIgnoreFeatureFlagCheck() ||
-        feature_flags::gFeatureFlagExposeArrayIndexInMapFilterReduce
-            .isEnabledUseLastLTSFCVWhenUninitialized(
-                expCtx->getVersionContext(),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool isExposeArrayIndexEnabled = expCtx->isFeatureFlagEnabledInParser(
+        feature_flags::gFeatureFlagExposeArrayIndexInMapFilterReduce);
 
     // "in" must be parsed after "as" regardless of BSON order.
     BSONElement inputElem;
@@ -174,11 +171,8 @@ boost::intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* cons
             expr.type() == BSONType::object);
     expCtx->checkAndIncrementMemoryIntensiveExprCount(expr.fieldNameStringData());
 
-    const bool isExposeArrayIndexEnabled = expCtx->shouldParserIgnoreFeatureFlagCheck() ||
-        feature_flags::gFeatureFlagExposeArrayIndexInMapFilterReduce
-            .isEnabledUseLastLTSFCVWhenUninitialized(
-                expCtx->getVersionContext(),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool isExposeArrayIndexEnabled = expCtx->isFeatureFlagEnabledInParser(
+        feature_flags::gFeatureFlagExposeArrayIndexInMapFilterReduce);
 
     BSONElement inputElem;
     BSONElement initialElem;
@@ -329,11 +323,8 @@ boost::intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* cons
     uassert(
         28646, "$filter only supports an object as its argument", expr.type() == BSONType::object);
 
-    const bool isExposeArrayIndexEnabled = expCtx->shouldParserIgnoreFeatureFlagCheck() ||
-        feature_flags::gFeatureFlagExposeArrayIndexInMapFilterReduce
-            .isEnabledUseLastLTSFCVWhenUninitialized(
-                expCtx->getVersionContext(),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool isExposeArrayIndexEnabled = expCtx->isFeatureFlagEnabledInParser(
+        feature_flags::gFeatureFlagExposeArrayIndexInMapFilterReduce);
 
     // "cond" must be parsed after "as" regardless of BSON order.
     BSONElement inputElem;

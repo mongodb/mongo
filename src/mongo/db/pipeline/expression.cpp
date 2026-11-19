@@ -236,7 +236,7 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
 
     auto& entry = it->second;
     if (entry.featureFlag) {
-        expCtx->ignoreFeatureInParserOrRejectAndThrow(opName, *entry.featureFlag);
+        expCtx->throwIfFeatureFlagNotEnabledInParser(opName, *entry.featureFlag);
     }
 
     if (expCtx->getOperationContext() && !expCtx->getIsReparsingRepresentativeQueryShape()) {
@@ -2037,7 +2037,7 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStreamsFeatureFlag(
     DocumentMetadataFields::MetaType type,
     std::string_view typeName,
     boost::optional<std::string_view> optionalPath) {
-    bool streamsEnabled = expCtx->shouldParserAllowStreams();
+    bool streamsEnabled = expCtx->isFeatureFlagEnabledInParser(gFeatureFlagStreams);
     // $meta: "stream" is only supported when the ff is enabled.
     uassert(9692105,
             ExpressionMeta::kParseErrPrefix + std::string{typeName},
@@ -2057,8 +2057,9 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStreamsFeatureFlag(
 ExpressionMeta::ParseMetaTypeResult ExpressionMeta::_parseMetaType(ExpressionContext* const expCtx,
                                                                    std::string_view typeName) {
     boost::optional<std::string_view> fieldPath;
-    if (size_t idx = typeName.find_first_of('.');
-        idx != std::string_view::npos && expCtx->shouldParserAllowStreams()) {
+    const size_t idx = typeName.find_first_of('.');
+    if (idx != std::string_view::npos &&
+        expCtx->isFeatureFlagEnabledInParser(gFeatureFlagStreams)) {
         // An optional path is supported for { $meta: "stream.<path>" }
         uassert(9692107,
                 ExpressionMeta::kParseErrPrefix + std::string{typeName},
@@ -4318,10 +4319,7 @@ bool ExpressionConvert::checkBinDataConvertAllowed() {
 }
 
 bool ExpressionConvert::checkBinDataConvertNumericAllowed(const ExpressionContext* expCtx) {
-    return expCtx->shouldParserIgnoreFeatureFlagCheck() ||
-        feature_flags::gFeatureFlagBinDataConvertNumeric.isEnabledUseLatestFCVWhenUninitialized(
-            expCtx->getVersionContext(),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    return expCtx->isFeatureFlagEnabledInParser(feature_flags::gFeatureFlagBinDataConvertNumeric);
 }
 
 namespace {

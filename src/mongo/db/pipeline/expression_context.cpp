@@ -15,7 +15,6 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knob_descriptors_execution.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/version_context.h"
 #include "mongo/util/version/releases.h"
@@ -59,11 +58,7 @@ ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
       _collator(std::move(_params.collator)),
       _documentComparator(_collator.getCollator()),
       _valueComparator(_collator.getCollator()),
-      _interruptChecker(this),
-      _featureFlagStreams([](const VersionContext& vCtx) {
-          return gFeatureFlagStreams.isEnabledUseLastLTSFCVWhenUninitialized(
-              vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-      }) {
+      _interruptChecker(this) {
 
     _params.timeZoneDatabase = mongo::getTimeZoneDatabase(_params.opCtx);
 
@@ -222,7 +217,22 @@ void ExpressionContext::initializeReferencedSystemVariables() {
     }
 }
 
-void ExpressionContext::throwIfParserShouldRejectFeature(std::string_view name, FeatureFlag& flag) {
+bool ExpressionContext::isFeatureFlagEnabledInParser(const FCVGatedFeatureFlag& flag) const {
+    if (shouldParserIgnoreFeatureFlagCheck()) {
+        return true;
+    }
+
+    // (Generic FCV reference): Fall back to kLastLTS when 'vCtx' is not initialized.
+    return flag.isEnabledUseLastLTSFCVWhenUninitialized(
+        _params.vCtx, ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS});
+}
+
+void ExpressionContext::throwIfFeatureFlagNotEnabledInParser(std::string_view name,
+                                                             FeatureFlag& flag) {
+    if (shouldParserIgnoreFeatureFlagCheck()) {
+        return;
+    }
+
     // (Generic FCV reference): Fall back to kLastLTS when 'vCtx' is not initialized.
     uassert(
         ErrorCodes::QueryFeatureNotAllowed,
@@ -233,13 +243,6 @@ void ExpressionContext::throwIfParserShouldRejectFeature(std::string_view name, 
         flag.checkWithContext(_params.vCtx,
                               *_params.ifrContext,
                               ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS}));
-}
-
-void ExpressionContext::ignoreFeatureInParserOrRejectAndThrow(std::string_view name,
-                                                              FeatureFlag& flag) {
-    if (!shouldParserIgnoreFeatureFlagCheck()) {
-        throwIfParserShouldRejectFeature(name, flag);
-    }
 }
 
 }  // namespace mongo
