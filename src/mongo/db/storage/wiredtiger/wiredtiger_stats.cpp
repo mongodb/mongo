@@ -71,6 +71,12 @@ void WiredTigerStats::updateCounter(int32_t key_id, uint64_t value) {
         case WT_STAT_SESSION_TXN_UPDATES:
             _txnNumUpdates = value;
             break;
+        case WT_STAT_SESSION_CURSOR_NEXT_ENTRIES_SKIPPED:
+            _cursorNextEntriesSkipped = value;
+            break;
+        case WT_STAT_SESSION_CURSOR_PREV_ENTRIES_SKIPPED:
+            _cursorPrevEntriesSkipped = value;
+            break;
         case WT_STAT_SESSION_READ_TIME:
             _readTime = Microseconds((int64_t)value);
             break;
@@ -98,7 +104,8 @@ void WiredTigerStats::updateCounter(int32_t key_id, uint64_t value) {
 void WiredTigerStats::appendToBsonObjBuilder(BSONObjBuilder& builder) const {
     // Only output metrics for non-zero values
     if (_bytesRead != 0 || _bytesWrite != 0 || _readTime.count() != 0 || _writeTime.count() != 0 ||
-        _txnBytesDirty != 0 || _txnNumUpdates != 0) {
+        _txnBytesDirty != 0 || _txnNumUpdates != 0 || _cursorNextEntriesSkipped != 0 ||
+        _cursorPrevEntriesSkipped != 0) {
         BSONObjBuilder dataSection(builder.subobjStart("data"));
         appendIfNonZero("bytesRead", _bytesRead, &dataSection);
         appendIfNonZero("bytesWritten", _bytesWrite, &dataSection);
@@ -106,6 +113,8 @@ void WiredTigerStats::appendToBsonObjBuilder(BSONObjBuilder& builder) const {
         appendIfNonZero("timeWritingMicros", durationCount<Microseconds>(_writeTime), &dataSection);
         appendIfNonZero("txnBytesDirty", _txnBytesDirty, &dataSection);
         appendIfNonZero("txnNumUpdates", _txnNumUpdates, &dataSection);
+        appendIfNonZero("cursorNextEntriesSkipped", _cursorNextEntriesSkipped, &dataSection);
+        appendIfNonZero("cursorPrevEntriesSkipped", _cursorPrevEntriesSkipped, &dataSection);
     }
 
     if (_lockDhandleWait != 0 || _lockSchemaWait != 0 || _cacheTime.count() != 0 ||
@@ -156,6 +165,8 @@ WiredTigerStats& WiredTigerStats::operator+=(const WiredTigerStats& other) {
     _lockDhandleWait += other._lockDhandleWait;
     _txnBytesDirty += other._txnBytesDirty;
     _txnNumUpdates += other._txnNumUpdates;
+    _cursorNextEntriesSkipped += other._cursorNextEntriesSkipped;
+    _cursorPrevEntriesSkipped += other._cursorPrevEntriesSkipped;
     _readTime += other._readTime;
     _writeTime += other._writeTime;
     _lockSchemaWait += other._lockSchemaWait;
@@ -177,6 +188,8 @@ WiredTigerStats& WiredTigerStats::operator-=(const WiredTigerStats& other) {
     _lockDhandleWait -= other._lockDhandleWait;
     _txnBytesDirty -= other._txnBytesDirty;
     _txnNumUpdates -= other._txnNumUpdates;
+    _cursorNextEntriesSkipped -= other._cursorNextEntriesSkipped;
+    _cursorPrevEntriesSkipped -= other._cursorPrevEntriesSkipped;
     _readTime -= other._readTime;
     _writeTime -= other._writeTime;
     _lockSchemaWait -= other._lockSchemaWait;

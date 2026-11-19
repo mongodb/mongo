@@ -157,6 +157,39 @@ protected:
         return storageEngineTime.Long();
     }
 
+    void deleteAtKey(int64_t key) {
+        ASSERT_WT_OK(_session->begin_transaction(nullptr));
+
+        WT_CURSOR* cursor;
+        ASSERT_WT_OK(_session->open_cursor(_uri.c_str(), nullptr, nullptr, &cursor));
+
+        cursor->set_key(cursor, key);
+        ASSERT_WT_OK(cursor->remove(cursor));
+
+        ASSERT_WT_OK(cursor->close(cursor));
+        ASSERT_WT_OK(_session->commit_transaction(nullptr));
+    }
+
+    int64_t scanSession(bool forward) {
+        ASSERT_WT_OK(_session->begin_transaction(nullptr));
+
+        WT_CURSOR* cursor;
+        ASSERT_WT_OK(_session->open_cursor(_uri.c_str(), nullptr, nullptr, &cursor));
+
+        auto step = forward ? cursor->next : cursor->prev;
+
+        int64_t visited = 0;
+        int ret;
+        while ((ret = step(cursor)) == 0) {
+            ++visited;
+        }
+
+        ASSERT_EQ(ret, WT_NOTFOUND);
+        ASSERT_WT_OK(cursor->close(cursor));
+        ASSERT_WT_OK(_session->commit_transaction(nullptr));
+        return visited;
+    }
+
     unittest::TempDir _path{"wiredtiger_operation_stats_test"};
     std::string _uri{"table:wiredtiger_operation_stats_test"};
     ClockSourceMock _clockSource;
@@ -199,6 +232,44 @@ TEST_F(WiredTigerStatsTest, SessionWithRead) {
         ASSERT_EQ(value.type(), BSONType::numberLong) << statsObj;
         ASSERT_GT(value.numberLong(), 0) << statsObj;
     }
+}
+
+TEST_F(WiredTigerStatsTest, CursorNextEntriesSkipped) {
+    ASSERT_EQ(scanSession(/*forward=*/true), _kMaxReads);
+
+    auto statsObj = WiredTigerStats{*_session}.toBSON();
+    auto dataSection = statsObj["data"];
+    ASSERT_EQ(dataSection.type(), BSONType::object) << statsObj;
+    ASSERT_FALSE(dataSection["cursorNextEntriesSkipped"]) << statsObj;
+
+    deleteAtKey(0);
+    ASSERT_EQ(scanSession(/*forward=*/true), _kMaxReads - 1);
+
+    statsObj = WiredTigerStats{*_session}.toBSON();
+    dataSection = statsObj["data"];
+
+    ASSERT(dataSection["cursorNextEntriesSkipped"]) << statsObj;
+    ASSERT_EQ(dataSection["cursorNextEntriesSkipped"].type(), BSONType::numberLong) << statsObj;
+    ASSERT_EQ(dataSection["cursorNextEntriesSkipped"].numberLong(), 1) << statsObj;
+}
+
+TEST_F(WiredTigerStatsTest, CursorPrevEntriesSkipped) {
+    ASSERT_EQ(scanSession(/*forward=*/false), _kMaxReads);
+
+    auto statsObj = WiredTigerStats{*_session}.toBSON();
+    auto dataSection = statsObj["data"];
+    ASSERT_EQ(dataSection.type(), BSONType::object) << statsObj;
+    ASSERT_FALSE(dataSection["cursorPrevEntriesSkipped"]) << statsObj;
+
+    deleteAtKey(0);
+    ASSERT_EQ(scanSession(/*forward=*/false), _kMaxReads - 1);
+
+    statsObj = WiredTigerStats{*_session}.toBSON();
+    dataSection = statsObj["data"];
+
+    ASSERT(dataSection["cursorPrevEntriesSkipped"]) << statsObj;
+    ASSERT_EQ(dataSection["cursorPrevEntriesSkipped"].type(), BSONType::numberLong) << statsObj;
+    ASSERT_EQ(dataSection["cursorPrevEntriesSkipped"].numberLong(), 1) << statsObj;
 }
 
 TEST_F(WiredTigerStatsTest, OperationsAddToSessionStats) {
