@@ -934,6 +934,78 @@ TEST_F(ChangeStreamStageTest, CreatingChangestreamFailsWithInvalidVersions) {
     }
 }
 
+TEST_F(ChangeStreamStageTest, ShowEndOfTransactionRejectsResumeTokenVersion1) {
+    unittest::ServerParameterGuard eotFlag("featureFlagEndOfTransactionChangeEventSynthesis", true);
+
+    // A v1 high-water-mark token is rejected as well, so that consumers see the failure
+    // consistently regardless of the kind of v1 token they resume from.
+    for (auto mode : {"whenAvailable", "required"}) {
+        for (auto resumeOption : {"resumeAfter", "startAfter"}) {
+            auto v1Spec = BSON(
+                DSChangeStream::kStageName << BSON(
+                    "showEndOfTransaction"
+                    << mode << resumeOption
+                    << ResumeToken::makeHighWaterMarkToken(kDefaultTs, 1 /* version */).toBSON()));
+            ASSERT_THROWS_CODE(DSChangeStream::createFromBson(v1Spec.firstElement(), getExpCtx()),
+                               AssertionException,
+                               ErrorCodes::InvalidOptions);
+        }
+    }
+
+    // A v2 token is accepted.
+    auto v2Spec = BSON(DSChangeStream::kStageName
+                       << BSON("showEndOfTransaction"
+                               << "whenAvailable"
+                               << "resumeAfter"
+                               << ResumeToken::makeHighWaterMarkToken(kDefaultTs, 2).toBSON()));
+    ASSERT_DOES_NOT_THROW(DSChangeStream::createFromBson(v2Spec.firstElement(), getExpCtx()));
+
+    // Without showEndOfTransaction, a v1 token is still accepted.
+    auto offSpec =
+        BSON(DSChangeStream::kStageName
+             << BSON("resumeAfter" << ResumeToken::makeHighWaterMarkToken(kDefaultTs, 1).toBSON()));
+    ASSERT_DOES_NOT_THROW(DSChangeStream::createFromBson(offSpec.firstElement(), getExpCtx()));
+}
+
+TEST_F(ChangeStreamStageTest, ShowEndOfTransactionRejectsEventResumeTokenVersion1) {
+    unittest::ServerParameterGuard eotFlag("featureFlagEndOfTransactionChangeEventSynthesis", true);
+
+    // Builds an event (non high-water-mark) resume token of the given version.
+    const auto makeEventToken = [&](int version) {
+        ResumeTokenData tokenData{kDefaultTs,
+                                  version,
+                                  0 /* txnOpIndex */,
+                                  testUuid(),
+                                  Value(Document{{"operationType", DSChangeStream::kInsertOpType},
+                                                 {"documentKey", Document{{"_id", 1}}}})};
+        ASSERT_EQ(tokenData.tokenType, ResumeTokenData::kEventToken);
+        return ResumeToken(tokenData).toBSON();
+    };
+    const auto v1Token = makeEventToken(1);
+    const auto v2Token = makeEventToken(2);
+
+    for (auto resumeOption : {"resumeAfter", "startAfter"}) {
+        for (auto mode : {"whenAvailable", "required"}) {
+            // A v1 event token cannot be used with endOfTransaction events.
+            auto v1Spec = BSON(DSChangeStream::kStageName
+                               << BSON("showEndOfTransaction" << mode << resumeOption << v1Token));
+            ASSERT_THROWS_CODE(DSChangeStream::createFromBson(v1Spec.firstElement(), getExpCtx()),
+                               AssertionException,
+                               ErrorCodes::InvalidOptions);
+
+            // A v2 event token is accepted.
+            auto v2Spec = BSON(DSChangeStream::kStageName
+                               << BSON("showEndOfTransaction" << mode << resumeOption << v2Token));
+            ASSERT_DOES_NOT_THROW(
+                DSChangeStream::createFromBson(v2Spec.firstElement(), getExpCtx()));
+        }
+
+        // Without showEndOfTransaction, a v1 event token is still accepted.
+        auto offSpec = BSON(DSChangeStream::kStageName << BSON(resumeOption << v1Token));
+        ASSERT_DOES_NOT_THROW(DSChangeStream::createFromBson(offSpec.firstElement(), getExpCtx()));
+    }
+}
+
 // Tests that change stream reader version v1 is selected when the change stream is not opened on a
 // router, despite "v2" being explicitly requested.
 TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1WhenNotOnRouter) {

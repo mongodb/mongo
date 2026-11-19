@@ -237,6 +237,20 @@ ResumeTokenData initializeResumeState(const boost::intrusive_ptr<ExpressionConte
     // If the stream's default version differs from the client's token version, adopt the higher.
     // This is the token version that will be used once the stream has passed the resume token.
     const auto clientToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
+
+    // endOfTransaction events cannot be represented with a v1 resume token, so fail the stream on
+    // opening rather than silently upgrading the token version. Not validated when we are not
+    // expecting to execute queries, such as during $queryStats.
+    if (change_stream::showEndOfTransactionRequested(spec) &&
+        expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "The 'showEndOfTransaction' parameter to $changeStream requires "
+                                 "resume token version 2 or higher, but the provided resume token "
+                                 "has version "
+                              << clientToken.version,
+                clientToken.version >= 2);
+    }
+
     expCtx->setChangeStreamTokenVersion(
         std::max(expCtx->getChangeStreamTokenVersion(), clientToken.version));
 
