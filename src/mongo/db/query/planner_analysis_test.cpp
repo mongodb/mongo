@@ -353,6 +353,25 @@ TEST_F(BatchedFetchConversionTest, ReportsEligibleConsumeAllAccessPathWithEither
     }
 }
 
+TEST_F(BatchedFetchConversionTest,
+       TelemetryReportsEligibleSortedLimitAndSkipAccessPathsWithEitherFlagValue) {
+    addIndex(BSON("a" << 1));
+    for (bool enabled : {false, true}) {
+        unittest::ServerParameterGuard flag("featureFlagBatchedIndexScanFetch", enabled);
+        IncrementalFeatureRolloutContext::set(opCtx.get(),
+                                              std::make_shared<IncrementalFeatureRolloutContext>());
+        for (auto skip : {0, 1}) {
+            for (auto limit : {0, 1}) {
+                runQuerySortProjSkipLimitHint(
+                    BSON("a" << 1), BSON("b" << 1), BSONObj(), skip, limit, BSON("a" << 1));
+                ASSERT_EQ(solns.size(), 1);
+                ASSERT_EQ(eligibleAccessPaths(*solns[0]), 1);
+                check(*solns[0], enabled);
+            }
+        }
+    }
+}
+
 TEST_F(BatchedFetchConversionTest, ReportsEligibilityOnEachCandidateWithEitherFlagValue) {
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1), "a_1"sv);
@@ -391,9 +410,9 @@ TEST_F(BatchedFetchConversionTest, DoesNotReportIneligibleAccessPathsWithEitherF
         runQuerySortProjSkipLimitHint(BSON("a" << 1), BSONObj(), BSONObj(), 1, 0, BSON("a" << 1));
         check(*solns[0], false);
         ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
-        // An absorbed limit still disqualifies a top-k sort, including when there is a skip.
+        // An index-provided sort cannot restore eligibility for skip and limit.
         runQuerySortProjSkipLimitHint(
-            BSON("a" << 1), BSON("b" << 1), BSONObj(), 1, 1, BSON("a" << 1));
+            BSON("a" << 1), BSON("a" << 1), BSONObj(), 1, 1, BSON("a" << 1));
         check(*solns[0], false);
         ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
         // A blocking sort is insufficient when the index scan has a residual filter.
@@ -436,27 +455,27 @@ TEST_F(BatchedFetchConversionTest, ConsumeAllDoesNotAllowFindSkipConversion) {
     ASSERT_EQ(eligibleAccessPaths(*solns[0]), 0);
 }
 
-TEST_F(BatchedFetchConversionTest, TopKSortDoesNotConvert) {
+TEST_F(BatchedFetchConversionTest, TopKSortEnablesBatching) {
     addIndex(BSON("a" << 1));
     runQuerySortProjSkipLimitHint(BSON("a" << 1), BSON("b" << 1), BSONObj(), 0, 1, BSON("a" << 1));
     ASSERT_EQ(solns.size(), 1);
     const auto* root = solns[0]->root();
     ASSERT_EQ(root->getType(), STAGE_SORT_SIMPLE);
     ASSERT_EQ(static_cast<const SortNode*>(root)->limit, 1U);
-    check(*solns[0], false);
+    check(*solns[0], true);
 }
 
-TEST_F(BatchedFetchConversionTest, ConsumeAllDoesNotAllowTopKSortConversion) {
+TEST_F(BatchedFetchConversionTest, ConsumeAllWithTopKSortQualifies) {
     params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
     addIndex(BSON("a" << 1));
     runQuerySortProjSkipLimitHint(BSON("a" << 1), BSON("b" << 1), BSONObj(), 0, 1, BSON("a" << 1));
     ASSERT_EQ(solns.size(), 1);
     ASSERT_EQ(solns[0]->root()->getType(), STAGE_SORT_SIMPLE);
     ASSERT_EQ(static_cast<const SortNode*>(solns[0]->root())->limit, 1U);
-    check(*solns[0], false);
+    check(*solns[0], true);
 }
 
-TEST_F(BatchedFetchConversionTest, TopKDefaultSortDoesNotConvert) {
+TEST_F(BatchedFetchConversionTest, TopKDefaultSortEnablesBatching) {
     addIndex(BSON("a" << 1));
     // Needing the record id precludes the simple sort, so the planner emits a default top-k sort.
     forceRecordId = true;
@@ -465,20 +484,22 @@ TEST_F(BatchedFetchConversionTest, TopKDefaultSortDoesNotConvert) {
     const auto* sort = solns[0]->root()->getFirstNodeByType(STAGE_SORT_DEFAULT).first;
     ASSERT(sort);
     ASSERT_EQ(static_cast<const SortNode*>(sort)->limit, 1U);
-    check(*solns[0], false);
+    check(*solns[0], true);
 }
 
-TEST_F(BatchedFetchConversionTest, TopKSortWithSkipDoesNotConvert) {
+TEST_F(BatchedFetchConversionTest, TopKSortWithSkipEnablesBatching) {
     addIndex(BSON("a" << 1));
     runQuerySortProjSkipLimitHint(BSON("a" << 1), BSON("b" << 1), BSONObj(), 1, 1, BSON("a" << 1));
     ASSERT_EQ(solns.size(), 1);
-    ASSERT(solns[0]->hasNode(STAGE_SKIP));
     ASSERT_FALSE(solns[0]->hasNode(STAGE_LIMIT));
-    const auto* sort = solns[0]->root()->getFirstNodeByType(STAGE_SORT_SIMPLE).first;
-    ASSERT(sort);
+    const auto* root = solns[0]->root();
+    ASSERT_EQ(root->getType(), STAGE_SKIP);
+    ASSERT_EQ(static_cast<const SkipNode*>(root)->skip, 1);
+    const auto* sort = root->children[0].get();
+    ASSERT_EQ(sort->getType(), STAGE_SORT_SIMPLE);
     ASSERT_EQ(static_cast<const SortNode*>(sort)->limit, 2U);
-    check(*solns[0], false);
-    ASSERT_FALSE(solns[0]->eligibleForBatchedIndexScanFetch);
+    check(*solns[0], true);
+    ASSERT_TRUE(solns[0]->eligibleForBatchedIndexScanFetch);
 }
 
 TEST_F(BatchedFetchConversionTest, SkipAboveBlockingSortQualifiesWithEitherFlagValue) {
@@ -513,6 +534,34 @@ TEST_F(BatchedFetchConversionTest, SkipAboveDefaultBlockingSortQualifies) {
     ASSERT_EQ(static_cast<const SortNode*>(root->children[0].get())->limit, 0U);
     check(*solns[0], true);
     ASSERT_TRUE(solns[0]->eligibleForBatchedIndexScanFetch);
+}
+
+TEST_F(BatchedFetchConversionTest, SkipOrLimitBeforeBlockingSortPreventsBatching) {
+    addIndex(BSON("a" << 1));
+    runQueryHint(BSON("a" << 1), BSON("a" << 1));
+    // Plan the access path before enabling consume-all so each synthetic tree starts with an
+    // ordinary FETCH and an unbatched IXSCAN.
+    params.mainCollectionInfo.options |= QueryPlannerParams::CONSUME_ALL_ORDER_INSENSITIVE;
+    for (bool useLimit : {false, true}) {
+        auto fetch = solns[0]->root()->clone();
+        std::unique_ptr<QuerySolutionNode> barrier;
+        if (useLimit) {
+            barrier = std::make_unique<LimitNode>(
+                std::move(fetch), 1, LimitSkipParameterization::Disabled);
+        } else {
+            barrier = std::make_unique<SkipNode>(
+                std::move(fetch), 1, LimitSkipParameterization::Disabled);
+        }
+        auto sort = std::make_unique<SortNodeDefault>(std::move(barrier),
+                                                      BSON("b" << 1),
+                                                      0,
+                                                      LimitSkipParameterization::Disabled,
+                                                      100 * 1024 * 1024);
+        auto solution = QueryPlannerAnalysis::analyzeDataAccess(*cq, params, std::move(sort));
+        ASSERT(solution);
+        check(*solution, false);
+        ASSERT_EQ(eligibleAccessPaths(*solution), 0);
+    }
 }
 
 TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {

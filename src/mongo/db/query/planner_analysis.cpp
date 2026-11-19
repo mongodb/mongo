@@ -76,9 +76,9 @@ bool analyzeBatchedFetchEligibility(std::unique_ptr<QuerySolutionNode>& root,
                                     bool rewriteEnabled) {
     const auto type = root->getType();
     if (isSortStageType(type)) {
-        // Top-K sorts can select different tied documents if fetch reorders their input.
-        // TODO SERVER-138474 Investigate handling Top-K sort plans with batched ixscan+fetch
-        consumerIgnoresOrder = static_cast<const SortNode*>(root.get())->limit == 0;
+        // Blocking sorts, including top-k sorts, consume all input and establish their own order.
+        // Reordering input may change which tied documents are returned, but ties are unordered.
+        consumerIgnoresOrder = true;
     } else if (type != STAGE_FETCH && type != STAGE_IXSCAN && type != STAGE_SHARDING_FILTER &&
                !isProjectionStageType(type)) {
         // In particular, skip and limit make results depend on input order, while merge sorts
