@@ -38,10 +38,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // Replica set: the command runs on the primary.
 {
     const rst = new ReplSetTest({nodes: 2});
-    rst.startSet({
-        // TODO(SERVER-137710): Remove this server parameter.
-        setParameter: {fassertOnPerCollectionContinuousInternodeValidationFailure: false},
-    });
+    rst.startSet();
     rst.initiate();
 
     const primary = rst.getPrimary();
