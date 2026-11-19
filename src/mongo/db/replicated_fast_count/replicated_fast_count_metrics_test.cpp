@@ -61,6 +61,8 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
              MetricNames::kReplicatedFastCountWatermarksRecorded,
              MetricNames::kReplicatedFastCountWatermarksEvicted,
              MetricNames::kReplicatedFastCountCheckpointsSkipped,
+             MetricNames::kReplicatedFastCountValidatorCallCount,
+             MetricNames::kReplicatedFastCountValidatorTimeMsTotal,
          }) {
         EXPECT_EQ(capturer.readInt64Counter(counterName), 0);
     }
@@ -194,6 +196,16 @@ TEST(ReplicatedFastCountMetricsTest, WatermarkAwaitTimeTotalAccumulates) {
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarkAwaitTimeMsTotal),
               12);
+}
+
+TEST(ReplicatedFastCountMetricsTest, ValidatorCallMetricsAccumulate) {
+    OtelMetricsCapturer capturer;
+
+    recordValidatorCall(Milliseconds(5));
+    recordValidatorCall(Milliseconds(7));
+
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountValidatorCallCount), 2);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountValidatorTimeMsTotal), 12);
 }
 
 TEST(ReplicatedFastCountMetricsTest, FlushedDocsTotalUpdatedAfterFlushes) {

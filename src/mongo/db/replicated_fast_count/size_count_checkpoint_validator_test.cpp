@@ -804,6 +804,14 @@ TEST_F(SizeCountCheckpointValidatorRecoveryTest, MultiCheckpointBatchAdopted) {
           .delta = ReplicatedMetadataDelta{
               .metadata = {.sizeCount = CollectionSizeCount{.size = 5, .count = 0}}}}});
     expectValidatorMetrics(capturer, {.recorded = 3, .evicted = 3, .skipped = 2, .validated = 1});
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidatorCallCount),
+                  2);
+        EXPECT_GE(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountValidatorTimeMsTotal),
+                  0);
+    }
 }
 
 TEST_F(SizeCountCheckpointValidatorRecoveryTest, RepairHashSetReplacesPersistentHash) {

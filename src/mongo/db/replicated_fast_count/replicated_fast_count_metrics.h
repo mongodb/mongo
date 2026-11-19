@@ -59,6 +59,12 @@ void recordWatermarkAwaitTime(Milliseconds waitTime);
 void recordFlush(Date_t startTime, replicated_fast_count::CheckpointWriteCounts writeCounts);
 
 /**
+ * Records metrics for a call to `mergeAndValidate()`, regardless if a checkpoint was validated or
+ * not.
+ */
+void recordValidatorCall(Milliseconds duration);
+
+/**
  * Free functions for recording checkpoint oplog scan metrics. These functions are safe to call from
  * any code in the checkpoint scan path.
  */

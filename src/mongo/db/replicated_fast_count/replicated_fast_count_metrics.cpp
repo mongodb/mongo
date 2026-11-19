@@ -154,6 +154,22 @@ auto& checkpointsSkippedCounter = MetricsService::instance().createInt64Counter(
     {.serverStatusOptions = ServerStatusOptions{
          .dottedPath = "replicatedFastCount.checkpointsSkipped", .role = ClusterRole::None}});
 
+auto& validatorCallCountCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountValidatorCallCount,
+    "Total number of mergeAndValidate() calls in the replicated metadata checkpoint validator",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.validator.callCount", .role = ClusterRole::None}});
+
+auto& validatorTimeMsTotalCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountValidatorTimeMsTotal,
+    "Total elapsed milliseconds in replicated metadata checkpoint validator mergeAndValidate() "
+    "calls",
+    MetricUnit::kMilliseconds,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "replicatedFastCount.validator.validationTime.total",
+                             .role = ClusterRole::None}});
+
 // Total time the flusher spent blocked waiting for the oplog tailer to cut a batch at a
 // watermark.
 auto& watermarkAwaitTimeMsTotalCounter = MetricsService::instance().createInt64Counter(
@@ -259,6 +275,11 @@ void recordFlush(Date_t startTime, replicated_fast_count::CheckpointWriteCounts 
     flushedDocsTotalCounter.add(static_cast<int64_t>(writeCounts.entryWriteCount));
     insertCounter.add(static_cast<int64_t>(writeCounts.insertCount));
     updateCounter.add(static_cast<int64_t>(writeCounts.updateCount));
+}
+
+void recordValidatorCall(Milliseconds duration) {
+    validatorCallCountCounter.add(1);
+    validatorTimeMsTotalCounter.add(duration.count());
 }
 
 void recordAppliedOpTime(const Timestamp& ts) {

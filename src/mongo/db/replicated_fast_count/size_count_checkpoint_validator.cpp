@@ -23,6 +23,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/timer.h"
 
 #include <algorithm>
 #include <string>
@@ -454,10 +455,12 @@ SizeCountCheckpointValidator::ScopedThreadBuffer::~ScopedThreadBuffer() {
 void SizeCountCheckpointValidator::mergeAndValidate(OperationContext* opCtx,
                                                     const ValidatorBuffers& threadRecords,
                                                     UUID oplogUuid) {
+    Timer timer;
     merge(threadRecords);
 
     if (!_baseline.has_value()) {
         adoptCheckpoint(opCtx);
+        recordValidatorCall(Milliseconds(timer.millis()));
         return;
     }
 
@@ -507,6 +510,7 @@ void SizeCountCheckpointValidator::mergeAndValidate(OperationContext* opCtx,
     }
 
     _checkpoints.clear();
+    recordValidatorCall(Milliseconds(timer.millis()));
 }
 
 void SizeCountCheckpointValidator::reset() {
