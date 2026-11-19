@@ -151,4 +151,34 @@ std::unique_ptr<BulkWriteInsertCmdShape> makeBulkWriteInsertShape(OperationConte
         request.getNsInfo()[op.getNsInfoIdx()].getNs());
 }
 
+std::unique_ptr<Shape> makeBulkWriteShape(OperationContext* opCtx,
+                                          const BulkWriteCommandRequest& request,
+                                          size_t opIdx) {
+    return visit(
+        OverloadedVisitor{
+            [&](const BulkWriteInsertOp& op) -> std::unique_ptr<Shape> {
+                return std::make_unique<BulkWriteInsertCmdShape>(
+                    request.getNsInfo()[op.getNsInfoIdx()].getNs());
+            },
+            [&](const BulkWriteUpdateOp& op) -> std::unique_ptr<Shape> {
+                auto updateRequest = makeBulkWriteUpdateRequest(opCtx, request, opIdx);
+                auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, updateRequest).build();
+                auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+                    expCtx, &updateRequest, makeExtensionsCallback<ExtensionsCallbackNoop>()));
+                // The shape copies the representative BSONs, but its constructor dereferences the
+                // parsed request, so 'updateRequest' must still be alive here.
+                return std::make_unique<BulkWriteUpdateCmdShape>(parsedUpdate, expCtx);
+            },
+            [&](const BulkWriteDeleteOp& op) -> std::unique_ptr<Shape> {
+                auto deleteRequest = makeBulkWriteDeleteRequest(opCtx, request, opIdx);
+                auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, deleteRequest).build();
+                auto parsedDelete = uassertStatusOK(parsed_delete_command::parse(
+                    expCtx, &deleteRequest, makeExtensionsCallback<ExtensionsCallbackNoop>()));
+                // The shape copies the representative BSONs, but its constructor dereferences the
+                // parsed request, so 'deleteRequest' must still be alive here.
+                return std::make_unique<BulkWriteDeleteCmdShape>(parsedDelete, expCtx);
+            }},
+        request.getOps()[opIdx]);
+}
+
 }  // namespace mongo::query_shape

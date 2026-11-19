@@ -86,15 +86,9 @@ boost::optional<query_shape::DeferredQueryShape> computeAndStoreQueryShapeHash(
     }
 
     if constexpr (std::is_same_v<T, UpdateTypes>) {
-        // Skip unsupported update types, such as delta and transform.
-        auto modType = parsedRequest.getRequest()->getUpdateModification().type();
-        switch (modType) {
-            case write_ops::UpdateModification::Type::kReplacement:
-            case write_ops::UpdateModification::Type::kModifier:
-            case write_ops::UpdateModification::Type::kPipeline:
-                break;
-            default:
-                return boost::none;
+        if (!isQueryShapeSupportedUpdateType(
+                parsedRequest.getRequest()->getUpdateModification().type())) {
+            return boost::none;
         }
     }
 

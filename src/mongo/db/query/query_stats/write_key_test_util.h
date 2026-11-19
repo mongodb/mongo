@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_stats/write_key.h"
 #include "mongo/util/modules.h"
@@ -27,6 +28,15 @@ std::unique_ptr<DeleteKey> makeDeleteKey(
 std::unique_ptr<InsertKey> makeInsertKey(
     OperationContext* opCtx,
     std::string_view insertCmd,
+    query_shape::CollectionType collectionType = query_shape::CollectionType::kCollection);
+
+/**
+ * Builds the query stats key of the op at 'opIdx' of a bulkWrite command.
+ */
+std::unique_ptr<BulkWriteKey> makeBulkWriteKey(
+    OperationContext* opCtx,
+    const BulkWriteCommandRequest& request,
+    size_t opIdx,
     query_shape::CollectionType collectionType = query_shape::CollectionType::kCollection);
 
 }  // namespace mongo::query_stats

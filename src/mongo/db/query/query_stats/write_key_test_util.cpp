@@ -49,4 +49,15 @@ std::unique_ptr<InsertKey> makeInsertKey(OperationContext* opCtx,
         collectionType);
 }
 
+std::unique_ptr<BulkWriteKey> makeBulkWriteKey(OperationContext* opCtx,
+                                               const BulkWriteCommandRequest& request,
+                                               size_t opIdx,
+                                               query_shape::CollectionType collectionType) {
+    return std::make_unique<BulkWriteKey>(opCtx,
+                                          request,
+                                          opIdx,
+                                          query_shape::makeBulkWriteShape(opCtx, request, opIdx),
+                                          collectionType);
+}
+
 }  // namespace mongo::query_stats

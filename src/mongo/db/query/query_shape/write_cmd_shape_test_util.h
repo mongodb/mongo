@@ -82,4 +82,12 @@ std::unique_ptr<BulkWriteInsertCmdShape> makeBulkWriteInsertShape(OperationConte
                                                                   std::string_view bulkCmd,
                                                                   size_t opIdx = 0);
 
+/**
+ * Builds the shape of the op at 'opIdx' of an already-parsed bulkWrite command, dispatching on the
+ * op type.
+ */
+std::unique_ptr<Shape> makeBulkWriteShape(OperationContext* opCtx,
+                                          const BulkWriteCommandRequest& request,
+                                          size_t opIdx);
+
 }  // namespace mongo::query_shape

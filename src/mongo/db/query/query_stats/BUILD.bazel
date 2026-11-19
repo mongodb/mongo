@@ -76,6 +76,9 @@ mongo_cc_library(
     ],
     deps = [
         ":key",
+        "//src/mongo/db/commands/query_cmd:bulk_write_parser",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
     ],
 )
 
@@ -145,6 +148,7 @@ mongo_cc_unit_test(
     name = "db_query_query_stats_test",
     srcs = [
         "agg_key_test.cpp",
+        "bulk_write_key_test.cpp",
         "count_key_test.cpp",
         "delete_key_test.cpp",
         "distinct_key_test.cpp",
