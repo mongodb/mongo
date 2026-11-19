@@ -23,10 +23,10 @@ const conn = MongoRunner.runMongod({
 });
 const db = conn.getDB("test");
 const coll = db.getCollection("t");
+const pagesBeforeInsert = db.serverStatus().wiredTiger.cache["pages currently held in the cache"];
 
 const numDocs = 10000;
 const docs = [];
-const minBytes = 20;
 for (let i = 0; i < numDocs; ++i) {
     docs.push({_id: i, i: 0, x: "x".repeat(1000)});
 }
@@ -35,10 +35,17 @@ const insertsDone = new Date();
 
 const otelName = "mongodb.serverStatus.wiredTiger.cache.pages_currently_held_in_the_cache";
 
-const ssBytes = db.serverStatus().wiredTiger.cache["pages currently held in the cache"];
+const pagesAfterInsert = db.serverStatus().wiredTiger.cache["pages currently held in the cache"];
+jsTest.log.info("serverStatus cache pages before and after insert", {
+    before: pagesBeforeInsert,
+    after: pagesAfterInsert,
+});
 
-// Just assert that at least SOMETHING is in the cache, and the values broadly agree
-assert.gte(ssBytes, minBytes, "serverStatus cache bytes too low");
+assert.gt(
+    pagesAfterInsert,
+    pagesBeforeInsert,
+    "serverStatus cache pages did not increase after insert",
+);
 
 function withinTenPercent(a, b) {
     return Math.abs(a - b) <= 0.1 * Math.max(a, b);
@@ -46,8 +53,8 @@ function withinTenPercent(a, b) {
 awaitMetrics(
     metricsDir,
     insertsDone,
-    (m) => withinTenPercent(m[otelName]?.value ?? 0, ssBytes),
-    (m) => `${otelName}=${m[otelName]?.value} vs serverStatus=${ssBytes}`,
+    (m) => withinTenPercent(m[otelName]?.value ?? 0, pagesAfterInsert),
+    (m) => `${otelName}=${m[otelName]?.value} vs serverStatus=${pagesAfterInsert}`,
 );
 
 MongoRunner.stopMongod(conn);
