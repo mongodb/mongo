@@ -65,7 +65,13 @@ function test(st, description, testBody) {
 (() => {
     const st = new ShardingTest({
         shards: {
-            rs0: {nodes: 3},
+            // TODO: SERVER-122925 remove once we stop setting priority to 0 in the disaggregated
+            // storage suite override.
+            // The test relies on a standby taking over after the primary steps down, so make the
+            // second node electable. This is a no-op for the default (ASC) topology, but is
+            // required under the override, which defaults non-first members to priority 0 and
+            // would otherwise leave the replica set with no primary.
+            rs0: {nodes: [{}, {rsConfig: {priority: 1}}, {}]},
             rs1: {nodes: 3},
             // By default, our test infrastructure sets the election timeout to a very high value
             // (24 hours). For this test, we need a shorter election timeout because it relies on

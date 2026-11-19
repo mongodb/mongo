@@ -12,7 +12,7 @@
  * transaction.
  * 7. Attempt a step down. This step down should kill the range deleter operation and succeed.
  *
- * @tags: [uses_transactions, uses_multi_shard_transaction]
+ * @tags: [uses_transactions, uses_multi_shard_transaction, uses_prepare_transaction]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
