@@ -564,7 +564,8 @@ void DlPhdrStore::initialize() {
     }
 }
 
-MONGO_INITIALIZER(LibunwindPrefetch)(InitializerContext*) {
+MONGO_INITIALIZER(LibunwindSetup)(InitializerContext*) {
+    unw_set_caching_policy(unw_local_addr_space, UNW_CACHE_NONE);
     dlPhdrStore.initialize();
 }
 
