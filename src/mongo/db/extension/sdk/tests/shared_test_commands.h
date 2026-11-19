@@ -53,7 +53,9 @@ public:
         return _properties;
     }
 
-    BSONObj run(const BSONObj& request, const ::MongoExtensionCommandContext& ctx) const override {
+    BSONObj run(const BSONObj& request,
+                const ::MongoExtensionCommandContext& ctx,
+                const CommandExecutionContextHandle&) const override {
         BSONObjBuilder bob;
         bob.append("request", request);
         bob.appendElements(namespaceToBSON(ctx.namespaceString));

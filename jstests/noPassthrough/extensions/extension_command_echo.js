@@ -34,6 +34,65 @@ describe("testEcho extension command", function () {
         withExtensions(extensions, testEcho, ["standalone", "sharded"]);
     });
 
+    it("stops a long-running command when its maxTimeMS expires", function () {
+        // extInterruptibleEcho polls the host's interrupt check while sleeping, so the expired
+        // deadline is observed inside the extension and surfaced as the operation's
+        // MaxTimeMSExpired error.
+        withExtensions(
+            extensions,
+            (conn) => {
+                const db = conn.getDB(jsTestName());
+                const res = db.runCommand({
+                    extInterruptibleEcho: "coll",
+                    sleepMs: 60 * 1000,
+                    maxTimeMS: 100,
+                });
+                assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired, {res});
+            },
+            ["standalone", "sharded"],
+        );
+    });
+
+    it("stops a long-running command when it is killed", function () {
+        // Runs extInterruptibleEcho in a parallel shell, kills it from here, and checks that the
+        // extension observed the interrupt and failed with Interrupted.
+        withExtensions(
+            extensions,
+            (conn) => {
+                const db = conn.getDB(jsTestName());
+                const awaitEcho = startParallelShell(
+                    `const res = db.getSiblingDB(${tojson(db.getName())}).runCommand(
+                         {extInterruptibleEcho: "coll", sleepMs: 60 * 1000});
+                     assert.commandFailedWithCode(res, ErrorCodes.Interrupted);`,
+                    conn.port,
+                );
+
+                // On a sharded cluster the command runs locally on the mongos, so query local ops
+                // only; db.currentOp() would otherwise report shard operations.
+                let opId;
+                assert.soon(() => {
+                    const inprog = db
+                        .getSiblingDB("admin")
+                        .aggregate([
+                            {$currentOp: {localOps: true}},
+                            {$match: {"command.extInterruptibleEcho": {$exists: true}}},
+                        ])
+                        .toArray();
+                    if (inprog.length > 0) {
+                        opId = inprog[0].opid;
+                        return true;
+                    }
+                    return false;
+                }, "extInterruptibleEcho never appeared in currentOp");
+
+                db.killOp(opId);
+
+                assert.eq(awaitEcho(), 0, "extInterruptibleEcho was not interrupted by killOp");
+            },
+            ["standalone", "sharded"],
+        );
+    });
+
     it("is not registered when featureFlagExtensionCommands is disabled", function () {
         withExtensions(
             extensions,

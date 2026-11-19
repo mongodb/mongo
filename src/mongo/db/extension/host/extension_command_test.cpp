@@ -9,7 +9,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/extension/host/host_portal.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
+#include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/command.h"
+#include "mongo/db/extension/sdk/command_execution_context_handle.h"
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/tests/shared_test_commands.h"
 #include "mongo/db/extension/shared/handle/command/command_descriptor.h"
@@ -34,6 +36,7 @@ namespace {
 using sdk::shared_test_commands::EchoCommandDescriptor;
 
 const DatabaseName kTestDb = DatabaseName::createDatabaseName_forTest(boost::none, "testDb");
+const BSONObj kNoPrivileges = BSON("requiredPrivileges" << BSONArray());
 
 /**
  * Returns the reply that EchoCommandDescriptor gives, without the echoed 'request', for a command
@@ -89,6 +92,36 @@ public:
     NamespaceString lastNss;
 };
 
+/**
+ * Reports the command execution context: whether the operation is interrupted and its deadline.
+ * A non-OK interrupt status is surfaced as the operation's error.
+ */
+class ExecCtxCommandDescriptor : public sdk::CommandDescriptor {
+public:
+    ExecCtxCommandDescriptor(std::string name, BSONObj properties)
+        : CommandDescriptor(std::move(name)), _properties(properties.getOwned()) {}
+
+    BSONObj getProperties() const override {
+        return _properties;
+    }
+
+    BSONObj run(const BSONObj&,
+                const ::MongoExtensionCommandContext&,
+                const sdk::CommandExecutionContextHandle& execCtx) const override {
+        auto interrupted = execCtx->checkForInterrupt();
+        if (interrupted.getCode() != MONGO_EXTENSION_STATUS_OK) {
+            sdk_uasserted(interrupted.getCode(), std::string(interrupted.getReason()));
+        }
+        BSONObjBuilder bob;
+        bob.append("interrupted", false);
+        bob.append("deadline", execCtx->getDeadlineTimestampMs());
+        return bob.obj();
+    }
+
+private:
+    const BSONObj _properties;
+};
+
 class ExtensionCommandTest : public ServiceContextTest {
 public:
     static constexpr CapabilityVersion kCapabilityVersion = CapabilityVersion::latestCapability();
@@ -136,6 +169,20 @@ public:
             CommandDescriptorHandle(descriptor.get(), kCapabilityVersion));
     }
 
+    /**
+     * Registers an ExecCtxCommandDescriptor through the same path the host portal uses.
+     */
+    void registerExecCtxCommand(std::string name, BSONObj properties = kNoPrivileges) {
+        static StaticImmortal<std::vector<std::unique_ptr<sdk::ExtensionCommandDescriptorAdapter>>>
+            descriptors;
+        auto& descriptor =
+            descriptors->emplace_back(std::make_unique<sdk::ExtensionCommandDescriptorAdapter>(
+                std::make_unique<ExecCtxCommandDescriptor>(std::move(name),
+                                                           std::move(properties))));
+        ExtensionCommand::registerCommand(
+            CommandDescriptorHandle(descriptor.get(), CapabilityVersion::latestCapability()));
+    }
+
     ExtensionCommand* findCommand(std::string_view name) {
         return dynamic_cast<ExtensionCommand*>(
             getCommandRegistry(ClusterRole::ShardServer)->findCommand(name));
@@ -146,6 +193,32 @@ private:
     unittest::ServerParameterGuard _featureFlagExtensionCommands{"featureFlagExtensionCommands",
                                                                  true};
 };
+
+TEST_F(ExtensionCommandTest, RunPassesExecutionContextBackedByOperationContext) {
+    registerExecCtxCommand("testExtExecCtx");
+    auto* cmd = findCommand("testExtExecCtx");
+    auto opCtx = makeOperationContext();
+    ASSERT_TRUE(cmd);
+
+    BSONObjBuilder result;
+    ASSERT_TRUE(cmd->run(opCtx.get(), kTestDb, BSON("testExtExecCtx" << 1), result));
+    ASSERT_BSONOBJ_EQ(result.obj(),
+                      BSON("interrupted" << false << "deadline" << opCtx->getDeadline().asInt64()));
+}
+
+TEST_F(ExtensionCommandTest, RunSeesInterruptFromOperationContext) {
+    registerExecCtxCommand("testExtExecCtxKilled");
+    auto* cmd = findCommand("testExtExecCtxKilled");
+    auto opCtx = makeOperationContext();
+    ASSERT_TRUE(cmd);
+
+    opCtx->markKilled(ErrorCodes::Interrupted);
+
+    BSONObjBuilder result;
+    ASSERT_THROWS_CODE(cmd->run(opCtx.get(), kTestDb, BSON("testExtExecCtxKilled" << 1), result),
+                       DBException,
+                       ErrorCodes::Interrupted);
+}
 
 TEST_F(ExtensionCommandTest, PropertiesMapToCommandOverrides) {
     registerCommand("testExtProperties",

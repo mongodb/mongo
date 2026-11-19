@@ -6,6 +6,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/database_name_util.h"
+#include "mongo/db/extension/host/command_execution_context.h"
 #include "mongo/db/extension/host/extension_host_utils.h"
 #include "mongo/db/extension/host_connector/adapter/resolved_namespace_adapter.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
@@ -222,7 +223,9 @@ bool ExtensionCommand::run(OperationContext* opCtx,
                 .collectionName = stringViewAsByteView(sourceNss.coll()),
             },
     };
-    _descriptor->run(cmdObj, ctx, result);
+    host_connector::CommandExecutionContextAdapter execCtx(
+        std::make_unique<CommandExecutionContext>(opCtx));
+    _descriptor->run(cmdObj, ctx, execCtx, result);
 
     const auto reply = result.asTempObj();
     for (auto field : kReservedReplyFields) {

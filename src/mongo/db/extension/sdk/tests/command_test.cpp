@@ -17,6 +17,7 @@
 #include "mongo/db/extension/shared/handle/command/command_descriptor.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -25,6 +26,47 @@ namespace mongo::extension::sdk {
 namespace {
 
 using shared_test_commands::EchoCommandDescriptor;
+
+/**
+ * A minimal command execution context implemented directly against the C API, used to exercise the
+ * SDK handle. checkForInterrupt() reports a fixed code and the deadline is a fixed value.
+ */
+struct TestCommandExecutionContext final : public ::MongoExtensionCommandExecutionContext {
+    TestCommandExecutionContext(int32_t interruptCode = MONGO_EXTENSION_STATUS_OK,
+                                int64_t deadlineMs = std::numeric_limits<int64_t>::max())
+        : ::MongoExtensionCommandExecutionContext{&VTABLE},
+          interruptCode(interruptCode),
+          deadlineMs(deadlineMs) {}
+
+    static ::MongoExtensionStatus* _extCheckForInterrupt(
+        const ::MongoExtensionCommandExecutionContext* ctx,
+        ::MongoExtensionStatus* opStatus) noexcept {
+        const auto* self = static_cast<const TestCommandExecutionContext*>(ctx);
+        if (self->interruptCode != MONGO_EXTENSION_STATUS_OK) {
+            auto statusAPI = StatusAPI(opStatus);
+            statusAPI.setCode(self->interruptCode);
+            statusAPI.setReason("interrupted");
+        }
+        return &ExtensionStatusOK::getInstance();
+    }
+
+    static ::MongoExtensionStatus* _extGetDeadlineTimestampMs(
+        const ::MongoExtensionCommandExecutionContext* ctx, int64_t* deadlineTimestampMs) noexcept {
+        *deadlineTimestampMs = static_cast<const TestCommandExecutionContext*>(ctx)->deadlineMs;
+        return &ExtensionStatusOK::getInstance();
+    }
+
+    static constexpr ::MongoExtensionCommandExecutionContextVTable VTABLE = {
+        .check_for_interrupt = &_extCheckForInterrupt,
+        .get_deadline_timestamp_ms = &_extGetDeadlineTimestampMs,
+    };
+
+    int32_t interruptCode;
+    int64_t deadlineMs;
+};
+
+// A never-interrupted execution context with no deadline, used by tests that do not care about it.
+TestCommandExecutionContext kNoopExecCtx;
 
 /**
  * Throws from both getProperties() and run().
@@ -38,7 +80,9 @@ public:
         return {};
     }
 
-    BSONObj run(const BSONObj&, const ::MongoExtensionCommandContext&) const override {
+    BSONObj run(const BSONObj&,
+                const ::MongoExtensionCommandContext&,
+                const CommandExecutionContextHandle&) const override {
         sdk_uasserted(13729903, "run failed");
         return {};
     }
@@ -92,6 +136,7 @@ struct CountingCommandDescriptor : public ::MongoExtensionCommandDescriptor {
     static ::MongoExtensionStatus* _extRun(const ::MongoExtensionCommandDescriptor*,
                                            ::MongoExtensionByteView,
                                            const ::MongoExtensionCommandContext*,
+                                           const ::MongoExtensionCommandExecutionContext*,
                                            ::MongoExtensionByteBuf** responseBson) noexcept {
         *responseBson = new CountingByteBuf(BSON("ok" << 1));
         return &ExtensionStatusOK::getInstance();
@@ -124,6 +169,32 @@ TEST_F(CommandDescriptorTest, HandleRequiresCapability11) {
     ASSERT_TRUE(VTableAPI<::MongoExtensionCommandDescriptor>::isSupported(CapabilityVersion(1, 1)));
 }
 
+TEST_F(CommandDescriptorTest, ExecutionContextHandleRequiresCapability11) {
+    ASSERT_FALSE(VTableAPI<::MongoExtensionCommandExecutionContext>::isSupported(
+        CapabilityVersion::legacyCapability()));
+    ASSERT_TRUE(
+        VTableAPI<::MongoExtensionCommandExecutionContext>::isSupported(CapabilityVersion(1, 1)));
+}
+
+TEST_F(CommandDescriptorTest, ExecutionContextHandleRoundTrips) {
+    TestCommandExecutionContext execCtx(/*interruptCode=*/11601, /*deadlineMs=*/12345);
+    CommandExecutionContextHandle handle{&execCtx, CapabilityVersion::latestCapability()};
+
+    ASSERT_EQ(handle->getDeadlineTimestampMs(), 12345);
+
+    auto status = handle->checkForInterrupt();
+    ASSERT_EQ(status.getCode(), 11601);
+    ASSERT_EQ(status.getReason(), "interrupted");
+}
+
+TEST_F(CommandDescriptorTest, ExecutionContextHandleReportsOkWhenNotInterrupted) {
+    TestCommandExecutionContext execCtx;
+    CommandExecutionContextHandle handle{&execCtx, CapabilityVersion::latestCapability()};
+
+    ASSERT_EQ(handle->getDeadlineTimestampMs(), std::numeric_limits<int64_t>::max());
+    ASSERT_EQ(handle->checkForInterrupt().getCode(), MONGO_EXTENSION_STATUS_OK);
+}
+
 TEST_F(CommandDescriptorTest, GetNameRoundTrips) {
     auto adapter = makeAdapter<EchoCommandDescriptor>();
     CommandDescriptorHandle handle{adapter.get(), CapabilityVersion::latestCapability()};
@@ -150,7 +221,7 @@ TEST_F(CommandDescriptorTest, RunRoundTripsRequestAndContext) {
     const ::MongoExtensionCommandContext ctx{.namespaceString = nss, .sourceNamespaceString = nss};
 
     BSONObjBuilder result;
-    handle->run(request, ctx, result);
+    handle->run(request, ctx, kNoopExecCtx, result);
 
     const auto nssBson = shared_test_commands::namespaceToBSON(nss);
     ASSERT_BSONOBJ_EQ(result.obj(),
@@ -186,7 +257,7 @@ TEST_F(CommandDescriptorTest, RunPassesResolvedContextToExtension) {
 
     const auto request = BSON("testEcho" << "view");
     BSONObjBuilder result;
-    handle->run(request, ctx, result);
+    handle->run(request, ctx, kNoopExecCtx, result);
 
     const auto viewBson = shared_test_commands::namespaceToBSON(viewNss);
     ASSERT_BSONOBJ_EQ(
@@ -213,7 +284,7 @@ TEST_F(CommandDescriptorTest, RunAppendsToExistingResult) {
 
     BSONObjBuilder result;
     result.append("existing", true);
-    handle->run(request, ctx, result);
+    handle->run(request, ctx, kNoopExecCtx, result);
 
     ASSERT_BSONOBJ_EQ(result.obj(),
                       BSON("existing" << true << "request" << request << "db"
@@ -247,14 +318,15 @@ TEST_F(CommandDescriptorTest, RunExceptionIsReturnedAsStatus) {
                             .collectionName = stringViewAsByteView("coll")}};
 
     ::MongoExtensionByteBuf* buf{nullptr};
-    StatusHandle status(adapter->vtable->run(adapter.get(), objAsByteView(request), &ctx, &buf));
+    StatusHandle status(
+        adapter->vtable->run(adapter.get(), objAsByteView(request), &ctx, &kNoopExecCtx, &buf));
     ASSERT_EQ(status->getCode(), 13729903);
     ASSERT_EQ(buf, nullptr);
 
     CommandDescriptorHandle handle{adapter.get(), CapabilityVersion::latestCapability()};
     BSONObjBuilder result;
     result.append("existing", true);
-    ASSERT_THROWS_CODE(handle->run(request, ctx, result), DBException, 13729903);
+    ASSERT_THROWS_CODE(handle->run(request, ctx, kNoopExecCtx, result), DBException, 13729903);
 
     // Nothing from the failed run is appended to the result.
     ASSERT_BSONOBJ_EQ(result.obj(), BSON("existing" << true));
@@ -274,7 +346,7 @@ TEST_F(CommandDescriptorTest, HandleTakesOwnershipOfReturnedBuffers) {
     const ::MongoExtensionCommandContext ctx{
         .namespaceString = {.databaseName = stringViewAsByteView("testDb"),
                             .collectionName = stringViewAsByteView("coll")}};
-    handle->run(BSON("testCounting" << 1), ctx, result);
+    handle->run(BSON("testCounting" << 1), ctx, kNoopExecCtx, result);
     ASSERT_EQ(CountingByteBuf::destroyed, 2);
     ASSERT_BSONOBJ_EQ(result.obj(), BSON("ok" << 1));
 }

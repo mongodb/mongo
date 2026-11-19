@@ -48,13 +48,14 @@ public:
     BSONObj getProperties() const;
 
     /**
-     * Runs the command with the given request and context, appending the extension's response to
-     * 'result'.
+     * Runs the command with the given request, context, and execution context, appending the
+     * extension's response to 'result'.
      *
      * On failure, the error triggers an assertion and nothing is appended to 'result'.
      */
     void run(const BSONObj& requestBson,
              const ::MongoExtensionCommandContext& ctx,
+             const ::MongoExtensionCommandExecutionContext& execCtx,
              BSONObjBuilder& result) const;
 
     static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {

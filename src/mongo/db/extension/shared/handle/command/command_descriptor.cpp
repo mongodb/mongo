@@ -24,11 +24,12 @@ BSONObj CommandDescriptorAPI::getProperties() const {
 
 void CommandDescriptorAPI::run(const BSONObj& requestBson,
                                const ::MongoExtensionCommandContext& ctx,
+                               const ::MongoExtensionCommandExecutionContext& execCtx,
                                BSONObjBuilder& result) const {
     ::MongoExtensionByteBuf* buf{nullptr};
 
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().run(get(), objAsByteView(requestBson), &ctx, &buf); });
+        [&]() { return _vtable().run(get(), objAsByteView(requestBson), &ctx, &execCtx, &buf); });
 
     tassert(ErrorCodes::ExtensionSerializationError,
             "buffer returned from run must not be null",

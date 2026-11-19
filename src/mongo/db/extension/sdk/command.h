@@ -5,6 +5,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/assert_util.h"
+#include "mongo/db/extension/sdk/command_execution_context_handle.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
@@ -38,13 +39,15 @@ public:
     virtual BSONObj getProperties() const = 0;
 
     /**
-     * Executes the command. 'requestBson' contains the full command request and 'ctx' provides
-     * the per-invocation command context, which is only valid for the duration of this call.
+     * Executes the command. 'requestBson' contains the full command request, 'ctx' provides the
+     * per-invocation command context, and 'execCtx' exposes host services (interrupt checks,
+     * deadline) that are valid only for the duration of this call.
      *
      * Returns the command response as a BSON document.
      */
     virtual BSONObj run(const BSONObj& requestBson,
-                        const ::MongoExtensionCommandContext& ctx) const = 0;
+                        const ::MongoExtensionCommandContext& ctx,
+                        const CommandExecutionContextHandle& execCtx) const = 0;
 
 protected:
     CommandDescriptor(std::string name) : _name(std::move(name)) {}
@@ -103,13 +106,19 @@ private:
     static ::MongoExtensionStatus* _extRun(const ::MongoExtensionCommandDescriptor* descriptor,
                                            ::MongoExtensionByteView requestBson,
                                            const ::MongoExtensionCommandContext* ctx,
+                                           const ::MongoExtensionCommandExecutionContext* execCtx,
                                            ::MongoExtensionByteBuf** responseBson) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             *responseBson = nullptr;
             sdk_tassert(13729901, "Command context was null", ctx != nullptr);
+            sdk_tassert(13729703, "Command execution context was null", execCtx != nullptr);
             const auto& impl =
                 static_cast<const ExtensionCommandDescriptorAdapter*>(descriptor)->getImpl();
-            *responseBson = new ByteBuf(impl.run(bsonObjFromByteView(requestBson), *ctx));
+            // The negotiated capability is at least 1.1 here, since commands only exist from 1.1.
+            *responseBson = new ByteBuf(
+                impl.run(bsonObjFromByteView(requestBson),
+                         *ctx,
+                         CommandExecutionContextHandle(execCtx, CapabilityVersion(1, 1))));
         });
     }
 

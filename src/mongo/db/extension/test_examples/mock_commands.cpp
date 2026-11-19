@@ -4,12 +4,16 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/public/extension_command_static_properties_gen.h"
+#include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/command.h"
+#include "mongo/db/extension/sdk/command_execution_context_handle.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/tests/shared_test_commands.h"
 
+#include <chrono>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 namespace sdk = mongo::extension::sdk;
@@ -51,7 +55,8 @@ public:
     }
 
     mongo::BSONObj run(const mongo::BSONObj&,
-                       const ::MongoExtensionCommandContext&) const override {
+                       const ::MongoExtensionCommandContext&,
+                       const sdk::CommandExecutionContextHandle&) const override {
         return mongo::BSONObj();
     }
 
@@ -79,12 +84,46 @@ public:
                                         /*requiresDatabasePrivilege=*/true) {}
 };
 
+/**
+ * Echoes like 'testEcho', but first sleeps for the request's 'sleepMs' while polling the host's
+ * interrupt check. Tests use it to verify that a running extension command observes killOp and
+ * maxTimeMS expiry and surfaces the resulting error to the client.
+ */
+class InterruptibleEchoCommandDescriptor : public sdk::shared_test_commands::EchoCommandDescriptor {
+public:
+    static constexpr const char* kCommandName = "extInterruptibleEcho";
+
+    InterruptibleEchoCommandDescriptor() : EchoCommandDescriptor(kCommandName) {}
+
+    mongo::BSONObj run(const mongo::BSONObj& request,
+                       const ::MongoExtensionCommandContext& ctx,
+                       const sdk::CommandExecutionContextHandle& execCtx) const override {
+        if (auto sleepMs = request["sleepMs"]; sleepMs.isNumber()) {
+            _sleepWhilePolling(execCtx, sleepMs.numberLong());
+        }
+        return EchoCommandDescriptor::run(request, ctx, execCtx);
+    }
+
+private:
+    static void _sleepWhilePolling(const sdk::CommandExecutionContextHandle& execCtx,
+                                   long long sleepMs) {
+        const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(sleepMs);
+        while (std::chrono::steady_clock::now() < end) {
+            auto status = execCtx->checkForInterrupt();
+            if (status.getCode() != MONGO_EXTENSION_STATUS_OK) {
+                sdk_uasserted(status.getCode(), std::string(status.getReason()));
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+    }
+};
 }  // namespace
 
 class MockCommandsExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) override {
         _registerCommand<sdk::shared_test_commands::EchoCommandDescriptor>(portal);
+        _registerCommand<InterruptibleEchoCommandDescriptor>(portal);
         _registerCommand<RequiresFindOnNamespaceCommandDescriptor>(portal);
         _registerCommand<RequiresFindOnDatabaseCommandDescriptor>(portal);
     }

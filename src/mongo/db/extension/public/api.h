@@ -1263,6 +1263,37 @@ typedef struct MongoExtensionCommandContext {
 } MongoExtensionCommandContext;
 
 /**
+ * MongoExtensionCommandExecutionContext exposes host services that an extension command may call
+ * while its run() executes. It is owned by the host and is only valid for the duration of the
+ * run() call it was passed to.
+ *
+ * On the host side, this is backed by the command's OperationContext. An extension command that
+ * blocks on external work should poll check_for_interrupt() (or bound its wait by
+ * get_deadline_timestamp_ms()) so that killOp, maxTimeMS expiry, and shutdown can end the command.
+ */
+typedef struct MongoExtensionCommandExecutionContext {
+    const struct MongoExtensionCommandExecutionContextVTable* const vtable;
+} MongoExtensionCommandExecutionContext;
+
+typedef struct MongoExtensionCommandExecutionContextVTable {
+    /**
+     * Checks whether the command's operation has been interrupted (e.g. killOp, maxTimeMS expiry,
+     * or shutdown) and populates 'opStatus' with the resulting code/reason. Populates opStatus with
+     * MONGO_EXTENSION_STATUS_OK unless the operation is in a killed state. 'opStatus' is owned by
+     * the extension and ownership is NOT transferred to the host.
+     */
+    MongoExtensionStatus* (*check_for_interrupt)(const MongoExtensionCommandExecutionContext* ctx,
+                                                 MongoExtensionStatus* opStatus);
+
+    /**
+     * Returns the operation's deadline as a UNIX timestamp in milliseconds. If the operation has
+     * no deadline, returns the maximum representable int64_t value.
+     */
+    MongoExtensionStatus* (*get_deadline_timestamp_ms)(
+        const MongoExtensionCommandExecutionContext* ctx, int64_t* deadlineTimestampMs);
+} MongoExtensionCommandExecutionContextVTable;
+
+/**
  * A CommandDescriptor describes a server command provided by an extension, and runs it on behalf
  * of the host. Ownership of these objects remains with the extension.
  */
@@ -1287,13 +1318,14 @@ typedef struct MongoExtensionCommandDescriptorVTable {
     /**
      * Run the command with the user-provided command request as input.
      *
-     * requestBson contains the full command request as a BSON document. In case of success,
-     * `responseBson` is populated with the command response as a BSON document and owned by the
-     * caller.
+     * requestBson contains the full command request as a BSON document. ctx and execCtx are
+     * host-owned and valid only for the duration of this call. In case of success, `responseBson`
+     * is populated with the command response as a BSON document and owned by the caller.
      */
     MongoExtensionStatus* (*run)(const MongoExtensionCommandDescriptor* descriptor,
                                  MongoExtensionByteView requestBson,
                                  const MongoExtensionCommandContext* ctx,
+                                 const MongoExtensionCommandExecutionContext* execCtx,
                                  MongoExtensionByteBuf** responseBson);
 } MongoExtensionCommandDescriptorVTable;
 
