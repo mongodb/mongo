@@ -7,13 +7,21 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/database_name_util.h"
 #include "mongo/db/extension/host/extension_host_utils.h"
+#include "mongo/db/extension/host_connector/adapter/resolved_namespace_adapter.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/search/search_index_process_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #include <array>
+#include <memory>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <fmt/format.h>
@@ -42,6 +50,39 @@ ClusterRole toClusterRole(MongoExtensionCommandClusterRoleEnum role) {
  */
 constexpr std::array kReservedReplyFields{
     "ok", "errmsg", "code", "codeName", "$clusterTime", "operationTime", "writeConcernError"};
+
+/**
+ * Resolves the target of an extension command to the UUID and view metadata of the collection that
+ * 'nss' names, where a view resolves to its source collection's UUID and the view's pipeline.
+ * Returns both as boost::none when the command names no collection or the target does not exist,
+ * since the extension decides what a missing target means. Any other failure, (e.g. a
+ * timeseries target), throws with the command name added to the error context.
+ */
+std::pair<boost::optional<UUID>, boost::optional<ResolvedNamespace>> resolveTargetNamespace(
+    OperationContext* opCtx, const NamespaceString& nss, std::string_view cmdName) {
+    // Command doesn't name a collection, so there's nothing to resolve.
+    if (nss.coll().empty()) {
+        return {};
+    }
+    try {
+        // TODO SPM-4543: This uses the lookup that the built-in search index commands use, which
+        // is registered for the shard and router services. Move it out of the search code before
+        // those commands are removed.
+        auto [uuid, resolvedNamespace] =
+            SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveView(
+                opCtx, nss, /*failOnTsColl=*/true);
+        return {std::move(uuid), std::move(resolvedNamespace)};
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // A router throws this when the target's database doesn't exist, whereas a shard returns
+        // no UUID. Treat both as a missing target, which the extension decides how to handle.
+        return {};
+    } catch (DBException& ex) {
+        ex.addContext(str::stream()
+                      << "Failed to resolve the target namespace " << nss.toStringForErrorMsg()
+                      << " of extension command '" << cmdName << "'");
+        throw;
+    }
+}
 
 }  // namespace
 
@@ -153,15 +194,32 @@ bool ExtensionCommand::run(OperationContext* opCtx,
                            const BSONObj& cmdObj,
                            BSONObjBuilder& result) {
     const auto nss = parseNs(dbName, cmdObj);
+    const auto [uuid, view] = resolveTargetNamespace(opCtx, nss, getName());
+    const auto& sourceNss = view ? view->getResolvedNamespace() : nss;
+
     const auto dbNameStr =
         DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
+    const auto uuidStr = uuid ? uuid->toString() : std::string{};
 
-    // TODO SERVER-137298: Pass the resolved collection UUID and view.
+    std::unique_ptr<host_connector::ResolvedNamespaceAdapter> viewAdapter;
+    if (view) {
+        viewAdapter = std::unique_ptr<host_connector::ResolvedNamespaceAdapter>(
+            new host_connector::ResolvedNamespaceAdapter(
+                host_connector::ResolvedNamespaceAdapter::fromResolvedNamespace(*view)));
+    }
+
     const ::MongoExtensionCommandContext ctx{
         .namespaceString =
             {
                 .databaseName = stringViewAsByteView(dbNameStr),
                 .collectionName = stringViewAsByteView(nss.coll()),
+            },
+        .uuidString = stringViewAsByteView(uuidStr),
+        .resolvedNamespace = viewAdapter ? &viewAdapter->getAsBoundaryType() : nullptr,
+        .sourceNamespaceString =
+            {
+                .databaseName = stringViewAsByteView(dbNameStr),
+                .collectionName = stringViewAsByteView(sourceNss.coll()),
             },
     };
     _descriptor->run(cmdObj, ctx, result);

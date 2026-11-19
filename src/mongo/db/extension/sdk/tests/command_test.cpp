@@ -145,18 +145,59 @@ TEST_F(CommandDescriptorTest, RunRoundTripsRequestAndContext) {
     CommandDescriptorHandle handle{adapter.get(), CapabilityVersion::latestCapability()};
 
     const auto request = BSON("testEcho" << "coll" << "payload" << BSON("a" << 1));
-    const ::MongoExtensionCommandContext ctx{
-        .namespaceString = {.databaseName = stringViewAsByteView("testDb"),
-                            .collectionName = stringViewAsByteView("coll")}};
+    const ::MongoExtensionNamespaceString nss{.databaseName = stringViewAsByteView("testDb"),
+                                              .collectionName = stringViewAsByteView("coll")};
+    const ::MongoExtensionCommandContext ctx{.namespaceString = nss, .sourceNamespaceString = nss};
 
     BSONObjBuilder result;
     handle->run(request, ctx, result);
 
+    const auto nssBson = shared_test_commands::namespaceToBSON(nss);
     ASSERT_BSONOBJ_EQ(result.obj(),
-                      BSON("request" << request << "db"
-                                     << "testDb"
-                                     << "coll"
-                                     << "coll"));
+                      BSONObjBuilder()
+                          .append("request", request)
+                          .appendElements(nssBson)
+                          .append("uuid", "")
+                          .append("source", nssBson)
+                          .obj());
+}
+
+TEST_F(CommandDescriptorTest, RunPassesResolvedContextToExtension) {
+    auto adapter = makeAdapter<EchoCommandDescriptor>();
+    CommandDescriptorHandle handle{adapter.get(), CapabilityVersion::latestCapability()};
+
+    const auto stage = BSON("$match" << BSON("a" << 1));
+    const ::MongoExtensionByteView viewPipeline[] = {objAsByteView(stage)};
+    const ::MongoExtensionNamespaceString viewNss{.databaseName = stringViewAsByteView("testDb"),
+                                                  .collectionName = stringViewAsByteView("view")};
+    const ::MongoExtensionNamespaceString sourceNss{.databaseName = stringViewAsByteView("testDb"),
+                                                    .collectionName = stringViewAsByteView("coll")};
+    const ::MongoExtensionResolvedNamespace view{
+        .viewNamespace = viewNss,
+        .viewPipelineLen = 1,
+        .viewPipeline = viewPipeline,
+    };
+    const ::MongoExtensionCommandContext ctx{
+        .namespaceString = viewNss,
+        .uuidString = stringViewAsByteView("some-uuid"),
+        .resolvedNamespace = &view,
+        .sourceNamespaceString = sourceNss,
+    };
+
+    const auto request = BSON("testEcho" << "view");
+    BSONObjBuilder result;
+    handle->run(request, ctx, result);
+
+    const auto viewBson = shared_test_commands::namespaceToBSON(viewNss);
+    ASSERT_BSONOBJ_EQ(
+        result.obj(),
+        BSONObjBuilder()
+            .append("request", request)
+            .appendElements(viewBson)
+            .append("uuid", "some-uuid")
+            .append("source", shared_test_commands::namespaceToBSON(sourceNss))
+            .append("view", BSON("namespace" << viewBson << "pipeline" << BSON_ARRAY(stage)))
+            .obj());
 }
 
 TEST_F(CommandDescriptorTest, RunAppendsToExistingResult) {
@@ -166,7 +207,9 @@ TEST_F(CommandDescriptorTest, RunAppendsToExistingResult) {
     const auto request = BSON("testEcho" << 1);
     const ::MongoExtensionCommandContext ctx{
         .namespaceString = {.databaseName = stringViewAsByteView("testDb"),
-                            .collectionName = stringViewAsByteView("")}};
+                            .collectionName = stringViewAsByteView("")},
+        .sourceNamespaceString = {.databaseName = stringViewAsByteView("testDb"),
+                                  .collectionName = stringViewAsByteView("")}};
 
     BSONObjBuilder result;
     result.append("existing", true);
@@ -176,7 +219,10 @@ TEST_F(CommandDescriptorTest, RunAppendsToExistingResult) {
                       BSON("existing" << true << "request" << request << "db"
                                       << "testDb"
                                       << "coll"
-                                      << ""));
+                                      << ""
+                                      << "uuid"
+                                      << ""
+                                      << "source" << BSON("db" << "testDb" << "coll" << "")));
 }
 
 TEST_F(CommandDescriptorTest, GetPropertiesExceptionIsReturnedAsStatus) {

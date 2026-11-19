@@ -13,14 +13,19 @@
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/tests/shared_test_commands.h"
 #include "mongo/db/extension/shared/handle/command/command_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
+#include "mongo/db/query/search/search_index_process_interface.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/uuid.h"
 
 #include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace mongo::extension::host {
@@ -30,6 +35,60 @@ using sdk::shared_test_commands::EchoCommandDescriptor;
 
 const DatabaseName kTestDb = DatabaseName::createDatabaseName_forTest(boost::none, "testDb");
 
+/**
+ * Returns the reply that EchoCommandDescriptor gives, without the echoed 'request', for a command
+ * on 'coll' in kTestDb that resolves to 'uuid' and 'sourceColl', followed by 'view' if it is not
+ * empty.
+ */
+BSONObj expectedEchoContext(std::string_view coll,
+                            std::string_view uuid,
+                            std::string_view sourceColl,
+                            const BSONObj& view = BSONObj()) {
+    BSONObjBuilder bob;
+    bob.append("db", kTestDb.toString_forTest());
+    bob.append("coll", coll);
+    bob.append("uuid", uuid);
+    bob.append("source", BSON("db" << kTestDb.toString_forTest() << "coll" << sourceColl));
+    if (!view.isEmpty()) {
+        bob.append("view", view);
+    }
+    return bob.obj();
+}
+
+/**
+ * Returns the 'view' field that EchoCommandDescriptor gives for a view named 'viewName' in kTestDb
+ * with the given pipeline.
+ */
+BSONObj expectedView(std::string_view viewName, const BSONArray& pipeline) {
+    return BSON("namespace" << BSON("db" << kTestDb.toString_forTest() << "coll" << viewName)
+                            << "pipeline" << pipeline);
+}
+
+/**
+ * Stands in for the shard or router catalog lookup that the host uses to resolve a command's
+ * target. Returns the configured UUID and view, or throws the configured error.
+ */
+class MockSearchIndexProcessInterface final : public SearchIndexProcessInterface {
+public:
+    std::pair<boost::optional<UUID>, boost::optional<ResolvedNamespace>>
+    fetchCollectionUUIDAndResolveView(OperationContext*,
+                                      const NamespaceString& nss,
+                                      bool failOnTsColl) override {
+        ++calls;
+        lastNss = nss;
+        // The host must always ask the lookup to reject timeseries targets.
+        ASSERT_TRUE(failOnTsColl);
+        uassertStatusOK(error);
+        return {uuid, view};
+    }
+
+    boost::optional<UUID> uuid;
+    boost::optional<ResolvedNamespace> view;
+    Status error = Status::OK();
+    int calls = 0;
+    NamespaceString lastNss;
+};
+
 class ExtensionCommandTest : public ServiceContextTest {
 public:
     static constexpr CapabilityVersion kCapabilityVersion = CapabilityVersion::latestCapability();
@@ -38,6 +97,26 @@ public:
         ServiceContextTest::setUp();
         sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get(),
                                               kCapabilityVersion);
+        auto resolver = std::make_unique<MockSearchIndexProcessInterface>();
+        _resolver = resolver.get();
+        SearchIndexProcessInterface::set(getServiceContext()->getService(), std::move(resolver));
+    }
+
+    MockSearchIndexProcessInterface& resolver() {
+        return *_resolver;
+    }
+
+    /**
+     * Runs 'commandName' against 'coll' in kTestDb, and returns the reply without the echoed
+     * 'request'.
+     */
+    BSONObj runCommandAgainstCollection(std::string_view commandName, std::string_view coll) {
+        auto* cmd = findCommand(commandName);
+        ASSERT_TRUE(cmd);
+        auto opCtx = makeOperationContext();
+        BSONObjBuilder result;
+        ASSERT_TRUE(cmd->run(opCtx.get(), kTestDb, BSON(commandName << coll), result));
+        return result.obj().removeField("request");
     }
 
     /**
@@ -63,6 +142,7 @@ public:
     }
 
 private:
+    MockSearchIndexProcessInterface* _resolver = nullptr;
     unittest::ServerParameterGuard _featureFlagExtensionCommands{"featureFlagExtensionCommands",
                                                                  true};
 };
@@ -99,7 +179,94 @@ TEST_F(ExtensionCommandTest, RunPassesNamespaceToExtension) {
                       BSON("request" << request << "db"
                                      << "testDb"
                                      << "coll"
-                                     << "coll"));
+                                     << "coll"
+                                     << "uuid"
+                                     << ""
+                                     << "source" << BSON("db" << "testDb" << "coll" << "coll")));
+}
+
+TEST_F(ExtensionCommandTest, RunPassesMissingCollectionAsEmptyUuid) {
+    registerCommand("testExtMissing");
+
+    ASSERT_BSONOBJ_EQ(runCommandAgainstCollection("testExtMissing", "coll"),
+                      expectedEchoContext("coll", "", "coll"));
+    ASSERT_EQ(resolver().calls, 1);
+    ASSERT_EQ(resolver().lastNss, NamespaceString::createNamespaceString_forTest(kTestDb, "coll"));
+}
+
+TEST_F(ExtensionCommandTest, RunPassesCollectionUuid) {
+    registerCommand("testExtUuid");
+    const auto uuid = UUID::gen();
+    resolver().uuid = uuid;
+
+    ASSERT_BSONOBJ_EQ(runCommandAgainstCollection("testExtUuid", "coll"),
+                      expectedEchoContext("coll", uuid.toString(), "coll"));
+}
+
+TEST_F(ExtensionCommandTest, RunPassesView) {
+    registerCommand("testExtView");
+    const auto uuid = UUID::gen();
+    const auto pipeline =
+        std::vector<BSONObj>{BSON("$match" << BSON("a" << 1)), BSON("$project" << BSON("b" << 0))};
+    resolver().uuid = uuid;
+    resolver().view.emplace(NamespaceString::createNamespaceString_forTest(kTestDb, "view"),
+                            NamespaceString::createNamespaceString_forTest(kTestDb, "coll"),
+                            pipeline,
+                            BSONObj());
+
+    ASSERT_BSONOBJ_EQ(
+        runCommandAgainstCollection("testExtView", "view"),
+        expectedEchoContext("view",
+                            uuid.toString(),
+                            "coll",
+                            expectedView("view", BSON_ARRAY(pipeline[0] << pipeline[1]))));
+}
+
+TEST_F(ExtensionCommandTest, RunPassesViewWithMissingSourceCollection) {
+    registerCommand("testExtViewNoSource");
+    resolver().view.emplace(NamespaceString::createNamespaceString_forTest(kTestDb, "view"),
+                            NamespaceString::createNamespaceString_forTest(kTestDb, "coll"),
+                            std::vector<BSONObj>{},
+                            BSONObj());
+
+    ASSERT_BSONOBJ_EQ(runCommandAgainstCollection("testExtViewNoSource", "view"),
+                      expectedEchoContext("view", "", "coll", expectedView("view", BSONArray())));
+}
+
+// A router throws NamespaceNotFound when the database does not exist, whereas a shard returns no
+// UUID. The extension sees the same context either way.
+TEST_F(ExtensionCommandTest, RunPassesThrownNamespaceNotFoundAsEmptyUuid) {
+    registerCommand("testExtNoDb");
+    resolver().error = {ErrorCodes::NamespaceNotFound, "database not found"};
+
+    ASSERT_BSONOBJ_EQ(runCommandAgainstCollection("testExtNoDb", "coll"),
+                      expectedEchoContext("coll", "", "coll"));
+}
+
+TEST_F(ExtensionCommandTest, RunReturnsOtherResolutionErrorsWithoutRunning) {
+    registerCommand("testExtResolveError");
+    auto* cmd = findCommand("testExtResolveError");
+    ASSERT_TRUE(cmd);
+    auto opCtx = makeOperationContext();
+
+    // Stands in for the timeseries rejection, or any other error from the catalog lookup.
+    resolver().error = {ErrorCodes::InternalError, "lookup failed"};
+    BSONObjBuilder result;
+    ASSERT_THROWS_CODE(
+        cmd->run(opCtx.get(), kTestDb, BSON("testExtResolveError" << "coll"), result),
+        DBException,
+        ErrorCodes::InternalError);
+    // The extension command did not run, so nothing was appended.
+    ASSERT_BSONOBJ_EQ(result.obj(), BSONObj());
+}
+
+TEST_F(ExtensionCommandTest, RunDoesNotResolveWithoutCollection) {
+    registerCommand("testExtNoColl");
+    resolver().error = {ErrorCodes::InternalError, "should not be called"};
+
+    ASSERT_BSONOBJ_EQ(runCommandAgainstCollection("testExtNoColl", ""),
+                      expectedEchoContext("", "", ""));
+    ASSERT_EQ(resolver().calls, 0);
 }
 
 TEST_F(ExtensionCommandTest, RunRejectsReservedReplyFields) {

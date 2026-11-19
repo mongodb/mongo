@@ -1237,11 +1237,29 @@ typedef struct MongoExtensionDistributedPlanLogicVTable {
  * MongoExtensionCommandContext as a parameter, the callee is responsible for immediately copying
  * the values into an owned copy if they must persist beyond the scope of the callee function.
  *
- * namespaceString is the namespace to which the user sent the command. For a view, this is the
- * database and view name rather than the resolved source collection.
+ * The host resolves namespaceString, the namespace to which the user sent the command. A target
+ * that does not exist is not automatically an error; the extension decides what to do with an empty
+ * UUID.
+ *
+ * The host resolves the namespace for every command, without checking whether the user may list the
+ * target's collections or views. An extension must ensure that only a user authorized to see this
+ * context receives it by declaring requiredPrivileges on the command.
+ *
+ * For a command on collection db.coll, or on view db.view whose source collection is db.coll:
+ *   collection: namespaceString = db.coll, uuidString = <UUID of db.coll>,
+ *               resolvedNamespace = null, sourceNamespaceString = db.coll
+ *   view:       namespaceString = db.view, uuidString = <UUID of db.coll>,
+ *               resolvedNamespace = {viewNamespace = db.view, viewPipeline = [...]},
+ *               sourceNamespaceString = db.coll
+ * uuidString is empty if db.coll does not exist. For a view on another view, viewPipeline is the
+ * combined pipeline of every view down to the source collection, with the innermost view's stages
+ * first.
  */
 typedef struct MongoExtensionCommandContext {
     const ::MongoExtensionNamespaceString namespaceString;
+    const MongoExtensionByteView uuidString;
+    const ::MongoExtensionResolvedNamespace* resolvedNamespace;
+    const ::MongoExtensionNamespaceString sourceNamespaceString;
 } MongoExtensionCommandContext;
 
 /**
