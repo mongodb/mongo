@@ -151,6 +151,9 @@ filters:
   - "document_source_sort_by_count*":
     approvers:
       - 10gen/query-optimization
+  - "end_of_transaction*":
+    approvers:
+      - 10gen/query-execution-change-streams
   - "expression*":
     approvers:
       - 10gen/query-optimization
