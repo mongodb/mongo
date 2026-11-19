@@ -9,6 +9,7 @@ import os
 import pathlib
 import platform
 import posixpath
+import re
 import subprocess
 import tarfile
 import tempfile
@@ -46,9 +47,46 @@ TARGET_ELF = {
 }
 
 
+def _linker_script_inputs(contents: str) -> list[str]:
+    """Read file operands in libc's GROUP/INPUT/AS_NEEDED directives."""
+    contents = re.sub(r"/\*.*?\*/", "", contents, flags=re.DOTALL)
+    directives = {"GROUP", "INPUT", "AS_NEEDED"}
+    contexts: list[bool] = []
+    previous = ""
+    inputs = []
+    for token in re.findall(r'"[^"]*"|[(){};]|[^\s(){};]+', contents):
+        if token == "(":
+            contexts.append(previous in directives or bool(contexts and contexts[-1]))
+        elif token == ")":
+            if not contexts:
+                raise ValueError("Unbalanced parentheses in libc linker script")
+            contexts.pop()
+        elif contexts and contexts[-1] and token not in directives | {"{", "}", ";"}:
+            inputs.append(token.strip('"').removeprefix("="))
+        previous = token
+    if contexts:
+        raise ValueError("Unbalanced parentheses in libc linker script")
+    return inputs
+
+
 def validate_toolchain_sysroot(root: pathlib.Path, architecture: str) -> list[str]:
     """Check the target files used to configure/build GCC's runtime libraries."""
     machine, encoding, loader = TARGET_ELF[architecture]
+
+    def validate_elf(path: pathlib.Path, *, allow_archive: bool = False) -> None:
+        with path.open("rb") as source:
+            header = source.read(20)
+        if allow_archive and header.startswith(b"!<arch>\n"):
+            return
+        byteorder = "little" if encoding == 1 else "big"
+        if (
+            len(header) < 20
+            or header[:5] != b"\x7fELF\x02"
+            or header[5] != encoding
+            or int.from_bytes(header[18:20], byteorder) != machine
+        ):
+            raise ValueError(f"Wrong ELF architecture for {architecture}: {path}")
+
     for path in sorted(root.rglob("*")):
         if path.is_symlink():
             try:
@@ -63,33 +101,56 @@ def validate_toolchain_sysroot(root: pathlib.Path, architecture: str) -> list[st
         if not path.is_file():
             raise ValueError(f"Toolchain sysroot is missing usr/include/{header}")
         validated.append(path.relative_to(root).as_posix())
+    loader_paths = [
+        root / directory / loader for directory in ("usr/lib64", "lib64", "usr/lib", "lib")
+    ]
+    for script in (root / "usr/lib64/libc.so", root / "lib64/libc.so"):
+        if not script.is_file():
+            continue
+        for token in _linker_script_inputs(script.read_text(encoding="utf-8")):
+            reference = pathlib.PurePosixPath(token)
+            if reference.is_absolute():
+                path = root / reference.relative_to("/")
+            elif len(reference.parts) > 1:
+                path = script.parent / reference
+            else:
+                candidates = [script.parent / reference] + [
+                    root / directory / reference
+                    for directory in ("usr/lib64", "lib64", "usr/lib", "lib")
+                ]
+                path = next(
+                    (candidate for candidate in candidates if candidate.is_file()), candidates[0]
+                )
+            if not path.resolve().is_relative_to(root.resolve()):
+                raise ValueError(f"{script.relative_to(root)} input reference escapes the sysroot")
+            if not path.is_file():
+                raise ValueError(f"{script.relative_to(root)} references missing input {reference}")
+            # Libc scripts use ELF inputs and libc_nonshared.a. Check every ELF
+            # operand, including loaders with unexpected or versioned filenames.
+            validate_elf(path, allow_archive=True)
+            validated.append(path.relative_to(root).as_posix())
+            if reference.name == loader and path not in loader_paths:
+                loader_paths.append(path)
     elf_files = ("crt1.o", "crti.o", "crtn.o", "libc.so.6", "libgcc_s.so.1", "libcrypt.so", loader)
     for name in (*elf_files, "libc.so", "libc_nonshared.a"):
-        # These RHEL targets are all 64-bit. A copy in usr/lib or an unrelated
-        # subdirectory cannot replace GCC's required usr/lib64 linker inputs.
         required = root / "usr/lib64" / name
-        if not required.is_file():
-            raise ValueError(f"Toolchain sysroot is missing usr/lib64/{name}")
         paths = [required, root / "lib64" / name]
         if name == loader:
-            # RHEL also exposes some 64-bit loaders through /lib and /usr/lib.
-            paths.extend([root / "usr/lib" / name, root / "lib" / name])
+            # RHEL 9/10 ARM64 installs its 64-bit loader in /usr/lib, exposed
+            # through /lib. Validate every existing loader at these known paths.
+            paths = loader_paths
+            if not any(path.is_file() for path in paths):
+                raise ValueError(f"Toolchain sysroot is missing target dynamic loader {name}")
+        elif not required.is_file():
+            # Copies elsewhere cannot replace GCC's required 64-bit linker inputs.
+            raise ValueError(f"Toolchain sysroot is missing usr/lib64/{name}")
         for path in paths:
             if not path.is_file():
                 continue
             if name in elf_files:
-                with path.open("rb") as source:
-                    header = source.read(20)
-                byteorder = "little" if encoding == 1 else "big"
-                if (
-                    len(header) < 20
-                    or header[:5] != b"\x7fELF\x02"
-                    or header[5] != encoding
-                    or int.from_bytes(header[18:20], byteorder) != machine
-                ):
-                    raise ValueError(f"Wrong ELF architecture for {architecture}: {path}")
+                validate_elf(path)
             validated.append(path.relative_to(root).as_posix())
-    return sorted(validated)
+    return sorted(set(validated))
 
 
 def sysroot_provenance(
