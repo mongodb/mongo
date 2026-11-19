@@ -2163,7 +2163,7 @@ static const auto invokeLambdaOp =
  * the input for which the mask has, in the same position, a 'true' value. A mask value of Nothing
  * is equivalent to a mask full of 'true' values.
  */
-void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
+void ByteCode::valueBlockApplyLambda(const CodeFragment* code, Interruptible* interruptible) {
     auto [lamOwn, lamTag, lamVal] = moveFromStack(0);
     popAndReleaseStack();
     value::TagValueMaybeOwned lam{lamOwn, lamTag, lamVal};
@@ -2204,17 +2204,19 @@ void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
         // Pre-fill with Nothing, and overwrite only the allowed indexes.
         std::vector<value::Value> valueOut(extracted.count());
         std::vector<value::TypeTags> tagOut(extracted.count(), value::TypeTags::Nothing);
+        value::ValueVectorGuard blockGuard(tagOut, valueOut);
 
-        ByteCode::InvokeLambdaFunctor invoker(*this, code, lamPos);
+        ByteCode::InvokeLambdaFunctor invoker(*this, code, lamPos, interruptible);
         for (size_t i = 0; i < extracted.count(); ++i) {
             if (value::bitcastTo<bool>(extractedMask.vals()[i])) {
                 std::tie(tagOut[i], valueOut[i]) =
                     invoker(extracted.tags()[i], extracted.vals()[i]);
             }
         }
+        blockGuard.reset();
         outBlock = buildBlockFromStorage(std::move(tagOut), std::move(valueOut));
     } else {
-        outBlock = block->map(invokeLambdaOp.bindParams(*this, code, lamPos));
+        outBlock = block->map(invokeLambdaOp.bindParams(*this, code, lamPos, interruptible));
     }
 
     pushStack(true,

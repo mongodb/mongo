@@ -151,7 +151,7 @@ boost::optional<int64_t> LimitSkipStage::_runLimitOrSkipCode(const vm::CodeFragm
         return boost::none;
     }
 
-    value::TagValueMaybeOwned res = _bytecode->run(code);
+    value::TagValueMaybeOwned res = _bytecode->run(code, _opCtx);
     tassert(8349200,
             "Expect limit or skip code to return an int64",
             res.tag() == value::TypeTags::NumberInt64);

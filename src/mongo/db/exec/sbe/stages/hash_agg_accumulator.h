@@ -62,8 +62,10 @@ public:
      * a 'finalize()' call will produce the output expected from accumulating an exmpty list. Must
      * be called before executing any accumulate or merge operations.
      */
-    virtual void initialize(vm::ByteCode& bytecode,
-                            value::AssignableSlotAccessor& accumulatorState) const = 0;
+    virtual void initialize(
+        vm::ByteCode& bytecode,
+        value::AssignableSlotAccessor& accumulatorState,
+        Interruptible* interruptible = Interruptible::notInterruptible()) const = 0;
 
     /**
      * Reads the current accumulator state and a new value and writes out the updated accumulator
@@ -72,8 +74,10 @@ public:
      * The sources of the input accumulator state and input value are defined by the child
      * implementations of this method.
      */
-    virtual void accumulate(vm::ByteCode& bytecode,
-                            value::AssignableSlotAccessor& accumulatorState) const = 0;
+    virtual void accumulate(
+        vm::ByteCode& bytecode,
+        value::AssignableSlotAccessor& accumulatorState,
+        Interruptible* interruptible = Interruptible::notInterruptible()) const = 0;
 
     /**
      * Reads the current accumulator state, updates the accumulator's state with the recovered state
@@ -84,7 +88,8 @@ public:
      * implementations of this method.
      */
     virtual void merge(vm::ByteCode& bytecode,
-                       value::MaterializedSingleRowAccessor& accumulatorState) const = 0;
+                       value::MaterializedSingleRowAccessor& accumulatorState,
+                       Interruptible* interruptible = Interruptible::notInterruptible()) const = 0;
 
     /**
      * Computes the final accumulation result based on the values added with `accumulate()` so far
@@ -163,15 +168,18 @@ public:
     void prepareForMerge(CompileCtx& ctx, value::SlotAccessor* accumulatorAccessor) final;
 
     void initialize(vm::ByteCode& bytecode,
-                    value::AssignableSlotAccessor& accumulatorState) const final;
+                    value::AssignableSlotAccessor& accumulatorState,
+                    Interruptible* interruptible = Interruptible::notInterruptible()) const final;
 
     void accumulate(vm::ByteCode& bytecode,
-                    value::AssignableSlotAccessor& accumulatorState) const final {
-        accumulatorState.reset(bytecode.run(_accumulatorCode.get()));
+                    value::AssignableSlotAccessor& accumulatorState,
+                    Interruptible* interruptible = Interruptible::notInterruptible()) const final {
+        accumulatorState.reset(bytecode.run(_accumulatorCode.get(), interruptible));
     };
 
     void merge(vm::ByteCode& bytecode,
-               value::MaterializedSingleRowAccessor& accumulatorState) const final;
+               value::MaterializedSingleRowAccessor& accumulatorState,
+               Interruptible* interruptible = Interruptible::notInterruptible()) const final;
 
     void finalize(vm::ByteCode&, value::AssignableSlotAccessor&) const final {};
 
@@ -246,10 +254,12 @@ public:
     void prepareForMerge(CompileCtx& ctx, value::SlotAccessor* accumulatorAccessor) final;
 
     void accumulate(vm::ByteCode& bytecode,
-                    value::AssignableSlotAccessor& accumulatorState) const final;
+                    value::AssignableSlotAccessor& accumulatorState,
+                    Interruptible* interruptible = Interruptible::notInterruptible()) const final;
 
     void merge(vm::ByteCode& bytecode,
-               value::MaterializedSingleRowAccessor& accumulatorState) const final;
+               value::MaterializedSingleRowAccessor& accumulatorState,
+               Interruptible* interruptible = Interruptible::notInterruptible()) const final;
 
     void finalize(vm::ByteCode&, value::AssignableSlotAccessor& accumulatorState) const override;
 
@@ -332,7 +342,8 @@ public:
     using SinglePurposeHashAggAccumulator::SinglePurposeHashAggAccumulator;
 
     void initialize(vm::ByteCode& bytecode,
-                    value::AssignableSlotAccessor& accumulatorState) const final;
+                    value::AssignableSlotAccessor& accumulatorState,
+                    Interruptible* interruptible = Interruptible::notInterruptible()) const final;
 
 protected:
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
@@ -401,7 +412,8 @@ public:
     }
 
     void initialize(vm::ByteCode& bytecode,
-                    value::AssignableSlotAccessor& accumulatorState) const final;
+                    value::AssignableSlotAccessor& accumulatorState,
+                    Interruptible* interruptible = Interruptible::notInterruptible()) const final;
 
 protected:
     void singlePurposePrepare(CompileCtx& ctx) final;
@@ -443,7 +455,8 @@ public:
     }
 
     void initialize(vm::ByteCode& bytecode,
-                    value::AssignableSlotAccessor& accumulatorState) const final;
+                    value::AssignableSlotAccessor& accumulatorState,
+                    Interruptible* interruptible = Interruptible::notInterruptible()) const final;
 
 protected:
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
@@ -468,7 +481,8 @@ public:
     using SinglePurposeHashAggAccumulator::SinglePurposeHashAggAccumulator;
 
     void initialize(vm::ByteCode& bytecode,
-                    value::AssignableSlotAccessor& accumulatorState) const final;
+                    value::AssignableSlotAccessor& accumulatorState,
+                    Interruptible* interruptible = Interruptible::notInterruptible()) const final;
 
     std::unique_ptr<HashAggAccumulator> clone() const final {
         return std::make_unique<FirstHashAggAccumulator>(
@@ -498,7 +512,8 @@ public:
     using SinglePurposeHashAggAccumulator::SinglePurposeHashAggAccumulator;
 
     void initialize(vm::ByteCode& bytecode,
-                    value::AssignableSlotAccessor& accumulatorState) const final;
+                    value::AssignableSlotAccessor& accumulatorState,
+                    Interruptible* interruptible = Interruptible::notInterruptible()) const final;
 
 protected:
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
@@ -568,7 +583,8 @@ public:
           _memLimit(memLimit) {}
 
     void initialize(vm::ByteCode& bytecode,
-                    value::AssignableSlotAccessor& accumulatorState) const final;
+                    value::AssignableSlotAccessor& accumulatorState,
+                    Interruptible* interruptible = Interruptible::notInterruptible()) const final;
 
     size_t estimateSize() const override;
 

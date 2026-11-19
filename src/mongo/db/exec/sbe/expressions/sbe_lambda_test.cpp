@@ -4,6 +4,7 @@
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
+#include "mongo/db/exec/sbe/expressions/sbe_test_interruptible.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/golden_test.h"
@@ -163,6 +164,78 @@ TEST_F(SBELambdaTest, TraverseF_WithLocalBind) {
     slotAccessor.reset(value::TypeTags::bsonArray,
                        value::bitcastFrom<const char*>(bsonArr.objdata()));
     executeAndPrintVariation(os, *compiledExpr);
+}
+
+using SBEInterruptibleTraversalTest = EExpressionTestFixture;
+
+TEST_F(SBEInterruptibleTraversalTest, InterruptsAfterFirstArrayBatch) {
+    BSONArrayBuilder array;
+    for (int i = 0; i < 16384; ++i) {
+        array.append(false);
+    }
+    const auto input = array.arr();
+    for (bool immediate : {false, true}) {
+        value::ViewOfValueAccessor compareArray;
+        compareArray.reset(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
+        const auto compareSlot = bindAccessor(&compareArray);
+        auto [tag, val] = makeArray(input);
+        auto expr =
+            makeE<EFunction>(EFn::kTraverseF,
+                             makeEs(makeE<EConstant>(tag, val),
+                                    makeE<ELocalLambda>(10, makeE<EVariable>(10, 0)),
+                                    immediate ? std::unique_ptr<EExpression>(makeC(makeBool(false)))
+                                              : makeE<EVariable>(compareSlot)));
+        auto code = compileExpression(*expr);
+        CountingInterruptible interruptible(2);
+        ASSERT_THROWS_CODE(
+            _vm.run(code.get(), &interruptible), DBException, ErrorCodes::Interrupted);
+        ASSERT_EQ(interruptible.checks(), 2);
+    }
+}
+
+TEST_F(SBEInterruptibleTraversalTest, NestedMembershipSharesInterruptible) {
+    BSONArrayBuilder array;
+    for (int i = 0; i < 16384; ++i) {
+        array.append(false);
+    }
+    auto [innerTag, innerVal] = makeArray(array.arr());
+    auto outer = value::TagValueOwned::fromRaw(value::makeNewArray());
+    value::getArrayView(outer.value())->push_back_raw(innerTag, innerVal);
+    auto [outerTag, outerVal] = outer.releaseToRaw();
+    auto expr = makeE<EFunction>(
+        EFn::kTraverseF,
+        makeEs(makeE<EConstant>(outerTag, outerVal),
+               makeE<ELocalLambda>(
+                   10,
+                   makeE<EFunction>(EFn::kIsMember,
+                                    makeEs(makeC(makeBool(true)), makeE<EVariable>(10, 0)))),
+               makeC(makeBool(false))));
+    auto code = compileExpression(*expr);
+    CountingInterruptible interruptible(2);
+    ASSERT_THROWS_CODE(_vm.run(code.get(), &interruptible), DBException, ErrorCodes::Interrupted);
+    ASSERT_EQ(interruptible.checks(), 2);
+}
+
+TEST_F(SBEInterruptibleTraversalTest, ShortNestedMembershipScansShareInterruptBudget) {
+    BSONArrayBuilder array;
+    for (int i = 0; i < 511; ++i) {
+        array.append(BSON_ARRAY(false));
+    }
+    auto [tag, val] = makeArray(array.arr());
+    auto expr = makeE<EFunction>(
+        EFn::kTraverseF,
+        makeEs(makeE<EConstant>(tag, val),
+               makeE<ELocalLambda>(
+                   10,
+                   makeE<EFunction>(EFn::kIsMember,
+                                    makeEs(makeC(makeBool(true)), makeE<EVariable>(10, 0)))),
+               makeC(makeBool(false))));
+    auto code = compileExpression(*expr);
+    CountingInterruptible interruptible;
+    ASSERT_FALSE(_vm.runPredicate(code.get(), &interruptible));
+    ASSERT_EQ(interruptible.checks(), 0);
+    ASSERT_FALSE(_vm.runPredicate(code.get(), &interruptible));
+    ASSERT_EQ(interruptible.checks(), 1);
 }
 
 }  // namespace mongo::sbe

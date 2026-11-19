@@ -5,6 +5,7 @@
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
+#include "mongo/db/exec/sbe/expressions/sbe_test_interruptible.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -241,4 +242,27 @@ TEST_F(SBEBuiltinInTest, inBSONArrayWithCollator) {
         collatorSlot,
         false);
 }
+TEST_F(SBEBuiltinInTest, CollatedMembershipChecksInterrupt) {
+    BSONArrayBuilder array;
+    for (int i = 0; i < 16384; ++i) {
+        array.append("abc");
+    }
+    value::ViewOfValueAccessor collatorAccessor;
+    auto collatorSlot = bindAccessor(&collatorAccessor);
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    collatorAccessor.reset(value::TypeTags::collator,
+                           value::bitcastFrom<CollatorInterface*>(&collator));
+    auto [tag, val] = makeBsonArray(array.arr());
+    auto [needleTag, needleVal] = value::makeNewString("absent");
+    auto expr = makeE<EFunction>(EFn::kCollIsMember,
+                                 makeEs(makeE<EConstant>(needleTag, needleVal),
+                                        makeE<EConstant>(tag, val),
+                                        makeE<EVariable>(collatorSlot)));
+    auto code = compileExpression(*expr);
+    CountingInterruptible interruptible(1);
+    ASSERT_THROWS_CODE(
+        _vm.runPredicate(code.get(), &interruptible), DBException, ErrorCodes::Interrupted);
+    ASSERT_EQ(interruptible.checks(), 1);
+}
+
 }  // namespace mongo::sbe

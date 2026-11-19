@@ -275,14 +275,14 @@ private:
     const key_string::Value& getSeekKeyHigh() const;
 
     inline void initializeSeekKeyLow() {
-        value::TagValueMaybeOwned seekKeyLow = _bytecode->run(_seekKeyLowCode.get());
+        value::TagValueMaybeOwned seekKeyLow = _bytecode->run(_seekKeyLowCode.get(), _opCtx);
         uassert(4822851,
                 str::stream() << "seek key is wrong type: " << seekKeyLow.tag(),
                 seekKeyLow.tag() == value::TypeTags::keyString);
         _seekKeyLowHolder.reset(std::move(seekKeyLow));
     };
     inline void initializeSeekKeyHigh() {
-        value::TagValueMaybeOwned seekKeyHigh = _bytecode->run(_seekKeyHighCode.get());
+        value::TagValueMaybeOwned seekKeyHigh = _bytecode->run(_seekKeyHighCode.get(), _opCtx);
         uassert(4822852,
                 str::stream() << "seek key is wrong type: " << seekKeyHigh.tag(),
                 seekKeyHigh.tag() == value::TypeTags::keyString);

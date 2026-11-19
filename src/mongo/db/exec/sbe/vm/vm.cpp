@@ -16,6 +16,16 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
+void ByteCode::checkForInterrupt(Interruptible* interruptible) {
+    if (MONGO_unlikely(--_interruptCounter == 0)) {
+        // Reset before the check, which can throw. The budget persists across runs.
+        _interruptCounter = kInterruptCheckPeriod;
+        if (interruptible) {
+            interruptible->checkForInterrupt();
+        }
+    }
+}
+
 void ByteCode::allocStackImpl(size_t newSizeDelta) noexcept {
     tassert(11086816, "Asking for 0 bytes on stack", newSizeDelta != 0);
 
@@ -160,7 +170,7 @@ value::TagValueView ByteCode::getFieldOrElement(value::TagValueView obj,
     }
 }
 
-void ByteCode::traverseP(const CodeFragment* code) {
+void ByteCode::traverseP(const CodeFragment* code, Interruptible* interruptible) {
     // Traverse a projection path - evaluate the input lambda on every element of the input array.
     // The traversal is recursive; i.e. we visit nested arrays if any.
     auto [maxDepthOwn, maxDepthTag, maxDepthVal] = getFromStack(0);
@@ -181,13 +191,14 @@ void ByteCode::traverseP(const CodeFragment* code) {
         ? value::bitcastTo<int32_t>(maxDepthVal)
         : std::numeric_limits<int64_t>::max();
 
-    traverseP(code, lamPos, lamTag == value::TypeTags::LocalTwoArgLambda, maxDepth);
+    traverseP(code, lamPos, lamTag == value::TypeTags::LocalTwoArgLambda, maxDepth, interruptible);
 }
 
 void ByteCode::traverseP(const CodeFragment* code,
                          int64_t position,
                          bool providePosition,
-                         int64_t maxDepth) {
+                         int64_t maxDepth,
+                         Interruptible* interruptible) {
     auto [own, tag, val] = getFromStack(0);
 
     if (value::isArray(tag) && maxDepth > 0) {
@@ -198,14 +209,14 @@ void ByteCode::traverseP(const CodeFragment* code,
             --maxDepth;
         }
 
-        traverseP_nested(code, position, tag, val, providePosition, maxDepth, 0);
+        traverseP_nested(code, position, tag, val, providePosition, maxDepth, 0, interruptible);
     } else {
         if (providePosition) {
             // Push a -1 on the stack (to indicate that we are not iterating over an array) before
             // the value to be processed
             pushStack(false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(-1));
         }
-        runLambdaInternal(code, position);
+        runLambdaInternal(code, position, interruptible);
         if (providePosition) {
             // Remove the position from the stack.
             swapStack();
@@ -220,7 +231,8 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
                                 value::Value valInput,
                                 bool providePosition,
                                 int64_t maxDepth,
-                                int64_t curDepth) {
+                                int64_t curDepth,
+                                Interruptible* interruptible) {
     auto decrement = [](int64_t d) {
         return d == std::numeric_limits<int64_t>::max() ? d : d - 1;
     };
@@ -238,13 +250,14 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
                              elemVal,
                              providePosition,
                              decrement(maxDepth),
-                             curDepth + 1);
+                             curDepth + 1,
+                             interruptible);
         } else {
             pushStack(false, elemTag, elemVal);
             if (providePosition) {
                 pushStack(false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(arrayPos));
             }
-            runLambdaInternal(code, position);
+            runLambdaInternal(code, position, interruptible);
             if (providePosition) {
                 // Remove the position from the stack.
                 swapStack();
@@ -266,7 +279,7 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
     pushStack(true, tagArrOutput, valArrOutput);
 }
 
-void ByteCode::traverseF(const CodeFragment* code) {
+void ByteCode::traverseF(const CodeFragment* code, Interruptible* interruptible) {
     // Traverse a filter path - evaluate the input lambda (predicate) on every element of the input
     // array without recursion.
     auto [numberOwn, numberTag, numberVal] = getFromStack(0);
@@ -284,24 +297,26 @@ void ByteCode::traverseF(const CodeFragment* code) {
 
     bool compareArray = numberTag == value::TypeTags::Boolean && value::bitcastTo<bool>(numberVal);
 
-    traverseF(code, lamPos, lamTag == value::TypeTags::LocalTwoArgLambda, compareArray);
+    traverseF(
+        code, lamPos, lamTag == value::TypeTags::LocalTwoArgLambda, compareArray, interruptible);
 }
 
 void ByteCode::traverseF(const CodeFragment* code,
                          int64_t position,
                          bool providePosition,
-                         bool compareArray) {
+                         bool compareArray,
+                         Interruptible* interruptible) {
     auto [ownInput, tagInput, valInput] = getFromStack(0);
 
     if (value::isArray(tagInput)) {
-        traverseFInArray(code, position, providePosition, compareArray);
+        traverseFInArray(code, position, providePosition, compareArray, interruptible);
     } else {
         // Push a -1 on the stack (to indicate that we are not iterating over an array) before the
         // value to be processed
         if (providePosition) {
             pushStack(false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(-1));
         }
-        runLambdaInternal(code, position);
+        runLambdaInternal(code, position, interruptible);
         // Remove the item position from the stack.
         if (providePosition) {
             swapStack();
@@ -310,8 +325,10 @@ void ByteCode::traverseF(const CodeFragment* code,
     }
 }
 
-bool ByteCode::runLambdaPredicate(const CodeFragment* code, int64_t position) {
-    runLambdaInternal(code, position);
+bool ByteCode::runLambdaPredicate(const CodeFragment* code,
+                                  int64_t position,
+                                  Interruptible* interruptible) {
+    runLambdaInternal(code, position, interruptible);
     auto ret = getMaybeOwnedFromStack(0);
     popStack();
     return (ret.tag() == value::TypeTags::Boolean) && value::bitcastTo<bool>(ret.value());
@@ -320,7 +337,8 @@ bool ByteCode::runLambdaPredicate(const CodeFragment* code, int64_t position) {
 void ByteCode::traverseFInArray(const CodeFragment* code,
                                 int64_t position,
                                 bool providePosition,
-                                bool compareArray) {
+                                bool compareArray,
+                                Interruptible* interruptible) {
     auto [ownInput, tagInput, valInput] = getFromStack(0);
 
     value::TagValueMaybeOwned input(ownInput, tagInput, valInput);
@@ -329,12 +347,13 @@ void ByteCode::traverseFInArray(const CodeFragment* code,
     size_t arrayPos = 0;
     const bool passed =
         value::arrayAny(tagInput, valInput, [&](value::TypeTags tag, value::Value val) {
+            checkForInterrupt(interruptible);
             pushStack(false, tag, val);
             if (providePosition) {
                 pushStack(
                     false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(arrayPos++));
             }
-            if (runLambdaPredicate(code, position)) {
+            if (runLambdaPredicate(code, position, interruptible)) {
                 if (providePosition) {
                     popStack();
                 }
@@ -360,7 +379,7 @@ void ByteCode::traverseFInArray(const CodeFragment* code,
             pushStack(false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(-1));
         }
         input.disown();
-        runLambdaInternal(code, position);
+        runLambdaInternal(code, position, interruptible);
         if (providePosition) {
             swapStack();
             popStack();

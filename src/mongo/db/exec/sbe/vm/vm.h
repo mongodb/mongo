@@ -23,6 +23,7 @@
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -306,12 +307,14 @@ public:
     /**
      * Runs a CodeFragment representing an arbitrary VM program that returns one slot value.
      */
-    value::TagValueMaybeOwned run(const CodeFragment* code);
+    value::TagValueMaybeOwned run(const CodeFragment* code,
+                                  Interruptible* interruptible = Interruptible::notInterruptible());
 
     /**
      * Runs a CodeFragment reprensenting a predicate that returns a boolean result.
      */
-    bool runPredicate(const CodeFragment* code);
+    bool runPredicate(const CodeFragment* code,
+                      Interruptible* interruptible = Interruptible::notInterruptible());
 
     typedef std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t>
         MultiAccState;
@@ -321,16 +324,20 @@ public:
     }
 
 private:
+    void checkForInterrupt(Interruptible* interruptible);
+
     /**
      * Executes the VM instructions of an arbitrary CodeFragment starting at 'position'.
      */
-    void runInternal(const CodeFragment* code, int64_t position);
+    void runInternal(const CodeFragment* code, int64_t position, Interruptible* interruptible);
 
     /**
      * Executes the VM instructions of a CodeFragment starting at 'position' that represents a
      * lambda function and leaves its result on the top of the stack.
      */
-    void runLambdaInternal(const CodeFragment* code, int64_t position);
+    void runLambdaInternal(const CodeFragment* code,
+                           int64_t position,
+                           Interruptible* interruptible);
 
     MONGO_COMPILER_NORETURN void runFailInstruction();
 
@@ -374,31 +381,37 @@ private:
 
     value::TagValueView getFieldOrElement(value::TagValueView obj, value::TagValueView field);
 
-    void traverseP(const CodeFragment* code);
+    void traverseP(const CodeFragment* code, Interruptible* interruptible);
     void traverseP(const CodeFragment* code,
                    int64_t position,
                    bool providePosition,
-                   int64_t maxDepth);
+                   int64_t maxDepth,
+                   Interruptible* interruptible);
     void traverseP_nested(const CodeFragment* code,
                           int64_t position,
                           value::TypeTags tag,
                           value::Value val,
                           bool providePosition,
                           int64_t maxDepth,
-                          int64_t curDepth);
+                          int64_t curDepth,
+                          Interruptible* interruptible);
 
-    void traverseF(const CodeFragment* code);
+    void traverseF(const CodeFragment* code, Interruptible* interruptible);
     void traverseF(const CodeFragment* code,
                    int64_t position,
                    bool providePosition,
-                   bool compareArray);
+                   bool compareArray,
+                   Interruptible* interruptible);
     void traverseFInArray(const CodeFragment* code,
                           int64_t position,
                           bool providePosition,
-                          bool compareArray);
+                          bool compareArray,
+                          Interruptible* interruptible);
 
-    bool runLambdaPredicate(const CodeFragment* code, int64_t position);
-    void valueBlockApplyLambda(const CodeFragment* code);
+    bool runLambdaPredicate(const CodeFragment* code,
+                            int64_t position,
+                            Interruptible* interruptible);
+    void valueBlockApplyLambda(const CodeFragment* code, Interruptible* interruptible);
 
 
     int32_t convertNumericToInt32(value::TagValueView v);
@@ -569,7 +582,8 @@ private:
     value::TagValueMaybeOwned builtinCollAddToSet(ArityType arity);
     value::TagValueMaybeOwned isMemberImpl(value::TagValueView expr,
                                            value::TagValueView arr,
-                                           CollatorInterface* collator);
+                                           CollatorInterface* collator,
+                                           Interruptible* interruptible);
     value::TagValueMaybeOwned builtinAddToSetCapped(ArityType arity);
     value::TagValueMaybeOwned builtinCollAddToSetCapped(ArityType arity);
     value::TagValueMaybeOwned builtinSetToArray(ArityType arity);
@@ -688,8 +702,8 @@ private:
     value::TagValueMaybeOwned builtinAggCollSetUnion(ArityType arity);
     value::TagValueMaybeOwned builtinAggSetUnionCapped(ArityType arity);
     value::TagValueMaybeOwned builtinAggCollSetUnionCapped(ArityType arity);
-    value::TagValueMaybeOwned builtinIsMember(ArityType arity);
-    value::TagValueMaybeOwned builtinCollIsMember(ArityType arity);
+    value::TagValueMaybeOwned builtinIsMember(ArityType arity, Interruptible* interruptible);
+    value::TagValueMaybeOwned builtinCollIsMember(ArityType arity, Interruptible* interruptible);
     value::TagValueMaybeOwned builtinIndexOfBytes(ArityType arity);
     value::TagValueMaybeOwned builtinIndexOfCP(ArityType arity);
     value::TagValueMaybeOwned builtinIsDayOfWeek(ArityType arity);
@@ -952,7 +966,8 @@ private:
      */
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f,
                                                                    ArityType arity,
-                                                                   const CodeFragment* code);
+                                                                   const CodeFragment* code,
+                                                                   Interruptible* interruptible);
 
     static constexpr size_t offsetOwned = 0;
     static constexpr size_t offsetTag = 1;
@@ -1116,6 +1131,9 @@ private:
 
     // Some builtins track their memory usage against per-query limits. nullptr disables this.
     SimpleMemoryUsageTracker* _memoryTracker{nullptr};
+    // The polling budget persists across runs and nested lambdas.
+    static constexpr int kInterruptCheckPeriod = 1024;
+    int _interruptCounter = kInterruptCheckPeriod;
 };
 
 class ByteCode::MakeObjImplBase {
@@ -1150,7 +1168,7 @@ protected:
         int64_t lamPos, value::TypeTags inputTag, value::Value inputVal) const {
         // Invoke the lambda.
         bc.pushStack(false, inputTag, inputVal);
-        bc.runLambdaInternal(code, lamPos);
+        bc.runLambdaInternal(code, lamPos, Interruptible::notInterruptible());
         // Move the result off the stack and return it.
         auto outputTuple = bc.getFromStack(0);
         bc.popStack();
@@ -1164,14 +1182,17 @@ private:
 };
 
 struct ByteCode::InvokeLambdaFunctor {
-    InvokeLambdaFunctor(ByteCode& bytecode, const CodeFragment* code, int64_t lamPos)
-        : bytecode(bytecode), code(code), lamPos(lamPos) {}
+    InvokeLambdaFunctor(ByteCode& bytecode,
+                        const CodeFragment* code,
+                        int64_t lamPos,
+                        Interruptible* interruptible)
+        : bytecode(bytecode), code(code), lamPos(lamPos), interruptible(interruptible) {}
 
     std::pair<value::TypeTags, value::Value> operator()(value::TypeTags tag,
                                                         value::Value val) const {
         // Invoke the lambda.
         bytecode.pushStack(false, tag, val);
-        bytecode.runLambdaInternal(code, lamPos);
+        bytecode.runLambdaInternal(code, lamPos, interruptible);
         // Move the result off the stack, make sure it's owned, and return it.
         auto result = bytecode.moveOwnedFromStack(0).releaseToRaw();
         bytecode.popStack();
@@ -1181,6 +1202,7 @@ struct ByteCode::InvokeLambdaFunctor {
     ByteCode& bytecode;
     const CodeFragment* const code;
     const int64_t lamPos;
+    Interruptible* const interruptible;
 };
 
 class ByteCode::TopBottomArgs {

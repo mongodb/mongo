@@ -222,8 +222,10 @@ void ByteCode::runTagCheck(const uint8_t*& pcPointer, value::TypeTags tagRhs) {
     runTagCheck(pcPointer, [tagRhs](value::TypeTags tagLhs) { return tagLhs == tagRhs; });
 }
 
-void ByteCode::runLambdaInternal(const CodeFragment* code, int64_t position) {
-    runInternal(code, position);
+void ByteCode::runLambdaInternal(const CodeFragment* code,
+                                 int64_t position,
+                                 Interruptible* interruptible) {
+    runInternal(code, position, interruptible);
     swapStack();
     popAndReleaseStack();
 }
@@ -242,7 +244,9 @@ constexpr DispatchTable defaultInitializeDispatchTable(void* lastInstructionAddr
 };
 }  // namespace
 
-void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
+void ByteCode::runInternal(const CodeFragment* code,
+                           int64_t position,
+                           Interruptible* interruptible) {
 #if USE_THREADED_INTERPRETER
     // Very important this in sync with Instruction::Tags.
     constexpr DispatchTable dispatchTable =
@@ -998,7 +1002,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
     }
     DISPATCH();
     INSTRUCTION(traverseP) {
-        traverseP(code);
+        traverseP(code, interruptible);
     }
     DISPATCH();
     INSTRUCTION(traversePImm) {
@@ -1014,11 +1018,12 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         traverseP(code,
                   codePosition,
                   providePosition == Instruction::True ? true : false,
-                  k == Instruction::Nothing ? std::numeric_limits<int64_t>::max() : 1);
+                  k == Instruction::Nothing ? std::numeric_limits<int64_t>::max() : 1,
+                  interruptible);
     }
     DISPATCH();
     INSTRUCTION(traverseF) {
-        traverseF(code);
+        traverseF(code, interruptible);
     }
     DISPATCH();
     INSTRUCTION(traverseFImm) {
@@ -1034,7 +1039,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         traverseF(code,
                   codePosition,
                   providePosition == Instruction::True ? true : false,
-                  k == Instruction::True ? true : false);
+                  k == Instruction::True ? true : false,
+                  interruptible);
     }
     DISPATCH();
     INSTRUCTION(aggSum) {
@@ -1283,7 +1289,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         arity = readFromMemory<SmallArityType>(pcPointer);
         pcPointer += sizeof(SmallArityType);
 
-        auto [owned, tag, val] = dispatchBuiltin(static_cast<Builtin>(f), arity, code);
+        auto [owned, tag, val] =
+            dispatchBuiltin(static_cast<Builtin>(f), arity, code, interruptible);
 
         for (ArityType cnt = 0; cnt < arity; ++cnt) {
             popAndReleaseStack();
@@ -1299,7 +1306,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         arity = readFromMemory<ArityType>(pcPointer);
         pcPointer += sizeof(ArityType);
 
-        auto [owned, tag, val] = dispatchBuiltin(f, arity, code);
+        auto [owned, tag, val] = dispatchBuiltin(f, arity, code, interruptible);
 
         for (ArityType cnt = 0; cnt < arity; ++cnt) {
             popAndReleaseStack();
@@ -1389,7 +1396,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
     }
     DISPATCH();
     INSTRUCTION(valueBlockApplyLambda) {
-        valueBlockApplyLambda(code);
+        valueBlockApplyLambda(code, interruptible);
     }
     DISPATCH();
     INSTRUCTION(lastInstruction) {
@@ -1410,14 +1417,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 #undef INSTRUCTION
 }  // ByteCode::runInternal
 
-value::TagValueMaybeOwned ByteCode::run(const CodeFragment* code) {
+value::TagValueMaybeOwned ByteCode::run(const CodeFragment* code, Interruptible* interruptible) {
     try {
         uassert(6040900,
                 "The evaluation stack must be empty",
                 _argStackTop + sizeOfElement == _argStack);
 
         allocStack(code->maxStackSize());
-        runInternal(code, 0);
+        runInternal(code, 0, interruptible);
 
         uassert(4822801,
                 "The evaluation stack must hold only a single value",
@@ -1436,8 +1443,8 @@ value::TagValueMaybeOwned ByteCode::run(const CodeFragment* code) {
     }
 }
 
-bool ByteCode::runPredicate(const CodeFragment* code) {
-    value::TagValueMaybeOwned result = run(code);
+bool ByteCode::runPredicate(const CodeFragment* code, Interruptible* interruptible) {
+    value::TagValueMaybeOwned result = run(code, interruptible);
 
     return (result.tag() == value::TypeTags::Boolean) && value::bitcastTo<bool>(result.value());
 }

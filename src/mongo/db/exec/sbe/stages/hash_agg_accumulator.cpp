@@ -99,17 +99,19 @@ void CompiledHashAggAccumulator::prepareForMerge(CompileCtx& ctx,
 }
 
 void CompiledHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                            value::AssignableSlotAccessor& accumulatorState) const {
+                                            value::AssignableSlotAccessor& accumulatorState,
+                                            Interruptible* interruptible) const {
     if (_optionalInitializerCode) {
-        accumulatorState.reset(bytecode.run(_optionalInitializerCode.get()));
+        accumulatorState.reset(bytecode.run(_optionalInitializerCode.get(), interruptible));
     }
 }
 
-void CompiledHashAggAccumulator::merge(
-    vm::ByteCode& bytecode, value::MaterializedSingleRowAccessor& accumulatorState) const {
+void CompiledHashAggAccumulator::merge(vm::ByteCode& bytecode,
+                                       value::MaterializedSingleRowAccessor& accumulatorState,
+                                       Interruptible* interruptible) const {
     tassert(8186807, "Not prepared for merging partial aggregates", _mergingCode);
 
-    accumulatorState.reset(bytecode.run(_mergingCode.get()));
+    accumulatorState.reset(bytecode.run(_mergingCode.get(), interruptible));
 }
 
 size_t CompiledHashAggAccumulator::estimateSize() const {
@@ -154,9 +156,10 @@ void SinglePurposeHashAggAccumulator::prepareForMerge(CompileCtx& ctx,
     _recoverSpilledStateCode = _recoverSpilledStateExpr->compile(ctx);
 }
 
-void SinglePurposeHashAggAccumulator::accumulate(
-    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
-    value::TagValueMaybeOwned field = bytecode.run(_transformCode.get());
+void SinglePurposeHashAggAccumulator::accumulate(vm::ByteCode& bytecode,
+                                                 value::AssignableSlotAccessor& accumulatorState,
+                                                 Interruptible* interruptible) const {
+    value::TagValueMaybeOwned field = bytecode.run(_transformCode.get(), interruptible);
 
     accumulateTransformedValue(std::move(field), accumulatorState);
 }
@@ -167,11 +170,13 @@ void SinglePurposeHashAggAccumulator::finalize(
     finalizePartialAggregate(std::move(partialAggregate), accumulatorState);
 }
 
-void SinglePurposeHashAggAccumulator::merge(
-    vm::ByteCode& bytecode, value::MaterializedSingleRowAccessor& accumulatorState) const {
+void SinglePurposeHashAggAccumulator::merge(vm::ByteCode& bytecode,
+                                            value::MaterializedSingleRowAccessor& accumulatorState,
+                                            Interruptible* interruptible) const {
     tassert(8186802, "Not prepared for merging partial aggregates", _recoverSpilledStateCode);
 
-    value::TagValueMaybeOwned recoveredState = bytecode.run(_recoverSpilledStateCode.get());
+    value::TagValueMaybeOwned recoveredState =
+        bytecode.run(_recoverSpilledStateCode.get(), interruptible);
     mergeRecoveredState(std::move(recoveredState), accumulatorState);
 }
 
@@ -215,7 +220,7 @@ std::vector<DebugPrinter::Block> SinglePurposeHashAggAccumulator::debugPrintMerg
 }
 
 void ArithmeticAverageHashAggAccumulatorBase::initialize(
-    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
+    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState, Interruptible*) const {
     // Create the array for the sum of inputs. See enum AggSumValueElems for documentation of what
     // these fields mean. The kNonDecimalTotalSum and kNonDecimalTotalAddend must be NumberDouble
     // per tassert 5755312.
@@ -377,7 +382,8 @@ void AddToSetHashAggAccumulator::singlePurposePrepare(CompileCtx& ctx) {
 }
 
 void AddToSetHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                            value::AssignableSlotAccessor& accumulatorState) const {
+                                            value::AssignableSlotAccessor& accumulatorState,
+                                            Interruptible*) const {
     accumulatorState.reset(value::TagValueView::nothing());
 }
 
@@ -451,7 +457,8 @@ void AddToSetHashAggAccumulator::finalizePartialAggregate(
 }
 
 void PushHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                        value::AssignableSlotAccessor& accumulatorState) const {
+                                        value::AssignableSlotAccessor& accumulatorState,
+                                        Interruptible*) const {
     accumulatorState.reset(value::TagValueView::nothing());
 }
 
@@ -516,7 +523,8 @@ void PushHashAggAccumulator::finalizePartialAggregate(value::TagValueOwned parti
 }
 
 void FirstHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                         value::AssignableSlotAccessor& accumulatorState) const {
+                                         value::AssignableSlotAccessor& accumulatorState,
+                                         Interruptible*) const {
     accumulatorState.reset(value::TagValueView::nothing());
 }
 
@@ -558,8 +566,9 @@ void FirstHashAggAccumulator::finalizePartialAggregate(
     result.reset(std::move(partialAggregate));
 }
 
-void CountHashAggAccumulatorBase::initialize(
-    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
+void CountHashAggAccumulatorBase::initialize(vm::ByteCode& bytecode,
+                                             value::AssignableSlotAccessor& accumulatorState,
+                                             Interruptible*) const {
     accumulatorState.reset(value::TagValueView::numberInt64(0));
 }
 
@@ -633,15 +642,16 @@ void CountHashAggAccumulatorPartial::finalizePartialAggregate(
 }
 
 template <AccumulatorMinMaxN::MinMaxSense S>
-void MinMaxNHashAggAccumulatorBase<S>::initialize(
-    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
+void MinMaxNHashAggAccumulatorBase<S>::initialize(vm::ByteCode& bytecode,
+                                                  value::AssignableSlotAccessor& accumulatorState,
+                                                  Interruptible* interruptible) const {
     auto stateOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto* state = value::getArrayViewChecked(stateOwned);
 
     state->push_back(value::TagValueOwned::fromRaw(value::makeNewArray()));
     state->push_back(value::TagValueOwned::numberInt32(0));
 
-    auto maxSizeResult = bytecode.run(_maxSizeCode.get());
+    auto maxSizeResult = bytecode.run(_maxSizeCode.get(), interruptible);
     auto maxSizeConverted =
         genericNumConvert(maxSizeResult.tag(), maxSizeResult.value(), value::TypeTags::NumberInt64);
     uassert(13224210,

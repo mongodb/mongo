@@ -679,7 +679,7 @@ void GenericIndexScanStage::open(bool reOpen) {
 
     IndexScanStageBase::openImpl(reOpen);
 
-    value::TagValueMaybeOwned bound = _bytecode->run(_indexBoundsCode.get());
+    value::TagValueMaybeOwned bound = _bytecode->run(_indexBoundsCode.get(), _opCtx);
     if (bound.tag() == value::TypeTags::Nothing) {
         _scanState = ScanState::kFinished;
         return;

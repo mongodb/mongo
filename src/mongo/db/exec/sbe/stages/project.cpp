@@ -118,7 +118,7 @@ PlanState ProjectStage::getNext() {
         // Run the expressions in order so that each one sees the values produced for this row by
         // the expressions before it.
         for (auto& project : _compiled) {
-            project.accessor.reset(_bytecode->run(project.code.get()));
+            project.accessor.reset(_bytecode->run(project.code.get(), _opCtx));
         }
     }
 

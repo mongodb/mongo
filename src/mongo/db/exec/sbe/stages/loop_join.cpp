@@ -188,7 +188,7 @@ PlanState LoopJoinStage::getNext() {
 
     for (;;) {
         while (_children[1]->getNext() == PlanState::ADVANCED) {
-            if (!_predicateCode || _bytecode->runPredicate(_predicateCode.get())) {
+            if (!_predicateCode || _bytecode->runPredicate(_predicateCode.get(), _opCtx)) {
                 return trackPlanState(PlanState::ADVANCED);
             }
         }

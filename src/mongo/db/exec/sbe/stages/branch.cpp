@@ -108,7 +108,7 @@ void BranchStage::open(bool reOpen) {
     _specificStats.numTested++;
 
     // run the filter expressions here
-    value::TagValueMaybeOwned filterResult = _bytecode->run(_filterCode.get());
+    value::TagValueMaybeOwned filterResult = _bytecode->run(_filterCode.get(), _opCtx);
     if (filterResult.tag() == value::TypeTags::Boolean) {
         if (value::bitcastTo<bool>(filterResult.value())) {
             _activeBranch = 0;

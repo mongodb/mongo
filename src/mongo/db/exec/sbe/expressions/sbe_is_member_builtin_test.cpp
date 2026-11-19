@@ -6,6 +6,7 @@
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
+#include "mongo/db/exec/sbe/expressions/sbe_test_interruptible.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/decimal128.h"
@@ -221,4 +222,66 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberReturnsNothing) {
     runAndAssertExpression(
         inputSlot, {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)}, false);
 }
+TEST_F(SBEBuiltinIsMemberTest, InterruptsAfterFirstArrayBatch) {
+    BSONArrayBuilder array;
+    for (int i = 0; i < 16384; ++i) {
+        array.append(i);
+    }
+    const auto input = array.arr();
+    for (bool bson : {false, true}) {
+        auto [tag, val] = bson ? makeBsonArray(input) : makeArray(input);
+        auto expr = makeE<EFunction>(EFn::kIsMember,
+                                     makeEs(makeC(makeInt32(-1)), makeE<EConstant>(tag, val)));
+        auto code = compileExpression(*expr);
+        CountingInterruptible interruptible(2);
+        ASSERT_THROWS_CODE(
+            _vm.run(code.get(), &interruptible), DBException, ErrorCodes::Interrupted);
+        ASSERT_EQ(interruptible.checks(), 2);
+    }
+}
+
+TEST_F(SBEBuiltinIsMemberTest, InterruptBudgetPersistsAcrossRuns) {
+    auto [tag, val] = makeArray(BSON_ARRAY(false));
+    auto expr =
+        makeE<EFunction>(EFn::kIsMember, makeEs(makeC(makeBool(true)), makeE<EConstant>(tag, val)));
+    auto code = compileExpression(*expr);
+    CountingInterruptible interruptible;
+    for (int i = 0; i < 1023; ++i) {
+        ASSERT_FALSE(_vm.runPredicate(code.get(), &interruptible));
+    }
+    ASSERT_EQ(interruptible.checks(), 0);
+    ASSERT_FALSE(_vm.runPredicate(code.get(), &interruptible));
+    ASSERT_EQ(interruptible.checks(), 1);
+    for (int i = 0; i < 1023; ++i) {
+        ASSERT_FALSE(_vm.runPredicate(code.get(), &interruptible));
+    }
+    ASSERT_EQ(interruptible.checks(), 1);
+    ASSERT_FALSE(_vm.runPredicate(code.get(), &interruptible));
+    ASSERT_EQ(interruptible.checks(), 2);
+}
+
+TEST_F(SBEBuiltinIsMemberTest, InterruptCheckpointUsesCurrentInterruptibleAfterThrow) {
+    auto [tag, val] = makeArray(BSON_ARRAY(false));
+    auto expr =
+        makeE<EFunction>(EFn::kIsMember, makeEs(makeC(makeBool(true)), makeE<EConstant>(tag, val)));
+    auto code = compileExpression(*expr);
+    CountingInterruptible original;
+    for (int i = 0; i < 1023; ++i) {
+        ASSERT_FALSE(_vm.runPredicate(code.get(), &original));
+    }
+    {
+        CountingInterruptible interrupted(1);
+        ASSERT_THROWS_CODE(
+            _vm.runPredicate(code.get(), &interrupted), DBException, ErrorCodes::Interrupted);
+        ASSERT_EQ(interrupted.checks(), 1);
+    }
+    for (int i = 0; i < 1023; ++i) {
+        ASSERT_FALSE(_vm.runPredicate(code.get(), &original));
+    }
+    ASSERT_EQ(original.checks(), 0);
+    ASSERT_FALSE(_vm.runPredicate(code.get(), &original));
+    ASSERT_EQ(original.checks(), 1);
+    ASSERT_FALSE(_vm.runPredicate(code.get()));
+}
+
 }  // namespace mongo::sbe

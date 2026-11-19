@@ -100,7 +100,7 @@ public:
         if constexpr (IsConst) {
             _specificStats.numTested++;
 
-            auto pass = _bytecode->runPredicate(_filterCode.get());
+            auto pass = _bytecode->runPredicate(_filterCode.get(), _opCtx);
             if (!pass) {
                 close();
                 return;
@@ -131,7 +131,7 @@ public:
             if (state == PlanState::ADVANCED) {
                 _specificStats.numTested++;
 
-                pass = _bytecode->runPredicate(_filterCode.get());
+                pass = _bytecode->runPredicate(_filterCode.get(), _opCtx);
 
                 if constexpr (IsEof) {
                     if (!pass) {

@@ -250,7 +250,7 @@ void StreamingAggStage::startNewGroupAt(size_t idx) {
     }
 
     for (size_t i = 0; i < _accumulatorList.size(); ++i) {
-        _accumulatorList[i]->initialize(*_bytecode, _curAggAccessors[i]);
+        _accumulatorList[i]->initialize(*_bytecode, _curAggAccessors[i], _opCtx);
     }
 }
 
@@ -291,7 +291,7 @@ void StreamingAggStage::accumulate() {
             "Current group index must reference an allocated row",
             _curGroupIdx < _groupAggs.size());
     for (size_t i = 0; i < _accumulatorList.size(); ++i) {
-        _accumulatorList[i]->accumulate(*_bytecode, _curAggAccessors[i]);
+        _accumulatorList[i]->accumulate(*_bytecode, _curAggAccessors[i], _opCtx);
     }
 }
 

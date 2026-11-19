@@ -508,9 +508,8 @@ std::string builtinToString(Builtin b) {
     }
 }  // builtinToString
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
-                                                                         ArityType arity,
-                                                                         const CodeFragment* code) {
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(
+    Builtin f, ArityType arity, const CodeFragment* code, Interruptible* interruptible) {
     switch (f) {
         case Builtin::dateDiff:
             return builtinDateDiff(arity).releaseToRaw();
@@ -703,9 +702,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::collSetUnionCapped:
             return builtinCollSetUnionCapped(arity).releaseToRaw();
         case Builtin::isMember:
-            return builtinIsMember(arity).releaseToRaw();
+            return builtinIsMember(arity, interruptible).releaseToRaw();
         case Builtin::collIsMember:
-            return builtinCollIsMember(arity).releaseToRaw();
+            return builtinCollIsMember(arity, interruptible).releaseToRaw();
         case Builtin::indexOfBytes:
             return builtinIndexOfBytes(arity).releaseToRaw();
         case Builtin::indexOfCP:

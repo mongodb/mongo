@@ -271,14 +271,14 @@ void HashAggStage::open(bool reOpen) {
         if (newKey) {
             // Run all acc initializers for this key.
             for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
-                _accumulatorList[idx]->initialize(*_bytecode, *_outHashAggAccessors[idx]);
+                _accumulatorList[idx]->initialize(*_bytecode, *_outHashAggAccessors[idx], _opCtx);
             }
         }
 
         // Accumulate state in '_ht' value, which is a materialized row of '_outAggAccessors'
         // each of which contains the current accumulator state for one accumulator.
         for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
-            _accumulatorList[idx]->accumulate(*_bytecode, *_outHashAggAccessors[idx]);
+            _accumulatorList[idx]->accumulate(*_bytecode, *_outHashAggAccessors[idx], _opCtx);
         }
 
         // If the group-by key is empty we will only ever aggregate into a single row so no
@@ -409,7 +409,7 @@ PlanState HashAggStage::getNextSpilled() {
         // state to be merged into it is in _spilledAggRow.getViewOfValue(idx).
         _spilledAggRow = std::move(recoveredRow.second);
         for (size_t idx = 0; idx < _accumulatorList.size(); ++idx) {
-            _accumulatorList[idx]->merge(*_bytecode, *_outRecordStoreAggAccessors[idx]);
+            _accumulatorList[idx]->merge(*_bytecode, *_outRecordStoreAggAccessors[idx], _opCtx);
         }
     }
 

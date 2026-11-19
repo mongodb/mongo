@@ -211,7 +211,7 @@ private:
     };
 
     int64_t _runLimitCode() {
-        value::TagValueMaybeOwned res = _bytecode->run(_limitCode.get());
+        value::TagValueMaybeOwned res = _bytecode->run(_limitCode.get(), _stage._opCtx);
         tassert(8349205,
                 "Limit code returned unexpected value",
                 res.tag() == value::TypeTags::NumberInt64);

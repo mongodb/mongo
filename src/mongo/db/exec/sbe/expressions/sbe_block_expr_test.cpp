@@ -4,6 +4,7 @@
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
+#include "mongo/db/exec/sbe/expressions/sbe_test_interruptible.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
@@ -1629,6 +1630,77 @@ TEST_F(SBEBlockExpressionTest, BlockApplyMaskedLambdaTest) {
                   result.value(),
                   std::vector<std::pair<value::TypeTags, value::Value>>{
                       makeInt32(84), makeNothing(), makeInt32(88), makeNothing(), makeNothing()});
+}
+
+// Tracks the owned values returned by the masked lambda, independently of the input block.
+class CountingBlock final : public value::ValueBlock {
+public:
+    explicit CountingBlock(int* live) : _live(live) {
+        ++*_live;
+    }
+
+    ~CountingBlock() override {
+        --*_live;
+    }
+
+    std::unique_ptr<value::ValueBlock> clone() const override {
+        return std::make_unique<CountingBlock>(_live);
+    }
+
+    size_t count() override {
+        return 0;
+    }
+
+    int getApproximateSize() const override {
+        return sizeof(*this);
+    }
+
+protected:
+    value::DeblockedTagVals deblock(boost::optional<value::DeblockedTagValStorage>&) override {
+        MONGO_UNREACHABLE;
+    }
+
+private:
+    int* _live;
+};
+
+TEST_F(SBEBlockExpressionTest, InterruptedMaskedLambdaReleasesPriorOwnedResults) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    value::ViewOfValueAccessor maskAccessor;
+    auto maskSlot = bindAccessor(&maskAccessor);
+
+    auto [arrayTag, arrayVal] = makeArray(BSON_ARRAY(false));
+    FrameId frame = 10;
+    auto expr = makeE<EFunction>(
+        EFn::kValueBlockApplyLambda,
+        makeEs(makeE<EVariable>(maskSlot),
+               makeE<EVariable>(blockSlot),
+               makeE<ELocalLambda>(
+                   frame,
+                   makeE<EIf>(makeE<EFunction>(EFn::kIsMember,
+                                               makeEs(makeC(makeBool(true)),
+                                                      makeE<EConstant>(arrayTag, arrayVal))),
+                              makeC(makeNothing()),
+                              makeE<EVariable>(frame, 0)))));
+    auto code = compileExpression(*expr);
+
+    int live = 0;
+    value::HeterogeneousBlock block;
+    for (int i = 0; i < 1024; ++i) {
+        block.push_back(value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(new CountingBlock(&live)));
+    }
+    blockAccessor.reset(value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+    auto mask = makeHeterogeneousBoolBlock(std::vector<bool>(1024, true));
+    maskAccessor.reset(value::TypeTags::valueBlock,
+                       value::bitcastFrom<value::ValueBlock*>(mask.get()));
+
+    CountingInterruptible interruptible(1);
+    ASSERT_THROWS_CODE(_vm.run(code.get(), &interruptible), DBException, ErrorCodes::Interrupted);
+    ASSERT_EQ(interruptible.checks(), 1);
+    ASSERT_EQ(live, 1024);
 }
 
 void SBEBlockExpressionTest::testBlockLogicalOp(EPrimBinary::Op scalarOp,

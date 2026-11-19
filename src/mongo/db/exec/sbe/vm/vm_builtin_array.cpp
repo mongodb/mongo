@@ -376,7 +376,8 @@ value::TagValueMaybeOwned ByteCode::builtinConcatArraysCapped(ArityType arity) {
 
 value::TagValueMaybeOwned ByteCode::isMemberImpl(value::TagValueView expr,
                                                  value::TagValueView arr,
-                                                 CollatorInterface* collator) {
+                                                 CollatorInterface* collator,
+                                                 Interruptible* interruptible) {
     if (!value::isArray(arr.tag) && arr.tag != value::TypeTags::inList) {
         return value::TagValueMaybeOwned::nothing();
     }
@@ -414,6 +415,7 @@ value::TagValueMaybeOwned ByteCode::isMemberImpl(value::TagValueView expr,
     }
     const bool found =
         value::arrayAny(arr.tag, arr.value, [&](value::TypeTags elemTag, value::Value elemVal) {
+            checkForInterrupt(interruptible);
             auto [tag, val] = value::compareValue(expr.tag, expr.value, elemTag, elemVal, collator);
             if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(val) == 0) {
                 return true;
@@ -424,15 +426,16 @@ value::TagValueMaybeOwned ByteCode::isMemberImpl(value::TagValueView expr,
     return value::TagValueMaybeOwned::boolean(found);
 }
 
-value::TagValueMaybeOwned ByteCode::builtinIsMember(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinIsMember(ArityType arity, Interruptible* interruptible) {
     tassert(11080068, "Unexpected arity value", arity == 2);
     auto expr = viewFromStack(0);
     auto arr = viewFromStack(1);
 
-    return ByteCode::isMemberImpl(expr, arr, nullptr);
+    return ByteCode::isMemberImpl(expr, arr, nullptr, interruptible);
 }
 
-value::TagValueMaybeOwned ByteCode::builtinCollIsMember(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCollIsMember(ArityType arity,
+                                                        Interruptible* interruptible) {
     tassert(11080067, "Unexpected arity value", arity == 3);
     auto expr = viewFromStack(0);
     auto arr = viewFromStack(1);
@@ -446,7 +449,7 @@ value::TagValueMaybeOwned ByteCode::builtinCollIsMember(ArityType arity) {
         return value::TagValueMaybeOwned::nothing();
     }
 
-    return ByteCode::isMemberImpl(expr, arr, collator);
+    return ByteCode::isMemberImpl(expr, arr, collator, interruptible);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinExtractSubArray(ArityType arity) {
