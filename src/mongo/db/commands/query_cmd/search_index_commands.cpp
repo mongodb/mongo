@@ -5,6 +5,7 @@
 #include "mongo/db/commands/query_cmd/search_index_commands_gen.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/search_index_process_interface.h"
 #include "mongo/db/query/search/search_index_view_validation.h"
@@ -19,6 +20,16 @@
 namespace mongo {
 
 namespace {
+
+/**
+ * The built-in search index management commands defer their registration to the extension-provided
+ * counterparts when both flags are configured at startup. This decision is fixed for the process
+ * lifetime.
+ */
+bool canEnableExtensionSearchIndexManagement() {
+    return feature_flags::gFeatureFlagExtensionCommands.isEnabled() &&
+        feature_flags::gFeatureFlagExtensionSearchIndexManagement.isEnabled();
+}
 
 template <typename CommandType>
 BSONObj retrieveSearchIndexManagerResponseHelper(OperationContext* opCtx, CommandType& cmd) {
@@ -112,7 +123,10 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdCreateSearchIndexesCommand).forShard().forRouter();
+MONGO_REGISTER_COMMAND(CmdCreateSearchIndexesCommand)
+    .forShard()
+    .forRouter()
+    .deferToExtensionIf(canEnableExtensionSearchIndexManagement);
 
 /**
  * Passthrough command to the search index management endpoint on which the manageSearchIndex
@@ -187,7 +201,10 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdDropSearchIndexCommand).forShard().forRouter();
+MONGO_REGISTER_COMMAND(CmdDropSearchIndexCommand)
+    .forShard()
+    .forRouter()
+    .deferToExtensionIf(canEnableExtensionSearchIndexManagement);
 
 /**
  * Passthrough command to the search index management endpoint on which the manageSearchIndex
@@ -267,7 +284,10 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdUpdateSearchIndexCommand).forShard().forRouter();
+MONGO_REGISTER_COMMAND(CmdUpdateSearchIndexCommand)
+    .forShard()
+    .forRouter()
+    .deferToExtensionIf(canEnableExtensionSearchIndexManagement);
 
 /**
  * Passthrough command to the search index management endpoint on which the manageSearchIndex

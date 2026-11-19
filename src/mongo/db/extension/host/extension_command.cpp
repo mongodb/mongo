@@ -52,6 +52,12 @@ ClusterRole toClusterRole(MongoExtensionCommandClusterRoleEnum role) {
 constexpr std::array kReservedReplyFields{
     "ok", "errmsg", "code", "codeName", "$clusterTime", "operationTime", "writeConcernError"};
 
+// TODO SPM-4543: Remove this function when removing the legacy search index management commands.
+bool isSearchIndexManagementCommand(std::string_view cmdName) {
+    return cmdName == "createSearchIndexes" || cmdName == "updateSearchIndex" ||
+        cmdName == "dropSearchIndex";
+}
+
 /**
  * Resolves the target of an extension command to the UUID and view metadata of the collection that
  * 'nss' names, where a view resolves to its source collection's UUID and the view's pipeline.
@@ -99,6 +105,15 @@ void ExtensionCommand::registerCommand(CommandDescriptorHandle descriptor) {
     if (!feature_flags::gFeatureFlagExtensionCommands.isEnabled()) {
         LOGV2(13730005,
               "Extension commands are disabled; skipping command registration",
+              "commandName"_attr = cmdName);
+        return;
+    }
+
+    if (isSearchIndexManagementCommand(cmdName) &&
+        !feature_flags::gFeatureFlagExtensionSearchIndexManagement.isEnabled()) {
+        LOGV2(13730008,
+              "The legacy search index management commands are in use; skipping registration of "
+              "the extension-provided counterpart",
               "commandName"_attr = cmdName);
         return;
     }

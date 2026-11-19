@@ -392,6 +392,30 @@ TEST_F(ExtensionCommandTest, RegisterCommandIsSkippedWhenFeatureFlagDisabled) {
     ASSERT_FALSE(findCommand("testExtFlagOff"));
 }
 
+TEST_F(ExtensionCommandTest, RegisterCommandSkipsSearchIndexManagementWhenBuiltinsInUse) {
+    const char* const kSearchIndexCommands[] = {
+        "createSearchIndexes", "updateSearchIndex", "dropSearchIndex"};
+
+    // featureFlagExtensionSearchIndexManagement defaults off, so the built-in search index
+    // management commands are in use and the extension's registrations of their names are skipped
+    // rather than colliding with the built-ins.
+    for (const char* name : kSearchIndexCommands) {
+        registerCommand(name);
+        ASSERT_FALSE(findCommand(name)) << name;
+    }
+
+    // A command that is not a search index management command is still registered.
+    registerCommand("testExtNotSearchIndex");
+    ASSERT_TRUE(findCommand("testExtNotSearchIndex"));
+
+    // When the flag is on, the built-ins defer to the extension, so all of these names register.
+    unittest::ServerParameterGuard flag{"featureFlagExtensionSearchIndexManagement", true};
+    for (const char* name : kSearchIndexCommands) {
+        registerCommand(name);
+        ASSERT_TRUE(findCommand(name)) << name;
+    }
+}
+
 TEST_F(ExtensionCommandTest, HostPortalRefusesCommandFromApi10Session) {
     HostPortal portal(CapabilityVersion(MONGODB_EXTENSION_API_MAJOR_VERSION, 0));
     sdk::ExtensionCommandDescriptorAdapter descriptor(
