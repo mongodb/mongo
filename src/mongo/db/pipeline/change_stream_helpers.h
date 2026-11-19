@@ -11,6 +11,7 @@
 #include "mongo/db/pipeline/change_stream_error_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
+#include "mongo/db/pipeline/end_of_transaction_rebuild_state.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -26,6 +27,8 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+
+class AggregateCommandRequest;
 
 // Builds an operationType:"error" change stream event from the exception 'ex' being handled, using
 // the failing change event in flight ('sourceEvent', the recorded identity of the error; its
@@ -98,6 +101,24 @@ bool isRouterOrNonShardedReplicaSet(const boost::intrusive_ptr<ExpressionContext
  * shard-local: its events are merged on the router.
  */
 bool isShardLocalStream(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+/**
+ * Adds (or replaces) the internal 'backfillingStartAtOperationTime' field on the '$changeStream'
+ * stage of 'request', so that a rebuilt change stream scans the oplog from 'backfillFrom' while its
+ * resume point remains the suppression point. When 'resumeToken' is non-empty, the existing resume
+ * options are replaced with 'startAfter: resumeToken' (the client's current resume position), so a
+ * rebuilt stream does not re-emit events the client has already received. 'startAfter' rather than
+ * 'resumeAfter' is used because the current position may be an invalidate notification (a stream
+ * opened with 'startAfter' an invalidate event that has not advanced), which 'resumeAfter' rejects.
+ * When the stage carries no resume option and 'resolvedStartPoint' is set, an explicit
+ * 'startAtOperationTime' is added so the rebuilt stream keeps the start point resolved for the
+ * first attempt instead of re-resolving a later one.
+ */
+void setBackfillingStartOnChangeStreamStage(
+    AggregateCommandRequest& request,
+    Timestamp backfillFrom,
+    const BSONObj& resumeToken = BSONObj(),
+    boost::optional<Timestamp> resolvedStartPoint = boost::none);
 
 /**
  * Extracts the resume token from the given spec. If a 'startAtOperationTime' is specified,

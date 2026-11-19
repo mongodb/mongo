@@ -5,9 +5,11 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/end_of_transaction_parameter.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -290,6 +292,52 @@ namespace {
 // conversion stage also serializes events for opted-in streams.
 auto& changeStreamsLargeEventsFailedCounter =
     *MetricBuilder<Counter64>{"changeStreams.largeEventsFailed"};
+
+// Rebuilds a '$changeStream' stage for backfilling, replacing its resume options with the supplied
+// 'resumeToken' (as 'startAfter') and setting 'backfillingStartAtOperationTime' to 'backfillFrom'.
+// See 'setBackfillingStartOnChangeStreamStage' for the full contract.
+BSONObj rewriteChangeStreamStageForBackfill(const BSONObj& stage,
+                                            Timestamp backfillFrom,
+                                            const BSONObj& resumeToken,
+                                            boost::optional<Timestamp> resolvedStartPoint) {
+    BSONObjBuilder builder;
+    BSONObjBuilder changeStreamBuilder(builder.subobjStart(DocumentSourceChangeStream::kStageName));
+    bool hasResumeOption = false;
+    for (const auto& elem : stage.firstElement().Obj()) {
+        const auto fieldName = elem.fieldNameStringData();
+        if (fieldName ==
+            DocumentSourceChangeStreamSpec::kBackfillingStartAtOperationTimeFieldName) {
+            continue;
+        }
+        // Pipeline construction rejects a stage with more than one resume option, so at most one of
+        // these is present. When a resume token is supplied, the existing option is dropped here
+        // and a single 'startAfter' is appended below; the below append is also what covers a stage
+        // that carries no resume option at all.
+        if (fieldName == DocumentSourceChangeStreamSpec::kResumeAfterFieldName ||
+            fieldName == DocumentSourceChangeStreamSpec::kStartAfterFieldName ||
+            fieldName == DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName) {
+            hasResumeOption = true;
+            if (!resumeToken.isEmpty()) {
+                continue;
+            }
+        }
+        changeStreamBuilder.append(elem);
+    }
+    if (!resumeToken.isEmpty()) {
+        // Use 'startAfter' rather than 'resumeAfter': the client's current resume position may be
+        // an invalidate notification (a stream opened with 'startAfter' an invalidate event that
+        // has not advanced), which 'resumeAfter' rejects.
+        changeStreamBuilder.append(DocumentSourceChangeStreamSpec::kStartAfterFieldName,
+                                   resumeToken);
+    } else if (!hasResumeOption && resolvedStartPoint) {
+        changeStreamBuilder.append(DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName,
+                                   *resolvedStartPoint);
+    }
+    changeStreamBuilder.append(
+        DocumentSourceChangeStreamSpec::kBackfillingStartAtOperationTimeFieldName, backfillFrom);
+    changeStreamBuilder.doneFast();
+    return builder.obj();
+}
 }  // namespace
 
 void incrementLargeEventsFailedMetric() {
@@ -430,6 +478,27 @@ Document makeEndOfTransactionChangeEvent(const Value& resumeToken,
     }
 
     return document.freeze();
+}
+
+void setBackfillingStartOnChangeStreamStage(AggregateCommandRequest& request,
+                                            Timestamp backfillFrom,
+                                            const BSONObj& resumeToken,
+                                            boost::optional<Timestamp> resolvedStartPoint) {
+    auto pipeline = request.getPipeline();
+    bool found = false;
+    for (auto& stage : pipeline) {
+        if (stage.firstElementFieldNameStringData() != DocumentSourceChangeStream::kStageName) {
+            continue;
+        }
+
+        stage = rewriteChangeStreamStageForBackfill(
+            stage, backfillFrom, resumeToken, resolvedStartPoint);
+        found = true;
+        break;
+    }
+
+    tassert(13878204, "expected a $changeStream stage in the aggregate request", found);
+    request.setPipeline(pipeline);
 }
 
 }  // namespace mongo::change_stream

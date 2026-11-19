@@ -6,6 +6,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
@@ -462,6 +463,106 @@ TEST_F(ChangeStreamHelpersTest, NoInfrastructureOrTransientErrorIsConvertible) {
         ASSERT_FALSE(isConvertibleChangeStreamError(code))
             << "infrastructure/transient code " << code << " (" << ErrorCodes::errorString(code)
             << ") must not be convertible";
+    }
+}
+
+TEST_F(ChangeStreamHelpersTest, BackfillRewriteUsesStartAfterForTheResumeToken) {
+    // The client's current resume position can be an invalidate notification, which is a valid
+    // resume option only as 'startAfter'. The rewrite must therefore not turn it into
+    // 'resumeAfter', which the server rejects for such a token.
+    const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    const BSONObj resumeToken = BSON("_data" << "token");
+    const Timestamp backfillFrom(100, 1);
+
+    AggregateCommandRequest request(
+        nss, std::vector<BSONObj>{BSON("$changeStream" << BSON("startAfter" << resumeToken))});
+    setBackfillingStartOnChangeStreamStage(request, backfillFrom, resumeToken);
+
+    const auto stage = request.getPipeline()[0]["$changeStream"].Obj();
+    ASSERT_FALSE(stage.hasField("resumeAfter"));
+    ASSERT_TRUE(stage.hasField("startAfter"));
+    ASSERT_BSONOBJ_EQ(resumeToken, stage["startAfter"].Obj());
+    ASSERT_EQ(backfillFrom, stage["backfillingStartAtOperationTime"].timestamp());
+}
+
+TEST_F(ChangeStreamHelpersTest, BackfillRewriteUsesStartAfterForAResumeAfterClient) {
+    // A client that opened with 'resumeAfter' (and therefore cannot be sitting on an invalidate
+    // token) is rewritten the same way; 'startAfter' and 'resumeAfter' are equivalent for any
+    // other token.
+    const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    const BSONObj resumeToken = BSON("_data" << "token");
+    const Timestamp backfillFrom(100, 1);
+
+    AggregateCommandRequest request(
+        nss, std::vector<BSONObj>{BSON("$changeStream" << BSON("resumeAfter" << resumeToken))});
+    setBackfillingStartOnChangeStreamStage(request, backfillFrom, resumeToken);
+
+    const auto stage = request.getPipeline()[0]["$changeStream"].Obj();
+    ASSERT_FALSE(stage.hasField("resumeAfter"));
+    ASSERT_TRUE(stage.hasField("startAfter"));
+    ASSERT_BSONOBJ_EQ(resumeToken, stage["startAfter"].Obj());
+}
+
+TEST_F(ChangeStreamHelpersTest, BackfillRewriteMakesAnImplicitStartPointExplicit) {
+    // A brand-new stream has no explicit resume option; the rewrite must make its resolved start
+    // point explicit so a retry does not re-resolve a later one.
+    const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    const Timestamp backfillFrom(100, 1);
+    const Timestamp resolvedStartPoint(200, 5);
+
+    AggregateCommandRequest request(nss, std::vector<BSONObj>{BSON("$changeStream" << BSONObj())});
+    setBackfillingStartOnChangeStreamStage(
+        request, backfillFrom, /*resumeToken=*/BSONObj(), resolvedStartPoint);
+
+    const auto stage = request.getPipeline()[0]["$changeStream"].Obj();
+    ASSERT_FALSE(stage.hasField("resumeAfter"));
+    ASSERT_FALSE(stage.hasField("startAfter"));
+    ASSERT_EQ(resolvedStartPoint, stage["startAtOperationTime"].timestamp());
+    ASSERT_EQ(backfillFrom, stage["backfillingStartAtOperationTime"].timestamp());
+}
+
+TEST_F(ChangeStreamHelpersTest, BackfillRewriteAddsStartAfterWhenStageHasNoResumeOption) {
+    // A stream opened without a resume option (a brand-new stream) can still be rebuilt with a
+    // non-empty resume token, e.g. the current high-water mark on a getMore rebuild. The stage has
+    // no resume option to replace, so the rewrite must append a 'startAfter' on its own.
+    const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    const BSONObj resumeToken = BSON("_data" << "token");
+    const Timestamp backfillFrom(100, 1);
+
+    AggregateCommandRequest request(
+        nss, std::vector<BSONObj>{BSON("$changeStream" << BSON("fullDocument" << "updateLookup"))});
+    setBackfillingStartOnChangeStreamStage(request, backfillFrom, resumeToken);
+
+    ASSERT_BSONOBJ_EQ(
+        BSON("$changeStream" << BSON("fullDocument" << "updateLookup" << "startAfter" << resumeToken
+                                                    << "backfillingStartAtOperationTime"
+                                                    << backfillFrom)),
+        request.getPipeline()[0]);
+}
+
+TEST_F(ChangeStreamHelpersTest, BackfillRewriteReplacesExistingValuesOnRepeatedRebuilds) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    const BSONObj originalToken = BSON("_data" << "original");
+    const BSONObj downstreamStage = BSON("$match" << BSON("operationType" << "insert"));
+    AggregateCommandRequest request(
+        nss,
+        std::vector<BSONObj>{
+            BSON("$changeStream" << BSON("resumeAfter" << originalToken << "fullDocument"
+                                                       << "updateLookup")),
+            downstreamStage});
+
+    for (int attempt = 1; attempt <= 2; ++attempt) {
+        const BSONObj resumeToken = BSON("_data" << (attempt == 1 ? "first" : "second"));
+        const Timestamp backfillFrom(100 + attempt, 1);
+        setBackfillingStartOnChangeStreamStage(request, backfillFrom, resumeToken);
+
+        ASSERT_EQ(2U, request.getPipeline().size());
+        ASSERT_BSONOBJ_EQ(
+            BSON("$changeStream" << BSON("fullDocument"
+                                         << "updateLookup" << "startAfter" << resumeToken
+                                         << "backfillingStartAtOperationTime" << backfillFrom)),
+            request.getPipeline()[0]);
+        ASSERT_BSONOBJ_EQ(downstreamStage, request.getPipeline()[1]);
     }
 }
 
