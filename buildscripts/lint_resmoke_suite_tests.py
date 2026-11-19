@@ -69,6 +69,7 @@ EVERGREEN_EXEMPT_PATTERNS = (
     # release classification metadata (see docs/evergreen-testing/yaml_configuration/task_selection_tags.md)
     "non_release_critical",
     "release_critical",
+    "infinite_release_critical",
     "build_critical",
 )
 
