@@ -5207,5 +5207,134 @@ TEST_F(PipelineDependencyGraphTest, GetTypeOfUnknownSubfieldOfProjectedThenDotte
     ASSERT_EQ(graph->getType_forTest(nullptr, "a.c").toDebugString(), "~missing");
 }
 
+TEST_F(PipelineDependencyGraphTest, GetTypeOfNonArraySubpathAfterSingleRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    pathArrayness->addPath("b.x", {}, true);
+    setPipeline("[{$set: {a: '$b'}}]");
+
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "b.x").toDebugString(), "~array");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a.x").toDebugString(), "~array");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfNonArraySubpathAfterTransitiveWholeFieldRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    pathArrayness->addPath("b.x", {}, true);
+    setPipeline(R"([
+        {$set: {a: '$b'}},
+        {$set: {c: '$a'}}
+    ])");
+
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a.x").toDebugString(), "~array");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "c.x").toDebugString(), "~array");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfNonArraySubpathAfterTransitiveDottedSourceRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    pathArrayness->addPath("b.x.y", {}, true);
+    setPipeline(R"([
+        {$set: {a: '$b'}},
+        {$set: {c: '$a.x'}}
+    ])");
+
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a.x.y").toDebugString(), "~array");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "c.y").toDebugString(), "~array");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfNonArraySubpathAfterDottedSourceRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    pathArrayness->addPath("b.x.y", {}, true);
+    setPipeline("[{$set: {a: '$b.x'}}]");
+
+    runTest([&] {
+        ASSERT_FALSE(graph->getType_forTest(nullptr, "b.x.y").hasType(BSONType::array));
+        ASSERT_FALSE(graph->getType_forTest(nullptr, "a.y").hasType(BSONType::array));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaSubpathAfterSingleRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setSchemaTypeFromMatch(R"({
+        b: {$_internalSchemaType: 'object'},
+        'b.x': {$_internalSchemaType: 'int'}
+    })");
+    setPipeline("[{$set: {a: '$b'}}]");
+
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "b.x").toDebugString(), "int");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a.x").toDebugString(), "int");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaSubpathAfterTransitiveDottedSourceRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setSchemaTypeFromMatch(R"({
+        b: {$_internalSchemaType: 'object'},
+        'b.x': {$_internalSchemaType: 'object'},
+        'b.x.y': {$_internalSchemaType: 'string'}
+    })");
+    setPipeline(R"([
+        {$set: {a: '$b'}},
+        {$set: {c: '$a.x'}}
+    ])");
+
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a.x.y").toDebugString(), "string");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "c.y").toDebugString(), "string");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaSubpathAfterDottedSourceRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setSchemaTypeFromMatch(R"({
+        b: {$_internalSchemaType: 'object'},
+        'b.x': {$_internalSchemaType: 'object'},
+        'b.x.y': {$_internalSchemaType: 'bool'}
+    })");
+    setPipeline("[{$set: {a: '$b.x'}}]");
+
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a").toDebugString(), "{y: bool, ...}");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "a.y").toDebugString(), "bool");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CollectionAliasThroughArrayPrefixCanBeArray) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setSchemaTypeFromMatch(R"({
+        a: {$_internalSchemaType: 'object'},
+        'a.b': {$_internalSchemaType: 'object'},
+        'a.b.c': {$_internalSchemaType: 'int'}
+    })");
+    setPipeline(R"([
+        {$set: {p: [{}]}},
+        {$set: {'p.x': '$a'}},
+        {$set: {y: '$p.x.b'}}
+    ])");
+
+    runTest([&] {
+        // TODO(SERVER-137963): 'p.x.b.c' cannot be missing here.
+        ASSERT_EQ(graph->getType_forTest(nullptr, "p.x.b.c").toDebugString(),
+                  "missing|int|array(S)");
+        ASSERT_EQ(graph->getType_forTest(nullptr, "y.c").toDebugString(), "int|array(S)");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfSchemaArraySubpathAfterRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setSchemaTypeFromMatch(R"({
+        b: {$_internalSchemaType: 'object'},
+        'b.x': {$_internalSchemaType: 'array'}
+    })");
+    setPipeline("[{$set: {a: '$b'}}]");
+
+    runTest([&] { ASSERT_EQ(graph->getType_forTest(nullptr, "a.x").toDebugString(), "array"); });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

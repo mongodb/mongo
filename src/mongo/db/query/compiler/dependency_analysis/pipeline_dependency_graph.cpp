@@ -1358,12 +1358,28 @@ private:
                                           subGraph->_impl->lookupPath(nullptr, pathMatch.suffix()),
                                           arraynessOnly));
                 }
+                if (auto* alias = getCollectionAlias(pathMatch.field.fieldId)) {
+                    const auto aliasPath = buildDottedPath(*alias);
+                    const auto collectionPath = buildDottedPath(*alias, pathMatch.suffix());
+                    auto aliasPathType =
+                        resolvePathType(getDocumentTypeFromCollection(collectionPath), aliasPath);
+                    // The fieldType already encodes the arrayness of the field. The alias is
+                    // assigned transitively, and could go through an array-containing prefix.
+                    // Example:
+                    // [{$set: {'p.x': '$a'}}, {$set: {y: '$p.x.b'}}]
+                    // If 'p' is an array, 'y' can be an array even if 'a.b' is an object.
+                    // For 'y.c', fieldType correctly includes the array. Clearing it here would
+                    // incorrectly infer 'y.c' as non-array.
+                    fieldType =
+                        intersectType(std::move(fieldType),
+                                      unionType(std::move(aliasPathType), Type::anyArray()));
+                }
                 break;
             case FieldMatchType::kMissing:
                 fieldType = getFieldTypeFromMetadata(pathMatch.field.fieldId);
                 break;
             case FieldMatchType::kBaseDocument: {
-                auto rootType = getDocumentTypeFromCollection(pathMatch);
+                auto rootType = getDocumentTypeFromCollection(pathMatch.path);
                 fieldType = resolvePathType(
                     std::move(rootType),
                     takePathComponents(pathMatch.path, pathMatch.prefix.size() + 1));
@@ -1386,23 +1402,23 @@ private:
      * Returns the document type of the collection holding the matched path, with arrays removed
      * where the collection's path arrayness proves them absent.
      */
-    Type getDocumentTypeFromCollection(const PathMatch& pathMatch) const {
-        const PathRef topLevelField = takePathComponents(pathMatch.path, 1);
+    Type getDocumentTypeFromCollection(PathRef path) const {
+        const PathRef topLevelField = takePathComponents(path, 1);
         Type rootType = Type::anyObject();
         rootType.setField(topLevelField, getTypeFromSchema(topLevelField));
-        if (!rootType.canPathBeArray(FieldRef(pathMatch.path))) {
+        if (!rootType.canPathBeArray(FieldRef(path))) {
             return rootType;
         }
-        return ts::intersectType(std::move(rootType), getConstraintFromPathArrayness(pathMatch));
+        return ts::intersectType(std::move(rootType), getConstraintFromPathArrayness(path));
     }
 
     /**
      * Returns a Type encoding the PathArrayness information for the given path.
      */
-    Type getConstraintFromPathArrayness(const PathMatch& pathMatch) const {
+    Type getConstraintFromPathArrayness(PathRef path) const {
         // Probe prefixes, until we exhaust the path.
         // For 'a.b.c', check 'a.b.c' then 'a.b', then 'a'.
-        for (PathRef path = pathMatch.path;; path = getPathPrefix(path)) {
+        for (;; path = getPathPrefix(path)) {
             if (!canCollectionFieldBeArray(path)) {
                 return nonArrayPathType(path);
             }
@@ -2311,21 +2327,26 @@ private:
                     dassert(lookupField(scopeId, parsedNewPath).fieldId == leafFieldId);
                     _fields[leafFieldId].dependencies.insert(oldPathField);
 
+                    if (constant) {
+                        setConstant(leafFieldId, *std::move(constant));
+                    }
+
+                    // Group stages pretend that '_id' renames a prior field, but in reality,
+                    // it's not a simple rename. For instance, missing becomes null, and int(1)
+                    // and long(1) share the same bucket. Hence we don't want to forward some
+                    // metadata with $group. The check is more conservative than $group - check for
+                    // single doc transformation.
+                    if (!ds.isSingleDocumentTransformation()) {
+                        return;
+                    }
+
                     // Store old path for the rename.
                     _renames[leafFieldId] = std::string(p.getOldPath());
                     // Store alias for the leaf field of the new path.
                     if (!aliasCollectionPath.empty()) {
                         _collectionAliases[leafFieldId] = std::move(aliasCollectionPath);
                     }
-                    if (constant) {
-                        setConstant(leafFieldId, *std::move(constant));
-                    }
-                    if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled() &&
-                        // Group stages pretend that '_id' renames a prior field, but in reality,
-                        // it's not a simple rename. For instance, missing becomes null, and int(1)
-                        // and long(1) share the same bucket. Hence we don't want type information
-                        // to flow through group stages.
-                        ds.isSingleDocumentTransformation()) {
+                    if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
                         setType(leafFieldId, getType(oldPathMatch));
                     }
                 },
