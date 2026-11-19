@@ -101,11 +101,20 @@ struct [[MONGO_MOD_PUBLIC]] PlanSummaryStats {
         HASH_JOIN,
         SET_WINDOW_FIELDS,
         SORT,
+        SPOOL,
         TEXT_OR,
     };
 
     // The accumulated spilling statistics per stage type.
     absl::flat_hash_map<SpillingStage, SpillingStats> spillingStatsPerStage;
+
+    SpillingStats getTotalSpillingStats() const {
+        SpillingStats total;
+        for (const auto& [_, stageStats] : spillingStatsPerStage) {
+            total.accumulate(stageStats);
+        }
+        return total;
+    }
 
     // The amount of data we've sorted in bytes.
     size_t sortTotalDataSizeBytes = 0;

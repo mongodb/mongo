@@ -101,6 +101,14 @@ void addSingleSpillingStats(PlanSummaryStats::SpillingStage stage,
             appendCallback("sortTotalDataSizeBytes",
                            static_cast<long long>(sortTotalDataSizeBytes));
             return;
+        case PlanSummaryStats::SpillingStage::SPOOL:
+            appendCallback("spoolSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("spoolSpilledBytes", static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("spoolSpilledRecords",
+                           static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("spoolSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            return;
         case PlanSummaryStats::SpillingStage::TEXT_OR:
             appendCallback("textOrSpills", static_cast<long long>(stats.getSpills()));
             appendCallback("textOrSpilledBytes", static_cast<long long>(stats.getSpilledBytes()));

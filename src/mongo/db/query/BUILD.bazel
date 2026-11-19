@@ -98,6 +98,7 @@ mongo_cc_library(
         ":replanning_required_info",
         "//src/mongo:base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/pipeline/spilling:spilling_stats",
         "//src/mongo/db/query/datetime:init_timezone_data",
     ],
 )
@@ -874,6 +875,7 @@ mongo_cc_unit_test(
         "plan_explainer_test.cpp",
         "plan_ranker_index_prefix_test.cpp",
         "plan_ranker_test.cpp",
+        "plan_summary_stats_test.cpp",
         "query_feature_flag_test.cpp",
         "query_latency_accumulator_test.cpp",
         "query_lifespan_test.cpp",

@@ -78,6 +78,15 @@ public:
         boost::optional<int64_t> limit = boost::none,
         boost::optional<int64_t> skip = boost::none);
 
+    static void buildExecStats_forTest(
+        const std::vector<AsyncRequestsSender::Response>& shardResponses,
+        const char* mongosStageName,
+        long long millisElapsed,
+        BSONObjBuilder* out,
+        boost::optional<int64_t> limit,
+        boost::optional<int64_t> skip) {
+        buildExecStats(shardResponses, mongosStageName, millisElapsed, out, limit, skip);
+    }
 
     //
     // Names of mock mongos execution stages.

@@ -1083,15 +1083,24 @@ PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* stats,
     summary.nReturned = stats->common.advanced;
     summary.executionTime = stats->common.executionTime;
 
-    const auto statsNodeCallback = [&summary](const PlanStageStats* statsNode) {
+    // The visitor counts docs and keys separately, spillingSummary is used as a temp to prevent
+    // double counting.
+    PlanSummaryStats spillingSummary;
+    PlanSummaryStatsVisitor spillingVisitor(spillingSummary);
+
+    const auto statsNodeCallback = [&summary, &spillingVisitor](const PlanStageStats* statsNode) {
         tassert(3420005, "Unexpected MultiPlanStage", STAGE_MULTI_PLAN != statsNode->stageType);
         summary.totalKeysExamined +=
             getKeysExamined(statsNode->stageType, statsNode->specific.get());
         summary.totalDocsExamined +=
             getDocsExamined(statsNode->stageType, statsNode->specific.get());
+        if (statsNode->specific) {
+            statsNode->specific->acceptVisitor(&spillingVisitor);
+        }
     };
     traverseStatsTree(stats, planIdx, statsNodeCallback);
 
+    summary.spillingStatsPerStage = std::move(spillingSummary.spillingStatsPerStage);
     summary.planFailed = stats->common.failed;
 
     return summary;
@@ -1263,6 +1272,7 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->indexesUsed.clear();
     statsOut->collectionScans = 0;
     statsOut->collectionScansNonTailable = 0;
+    statsOut->spillingStatsPerStage.clear();
 
     statsOut->replanReason = _replanReason;
     statsOut->planSelectionStrategy = _planSelectionStrategy;

@@ -332,6 +332,22 @@ number of documents and index keys examined. The `executionTimeMillis` field des
 amount of time required for both query optimization and query execution. It does not include the
 network time required to transmit the data back to the client.
 
+Each stage that spilled to disk reports its own spill metrics: `spills`, `spilledBytes`,
+`spilledRecords` and `spilledDataStorageSize` (a `SPOOL` stage reports its bytes as
+`spilledUncompressedDataSize`). `executionStats` sums these over the winning plan's stages as
+`totalSpills`, `totalSpilledBytes`, `totalSpilledRecords` and `totalSpilledDataStorageSize`, which
+are omitted when nothing spilled and not reported in the `allPlansExecution` entries.
+
+For an aggregation, the top-level totals cover the whole pipeline. In a sharded find or count,
+mongos sums the shards' totals into its `executionStats`. For an aggregate, each shard reports its
+own totals under `shards.<shardId>` and mongos does not sum them; the part of the pipeline that
+merges the shards' results reports none, as it does not run for explain.
+
+Accepted limitation: each shard's explain runs to completion independently, so in a sharded find or
+count with skip or limit, the summed spill totals can overstate what a real run would spill, as the
+real run may stop pulling from shards early once the limit is satisfied. Unlike `nReturned`, the
+totals are not adjusted for the router-side skip and limit, as there is no meaningful way to do so.
+
 For write operations, query execution refers to the modifications that **would** be performed, but
 does **not** make those modifications to the database.
 

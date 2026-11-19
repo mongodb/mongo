@@ -4,15 +4,20 @@
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -252,6 +257,65 @@ TEST_F(ShardedAggHelpersFixture, HasUnsourcedSetVariableStage) {
     ASSERT(setVariableStage);
     setVariableStage->addSubPipelineInitialSource(DocumentSourceMock::create(expCtx()));
     ASSERT_FALSE(hasUnsourcedSetVariableStage(*unsourcedPipeline));
+}
+
+AsyncRequestsSender::Response makeExplainResponse(const std::string& shardName,
+                                                  const BSONObj& explain) {
+    return {ShardId(shardName),
+            executor::RemoteCommandResponse::make_forTest(explain.addFields(BSON("ok" << 1)),
+                                                          Microseconds(0)),
+            HostAndPort(shardName, 27017)};
+}
+
+BSONObj mergeShardExplains(const std::vector<AsyncRequestsSender::Response>& responses) {
+    BSONObjBuilder bob;
+    mergeExplainOutputFromShards(responses, &bob);
+    return bob.obj();
+}
+
+const BSONObj kSpillingTotals = fromjson(
+    "{totalSpills: 3, totalSpilledBytes: 300, totalSpilledRecords: 30,"
+    " totalSpilledDataStorageSize: 90}");
+
+TEST(MergeExplainOutputFromShardsTest, KeepsSpillingTotalsOfPipelineShapedShardExplain) {
+    std::vector<AsyncRequestsSender::Response> responses;
+    responses.push_back(makeExplainResponse(
+        "shardA",
+        BSON("explainVersion" << "1" << "stages" << BSON_ARRAY(BSON("$group" << BSONObj())))
+            .addFields(kSpillingTotals)));
+    // A shard that did not spill sends no totals, so none are added for it.
+    responses.push_back(makeExplainResponse(
+        "shardB",
+        BSON("explainVersion" << "1" << "stages" << BSON_ARRAY(BSON("$group" << BSONObj())))));
+
+    const BSONObj merged = mergeShardExplains(responses);
+    const BSONObj shardA = merged["shards"]["shardA"].Obj();
+    for (auto&& total : kSpillingTotals) {
+        ASSERT_EQ(shardA[total.fieldNameStringData()].numberLong(), total.numberLong())
+            << total.fieldNameStringData();
+    }
+    ASSERT_TRUE(shardA.hasField("stages"));
+
+    const BSONObj shardB = merged["shards"]["shardB"].Obj();
+    for (auto fieldName : explain_common::kTotalSpillingStatsFieldNames) {
+        ASSERT_FALSE(shardB.hasField(fieldName)) << fieldName;
+    }
+}
+
+TEST(MergeExplainOutputFromShardsTest, FindShapedShardExplainKeepsTotalsInExecutionStats) {
+    std::vector<AsyncRequestsSender::Response> responses;
+    responses.push_back(makeExplainResponse(
+        "shardA",
+        BSON("explainVersion" << "1" << "queryPlanner" << BSONObj() << "executionStats"
+                              << BSON("nReturned" << 5).addFields(kSpillingTotals))));
+
+    const BSONObj merged = mergeShardExplains(responses);
+    const BSONObj shardA = merged["shards"]["shardA"].Obj();
+    // The totals stay inside 'executionStats' and are not copied to the top level.
+    ASSERT_EQ(shardA["executionStats"]["totalSpills"].numberLong(), 3);
+    for (auto fieldName : explain_common::kTotalSpillingStatsFieldNames) {
+        ASSERT_FALSE(shardA.hasField(fieldName)) << fieldName;
+    }
 }
 
 }  // namespace

@@ -72,5 +72,69 @@ TEST(ClusterExplainTest, PropagateReadConcern) {
     std::string readConcern = "readConcern: {level: 'linearizable'}";
     testPropagateGenericArgs(readConcern);
 }
+
+AsyncRequestsSender::Response makeShardResponse(const std::string& shardName,
+                                                BSONObj executionStats) {
+    return {ShardId(shardName),
+            executor::RemoteCommandResponse::make_forTest(BSON("executionStats" << executionStats),
+                                                          Microseconds(0)),
+            boost::none};
+}
+
+BSONObj buildExecStatsForShards(const std::vector<AsyncRequestsSender::Response>& responses,
+                                boost::optional<int64_t> limit = boost::none,
+                                boost::optional<int64_t> skip = boost::none) {
+    BSONObjBuilder bob;
+    ClusterExplain::buildExecStats_forTest(responses, "SINGLE_SHARD", 0, &bob, limit, skip);
+    return bob.obj();
+}
+
+TEST(ClusterExplainTest, ExecStatsSumsSpillingTotalsAcrossShards) {
+    std::vector<AsyncRequestsSender::Response> responses;
+    responses.push_back(
+        makeShardResponse("shardA",
+                          fromjson("{nReturned: 5, totalKeysExamined: 0,"
+                                   " totalDocsExamined: 5, totalSpills: 2,"
+                                   " totalSpilledBytes: 100, totalSpilledRecords: 10,"
+                                   " totalSpilledDataStorageSize: 40,"
+                                   " executionStages: {stage: 'SORT'}}")));
+    responses.push_back(
+        makeShardResponse("shardB",
+                          fromjson("{nReturned: 5, totalKeysExamined: 0,"
+                                   " totalDocsExamined: 5, totalSpills: 3,"
+                                   " totalSpilledBytes: 200, totalSpilledRecords: 20,"
+                                   " totalSpilledDataStorageSize: 60,"
+                                   " executionStages: {stage: 'SORT'}}")));
+
+    // A limit is applied to show that the spilling totals are the raw sum of the shards' totals.
+    // Unlike 'nReturned', they are not clamped or scaled by the router-side limit.
+    auto execStats =
+        buildExecStatsForShards(responses, /*limit=*/3)["executionStats"].Obj().getOwned();
+    ASSERT_EQ(execStats["nReturned"].numberLong(), 3);
+    ASSERT_EQ(execStats["totalSpills"].numberLong(), 5);
+    ASSERT_EQ(execStats["totalSpilledBytes"].numberLong(), 300);
+    ASSERT_EQ(execStats["totalSpilledRecords"].numberLong(), 30);
+    ASSERT_EQ(execStats["totalSpilledDataStorageSize"].numberLong(), 100);
+
+    // The root mongos stage reports the same totals.
+    auto stage = execStats["executionStages"].Obj();
+    ASSERT_EQ(stage["totalSpills"].numberLong(), 5);
+    ASSERT_EQ(stage["totalSpilledBytes"].numberLong(), 300);
+}
+
+TEST(ClusterExplainTest, ExecStatsOmitsSpillingTotalsWhenNoShardSpilled) {
+    std::vector<AsyncRequestsSender::Response> responses;
+    responses.push_back(makeShardResponse("shardA",
+                                          fromjson("{nReturned: 5, totalKeysExamined: 0,"
+                                                   " totalDocsExamined: 5,"
+                                                   " executionStages: {stage: 'COLLSCAN'}}")));
+
+    auto execStats = buildExecStatsForShards(responses)["executionStats"].Obj().getOwned();
+    ASSERT_FALSE(execStats.hasField("totalSpills"));
+    ASSERT_FALSE(execStats.hasField("totalSpilledBytes"));
+    ASSERT_FALSE(execStats.hasField("totalSpilledRecords"));
+    ASSERT_FALSE(execStats.hasField("totalSpilledDataStorageSize"));
+    ASSERT_FALSE(execStats["executionStages"].Obj().hasField("totalSpills"));
+}
 }  // namespace
 }  // namespace mongo

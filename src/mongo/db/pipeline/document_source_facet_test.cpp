@@ -16,6 +16,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -23,6 +24,7 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/explain_util.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -655,6 +657,34 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDisposeThroughToSource) {
 
     facetStage->dispose();
     ASSERT_TRUE(mockSource->isDisposed);
+}
+
+// The facet rebuilds its summary stats after every pass over its branches. A branch that reaches
+// EOF early is still visited on every later pass, so its final stats must be counted once.
+TEST_F(DocumentSourceFacetTest, SummaryStatsCountBranchThatFinishesEarlyOnce) {
+    auto ctx = getExpCtx();
+
+    deque<DocumentSource::GetNextResult> inputs = {
+        Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}, Document{{"_id", 3}}};
+    auto mock = exec::agg::MockStage::createForTest(inputs, ctx);
+
+    auto longPipeline = Pipeline::create({DocumentSourcePassthrough::create(ctx)}, ctx);
+    auto shortPipeline = Pipeline::create(
+        {DocumentSourceLimit::create(ctx, 1), DocumentSourceSort::create(ctx, BSON("_id" << 1))},
+        ctx);
+
+    std::vector<DocumentSourceFacet::FacetPipeline> facets;
+    facets.emplace_back("all", std::move(longPipeline));
+    facets.emplace_back("first", std::move(shortPipeline));
+    auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx, /*bufferSizeBytes=*/1);
+    auto facetStage = exec::agg::buildStageAndStitch(facetSource, mock);
+
+    ASSERT(facetStage->getNext().isAdvanced());
+
+    auto* stats = dynamic_cast<const DocumentSourceFacetStats*>(facetStage->getSpecificStats());
+    ASSERT(stats);
+    ASSERT_TRUE(stats->planSummaryStats.hasSortStage);
+    ASSERT_EQ(stats->planSummaryStats.keysSorted, 1);
 }
 
 // TODO(SERVER-122403): DocumentSourceFacet will have to propagate pauses if we ever allow nested

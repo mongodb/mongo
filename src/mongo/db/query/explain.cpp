@@ -312,7 +312,8 @@ void generatePlannerInfo(PlanExecutor* exec,
 void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& details,
                                      boost::optional<long long> totalTimeMicros,
                                      BSONObjBuilder* out,
-                                     bool isTrialPeriodInfo) {
+                                     bool isTrialPeriodInfo,
+                                     bool includeSpillingTotals = false) {
     auto&& [stats, summary] = details;
     tassert(11320910, "summary must not be null", summary);
 
@@ -328,6 +329,10 @@ void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& deta
 
     out->appendNumber("totalKeysExamined", static_cast<long long>(summary->totalKeysExamined));
     out->appendNumber("totalDocsExamined", static_cast<long long>(summary->totalDocsExamined));
+
+    if (includeSpillingTotals) {
+        explain_common::appendTotalSpillingStats(summary->getTotalSpillingStats(), out);
+    }
 
     if (summary->planFailed) {
         out->appendBool("failed", true);
@@ -395,7 +400,8 @@ void generateExecutionInfo(PlanExecutor* exec,
     generateSinglePlanExecutionInfo(explainer.getWinningPlanStats(verbosity),
                                     totalTimeMicros,
                                     &execBob,
-                                    /*isTrialPeriodInfo=*/false);
+                                    /*isTrialPeriodInfo=*/false,
+                                    /*includeSpillingTotals=*/true);
 
     // Also generate exec stats for all plans, if the verbosity level is high enough. These stats
     // reflect what happened during the trial period that ranked the plans.
@@ -762,6 +768,11 @@ void Explain::explainPipeline(PlanExecutor* exec,
     // execution).
     if (explainPolicyFor(verbosity).hasExecStats()) {
         explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
+
+        // The summary stats already include the '$cursor' stage, so don't add its totals again.
+        PlanSummaryStats summaryStats;
+        explainer.getSummaryStats(&summaryStats);
+        explain_common::appendTotalSpillingStats(summaryStats.getTotalSpillingStats(), out);
     }
     explain_common::generateServerInfo(out);
 

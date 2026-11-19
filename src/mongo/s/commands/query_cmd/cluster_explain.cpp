@@ -283,9 +283,25 @@ void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>&
     long long totalChildMillis = 0;
     long long totalNCounted = 0;
     auto appendNCounted = false;
+    // Unlike 'nReturned', spilling totals are not adjusted for the router-side skip and limit.
+    // Each shard's explain runs to completion independently, whereas a real run with a limit may
+    // stop pulling from shards early once the limit is satisfied, so the summed totals may
+    // overstate the spilling a real run would do. There is no meaningful way to scale spill
+    // metrics by skip and limit, so they are reported as the raw sum.
+    SpillingStats totalSpilling;
     for (size_t i = 0; i < shardResponses.size(); i++) {
         auto responseData = shardResponses[i].swResponse.getValue().data;
         BSONObj execStats = responseData["executionStats"].Obj();
+        if (execStats.hasField(explain_common::kTotalSpillsFieldName)) {
+            totalSpilling.incrementSpills(
+                execStats[explain_common::kTotalSpillsFieldName].numberLong());
+            totalSpilling.incrementSpilledBytes(
+                execStats[explain_common::kTotalSpilledBytesFieldName].numberLong());
+            totalSpilling.incrementSpilledRecords(
+                execStats[explain_common::kTotalSpilledRecordsFieldName].numberLong());
+            totalSpilling.incrementSpilledDataStorageSize(
+                execStats[explain_common::kTotalSpilledDataStorageSizeFieldName].numberLong());
+        }
         if (execStats.hasField("nReturned")) {
             totalNReturned += execStats["nReturned"].numberLong();
         }
@@ -328,6 +344,7 @@ void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>&
     executionStatsBob.appendNumber("executionTimeMillis", millisElapsed);
     executionStatsBob.appendNumber("totalKeysExamined", keysExamined);
     executionStatsBob.appendNumber("totalDocsExamined", docsExamined);
+    explain_common::appendTotalSpillingStats(totalSpilling, &executionStatsBob);
 
     // Fill in the tree of stages.
     {
@@ -350,6 +367,7 @@ void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>&
         executionStagesBob.appendNumber("executionTimeMillis", millisElapsed);
         executionStagesBob.appendNumber("totalKeysExamined", keysExamined);
         executionStagesBob.appendNumber("totalDocsExamined", docsExamined);
+        explain_common::appendTotalSpillingStats(totalSpilling, &executionStagesBob);
         executionStagesBob.append("totalChildMillis", totalChildMillis);
 
         {

@@ -1548,6 +1548,12 @@ void mergeExplainOutputFromShards(const std::vector<AsyncRequestsSender::Respons
 
         if (auto stagesElement = data["stages"]) {
             explain << "stages" << stagesElement;
+
+            for (auto fieldName : explain_common::kTotalSpillingStatsFieldNames) {
+                if (auto totalElement = data[fieldName]) {
+                    explain.append(totalElement);
+                }
+            }
         } else {
             auto queryPlannerElement = data["queryPlanner"];
             uassert(51157,

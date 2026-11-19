@@ -107,13 +107,96 @@ function assertSpillingStats(explain, classicStageName, SBEStageName) {
     );
 }
 
+const spillingFields = ["spills", "spilledBytes", "spilledRecords", "spilledDataStorageSize"];
+
+function totalFieldName(field) {
+    return "total" + field.charAt(0).toUpperCase() + field.slice(1);
+}
+
+function sumPerStageSpillingStats(
+    node,
+    sums = Object.fromEntries(spillingFields.map((f) => [f, 0])),
+) {
+    if (Array.isArray(node)) {
+        node.forEach((child) => sumPerStageSpillingStats(child, sums));
+    } else if (node !== null && typeof node === "object") {
+        // The counters can be plain numbers or NumberLongs, so do not check the type.
+        if (node.hasOwnProperty("spills") && !isNaN(Number(node.spills))) {
+            for (const field of spillingFields) {
+                sums[field] += Number(node[field]);
+            }
+        }
+        for (const key of Object.keys(node)) {
+            sumPerStageSpillingStats(node[key], sums);
+        }
+    }
+    return sums;
+}
+
+function assertTotalsMatchStages(totalsHolder, perStageSums, explain) {
+    const spilled = perStageSums.spills > 0;
+    for (const field of spillingFields) {
+        const name = totalFieldName(field);
+        if (spilled) {
+            assert.eq(
+                Number(totalsHolder[name]),
+                perStageSums[field],
+                `Unexpected "${name}" in explain output`,
+                {explain},
+            );
+        } else {
+            assert(!totalsHolder.hasOwnProperty(name), `Found "${name}" although nothing spilled`, {
+                explain,
+            });
+        }
+    }
+}
+
+function assertPipelineTotalSpillingStats(explain) {
+    if (explain.stages === undefined) {
+        // The whole pipeline was pushed down to the query executor, totals are in the top-level
+        // 'executionStats'.
+        assertTotalsMatchStages(
+            explain.executionStats,
+            sumPerStageSpillingStats(explain.executionStats.executionStages),
+            explain,
+        );
+        return explain;
+    }
+
+    // The pipeline-wide totals are at the top level of the explain and cover every stage.
+    assertTotalsMatchStages(explain, sumPerStageSpillingStats(explain.stages), explain);
+
+    // The '$cursor' stage reports totals for only the part of the pipeline pushed down to the query
+    // executor. Per-stage stats under the cursor are in its 'executionStats'.
+    const cursorStage = explain.stages[0].$cursor;
+    if (cursorStage !== undefined) {
+        assertTotalsMatchStages(
+            cursorStage.executionStats,
+            sumPerStageSpillingStats(cursorStage.executionStats.executionStages),
+            explain,
+        );
+    }
+    return explain;
+}
+
 function testSpillingStats(pipeline, classicStageName, SBEStageName) {
     jsTest.log.info(`Running pipeline`, pipeline);
 
-    const executionStats = db[collName]
+    const explain = db[collName]
         .explain("executionStats")
         .aggregate(pipeline, {"allowDiskUse": true});
-    assertSpillingStats(executionStats, classicStageName, SBEStageName);
+    assertSpillingStats(explain, classicStageName, SBEStageName);
+
+    assertPipelineTotalSpillingStats(explain);
+    // The totals sit at the top level for a 'stages' explain, and in 'executionStats' if the whole
+    // pipeline was pushed down to the query executor.
+    const totalsHolder = explain.stages === undefined ? explain.executionStats : explain;
+    assert(
+        totalsHolder.hasOwnProperty("totalSpills"),
+        "Expected pipeline-wide spilling totals, since the stage spilled",
+        {explain},
+    );
 
     const allPlansExecution = db[collName]
         .explain("allPlansExecution")
@@ -135,5 +218,38 @@ if (isSbeEnabled) {
 }
 testSpillingStats(pipelines["bucketAuto"], "$bucketAuto", "$bucketAuto");
 testSpillingStats(pipelines["graphLookup"], "$graphLookup", "$graphLookup");
+
+// The totals must equal the per-stage sums when a skip and a limit are applied.
+{
+    const findExplain = coll.find().sort({a: 1}).skip(2).limit(5).explain("executionStats");
+    assertTotalsMatchStages(
+        findExplain.executionStats,
+        sumPerStageSpillingStats(findExplain.executionStats.executionStages),
+        findExplain,
+    );
+    assertPipelineTotalSpillingStats(
+        db[collName]
+            .explain("executionStats")
+            .aggregate([{$sort: {a: 1}}, {$skip: 2}, {$limit: 5}], {"allowDiskUse": true}),
+    );
+}
+
+// A spill in a pushed-down '$sort' plus a spill in a later '$bucketAuto' must be counted once each.
+{
+    const explain = db[collName]
+        .explain("executionStats")
+        .aggregate([{$sort: {a: 1}}, ...pipelines["bucketAuto"]], {"allowDiskUse": true});
+    assertPipelineTotalSpillingStats(explain);
+    const cursorTotals = explain.stages[0].$cursor.executionStats;
+    assert(cursorTotals.hasOwnProperty("totalSpills"), "Expected the '$cursor' stage to spill", {
+        explain,
+    });
+    assert.gt(
+        Number(explain.totalSpills),
+        Number(cursorTotals.totalSpills),
+        "Pipeline-wide total should also include the stage after '$cursor'",
+        {explain},
+    );
+}
 
 MongoRunner.stopMongod(conn);

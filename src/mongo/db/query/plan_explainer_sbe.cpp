@@ -772,6 +772,7 @@ void PlanExplainerSBEBase::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->fromPlanCache = isFromCache();
     statsOut->totalKeysExamined = 0;
     statsOut->totalDocsExamined = 0;
+    statsOut->spillingStatsPerStage.clear();
     statsOut->replanReason = _rootData->replanReason;
 
     // Collect cumulative execution stats for the plan.

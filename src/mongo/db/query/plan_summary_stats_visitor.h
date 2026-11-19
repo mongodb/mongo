@@ -60,6 +60,13 @@ public:
                 stats->spillingStats);
         }
     }
+    void visit(tree_walker::MaybeConstPtr<true, SpoolStats> stats) final {
+        if (stats->spillingStats.getSpills() > 0) {
+            _summary.usedDisk = true;
+            _summary.spillingStatsPerStage[PlanSummaryStats::SpillingStage::SPOOL].accumulate(
+                stats->spillingStats);
+        }
+    }
     void visit(tree_walker::MaybeConstPtr<true, TextOrStats> stats) final {
         if (stats->spillingStats.getSpills() > 0) {
             _summary.usedDisk = true;

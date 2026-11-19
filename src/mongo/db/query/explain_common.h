@@ -6,8 +6,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/util/modules.h"
 
+#include <array>
 #include <string_view>
 
 /**
@@ -50,6 +52,24 @@ void generateQueryShapeHash(OperationContext* opCtx, BSONObjBuilder* out);
  * Adds the 'peakTrackedMemBytes' value to the BSON object being built by 'out'.
  */
 void generatePeakTrackedMemBytes(const OperationContext* opCtx, BSONObjBuilder* out);
+
+inline constexpr std::string_view kTotalSpillsFieldName = "totalSpills";
+inline constexpr std::string_view kTotalSpilledBytesFieldName = "totalSpilledBytes";
+inline constexpr std::string_view kTotalSpilledRecordsFieldName = "totalSpilledRecords";
+inline constexpr std::string_view kTotalSpilledDataStorageSizeFieldName =
+    "totalSpilledDataStorageSize";
+inline constexpr std::array<std::string_view, 4> kTotalSpillingStatsFieldNames = {
+    kTotalSpillsFieldName,
+    kTotalSpilledBytesFieldName,
+    kTotalSpilledRecordsFieldName,
+    kTotalSpilledDataStorageSizeFieldName,
+};
+
+/**
+ * Appends the 'kTotalSpillingStatsFieldNames' fields to 'out', or nothing if 'totals' has no
+ * spills.
+ */
+void appendTotalSpillingStats(const SpillingStats& totals, BSONObjBuilder* out);
 
 /**
  * Conditionally appends a BSONObj to 'bob' depending on whether or not the maximum user size for a

@@ -100,6 +100,19 @@ void generatePeakTrackedMemBytes(const OperationContext* opCtx, BSONObjBuilder* 
     }
 }
 
+void appendTotalSpillingStats(const SpillingStats& totals, BSONObjBuilder* out) {
+    if (totals.getSpills() == 0) {
+        return;
+    }
+    out->appendNumber(kTotalSpillsFieldName, static_cast<long long>(totals.getSpills()));
+    out->appendNumber(kTotalSpilledBytesFieldName,
+                      static_cast<long long>(totals.getSpilledBytes()));
+    out->appendNumber(kTotalSpilledRecordsFieldName,
+                      static_cast<long long>(totals.getSpilledRecords()));
+    out->appendNumber(kTotalSpilledDataStorageSizeFieldName,
+                      static_cast<long long>(totals.getSpilledDataStorageSize()));
+}
+
 bool appendIfRoom(const BSONObj& toAppend, std::string_view fieldName, BSONObjBuilder* out) {
     if ((out->len() + toAppend.objsize()) < append_if_room::OutputObjectMaxSize) {
         out->append(fieldName, toAppend);

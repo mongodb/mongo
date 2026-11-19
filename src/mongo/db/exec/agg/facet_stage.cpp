@@ -128,8 +128,12 @@ DocumentSource::GetNextResult FacetStage::doGetNext() {
                 results[facetId].emplace_back(next.releaseDocument());
             }
             allPipelinesEOF = allPipelinesEOF && next.isEOF();
-            execPipeline.accumulatePlanSummaryStats(_stats.planSummaryStats);
         }
+    }
+
+    // Collect the plan summary stats once after all sub-pipelines are exhausted.
+    for (const auto& facet : _facets) {
+        facet.execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
     }
 
     MutableDocument resultDoc;
