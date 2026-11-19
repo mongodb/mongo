@@ -100,6 +100,18 @@ server_parameters:
         validator: {gte: 0}
         redact: false
 
+    sessionEstablishmentConcurrencyLimiterEnabled:
+        description: "Enable or disable the Session Establishment Concurrency Limiter."
+        set_at: [startup]
+        cpp_varname: gSessionEstablishmentConcurrencyLimiterEnabled
+        cpp_vartype: bool
+        default: false
+        redact: false
+        # Because this is a startup-only option, it can't be gated by a feature flag. The code that
+        # checks whether SECL should be enabled or disabled will check both this parameter and the
+        # feature flag before proceeding. Later runtime-configurable parameters can be gated on the
+        # feature flag being enabled.
+
     pessimisticConnectivityCheckForAcceptedConnections:
         description: >-
             Instructs the server to check connectivity of accepted connections before further 
