@@ -173,8 +173,9 @@ const std::shared_ptr<DBClientWithAutoEncryption>& getDBClientWithAutoEncryption
     JS::CallArgs& args) {
     auto ret = JS::GetMaybePtrFromReservedSlot<std::shared_ptr<DBClientWithAutoEncryption>>(
         args.thisv().toObjectOrNull(), MongoBase::DBClientWithAutoEncryptionSlot);
-    uassert(
-        ErrorCodes::BadValue, "Trying to get connection for closed Mongo object", *ret != nullptr);
+    uassert(ErrorCodes::BadValue,
+            "Trying to get connection for closed Mongo object",
+            ret && *ret != nullptr);
     return *ret;
 }
 
@@ -521,20 +522,19 @@ void MongoBase::Functions::setAutoEncryption::call(JSContext* cx, JS::CallArgs a
     if (args.length() < 1)
         uasserted(ErrorCodes::BadValue, "setAutoEncryption needs at least 1 arg");
 
-    std::shared_ptr<DBClientWithAutoEncryption> kvClient;
     JS::RootedObject keyvaultConn(cx);
     if (args.length() > 1 && !args.get(1).isUndefined()) {
         uassert(7760002,
                 str::stream() << "the second parameter to setAutoEncryption() must be an object",
                 args.get(1).isObject());
+        auto& mongoProto = getScope(cx)->getProto<MongoExternalInfo>();
+        uassert(ErrorCodes::BadValue,
+                "the second parameter to setAutoEncryption() must be a Mongo connection",
+                mongoProto.instanceOf(args.get(1)) &&
+                    args.get(1).toObjectOrNull() != mongoProto.getProto());
         keyvaultConn.set(args.get(1).toObjectOrNull());
-        kvClient = *JS::GetMaybePtrFromReservedSlot<std::shared_ptr<DBClientWithAutoEncryption>>(
-            args.get(1).toObjectOrNull(), DBClientWithAutoEncryptionSlot);
-
     } else {
         keyvaultConn.set(args.thisv().toObjectOrNull());
-        kvClient = *JS::GetMaybePtrFromReservedSlot<std::shared_ptr<DBClientWithAutoEncryption>>(
-            args.thisv().toObjectOrNull(), DBClientWithAutoEncryptionSlot);
     }
 
     auto client = getDBClientWithAutoEncryptionRef(args);
